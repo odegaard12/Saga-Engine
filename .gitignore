@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.env
+.venv/
+data/gamestate.json
+data/positions.json
+templates/*.bak*
+static/*.bak*
+_SYNC_FROM_CONTAINER/

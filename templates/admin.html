@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html class="dark">
+<head>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(rs => rs.forEach(r => r.unregister()))
+    .catch(()=>{});
+}
+</script>
+
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+body { background: #050505; color: #00ff41; font-family: 'Fira Code', monospace; }
+.sidebar { background: #000; border-right: 1px solid #1a1a1a; width: 380px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.config-input { background: #111; border: 1px solid #333; color: #fff; padding: 8px; width: 100%; border-radius: 2px; margin-bottom: 8px; font-size: 11px; }
+.node-card { border-left: 3px solid #111; background: #0a0a0a; margin-bottom: 4px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
+.node-card.active { border-left-color: #00ff41; background: #151515; }
+.ctrl-btn { background: #111; color: #666; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; border: 1px solid #222; }
+.ctrl-btn:hover { color: #fff; border-color: #fff; }
+label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2px; display: block; }
+.section { border-top: 1px solid #111; padding-top: 10px; margin-top: 10px; }
+.section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 0; }
+.section-head span { color:#aaa; font-size:10px; letter-spacing:.12em; }
+.section-head strong { color:#fff; font-size:11px; letter-spacing:.12em; }
+.section-body.hidden { display:none; }
+.small-btn { width:100%; padding:8px; background:#111; border:1px solid #222; color:#ddd; font-size:11px; }
+.small-btn:hover { background:#1a1a1a; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 10px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; border: 2px solid #050505; }
+.sticky-savebar { position: sticky; top: 0; z-index: 30; background: #000; padding-bottom: 10px; }
+
+</style>
+</head>
+<body class="h-screen flex overflow-hidden">
+
+<div id="login-screen" class="fixed inset-0 bg-black z-[10000] flex items-center justify-center p-4">
+  <div class="border border-green-900 p-8 w-full max-w-sm text-center bg-zinc-950">
+    <h1 class="text-2xl font-bold mb-6 tracking-widest text-white">{{ config.admin_title or 'SAGA_ADMIN' }}</h1>
+    <input id="pass" type="password" class="config-input text-center mb-4" placeholder="CONTRASEÑA">
+    <button onclick="login()" class="w-full bg-green-900 text-white py-3 font-bold hover:bg-green-700">ENTRAR</button>
+  </div>
+</div>
+
+<div id="main-ui" class="flex flex-grow h-full hidden">
+  <div class="sidebar p-4">
+    <div class="mb-4 border-b border-zinc-900 pb-4">
+      <div class="flex items-center justify-between gap-2">
+        <h1 id="header-admin-title" class="text-white font-bold text-lg">{{ config.admin_title }}</h1>
+        <div class="flex items-center gap-2">
+          <button onclick="saveConfigAdmin(); saveAll();" style="font-size:10px;padding:4px 8px;border-radius:10px;border:1px solid #166534;background:#14532d;color:#fff;text-decoration:none;font-weight:800;letter-spacing:.08em">💾 SAVE ALL</button>
+          <a href="/" style="font-size:10px;padding:4px 8px;border-radius:10px;border:1px solid #7f1d1d;background:rgba(127,29,29,.25);color:#ff6b6b;text-decoration:none;font-weight:800;letter-spacing:.08em">⟵ RETURN TO LOGIN</a>
+        </div>
+      </div>
+      <div id="header-admin-subtitle" class="text-[9px] text-zinc-600">{{ config.admin_subtitle }}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection('section-game')">
+        <strong>EDIT GAME</strong><span id="arrow-section-game">▶</span>
+      </div>
+      <div id="section-game" class="section-body hidden">
+        <label>Site title</label>
+        <input id="cfg-site-name" class="config-input">
+
+        <label>Admin title</label>
+        <input id="cfg-admin-title" class="config-input">
+
+        <label>Admin subtitle</label>
+        <input id="cfg-admin-subtitle" class="config-input">
+
+        <label>Login subtitle</label>
+        <input id="cfg-story-title" class="config-input">
+
+        <label>Story text</label>
+        <textarea id="cfg-story-text" class="config-input" style="height:90px"></textarea>
+
+        
+        <label>Map center · lat</label>
+        <input id="cfg-map-lat" class="config-input">
+
+        <label>Map center · lon</label>
+        <input id="cfg-map-lon" class="config-input">
+
+        <label>Map zoom</label>
+        <input id="cfg-map-zoom" class="config-input">
+
+        <label>Prologue title</label>
+        <input id="cfg-prologue-title" class="config-input">
+
+        <label>Prologue subtitle</label>
+        <input id="cfg-prologue-subtitle" class="config-input">
+
+        <label>Prologue text</label>
+        <textarea id="cfg-prologue-body" class="config-input" style="height:120px"></textarea>
+
+        
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection('section-players')">
+        <strong>EDIT PLAYERS</strong><span id="arrow-section-players">▶</span>
+      </div>
+      <div id="section-players" class="section-body hidden">
+        <label>Players (one per line)</label>
+        <textarea id="cfg-players" class="config-input" style="height:140px"></textarea>
+        
+      </div>
+    </div>
+
+    <div class="section flex-grow min-h-0">
+      <div class="section-head" onclick="toggleSection('section-points')">
+        <strong>EDIT NODES</strong><span id="arrow-section-points">▶</span>
+      </div>
+      <div id="section-points" class="section-body hidden flex flex-col min-h-0" style="height:100%;">
+        <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
+        <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
+        <div id="list" class="flex-grow overflow-y-auto pr-2 custom-scrollbar"></div>
+        <div class="mt-4 pt-4 border-t border-zinc-900 grid grid-cols-2 gap-2">
+          <button onclick="addNew()" class="py-2 bg-zinc-900 text-zinc-400 text-xs border border-zinc-800 hover:bg-zinc-800">+ ADD NODE</button>
+          <button onclick="saveAll()" class="py-2 bg-green-900 text-white font-bold text-xs border border-green-500 hover:bg-green-700">💾 GUARDAR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-grow relative">
+    <div id="map" class="absolute inset-0" style="filter: invert(1) hue-rotate(180deg) brightness(0.6);"></div>
+  </div>
+</div>
+
+<div id="editor" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-8 backdrop-blur-sm">
+  <div class="bg-zinc-950 border border-zinc-800 w-full max-w-2xl p-6 rounded shadow-2xl">
+    <div class="flex justify-between mb-4 border-b border-zinc-800 pb-2">
+      <h2 class="text-lg font-bold text-white tracking-widest" id="edit-header">EDIT NODE</h2>
+      <button onclick="closeEditor()" class="text-zinc-500 hover:text-white">✕</button>
+    </div>
+    <div class="grid grid-cols-3 gap-4 mb-2">
+      <div class="col-span-2"><label>Node title</label><input id="e-title" class="config-input"></div>
+      <div><label>Radius (m)</label><input id="e-radius" type="number" class="config-input"></div>
+    </div>
+    <label>Mission type</label>
+    <select id="e-type" class="config-input mb-4" onchange="renderGameConfig()">
+      <option value="circuit_hack">🧩 Tuberías</option>
+      <option value="cryptex">🧭 Cryptex</option>
+      <option value="radio_azimuth">📡 Radio Azimuth</option>
+      <option value="gyro_storm">⚖️ Gyro Storm</option>
+      <option value="switchboard">⚡ Switchboard</option>
+      <option value="simon_says">🧠 Simon Says</option>
+      <option value="compass_blow">🎙️ Compass Blow</option>
+      <option value="digital_tuner">📻 Digital Tuner</option>
+    </select>
+    <div id="game-params" class="bg-black p-4 border border-zinc-800 rounded mb-4"></div>
+    <label>Node text</label>
+    <textarea id="e-content" class="config-input h-24 font-mono text-xs leading-tight"></textarea>
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="delPoint()" class="px-4 py-2 bg-red-900/20 text-red-500 text-xs border border-red-900 hover:bg-red-900/40">DELETE</button>
+      <button onclick="applyChanges()" class="px-6 py-2 bg-blue-900 text-white text-xs font-bold hover:bg-blue-800">APPLY CHANGES</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const cmsPointIcon = L.divIcon({
+  className: 'map-icon-container',
+  html: '<div style="width:18px;height:18px;border-radius:999px;background:#00ff3b;border:3px solid #003b10;box-shadow:0 0 18px rgba(0,255,59,.55)"></div>',
+  iconSize: [18,18],
+  iconAnchor: [9,9]
+});
+
+let stages = [], currentIdx = -1, pass = "";
+let map = L.map('map', {zoomControl: false}).setView({{ config.map_center | tojson }}, {{ config.map_zoom }});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 20
+}).addTo(map);
+
+map.on('click', function(e) {
+  stages.push({
+    id: stages.length,
+    title: "NEW NODE",
+    lat: e.latlng.lat,
+    lon: e.latlng.lng,
+    radius: 50,
+    type: "circuit_hack",
+    content: "PUT NODE TEXT HERE",
+    config: {},
+    answer: "",
+    rune: ""
+  });
+  render();
+});
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (el.classList.contains('hidden')) {
+    el.classList.remove('hidden');
+    if (arrow) arrow.textContent = '▼';
+  } else {
+    el.classList.add('hidden');
+    if (arrow) arrow.textContent = '▶';
+  }
+}
+
+async function login() {
+  let p = document.getElementById('pass').value;
+  let r = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ password: p })
+  });
+
+  if (r.ok) {
+    pass = p;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-ui').classList.remove('hidden');
+    map.invalidateSize();
+    await loadConfigAdmin();
+    await load();
+  } else {
+    alert("DENEGADO");
+  }
+}
+
+async function loadConfigAdmin() {
+  let r = await fetch('/api/config');
+  let cfg = await r.json();
+
+  document.getElementById('cfg-site-name').value = cfg.site_name || '';
+  document.getElementById('cfg-admin-title').value = cfg.admin_title || '';
+  document.getElementById('cfg-admin-subtitle').value = cfg.admin_subtitle || '';
+  document.getElementById('cfg-story-title').value = cfg.story_title || '';
+  document.getElementById('cfg-story-text').value = cfg.story_text || '';
+  document.getElementById('cfg-prologue-title').value = cfg.prologue_title || '';
+  document.getElementById('cfg-prologue-subtitle').value = cfg.prologue_subtitle || '';
+  document.getElementById('cfg-prologue-body').value = cfg.prologue_body || '';
+  document.getElementById('cfg-map-lat').value = (cfg.map_center || [42.26, -8.86])[0];
+  document.getElementById('cfg-map-lon').value = (cfg.map_center || [42.26, -8.86])[1];
+  document.getElementById('cfg-map-zoom').value = cfg.map_zoom || 13;
+  document.getElementById('cfg-players').value = (cfg.players || []).join('\n');
+
+  document.title = cfg.site_name || 'SAGA ENGINE';
+  document.getElementById('header-admin-title').textContent = cfg.admin_title || 'SAGA_ADMIN';
+  document.getElementById('header-admin-subtitle').textContent = cfg.admin_subtitle || '';
+}
+
+async function saveConfigAdmin() {
+  const payload = {
+    site_name: document.getElementById('cfg-site-name').value,
+    admin_title: document.getElementById('cfg-admin-title').value,
+    admin_subtitle: document.getElementById('cfg-admin-subtitle').value,
+    story_title: document.getElementById('cfg-story-title').value,
+    story_text: document.getElementById('cfg-story-text').value,
+    prologue_title: document.getElementById('cfg-prologue-title').value,
+    prologue_subtitle: document.getElementById('cfg-prologue-subtitle').value,
+    prologue_body: document.getElementById('cfg-prologue-body').value,
+    map_center: [
+      parseFloat(document.getElementById('cfg-map-lat').value || 42.26),
+      parseFloat(document.getElementById('cfg-map-lon').value || -8.86)
+    ],
+    map_zoom: parseInt(document.getElementById('cfg-map-zoom').value || 13, 10),
+    players: document.getElementById('cfg-players').value.split('\n').map(x => x.trim()).filter(Boolean)
+  };
+
+  let r = await fetch('/api/admin/save-config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ password: pass, config: payload })
+  });
+
+  const data = await r.json().catch(() => ({}));
+
+  if (r.ok) {
+    await loadConfigAdmin();
+    alert('SETTINGS SAVED');
+  } else {
+    alert('ERROR SAVING SETTINGS: ' + (data.detail || 'sin detalle'));
+  }
+}
+
+async function load() {
+  let r = await fetch('/api/admin/stages');
+  stages = await r.json();
+  render();
+}
+
+function render() {
+  map.eachLayer(l => { if(l instanceof L.Marker || l instanceof L.Circle) map.removeLayer(l); });
+  const list = document.getElementById('list');
+  list.innerHTML = "";
+
+  stages.forEach((s, i) => {
+    let m = L.marker([s.lat, s.lon], {draggable: true, icon: cmsPointIcon}).addTo(map);
+    m.bindTooltip(`${i}: ${s.title}`, {permanent:true, direction:'right', className:'bg-black text-white border-0'});
+    L.circle([s.lat, s.lon], {radius: s.radius, color: '#333', weight:1}).addTo(map);
+    m.on('dragend', e => { stages[i].lat = e.target.getLatLng().lat; stages[i].lon = e.target.getLatLng().lng; });
+    m.on('click', () => openEditor(i));
+
+    let item = document.createElement('div');
+    item.className = `node-card ${currentIdx === i ? 'active' : ''}`;
+    item.innerHTML = `
+      <div onclick="map.setView([${s.lat}, ${s.lon}], 16); openEditor(${i})" class="flex-grow cursor-pointer">
+        <div class="text-white text-xs font-bold leading-tight">${i}. ${s.title}</div>
+        <div class="text-[9px] text-green-700 truncate">${s.type}</div>
+      </div>
+      <div class="flex flex-col gap-1 ml-2">
+        <div onclick="moveItem(${i}, -1)" class="ctrl-btn hover:bg-green-900">▲</div>
+        <div onclick="moveItem(${i}, 1)" class="ctrl-btn hover:bg-green-900">▼</div>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function moveItem(i, dir) {
+  if(i + dir < 0 || i + dir >= stages.length) return;
+  let temp = stages[i];
+  stages[i] = stages[i + dir];
+  stages[i + dir] = temp;
+  stages.forEach((s, idx) => s.id = idx);
+  render();
+}
+
+function openEditor(i) {
+  currentIdx = i;
+  let s = stages[i];
+  document.getElementById('edit-header').innerText = `EDITAR: ${s.title}`;
+  document.getElementById('e-title').value = s.title || '';
+  document.getElementById('e-radius').value = s.radius || 50;
+  document.getElementById('e-type').value = s.type || 'circuit_hack';
+  document.getElementById('e-content').value = s.content || '';
+  renderGameConfig();
+  document.getElementById('editor').classList.remove('hidden');
+}
+
+function closeEditor() {
+  document.getElementById('editor').classList.add('hidden');
+}
+
+function renderGameConfig() {
+  const type = document.getElementById('e-type').value;
+  const s = stages[currentIdx] || {};
+  const cfg = s.config || {};
+  let html = '';
+
+  if (type === 'circuit_hack') {
+    html = `<label>Grid</label><input id="cfg-grid" type="number" class="config-input" value="${cfg.grid || 4}">`;
+  } else if (type === 'gyro_storm') {
+    html = `<label>Duración</label><input id="cfg-duration" type="number" class="config-input" value="${cfg.duration || 10}">`;
+  } else if (type === 'switchboard') {
+    html = `<label>Switches (ej: 1,1,0,1,1)</label><input id="cfg-switches" class="config-input" value="${(cfg.switches || []).join(',')}">`;
+  } else if (type === 'cryptex') {
+    html = `<label>Modo</label><input id="cfg-mode" class="config-input" value="${cfg.mode || 'dial_navegacion'}">`;
+  } else {
+    html = `<div class="text-xs text-zinc-500">Sin parámetros extra</div>`;
+  }
+
+  document.getElementById('game-params').innerHTML = html;
+}
+
+function applyChanges() {
+  let s = stages[currentIdx];
+  s.title = document.getElementById('e-title').value;
+  s.radius = Number(document.getElementById('e-radius').value || 50);
+  s.type = document.getElementById('e-type').value;
+  s.content = document.getElementById('e-content').value;
+  s.config = s.config || {};
+
+  if (s.type === 'circuit_hack') {
+    s.config.grid = Number(document.getElementById('cfg-grid')?.value || 4);
+  } else if (s.type === 'gyro_storm') {
+    s.config.duration = Number(document.getElementById('cfg-duration')?.value || 10);
+  } else if (s.type === 'switchboard') {
+    s.config.switches = (document.getElementById('cfg-switches')?.value || '').split(',').map(x => Number(x.trim())).filter(x => !Number.isNaN(x));
+  } else if (s.type === 'cryptex') {
+    s.config.mode = document.getElementById('cfg-mode')?.value || 'dial_navegacion';
+  }
+
+  closeEditor();
+  render();
+}
+
+function delPoint() {
+  if (currentIdx < 0) return;
+  stages.splice(currentIdx, 1);
+  stages.forEach((s, idx) => s.id = idx);
+  currentIdx = -1;
+  closeEditor();
+  render();
+}
+
+function addNew() {
+  stages.push({
+    id: stages.length,
+    title: "NEW NODE",
+    lat: {{ config.map_center[0] }},
+    lon: {{ config.map_center[1] }},
+    radius: 50,
+    type: "circuit_hack",
+    content: "",
+    config: {},
+    answer: "",
+    rune: ""
+  });
+  render();
+}
+
+async function saveAll() {
+  let r = await fetch('/api/admin/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ password: pass, stages })
+  });
+
+  if (r.ok) {
+    alert('NODES SAVED');
+  } else {
+    alert('ERROR SAVING NODES');
+  }
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  ['section-game','section-players','section-points'].forEach(id => {
+    const el = document.getElementById(id);
+    const arrow = document.getElementById('arrow-' + id);
+    if (el) el.classList.add('hidden');
+    if (arrow) arrow.textContent = '▶';
+  });
+
+  const list = document.getElementById('list');
+  if (list) list.classList.add('custom-scrollbar');
+});
+</script>
+
+</body>
+</html>

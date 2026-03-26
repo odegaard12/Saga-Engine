@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+/* SAGA_SW_PURGE_V1: limpia Service Worker + CacheStorage SOLO 1 vez por sesión/origen */
+(async () => {
+  try {
+    const key = "saga_sw_purge_done_v1";
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ("caches" in window) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+    // recarga dura 1 vez
+    location.reload(true);
+  } catch(e) {}
+})();
+
+/* BTN_PATCH_DEBUG_INIT_V1 */
+document.addEventListener('DOMContentLoaded',function(){
+  var b=document.getElementById('debug-btn');
+  if(!b) return;
+  b.classList.toggle('debug-on',!!debugMode);
+  b.classList.toggle('debug-off',!debugMode);
+});
+</script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SAGA_CONFIG = {{ config | tojson }};
+</script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+
+
+.saga_dial-dial-wrap{max-width:720px;margin:0 auto;padding:12px 12px;}
+.saga_dial-title{opacity:.9;letter-spacing:.18em;text-transform:uppercase;font-size:12px;text-align:center;margin-bottom:6px;}
+.saga_dial-sub{opacity:.8;letter-spacing:.12em;text-transform:uppercase;font-size:11px;text-align:center;margin-bottom:12px;}
+.saga_dial-card{
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(0,255,65,.25);
+  padding: 10px 12px;
+  border-radius: 10px;
+  max-width: 620px;
+  margin: 0 auto 14px auto;
+  font-size: 11px;
+  letter-spacing:.12em;
+  text-transform: uppercase;
+  opacity:.9;
+}
+.saga_dial-dials{display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:10px;}
+.saga_dial-dial{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:140px;}
+.saga_dial-circle{
+  width:120px;height:120px;border-radius:999px;
+  border:2px solid rgba(0,255,120,.55);
+  box-shadow:0 0 18px rgba(0,255,120,.18);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden; position:relative;
+  user-select:none; cursor:pointer;
+  padding: 10px;
+}
+.saga_dial-circle:active{transform:scale(.98);}
+.saga_dial-value{
+  width:100%;
+  text-align:center;
+  line-height:1.05;
+  letter-spacing:.10em;
+  text-transform:uppercase;
+  font-weight:800;
+  font-size: clamp(12px, 2.1vw, 18px);
+  word-break: break-word;
+  overflow-wrap:anywhere;
+}
+.saga_dial-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.75;}
+.saga_dial-icon svg{width:44px;height:44px;display:block;color:rgba(0,255,120,.92);}
+@media (max-width:420px){
+  .saga_dial-circle{width:104px;height:104px;}
+  .saga_dial-dial{min-width:120px;}
+  .saga_dial-icon svg{width:40px;height:40px;}
+}
+.saga_dial-dial-wrap{max-width:880px;margin:0 auto;padding:10px 12px;}
+.saga_dial-dials{display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:10px;}
+.saga_dial-dial{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.saga_dial-circle{
+  width:120px;height:120px;border-radius:999px;
+  border:2px solid rgba(0,255,120,.55);
+  box-shadow:0 0 18px rgba(0,255,120,.18);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden; position:relative;
+  user-select:none; cursor:pointer;
+}
+.saga_dial-circle:active{transform:scale(.98);}
+.saga_dial-value{
+  text-align:center; padding:0 10px;
+  line-height:1.05; letter-spacing:.10em;
+  text-transform:uppercase; font-weight:700;
+  font-size:clamp(12px, 2.1vw, 18px);
+  max-width:100%;
+  word-break:break-word;
+}
+.saga_dial-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.75;}
+.saga_dial-icon svg{width:44px;height:44px;display:block;color:rgba(0,255,120,.90);}
+@media (max-width:420px){
+  .saga_dial-circle{width:104px;height:104px;}
+  .saga_dial-icon svg{width:40px;height:40px;}
+}
+
+
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #050505; color: #00ff41; font-family: 'Share Tech Mono', monospace; }
+        #map { position: absolute; inset: 0; z-index: 1; filter: none !important; background: #111; }
+        
+        .hud-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, #000 95%, transparent); padding: 20px; z-index: 50; border-top: 1px solid #00ff41; pointer-events: auto; }
+        
+        /* BOTONES */
+        .btn-action { width: 100%; background: #002200; color: #00ff41; border: 1px solid #00ff41; padding: 15px; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+        .btn-action:disabled {
+            color: #00c94a;
+            border-color: #00c94a;
+            background: rgba(0, 34, 0, 0.65);
+            opacity: 0.85;
+        }
+        
+        .top-nav {
+            position: fixed;
+            top: calc(72px + env(safe-area-inset-top));
+            left: 10px; right: 10px;
+            z-index: 3000;
+
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+
+            pointer-events: auto;
+        }
+.nav-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: rgba(0,0,0,0.88);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 5px 10px;
+            font-size: 10px;
+            line-height: 1;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            border-radius: 999px;
+        }
+/* ICONOS MAPA - FIX POSICIONAMIENTO */
+        .map-icon-container { background: transparent; border: none; }
+        .map-icon { 
+            display: flex; align-items: center; justify-content: center; 
+            width: 32px; height: 32px; 
+            border-radius: 50%; background: #000; border: 2px solid; font-weight: bold; 
+            box-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
+        .icon-locked { border-color: #ff0000; color: #ff0000; }
+        .icon-active { border-color: #00ff41; color: #00ff41; box-shadow: 0 0 15px #00ff41; animation: pulse 1.5s infinite; }
+        .icon-done { border-color: #004400; color: #004400; opacity: 0.6; }
+        
+        /* MARCADOR USUARIO (FLECHA AZUL) */
+        .user-marker {
+            width: 0; height: 0;
+            border-left: 8px solid transparent; border-right: 8px solid transparent;
+            border-bottom: 16px solid #0088ff;
+            filter: drop-shadow(0 0 4px #0088ff);
+        }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        #game-modal { position: fixed; inset: 0; z-index: 2000; background: #000; display: none; flex-direction: column; border: 2px solid #003300; }
+        #game-modal.active { display: flex; }
+        
+        /* ESTILOS JUEGOS */
+        .terminal-input { background: #000; border: 1px solid #00ff41; color: #00ff41; font-size: 24px; text-align: center; width: 100%; padding: 10px; outline: none; margin: 20px 0; font-family: 'Share Tech Mono'; }
+        .pipe-grid { background: #050505; border: 1px solid #004400; padding: 5px; margin: 0 auto; }
+        .pipe-cell { width: 60px; height: 60px; background: #0a0a0a; border: 1px solid #111; position: relative; }
+
+  .pipe-cell svg{ width: 80% !important; height: 80% !important; display:block !important; }
+
+
+        .pipe-inner { width: 14px; height: 100%; background: #003300; position: absolute; left: 50%; transform: translateX(-50%); transition: 0.2s; }
+        .pipe-cell.active .pipe-inner { background: #00ff41; box-shadow: 0 0 10px #00ff41; }
+    
+        /* RUNES BAR */
+        .rune-bar{
+            display:flex; gap:8px; justify-content:center; align-items:center;
+            padding:6px 10px;
+            background: rgba(0,0,0,0.75);
+            border: 1px solid #00ff41;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            pointer-events:auto;
+        }
+        .rune{
+            width:34px; height:34px;
+            display:flex; align-items:center; justify-content:center;
+            border:1px solid #004400;
+            color:#004400;
+            background:#000;
+            font-size:20px;
+            border-radius:8px;
+            position:relative;
+            opacity:.75;
+        }
+        .rune.on{
+            border-color:#00ff41;
+            color:#dfffe3;
+            box-shadow: 0 0 10px rgba(0,255,65,.25);
+            opacity:1;
+        }
+        .rune small{
+            position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
+            font-size:8px; color:#00ff41; opacity:.55; letter-spacing:.18em; white-space:nowrap;
+        }
+
+
+        #prologue {
+            position: fixed; inset: 0; z-index: 5000;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.92), rgba(0,0,0,0.98));
+            display: flex; align-items: center; justify-content: center;
+            padding: 18px;
+        }
+        #prologue.hidden { display: none; }
+        .prologue-card {
+            width: 100%; max-width: 720px;
+            border: 1px solid #0b3; background: rgba(0,0,0,0.75);
+            box-shadow: 0 0 22px rgba(0,255,65,0.10);
+            clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+            padding: 18px;
+        }
+        .prologue-title { font-weight: 800; letter-spacing: 3px; color: #ffffff; font-size: 14px; }
+        .prologue-sub { color: #00ff41; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; opacity: 0.9; }
+        .prologue-text { margin-top: 14px; color: #9ef7b8; font-size: 12px; line-height: 1.55; }
+        .prologue-text b { color: #00ff41; }
+        .prologue-foot { margin-top: 14px; font-size: 10px; color: #5aa66d; opacity: 0.9; }
+        .prologue-btn {
+            margin-top: 16px; width: 100%;
+            background: #002200; color: #00ff41; border: 1px solid #00ff41;
+            padding: 14px; font-size: 14px; font-weight: 800; letter-spacing: 3px;
+            text-transform: uppercase;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        .prologue-btn:hover { box-shadow: 0 0 14px rgba(0,255,65,0.18); }
+
+    
+        #rune-bar, #runes-bar, .rune-bar, .runes-bar {
+            position: fixed !important;
+            top: 10px !important;
+            left: 10px !important;
+            right: 10px !important;
+            z-index: 2600 !important;
+        }
+        /* En pantallas muy pequeñas, compactar aún más */
+        @media (max-width: 420px) {
+            .top-nav { top: 74px; }
+            .nav-btn { padding: 5px 8px; font-size: 9px; }
+        }
+
+    
+        #rune-bar, #runes-bar, .rune-bar, .runes-bar {
+            position: fixed !important;
+            top: 10px !important;
+            left: 50% !important;
+            right: auto !important;
+            transform: translateX(-50%) !important;
+
+            width: fit-content !important;
+            max-width: calc(100vw - 20px) !important;
+
+            padding: 6px 8px !important;
+            border-radius: 14px !important;
+            background: rgba(0,0,0,0.55) !important;
+            border: 1px solid rgba(0,255,65,0.35) !important;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+
+            z-index: 2600 !important;
+            box-shadow: 0 0 18px rgba(0,255,65,0.08) !important;
+        }
+
+        /* Si el contenedor interno existe, también lo compactamos */
+        #rune-bar > *, #runes-bar > *, .rune-bar > *, .runes-bar > * {
+            flex: 0 0 auto !important;
+        }
+
+        /* Ocultar scrollbar visual en webkit */
+        #rune-bar::-webkit-scrollbar,
+        #runes-bar::-webkit-scrollbar,
+        .rune-bar::-webkit-scrollbar,
+        .runes-bar::-webkit-scrollbar {
+            height: 0px;
+        }
+
+        /* La top-nav debajo, ya con margen para que no choque */
+        .top-nav {
+            top: 66px !important;
+        }
+
+        /* En pantallas estrechas: un pelín más abajo */
+        @media (max-width: 420px) {
+            .top-nav { top: 74px !important; }
+        }
+
+    
+        #rune-bar, #runes-bar, .rune-bar, .runes-bar {
+            position: fixed !important;
+            top: calc(10px + env(safe-area-inset-top)) !important;
+            left: 50% !important;
+            right: auto !important;
+            transform: translateX(-50%) !important;
+
+            width: fit-content !important;
+            max-width: calc(100vw - 20px) !important;
+
+            padding: 6px 8px !important;
+            border-radius: 14px !important;
+            background: rgba(0,0,0,0.55) !important;
+            border: 1px solid rgba(0,255,65,0.35) !important;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+
+            z-index: 2600 !important;
+            box-shadow: 0 0 18px rgba(0,255,65,0.08) !important;
+        }
+        #rune-bar > *, #runes-bar > *, .rune-bar > *, .runes-bar > * { flex: 0 0 auto !important; }
+        #rune-bar::-webkit-scrollbar, #runes-bar::-webkit-scrollbar, .rune-bar::-webkit-scrollbar, .runes-bar::-webkit-scrollbar { height: 0px; }
+
+        /* Si la pantalla es muy estrecha, bajamos un poco el bloque de botones */
+        @media (max-width: 420px) {
+            .top-nav { top: calc(78px + env(safe-area-inset-top)); gap: 6px; }
+            .nav-btn { padding: 5px 9px; font-size: 9px; }
+        }
+
+    
+        #rune-bar small, #runes-bar small, .rune-bar small, .runes-bar small,
+        #rune-bar .label, #runes-bar .label, .rune-bar .label, .runes-bar .label,
+        #rune-bar .rune-label, #runes-bar .rune-label, .rune-bar .rune-label, .runes-bar .rune-label,
+        #rune-bar .rune-text, #runes-bar .rune-text, .rune-bar .rune-text, .runes-bar .rune-text {
+            display: none !important;
+        }
+
+    
+/* 1) Evitar emojis a color: */
+.gia-mono, .symbol, .dialSymbol, .dial-symbol { font-variant-emoji: text; }
+
+/* 2) Centrados fuertes (soluciona texto “se sale”): */
+.dial, .dialRow, .dial-row, .dialWrap, .dial-wrap,
+.ringRow, .ring-row { display:flex; gap:24px; justify-content:center; align-items:center; flex-wrap:wrap; }
+
+.dialCircle, .dial-circle, .ring, .dialRing, .dial-ring,
+.circle, .circleBtn, .circle-btn {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-align:center !important;
+  line-height:1 !important;
+}
+
+/* texto dentro del círculo */
+.dialCircle *, .dial-circle *, .ring *, .dialRing *, .dial-ring *,
+.circle *, .circleBtn *, .circle-btn * {
+  line-height:1 !important;
+}
+
+/* Si hay spans para letras grandes, limitamos overflow sin deformar */
+.dialText, .dial-text, .ringText, .ring-text, .circleText, .circle-text {
+  display:block;
+  max-width: 100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  transform: translateY(0);
+}
+
+/* Ajuste de tamaño adaptable */
+@media (max-width: 520px){
+  .dialCircle, .dial-circle, .ring, .dialRing, .dial-ring, .circle, .circleBtn, .circle-btn { min-width:78px; min-height:78px; }
+}
+
+
+
+/* Evitar emojis a color (forzar presentación texto cuando exista) */
+.gia-mono, .dialSymbol, .dial-symbol, .symbol { font-variant-emoji: text; }
+
+/* Centrado fuerte para círculos */
+.dial, .dialRow, .dial-row, .dialWrap, .dial-wrap,
+.ringRow, .ring-row {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:22px;
+  flex-wrap:wrap;
+}
+
+.dialCircle, .dial-circle, .ring, .dialRing, .dial-ring, .circle, .circleBtn, .circle-btn {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-align:center !important;
+  line-height:1.05 !important;
+  padding: 10px 12px !important;
+}
+
+/* Texto dentro del círculo: permite salto, encoge si hace falta */
+.dialText, .dial-text, .ringText, .ring-text, .circleText, .circle-text,
+.dialCircle span, .dial-circle span, .ring span {
+  display:block;
+  max-width: 100%;
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height:1.05 !important;
+  font-size: clamp(12px, 2.2vw, 22px) !important;
+  letter-spacing: 0.08em !important;  /* menor para que quepa */
+}
+
+/* Si por diseño venía sin espacio (PRIMEIRABRUMA), forzamos separación visual */
+.dialText, .dial-text, .ringText, .ring-text, .circleText, .circle-text {
+  text-transform: uppercase;
+}
+
+/* Móvil: círculos algo más compactos */
+@media (max-width: 520px){
+  .dialCircle, .dial-circle, .ring, .dialRing, .dial-ring, .circle, .circleBtn, .circle-btn {
+    min-width: 78px;
+    min-height: 78px;
+    padding: 8px 10px !important;
+  }
+}
+
+
+
+  /* A) Ocultar barra duplicada inyectada por minigames_v50.js */
+  #gia-rune-bar { display: none !important; }
+
+  /* B) El modal SIEMPRE por encima de top-nav (evita solapes sin tocar lógica) */
+  #game-modal { z-index: 4000 !important; }
+
+  /* C) En móviles, compactar pipes (solo tamaño) */
+  @media (max-width: 420px){
+    .pipe-cell{ width: 48px; height: 48px; }
+    .terminal-input{ font-size: 18px; }
+  }
+
+
+
+  /* Fuerza la cuadrícula 5x5 del minijuego PIPES del game.html (legacy) */
+  .pipe-grid{
+    display: grid !important;
+    grid-template-columns: repeat(5, 60px) !important;
+    gap: 8px !important;
+    justify-content: center !important;
+    align-content: center !important;
+    width: fit-content !important;
+    margin: 0 auto !important;
+    padding: 10px !important;
+  }
+  .pipe-cell{
+    width: 60px !important;
+    height: 60px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Móvil: compactar sin romper */
+  @media (max-width: 420px){
+    .pipe-grid{
+      grid-template-columns: repeat(5, 46px) !important;
+      gap: 6px !important;
+      padding: 8px !important;
+    }
+    .pipe-cell{
+      width: 46px !important;
+      height: 46px !important;
+    }
+    .pipe-inner{ width: 12px !important; }
+  }
+
+
+#pg.gia-pg {
+  display: grid !important;
+  grid-template-columns: repeat(5, var(--cell, 64px)) !important;
+  gap: var(--gap, 8px) !important;
+  padding: 12px !important;
+  border: 1px solid rgba(0,255,65,.45) !important;
+  background: rgba(0,0,0,.35) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 22px rgba(0,255,65,.08) !important;
+  justify-content: center !important;
+  align-content: center !important;
+  width: max-content !important;
+  margin: 0 auto !important;
+}
+#pg.gia-pg .gia-pipe-cell {
+  width: var(--cell, 64px) !important;
+  height: var(--cell, 64px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(5,5,5,.9) !important;
+  border: 1px solid rgba(0,255,65,.22) !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+#pg.gia-pg .gia-pipe-cell.fixed {
+  cursor: default !important;
+  border-color: rgba(0,255,65,.55) !important;
+  box-shadow: 0 0 14px rgba(0,255,65,.16) !important;
+}
+#pg.gia-pg .gia-pipe-cell.active {
+  border-color: rgba(0,255,65,.75) !important;
+  box-shadow: 0 0 16px rgba(0,255,65,.22) !important;
+}
+#pg.gia-pg svg {
+  width: 80% !important;
+  height: 80% !important;
+  display: block !important;
+}
+#pg.gia-pg .gia-pipe {
+  transform-origin: 50% 50% !important;
+  transition: transform .12s ease !important;
+}
+
+
+  .pipes-wrap{width:100%;max-width:760px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 8px;}
+  .pipes-title{color:#1f6;opacity:.8;font-size:11px;letter-spacing:.22em;text-transform:uppercase;text-align:center;margin-top:4px;}
+  .pipes-grid{
+    --cell: 64px;
+    display:grid;
+    grid-template-columns: repeat(5, var(--cell));
+    grid-auto-rows: var(--cell);
+    gap:10px;
+    padding:12px;
+    border:1px solid rgba(0,255,65,.35);
+    background: rgba(0,0,0,.35);
+    border-radius:16px;
+    box-shadow: 0 0 24px rgba(0,255,65,.08);
+  }
+  .pipes-cell{
+    width:var(--cell);height:var(--cell);
+    display:flex;align-items:center;justify-content:center;
+    background:#070707;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    box-sizing:border-box;
+    user-select:none;
+  }
+  .pipes-cell.pipes-center{
+    outline:2px solid rgba(0,255,65,.35);
+    box-shadow:0 0 16px rgba(0,255,65,.18);
+  }
+  .pipes-piece{
+    width:88%;height:88%;
+    display:flex;align-items:center;justify-content:center;
+    transform-origin:center;
+    will-change:transform;
+  }
+  .pipes-cell.pipes-active{background:#021a08;border-color:rgba(0,255,65,.35);}
+  .pipes-hint{font-size:11px;opacity:.75;text-align:center;letter-spacing:.08em;}
+  @media (max-width: 420px){
+    .pipes-grid{ --cell: 48px; gap:8px; padding:10px; border-radius:14px; }
+    .pipes-title{font-size:10px;}
+    .pipes-hint{font-size:10px;}
+  }
+
+
+
+/* Pipes V3: grid robusto + feedback + anim */
+.gia-pipes-wrap{
+  width: min(92vw, 640px);
+  margin: 0 auto;
+  padding: 10px 0 0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap: 14px;
+}
+#g ia-ignore{}
+.gia-pipe-grid{
+  --cell: 86px;
+  display:grid !important;
+  grid-template-columns: repeat(5, var(--cell)) !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(0,255,65,.35) !important;
+  border-radius: 16px !important;
+  background: radial-gradient(ellipse at center, rgba(0,40,0,.18), rgba(0,0,0,.0));
+  box-shadow: 0 0 22px rgba(0,255,65,.06) !important;
+  overflow:hidden;
+}
+@media (max-width: 520px){
+  .gia-pipe-grid{ --cell: 62px; gap: 8px; padding: 12px; border-radius: 14px; }
+}
+@media (max-width: 420px){
+  .gia-pipe-grid{ --cell: 54px; gap: 7px; padding: 10px; }
+}
+
+.gia-pipe-cell{
+  width: var(--cell) !important;
+  height: var(--cell) !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(0,255,65,.12);
+  border-radius: 10px;
+  box-sizing:border-box;
+  transform-origin: 50% 50%;
+  transition: transform .16s ease, box-shadow .16s ease, outline-color .16s ease, filter .16s ease;
+  will-change: transform;
+  cursor:pointer;
+}
+.gia-pipe-cell:hover{ filter: brightness(1.08); }
+.gia-pipe-cell.gia-fixed{ cursor: default; }
+.gia-pipe-cell.gia-ok{
+  outline: 2px solid rgba(0,255,65,.75) !important;
+  box-shadow: 0 0 18px rgba(0,255,65,.22) !important;
+}
+.gia-pipe-cell.gia-bad{
+  outline: 2px solid rgba(255,45,45,.35) !important;
+  box-shadow: 0 0 18px rgba(255,45,45,.08) !important;
+}
+.gia-pipe-cell.gia-spin{
+  filter: brightness(1.12);
+}
+
+/* SVG glow más “neón” */
+.gia-pipe-cell svg{ width: 82%; height: 82%; }
+.gia-pipe-stroke{
+  filter: drop-shadow(0 0 10px rgba(0,255,65,.26)) drop-shadow(0 0 22px rgba(0,255,65,.10));
+}
+
+
+
+.gia-pipes-wrap{
+  width: min(92vw, 760px);
+  margin: 0 auto;
+  padding: 10px 0 0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap: 14px;
+}
+.gia-pipe-grid{
+  --cell: 86px;
+  display:grid !important;
+  grid-template-columns: repeat(5, var(--cell)) !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(0,255,65,.35) !important;
+  border-radius: 16px !important;
+  background: radial-gradient(ellipse at center, rgba(0,40,0,.18), rgba(0,0,0,0));
+  box-shadow: 0 0 22px rgba(0,255,65,.06) !important;
+  overflow:hidden;
+}
+@media (max-width: 520px){ .gia-pipe-grid{ --cell: 62px; gap: 8px; padding: 12px; } }
+@media (max-width: 420px){ .gia-pipe-grid{ --cell: 54px; gap: 7px; padding: 10px; } }
+
+.gia-pipe-cell{
+  width: var(--cell) !important;
+  height: var(--cell) !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(0,255,65,.12);
+  border-radius: 12px;
+  box-sizing:border-box;
+  transform-origin: 50% 50%;
+  cursor:pointer;
+  transition:
+    transform .16s ease,
+    filter .16s ease,
+    outline-color .16s ease,
+    box-shadow .16s ease;
+  will-change: transform;
+}
+.gia-pipe-cell:hover{ filter: brightness(1.08); }
+.gia-pipe-cell.gia-fixed{ cursor: default; }
+
+.gia-pipe-cell.gia-ok{
+  outline: 2px solid rgba(0,255,65,.75) !important;
+  box-shadow: 0 0 18px rgba(0,255,65,.22) !important;
+}
+.gia-pipe-cell.gia-bad{
+  outline: 2px solid rgba(255,45,45,.30) !important;
+  box-shadow: 0 0 16px rgba(255,45,45,.08) !important;
+}
+
+/* anim “curvas” al girar: leve elastic + glow */
+.gia-pipe-cell.gia-spin{
+  filter: brightness(1.14);
+  transform: scale(1.03) rotate(var(--rot,0deg));
+}
+.gia-pipe-cell svg{ width: 84%; height: 84%; }
+.gia-pipe-stroke{
+  filter:
+    drop-shadow(0 0 10px rgba(0,255,65,.26))
+    drop-shadow(0 0 22px rgba(0,255,65,.10));
+}
+
+
+/* BTN_PATCH_SAFE_V1 */
+#reset-btn{
+  border-color:#b91c1c !important;
+  background:#b91c1c !important;
+  color:#ffffff !important;
+}
+#reset-btn:hover{
+  background:#dc2626 !important;
+  border-color:#dc2626 !important;
+}
+#debug-btn{
+  border-color:#52525b !important;
+  color:#a1a1aa !important;
+}
+#debug-btn.debug-on{
+  border-color:#00ff66 !important;
+  color:#00ff66 !important;
+}
+
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="prologue">
+    <div class="prologue-card">
+        <div class="prologue-title">{{ config.prologue_title }}</div>
+        <div class="prologue-sub">{{ config.prologue_subtitle or 'PUT PROLOGUE SUBTITLE HERE' }}</div>
+
+        <div class="prologue-text">
+            {{ config.prologue_body or 'PUT PROLOGUE TEXT HERE' }}
+            O seu poder depende de <b>6 Nodos</b> que forman un Escudo Invisible.<br><br>
+            Ti es o <b>Portador da Chama</b>. Reactiva os nodos, recupera as <b>Runas Perdidas</b>
+            
+        </div>
+
+        <div class="prologue-foot">Consello: a pista sempre está no lugar. Observa antes de actuar.</div>
+
+        <button class="prologue-btn" onclick="closePrologue()">ENTRAR</button>
+    </div>
+</div>
+
+<div class="top-nav">
+    <a href="/" class="nav-btn">⟵ SALIR</a>
+    <div id="rune-bar" class="rune-bar"></div>
+<div class="flex gap-2">
+        <button onclick="toggleDebug()" id="debug-btn" class="nav-btn border-zinc-600 text-zinc-400">DEBUG</button>
+        <button id="reset-btn" onclick="resetMission()" class="nav-btn border-red-900 text-red-500">RESTART</button>
+    </div>
+</div>
+
+<div class="hud-panel">
+    <div class="flex justify-between items-end mb-4">
+        <div>
+            <div class="text-[10px] text-green-700 font-bold uppercase tracking-widest">CURRENT OBJECTIVE:</div>
+            <div id="target-name" class="text-white font-bold text-lg leading-none mt-1">---</div>
+        </div>
+        <div id="dist-display" class="text-3xl text-white font-bold tracking-tighter">--- m</div>
+    </div>
+    <button id="main-btn" onclick="requestPermissions()" class="btn-action mb-4" disabled>SYSTEM LOCKED</button>
+    <div class="flex gap-2 border-t border-zinc-900 pt-3">
+        <input id="rune-code" class="bg-black border border-zinc-800 text-[10px] text-green-500 px-3 py-2 flex-grow outline-none uppercase" placeholder="ENTER CODE...">
+        <button onclick="checkRune()" class="bg-green-900 text-white text-[10px] px-4 font-bold">ENTRAR</button>
+    </div>
+</div>
+
+<div id="game-modal">
+    <div class="flex justify-between p-3 bg-black border-b border-green-900">
+        <div class="text-green-600 text-xs font-bold tracking-widest">GAME MODE</div>
+        <button onclick="closeGame()" class="text-red-500 text-xs border border-red-900 px-2 uppercase">CLOSE</button>
+    </div>
+    <div id="game-canvas" class="flex-grow flex flex-col items-center justify-center p-4 overflow-y-auto"></div>
+    <div id="game-instruction" class="p-4 text-center text-green-400 text-xs bg-zinc-950 border-t border-green-900 leading-relaxed font-mono"></div>
+</div>
+
+<script>
+const USER = "{{user}}";
+
+
+// --- RUNAS (HUD SUPERIOR) ---
+const RUNES = [{sym:"◉",label:"NODE"}];
+
+function renderRunes(level){
+  const bar = document.getElementById("rune-bar");
+  if(!bar) return;
+  bar.innerHTML = "";
+  const total = RUNES.length;
+  for(let i=0;i<total;i++){
+    const r = document.createElement("div");
+    r.className = "rune" + (i < level ? " on" : "");
+    r.innerHTML = `${RUNES[i].sym}<small>${RUNES[i].label}</small>`;
+    bar.appendChild(r);
+  }
+}
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let map = L.map('map', {zoomControl: false, attributionControl: false}).setView([42.26, -8.86], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+let userMarker = null; // Marcador del jugador (Azul)
+let currentTarget = null, config = {}, debugMode = false, noiseGain = null, noiseNode = null;
+let lastRealPos = null; // última posición GPS real
+
+
+// PERMISOS SENSORES
+async function requestPermissions() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res !== 'granted') return alert("SENSORES REQUERIDOS");
+    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    openGame();
+}
+
+
+  function showFinishedScreen(){
+      // Oculta prólogo si está visible
+      try{
+        const pro = document.getElementById("prologue");
+        if(pro){ pro.classList.add("hidden"); pro.style.display="none"; }
+      }catch(e){}
+
+      // Crea overlay final (si no existe)
+      let ov = document.getElementById("gia-finished");
+      if(!ov){
+        ov = document.createElement("div");
+        ov.id = "gia-finished";
+        ov.style.position="fixed";
+        ov.style.inset="0";
+        ov.style.zIndex="99999";
+        ov.style.background="rgba(0,0,0,.85)";
+        ov.style.display="flex";
+        ov.style.alignItems="center";
+        ov.style.justifyContent="center";
+        ov.innerHTML = `
+          <div style="max-width:560px;width:92%;border:1px solid #00ff41;border-radius:18px;background:rgba(0,0,0,.75);padding:18px">
+            <div class="text-green-700 text-[10px] uppercase tracking-[.25em] mb-2">[ SISTEMA ]</div>
+            <div class="text-white font-bold text-2xl mb-2">SYSTEM RESTORED</div>
+            <div class="text-green-200 text-sm leading-relaxed mb-4">
+              Sequence complete. You can return to the start or restart the session.
+            </div>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button id="fin-login" class="btn-action" style="min-width:200px">RETURN TO LOGIN</button>
+              <button id="fin-reset" class="btn-action" style="min-width:200px;border-color:#b91c1c;background:#b91c1c">RESTART SESSION</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(ov);
+
+        document.getElementById("fin-login").onclick = ()=>{ window.location.href = "/"; };
+        document.getElementById("fin-reset").onclick = async ()=>{
+          if(!confirm("¿Reiniciar la partida?")) return;
+          try{
+            await fetch('/api/reset', {method:'POST', body: JSON.stringify({user: USER})});
+          }catch(e){}
+          window.location.href = "/";
+        };
+      }else{
+        ov.style.display="flex";
+      }
+  }
+
+
+  
+  function showVideoOverlay(src, onDone){
+    try{
+      // CSS 1 vez
+        const st = document.createElement("style");
+        st.textContent = `
+            display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(1.02);
+            transition:opacity .28s ease, transform .28s ease;}
+            background:rgba(0,0,0,.65);padding:12px;box-shadow:0 0 30px rgba(0,255,65,.08);}
+            padding:8px 12px;border-radius:999px;font-weight:700;cursor:pointer}
+        `;
+        document.head.appendChild(st);
+      }
+
+      // overlay
+      if(ov) ov.remove();
+      ov = document.createElement("div");
+      ov.innerHTML = `
+        <div class="card">
+          <div class="top">
+            <div class="ttl">[ REGISTRO VISUAL ]</div>
+          </div>
+          <div class="hint">Si no arranca solo, pulsa ▶️ en el vídeo.</div>
+        </div>
+      `;
+      document.body.appendChild(ov);
+      requestAnimationFrame(()=>ov.classList.add("on"));
+
+      const close = ()=>{
+        try{ ov.classList.remove("on"); }catch(e){}
+        setTimeout(()=>{ try{ ov.remove(); }catch(e){} }, 220);
+      };
+
+      let advanced = false;
+      const done = ()=>{
+        if(advanced) return;
+        advanced = true;
+        close();
+        try{ onDone && onDone(); }catch(e){}
+      };
+
+      v.onended = done;
+      v.onerror = done;
+
+      // fail-safe
+      setTimeout(done, 30000);
+    }catch(e){
+      try{ onDone && onDone(); }catch(e2){}
+    }
+  }
+
+
+async function loadState() {
+    let [rState, rStages] = await Promise.all([fetch('/api/state/'+USER), fetch('/api/admin/stages')]);
+    let state = await rState.json(), stages = await rStages.json();
+    
+    // Limpiar mapa excepto userMarker
+    map.eachLayer(l => {
+        if((l instanceof L.Marker || l instanceof L.Circle) && l !== userMarker) map.removeLayer(l);
+    });
+
+    if(state.finished) { showFinishedScreen(); return; }
+    
+    currentTarget = stages[state.level];
+    renderRunes(state.level); 
+    config = currentTarget.config;
+    document.getElementById('target-name').innerText = currentTarget.title;
+
+    stages.forEach((s, i) => {
+        let isCurrent = (i === state.level);
+        let isDone = (i < state.level);
+        let st = isDone ? 'icon-done' : (isCurrent ? 'icon-active' : 'icon-locked');
+        
+        // FIX: IconAnchor para que no vuele a la esquina
+        let icon = L.divIcon({
+            className: 'map-icon-container',
+            html: `<div class="map-icon ${st}">${isDone ? '✓' : (isCurrent ? '◉' : '🔒')}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16] // CENTRO EXACTO
+        });
+        
+        let m = L.marker([s.lat, s.lon], {icon: icon}).addTo(map);
+        
+        // Debug Teleport
+        m.on('click', () => { 
+            if(debugMode) { 
+                updateDist(s.lat, s.lon); 
+                map.setView([s.lat, s.lon], 16); 
+            } 
+        });
+
+        if(isCurrent) {
+            L.circle([s.lat, s.lon], {color: '#0f0', radius: s.radius, fill: false, dashArray: '5,5'}).addTo(map);
+            if(!debugMode) map.setView([s.lat, s.lon], 15);
+        }
+    });
+}
+
+// UPDATE POSICIÓN USUARIO
+function updateDist(lat, lon) {
+    // Actualizar o crear marcador azul del usuario
+    if(!userMarker) {
+        let uIcon = L.divIcon({className: 'user-marker', iconSize:[16,16], iconAnchor:[8,8]});
+        userMarker = L.marker([lat, lon], {icon: uIcon, zIndexOffset: 1000}).addTo(map);
+    } else {
+        userMarker.setLatLng([lat, lon]);
+    }
+
+    if(!currentTarget) return;
+    let d = map.distance([lat, lon], [currentTarget.lat, currentTarget.lon]);
+    if(debugMode) d = 0;
+    
+    document.getElementById('dist-display').innerText = Math.round(d) + " m";
+    let btn = document.getElementById('main-btn');
+    
+    if(d <= currentTarget.radius) {
+        btn.disabled = false;
+        btn.innerText = ">> ENTER <<";
+        btn.style.borderColor = "#00ff41";
+        btn.style.color = "#00ff41";
+    } else {
+        btn.disabled = true;
+        btn.innerText = "FORA DE ALCANCE";
+        btn.style.borderColor = "#004400";
+        btn.style.color = "#004400";
+    }
+}
+
+navigator.geolocation.watchPosition(p => {
+    // Guardar SIEMPRE la última posición real, incluso en DEBUG
+    lastRealPos = {lat: p.coords.latitude, lon: p.coords.longitude};
+    if(!debugMode) updateDist(lastRealPos.lat, lastRealPos.lon);
+}, e => console.log(e), {enableHighAccuracy:true, maximumAge:0});
+
+// --- MOTORES DE JUEGO ---
+
+function openGame() {
+    document.getElementById('game-modal').classList.add('active');
+    let c = document.getElementById('game-canvas'); c.innerHTML = "";
+    const gi = document.getElementById('game-instruction');
+if(currentTarget && currentTarget.type === 'cryptex'){
+  gi.innerText = "";
+  gi.style.display = "none";
+}else{
+  gi.style.display = "";
+  gi.innerText = currentTarget.content;
+}
+    
+    const t = currentTarget.type;
+    if(t === 'digital_tuner') { window.initDigitalTuner(c, currentTarget.config); } else if(t === 'circuit_hack') initPipes(c);
+    else if(t === 'cryptex') {
+      const cfg = (currentTarget && currentTarget.config) ? currentTarget.config : {};
+      if (window.initCryptex) window.initCryptex(c, cfg);
+      else if (typeof initCryptex === 'function') initCryptex(c);
+    }
+    else if(t === 'radio_azimuth') initRadio(c);
+    else if(t === 'gyro_storm') { window.initGyro(c, currentTarget.config); }
+    else if(t === 'simon_says') initSimon(c);
+    else if(t === 'switchboard') initSwitch(c);
+    else if(t === 'compass_blow') initBlow(c, config);
+}
+
+// 1. TUBERIAS (ESPIRAL 5x5 · CANVAS)
+// 1. TUBERIAS (ESPIRAL 5x5 · CANVAS)
+
+function initPipes(c) {
+  const size = 5;
+  const total = size * size;
+
+  c.innerHTML = `
+    <div class="gia-pipes-wrap">
+      <div class="text-green-700 text-[10px] uppercase tracking-widest text-center">
+        ORDENA LA ESPIRAL.
+      </div>
+
+      <div id="gia-pg" class="gia-pipe-grid" aria-label="Espiral 5x5"></div>
+
+      <button id="pipes-validate" class="btn-action" style="max-width:560px;">
+        VALIDATE
+      </button>
+
+      <div id="pipes-hint" class="text-[10px] text-zinc-500 text-center" style="letter-spacing:.14em;">
+        ROTATE PIECES TO MATCH THE TARGET.
+      </div>
+    </div>
+  `;
+
+  const pg   = document.getElementById("gia-pg");
+  const btn  = document.getElementById("pipes-validate");
+  const hint = document.getElementById("pipes-hint");
+
+  const idx = (r, col) => r * size + col;
+
+  // Spiral outward:
+  // - start dir RIGHT (barra central cara o lado)
+  // - turn CW (R,D,L,U) => acaba arriba-dereita en 5x5
+    function spiralOutward(n) {
+        let r = Math.floor(n / 2), col = Math.floor(n / 2);
+        const path = [[r, col]];
+        const dirs = [[-1, 0], [0, -1], [1, 0], [0, 1]]; // U, L, D, R (CCW) empieza ARRIBA
+        let step = 1, d = 0;
+        while (path.length < n * n) {
+            for (let rep = 0; rep < 2; rep++) {
+                const dr = dirs[d % 4][0], dc = dirs[d % 4][1];
+                for (let i = 0; i < step; i++) {
+                    r += dr; col += dc;
+                    if (r >= 0 && r < n && col >= 0 && col < n) path.push([r, col]);
+                    if (path.length >= n * n) break;
+                }
+                d++;
+                if (path.length >= n * n) break;
+            }
+            step++;
+        }
+        return path;
+    }
+
+  const path = spiralOutward(size);
+
+  // conexiones por celda (N,E,S,W)
+  const conn = Array.from({length: total}, ()=>({N:false,E:false,S:false,W:false}));
+
+  function link(a,b){
+    const [r1,c1]=a, [r2,c2]=b;
+    const i1=idx(r1,c1), i2=idx(r2,c2);
+    if(r2===r1 && c2===c1+1){ conn[i1].E=true; conn[i2].W=true; return; }
+    if(r2===r1 && c2===c1-1){ conn[i1].W=true; conn[i2].E=true; return; }
+    if(r2===r1-1 && c2===c1){ conn[i1].N=true; conn[i2].S=true; return; }
+    if(r2===r1+1 && c2===c1){ conn[i1].S=true; conn[i2].N=true; return; }
+  }
+  for(let i=0;i<path.length-1;i++) link(path[i], path[i+1]);
+
+  const centerIdx = idx(Math.floor(size/2), Math.floor(size/2));
+
+  // SVG base:
+  // - straight: vertical (N+S)
+  // - elbow: N+E
+  // - terminal: N
+  function svgFor(type){
+    const common = `fill="none" stroke="#00ff41" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" class="gia-pipe-stroke"`;
+    if(type==="straight") return `<svg viewBox="0 0 100 100"><path ${common} d="M50 8 L50 92"/></svg>`;
+    if(type==="elbow")   return `<svg viewBox="0 0 100 100"><path ${common} d="M50 8 L50 50 L92 50"/></svg>`;
+    return `<svg viewBox="0 0 100 100"><path ${common} d="M50 50 L50 8"/></svg>`;
+  }
+
+  // piezas solución
+  const pieces = Array.from({length: total}, (_,i)=>{
+    const c = conn[i];
+    const n = (c.N?1:0)+(c.E?1:0)+(c.S?1:0)+(c.W?1:0);
+    let type="terminal", solRot=0;
+
+    if(n===2){
+      if((c.N&&c.S)||(c.E&&c.W)){
+        type="straight";
+        solRot = (c.N&&c.S) ? 0 : 90; // vertical=0, horizontal=90
+      }else{
+        type="elbow";
+        if(c.N&&c.E) solRot=0;
+        else if(c.E&&c.S) solRot=90;
+        else if(c.S&&c.W) solRot=180;
+        else if(c.W&&c.N) solRot=270;
+      }
+    }else if(n===1){
+      type="terminal";
+      if(c.N) solRot=0;
+      else if(c.E) solRot=90;
+      else if(c.S) solRot=180;
+      else if(c.W) solRot=270;
+    }else{
+      // fallback
+      type="terminal";
+      solRot=0;
+    }
+    return {type, solRot, rot: solRot};
+  });
+
+  // random rota todas menos centro (centro fijo “barra cara o lado”: rot solución)
+  const rots=[0,90,180,270];
+  for(let i=0;i<total;i++){
+    if(i===centerIdx) continue;
+    pieces[i].rot = rots[Math.floor(Math.random()*rots.length)];
+  }
+
+  // render grid
+  const cells = [];
+  for(let i=0;i<total;i++){
+    const d = document.createElement("div");
+    d.className = "gia-pipe-cell";
+    d.dataset.i = String(i);
+    d.innerHTML = svgFor(pieces[i].type);
+
+    const applyRot = ()=>{
+      d.style.transform = `rotate(${pieces[i].rot}deg)`;
+      // feedback live
+      d.classList.toggle("gia-ok",  (pieces[i].rot%360)===(pieces[i].solRot%360));
+      d.classList.toggle("gia-bad", (pieces[i].rot%360)!==(pieces[i].solRot%360));
+    };
+
+    if(i===centerIdx){
+      d.classList.add("gia-fixed");
+      d.style.outline = "2px solid rgba(0,255,65,.25)";
+      d.style.boxShadow = "0 0 18px rgba(0,255,65,.12)";
+    }else{
+      d.addEventListener("click", ()=>{
+        pieces[i].rot = (pieces[i].rot + 90) % 360;
+        d.classList.add("gia-spin");
+        applyRot();
+        beep(520,0.04);
+        setTimeout(()=>d.classList.remove("gia-spin"), 180);
+      }, {passive:true});
+    }
+
+    applyRot();
+    pg.appendChild(d);
+    cells.push(d);
+  }
+
+  function validate(){
+    let ok = 0;
+    for(let i=0;i<total;i++){
+      if((pieces[i].rot%360)===(pieces[i].solRot%360)) ok++;
+      // refuerza feedback
+      cells[i].classList.toggle("gia-ok",  (pieces[i].rot%360)===(pieces[i].solRot%360));
+      cells[i].classList.toggle("gia-bad", (pieces[i].rot%360)!==(pieces[i].solRot%360));
+    }
+
+    if(ok === total){
+      hint.textContent = "✅ ESPIRAL ALIÑADA · RUNA DESBLOQUEADA";
+      hint.style.color = "#dfffe3";
+      cells.forEach((el,k)=>setTimeout(()=>el.classList.add("gia-ok"), k*10));
+      setTimeout(winGame, 450);
+    }else{
+      hint.textContent = `⛔ AÍNDA NON · CORRECTAS: ${ok}/${total} (CENTRO→FORA · FINAL ARRIBA-DEREITA)`;
+      hint.style.color = "#ff6b6b";
+      beep(140,0.16);
+      setTimeout(()=>{ hint.style.color="#9ca3af"; }, 700);
+    }
+  }
+
+  btn.onclick = validate;
+}
+
+
+
+
+function saga_initPipes(c){
+  const size = 5;
+  const total = size*size;
+
+  c.innerHTML = `
+    <div class="gia-pipes-wrap">
+      <div class="text-green-700 text-[10px] uppercase tracking-widest text-center">
+        ORDENA LA ESPIRAL.
+      </div>
+
+      <div id="gia-pg" class="gia-pipe-grid"></div>
+
+      <button id="pipes-validate" class="btn-action" style="max-width:560px;">
+        VALIDATE
+      </button>
+
+      <div id="pipes-hint" class="text-[10px] text-zinc-500 text-center" style="letter-spacing:.14em;">
+        ROTATE PIECES TO MATCH THE TARGET.
+      </div>
+    </div>
+  `;
+
+  const pg = document.getElementById("gia-pg");
+  const btn = document.getElementById("pipes-validate");
+  const hint = document.getElementById("pipes-hint");
+
+  const idx = (r,c)=> r*size + c;
+
+  // Spiral outward CCW:
+  // start RIGHT, then UP, LEFT, DOWN ... => acaba arriba-dereita en 5x5
+  function spiralOutwardCCW(n){
+    let r = Math.floor(n/2), c = Math.floor(n/2);
+    const path = [[r,c]];
+    const dirs = [[0,1],[-1,0],[0,-1],[1,0]]; // R,U,L,D (CCW)
+    let step=1, d=0;
+    while(path.length < n*n){
+      for(let rep=0; rep<2; rep++){
+        const [dr,dc] = dirs[d%4];
+        for(let i=0;i<step;i++){
+          r += dr; c += dc;
+          if(r>=0 && r<n && c>=0 && c<n) path.push([r,c]);
+          if(path.length >= n*n) break;
+        }
+        d++;
+        if(path.length >= n*n) break;
+      }
+      step++;
+    }
+    return path;
+  }
+
+  const path = spiralOutwardCCW(size);
+
+  const conn = Array.from({length: total}, ()=>({N:false,E:false,S:false,W:false}));
+
+  function link(a,b){
+    const [r1,c1]=a, [r2,c2]=b;
+    const i1=idx(r1,c1), i2=idx(r2,c2);
+    if(r2===r1 && c2===c1+1){ conn[i1].E=true; conn[i2].W=true; return; }
+    if(r2===r1 && c2===c1-1){ conn[i1].W=true; conn[i2].E=true; return; }
+    if(r2===r1-1 && c2===c1){ conn[i1].N=true; conn[i2].S=true; return; }
+    if(r2===r1+1 && c2===c1){ conn[i1].S=true; conn[i2].N=true; return; }
+  }
+  for(let i=0;i<path.length-1;i++) link(path[i], path[i+1]);
+
+  const centerIdx = idx(Math.floor(size/2), Math.floor(size/2));
+
+  function svgFor(type){
+    const common = `fill="none" stroke="#00ff41" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" class="gia-pipe-stroke"`;
+    if(type==="straight") return `<svg viewBox="0 0 100 100"><path ${common} d="M50 8 L50 92"/></svg>`;
+    if(type==="elbow")   return `<svg viewBox="0 0 100 100"><path ${common} d="M50 8 L50 50 L92 50"/></svg>`;
+    return `<svg viewBox="0 0 100 100"><path ${common} d="M50 50 L50 8"/></svg>`;
+  }
+
+  const pieces = Array.from({length: total}, (_,i)=>{
+    const c = conn[i];
+    const n = (c.N?1:0)+(c.E?1:0)+(c.S?1:0)+(c.W?1:0);
+    let type="terminal", solRot=0;
+    if(n===2){
+      if((c.N&&c.S)||(c.E&&c.W)){
+        type="straight";
+        solRot = (c.N&&c.S) ? 0 : 90;
+      }else{
+        type="elbow";
+        if(c.N&&c.E) solRot=0;
+        else if(c.E&&c.S) solRot=90;
+        else if(c.S&&c.W) solRot=180;
+        else if(c.W&&c.N) solRot=270;
+      }
+    }else if(n===1){
+      type="terminal";
+      if(c.N) solRot=0;
+      else if(c.E) solRot=90;
+      else if(c.S) solRot=180;
+      else if(c.W) solRot=270;
+    }else{
+      type="terminal";
+      solRot=0;
+    }
+    return {type, solRot, rot: solRot};
+  });
+
+  // randomiza menos centro (centro fijo, “cara o lado” => a dereita)
+  const rots=[0,90,180,270];
+  for(let i=0;i<total;i++){
+    if(i===centerIdx) continue;
+    pieces[i].rot = rots[Math.floor(Math.random()*rots.length)];
+  }
+
+  const cells=[];
+  function apply(i, el){
+    const rot = pieces[i].rot%360;
+    el.style.setProperty("--rot", rot+"deg");
+    el.style.transform = `rotate(${rot}deg)`;
+    el.classList.toggle("gia-ok", rot === (pieces[i].solRot%360));
+    el.classList.toggle("gia-bad", rot !== (pieces[i].solRot%360));
+  }
+
+  for(let i=0;i<total;i++){
+    const el = document.createElement("div");
+    el.className = "gia-pipe-cell";
+    el.dataset.i = String(i);
+    el.innerHTML = svgFor(pieces[i].type);
+
+    if(i===centerIdx){
+      el.classList.add("gia-fixed");
+      el.style.outline = "2px solid rgba(0,255,65,.22)";
+      el.style.boxShadow = "0 0 18px rgba(0,255,65,.10)";
+    }else{
+      el.addEventListener("click", ()=>{
+        pieces[i].rot = (pieces[i].rot + 90) % 360;
+        el.classList.add("gia-spin");
+        apply(i, el);
+        try{beep(520,0.04);}catch(e){}
+        setTimeout(()=>el.classList.remove("gia-spin"), 180);
+      }, {passive:true});
+    }
+
+    apply(i, el);
+    pg.appendChild(el);
+    cells.append(el);
+  }
+
+  function validate(){
+    let ok=0;
+    for(let i=0;i<total;i++){
+      const good = (pieces[i].rot%360)===(pieces[i].solRot%360);
+      if(good) ok++;
+      cells[i].classList.toggle("gia-ok", good);
+      cells[i].classList.toggle("gia-bad", !good);
+    }
+    if(ok===total){
+      hint.textContent = "✅ ESPIRAL ALIÑADA · RUNA DESBLOQUEADA";
+      hint.style.color = "#dfffe3";
+      setTimeout(()=>winGame(), 350);
+    }else{
+      hint.textContent = `⛔ NOT YET · CORRECT: ${ok}/${total} (CENTER→OUTWARD · COUNTERCLOCKWISE · FINAL TOP-RIGHT)`;
+      hint.style.color = "#ff6b6b";
+      try{beep(140,0.16);}catch(e){}
+      setTimeout(()=>{ hint.style.color="#9ca3af"; }, 750);
+    }
+  }
+  btn.onclick = validate;
+}
+
+
+// 2. CRYPTEX (Texto)
+
+/* [REMOVED DUPLICATE initCryptex - keep latest] */
+function initCryptex(c) {
+  // - Símbolos en SVG monocromo (no emoji)
+  // - Texto dentro de círculos con clamp/word-break
+  // - La carta se consulta en el tríptico (aquí solo recordatorio)
+
+  const SVG = {
+    estrela: `<span class="saga_dial-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2l2.6 6.8L22 9.3l-5.7 4.3L18 21l-6-3.7L6 21l1.7-7.4L2 9.3l7.4-.5L12 2z"/>
+    </svg></span>`,
+    ancora: `<span class="saga_dial-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2v16"/>
+      <path d="M8 6h8"/>
+      <path d="M5 12a7 7 0 0 0 14 0"/>
+      <path d="M5 12l-3 3"/>
+      <path d="M19 12l3 3"/>
+      <path d="M9 19l-2 2"/>
+      <path d="M15 19l2 2"/>
+    </svg></span>`,
+    faro: `<span class="saga_dial-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10 2h4l1 4H9l1-4z"/>
+      <path d="M9 6h6l-1 4H10L9 6z"/>
+      <path d="M10 10h4v12h-4z"/>
+      <path d="M8 22h8"/>
+      <path d="M3 8l5 2"/>
+      <path d="M21 8l-5 2"/>
+    </svg></span>`,
+    lua: `<span class="saga_dial-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5z"/>
+    </svg></span>`,
+  };
+
+  const SYMBOLS = [
+    { key:"estrela", html: SVG.estrela },
+    { key:"faro",    html: SVG.faro },
+    { key:"ancora",  html: SVG.ancora },
+    { key:"lua",     html: SVG.lua },
+  ];
+
+  const GUARDS = ["PRIMEIRA","SEGUNDA","TERCEIRA","CUARTA"];
+  const RUMBOS = ["NORTH","EAST","SOUTH","WEST"];
+
+  // ✅ Solución actual (puedes cambiarla luego cuando fijemos definitivamente la carta del tríptico)
+  const TARGET = { symbol:"faro", guard:"SECOND", rumbo:"NORTH" };
+
+  // indices aleatorios
+  let si = Math.floor(Math.random()*SYMBOLS.length);
+  let gi = Math.floor(Math.random()*GUARDS.length);
+  let ri = Math.floor(Math.random()*RUMBOS.length);
+
+  c.innerHTML = `
+    <div class="saga_dial-dial-wrap">
+
+      <div class="saga_dial-card">
+      </div>
+
+      <div class="saga_dial-dials">
+        <div class="saga_dial-dial">
+          <div class="saga_dial-circle" id="ring-sym" title="Rotate symbol"></div>
+          <div class="saga_dial-label">SYMBOL</div>
+        </div>
+
+        <div class="saga_dial-dial">
+          <div class="saga_dial-circle" id="ring-guard" title="Rotate guard">
+            <div class="saga_dial-value" id="ring-guard-val"></div>
+          </div>
+          <div class="saga_dial-label">GUARD</div>
+        </div>
+
+        <div class="saga_dial-dial">
+          <div class="saga_dial-circle" id="ring-rumbo" title="Rotate direction">
+            <div class="saga_dial-value" id="ring-rumbo-val"></div>
+          </div>
+          <div class="saga_dial-label">DIRECTION</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:center;margin-top:12px;">
+        <button id="nav-validate" class="btn-action" style="max-width:520px;width:100%;">VALIDATE ALIÑAMENTO</button>
+      </div>
+
+      <div id="nav-msg" style="text-align:center;margin-top:10px;opacity:.7;font-size:11px;letter-spacing:.10em;text-transform:uppercase;">
+        Toca cada anel para xiralo (90° lóxico).
+      </div>
+    </div>
+  `;
+
+  const elSym = document.getElementById("ring-sym");
+  const elGuard = document.getElementById("ring-guard");
+  const elRumbo = document.getElementById("ring-rumbo");
+  const vGuard = document.getElementById("ring-guard-val");
+  const vRumbo = document.getElementById("ring-rumbo-val");
+  const msg = document.getElementById("nav-msg");
+  const btn = document.getElementById("nav-validate");
+
+  function render(){
+    elSym.innerHTML = SYMBOLS[si].html;
+    vGuard.textContent = GUARDS[gi];
+    vRumbo.textContent = RUMBOS[ri];
+  }
+
+  elSym.onclick = ()=>{ si = (si+1)%SYMBOLS.length; beep(520,0.05); render(); };
+  elGuard.onclick = ()=>{ gi = (gi+1)%GUARDS.length; beep(620,0.05); render(); };
+  elRumbo.onclick = ()=>{ ri = (ri+1)%RUMBOS.length; beep(720,0.05); render(); };
+
+  btn.onclick = ()=>{
+    const ok = (SYMBOLS[si].key===TARGET.symbol) && (GUARDS[gi]===TARGET.guard) && (RUMBOS[ri]===TARGET.rumbo);
+    if(ok){
+      msg.textContent = "ALIÑAMENTO CORRECTO ✓";
+      msg.style.color = "#dfffe3";
+      beep(1100,0.2);
+      setTimeout(winGame, 180);
+    }else{
+      msg.textContent = "INCORRECTO ✗ Revisa a Carta de Navegación.";
+      msg.style.color = "#ff6b6b";
+      beep(160,0.18);
+      setTimeout(()=>{ msg.style.color="#00ff41"; msg.textContent="Toca cada anel para xiralo (90° lóxico)."; }, 900);
+    }
+  };
+
+  render();
+}
+
+// 2) TRIPLE SINTONIZADOR (Freq/Gain/Azimut) ±1 simultáneo
+function initRadio(c) {
+    const target = { freq: 95.5, gain: 80, az: 180 };
+    const tol = 1;
+
+    c.innerHTML = `
+      <div class="text-green-800 text-xs mb-4 uppercase">[ TRIPLE SINTONIZADOR ]</div>
+
+      <div class="text-[10px] text-green-700 uppercase tracking-widest">FRECUENCIA</div>
+      <div class="text-5xl font-bold mb-2 text-white" id="rf">92.0</div>
+      <input id="rf_s" type="range" min="88" max="108" step="0.1" class="w-full h-10">
+
+      <div class="mt-4 text-[10px] text-green-700 uppercase tracking-widest">GANANCIA</div>
+      <div class="text-5xl font-bold mb-2 text-white" id="rg">50</div>
+      <input id="rg_s" type="range" min="0" max="100" step="1" class="w-full h-10">
+
+      <div class="mt-4 text-[10px] text-green-700 uppercase tracking-widest">AZIMUT</div>
+      <div class="text-5xl font-bold mb-2 text-white" id="ra">90</div>
+      <input id="ra_s" type="range" min="0" max="360" step="1" class="w-full h-10">
+
+      <div class="text-[10px] text-green-700 mt-4 uppercase tracking-widest">Tolerancia ±${tol} · Deben coincidir los 3 a la vez</div>
+    `;
+
+    const rf = document.getElementById("rf");
+    const rg = document.getElementById("rg");
+    const ra = document.getElementById("ra");
+    const rf_s = document.getElementById("rf_s");
+    const rg_s = document.getElementById("rg_s");
+    const ra_s = document.getElementById("ra_s");
+
+    rf_s.oninput = ()=>{ rf.textContent = (+rf_s.value).toFixed(1); check(); };
+    rg_s.oninput = ()=>{ rg.textContent = rg_s.value; check(); };
+    ra_s.oninput = ()=>{ ra.textContent = ra_s.value; check(); };
+
+    function within(v,t){ return Math.abs(v-t) <= tol; }
+    function check(){
+      const f = parseFloat(rf.textContent);
+      const g = parseFloat(rg.textContent);
+      const a = parseFloat(ra.textContent);
+      if(within(f,target.freq) && within(g,target.gain) && within(a,target.az)){
+        beep(1000,0.2);
+        winGame();
+      }
+    }
+}
+
+// 3) GIROSCOPIO equilibrio 10s con deriva (viento)
+function initGyro(c) {
+    c.innerHTML = `
+      <div class="text-green-800 text-xs mb-4 uppercase">[ EQUILIBRIO · 10s EN ZONA SEGURA ]</div>
+      <button id="gstart" class="btn-action mb-4">ACTIVAR SENSOR</button>
+      <div class="w-full max-w-[360px] mx-auto" style="position:relative;">
+        <div id="gbox" style="width:100%;height:240px;border:1px solid #00ff41;border-radius:16px;background:#001100;position:relative;overflow:hidden;">
+          <div style="position:absolute;left:50%;top:50%;width:120px;height:120px;transform:translate(-50%,-50%);border-radius:999px;border:1px dashed rgba(0,255,65,.6)"></div>
+          <div id="gcore" style="width:26px;height:26px;border-radius:999px;background:#00ff3b;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 5px rgba(0,255,59,.22)"></div>
+        </div>
+        <div class="mt-3 text-white font-bold" id="gt">0.0s / 10.0s</div>
+      </div>
+      <div class="text-[10px] text-green-700 mt-2 uppercase tracking-widest">El viento empuja · Inclina para compensar</div>
+    `;
+
+    const gbox = document.getElementById("gbox");
+    const gcore = document.getElementById("gcore");
+    const gt = document.getElementById("gt");
+    const btn = document.getElementById("gstart");
+
+    let okTime = 0;
+    let last = performance.now();
+    let pos = {x:0, y:0};
+    const drift = {x:0.25, y:0.08};
+    let raf = 0;
+    let running = false;
+
+    function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+    function step(now){
+      const dt = Math.min(0.05,(now-last)/1000);
+      last = now;
+
+      pos.x += drift.x*dt;
+      pos.y += drift.y*dt;
+
+      const w = gbox.clientWidth, h = gbox.clientHeight;
+      const cx = w/2 + pos.x*(w*0.35);
+      const cy = h/2 + pos.y*(h*0.35);
+      gcore.style.left = cx+"px";
+      gcore.style.top = cy+"px";
+
+      const dist = Math.hypot(cx-w/2, cy-h/2);
+      if(dist <= 60) okTime += dt;
+      else okTime = 0;
+
+      gt.textContent = `${okTime.toFixed(1)}s / 10.0s`;
+
+      if(okTime >= 10){
+        window.ondeviceorientation = null;
+        winGame();
+        return;
+      }
+      raf = requestAnimationFrame(step);
+    }
+
+    function onOri(e){
+      const g = (e.gamma||0)/45;
+      const b = (e.beta||0)/45;
+      pos.x -= clamp(g,-1,1)*0.10;
+      pos.y -= clamp(b,-1,1)*0.10;
+      pos.x = clamp(pos.x,-1.4,1.4);
+      pos.y = clamp(pos.y,-1.4,1.4);
+    }
+
+    async function start(){
+      if(running) return;
+      // iOS permiso
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const res = await DeviceOrientationEvent.requestPermission();
+          if (res !== 'granted') throw new Error("permiso");
+      }
+      running = true;
+      okTime = 0;
+      last = performance.now();
+      window.addEventListener("deviceorientation", onOri, {passive:true});
+      raf = requestAnimationFrame(step);
+    }
+
+    btn.onclick = ()=>{
+      start().catch(()=>{
+        // fallback teclado
+        btn.textContent = "MODO TECLADO (WASD)";
+        if(running) return;
+        running = true;
+        okTime = 0;
+        last = performance.now();
+        window.addEventListener("keydown",(ev)=>{
+          const k = ev.key.toLowerCase();
+          if(k==="a") pos.x -= 0.08;
+          if(k==="d") pos.x += 0.08;
+          if(k==="w") pos.y -= 0.08;
+          if(k==="s") pos.y += 0.08;
+          pos.x = clamp(pos.x,-1.4,1.4);
+          pos.y = clamp(pos.y,-1.4,1.4);
+        });
+        raf = requestAnimationFrame(step);
+      });
+    };
+}
+
+// 4) SWITCHBOARD [1,0,0,1]
+function initSwitch(c){
+  const sol = [1,0,0,1];
+  const st = [0,0,0,0];
+  c.innerHTML = `
+    <div class="text-green-800 text-xs mb-4 uppercase">[ SWITCHBOARD · BINARIO ]</div>
+    <div id="sw" class="grid gap-3" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="text-[10px] text-green-700 mt-4 uppercase tracking-widest">Objetivo: [1,0,0,1]</div>
+  `;
+  const sw = document.getElementById("sw");
+
+  function render(){
+    sw.innerHTML="";
+    for(let i=0;i<4;i++){
+      const box = document.createElement("div");
+      box.style.border="1px solid #004400";
+      box.style.borderRadius="12px";
+      box.style.padding="10px";
+      box.style.background= st[i] ? "#002200" : "#000";
+      box.style.textAlign="center";
+
+      const lamp = document.createElement("div");
+      lamp.style.width="22px"; lamp.style.height="22px"; lamp.style.margin="0 auto 10px";
+      lamp.style.borderRadius="999px";
+      lamp.style.background = st[i] ? "#00ff3b" : "#111";
+      lamp.style.boxShadow = st[i] ? "0 0 0 4px rgba(0,255,59,.22)" : "none";
+
+      const b = document.createElement("button");
+      b.className="btn-action";
+      b.style.padding="10px";
+      b.style.fontSize="14px";
+      b.textContent = st[i] ? "1" : "0";
+      b.onclick = ()=>{
+        st[i] = st[i] ? 0 : 1;
+        beep(500,0.05);
+        render();
+        if(st.every((v,idx)=>v===sol[idx])) winGame();
+      };
+
+      box.appendChild(lamp);
+      box.appendChild(b);
+      sw.appendChild(box);
+    }
+  }
+  render();
+}
+
+// 5) SIMON 3 rondas (fallo repite ronda)
+function initSimon(c){
+  const rounds = 3;
+  const colors = ["g","r","b","y"];
+  const seq = [];
+  let round = 1;
+  let input = [];
+  let accepting = false;
+
+  c.innerHTML = `
+    <div class="text-green-800 text-xs mb-4 uppercase">[ SIMON · 3 RONDAS ]</div>
+    <button id="sstart" class="btn-action mb-4">EMPEZAR</button>
+    <div id="sinfo" class="text-white font-bold mb-3">Ronda 1/3</div>
+    <div id="sgrid" class="grid gap-3" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="text-[10px] text-green-700 mt-4 uppercase tracking-widest">Si fallas: se repite la ronda</div>
+  `;
+
+  const sinfo = document.getElementById("sinfo");
+  const sgrid = document.getElementById("sgrid");
+
+  const pad = (cls, bg) => {
+    const d = document.createElement("div");
+    d.style.height="80px";
+    d.style.borderRadius="14px";
+    d.style.background=bg;
+    d.style.opacity="0.8";
+    d.style.cursor="pointer";
+    d.dataset.c = cls;
+    d.onclick = ()=> press(cls, d);
+    return d;
+  };
+
+  const pads = {
+    g: pad("g","#00ff3b"),
+    r: pad("r","#ff2d2d"),
+    b: pad("b","#2d6bff"),
+    y: pad("y","#ffe12d"),
+  };
+  Object.values(pads).forEach(x=>sgrid.appendChild(x));
+
+  const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+  async function flash(c){
+    const el = pads[c];
+    el.style.opacity="1";
+    el.style.filter="brightness(1.4)";
+    await sleep(260);
+    el.style.opacity="0.8";
+    el.style.filter="none";
+    await sleep(140);
+  }
+
+  async function playRound(){
+    accepting = false;
+    sinfo.textContent = `Ronda ${round}/${rounds}`;
+    if(seq.length < round) seq.push(colors[Math.floor(Math.random()*colors.length)]);
+    for(let i=0;i<round;i++) await flash(seq[i]);
+    input = [];
+    accepting = true;
+  }
+
+  function fail(){
+    accepting = false;
+    beep(150,0.25);
+    sgrid.style.filter="brightness(1.6)";
+    setTimeout(()=>{ sgrid.style.filter="none"; playRound(); }, 350);
+  }
+
+  function press(c, el){
+    if(!accepting) return;
+    input.push(c);
+    flash(c);
+    const idx = input.length-1;
+    if(input[idx] !== seq[idx]) return fail();
+    if(input.length === round){
+      accepting = false;
+      if(round === rounds) return winGame();
+      round += 1;
+      setTimeout(playRound, 450);
+    }
+  }
+
+  document.getElementById("sstart").onclick = ()=>{
+    round = 1;
+    seq.length = 0;
+    playRound();
+  };
+}
+
+// 6) SOPLIDO: micrófono, >80% acumulado 3s
+async function initBlow(c, cfg){
+  cfg = cfg || {};
+  const DURATION = Number(cfg.duration || 10);
+  const THRESH   = Number(cfg.threshold || 0.55);
+  const SENS     = Number(cfg.sensitivity || 2.2);
+  const CAL_MS   = Number(cfg.calibrate_ms || 900);
+  const DECAY    = Number(cfg.decay || 0.65);
+  const VIDEO    = "";
+  const TITLE    = (cfg.title || "SOPLIDO · ENCENDER LA LLAMA");
+
+  c.innerHTML = `
+    <div style="border:1px solid #00ff41;border-radius:16px;padding:14px;background:rgba(0,0,0,.55)">
+      <div class="text-green-700 text-[10px] uppercase tracking-[.25em] mb-2">[ ${TITLE} ]</div>
+
+      <div style="display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+        <button id="bstart" class="btn-action" style="min-width:210px">ACTIVAR MICRÓFONO</button>
+
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:190px;height:10px;border:1px solid #00ff41;border-radius:999px;background:#001100;overflow:hidden">
+            <div id="bprog" style="height:100%;width:0%;background:#00ff3b"></div>
+          </div>
+          <div id="btxt" class="text-white font-bold text-sm">0.0s / ${DURATION.toFixed(1)}s</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;align-items:center;margin-top:14px">
+        <div style="width:66px;height:210px;border:1px solid #00ff41;border-radius:18px;background:#001100;position:relative;overflow:hidden">
+          <div id="bfill" style="position:absolute;left:0;bottom:0;width:100%;height:0%;background:linear-gradient(#00ff3b,#00c82d)"></div>
+          <div style="position:absolute;left:0;top:0;width:100%;height:100%;box-shadow:inset 0 0 18px rgba(0,255,65,.25)"></div>
+        </div>
+
+        <div style="flex:1;min-width:220px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div id="bflame" style="font-size:42px;filter:grayscale(1) brightness(.85)">🕯️</div>
+            <div>
+              <div id="bst" class="text-green-200 font-bold">LISTO</div>
+              <div class="text-green-700 text-[10px] uppercase tracking-[.2em]">Calibración automática · sopla fuerte y constante</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="text-[10px] text-green-700 uppercase tracking-widest">Umbral: <span id="bthr">${Math.round(THRESH*100)}%</span></div>
+            <div class="text-[10px] text-green-700 uppercase tracking-widest">Sens: <span id="bsens">${SENS.toFixed(1)}</span></div>
+            <div class="text-[10px] text-green-700 uppercase tracking-widest">AutoCal: <span id="bcal">${CAL_MS}ms</span></div>
+          </div>
+
+          <div id="berr" class="text-red-400 text-xs mt-2" style="display:none"></div>
+        </div>
+      </div>
+
+      
+    </div>
+  `;
+
+  const btn   = document.getElementById("bstart");
+  const fill  = document.getElementById("bfill");
+  const flame = document.getElementById("bflame");
+  const btxt  = document.getElementById("btxt");
+  const bprog = document.getElementById("bprog");
+  const bst   = document.getElementById("bst");
+  const berr  = document.getElementById("berr");
+  const vwrap = null;
+
+  let ac=null, analyser=null, src=null, stream=null, raf=0;
+  let eff=0.0, last=performance.now();
+
+  // calibración / normalización
+  let calStart=0, calSum=0.0, calN=0;
+  let noise=0.02, range=0.25, ema=0.0;
+
+  function stop(){
+    try{ cancelAnimationFrame(raf); }catch(e){}
+    try{ if(stream) stream.getTracks().forEach(t=>t.stop()); }catch(e){}
+    try{ src && src.disconnect(); }catch(e){}
+    try{ analyser && analyser.disconnect(); }catch(e){}
+    try{ ac && ac.close(); }catch(e){}
+    ac=null; analyser=null; src=null; stream=null;
+  }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+
+  function computeLevel(){
+    // TIME RMS
+    const td = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(td);
+    let sum=0;
+    for(let i=0;i<td.length;i++){
+      const v = (td[i]-128)/128;
+      sum += v*v;
+    }
+    const rms = Math.sqrt(sum/td.length);
+    const timeEnergy = rms*2.4;
+
+    // FREQ (soplido)
+    const fd = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(fd);
+    let s=0, n=0;
+    const a = 6;
+    const b = Math.min(80, fd.length-1);
+    for(let i=a;i<b;i++){ s += fd[i]; n += 1; }
+    const freqEnergy = (n? (s/n) : 0)/255;
+
+    // mezcla + sensibilidad
+    let raw = Math.max(timeEnergy, freqEnergy) * SENS;
+
+    // suavizado
+    ema = (ema*0.75) + (raw*0.25);
+
+    // normalización vs ruido
+    return clamp((ema - (noise*1.15)) / range, 0, 1);
+  }
+
+  async function finish(){
+    stop();
+    flame.style.filter = "none";
+    flame.textContent = "🔥";
+    bst.textContent = "NODO ACTIVO";
+    if(VIDEO){
+        // Fullscreen overlay + animación
+        showVideoOverlay(VIDEO, ()=>{ if(window.winGame) window.winGame(); });
+        return;
+      }
+    if(window.winGame) window.winGame();
+  }
+
+  function loop(now){
+    const dt = Math.min(0.05,(now-last)/1000);
+    last = now;
+
+    const lvl = computeLevel();
+    fill.style.height = `${Math.round(lvl*100)}%`;
+
+    // calibración inicial
+    if(now - calStart < CAL_MS){
+      calSum += lvl; calN += 1;
+      bst.textContent = "CALIBRANDO...";
+      btxt.textContent = `0.0s / ${DURATION.toFixed(1)}s`;
+      raf = requestAnimationFrame(loop);
+      return;
+    }
+
+    // fijar noise/range una sola vez
+    if(calN > 0){
+      noise = Math.max(0.02, calSum / calN);
+      range = Math.max(0.18, noise*2.2);
+      calN = 0;
+      bst.textContent = "SOPLA PARA ENCENDER";
+    }
+
+    if(lvl >= THRESH) eff += dt;
+    else eff = Math.max(0, eff - dt*(1-DECAY));
+
+    bprog.style.width = `${Math.round(clamp(eff/DURATION,0,1)*100)}%`;
+    btxt.textContent = `${eff.toFixed(1)}s / ${DURATION.toFixed(1)}s`;
+
+    if(eff > 0.3){
+      flame.style.filter = "none";
+      flame.textContent = (eff >= DURATION*0.98) ? "🔥" : "🕯️";
+    }
+
+    if(eff >= DURATION) return finish();
+    raf = requestAnimationFrame(loop);
+  }
+
+  btn.onclick = async ()=>{
+    try{
+      berr.style.display="none";
+      stop();
+      eff = 0; ema = 0; calSum = 0; calN = 0;
+
+      stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
+      src = ac.createMediaStreamSource(stream);
+      src.connect(analyser);
+
+      btn.textContent = "MICRÓFONO ACTIVO";
+      btn.disabled = true;
+
+      last = performance.now();
+      calStart = last;
+      raf = requestAnimationFrame(loop);
+
+      document.addEventListener("visibilitychange", ()=>{ if(document.hidden) stop(); }, {once:true});
+    }catch(e){
+      berr.style.display="block";
+      berr.textContent="Permiso denegado o micrófono no disponible. Revisa permisos y vuelve a intentar.";
+      btn.textContent="PERMISO DENEGADO";
+      btn.style.borderColor="#ff2d2d";
+      btn.style.color="#ff2d2d";
+    }
+  };
+}
+
+
+
+// UTILS
+
+
+
+function closePrologue() {
+  const el = document.getElementById('prologue');
+  if(!el) return;
+  el.classList.add('hidden');
+  el.style.display = 'none';
+}
+try {
+  const __p = document.getElementById('prologue');
+  const __b = document.querySelector('#prologue .prologue-btn');
+  if (__b && __p) {
+    __b.addEventListener('click', () => __p.classList.add('hidden'));
+  }
+} catch(e) {}
+
+window.closePrologue = closePrologue;
+(function(){
+  const btn = document.querySelector('#prologue .prologue-btn');
+  if(btn){
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); closePrologue(); }, {passive:false});
+  }
+})();
+
+window.closePrologue = closePrologue;
+// por si el inline falla o hay overlays:
+(function(){
+  const btn = document.querySelector('#prologue .prologue-btn');
+  if(btn){
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); closePrologue(); }, {passive:false});
+  }
+})();
+
+
+function beep(f,d) {
+    try {
+        if (audioCtx && audioCtx.state !== 'running') {
+            // resume() debe ir asociado a una interacción; aquí suele venir de click/touch
+            audioCtx.resume().catch(()=>{});
+        }
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime(f, audioCtx.currentTime);
+
+        // Ganancia inicial audible, luego decae
+        g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
+
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start();
+        o.stop(audioCtx.currentTime + d);
+    } catch(e) {
+        // silencioso
+    }
+}
+function closeGame() { document.getElementById('game-modal').classList.remove('active'); window.ondeviceorientation=null; if(noiseGain) noiseGain.gain.value=0; }
+async function winGame() { beep(1000,0.2); setTimeout(()=>beep(1500,0.4),200); document.getElementById('game-canvas').innerHTML="<h1 class='text-4xl text-center animate-pulse text-green-500'>NODO ACTIVO</h1>"; await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:'OK'})}); setTimeout(()=>{closeGame();loadState()},2000); }
+async function checkRune() { let c=document.getElementById('rune-code').value.toUpperCase(); let r=await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:c})}); let d=await r.json(); if(d.status==='ok'){beep(1200,0.5);loadState();document.getElementById('rune-code').value="";} else alert("INVALID CODE"); }
+function toggleDebug(){debugMode=!debugMode;var b=document.getElementById('debug-btn');if(b){b.innerText=debugMode?'DEBUG':'DEBUG';b.classList.toggle('debug-on',debugMode);b.classList.toggle('debug-off',!debugMode);}if(!debugMode){try{var u=new URL(location.href);u.searchParams.set('v',Date.now());location.href=u.toString();}catch(e){location.reload();}return;}loadState();}
+function resetMission() { if(confirm("¿REINICIAR?")) fetch('/api/reset',{method:'POST',body:JSON.stringify({user:USER})}).then(()=>location.reload()); }
+
+loadState();
+
+(function(){
+  try{
+    const qs = new URLSearchParams(location.search);
+    if(qs.has("pipes")){
+      // Forzar un target falso para test visual
+      currentTarget = currentTarget || {};
+      currentTarget.type = "circuit_hack";
+      currentTarget.content = "TEST PIPES: se debe ver una cuadrícula 5x5";
+      // Abrir sin pedir sensores
+      setTimeout(()=>{ openGame(); }, 150);
+    }
+  }catch(e){}
+})();
+
+
+</script>
+
+<!-- Minigames V50 overlay -->
+<div id="minigame-root"></div>
+
+
+<script>
+window.__saga_initPipes = (typeof initPipes === "function") ? initPipes : null;
+</script>
+
+
+
+<script src="/static/minigames_final.js?v=2026-03-27_clean"
+
+
+</script>
+<script>
+  // fuerza la versión buena aunque minigames redefina initPipes
+  window.saga_initPipes = window.saga_initPipes || saga_initPipes;
+  window.initPipes = window.saga_initPipes;
+</script>
+
+
+<script>
+if (window.__saga_initPipes) { window.initPipes = window.__saga_initPipes; }
+</script>
+
+
+<script>
+  // Hook opcional: si tu lógica ya llama winGame(), perfecto.
+  // Si no, puedes escuchar el evento:
+  // window.addEventListener('gia:win', () => console.log('WIN!'));
+</script>
+
+
+<script>
+(function(){
+  function forceClose(){
+    var el = document.getElementById('prologue');
+    if(el) el.classList.add('hidden');
+  }
+  try{
+    // Asegurar que exista closePrologue
+    window.closePrologue = window.closePrologue || forceClose;
+
+    // Si el botón existe, enganchar click
+    function bind(){
+      var btn = document.querySelector('#prologue .prologue-btn');
+      if(btn){
+        btn.addEventListener('click', function(ev){
+          try{ ev.preventDefault(); }catch(e){}
+          forceClose();
+        }, {passive:false});
+      }
+    }
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', bind);
+    } else {
+      bind();
+    }
+  }catch(e){}
+})();
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const cfg = (typeof SAGA_CONFIG !== 'undefined' && SAGA_CONFIG) ? SAGA_CONFIG : {};
+
+  document.title = cfg.site_name || document.title;
+
+  const titleEl = document.querySelector('.prologue-title');
+  const subEl = document.querySelector('.prologue-sub');
+  const textEl = document.querySelector('.prologue-text');
+  const footEl = document.querySelector('.prologue-foot');
+
+  if (titleEl) titleEl.textContent = cfg.prologue_title || '';
+  if (subEl) subEl.textContent = cfg.prologue_subtitle || '';
+  if (textEl) textEl.textContent = cfg.prologue_body || '';
+  if (footEl) footEl.textContent = cfg.story_text || '';
+
+  const mapEl = document.getElementById('map');
+  if (mapEl) {
+    mapEl.style.filter = 'none';
+    mapEl.style.background = '#111';
+  }
+
+  document.querySelectorAll('.leaflet-tile-pane, .leaflet-map-pane, .leaflet-container, .leaflet-layer').forEach(el => {
+    el.style.filter = 'none';
+  });
+});
+</script>
+
+</body>
+</html>

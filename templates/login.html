@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html class="dark">
+<head>
+<script>
+/* SAGA_SW_PURGE_V1: limpia Service Worker + CacheStorage SOLO 1 vez por sesión/origen */
+(async () => {
+  try {
+    const key = "saga_sw_purge_done_v1";
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ("caches" in window) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+    // recarga dura 1 vez
+    location.reload(true);
+  } catch(e) {}
+})();
+</script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; }
+        .scan-line { position: fixed; top: 0; left: 0; width: 100%; height: 5px; background: rgba(0, 255, 65, 0.5); animation: scan 3s linear infinite; opacity: 0.3; pointer-events: none; }
+        @keyframes scan { 0% { top: -10%; } 100% { top: 110%; } }
+        .player-card { border: 1px solid #111; background: #0a0a0a; transition: all 0.2s; position: relative; overflow: hidden; }
+        .player-card:hover { border-color: #00ff41; background: #0f1a0f; transform: scale(1.02); }
+        .player-card::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,255,65,0.1), transparent); transition: 0.5s; }
+        .player-card:hover::after { left: 100%; }
+        .glitch { text-shadow: 2px 0 #fff, -2px 0 #00ff41; animation: glitch 1s infinite alternate-reverse; }
+        @keyframes glitch { 0% { transform: skew(0deg); } 20% { transform: skew(-2deg); } 40% { transform: skew(2deg); } 100% { transform: skew(0deg); } }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-6">
+    <div class="scan-line"></div>
+    
+    <div class="text-center mb-8">
+        <h1 class="text-6xl font-bold mb-2 tracking-tighter text-white glitch">{{ config.site_name }}</h1>
+        <p class="text-xs text-gray-500 uppercase tracking-widest">{{ config.story_title or config.admin_subtitle }}</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 w-full max-w-md">
+        {% for p in players %}
+        <a href="/player/{{p}}" class="player-card p-4 rounded text-center group">
+            <div class="text-2xl mb-1">👤</div>
+            <div class="font-bold text-lg group-hover:text-white transition">{{p}}</div>
+            <div class="text-[10px] text-gray-600 group-hover:text-green-500">OPERATIVO</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="mt-12 opacity-50 hover:opacity-100 transition">
+        <a href="/admin" class="border border-gray-800 text-gray-600 px-4 py-2 rounded text-xs uppercase tracking-widest hover:border-green-800 hover:text-green-500">
+            🔧 Panel de Control
+        </a>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 0,
+    "title": "NEW NODE",
+    "lat": 40.42839425751665,
+    "lon": -3.7320256233215336,
+    "radius": 50,
+    "type": "circuit_hack",
+    "content": "PUT NODE TEXT HERE",
+    "config": {},
+    "answer": "",
+    "rune": ""
+  }
+]

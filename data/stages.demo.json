@@ -1,0 +1,109 @@
+[
+  {
+    "id": 0,
+    "title": "A CARACOLA",
+    "lat": 42.27092610625838,
+    "lon": -8.861235380172731,
+    "radius": 50,
+    "type": "circuit_hack",
+    "content": "RECONECTA O SISTEMA.",
+    "config": {
+      "grid": 4
+    },
+    "answer": "SAGA-WIND",
+    "rune": "SAGA-START"
+  },
+  {
+    "id": 1,
+    "title": "DIAL NODE",
+    "lat": 42.2532155817828,
+    "lon": -8.87326776981354,
+    "radius": 50,
+    "type": "cryptex",
+    "content": "DIAL NODE · NAVIGATION PUZZLE",
+    "config": {
+      "mode": "dial_navegacion"
+    },
+    "answer": "SAGA-LIGHT",
+    "rune": "SAGA-HOME"
+  },
+  {
+    "id": 2,
+    "title": "ROBALEIRA",
+    "lat": 42.25051151999688,
+    "lon": -8.87273669242859,
+    "radius": 50,
+    "type": "digital_tuner",
+    "content": "CANLE DE EMERXENCIA.",
+    "config": {},
+    "answer": "SAGA-VOICE",
+    "rune": "SAGA-RED"
+  },
+  {
+    "id": 3,
+    "title": "MELIDE",
+    "lat": 42.25204423297994,
+    "lon": -8.868868947029116,
+    "radius": 50,
+    "type": "gyro_storm",
+    "content": "O terreo é inestable e o vento das Cíes forte. Mantén o nivel do sistema firme durante 10 segundos para ancorar a defensa.",
+    "config": {
+      "duration": 10
+    },
+    "answer": "SAGA-EARTH",
+    "rune": "SAGA-SAND"
+  },
+  {
+    "id": 4,
+    "title": "SUBRIDO",
+    "lat": 42.247716009735676,
+    "lon": -8.864121437072756,
+    "radius": 50,
+    "type": "switchboard",
+    "content": "A Fragua do sistema está fría.\n\nConsulta o Protocolo de Combustión no tríptico: Abre a admisión externa, pecha o centro e purga o sistema.",
+    "config": {
+      "switches": [
+        1,
+        1,
+        0,
+        1,
+        1
+      ]
+    },
+    "answer": "SAGA-WIND",
+    "rune": "SAGA-FIRE"
+  },
+  {
+    "id": 5,
+    "title": "ALDEA DE PUXEIRO",
+    "lat": 42.27795573745799,
+    "lon": -8.860795497894289,
+    "radius": 50,
+    "type": "simon_says",
+    "content": "O ARQUIVO (A Memoria).\n\nO Vixía non pode espertar se non recorda como loitar.\nCando restaures os patróns de luz e o Arquivo recupere a súa integridade... liberarás a quinta Runa.",
+    "config": {
+      "rounds": 5
+    },
+    "answer": "SAGA-MEM",
+    "rune": "RUNA DA MEMORIA"
+  },
+  {
+    "id": 6,
+    "title": "O FACHO",
+    "lat": 42.27632045563478,
+    "lon": -8.861187100410463,
+    "radius": 50,
+    "type": "compass_blow",
+    "content": "IGNICIÓN FINAL.",
+    "config": {
+      "intensity": 80,
+      "duration": 12,
+      "calibrate_ms": 1200,
+      "sensitivity": 2.8,
+      "threshold": 0.58,
+      "decay": 0.55
+    },
+    "answer": "SAGA-WAKE",
+    "rune": "SAGA-END"
+  }
+]

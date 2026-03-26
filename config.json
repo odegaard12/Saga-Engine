@@ -1,0 +1,22 @@
+{
+  "site_name": "PUT TITLE HERE",
+  "admin_title": "PUT ADMIN TITLE HERE",
+  "admin_subtitle": "PUT ADMIN SUBTITLE HERE",
+  "story_title": "PUT LOGIN SUBTITLE HERE",
+  "story_text": "PUT STORY TEXT HERE",
+  "map_center": [
+    40.4168,
+    -3.7038
+  ],
+  "map_zoom": 13,
+  "players": [
+    "PLAYER 1",
+    "PLAYER 2",
+    "PLAYER 3",
+    "PLAYER 4"
+  ],
+  "data_dir": "data",
+  "prologue_title": "PUT PROLOGUE TITLE HERE",
+  "prologue_subtitle": "PUT PROLOGUE SUBTITLE HERE",
+  "prologue_body": "PUT PROLOGUE TEXT HERE"
+}
