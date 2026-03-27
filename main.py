@@ -45,7 +45,15 @@ def load_config():
 
 CONFIG = load_config()
 DATA_DIR = CONFIG.get("data_dir", "data")
-ADMIN_PASS = os.getenv("ADMIN_PASS", "CHANGE_ME")
+ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
+ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
+
+if not ADMIN_PASS:
+    if ALLOW_DEFAULT_ADMIN:
+        ADMIN_PASS = "CHANGE_ME"
+        print("[WARN] ADMIN_PASS not set. Using development fallback CHANGE_ME because ALLOW_DEFAULT_ADMIN=1")
+    else:
+        raise RuntimeError("ADMIN_PASS is required. Set ADMIN_PASS or enable ALLOW_DEFAULT_ADMIN=1 only for local development.")
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")

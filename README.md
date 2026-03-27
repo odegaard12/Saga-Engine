@@ -156,13 +156,51 @@ Create a local environment file:
 
     cp .env.example .env
 
-Set at least:
+Normal setup:
 
     ADMIN_PASS=your_password_here
+
+Optional local-development fallback only:
+
+    ALLOW_DEFAULT_ADMIN=1
 
 ### Important
 
 Do **not** commit `.env`.
+
+### Admin password management
+
+The admin password is read from the `ADMIN_PASS` environment variable.
+
+In the current hardened setup:
+
+- `ADMIN_PASS` is required in normal use
+- the app will not start without `ADMIN_PASS`
+- the only exception is local development when you explicitly set:
+
+    ALLOW_DEFAULT_ADMIN=1
+
+If you enable that fallback, the admin password becomes:
+
+    CHANGE_ME
+
+That fallback is for local development only and should never be used in a real deployment.
+
+### Change or reset the admin password from terminal
+
+If you control the server, you do not need the old password.
+Just set a new `ADMIN_PASS` value and restart the app.
+
+Docker example:
+
+    docker rm -f saga_engine_app
+
+    docker run -d       --name saga_engine_app       -p 8096:5000       -e ADMIN_PASS='YOUR_NEW_PASSWORD'       -v ~/saga_engine:/app       --restart unless-stopped       saga-engine
+
+Python example:
+
+    export ADMIN_PASS='YOUR_NEW_PASSWORD'
+    python -m uvicorn main:app --host 0.0.0.0 --port 8097
 
 ---
 
@@ -270,11 +308,18 @@ Before publishing or sharing a deployment:
 
 ### Admin password warning
 
-If `ADMIN_PASS` is missing, your backend may fall back to a development/default password depending on the current code path.
+The app now requires `ADMIN_PASS` unless you explicitly enable the local-development fallback with:
+
+    ALLOW_DEFAULT_ADMIN=1
+
+If you enable that fallback, the password becomes:
+
+    CHANGE_ME
 
 For real deployments:
 
 - always set `ADMIN_PASS`
+- keep `ALLOW_DEFAULT_ADMIN=0`
 - verify `/admin` is protected
 - never leave default credentials active
 
