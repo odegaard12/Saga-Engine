@@ -9,3 +9,37 @@ data/positions.json
 templates/*.bak*
 static/*.bak*
 _SYNC_FROM_CONTAINER/
+# --- Local backups / temporary files ---
+*.bak
+*.bak_*
+*.broken_now
+*.tmp
+*.temp
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+
+# --- Python cache / local env ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# --- Logs ---
+*.log
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Keep local secrets out of git ---
+.env
+.env.*
+!.env.example
