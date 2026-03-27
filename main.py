@@ -4,6 +4,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import json
 import os
+import hashlib
+import hmac
+import secrets
 
 app = FastAPI()
 
@@ -45,19 +48,112 @@ def load_config():
 
 CONFIG = load_config()
 DATA_DIR = CONFIG.get("data_dir", "data")
-ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
-ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
-
-if not ADMIN_PASS:
-    if ALLOW_DEFAULT_ADMIN:
-        ADMIN_PASS = "CHANGE_ME"
-        print("[WARN] ADMIN_PASS not set. Using development fallback CHANGE_ME because ALLOW_DEFAULT_ADMIN=1")
-    else:
-        raise RuntimeError("ADMIN_PASS is required. Set ADMIN_PASS or enable ALLOW_DEFAULT_ADMIN=1 only for local development.")
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
+ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
+
+BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
+ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
+ADMIN_RESET = (os.getenv("ADMIN_RESET") or "0").strip() == "1"
+
 PLAYERS = CONFIG.get("players", ["PLAYER 1", "PLAYER 2"])
+
+def hash_password(password, salt=None, iterations=200000):
+    salt = salt or secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+    return {
+        "salt": salt,
+        "password_hash": dk.hex(),
+        "iterations": iterations
+    }
+
+def load_admin_auth():
+    return load_json(ADMIN_AUTH_DB, {})
+
+def save_admin_auth(data):
+    save_json(ADMIN_AUTH_DB, data)
+
+def verify_admin_password(password):
+    auth = load_admin_auth()
+    salt = auth.get("salt")
+    expected = auth.get("password_hash")
+    iterations = int(auth.get("iterations") or 200000)
+
+    if not salt or not expected:
+        return False
+
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        (password or "").encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations
+    ).hex()
+
+    return hmac.compare_digest(dk, expected)
+
+def is_weak_admin_password(password):
+    p = (password or "").strip()
+    weak = {
+        "",
+        "CHANGE_ME",
+        "admin",
+        "password",
+        "12345678",
+        "Pelochito13"
+    }
+    return len(p) < 10 or p in weak
+
+def set_admin_password(password, must_change=False, source="manual"):
+    data = hash_password(password)
+    auth = {
+        "salt": data["salt"],
+        "password_hash": data["password_hash"],
+        "iterations": data["iterations"],
+        "must_change": bool(must_change),
+        "source": source
+    }
+    save_admin_auth(auth)
+    return auth
+
+def admin_password_change_required():
+    auth = load_admin_auth()
+    return bool(auth.get("must_change"))
+
+def ensure_admin_auth():
+    auth = load_admin_auth()
+
+    if ADMIN_RESET:
+        if not BOOTSTRAP_ADMIN_PASS:
+            raise RuntimeError("ADMIN_RESET=1 requires ADMIN_PASS.")
+        set_admin_password(
+            BOOTSTRAP_ADMIN_PASS,
+            must_change=is_weak_admin_password(BOOTSTRAP_ADMIN_PASS),
+            source="reset"
+        )
+        print("[WARN] Admin password reset from environment.")
+        return
+
+    if auth.get("password_hash") and auth.get("salt"):
+        return
+
+    if BOOTSTRAP_ADMIN_PASS:
+        set_admin_password(
+            BOOTSTRAP_ADMIN_PASS,
+            must_change=is_weak_admin_password(BOOTSTRAP_ADMIN_PASS),
+            source="bootstrap"
+        )
+        print("[INFO] Admin password initialized from ADMIN_PASS.")
+        return
+
+    if ALLOW_DEFAULT_ADMIN:
+        set_admin_password("CHANGE_ME", must_change=True, source="fallback")
+        print("[WARN] ADMIN_PASS not set. Using development fallback CHANGE_ME because ALLOW_DEFAULT_ADMIN=1")
+        return
+
+    raise RuntimeError("ADMIN_PASS is required. Set ADMIN_PASS, or enable ALLOW_DEFAULT_ADMIN=1 only for local development.")
+
+ensure_admin_auth()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -234,17 +330,41 @@ async def reset(request: Request):
 @app.post("/api/admin/save")
 async def save_stages_endpoint(request: Request):
     data = await request.json()
-    if data.get("password") == ADMIN_PASS:
-        save_json(STAGES_DB, data.get("stages"))
-        return {"status": "ok"}
-    return JSONResponse(status_code=403, content={"status": "error"})
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+    save_json(STAGES_DB, data.get("stages"))
+    return {"status": "ok"}
 
 @app.post("/api/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
-    if data.get("password") == ADMIN_PASS:
-        return {"status": "ok"}
+    if verify_admin_password(data.get("password")):
+        return {"status": "ok", "must_change": admin_password_change_required()}
     return JSONResponse(status_code=403, content={"status": "fail"})
+
+@app.post("/api/admin/change-password")
+async def admin_change_password(request: Request):
+    data = await request.json()
+    current_password = (data.get("password") or "").strip()
+    new_password = (data.get("new_password") or "").strip()
+    confirm_password = (data.get("confirm_password") or "").strip()
+
+    if not verify_admin_password(current_password):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+
+    if not new_password:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "new password required"})
+
+    if new_password != confirm_password:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "passwords do not match"})
+
+    if is_weak_admin_password(new_password):
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "choose a stronger password (minimum 10 chars, avoid temporary/default values)"})
+
+    set_admin_password(new_password, must_change=False, source="web_change")
+    return {"status": "ok"}
 
 @app.get("/sw.js")
 async def saga_sw_block():

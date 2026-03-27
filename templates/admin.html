@@ -52,6 +52,20 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
   </div>
 </div>
 
+<div id="must-change-screen" class="fixed inset-0 bg-black z-[10001] hidden flex items-center justify-center p-4">
+  <div class="border border-amber-700 p-8 w-full max-w-lg text-center bg-zinc-950">
+    <h1 class="text-2xl font-bold mb-4 tracking-widest text-white">CHANGE ADMIN PASSWORD</h1>
+    <div class="text-sm text-zinc-300 leading-relaxed mb-6">
+      A temporary or insecure admin password is active.<br>
+      You must set a new password before continuing.
+    </div>
+    <input id="new-pass" type="password" class="config-input text-center mb-3" placeholder="NEW PASSWORD">
+    <input id="new-pass-2" type="password" class="config-input text-center mb-4" placeholder="CONFIRM NEW PASSWORD">
+    <button onclick="submitPasswordChange()" class="w-full bg-amber-700 text-white py-3 font-bold hover:bg-amber-600 mb-3">SAVE NEW PASSWORD</button>
+    <button onclick="backToLogin()" class="w-full bg-zinc-900 text-zinc-200 py-3 font-bold hover:bg-zinc-800">RETURN</button>
+  </div>
+</div>
+
 <div id="main-ui" class="flex flex-grow h-full hidden">
   <div class="sidebar p-4">
     <div class="mb-4 border-b border-zinc-900 pb-4">
@@ -215,6 +229,50 @@ function toggleSection(id) {
   }
 }
 
+async function enterAdminUi() {
+  document.getElementById('main-ui').classList.remove('hidden');
+  map.invalidateSize();
+  await loadConfigAdmin();
+  await load();
+}
+
+function backToLogin() {
+  pass = "";
+  document.getElementById('new-pass').value = "";
+  document.getElementById('new-pass-2').value = "";
+  document.getElementById('must-change-screen').classList.add('hidden');
+  document.getElementById('main-ui').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+async function submitPasswordChange() {
+  const p1 = document.getElementById('new-pass').value;
+  const p2 = document.getElementById('new-pass-2').value;
+
+  let r = await fetch('/api/admin/change-password', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      password: pass,
+      new_password: p1,
+      confirm_password: p2
+    })
+  });
+
+  let data = await r.json().catch(() => ({}));
+
+  if (r.ok) {
+    pass = p1;
+    document.getElementById('new-pass').value = "";
+    document.getElementById('new-pass-2').value = "";
+    document.getElementById('must-change-screen').classList.add('hidden');
+    await enterAdminUi();
+    alert('PASSWORD UPDATED');
+  } else {
+    alert((data && data.detail) ? String(data.detail).toUpperCase() : 'ERROR CHANGING PASSWORD');
+  }
+}
+
 async function login() {
   let p = document.getElementById('pass').value;
   let r = await fetch('/api/admin/login', {
@@ -223,15 +281,20 @@ async function login() {
     body: JSON.stringify({ password: p })
   });
 
+  let data = await r.json().catch(() => ({}));
+
   if (r.ok) {
     pass = p;
     document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('main-ui').classList.remove('hidden');
-    map.invalidateSize();
-    await loadConfigAdmin();
-    await load();
+
+    if (data && data.must_change) {
+      document.getElementById('must-change-screen').classList.remove('hidden');
+      return;
+    }
+
+    await enterAdminUi();
   } else {
-    alert("DENEGADO");
+    alert("DENIED");
   }
 }
 
