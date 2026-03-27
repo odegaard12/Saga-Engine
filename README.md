@@ -1,8 +1,8 @@
 # 🚀 SAGA Engine
 
-SAGA is a self-hosted engine for creating geolocated games, real-world routes, and interactive node-based experiences.
+SAGA is a self-hosted engine for building geolocated games, real-world routes, and interactive node-based experiences.
 
-Design your own adventures. Control everything. Deploy anywhere.
+Design your own adventure, host it yourself, and control the full player flow.
 
 ---
 
@@ -12,16 +12,17 @@ Design your own adventures. Control everything. Deploy anywhere.
 - Player selection system
 - Node-based progression
 - Mini-games per node
-- Admin panel (full control)
-- Fully configurable (titles, story, players)
-- JSON-based storage (simple & portable)
-- Ready for remote access (Cloudflare, VPN, etc.)
+- Admin panel for editing game content
+- JSON-based data storage
+- Self-hosted deployment
+- Docker-friendly setup
+- Suitable for local testing and remote HTTPS deployments
 
 ---
 
 ## 🧠 Concept
 
-SAGA works around nodes.
+SAGA works around **nodes**.
 
 Each node is a real-world location that can include:
 
@@ -29,146 +30,253 @@ Each node is a real-world location that can include:
 - Activation radius
 - A mini-game or interaction
 - Custom text or instructions
+- A rune or code
+- Per-node configuration
 
-Players move through the route, unlock nodes, and progress through the experience.
+Players move across the route, unlock nodes, complete interactions, and progress through the experience.
 
 ---
 
-## 🖥️ Interface Overview
+## 🖥️ Main Routes
 
 ### Player Selection
-Route: /
+- Route: `/`
 
-Players choose a profile and start the experience.
+Players choose a profile and enter the game.
 
----
+### Player Game View
+- Route: `/player/{PLAYER_NAME}`
 
-### Game Interface
-Route: /player/<name>
+Includes:
 
 - Map
 - Current objective
-- Node interaction
-- Progress tracking
-
----
+- Distance to active node
+- Rune/code input
+- Debug mode
+- Mini-game modal
 
 ### Admin Panel
-Route: /admin
+- Route: `/admin`
 
-Control everything:
+Admin can control:
 
 - Titles and subtitles
-- Story and prologue
+- Story and prologue text
 - Players
-- Map settings
-- Nodes (create / edit / delete)
+- Map center and zoom
+- Nodes
+- Node position, radius, content, type, rune, config
 
-Nodes can also be created directly by clicking on the map.
+Nodes can also be created directly from the map.
 
 ---
 
 ## 🔄 Game Flow
 
 1. Player enters the game
-2. System loads progression
+2. Current progression is loaded
 3. Active node is determined
-4. Player interacts with node
-5. Completes challenge
-6. Progress is saved
+4. Map and objective are rendered
+5. Distance to node is evaluated
+6. Player enters node area
+7. Mini-game or interaction is completed
+8. Progress is saved
+9. Next node becomes active
 
 ---
 
 ## 🎮 Mini-games
 
-Handled in frontend:
+Mini-game frontend logic lives in:
 
-static/minigames_final.js
+    static/minigames_final.js
 
-Each node can trigger a different type of interaction.
+The exact game opened depends on the current node `type`.
 
 ---
 
 ## 📁 Project Structure
 
-main.py                  → FastAPI backend  
-config.json              → Global configuration  
+    main.py                  FastAPI backend
+    config.json              Global configuration
+    .env.example             Example environment file
+    Dockerfile               Container build
 
-data/  
-  stages.json            → Nodes  
-  gamestate.json         → Player progress  
-  positions.json         → Player positions  
+    data/
+      stages.json            Node definitions
+      gamestate.json         Player progress
+      positions.json         Optional player positions storage
 
-templates/  
-  login.html             → Player selection  
-  game.html              → Game UI  
-  admin.html             → Admin panel  
+    templates/
+      login.html             Player selection
+      game.html              Player UI
+      admin.html             Admin panel
 
-static/  
-  minigames_final.js     → Game logic  
+    static/
+      minigames_final.js     Frontend mini-game logic
 
 ---
 
 ## ⚙️ Configuration
 
-Edit config.json:
+Main configuration lives in `config.json`.
 
-- Titles
-- Story
-- Prologue
-- Players
-- Map center and zoom
+You can define:
+
+- Site title
+- Admin texts
+- Story texts
+- Prologue texts
+- Map center
+- Map zoom
+- Players list
+- Data directory
+
+Example fields:
+
+- `site_name`
+- `admin_title`
+- `admin_subtitle`
+- `story_title`
+- `story_text`
+- `map_center`
+- `map_zoom`
+- `players`
+- `data_dir`
+- `prologue_title`
+- `prologue_subtitle`
+- `prologue_body`
 
 ---
 
 ## 🔐 Environment
 
-Create .env:
+Create a local environment file:
 
-cp .env.example .env
+    cp .env.example .env
 
-Set:
+Set at least:
 
-ADMIN_PASS=your_password
+    ADMIN_PASS=your_password_here
 
-Never commit .env
+### Important
+
+Do **not** commit `.env`.
 
 ---
 
-## 🧪 Local Run
+## 🧪 Local Run (Python)
 
-python3 -m venv .venv  
-source .venv/bin/activate  
-pip install fastapi uvicorn jinja2  
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install fastapi uvicorn jinja2
 
-export $(grep -v '^#' .env | xargs)  
+    export $(grep -v '^#' .env | xargs)
 
-python -m uvicorn main:app --host 0.0.0.0 --port 8097  
+    python -m uvicorn main:app --host 0.0.0.0 --port 8097
+
+---
+
+## 🐳 Docker Run
+
+Example local bind-mount deployment:
+
+    docker run -d \
+      --name saga_engine_app \
+      -p 8096:5000 \
+      -e ADMIN_PASS='your_password_here' \
+      -v ~/saga_engine:/app \
+      --restart unless-stopped \
+      saga-engine
+
+If you are building locally first:
+
+    docker build -t saga-engine .
+
+---
+
+## 📍 Geolocation / GPS
+
+SAGA player geolocation depends on browser permissions and secure context rules.
+
+### What works
+
+- **HTTPS deployments**: recommended for real player testing
+- **Secure public/reverse-proxied access**: recommended for live experiences
+- **DEBUG mode**: recommended for local development when real GPS is not available
+
+### What may not work
+
+Opening the player through a local network IP over plain HTTP, for example:
+
+    http://192.168.x.x:8096/player/PLAYER%201
+
+may load the map and nodes correctly, but the browser can block geolocation entirely.
+
+In that case:
+
+- The player may not receive a GPS permission prompt
+- Real distance updates may not work
+- The game can remain locked until GPS is available
+- DEBUG mode should be used for local testing
+
+### Recommended testing modes
+
+- **Real GPS test**: deploy behind HTTPS
+- **Local UI / game flow test**: local HTTP + DEBUG
+- **Same-machine test**: `localhost` may work depending on browser and OS, but HTTPS is still the reliable setup
+
+---
+
+## 🧪 Debug Mode
+
+DEBUG mode is useful for:
+
+- Testing local gameplay flow
+- Testing node interaction without GPS
+- Validating UI and mini-game opening
+- Verifying progression logic during development
+
+Use DEBUG when testing over local HTTP if browser geolocation is blocked.
 
 ---
 
 ## 🌍 Remote Access
 
-You can expose SAGA using:
+You can expose SAGA with:
 
 - Reverse proxy
 - VPN
-- Cloudflare Tunnel
+- HTTPS domain
+- Tunnel solutions
 
-Always protect /admin
+For real player testing on phones and browsers, HTTPS is strongly recommended.
+
+Always protect `/admin`.
 
 ---
 
-## 🔒 Security
+## 🔒 Security Notes
 
-Before publishing:
+Before publishing or sharing a deployment:
 
-- Do not commit .env
+- Do not commit `.env`
 - Do not include credentials
-- Do not include private URLs
-- Do not include real user data
+- Do not expose `/admin` without protection
+- Do not rely on default credentials
+- Do not publish real player data
+- Use demo data in public repositories
 
-Use only generic demo data
+### Admin password warning
+
+If `ADMIN_PASS` is missing, your backend may fall back to a development/default password depending on the current code path.
+
+For real deployments:
+
+- always set `ADMIN_PASS`
+- verify `/admin` is protected
+- never leave default credentials active
 
 ---
 
@@ -179,16 +287,19 @@ Use only generic demo data
 - Tourism routes
 - ARG experiences
 - Educational activities
-
----
-
-## 📄 License
-
-MIT recommended
+- Interactive story routes
+- Team challenges
 
 ---
 
 ## 🚧 Status
 
-Project under active development
+Project under active development.
 
+Current public version is intended as a clean, self-hosted base that can be adapted for custom experiences.
+
+---
+
+## 📄 License
+
+MIT recommended.

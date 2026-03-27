@@ -894,55 +894,12 @@ async function requestPermissions() {
 
 
   
-  function showVideoOverlay(src, onDone){
-    try{
-      // CSS 1 vez
-        const st = document.createElement("style");
-        st.textContent = `
-            display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(1.02);
-            transition:opacity .28s ease, transform .28s ease;}
-            background:rgba(0,0,0,.65);padding:12px;box-shadow:0 0 30px rgba(0,255,65,.08);}
-            padding:8px 12px;border-radius:999px;font-weight:700;cursor:pointer}
-        `;
-        document.head.appendChild(st);
-      }
-
-      // overlay
-      if(ov) ov.remove();
-      ov = document.createElement("div");
-      ov.innerHTML = `
-        <div class="card">
-          <div class="top">
-            <div class="ttl">[ REGISTRO VISUAL ]</div>
-          </div>
-          <div class="hint">Si no arranca solo, pulsa ▶️ en el vídeo.</div>
-        </div>
-      `;
-      document.body.appendChild(ov);
-      requestAnimationFrame(()=>ov.classList.add("on"));
-
-      const close = ()=>{
-        try{ ov.classList.remove("on"); }catch(e){}
-        setTimeout(()=>{ try{ ov.remove(); }catch(e){} }, 220);
-      };
-
-      let advanced = false;
-      const done = ()=>{
-        if(advanced) return;
-        advanced = true;
-        close();
-        try{ onDone && onDone(); }catch(e){}
-      };
-
-      v.onended = done;
-      v.onerror = done;
-
-      // fail-safe
-      setTimeout(done, 30000);
-    }catch(e){
-      try{ onDone && onDone(); }catch(e2){}
+    function showVideoOverlay(src, onDone){
+      try{
+        if (typeof onDone === "function") onDone();
+      }catch(e){}
     }
-  }
+
 
 
 async function loadState() {
@@ -1021,11 +978,170 @@ function updateDist(lat, lon) {
     }
 }
 
-navigator.geolocation.watchPosition(p => {
-    // Guardar SIEMPRE la última posición real, incluso en DEBUG
-    lastRealPos = {lat: p.coords.latitude, lon: p.coords.longitude};
-    if(!debugMode) updateDist(lastRealPos.lat, lastRealPos.lon);
-}, e => console.log(e), {enableHighAccuracy:true, maximumAge:0});
+let gpsNoticeText = '';
+
+function ensureGpsBadge() {
+    let badge = document.getElementById('gps-badge');
+    if (badge) return badge;
+
+    badge = document.createElement('button');
+    badge.id = 'gps-badge';
+    badge.type = 'button';
+    badge.title = 'GPS status';
+    badge.innerText = 'GPS!';
+    badge.style.display = 'none';
+    badge.style.marginLeft = '8px';
+    badge.style.padding = '4px 8px';
+    badge.style.border = '1px solid #b45309';
+    badge.style.borderRadius = '999px';
+    badge.style.background = 'rgba(20,12,0,.92)';
+    badge.style.color = '#facc15';
+    badge.style.fontSize = '10px';
+    badge.style.letterSpacing = '.12em';
+    badge.style.textTransform = 'uppercase';
+    badge.style.cursor = 'pointer';
+    badge.style.boxShadow = '0 0 12px rgba(250,204,21,.18)';
+
+    badge.onclick = () => {
+        if (gpsNoticeText) showGpsNotice(gpsNoticeText, false);
+    };
+
+    const debugBtn = document.getElementById('debug-btn');
+    if (debugBtn && debugBtn.parentElement) {
+        debugBtn.parentElement.appendChild(badge);
+    } else {
+        badge.style.position = 'fixed';
+        badge.style.top = '12px';
+        badge.style.right = '12px';
+        badge.style.zIndex = '9999';
+        document.body.appendChild(badge);
+    }
+
+    return badge;
+}
+
+function hideGpsNotice() {
+    const el = document.getElementById('gps-notice');
+    if (!el) return;
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-6px)';
+    setTimeout(() => {
+        const cur = document.getElementById('gps-notice');
+        if (cur) cur.remove();
+    }, 220);
+}
+
+function showGpsNotice(text, sticky=false) {
+    gpsNoticeText = text;
+
+    let el = document.getElementById('gps-notice');
+    if (el) el.remove();
+
+    el = document.createElement('div');
+    el.id = 'gps-notice';
+    el.style.position = 'fixed';
+    el.style.left = '50%';
+    el.style.top = '72px';
+    el.style.transform = 'translateX(-50%)';
+    el.style.zIndex = '9999';
+    el.style.width = 'min(92vw, 720px)';
+    el.style.padding = '14px 16px';
+    el.style.border = '1px solid #b45309';
+    el.style.background = 'rgba(20,12,0,.96)';
+    el.style.color = '#facc15';
+    el.style.fontSize = '14px';
+    el.style.lineHeight = '1.45';
+    el.style.textTransform = 'uppercase';
+    el.style.letterSpacing = '.08em';
+    el.style.borderRadius = '12px';
+    el.style.boxShadow = '0 0 24px rgba(250,204,21,.16)';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .22s ease, transform .22s ease';
+
+    el.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-size:11px;opacity:.8;margin-bottom:6px;">[ GPS STATUS ]</div>
+          <div>${text}</div>
+        </div>
+        <button id="gps-notice-close" type="button"
+          style="border:1px solid #b45309;background:transparent;color:#facc15;border-radius:999px;padding:4px 8px;cursor:pointer;font-size:10px;letter-spacing:.12em;">
+          CLOSE
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    const badge = ensureGpsBadge();
+    badge.style.display = 'inline-block';
+
+    const closeBtn = document.getElementById('gps-notice-close');
+    if (closeBtn) closeBtn.onclick = hideGpsNotice;
+
+    if (!sticky) {
+        setTimeout(() => {
+            const cur = document.getElementById('gps-notice');
+            if (cur) hideGpsNotice();
+        }, 4200);
+    }
+}
+
+function clearGpsNotice() {
+    hideGpsNotice();
+    const badge = document.getElementById('gps-badge');
+    if (badge) badge.style.display = 'none';
+}
+
+function setGpsUnavailable(reason) {
+    const dist = document.getElementById('dist-display');
+    if (dist) dist.innerText = 'GPS OFF';
+
+    const btn = document.getElementById('main-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'GPS NO DISPONIBLE';
+        btn.style.borderColor = '#b45309';
+        btn.style.color = '#facc15';
+    }
+
+    if (reason) showGpsNotice(reason, false);
+}
+
+if (!('geolocation' in navigator)) {
+    setGpsUnavailable('Este navegador no soporta geolocalización. Usa DEBUG para pruebas.');
+} else {
+    navigator.geolocation.watchPosition(
+        p => {
+            lastRealPos = {lat: p.coords.latitude, lon: p.coords.longitude};
+
+            clearGpsNotice();
+
+            if (!debugMode) updateDist(lastRealPos.lat, lastRealPos.lon);
+        },
+        e => {
+            console.warn('Geolocation error:', e);
+
+            const insecureLocal =
+                location.protocol !== 'https:' &&
+                location.hostname !== 'localhost' &&
+                location.hostname !== '127.0.0.1';
+
+            if (insecureLocal) {
+                setGpsUnavailable('GPS bloqueado: en HTTP local por IP el navegador puede bloquear la ubicación. Usa HTTPS. Para probar, activa DEBUG.');
+            } else if (e && e.code === 1) {
+                setGpsUnavailable('GPS denegado o bloqueado. Revisa permisos del navegador o usa DEBUG para pruebas.');
+            } else {
+                setGpsUnavailable('GPS no disponible ahora mismo. Revisa permisos o usa DEBUG para pruebas.');
+            }
+        },
+        {enableHighAccuracy:true, maximumAge:0, timeout:10000}
+    );
+}
 
 // --- MOTORES DE JUEGO ---
 
@@ -2103,15 +2219,12 @@ window.__saga_initPipes = (typeof initPipes === "function") ? initPipes : null;
 
 
 
-<script src="/static/minigames_final.js?v=2026-03-27_clean"
-
-
-</script>
-<script>
-  // fuerza la versión buena aunque minigames redefina initPipes
-  window.saga_initPipes = window.saga_initPipes || saga_initPipes;
-  window.initPipes = window.saga_initPipes;
-</script>
+  <script src="/static/minigames_final.js?v=2026-03-27_clean"></script>
+  <script>
+    // fuerza la versión buena aunque minigames redefina initPipes
+    window.saga_initPipes = window.saga_initPipes || window.__saga_initPipes;
+    if (window.saga_initPipes) window.initPipes = window.saga_initPipes;
+  </script>
 
 
 <script>
