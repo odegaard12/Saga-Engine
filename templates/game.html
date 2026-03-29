@@ -903,9 +903,10 @@ async function requestPermissions() {
 
 
 async function loadState() {
-    let [rState, rStages] = await Promise.all([fetch('/api/state/'+USER), fetch('/api/admin/stages')]);
-    let state = await rState.json(), stages = await rStages.json();
-    
+    let payload = await fetch('/api/game/' + USER).then(r => r.json());
+    let state = { level: payload.level, finished: payload.finished };
+    let stages = payload.stages || [];
+
     // Limpiar mapa excepto userMarker
     map.eachLayer(l => {
         if((l instanceof L.Marker || l instanceof L.Circle) && l !== userMarker) map.removeLayer(l);
@@ -914,9 +915,15 @@ async function loadState() {
     if(state.finished) { showFinishedScreen(); return; }
     
     currentTarget = stages[state.level];
-    renderRunes(state.level); 
-    config = currentTarget.config;
-    document.getElementById('target-name').innerText = currentTarget.title;
+
+    if (!currentTarget) {
+        showFinishedScreen();
+        return;
+    }
+
+    renderRunes(state.level);
+    config = currentTarget.config || {};
+    document.getElementById('target-name').innerText = currentTarget.title || '';
 
     stages.forEach((s, i) => {
         let isCurrent = (i === state.level);
@@ -949,8 +956,21 @@ async function loadState() {
 }
 
 // UPDATE POSICIÓN USUARIO
+function getCurrentEntryRules() {
+    return (currentTarget && currentTarget.entry) ? currentTarget.entry : {};
+}
+
+function getCurrentMessages() {
+    return (currentTarget && currentTarget.messages) ? currentTarget.messages : {};
+}
+
+function getNodeMessage(key, fallback='') {
+    const messages = getCurrentMessages();
+    const value = (messages && typeof messages[key] === 'string') ? messages[key].trim() : '';
+    return value || fallback || '';
+}
+
 function updateDist(lat, lon) {
-    // Actualizar o crear marcador azul del usuario
     if(!userMarker) {
         let uIcon = L.divIcon({className: 'user-marker', iconSize:[16,16], iconAnchor:[8,8]});
         userMarker = L.marker([lat, lon], {icon: uIcon, zIndexOffset: 1000}).addTo(map);
@@ -959,12 +979,28 @@ function updateDist(lat, lon) {
     }
 
     if(!currentTarget) return;
+
+    const entry = getCurrentEntryRules();
+    const requireProximity = entry.mode !== 'free' && entry.require_proximity !== false;
+    const allowDebugBypass = entry.allow_debug_bypass !== false;
+
     let d = map.distance([lat, lon], [currentTarget.lat, currentTarget.lon]);
-    if(debugMode) d = 0;
-    
-    document.getElementById('dist-display').innerText = Math.round(d) + " m";
+    if(debugMode && allowDebugBypass) d = 0;
+
+    document.getElementById('dist-display').innerText = requireProximity ? (Math.round(d) + " m") : "FREE";
     let btn = document.getElementById('main-btn');
-    
+    if (!btn) return;
+
+    btn.title = getNodeMessage('locked', '');
+
+    if(!requireProximity) {
+        btn.disabled = false;
+        btn.innerText = ">> ENTER <<";
+        btn.style.borderColor = "#00ff41";
+        btn.style.color = "#00ff41";
+        return;
+    }
+
     if(d <= currentTarget.radius) {
         btn.disabled = false;
         btn.innerText = ">> ENTER <<";
@@ -1101,15 +1137,19 @@ function setGpsUnavailable(reason) {
     const dist = document.getElementById('dist-display');
     if (dist) dist.innerText = 'GPS OFF';
 
+    const entry = getCurrentEntryRules();
+    const canEnterWithoutGps = entry.mode === 'free' || entry.require_proximity === false;
+
     const btn = document.getElementById('main-btn');
     if (btn) {
-        btn.disabled = true;
-        btn.innerText = 'GPS NO DISPONIBLE';
-        btn.style.borderColor = '#b45309';
-        btn.style.color = '#facc15';
+        btn.disabled = !canEnterWithoutGps;
+        btn.innerText = canEnterWithoutGps ? '>> ENTER <<' : 'GPS NO DISPONIBLE';
+        btn.style.borderColor = canEnterWithoutGps ? '#00ff41' : '#b45309';
+        btn.style.color = canEnterWithoutGps ? '#00ff41' : '#facc15';
     }
 
-    if (reason) showGpsNotice(reason, false);
+    const finalReason = getNodeMessage('gps_unavailable', reason);
+    if (finalReason) showGpsNotice(finalReason, false);
 }
 
 if (!('geolocation' in navigator)) {
@@ -1149,15 +1189,18 @@ function openGame() {
     document.getElementById('game-modal').classList.add('active');
     let c = document.getElementById('game-canvas'); c.innerHTML = "";
     const gi = document.getElementById('game-instruction');
-if(currentTarget && currentTarget.type === 'cryptex'){
-  gi.innerText = "";
-  gi.style.display = "none";
-}else{
-  gi.style.display = "";
-  gi.innerText = currentTarget.content;
-}
-    
-    const t = currentTarget.type;
+      const baseContent = (currentTarget && currentTarget.content) ? currentTarget.content : '';
+      const hintText = getNodeMessage('hint', '');
+
+      if(currentTarget && currentTarget.type === 'cryptex'){
+        gi.innerText = "";
+        gi.style.display = "none";
+      }else{
+        gi.style.display = "";
+        gi.innerText = hintText ? (baseContent + "\n\nHINT: " + hintText) : baseContent;
+      }
+
+      const t = currentTarget.type;
     if(t === 'digital_tuner') { window.initDigitalTuner(c, currentTarget.config); } else if(t === 'circuit_hack') initPipes(c);
     else if(t === 'cryptex') {
       const cfg = (currentTarget && currentTarget.config) ? currentTarget.config : {};

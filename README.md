@@ -1,349 +1,302 @@
-# 🚀 SAGA Engine
+# SAGA Engine
 
-SAGA is a self-hosted engine for building geolocated games, real-world routes, and interactive node-based experiences.
+SAGA Engine is a self-hosted engine for building geolocated games, real-world routes, and node-based interactive experiences.
 
-Design your own adventure, host it yourself, and control the full player flow.
+It is designed for organizers who want full control over:
+- player flow
+- node progression
+- admin-managed content
+- fallback recovery using organizer-provided codes / runes
+- self-hosted deployment
+
+SAGA is already usable as a real engine for route-based experiences and is evolving toward a cleaner node model with stronger runtime validation and more explicit gameplay rules.
 
 ---
 
-## ✨ Features
+## What SAGA does
 
-- Interactive map-based gameplay
-- Player selection system
-- Node-based progression
+A SAGA experience is built around **nodes**.
+
+A node can represent:
+- a real-world GPS point
+- a challenge location
+- a puzzle checkpoint
+- a narrative stop
+- a manual recovery / organizer override point
+
+Players move through nodes in order.  
+At each node, the engine can combine:
+- map location
+- activation radius
+- mini-game
+- custom narrative / instructions
+- fallback answer / rune
+- per-node entry rules
+- per-node GPS / hint messages
+
+---
+
+## Current project status
+
+The current engine supports:
+
+- player selection flow
+- player game screen with map and current objective
+- sequential node progression
 - GPS-based node access
-- Manual fallback progression using organizer-provided codes / runes
-- Multiple mini-game types
-- Admin panel for editing game content
-- JSON-based storage
-- Persistent admin authentication
-- Forced admin password change flow for temporary / insecure passwords
-- Docker-friendly deployment
-- Suitable for local testing and remote HTTPS deployments
+- organizer fallback progression using answer / rune
+- mini-game based progression
+- persistent admin authentication
+- forced admin password change flow
+- runtime node normalization and validation
+- sanitized player payloads that do not expose fallback secrets
+
+This means the public schema remains compatible and simple, while the backend already works internally with a cleaner runtime node model.
 
 ---
 
-## 🧠 Concept
+## Main routes
 
-SAGA works around **nodes**.
-
-Each node is a real-world location that can include:
-
-- Coordinates
-- Activation radius
-- A mini-game or interaction
-- Custom text or instructions
-- A fallback code / rune
-- Per-node configuration
-
-Players move across the route, unlock nodes, complete interactions, and progress through the experience.
-
----
-
-## 🖥️ Main Routes
-
-### Player Selection
+### Player selection
 - Route: `/`
 
-Players choose a profile and enter the game.
+Players choose a player profile and enter the experience.
 
-### Player Game View
+### Player game
 - Route: `/player/{PLAYER_NAME}`
 
-Includes:
+The player UI includes:
+- interactive map
+- active node
+- distance to target
+- code / rune input
+- debug mode
+- mini-game modal
+- GPS notice / badge
+- per-node hint support
+- per-node GPS unavailable messaging
 
-- Interactive map
-- Current objective
-- Distance to active node
-- Rune / code input
-- Debug mode
-- Mini-game modal
-- GPS status feedback
-
-### Admin Panel
+### Admin panel
 - Route: `/admin`
 
-Admin can control:
+The admin panel currently manages:
+- site title
+- admin texts
+- story and prologue text
+- players
+- map center and zoom
+- node list
+- node coordinates
+- node radius
+- node type
+- node content
+- node config
+- fallback answer / rune
 
-- Titles and subtitles
-- Story and prologue text
-- Players
-- Map center and zoom
-- Nodes
-- Node position, radius, content, type, rune, config
-
-Nodes can also be created directly from the map.
+Current admin editing still uses the simple public stage schema.  
+The backend already normalizes that schema internally into a richer runtime model.
 
 ---
 
-## 🔄 Gameplay Flow
+## Gameplay flow
 
-Normal flow:
+Normal progression flow:
 
 1. Player enters the game
-2. Current progression is loaded
-3. Active node is determined
-4. Map and objective are rendered
-5. Distance to node is evaluated
-6. Player reaches the active node area
+2. Current state is loaded
+3. Current active node is resolved
+4. Map and node markers are rendered
+5. GPS / entry conditions are evaluated
+6. Player enters the active node
 7. Mini-game or interaction is completed
 8. Progress is saved
 9. Next node becomes active
 
 ---
 
-## 🔐 Fallback Progression (Codes / Runes)
+## Fallback progression: official feature
 
-SAGA also supports **manual recovery / organizer override**.
+Fallback progression is an official engine feature.
 
-If a player cannot complete a node normally, for example:
-
-- GPS is blocked
+This is useful when:
+- browser geolocation is blocked
 - GPS fails in the field
-- a node is inaccessible
-- a mini-game cannot be completed
+- the player cannot physically unlock the node
+- a mini-game fails or becomes unusable
 - the organizer wants to manually advance a team
 
-the player can enter a valid fallback value in the code field.
+Current progression backend accepts success through:
 
-Current backend accepts progression through:
-
-- automatic `OK` after mini-game success
+- mini-game success token: `OK`
 - `answer`
 - `rune`
 
-This allows the organizer to keep the route moving even when real-world conditions fail.
+So the current engine supports:
+- normal completion
+- organizer recovery
+- field failure recovery
+- manual override without destroying route continuity
 
 ---
 
-## 🎮 Current Mini-games / Interaction Types
+## GPS / secure context notes
 
-Current player code supports these node types:
+Real player GPS depends on browser secure context rules.
 
-- `circuit_hack`
-- `cryptex`
-- `radio_azimuth`
-- `gyro_storm`
-- `switchboard`
-- `simon_says`
-- `compass_blow`
-- `digital_tuner`
+### Recommended
+- HTTPS deployment
+- reverse proxy / tunnel / public secure access
+- real phone/browser testing over HTTPS
 
-The exact game opened depends on the current node `type`.
+### Local development
+Local plain HTTP by LAN IP may block geolocation entirely, even if the map itself works.
 
-Frontend mini-game logic lives mainly in:
+Typical example:
+- map loads
+- node markers load
+- player screen opens
+- browser never grants geolocation
+- distance never updates
 
-    static/minigames_final.js
-
-There is also player-side game logic in:
-
-    templates/game.html
-
----
-
-## 🧪 Debug Mode
-
-`DEBUG` is intended for local testing and recovery.
-
-What it is useful for:
-
-- testing node flow without real GPS
-- simulating access to a node
-- validating that the map, objective, and mini-game open correctly
-- local development over HTTP where browser geolocation may be blocked
-
-In the current player implementation, debug mode allows local route testing without depending on real field conditions.
+For that reason SAGA supports:
+- visible GPS warning UI
+- persistent small GPS badge
+- DEBUG mode for local flow testing
+- fallback progression using code / rune
 
 ---
 
-## 📍 Geolocation / GPS
+## Debug mode
 
-SAGA player geolocation depends on browser permissions and secure context rules.
+DEBUG is intended for:
+- local UI testing
+- route flow testing without real GPS
+- node access simulation
+- mini-game testing
+- recovery during organizer checks
 
-### What works
-
-- **HTTPS deployments**: recommended for real player testing
-- **Secure public / reverse-proxied access**: recommended for live experiences
-- **DEBUG mode**: recommended for local development when real GPS is not available
-
-### What may not work
-
-Opening the player through a local network IP over plain HTTP, for example:
-
-    http://192.168.x.x:8096/player/PLAYER%201
-
-may load the map and nodes correctly, but the browser can block geolocation entirely.
-
-In that case:
-
-- the player may not receive a GPS permission prompt
-- real distance updates may not work
-- the game can remain locked until GPS is available
-- DEBUG mode should be used for local testing
-
-### Recommended testing modes
-
-- **Real GPS test**: deploy behind HTTPS
-- **Local UI / flow test**: local HTTP + DEBUG
-- **Same-machine test**: `localhost` may work depending on browser and OS, but HTTPS is still the reliable setup
+With the current runtime node model, a node can explicitly allow or deny debug bypass behavior.
 
 ---
 
-## 🔑 Admin Authentication
+## Admin authentication
 
-Admin authentication is now **persistent**.
+Admin authentication is persistent.
 
-It is no longer only based on a raw environment variable comparison at request time.
+It is no longer only a raw environment variable comparison on every request.
 
 Current behavior:
 
-- admin auth is stored in:
-
-    data/admin_auth.json
-
-- a bootstrap password can be provided through `ADMIN_PASS`
-- temporary or insecure passwords can trigger a **forced password change** screen
-- the admin panel can block access until a new password is set
-
-This makes admin auth more practical and safer for real use.
+- admin auth is stored in `data/admin_auth.json`
+- bootstrap password can be initialized with `ADMIN_PASS`
+- insecure / temporary passwords can trigger forced password change
+- admin can be blocked from the panel until password is changed
+- reset from terminal is supported with `ADMIN_RESET=1`
 
 ### Important
-
 Do **not** commit:
-
 - `.env`
 - `data/admin_auth.json`
 
-`data/admin_auth.json` should remain local to the deployment.
+---
+
+## Forced password change flow
+
+If the current admin password is temporary or weak, the admin UI can require a password change before access is granted.
+
+Typical flow:
+1. bootstrap or reset from terminal
+2. login with temporary password
+3. UI shows password-change screen
+4. admin cannot continue until a stronger password is saved
+
+This is important for recovery workflows where terminal reset is allowed but the final deployed system should not remain exposed.
 
 ---
 
-## 🔒 Forced Password Change Flow
+## Docker bootstrap / reset
 
-If a temporary or insecure admin password is active, the admin UI can require a password change before access is granted.
+### Normal bootstrap
+```bash
+docker rm -f saga_engine_app
+docker run -d \
+  --name saga_engine_app \
+  -p 8096:5000 \
+  -e ADMIN_PASS='YOUR_PASSWORD' \
+  -v ~/saga_engine:/app \
+  --restart unless-stopped \
+  saga_engine:latest
+```
 
-Typical use case:
+### Forced reset
+```bash
+docker rm -f saga_engine_app
+docker run -d \
+  --name saga_engine_app \
+  -p 8096:5000 \
+  -e ADMIN_PASS='TEMPORARY_PASSWORD' \
+  -e ADMIN_RESET='1' \
+  -v ~/saga_engine:/app \
+  --restart unless-stopped \
+  saga_engine:latest
+```
 
-- you bootstrap or reset admin access from terminal
-- you log in with the temporary password
-- the UI shows:
+### Local development fallback only
+```bash
+ALLOW_DEFAULT_ADMIN=1
+```
 
-    CHANGE ADMIN PASSWORD
-
-- the admin cannot continue until a new password is saved
-
-This is useful when recovering access without leaving the system permanently exposed.
-
----
-
-## 🔁 Change or Reset Admin Password from Terminal
-
-If you control the server, you do not need the old password.
-You can replace or reset admin access from terminal.
-
-### Docker: normal bootstrap
-
-    docker rm -f saga_engine_app
-
-    docker run -d \
-      --name saga_engine_app \
-      -p 8096:5000 \
-      -e ADMIN_PASS='YOUR_PASSWORD' \
-      -v ~/saga_engine:/app \
-      --restart unless-stopped \
-      saga_engine:latest
-
-### Docker: force reset from terminal
-
-    docker rm -f saga_engine_app
-
-    docker run -d \
-      --name saga_engine_app \
-      -p 8096:5000 \
-      -e ADMIN_PASS='TEMPORARY_PASSWORD' \
-      -e ADMIN_RESET='1' \
-      -v ~/saga_engine:/app \
-      --restart unless-stopped \
-      saga_engine:latest
-
-This resets the stored admin auth and allows you to recover access.
-
-### Local-development fallback only
-
-Only for local development, you may explicitly allow the fallback password:
-
-    ALLOW_DEFAULT_ADMIN=1
-
-If enabled, the system may initialize a temporary default password flow.
-
-This should never be used for real deployments.
+Use this only for local development, never for real deployments.
 
 ---
 
-## ⚙️ Environment
+## Environment
 
-Create a local environment file:
+Typical `.env` values:
 
-    cp .env.example .env
+```env
+ADMIN_PASS=your_password_here
+ALLOW_DEFAULT_ADMIN=0
+ADMIN_RESET=0
+```
 
-Typical values:
-
-    ADMIN_PASS=your_password_here
-    ALLOW_DEFAULT_ADMIN=0
-    ADMIN_RESET=0
-
-### Notes
-
-- `ADMIN_PASS` is required in normal use
-- `ALLOW_DEFAULT_ADMIN=1` is for local development only
-- `ADMIN_RESET=1` is for password reset / recovery workflows
+Notes:
+- `ADMIN_PASS` is required for normal use
+- `ALLOW_DEFAULT_ADMIN=1` is development only
+- `ADMIN_RESET=1` is for deliberate password recovery / reset
 
 Do **not** commit `.env`.
 
 ---
 
-## 📁 Project Structure
+## Current mini-games / interaction types
 
-    main.py                  FastAPI backend
-    config.json              Global configuration
-    .env.example             Example environment file
-    Dockerfile               Container build
+Current runtime supports these node types:
 
-    data/
-      stages.json            Node definitions
-      gamestate.json         Player progress
-      positions.json         Optional player positions storage
-      admin_auth.json        Persistent admin authentication (local only)
+- `digital_tuner`
+- `circuit_hack`
+- `cryptex`
+- `radio_azimuth`
+- `gyro_storm`
+- `simon_says`
+- `switchboard`
+- `compass_blow`
 
-    templates/
-      login.html             Player selection
-      game.html              Player UI
-      admin.html             Admin panel
+Frontend mini-game logic is mainly in:
+- `static/minigames_final.js`
 
-    static/
-      minigames_final.js     Frontend mini-game logic
+Player game flow logic also lives in:
+- `templates/game.html`
 
 ---
 
-## ⚙️ Configuration
+## Data model
 
-Main configuration lives in:
+### Global config
+Stored in:
+- `config.json`
 
-    config.json
-
-You can define:
-
-- Site title
-- Admin texts
-- Story texts
-- Prologue texts
-- Map center
-- Map zoom
-- Players list
-- Data directory
-
-Example fields:
-
+Typical fields:
 - `site_name`
 - `admin_title`
 - `admin_subtitle`
@@ -357,150 +310,250 @@ Example fields:
 - `prologue_subtitle`
 - `prologue_body`
 
+### Public stage schema (compatible / editable today)
+Stored in:
+- `data/stages.json`
+
+Current editable schema still supports simple node objects like:
+
+```json
+{
+  "id": 0,
+  "title": "NODE TITLE",
+  "lat": 42.0000,
+  "lon": -8.0000,
+  "radius": 50,
+  "type": "circuit_hack",
+  "content": "NODE TEXT",
+  "config": {},
+  "answer": "",
+  "rune": ""
+}
+```
+
+### Optional legacy-compatible fields already supported by runtime
+These fields can also be added today and are already interpreted by the runtime:
+
+```json
+{
+  "hint": "Fallback hint shown inside the node",
+  "gps_unavailable_message": "Custom message when GPS is unavailable",
+  "locked_message": "Custom message for locked / distance state",
+  "require_proximity": true,
+  "allow_debug_bypass": true,
+  "allow_manual_fallback_without_gps": true,
+  "entry_mode": "gps"
+}
+```
+
+Supported `entry_mode` values:
+- `gps`
+- `free`
+
+Meaning:
+- `gps`: node is expected to use GPS / distance rules
+- `free`: node can be entered without proximity requirement
+
+### Current note
+The admin panel does not yet expose all these advanced entry/message fields visually.  
+However, the backend runtime already supports them.
+
 ---
 
-## 🧱 Data Model (Current)
+## Runtime node model (internal)
 
-### Global config
+Internally, the backend now normalizes public stage nodes into a richer runtime structure.
 
-Stored in:
+Conceptually, the engine now works with sections like:
 
-    config.json
+- `presentation`
+- `location`
+- `entry`
+- `interaction`
+- `success`
+- `messages`
+- `debug`
 
-### Node list
+This internal runtime model allows:
+- safer evolution without breaking existing stage files
+- explicit entry rules
+- explicit message handling
+- cleaner future admin tooling
+- stage validation before saving
 
-Stored in:
+### Runtime behavior currently included
+- stage normalization from public JSON
+- stage validation before `/api/admin/save`
+- per-node entry rule interpretation
+- per-node message interpretation
+- sanitized player payload projection
 
-    data/stages.json
+---
 
-Typical per-node fields include:
+## Sanitized player payload
 
-- `id`
-- `title`
-- `lat`
-- `lon`
-- `radius`
-- `type`
-- `content`
-- `config`
+Players no longer consume raw admin stage data.
+
+Current player flow uses:
+- `GET /api/game/{user}`
+
+The player payload includes only what the player needs:
+- level / finished state
+- map-visible stage info
+- current active node runtime info
+- current node entry rules
+- current node messages
+
+It does **not** expose fallback secrets such as:
 - `answer`
 - `rune`
 
-### Player progression
-
-Stored in:
-
-    data/gamestate.json
-
-Current format is simple and portable, for example:
-
-    {
-      "PLAYER 1": 1,
-      "PLAYER 2": 0
-    }
+This is a major improvement over directly shipping raw stage definitions to the player client.
 
 ---
 
-## 🧪 Local Run (Python)
+## Stage validation
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install fastapi uvicorn jinja2
+When saving stages through admin, the backend now validates node data before writing it.
 
-    export $(grep -v '^#' .env | xargs)
+Validation currently checks things such as:
+- title is present
+- node type is supported
+- config is an object
+- entry mode is valid
+- GPS nodes with proximity rules have valid lat/lon/radius
+- success condition structure is valid
 
-    python -m uvicorn main:app --host 0.0.0.0 --port 8097
-
----
-
-## 🐳 Docker Run
-
-Example local bind-mount deployment:
-
-    docker run -d \
-      --name saga_engine_app \
-      -p 8096:5000 \
-      -e ADMIN_PASS='your_password_here' \
-      -v ~/saga_engine:/app \
-      --restart unless-stopped \
-      saga_engine:latest
-
-If you are building locally first:
-
-    docker build -t saga_engine .
+This reduces accidental broken saves and prepares the project for richer admin tooling.
 
 ---
 
-## 🌍 Remote Access
+## Current project structure
 
-You can expose SAGA with:
+```text
+main.py                      FastAPI backend
+config.json                  Global configuration
+.env.example                 Example environment values
+Dockerfile                   Container build
+data/
+  stages.json                Node definitions
+  gamestate.json             Player progression
+  positions.json             Optional player positions
+  admin_auth.json            Persistent admin auth (local only; do not commit)
+templates/
+  login.html                 Player selection
+  game.html                  Player UI
+  admin.html                 Admin panel
+static/
+  minigames_final.js         Frontend mini-game logic
+```
 
+---
+
+## Local run (Python)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install fastapi uvicorn jinja2
+export $(grep -v '^#' .env | xargs)
+python -m uvicorn main:app --host 0.0.0.0 --port 8097
+```
+
+---
+
+## Docker run
+
+Example bind-mount deployment:
+
+```bash
+docker run -d \
+  --name saga_engine_app \
+  -p 8096:5000 \
+  -e ADMIN_PASS='your_password_here' \
+  -v ~/saga_engine:/app \
+  --restart unless-stopped \
+  saga_engine:latest
+```
+
+If building locally first:
+
+```bash
+docker build -t saga_engine .
+```
+
+---
+
+## Remote access
+
+For real player use, HTTPS is strongly recommended.
+
+You can expose SAGA using:
 - reverse proxy
+- tunnel
 - VPN
-- HTTPS domain
-- tunnel solutions
-
-For real player testing on phones and browsers, HTTPS is strongly recommended.
+- secure domain
+- other secure remote access methods
 
 Always protect `/admin`.
 
 ---
 
-## 🔒 Security Notes
+## Security notes
 
 Before publishing or sharing a deployment:
 
 - do not commit `.env`
 - do not commit `data/admin_auth.json`
-- do not include credentials
 - do not expose `/admin` without protection
-- do not rely on temporary or default credentials
-- do not publish real player data
-- use demo data in public repositories
+- do not rely on default or temporary passwords
+- do not publish private player data
+- use demo content in public repositories if needed
 
 For real deployments:
 
 - always set `ADMIN_PASS`
 - keep `ALLOW_DEFAULT_ADMIN=0`
-- use `ADMIN_RESET=1` only when intentionally resetting access
-- verify `/admin` is protected
-- rotate temporary passwords immediately
+- use `ADMIN_RESET=1` only intentionally
+- rotate temporary credentials immediately
+- verify HTTPS for real player tests
 
 ---
 
-## 🧰 Use Cases
+## Use cases
 
-- Outdoor games
-- Treasure hunts
-- Tourism routes
+SAGA can be used for:
+
+- outdoor games
 - ARG experiences
-- Educational activities
-- Interactive story routes
-- Team challenges
-
----
-
-## 🚧 Status
-
-Project under active development.
-
-The current public version is already usable as a self-hosted base for:
-
 - geolocated routes
-- organizer-controlled progression
-- fallback code/rune recovery
-- admin-managed custom game flows
-
-Future improvements may include:
-
-- richer node logic
-- more admin tools
-- more mini-game types
-- cleaner data model
-- more production-grade frontend packaging
+- tourism experiences
+- puzzle routes
+- educational activities
+- team challenges
+- organizer-managed recovery flows
 
 ---
 
-## 📄 License
+## Current development direction
+
+The engine is already usable, but active development is focused on:
+
+1. richer node logic
+2. better admin tools
+3. more mini-games / interaction types
+4. cleaner runtime / schema evolution
+5. improved player UX
+
+Current architecture direction is:
+
+- keep public stage schema compatible
+- evolve runtime node model internally
+- expose safer player payloads
+- move toward cleaner admin editing of richer node rules
+
+---
+
+## License
 
 MIT recommended.
