@@ -93,6 +93,12 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
         <label>Admin subtitle</label>
         <input id="cfg-admin-subtitle" class="config-input">
 
+        <label>UI language</label>
+        <select id="cfg-ui-lang" class="config-input">
+          <option value="es">Español</option>
+          <option value="en">English</option>
+        </select>
+
         <label>Login subtitle</label>
         <input id="cfg-story-title" class="config-input">
 
@@ -154,13 +160,13 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
   </div>
 </div>
 
-<div id="editor" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-8 backdrop-blur-sm">
-  <div class="bg-zinc-950 border border-zinc-800 w-full max-w-2xl p-6 rounded shadow-2xl">
+<div id="editor" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
+  <div class="bg-zinc-950 border border-zinc-800 w-full max-w-5xl max-h-[92vh] overflow-y-auto p-4 md:p-6 rounded shadow-2xl">
     <div class="flex justify-between mb-4 border-b border-zinc-800 pb-2">
       <h2 class="text-lg font-bold text-white tracking-widest" id="edit-header">EDIT NODE</h2>
       <button onclick="closeEditor()" class="text-zinc-500 hover:text-white">✕</button>
     </div>
-    <div class="grid grid-cols-3 gap-4 mb-2">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
       <div class="col-span-2"><label>Node title</label><input id="e-title" class="config-input"></div>
       <div><label>Radius (m)</label><input id="e-radius" type="number" class="config-input"></div>
     </div>
@@ -178,7 +184,46 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
     <div id="game-params" class="bg-black p-4 border border-zinc-800 rounded mb-4"></div>
     <label>Node text</label>
     <textarea id="e-content" class="config-input h-24 font-mono text-xs leading-tight"></textarea>
-    <div class="flex justify-end gap-2 mt-4">
+
+    <div class="bg-black p-4 border border-zinc-800 rounded mb-4">
+      <div class="text-[11px] uppercase tracking-widest text-zinc-400 mb-3">Acceso del nodo y mensajes al jugador</div>
+
+      <div class="grid grid-cols-2 gap-4 mb-3">
+        <div>
+          <label>Modo de acceso</label><div class="text-[10px] text-zinc-500 mb-1">Cómo se desbloquea este nodo.</div>
+          <select id="e-entry-mode" class="config-input">
+            <option value="gps">Por ubicación (GPS)</option>
+            <option value="free">Acceso libre</option>
+          </select>
+        </div>
+
+        <div class="space-y-2 pt-6">
+          <label class="flex items-center gap-2 text-xs text-zinc-300">
+            <input id="e-require-proximity" type="checkbox">
+            <span>Exigir cercanía al punto</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs text-zinc-300">
+            <input id="e-allow-debug-bypass" type="checkbox">
+            <span>Permitir acceso en DEBUG</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs text-zinc-300">
+            <input id="e-allow-manual-fallback-without-gps" type="checkbox">
+            <span>Permitir código/runa si falla GPS</span>
+          </label>
+        </div>
+      </div>
+
+      <label>Pista opcional</label><div class="text-[10px] text-zinc-500 mb-1">Ayuda breve que verá el jugador al abrir el nodo.</div>
+      <textarea id="e-hint" class="config-input h-20 font-mono text-xs leading-tight"></textarea>
+
+      <label>Mensaje si falla GPS</label><div class="text-[10px] text-zinc-500 mb-1">Texto mostrado cuando el navegador no puede dar ubicación.</div>
+      <textarea id="e-gps-unavailable-message" class="config-input h-20 font-mono text-xs leading-tight"></textarea>
+
+      <label>Mensaje cuando el nodo está bloqueado</label><div class="text-[10px] text-zinc-500 mb-1">Texto mostrado cuando aún no se puede entrar al nodo.</div>
+      <textarea id="e-locked-message" class="config-input h-20 font-mono text-xs leading-tight"></textarea>
+    </div>
+
+    <div class="flex flex-wrap justify-end gap-2 mt-4">
       <button onclick="delPoint()" class="px-4 py-2 bg-red-900/20 text-red-500 text-xs border border-red-900 hover:bg-red-900/40">DELETE</button>
       <button onclick="applyChanges()" class="px-6 py-2 bg-blue-900 text-white text-xs font-bold hover:bg-blue-800">APPLY CHANGES</button>
     </div>
@@ -212,7 +257,14 @@ map.on('click', function(e) {
     content: "PUT NODE TEXT HERE",
     config: {},
     answer: "",
-    rune: ""
+    rune: "",
+    entry_mode: "gps",
+    require_proximity: true,
+    allow_debug_bypass: true,
+    allow_manual_fallback_without_gps: true,
+    hint: "",
+    gps_unavailable_message: "",
+    locked_message: ""
   });
   render();
 });
@@ -305,6 +357,7 @@ async function loadConfigAdmin() {
   document.getElementById('cfg-site-name').value = cfg.site_name || '';
   document.getElementById('cfg-admin-title').value = cfg.admin_title || '';
   document.getElementById('cfg-admin-subtitle').value = cfg.admin_subtitle || '';
+    document.getElementById('cfg-ui-lang').value = cfg.ui_lang || 'es';
   document.getElementById('cfg-story-title').value = cfg.story_title || '';
   document.getElementById('cfg-story-text').value = cfg.story_text || '';
   document.getElementById('cfg-prologue-title').value = cfg.prologue_title || '';
@@ -325,6 +378,7 @@ async function saveConfigAdmin() {
     site_name: document.getElementById('cfg-site-name').value,
     admin_title: document.getElementById('cfg-admin-title').value,
     admin_subtitle: document.getElementById('cfg-admin-subtitle').value,
+      ui_lang: document.getElementById('cfg-ui-lang').value,
     story_title: document.getElementById('cfg-story-title').value,
     story_text: document.getElementById('cfg-story-text').value,
     prologue_title: document.getElementById('cfg-prologue-title').value,
@@ -397,14 +451,45 @@ function moveItem(i, dir) {
   render();
 }
 
+
+function getStageEntryValue(s, key, fallback) {
+  const entry = (s && s.entry && typeof s.entry === "object") ? s.entry : {};
+  if (entry[key] !== undefined && entry[key] !== null) return entry[key];
+  if (s && s[key] !== undefined && s[key] !== null) return s[key];
+  return fallback;
+}
+
+function getStageMessageValue(s, key, legacyKey, fallback="") {
+  const messages = (s && s.messages && typeof s.messages === "object") ? s.messages : {};
+  if (messages[key] !== undefined && messages[key] !== null && String(messages[key]).trim() !== "") return messages[key];
+  if (s && s[legacyKey] !== undefined && s[legacyKey] !== null) return s[legacyKey];
+  return fallback;
+}
+
 function openEditor(i) {
   currentIdx = i;
   let s = stages[i];
+
+  const entryMode = String(getStageEntryValue(s, "mode", getStageEntryValue(s, "entry_mode", "gps")) || "gps").toLowerCase();
+  const requireProximity = !!getStageEntryValue(s, "require_proximity", entryMode !== "free");
+  const allowDebugBypass = !!getStageEntryValue(s, "allow_debug_bypass", true);
+  const allowManualFallbackWithoutGps = !!getStageEntryValue(s, "allow_manual_fallback_without_gps", true);
+
   document.getElementById('edit-header').innerText = `EDITAR: ${s.title}`;
   document.getElementById('e-title').value = s.title || '';
   document.getElementById('e-radius').value = s.radius || 50;
   document.getElementById('e-type').value = s.type || 'circuit_hack';
   document.getElementById('e-content').value = s.content || '';
+
+  document.getElementById('e-entry-mode').value = entryMode;
+  document.getElementById('e-require-proximity').checked = requireProximity;
+  document.getElementById('e-allow-debug-bypass').checked = allowDebugBypass;
+  document.getElementById('e-allow-manual-fallback-without-gps').checked = allowManualFallbackWithoutGps;
+
+  document.getElementById('e-hint').value = getStageMessageValue(s, "hint", "hint", "");
+  document.getElementById('e-gps-unavailable-message').value = getStageMessageValue(s, "gps_unavailable", "gps_unavailable_message", "");
+  document.getElementById('e-locked-message').value = getStageMessageValue(s, "locked", "locked_message", "");
+
   renderGameConfig();
   document.getElementById('editor').classList.remove('hidden');
 }
@@ -452,6 +537,20 @@ function applyChanges() {
     s.config.mode = document.getElementById('cfg-mode')?.value || 'dial_navegacion';
   }
 
+  const entryMode = (document.getElementById('e-entry-mode')?.value || 'gps').toLowerCase();
+  s.entry_mode = entryMode;
+  s.require_proximity = entryMode === 'free' ? false : !!document.getElementById('e-require-proximity')?.checked;
+  s.allow_debug_bypass = !!document.getElementById('e-allow-debug-bypass')?.checked;
+  s.allow_manual_fallback_without_gps = !!document.getElementById('e-allow-manual-fallback-without-gps')?.checked;
+
+  s.hint = document.getElementById('e-hint')?.value || '';
+  s.gps_unavailable_message = document.getElementById('e-gps-unavailable-message')?.value || '';
+  s.locked_message = document.getElementById('e-locked-message')?.value || '';
+
+  delete s.entry;
+  delete s.messages;
+  delete s.debug;
+
   closeEditor();
   render();
 }
@@ -476,7 +575,14 @@ function addNew() {
     content: "",
     config: {},
     answer: "",
-    rune: ""
+    rune: "",
+    entry_mode: "gps",
+    require_proximity: true,
+    allow_debug_bypass: true,
+    allow_manual_fallback_without_gps: true,
+    hint: "",
+    gps_unavailable_message: "",
+    locked_message: ""
   });
   render();
 }
