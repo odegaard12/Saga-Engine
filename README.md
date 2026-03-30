@@ -1,162 +1,178 @@
-# SAGA Engine
+# 🧭 SAGA Engine
 
-SAGA Engine is a self-hosted engine for building geolocated games, real-world routes, and node-based interactive experiences.
+**SAGA Engine** is a self-hosted engine for building **geolocated games**, **real-world interactive routes**, and **node-based experiences**.
 
 It is designed for organizers who want full control over:
+
 - player flow
 - node progression
 - admin-managed content
-- fallback recovery using organizer-provided codes / runes
+- organizer fallback recovery with answer / rune
 - self-hosted deployment
-
-SAGA is already usable as a real engine for route-based experiences and is evolving toward a cleaner node model with stronger runtime validation and more explicit gameplay rules.
 
 ---
 
-## What SAGA does
+## ✨ Current status
+
+SAGA is already usable as a real engine for:
+
+- outdoor routes
+- ARG-style experiences
+- tourism / exploration flows
+- puzzle checkpoints
+- organizer-managed recovery flows
+
+The project keeps a **simple public editable schema** while internally evolving toward a **cleaner runtime node model** with stronger validation and safer player payloads.
+
+---
+
+## 🚀 What SAGA does
 
 A SAGA experience is built around **nodes**.
 
 A node can represent:
-- a real-world GPS point
-- a challenge location
-- a puzzle checkpoint
-- a narrative stop
-- a manual recovery / organizer override point
+
+- 📍 a real-world GPS point
+- 🧩 a challenge location
+- 🔐 a puzzle checkpoint
+- 📖 a narrative stop
+- 🛠️ a manual recovery / organizer override point
 
 Players move through nodes in order.  
 At each node, the engine can combine:
+
 - map location
 - activation radius
 - mini-game
-- custom narrative / instructions
-- fallback answer / rune
+- narrative / instructions
+- organizer fallback answer / rune
 - per-node entry rules
-- per-node GPS / hint messages
+- per-node GPS / hint / locked messages
 
 ---
 
-## Current project status
+## ✅ Current capabilities
 
-The current engine supports:
-
-- player selection flow
-- player game screen with map and current objective
-- sequential node progression
-- GPS-based node access
-- organizer fallback progression using answer / rune
-- mini-game based progression
-- persistent admin authentication
-- forced admin password change flow
-- admin UI language selection (`es` / `en`)
-- runtime node normalization and validation
-- sanitized player payloads that do not expose fallback secrets
-
-This means the public schema remains compatible and simple, while the backend already works internally with a cleaner runtime node model.
+| Area | Status |
+|---|---|
+| Player selection flow | ✅ Implemented |
+| Player game screen with map | ✅ Implemented |
+| Sequential node progression | ✅ Implemented |
+| GPS-based access | ✅ Implemented |
+| Fallback progression via answer / rune | ✅ Implemented |
+| Mini-game progression | ✅ Implemented |
+| Persistent admin authentication | ✅ Implemented |
+| Forced admin password change flow | ✅ Implemented |
+| Admin UI language selection (`es` / `en`) | ✅ Implemented |
+| Runtime node normalization / validation | ✅ Implemented |
+| Sanitized player payloads | ✅ Implemented |
 
 ---
 
-## Main routes
+## 🧱 Main routes
 
-### Player selection
-- Route: `/`
+| Route | Purpose |
+|---|---|
+| `/` | Player selection |
+| `/player/{PLAYER_NAME}` | Player game UI |
+| `/admin` | Admin panel |
+| `/api/config` | Public config payload |
+| `/api/game/{user}` | Sanitized player game payload |
+| `/api/admin/stages` | Admin stage data |
+| `/api/admin/save-config` | Save global config |
+| `/api/admin/save` | Save stages |
 
-Players choose a player profile and enter the experience.
+---
 
-### Player game
-- Route: `/player/{PLAYER_NAME}`
+## 👤 Player experience
 
-The player UI includes:
-- interactive map
-- active node
-- distance to target
-- code / rune input
-- debug mode
-- mini-game modal
-- GPS notice / badge
-- per-node hint support
-- per-node GPS unavailable messaging
+The player UI currently includes:
 
-### Admin panel
-- Route: `/admin`
+- 🗺️ interactive map
+- 🎯 active node
+- 📏 distance to target
+- 🔤 answer / rune input
+- 🧪 debug mode
+- 🕹️ mini-game modal
+- 📡 GPS warning UI
+- 🏷️ persistent small GPS badge
+- 💡 per-node hint support
+- ⚠️ per-node GPS unavailable messaging
+
+---
+
+## 🛠️ Admin panel
 
 The admin panel currently manages:
-- site title
-- admin texts
-- admin UI language
-- story and prologue text
-- players
-- map center and zoom
-- node list
-- node coordinates
-- node radius
-- node type
-- node content
-- node config
-- node entry mode
-- node proximity / debug / manual fallback flags
-- node hint / GPS unavailable / locked messages
-- fallback answer / rune
 
-Current admin editing still uses the simple public stage schema.  
-The backend already normalizes that schema internally into a richer runtime model.
+| Global config | Nodes |
+|---|---|
+| site title | node list |
+| admin texts | node coordinates |
+| admin UI language | node radius |
+| story and prologue text | node type |
+| players | node content |
+| map center and zoom | node config |
+|  | fallback answer / rune |
+|  | node entry mode |
+|  | node proximity / debug / manual fallback flags |
+|  | node hint / GPS unavailable / locked messages |
+
+> The admin still edits a **simple public stage schema**.  
+> The backend internally normalizes that schema into a richer runtime model.
 
 ---
 
-## Gameplay flow
+## 🔄 Gameplay flow
 
-Normal progression flow:
+### Normal progression
 
 1. Player enters the game
 2. Current state is loaded
-3. Current active node is resolved
-4. Map and node markers are rendered
+3. Active node is resolved
+4. Map and markers are rendered
 5. GPS / entry conditions are evaluated
-6. Player enters the active node
+6. Player enters the node
 7. Mini-game or interaction is completed
 8. Progress is saved
 9. Next node becomes active
 
----
+### Organizer fallback progression
 
-## Fallback progression: official feature
+Fallback progression is an **official engine feature**.
 
-Fallback progression is an official engine feature.
+Useful when:
 
-This is useful when:
 - browser geolocation is blocked
 - GPS fails in the field
 - the player cannot physically unlock the node
-- a mini-game fails or becomes unusable
-- the organizer wants to manually advance a team
+- a mini-game becomes unusable
+- the organizer needs to manually recover a team
 
 Current progression backend accepts success through:
 
-- mini-game success token: `OK`
+- `OK` mini-game success token
 - `answer`
 - `rune`
 
-So the current engine supports:
-- normal completion
-- organizer recovery
-- field failure recovery
-- manual override without destroying route continuity
-
 ---
 
-## GPS / secure context notes
+## 📡 GPS / secure context notes
 
-Real player GPS depends on browser secure context rules.
+Real GPS depends on browser secure-context rules.
 
 ### Recommended
+
 - HTTPS deployment
-- reverse proxy / tunnel / public secure access
+- reverse proxy / tunnel / secure domain
 - real phone/browser testing over HTTPS
 
-### Local development
-Local plain HTTP by LAN IP may block geolocation entirely, even if the map itself works.
+### Local development note
 
-Typical example:
+Plain HTTP over LAN IP may block geolocation even if the map itself works.
+
+Typical symptom:
+
 - map loads
 - node markers load
 - player screen opens
@@ -164,52 +180,57 @@ Typical example:
 - distance never updates
 
 For that reason SAGA supports:
+
 - visible GPS warning UI
 - persistent small GPS badge
-- DEBUG mode for local flow testing
-- fallback progression using code / rune
+- DEBUG mode for local testing
+- fallback progression using answer / rune
 
 ---
 
-## Debug mode
+## 🧪 Debug mode
 
 DEBUG is intended for:
+
 - local UI testing
 - route flow testing without real GPS
 - node access simulation
 - mini-game testing
-- recovery during organizer checks
+- organizer recovery checks
 
 With the current runtime node model, a node can explicitly allow or deny debug bypass behavior.
 
 ---
 
-## Admin authentication
+## 🔐 Admin authentication
 
 Admin authentication is persistent.
 
-It is no longer only a raw environment variable comparison on every request.
+It is **no longer** only a raw environment-variable comparison on every request.
 
-Current behavior:
+### Current behavior
 
 - admin auth is stored in `data/admin_auth.json`
 - bootstrap password can be initialized with `ADMIN_PASS`
 - insecure / temporary passwords can trigger forced password change
 - admin can be blocked from the panel until password is changed
-- reset from terminal is supported with `ADMIN_RESET=1`
+- terminal reset is supported with `ADMIN_RESET=1`
 
 ### Important
+
 Do **not** commit:
+
 - `.env`
 - `data/admin_auth.json`
 
 ---
 
-## Forced password change flow
+## 🔑 Forced password change flow
 
 If the current admin password is temporary or weak, the admin UI can require a password change before access is granted.
 
 Typical flow:
+
 1. bootstrap or reset from terminal
 2. login with temporary password
 3. UI shows password-change screen
@@ -219,9 +240,10 @@ This is important for recovery workflows where terminal reset is allowed but the
 
 ---
 
-## Docker bootstrap / reset
+## 🐳 Docker bootstrap / reset
 
 ### Normal bootstrap
+
 ```bash
 docker rm -f saga_engine_app
 docker run -d \
@@ -234,6 +256,7 @@ docker run -d \
 ```
 
 ### Forced reset
+
 ```bash
 docker rm -f saga_engine_app
 docker run -d \
@@ -247,15 +270,16 @@ docker run -d \
 ```
 
 ### Local development fallback only
-```bash
+
+```env
 ALLOW_DEFAULT_ADMIN=1
 ```
 
-Use this only for local development, never for real deployments.
+Use this **only** for local development, never for real deployments.
 
 ---
 
-## Environment
+## ⚙️ Environment
 
 Typical `.env` values:
 
@@ -265,59 +289,72 @@ ALLOW_DEFAULT_ADMIN=0
 ADMIN_RESET=0
 ```
 
-Notes:
+### Notes
+
 - `ADMIN_PASS` is required for normal use
 - `ALLOW_DEFAULT_ADMIN=1` is development only
 - `ADMIN_RESET=1` is for deliberate password recovery / reset
-
-Do **not** commit `.env`.
+- do not commit `.env`
 
 ---
 
-## Current mini-games / interaction types
+## 🎮 Current mini-games / interaction types
 
-Current runtime supports these node types:
+Currently supported:
 
-- `digital_tuner`
-- `circuit_hack`
-- `cryptex`
-- `radio_azimuth`
-- `gyro_storm`
-- `simon_says`
-- `switchboard`
-- `compass_blow`
+| Type |
+|---|
+| `digital_tuner` |
+| `circuit_hack` |
+| `cryptex` |
+| `radio_azimuth` |
+| `gyro_storm` |
+| `simon_says` |
+| `switchboard` |
+| `compass_blow` |
 
-Frontend mini-game logic is mainly in:
+Frontend mini-game logic mainly lives in:
+
 - `static/minigames_final.js`
 
 Player game flow logic also lives in:
+
 - `templates/game.html`
 
 ---
 
-## Data model
+## 🧩 Data model
 
 ### Global config
+
 Stored in:
+
 - `config.json`
 
 Typical fields:
-- `site_name`
-- `admin_title`
-- `admin_subtitle`
-- `story_title`
-- `story_text`
-- `map_center`
-- `map_zoom`
-- `players`
-- `ui_lang`
-- `data_dir`
-- `prologue_title`
-- `prologue_subtitle`
-- `prologue_body`
+
+| Field | Purpose |
+|---|---|
+| `site_name` | Public site title |
+| `admin_title` | Admin login / header title |
+| `admin_subtitle` | Admin subtitle |
+| `story_title` | Login subtitle |
+| `story_text` | Login story text |
+| `map_center` | Default map center |
+| `map_zoom` | Default map zoom |
+| `players` | Available player profiles |
+| `ui_lang` | Admin UI language (`es` / `en`) |
+| `data_dir` | Data folder |
+| `prologue_title` | Prologue title |
+| `prologue_subtitle` | Prologue subtitle |
+| `prologue_body` | Prologue body |
+
+---
 
 ### Public stage schema (compatible / editable today)
+
 Stored in:
+
 - `data/stages.json`
 
 Current editable schema still supports simple node objects like:
@@ -337,7 +374,10 @@ Current editable schema still supports simple node objects like:
 }
 ```
 
+---
+
 ### Optional legacy-compatible fields already supported by runtime
+
 These fields can also be added today and are already interpreted by the runtime:
 
 ```json
@@ -353,15 +393,17 @@ These fields can also be added today and are already interpreted by the runtime:
 ```
 
 Supported `entry_mode` values:
-- `gps`
-- `free`
 
-Meaning:
-- `gps`: node is expected to use GPS / distance rules
-- `free`: node can be entered without proximity requirement
+| Value | Meaning |
+|---|---|
+| `gps` | Node is expected to use GPS / distance rules |
+| `free` | Node can be entered without proximity requirement |
 
-### Current note
-The admin panel now includes basic visual editing for advanced entry/message fields such as:
+---
+
+## 📝 Current note
+
+The admin panel now includes **basic visual editing** for advanced entry/message fields such as:
 
 - `entry_mode`
 - `require_proximity`
@@ -372,15 +414,14 @@ The admin panel now includes basic visual editing for advanced entry/message fie
 - `locked_message`
 
 The public schema remains compatible and simple, while the backend runtime continues to normalize nodes internally into the richer runtime model.
-The admin panel does not yet expose all these advanced entry/message fields visually.  
 
 ---
 
-## Runtime node model (internal)
+## 🧠 Runtime node model (internal)
 
-Internally, the backend now normalizes public stage nodes into a richer runtime structure.
+Internally, the backend normalizes public stage nodes into a richer runtime structure.
 
-Conceptually, the engine now works with sections like:
+Conceptually, the engine works with sections like:
 
 - `presentation`
 - `location`
@@ -391,13 +432,17 @@ Conceptually, the engine now works with sections like:
 - `debug`
 
 This internal runtime model allows:
+
 - safer evolution without breaking existing stage files
 - explicit entry rules
 - explicit message handling
 - cleaner future admin tooling
 - stage validation before saving
 
-### Runtime behavior currently included
+---
+
+## 🧪 Runtime behavior currently included
+
 - stage normalization from public JSON
 - stage validation before `/api/admin/save`
 - per-node entry rule interpretation
@@ -406,14 +451,16 @@ This internal runtime model allows:
 
 ---
 
-## Sanitized player payload
+## 🛡️ Sanitized player payload
 
 Players no longer consume raw admin stage data.
 
 Current player flow uses:
+
 - `GET /api/game/{user}`
 
 The player payload includes only what the player needs:
+
 - level / finished state
 - map-visible stage info
 - current active node runtime info
@@ -421,6 +468,7 @@ The player payload includes only what the player needs:
 - current node messages
 
 It does **not** expose fallback secrets such as:
+
 - `answer`
 - `rune`
 
@@ -428,11 +476,12 @@ This is a major improvement over directly shipping raw stage definitions to the 
 
 ---
 
-## Stage validation
+## ✅ Stage validation
 
-When saving stages through admin, the backend now validates node data before writing it.
+When saving stages through admin, the backend validates node data before writing it.
 
 Validation currently checks things such as:
+
 - title is present
 - node type is supported
 - config is an object
@@ -444,7 +493,7 @@ This reduces accidental broken saves and prepares the project for richer admin t
 
 ---
 
-## Current project structure
+## 🗂️ Current project structure
 
 ```text
 main.py                      FastAPI backend
@@ -466,7 +515,7 @@ static/
 
 ---
 
-## Local run (Python)
+## ▶️ Local run (Python)
 
 ```bash
 python3 -m venv .venv
@@ -478,7 +527,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8097
 
 ---
 
-## Docker run
+## 🐳 Docker run
 
 Example bind-mount deployment:
 
@@ -500,11 +549,12 @@ docker build -t saga_engine .
 
 ---
 
-## Remote access
+## 🌐 Remote access
 
-For real player use, HTTPS is strongly recommended.
+For real player use, **HTTPS is strongly recommended**.
 
 You can expose SAGA using:
+
 - reverse proxy
 - tunnel
 - VPN
@@ -515,7 +565,7 @@ Always protect `/admin`.
 
 ---
 
-## Security notes
+## 🔒 Security notes
 
 Before publishing or sharing a deployment:
 
@@ -536,7 +586,7 @@ For real deployments:
 
 ---
 
-## Use cases
+## 🧭 Use cases
 
 SAGA can be used for:
 
@@ -551,15 +601,15 @@ SAGA can be used for:
 
 ---
 
-## Current development direction
+## 🔮 Current development direction
 
 The engine is already usable, but active development is focused on:
 
-1. richer node logic
-2. better admin tools
-3. more mini-games / interaction types
-4. cleaner runtime / schema evolution
-5. improved player UX
+- richer node logic
+- better admin tools
+- more mini-games / interaction types
+- cleaner runtime / schema evolution
+- improved player UX
 
 Current architecture direction is:
 
@@ -570,6 +620,14 @@ Current architecture direction is:
 
 ---
 
-## License
+## 📄 License
 
-MIT recommended.
+**MIT recommended.**
+
+If you want the repository to be fully clear for public reuse, add a `LICENSE` file.
+
+---
+
+## 🙌 About
+
+Self-hosted engine for geolocated games and real-world interactive routes.
