@@ -48,6 +48,7 @@ The current engine supports:
 - mini-game based progression
 - persistent admin authentication
 - forced admin password change flow
+- admin UI language selection (`es` / `en`)
 - runtime node normalization and validation
 - sanitized player payloads that do not expose fallback secrets
 
@@ -82,6 +83,7 @@ The player UI includes:
 The admin panel currently manages:
 - site title
 - admin texts
+- admin UI language
 - story and prologue text
 - players
 - map center and zoom
@@ -91,6 +93,9 @@ The admin panel currently manages:
 - node type
 - node content
 - node config
+- node entry mode
+- node proximity / debug / manual fallback flags
+- node hint / GPS unavailable / locked messages
 - fallback answer / rune
 
 Current admin editing still uses the simple public stage schema.  
@@ -305,6 +310,7 @@ Typical fields:
 - `map_center`
 - `map_zoom`
 - `players`
+- `ui_lang`
 - `data_dir`
 - `prologue_title`
 - `prologue_subtitle`
@@ -355,8 +361,18 @@ Meaning:
 - `free`: node can be entered without proximity requirement
 
 ### Current note
+The admin panel now includes basic visual editing for advanced entry/message fields such as:
+
+- `entry_mode`
+- `require_proximity`
+- `allow_debug_bypass`
+- `allow_manual_fallback_without_gps`
+- `hint`
+- `gps_unavailable_message`
+- `locked_message`
+
+The public schema remains compatible and simple, while the backend runtime continues to normalize nodes internally into the richer runtime model.
 The admin panel does not yet expose all these advanced entry/message fields visually.  
-However, the backend runtime already supports them.
 
 ---
 
