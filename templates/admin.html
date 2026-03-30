@@ -22,30 +22,36 @@ if ('serviceWorker' in navigator) {
 body { background: #050505; color: #00ff41; font-family: 'Fira Code', monospace; }
 .sidebar { background: #000; border-right: 1px solid #1a1a1a; width: 380px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .config-input { background: #111; border: 1px solid #333; color: #fff; padding: 8px; width: 100%; border-radius: 2px; margin-bottom: 8px; font-size: 11px; }
-.node-card { border-left: 3px solid #111; background: #0a0a0a; margin-bottom: 4px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
-.node-card.active { border-left-color: #00ff41; background: #151515; }
-.ctrl-btn { background: #111; color: #666; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; border: 1px solid #222; }
-.ctrl-btn:hover { color: #fff; border-color: #fff; }
-label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2px; display: block; }
-.section { border-top: 1px solid #111; padding-top: 10px; margin-top: 10px; }
-.section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:10px 0; }
-.section-head span { color:#aaa; font-size:10px; letter-spacing:.12em; }
-.section-head strong { color:#fff; font-size:11px; letter-spacing:.12em; }
-.section-body.hidden { display:none; }
-.small-btn { width:100%; padding:8px; background:#111; border:1px solid #222; color:#ddd; font-size:11px; }
-.small-btn:hover { background:#1a1a1a; }
+  .node-card { border:1px solid #202020; background:#0b0b0b; margin-bottom:10px; padding:12px; border-radius:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .node-card.active { border-color:#00ff41; background:#101410; box-shadow: inset 0 0 0 1px rgba(0,255,65,.12); }
+  .node-meta { display:flex; align-items:center; gap:6px; font-size:10px; color:#7c8a7c; letter-spacing:.05em; text-transform:uppercase; }
+  .node-badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px; border:1px solid rgba(0,255,65,.28); background:rgba(0,255,65,.08); color:#b7ffca; font-size:9px; letter-spacing:.12em; text-transform:uppercase; }
+  .ctrl-btn { background:#111; color:#9ca3af; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; border:1px solid #2a2a2a; border-radius:8px; }
+  .ctrl-btn:hover { color:#fff; border-color:#00ff41; background:#0f160f; }
+  label { font-size: 10px; color: #7c7c7c; text-transform: uppercase; letter-spacing: .10em; margin-bottom: 4px; display: block; }
+  .section { border:1px solid #171717; background:#080808; border-radius:16px; padding:14px; margin-top:12px; }
+  .section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:0; }
+  .section-head span { color:#8b97a7; font-size:11px; letter-spacing:.14em; }
+  .section-head strong { color:#fff; font-size:12px; letter-spacing:.14em; }
+  .section-body { margin-top:12px; }
+  .section-body.hidden { display:none; }
+  .small-btn { width:100%; padding:10px 12px; background:#111; border:1px solid #2a2a2a; color:#e5e7eb; font-size:11px; border-radius:12px; }
+  .small-btn:hover { background:#161616; border-color:#3a3a3a; }
 
-.custom-scrollbar::-webkit-scrollbar { width: 10px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; border: 2px solid #050505; }
-.sticky-savebar { position: sticky; top: 0; z-index: 30; background: #000; padding-bottom: 10px; }
+  .custom-scrollbar::-webkit-scrollbar { width: 10px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; border: 2px solid #050505; }
+  .sticky-savebar { position: sticky; top: 0; z-index: 30; background: #000; padding-bottom: 10px; }
+  .action-row { margin-top:16px; padding-top:14px; border-top:1px solid #1f1f1f; display:grid; grid-template-columns:1fr 1fr; gap:10px; position:sticky; bottom:0; background:linear-gradient(180deg, rgba(8,8,8,0), #080808 22%, #080808 100%); }
+  .map-shell { position:relative; padding:14px; background:#050505; }
+  .map-frame { position:absolute; inset:14px; border:1px solid #1f2937; border-radius:22px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.35); }
 
-</style>
-</head>
-<body class="h-screen flex overflow-hidden">
+  </style>
+  </head>
+  <body class="h-screen flex overflow-hidden">
 
-<div id="login-screen" class="fixed inset-0 bg-black z-[10000] flex items-center justify-center p-4">
-  <div class="border border-green-900 p-8 w-full max-w-sm text-center bg-zinc-950">
+  <div id="login-screen" class="fixed inset-0 bg-black z-[10000] flex items-center justify-center p-4">
+    <div class="border border-green-900 p-8 w-full max-w-sm text-center bg-zinc-950">
     <h1 class="text-2xl font-bold mb-6 tracking-widest text-white">{{ config.admin_title or 'SAGA_ADMIN' }}</h1>
     <input id="pass" type="password" class="config-input text-center mb-4" placeholder="CONTRASEÑA">
     <button onclick="login()" class="w-full bg-green-900 text-white py-3 font-bold hover:bg-green-700">ENTRAR</button>
@@ -67,21 +73,24 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
 </div>
 
 <div id="main-ui" class="flex flex-grow h-full hidden">
-  <div class="sidebar p-4">
-    <div class="mb-4 border-b border-zinc-900 pb-4">
-      <div class="flex items-center justify-between gap-2">
-        <h1 id="header-admin-title" class="text-white font-bold text-lg">{{ config.admin_title }}</h1>
-        <div class="flex items-center gap-2">
-          <button onclick="saveConfigAdmin(); saveAll();" style="font-size:10px;padding:4px 8px;border-radius:10px;border:1px solid #166534;background:#14532d;color:#fff;text-decoration:none;font-weight:800;letter-spacing:.08em">💾 SAVE ALL</button>
-          <a href="/" style="font-size:10px;padding:4px 8px;border-radius:10px;border:1px solid #7f1d1d;background:rgba(127,29,29,.25);color:#ff6b6b;text-decoration:none;font-weight:800;letter-spacing:.08em">⟵ RETURN TO LOGIN</a>
+  <div class="sidebar p-5">
+    <div class="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/90 p-4 shadow-2xl">
+        <div class="flex flex-col gap-4">
+          <div class="min-w-0">
+            <div class="mb-2 text-[10px] uppercase tracking-[.28em] text-emerald-300/80">Control panel</div>
+            <h1 id="header-admin-title" class="break-words text-xl font-bold leading-tight text-white">{{ config.admin_title }}</h1>
+            <div id="header-admin-subtitle" class="mt-2 break-words text-[11px] text-zinc-400">{{ config.admin_subtitle }}</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="saveConfigAdmin(); saveAll();" class="shrink-0 rounded-xl border border-emerald-500 bg-emerald-800 px-3 py-2 text-[11px] font-extrabold tracking-[.12em] text-white transition hover:bg-emerald-700">💾 SAVE ALL</button>
+            <a href="/" class="shrink-0 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-[11px] font-extrabold tracking-[.12em] text-zinc-200 no-underline transition hover:border-zinc-500 hover:text-white">⟵ RETURN</a>
+          </div>
         </div>
-      </div>
-      <div id="header-admin-subtitle" class="text-[9px] text-zinc-600">{{ config.admin_subtitle }}</div>
     </div>
 
     <div class="section">
       <div class="section-head" onclick="toggleSection('section-game')">
-        <strong>EDIT GAME</strong><span id="arrow-section-game">▶</span>
+        <strong>GAME SETTINGS</strong><span id="arrow-section-game">▶</span>
       </div>
       <div id="section-game" class="section-body hidden">
         <label>Site title</label>
@@ -130,7 +139,7 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
 
     <div class="section">
       <div class="section-head" onclick="toggleSection('section-players')">
-        <strong>EDIT PLAYERS</strong><span id="arrow-section-players">▶</span>
+        <strong>PLAYERS</strong><span id="arrow-section-players">▶</span>
       </div>
       <div id="section-players" class="section-body hidden">
         <label>Players (one per line)</label>
@@ -139,26 +148,27 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
       </div>
     </div>
 
-    <div class="section flex-grow min-h-0">
-      <div class="section-head" onclick="toggleSection('section-points')">
-        <strong>EDIT NODES</strong><span id="arrow-section-points">▶</span>
-      </div>
-      <div id="section-points" class="section-body hidden flex flex-col min-h-0" style="height:100%;">
-        <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
-        <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
-        <div id="list" class="flex-grow overflow-y-auto pr-2 custom-scrollbar"></div>
-        <div class="mt-4 pt-4 border-t border-zinc-900 grid grid-cols-2 gap-2">
-          <button onclick="addNew()" class="py-2 bg-zinc-900 text-zinc-400 text-xs border border-zinc-800 hover:bg-zinc-800">+ ADD NODE</button>
-          <button onclick="saveAll()" class="py-2 bg-green-900 text-white font-bold text-xs border border-green-500 hover:bg-green-700">💾 GUARDAR</button>
+      <div class="section flex-grow min-h-0">
+        <div class="section-head" onclick="toggleSection('section-points')">
+          <strong>NODES</strong><span id="arrow-section-points">▶</span>
+        </div>
+        <div id="section-points" class="section-body hidden flex flex-col min-h-0" style="height:100%;">
+          <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
+          <div id="list" class="flex-grow overflow-y-auto pr-2 custom-scrollbar"></div>
+          <div class="action-row">
+            <button onclick="addNew()" class="small-btn">+ ADD NODE</button>
+            <button onclick="saveAll()" class="rounded-xl border border-emerald-500 bg-emerald-800 px-3 py-2 text-[11px] font-extrabold tracking-[.12em] text-white transition hover:bg-emerald-700">💾 SAVE NODES</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="flex-grow relative">
-    <div id="map" class="absolute inset-0" style="filter: invert(1) hue-rotate(180deg) brightness(0.6);"></div>
+    <div class="flex-grow relative map-shell">
+      <div class="map-frame">
+        <div id="map" class="absolute inset-0" style="filter: invert(1) hue-rotate(180deg) brightness(0.6);"></div>
+      </div>
+    </div>
   </div>
-</div>
 
 <div id="editor" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
   <div class="bg-zinc-950 border border-zinc-800 w-full max-w-5xl max-h-[92vh] overflow-y-auto p-4 md:p-6 rounded shadow-2xl">
@@ -218,7 +228,6 @@ label { font-size: 9px; color: #666; text-transform: uppercase; margin-bottom: 2
 
       <label>Mensaje si falla GPS</label><div class="text-[10px] text-zinc-500 mb-1">Texto mostrado cuando el navegador no puede dar ubicación.</div>
       <textarea id="e-gps-unavailable-message" class="config-input h-20 font-mono text-xs leading-tight"></textarea>
-
       <label>Mensaje cuando el nodo está bloqueado</label><div class="text-[10px] text-zinc-500 mb-1">Texto mostrado cuando aún no se puede entrar al nodo.</div>
       <textarea id="e-locked-message" class="config-input h-20 font-mono text-xs leading-tight"></textarea>
     </div>
@@ -420,6 +429,8 @@ function render() {
   list.innerHTML = "";
 
   stages.forEach((s, i) => {
+      const entryMode = String(getStageEntryValue(s, "mode", getStageEntryValue(s, "entry_mode", "gps")) || "gps").toLowerCase();
+      const radius = Number(s.radius || 0);
     let m = L.marker([s.lat, s.lon], {draggable: true, icon: cmsPointIcon}).addTo(map);
     m.bindTooltip(`${i}: ${s.title}`, {permanent:true, direction:'right', className:'bg-black text-white border-0'});
     L.circle([s.lat, s.lon], {radius: s.radius, color: '#333', weight:1}).addTo(map);
@@ -428,16 +439,23 @@ function render() {
 
     let item = document.createElement('div');
     item.className = `node-card ${currentIdx === i ? 'active' : ''}`;
-    item.innerHTML = `
-      <div onclick="map.setView([${s.lat}, ${s.lon}], 16); openEditor(${i})" class="flex-grow cursor-pointer">
-        <div class="text-white text-xs font-bold leading-tight">${i}. ${s.title}</div>
-        <div class="text-[9px] text-green-700 truncate">${s.type}</div>
-      </div>
-      <div class="flex flex-col gap-1 ml-2">
-        <div onclick="moveItem(${i}, -1)" class="ctrl-btn hover:bg-green-900">▲</div>
-        <div onclick="moveItem(${i}, 1)" class="ctrl-btn hover:bg-green-900">▼</div>
-      </div>
-    `;
+      item.innerHTML = `
+        <div onclick="map.setView([${s.lat}, ${s.lon}], 16); openEditor(${i})" class="flex-grow cursor-pointer min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="text-white text-sm font-bold leading-tight truncate">${i}. ${s.title}</div>
+            <span class="node-badge">${entryMode === 'free' ? 'FREE' : 'GPS'}</span>
+          </div>
+          <div class="node-meta">
+            <span>${s.type}</span>
+            <span>•</span>
+            <span>${radius}m</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2 ml-2 shrink-0">
+          <button type="button" onclick="moveItem(${i}, -1)" class="ctrl-btn" aria-label="Move node up">▲</button>
+          <button type="button" onclick="moveItem(${i}, 1)" class="ctrl-btn" aria-label="Move node down">▼</button>
+        </div>
+      `;
     list.appendChild(item);
   });
 }
@@ -604,11 +622,11 @@ async function saveAll() {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  ['section-game','section-players','section-points'].forEach(id => {
+  [['section-game', false], ['section-players', false], ['section-points', true]].forEach(([id, open]) => {
     const el = document.getElementById(id);
     const arrow = document.getElementById('arrow-' + id);
-    if (el) el.classList.add('hidden');
-    if (arrow) arrow.textContent = '▶';
+    if (el) { if (open) el.classList.remove('hidden'); else el.classList.add('hidden'); }
+    if (arrow) arrow.textContent = open ? '▼' : '▶';
   });
 
   const list = document.getElementById('list');
