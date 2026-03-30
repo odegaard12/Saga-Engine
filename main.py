@@ -43,6 +43,7 @@ def load_config():
         "map_center": [42.26, -8.86],
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
+        "ui_lang": "es",
         "data_dir": "data"
     })
 
@@ -549,6 +550,7 @@ async def get_config():
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
+        "ui_lang": cfg.get("ui_lang", "es"),
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
@@ -602,17 +604,25 @@ async def save_config_endpoint(request: Request):
     incoming = data.get("config") or {}
     cfg = load_config()
 
-    players = incoming.get("players", [])
-    if isinstance(players, str):
-        players = [p.strip() for p in players.split("\n") if p.strip()]
-    elif isinstance(players, list):
-        players = [str(p).strip() for p in players if str(p).strip()]
+    if "players" in incoming:
+        players = incoming.get("players")
+        if isinstance(players, str):
+            players = [p.strip() for p in players.split("\n") if p.strip()]
+        elif isinstance(players, list):
+            players = [str(p).strip() for p in players if str(p).strip()]
+        else:
+            players = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
     else:
         players = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+
+    ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "es"))).strip().lower()
+    if ui_lang not in {"es", "en"}:
+        ui_lang = "es"
 
     cfg["site_name"] = incoming.get("site_name", cfg.get("site_name", "PUT TITLE HERE")).strip() or "PUT TITLE HERE"
     cfg["admin_title"] = incoming.get("admin_title", cfg.get("admin_title", "PUT ADMIN TITLE HERE")).strip() or "PUT ADMIN TITLE HERE"
     cfg["admin_subtitle"] = incoming.get("admin_subtitle", cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE")).strip()
+    cfg["ui_lang"] = ui_lang
     cfg["story_title"] = incoming.get("story_title", cfg.get("story_title", "")).strip()
     cfg["story_text"] = incoming.get("story_text", cfg.get("story_text", "")).strip()
     cfg["prologue_title"] = incoming.get("prologue_title", cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE")).strip()
