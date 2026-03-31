@@ -19,61 +19,176 @@ if ('serviceWorker' in navigator) {
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
-body { background: #050505; color: #00ff41; font-family: 'Fira Code', monospace; }
-.sidebar { background: #000; border-right: 1px solid #1a1a1a; width: 380px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-.config-input { background: #111; border: 1px solid #333; color: #fff; padding: 8px; width: 100%; border-radius: 2px; margin-bottom: 8px; font-size: 11px; }
-  .node-card { border:1px solid #202020; background:#0b0b0b; margin-bottom:10px; padding:12px; border-radius:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .node-card.active { border-color:#00ff41; background:#101410; box-shadow: inset 0 0 0 1px rgba(0,255,65,.12); }
-  .node-meta { display:flex; align-items:center; gap:6px; font-size:10px; color:#7c8a7c; letter-spacing:.05em; text-transform:uppercase; }
-  .node-badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px; border:1px solid rgba(0,255,65,.28); background:rgba(0,255,65,.08); color:#b7ffca; font-size:9px; letter-spacing:.12em; text-transform:uppercase; }
-  .ctrl-btn { background:#111; color:#9ca3af; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; border:1px solid #2a2a2a; border-radius:8px; }
-  .ctrl-btn:hover { color:#fff; border-color:#00ff41; background:#0f160f; }
-  label { font-size: 10px; color: #7c7c7c; text-transform: uppercase; letter-spacing: .10em; margin-bottom: 4px; display: block; }
-  .section { border:1px solid #171717; background:#080808; border-radius:16px; padding:14px; margin-top:12px; }
-  .section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:0; }
-  .section-head span { color:#8b97a7; font-size:11px; letter-spacing:.14em; }
-  .section-head strong { color:#fff; font-size:12px; letter-spacing:.14em; }
-  .section-body { margin-top:12px; }
-  .section-body.hidden { display:none; }
-  .small-btn { width:100%; padding:10px 12px; background:#111; border:1px solid #2a2a2a; color:#e5e7eb; font-size:11px; border-radius:12px; }
-  .small-btn:hover { background:#161616; border-color:#3a3a3a; }
+body {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(16,185,129,.10), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(96,165,250,.08), transparent 30%),
+    linear-gradient(180deg, #030405, #050608 35%, #020304 100%);
+  color: #e5e7eb;
+  font-family: 'Fira Code', monospace;
+}
+.sidebar {
+  background: rgba(10,14,20,.20);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 30px;
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  backdrop-filter: blur(18px) saturate(135%);
+  box-shadow: 0 20px 60px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.config-input {
+  background: rgba(13,16,20,.26);
+  border: 1px solid rgba(255,255,255,.10);
+  color: #fff;
+  padding: 10px 12px;
+  width: 100%;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  backdrop-filter: blur(18px);
+}
+.config-input:focus {
+  outline: none;
+  border-color: rgba(52,211,153,.42);
+  box-shadow: 0 0 0 3px rgba(16,185,129,.10);
+}
+.node-card {
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(13,16,20,.24);
+  margin-bottom: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.14);
+}
+.node-card.active {
+  border-color: rgba(16,185,129,.42);
+  background: rgba(7,33,24,.30);
+  box-shadow: inset 0 0 0 1px rgba(16,185,129,.10), 0 14px 28px rgba(0,0,0,.16);
+}
+.node-meta { display:flex; align-items:center; gap:6px; font-size:10px; color:#a5b4c3; letter-spacing:.05em; text-transform:uppercase; }
+.node-badge {
+  display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px;
+  border:1px solid rgba(16,185,129,.30); background:rgba(16,185,129,.10); color:#d4ffe1;
+  font-size:9px; letter-spacing:.12em; text-transform:uppercase; backdrop-filter:blur(12px);
+}
+.ctrl-btn {
+  background: rgba(17,24,39,.40);
+  color: #cbd5e1;
+  width: 30px; height: 30px; display:flex; align-items:center; justify-content:center;
+  font-size: 12px; cursor: pointer; border:1px solid rgba(255,255,255,.08); border-radius:10px;
+  backdrop-filter: blur(14px);
+}
+.ctrl-btn:hover { color:#fff; border-color:rgba(16,185,129,.48); background:rgba(15,22,15,.60); }
+label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:.10em; margin-bottom:4px; display:block; }
+.section {
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(18,22,30,.12);
+  border-radius: 22px;
+  padding: 14px;
+  margin-top: 12px;
+  backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: 0 12px 26px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.section-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:0; }
+.section-head span { color:#c7d7f0; font-size:11px; letter-spacing:.14em; }
+.section-head strong { color:#fff; font-size:12px; letter-spacing:.14em; }
+.section-body { margin-top:12px; }
+.section-body.hidden { display:none; }
+.small-btn {
+  width:100%; padding:10px 12px; background:rgba(17,24,39,.42);
+  border:1px solid rgba(255,255,255,.08); color:#e5e7eb; font-size:11px; border-radius:14px;
+  backdrop-filter: blur(14px);
+}
+.small-btn:hover { background:rgba(24,32,45,.60); border-color:rgba(255,255,255,.16); }
+.custom-scrollbar::-webkit-scrollbar { width: 10px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; border: 2px solid transparent; }
+.sticky-savebar { position: sticky; top: 0; z-index: 30; background: transparent; padding-bottom: 10px; }
+.action-row {
+  margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.06);
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; position:sticky; bottom:0;
+  background: linear-gradient(180deg, rgba(8,10,14,0), rgba(8,10,14,.18) 20%, rgba(8,10,14,.32) 100%);
+  backdrop-filter: blur(16px);
+}
+.map-shell { position:absolute; inset:0; padding:14px; background:transparent; }
+.map-frame {
+  position:absolute; inset:14px; border:1px solid rgba(255,255,255,.08); border-radius:30px;
+  overflow:hidden; box-shadow:0 28px 70px rgba(0,0,0,.26); background:rgba(14,16,20,.08);
+}
+#editor > div {
+  background: rgba(10,14,20,.18) !important;
+  backdrop-filter: blur(30px) saturate(150%);
+  border-left: 1px solid rgba(255,255,255,.10) !important;
+  box-shadow: -20px 0 60px rgba(0,0,0,.18);
+}
+#editor .sticky {
+  background: rgba(10,14,20,.22) !important;
+  backdrop-filter: blur(24px) saturate(150%);
+}
+#editor .bg-black {
+  background: rgba(9,12,16,.12) !important;
+  border-color: rgba(255,255,255,.08) !important;
+}
+#main-ui .sidebar > .mb-4 {
+  background: rgba(10,14,20,.16) !important;
+  border-color: rgba(255,255,255,.10) !important;
+  backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: 0 18px 38px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.04);
+}
 
-  .custom-scrollbar::-webkit-scrollbar { width: 10px; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; border: 2px solid #050505; }
-  .sticky-savebar { position: sticky; top: 0; z-index: 30; background: #000; padding-bottom: 10px; }
-  .action-row { margin-top:16px; padding-top:14px; border-top:1px solid #1f1f1f; display:grid; grid-template-columns:1fr 1fr; gap:10px; position:sticky; bottom:0; background:linear-gradient(180deg, rgba(8,8,8,0), #080808 22%, #080808 100%); }
-  .map-shell { position:relative; padding:14px; background:#050505; }
-  .map-frame { position:absolute; inset:14px; border:1px solid #1f2937; border-radius:22px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.35); }
+  
+  .action-row {
+    border-radius: 18px 18px 20px 20px;
+    padding: 10px;
+  }
+  #main-ui .sidebar > .mb-4 {
+    border-radius: 24px !important;
+  }
+  #editor .bg-black,
+  #editor .config-input {
+    border-radius: 16px !important;
+  }
 
-  </style>
+</style>
   </head>
   <body class="h-screen flex overflow-hidden">
 
-  <div id="login-screen" class="fixed inset-0 bg-black z-[10000] flex items-center justify-center p-4">
-    <div class="border border-green-900 p-8 w-full max-w-sm text-center bg-zinc-950">
-    <h1 class="text-2xl font-bold mb-6 tracking-widest text-white">{{ config.admin_title or 'SAGA_ADMIN' }}</h1>
-    <input id="pass" type="password" class="config-input text-center mb-4" placeholder="CONTRASEÑA">
-    <button onclick="login()" class="w-full bg-green-900 text-white py-3 font-bold hover:bg-green-700">ENTRAR</button>
-  </div>
-</div>
-
-<div id="must-change-screen" class="fixed inset-0 bg-black z-[10001] hidden flex items-center justify-center p-4">
-  <div class="border border-amber-700 p-8 w-full max-w-lg text-center bg-zinc-950">
-    <h1 class="text-2xl font-bold mb-4 tracking-widest text-white">CHANGE ADMIN PASSWORD</h1>
-    <div class="text-sm text-zinc-300 leading-relaxed mb-6">
-      A temporary or insecure admin password is active.<br>
-      You must set a new password before continuing.
+    <div id="login-screen" class="fixed inset-0 bg-black/20 z-[10000] flex items-center justify-center p-4 backdrop-blur-md">
+    <div class="w-full max-w-sm rounded-[28px] border border-white/10 bg-[rgba(10,14,20,.22)] p-7 text-center shadow-2xl backdrop-blur-2xl">
+      <div class="mb-3 text-[10px] uppercase tracking-[.28em] text-emerald-300/80">Admin access</div>
+      <h1 class="text-2xl font-bold mb-2 tracking-widest text-white">{{ config.admin_title or 'SAGA_ADMIN' }}</h1>
+      <div class="mb-6 text-[11px] text-zinc-400">{{ config.admin_subtitle or 'Control panel' }}</div>
+      <input id="pass" type="password" class="config-input text-center mb-4" placeholder="CONTRASEÑA">
+      <button onclick="login()" class="w-full rounded-2xl border border-emerald-400/50 bg-emerald-700/80 py-3 text-sm font-extrabold tracking-[.18em] text-white transition hover:bg-emerald-600">ENTRAR</button>
     </div>
-    <input id="new-pass" type="password" class="config-input text-center mb-3" placeholder="NEW PASSWORD">
-    <input id="new-pass-2" type="password" class="config-input text-center mb-4" placeholder="CONFIRM NEW PASSWORD">
-    <button onclick="submitPasswordChange()" class="w-full bg-amber-700 text-white py-3 font-bold hover:bg-amber-600 mb-3">SAVE NEW PASSWORD</button>
-    <button onclick="backToLogin()" class="w-full bg-zinc-900 text-zinc-200 py-3 font-bold hover:bg-zinc-800">RETURN</button>
   </div>
-</div>
 
-<div id="main-ui" class="flex flex-grow h-full hidden">
-  <div class="sidebar p-5">
+  <div id="must-change-screen" class="fixed inset-0 bg-black/25 z-[10001] hidden flex items-center justify-center p-4 backdrop-blur-md">
+    <div class="w-full max-w-lg rounded-[30px] border border-white/10 bg-[rgba(10,14,20,.24)] p-8 text-center shadow-2xl backdrop-blur-2xl">
+      <div class="mb-3 text-[10px] uppercase tracking-[.28em] text-amber-300/80">Security update</div>
+      <h1 class="text-2xl font-bold mb-4 tracking-widest text-white">CHANGE ADMIN PASSWORD</h1>
+      <div class="text-sm text-zinc-300 leading-relaxed mb-6">
+        A temporary or insecure admin password is active.<br>
+        You must set a new password before continuing.
+      </div>
+      <input id="new-pass" type="password" class="config-input text-center mb-3" placeholder="NEW PASSWORD">
+      <input id="new-pass-2" type="password" class="config-input text-center mb-4" placeholder="CONFIRM NEW PASSWORD">
+      <button onclick="submitPasswordChange()" class="w-full rounded-2xl border border-amber-400/40 bg-amber-700/80 py-3 text-sm font-extrabold tracking-[.14em] text-white transition hover:bg-amber-600 mb-3">SAVE NEW PASSWORD</button>
+      <button onclick="backToLogin()" class="w-full rounded-2xl border border-white/10 bg-zinc-900/70 py-3 text-sm font-extrabold tracking-[.14em] text-zinc-200 transition hover:bg-zinc-800">RETURN</button>
+    </div>
+  </div>
+
+<div id="main-ui" class="relative h-full w-full hidden overflow-hidden">
+  <div class="sidebar absolute left-5 top-5 bottom-5 z-20 p-5">
     <div class="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/90 p-4 shadow-2xl">
         <div class="flex flex-col gap-4">
           <div class="min-w-0">
@@ -163,18 +278,21 @@ body { background: #050505; color: #00ff41; font-family: 'Fira Code', monospace;
       </div>
     </div>
 
-    <div class="flex-grow relative map-shell">
+    <div class="absolute inset-0 z-0 map-shell">
       <div class="map-frame">
         <div id="map" class="absolute inset-0" style="filter: invert(1) hue-rotate(180deg) brightness(0.6);"></div>
       </div>
     </div>
   </div>
 
-<div id="editor" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-  <div class="bg-zinc-950 border border-zinc-800 w-full max-w-5xl max-h-[92vh] overflow-y-auto p-4 md:p-6 rounded shadow-2xl">
-    <div class="flex justify-between mb-4 border-b border-zinc-800 pb-2">
-      <h2 class="text-lg font-bold text-white tracking-widest" id="edit-header">EDIT NODE</h2>
-      <button onclick="closeEditor()" class="text-zinc-500 hover:text-white">✕</button>
+<div id="editor" class="fixed inset-0 bg-black/24 z-50 hidden flex items-stretch justify-end p-0 backdrop-blur-sm">
+  <div class="bg-zinc-950/40 border-l border-white/10 w-full max-w-[720px] h-full overflow-y-auto p-4 md:p-5 rounded-none shadow-2xl backdrop-blur-2xl">
+        <div class="sticky top-0 z-10 mb-4 flex items-start justify-between gap-4 border-b border-white/10 pb-4 bg-zinc-950/30 backdrop-blur-xl">
+      <div>
+        <div class="mb-2 text-[10px] uppercase tracking-[.28em] text-emerald-300/80">Node editor</div>
+        <h2 class="text-2xl font-bold text-white tracking-[.14em]" id="edit-header">NODE</h2>
+      </div>
+      <button onclick="closeEditor()" class="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-zinc-300 transition hover:bg-white/10 hover:text-white">✕</button>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
       <div class="col-span-2"><label>Node title</label><input id="e-title" class="config-input"></div>
@@ -493,7 +611,7 @@ function openEditor(i) {
   const allowDebugBypass = !!getStageEntryValue(s, "allow_debug_bypass", true);
   const allowManualFallbackWithoutGps = !!getStageEntryValue(s, "allow_manual_fallback_without_gps", true);
 
-  document.getElementById('edit-header').innerText = `EDITAR: ${s.title}`;
+  document.getElementById('edit-header').innerText = s.title || 'NODE';
   document.getElementById('e-title').value = s.title || '';
   document.getElementById('e-radius').value = s.radius || 50;
   document.getElementById('e-type').value = s.type || 'circuit_hack';
