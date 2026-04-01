@@ -759,7 +759,7 @@ body[data-player-theme="glass"] .top-nav{
   max-width: calc(100% - 24px) !important;
 
   display: grid !important;
-  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) !important;
+  grid-template-columns: max-content minmax(56px,1fr) max-content !important;
   align-items: center !important;
   gap: 12px !important;
 
@@ -773,32 +773,42 @@ body[data-player-theme="glass"] .top-nav{
 }
 
 body[data-player-theme="glass"] .top-nav > a.nav-btn{
+  min-width: max-content !important;
   justify-self: start !important;
   margin: 0 !important;
   position: static !important;
 }
 
 body[data-player-theme="glass"] .top-nav > .flex.gap-2{
+  min-width: max-content !important;
   justify-self: end !important;
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
   margin: 0 !important;
   position: static !important;
+  flex-wrap: nowrap !important;
 }
 
-body[data-player-theme="glass"] .rune-bar{
+body[data-player-theme="glass"] .top-nav > .flex.gap-2 > *{
+  flex: 0 0 auto !important;
+}
+
+body[data-player-theme="glass"] #rune-bar.rune-bar{
   justify-self: center !important;
-  position: relative !important;
+  position: static !important;
   left: auto !important;
+  right: auto !important;
   top: auto !important;
+  bottom: auto !important;
   transform: none !important;
+  inset: auto !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 48px !important;
-  min-width: 48px !important;
-  height: 38px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 34px !important;
   padding: 0 !important;
   margin: 0 !important;
   border-radius: 12px !important;
@@ -808,8 +818,8 @@ body[data-player-theme="glass"] .rune-bar{
   z-index: auto !important;
 }
 
-body[data-player-theme="glass"] .rune-bar > *{
-  transform: scale(.56) !important;
+body[data-player-theme="glass"] #rune-bar.rune-bar > *{
+  transform: scale(.50) !important;
   transform-origin: center !important;
 }
 
@@ -839,15 +849,15 @@ body[data-player-theme="glass"] #rune-code{
 @media (max-width: 560px){
   body[data-player-theme="glass"] .top-nav{
     width: calc(100% - 24px) !important;
-    grid-template-columns: auto 1fr auto !important;
+    grid-template-columns: max-content minmax(36px,1fr) max-content !important;
     gap: 8px !important;
     padding: 8px 10px !important;
   }
 
   body[data-player-theme="glass"] .rune-bar{
-    width: 40px !important;
-    min-width: 40px !important;
-    height: 32px !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 30px !important;
   }
 
   body[data-player-theme="glass"] .rune-bar > *{
