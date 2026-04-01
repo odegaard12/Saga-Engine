@@ -167,8 +167,8 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
       <div class="mb-3 text-[10px] uppercase tracking-[.28em] text-emerald-300/80">Admin access</div>
       <h1 class="text-2xl font-bold mb-2 tracking-widest text-white">{{ config.admin_title or 'SAGA_ADMIN' }}</h1>
       <div class="mb-6 text-[11px] text-zinc-400">{{ config.admin_subtitle or 'Control panel' }}</div>
-      <input id="pass" type="password" class="config-input text-center mb-4" placeholder="CONTRASEÑA">
-      <button onclick="login()" class="w-full rounded-2xl border border-emerald-400/50 bg-emerald-700/80 py-3 text-sm font-extrabold tracking-[.18em] text-white transition hover:bg-emerald-600">ENTRAR</button>
+      <input id="pass" type="password" class="config-input text-center mb-4" placeholder="PASSWORD">
+      <button onclick="login()" class="w-full rounded-2xl border border-emerald-400/50 bg-emerald-700/80 py-3 text-sm font-extrabold tracking-[.18em] text-white transition hover:bg-emerald-600">ENTER</button>
     </div>
   </div>
 
@@ -219,8 +219,13 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
 
         <label>UI language</label>
         <select id="cfg-ui-lang" class="config-input">
-          <option value="es">Español</option>
           <option value="en">English</option>
+        </select>
+
+        <label>Player theme</label>
+        <select id="cfg-player-theme" class="config-input">
+          <option value="classic">Classic</option>
+          <option value="glass">Glass</option>
         </select>
 
         <label>Login subtitle</label>
@@ -484,7 +489,8 @@ async function loadConfigAdmin() {
   document.getElementById('cfg-site-name').value = cfg.site_name || '';
   document.getElementById('cfg-admin-title').value = cfg.admin_title || '';
   document.getElementById('cfg-admin-subtitle').value = cfg.admin_subtitle || '';
-    document.getElementById('cfg-ui-lang').value = cfg.ui_lang || 'es';
+    document.getElementById('cfg-ui-lang').value = cfg.ui_lang || 'en';
+  document.getElementById('cfg-player-theme').value = cfg.player_theme || 'classic';
   document.getElementById('cfg-story-title').value = cfg.story_title || '';
   document.getElementById('cfg-story-text').value = cfg.story_text || '';
   document.getElementById('cfg-prologue-title').value = cfg.prologue_title || '';
@@ -506,6 +512,7 @@ async function saveConfigAdmin() {
     admin_title: document.getElementById('cfg-admin-title').value,
     admin_subtitle: document.getElementById('cfg-admin-subtitle').value,
       ui_lang: document.getElementById('cfg-ui-lang').value,
+    player_theme: document.getElementById('cfg-player-theme').value,
     story_title: document.getElementById('cfg-story-title').value,
     story_text: document.getElementById('cfg-story-text').value,
     prologue_title: document.getElementById('cfg-prologue-title').value,

@@ -748,31 +748,135 @@ const SAGA_CONFIG = {{ config | tojson }};
   color:#00ff66 !important;
 }
 
+
+/* === PLAYER THEME: glass (final) === */
+body[data-player-theme="glass"] .top-nav{
+  top: calc(10px + env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(calc(100% - 24px), 820px) !important;
+  max-width: calc(100% - 24px) !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+
+  padding: 10px 14px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(110,255,180,.12) !important;
+  background: rgba(6, 12, 20, .44) !important;
+  backdrop-filter: blur(16px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
+  box-shadow: 0 14px 30px rgba(0,0,0,.24) !important;
+}
+
+body[data-player-theme="glass"] .top-nav > a.nav-btn{
+  justify-self: start !important;
+  margin: 0 !important;
+  position: static !important;
+}
+
+body[data-player-theme="glass"] .top-nav > .flex.gap-2{
+  justify-self: end !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  position: static !important;
+}
+
+body[data-player-theme="glass"] .rune-bar{
+  justify-self: center !important;
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(0,255,132,.04) !important;
+  border: 1px solid rgba(0,255,132,.12) !important;
+  overflow: hidden !important;
+  z-index: auto !important;
+}
+
+body[data-player-theme="glass"] .rune-bar > *{
+  transform: scale(.56) !important;
+  transform-origin: center !important;
+}
+
+body[data-player-theme="glass"] .hud-panel{
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(calc(100% - 24px), 1120px) !important;
+  border: 1px solid rgba(110,255,180,.10) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0)),
+    rgba(5,10,16,.48) !important;
+  backdrop-filter: blur(10px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(120%) !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,.18) !important;
+  border-radius: 24px !important;
+}
+
+body[data-player-theme="glass"] .btn-action{
+  clip-path: none;
+  border-radius: 18px;
+}
+
+body[data-player-theme="glass"] #rune-code{
+  border-radius: 14px;
+}
+
+@media (max-width: 560px){
+  body[data-player-theme="glass"] .top-nav{
+    width: calc(100% - 24px) !important;
+    grid-template-columns: auto 1fr auto !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  body[data-player-theme="glass"] .rune-bar{
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 32px !important;
+  }
+
+  body[data-player-theme="glass"] .rune-bar > *{
+    transform: scale(.50) !important;
+  }
+}
+
 </style>
 </head>
-<body>
+<body data-player-theme="{{ config.player_theme or 'classic' }}">
 <div id="map"></div>
 
 <div id="prologue">
     <div class="prologue-card">
-        <div class="prologue-title">{{ config.prologue_title }}</div>
-        <div class="prologue-sub">{{ config.prologue_subtitle or 'PUT PROLOGUE SUBTITLE HERE' }}</div>
+        <div class="prologue-title">{{ config.prologue_title or 'MISSION BRIEFING' }}</div>
+        <div class="prologue-sub">{{ config.prologue_subtitle or 'PROLOGUE' }}</div>
 
         <div class="prologue-text">
-            {{ config.prologue_body or 'PUT PROLOGUE TEXT HERE' }}
-            O seu poder depende de <b>6 Nodos</b> que forman un Escudo Invisible.<br><br>
-            Ti es o <b>Portador da Chama</b>. Reactiva os nodos, recupera as <b>Runas Perdidas</b>
-            
+            {{ config.prologue_body or 'Review the objective and proceed when ready.' }}
         </div>
 
-        <div class="prologue-foot">Consello: a pista sempre está no lugar. Observa antes de actuar.</div>
+        <div class="prologue-foot">Observe your surroundings before acting.</div>
 
-        <button class="prologue-btn" onclick="closePrologue()">ENTRAR</button>
+        <button class="prologue-btn" onclick="closePrologue()">ENTER</button>
     </div>
 </div>
 
 <div class="top-nav">
-    <a href="/" class="nav-btn">⟵ SALIR</a>
+    <a href="/" class="nav-btn">⟵ EXIT</a>
     <div id="rune-bar" class="rune-bar"></div>
 <div class="flex gap-2">
         <button onclick="toggleDebug()" id="debug-btn" class="nav-btn border-zinc-600 text-zinc-400">DEBUG</button>
@@ -791,7 +895,7 @@ const SAGA_CONFIG = {{ config | tojson }};
     <button id="main-btn" onclick="requestPermissions()" class="btn-action mb-4" disabled>SYSTEM LOCKED</button>
     <div class="flex gap-2 border-t border-zinc-900 pt-3">
         <input id="rune-code" class="bg-black border border-zinc-800 text-[10px] text-green-500 px-3 py-2 flex-grow outline-none uppercase" placeholder="ENTER CODE...">
-        <button onclick="checkRune()" class="bg-green-900 text-white text-[10px] px-4 font-bold">ENTRAR</button>
+        <button onclick="checkRune()" class="bg-green-900 text-white text-[10px] px-4 font-bold">ENTER</button>
     </div>
 </div>
 
@@ -837,7 +941,7 @@ let lastRealPos = null; // última posición GPS real
 async function requestPermissions() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         const res = await DeviceOrientationEvent.requestPermission();
-        if (res !== 'granted') return alert("SENSORES REQUERIDOS");
+        if (res !== 'granted') return alert("SENSORS REQUIRED");
     }
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     openGame();
@@ -1008,7 +1112,7 @@ function updateDist(lat, lon) {
         btn.style.color = "#00ff41";
     } else {
         btn.disabled = true;
-        btn.innerText = "FORA DE ALCANCE";
+        btn.innerText = "OUT OF RANGE";
         btn.style.borderColor = "#004400";
         btn.style.color = "#004400";
     }
@@ -1143,7 +1247,7 @@ function setGpsUnavailable(reason) {
     const btn = document.getElementById('main-btn');
     if (btn) {
         btn.disabled = !canEnterWithoutGps;
-        btn.innerText = canEnterWithoutGps ? '>> ENTER <<' : 'GPS NO DISPONIBLE';
+        btn.innerText = canEnterWithoutGps ? '>> ENTER <<' : 'GPS UNAVAILABLE';
         btn.style.borderColor = canEnterWithoutGps ? '#00ff41' : '#b45309';
         btn.style.color = canEnterWithoutGps ? '#00ff41' : '#facc15';
     }
@@ -1153,7 +1257,7 @@ function setGpsUnavailable(reason) {
 }
 
 if (!('geolocation' in navigator)) {
-    setGpsUnavailable('Este navegador no soporta geolocalización. Usa DEBUG para pruebas.');
+    setGpsUnavailable('This browser does not support geolocation. Use DEBUG for testing.');
 } else {
     navigator.geolocation.watchPosition(
         p => {
@@ -1172,11 +1276,11 @@ if (!('geolocation' in navigator)) {
                 location.hostname !== '127.0.0.1';
 
             if (insecureLocal) {
-                setGpsUnavailable('GPS bloqueado: en HTTP local por IP el navegador puede bloquear la ubicación. Usa HTTPS. Para probar, activa DEBUG.');
+                setGpsUnavailable('GPS blocked: on local HTTP by IP the browser may block location. Use HTTPS. For testing, enable DEBUG.');
             } else if (e && e.code === 1) {
-                setGpsUnavailable('GPS denegado o bloqueado. Revisa permisos del navegador o usa DEBUG para pruebas.');
+                setGpsUnavailable('GPS denied or blocked. Check browser permissions or use DEBUG for testing.');
             } else {
-                setGpsUnavailable('GPS no disponible ahora mismo. Revisa permisos o usa DEBUG para pruebas.');
+                setGpsUnavailable('GPS is currently unavailable. Check permissions or use DEBUG for testing.');
             }
         },
         {enableHighAccuracy:true, maximumAge:0, timeout:10000}
@@ -1224,7 +1328,7 @@ function initPipes(c) {
   c.innerHTML = `
     <div class="gia-pipes-wrap">
       <div class="text-green-700 text-[10px] uppercase tracking-widest text-center">
-        ORDENA LA ESPIRAL.
+        ORDER THE SPIRAL.
       </div>
 
       <div id="gia-pg" class="gia-pipe-grid" aria-label="Espiral 5x5"></div>
@@ -1384,7 +1488,7 @@ function initPipes(c) {
       cells.forEach((el,k)=>setTimeout(()=>el.classList.add("gia-ok"), k*10));
       setTimeout(winGame, 450);
     }else{
-      hint.textContent = `⛔ AÍNDA NON · CORRECTAS: ${ok}/${total} (CENTRO→FORA · FINAL ARRIBA-DEREITA)`;
+      hint.textContent = `⛔ NOT YET · CORRECT: ${ok}/${total} (CENTER→OUTWARD · FINAL TOP-RIGHT)`;
       hint.style.color = "#ff6b6b";
       beep(140,0.16);
       setTimeout(()=>{ hint.style.color="#9ca3af"; }, 700);
@@ -1404,7 +1508,7 @@ function saga_initPipes(c){
   c.innerHTML = `
     <div class="gia-pipes-wrap">
       <div class="text-green-700 text-[10px] uppercase tracking-widest text-center">
-        ORDENA LA ESPIRAL.
+        ORDER THE SPIRAL.
       </div>
 
       <div id="gia-pg" class="gia-pipe-grid"></div>
@@ -1643,11 +1747,11 @@ function initCryptex(c) {
       </div>
 
       <div style="display:flex;justify-content:center;margin-top:12px;">
-        <button id="nav-validate" class="btn-action" style="max-width:520px;width:100%;">VALIDATE ALIÑAMENTO</button>
+        <button id="nav-validate" class="btn-action" style="max-width:520px;width:100%;">VALIDATE ALIGNMENT</button>
       </div>
 
       <div id="nav-msg" style="text-align:center;margin-top:10px;opacity:.7;font-size:11px;letter-spacing:.10em;text-transform:uppercase;">
-        Toca cada anel para xiralo (90° lóxico).
+        Tap each ring to rotate it (logical 90°).
       </div>
     </div>
   `;
@@ -1673,15 +1777,15 @@ function initCryptex(c) {
   btn.onclick = ()=>{
     const ok = (SYMBOLS[si].key===TARGET.symbol) && (GUARDS[gi]===TARGET.guard) && (RUMBOS[ri]===TARGET.rumbo);
     if(ok){
-      msg.textContent = "ALIÑAMENTO CORRECTO ✓";
+      msg.textContent = "CORRECT ALIGNMENT ✓";
       msg.style.color = "#dfffe3";
       beep(1100,0.2);
       setTimeout(winGame, 180);
     }else{
-      msg.textContent = "INCORRECTO ✗ Revisa a Carta de Navegación.";
+      msg.textContent = "INCORRECT ✗ Check the navigation card.";
       msg.style.color = "#ff6b6b";
       beep(160,0.18);
-      setTimeout(()=>{ msg.style.color="#00ff41"; msg.textContent="Toca cada anel para xiralo (90° lóxico)."; }, 900);
+      setTimeout(()=>{ msg.style.color="#00ff41"; msg.textContent="Tap each ring to rotate it (logical 90°)."; }, 900);
     }
   };
 
@@ -2086,7 +2190,7 @@ async function initBlow(c, cfg){
     stop();
     flame.style.filter = "none";
     flame.textContent = "🔥";
-    bst.textContent = "NODO ACTIVO";
+    bst.textContent = "NODE ACTIVE";
     if(VIDEO){
         // Fullscreen overlay + animación
         showVideoOverlay(VIDEO, ()=>{ if(window.winGame) window.winGame(); });
@@ -2228,10 +2332,10 @@ function beep(f,d) {
     }
 }
 function closeGame() { document.getElementById('game-modal').classList.remove('active'); window.ondeviceorientation=null; if(noiseGain) noiseGain.gain.value=0; }
-async function winGame() { beep(1000,0.2); setTimeout(()=>beep(1500,0.4),200); document.getElementById('game-canvas').innerHTML="<h1 class='text-4xl text-center animate-pulse text-green-500'>NODO ACTIVO</h1>"; await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:'OK'})}); setTimeout(()=>{closeGame();loadState()},2000); }
+async function winGame() { beep(1000,0.2); setTimeout(()=>beep(1500,0.4),200); document.getElementById('game-canvas').innerHTML="<h1 class='text-4xl text-center animate-pulse text-green-500'>NODE ACTIVE</h1>"; await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:'OK'})}); setTimeout(()=>{closeGame();loadState()},2000); }
 async function checkRune() { let c=document.getElementById('rune-code').value.toUpperCase(); let r=await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:c})}); let d=await r.json(); if(d.status==='ok'){beep(1200,0.5);loadState();document.getElementById('rune-code').value="";} else alert("INVALID CODE"); }
 function toggleDebug(){debugMode=!debugMode;var b=document.getElementById('debug-btn');if(b){b.innerText=debugMode?'DEBUG':'DEBUG';b.classList.toggle('debug-on',debugMode);b.classList.toggle('debug-off',!debugMode);}if(!debugMode){try{var u=new URL(location.href);u.searchParams.set('v',Date.now());location.href=u.toString();}catch(e){location.reload();}return;}loadState();}
-function resetMission() { if(confirm("¿REINICIAR?")) fetch('/api/reset',{method:'POST',body:JSON.stringify({user:USER})}).then(()=>location.reload()); }
+function resetMission() { if(confirm("RESTART SESSION?")) fetch('/api/reset',{method:'POST',body:JSON.stringify({user:USER})}).then(()=>location.reload()); }
 
 loadState();
 
