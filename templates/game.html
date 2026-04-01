@@ -773,12 +773,14 @@ body[data-player-theme="glass"] .top-nav{
 }
 
 body[data-player-theme="glass"] .top-nav > a.nav-btn{
+  min-width: max-content !important;
   justify-self: start !important;
   margin: 0 !important;
   position: static !important;
 }
 
 body[data-player-theme="glass"] .top-nav > .flex.gap-2{
+  min-width: max-content !important;
   justify-self: end !important;
   display: flex !important;
   align-items: center !important;
@@ -792,12 +794,15 @@ body[data-player-theme="glass"] .top-nav > .flex.gap-2 > *{
   flex: 0 0 auto !important;
 }
 
-body[data-player-theme="glass"] .rune-bar{
+body[data-player-theme="glass"] #rune-bar.rune-bar{
   justify-self: center !important;
-  position: relative !important;
+  position: static !important;
   left: auto !important;
+  right: auto !important;
   top: auto !important;
+  bottom: auto !important;
   transform: none !important;
+  inset: auto !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -813,7 +818,7 @@ body[data-player-theme="glass"] .rune-bar{
   z-index: auto !important;
 }
 
-body[data-player-theme="glass"] .rune-bar > *{
+body[data-player-theme="glass"] #rune-bar.rune-bar > *{
   transform: scale(.50) !important;
   transform-origin: center !important;
 }
