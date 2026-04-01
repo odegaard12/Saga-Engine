@@ -33,8 +33,14 @@ def save_json(file, data):
     except Exception as e:
         print(f"Error guardando {file}: {e}")
 
+VALID_PLAYER_THEMES = {"classic", "glass"}
+
+def normalize_player_theme(value):
+    theme = str(value or "classic").strip().lower()
+    return theme if theme in VALID_PLAYER_THEMES else "classic"
+
 def load_config():
-    return load_json("config.json", {
+    cfg = load_json("config.json", {
         "site_name": "PUT TITLE HERE",
         "admin_title": "PUT ADMIN TITLE HERE",
         "admin_subtitle": "PUT ADMIN SUBTITLE HERE",
@@ -43,9 +49,14 @@ def load_config():
         "map_center": [42.26, -8.86],
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
-        "ui_lang": "es",
+        "ui_lang": "en",
+        "player_theme": "classic",
         "data_dir": "data"
     })
+    if not isinstance(cfg, dict):
+        cfg = {}
+    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "classic"))
+    return cfg
 
 CONFIG = load_config()
 DATA_DIR = CONFIG.get("data_dir", "data")
@@ -550,7 +561,8 @@ async def get_config():
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
-        "ui_lang": cfg.get("ui_lang", "es"),
+        "ui_lang": cfg.get("ui_lang", "en"),
+        "player_theme": normalize_player_theme(cfg.get("player_theme", "classic")),
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
@@ -615,14 +627,17 @@ async def save_config_endpoint(request: Request):
     else:
         players = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
 
-    ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "es"))).strip().lower()
-    if ui_lang not in {"es", "en"}:
-        ui_lang = "es"
+    ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "en"))).strip().lower()
+    if ui_lang not in {"en"}:
+        ui_lang = "en"
+
+    player_theme = normalize_player_theme(incoming.get("player_theme", cfg.get("player_theme", "classic")))
 
     cfg["site_name"] = incoming.get("site_name", cfg.get("site_name", "PUT TITLE HERE")).strip() or "PUT TITLE HERE"
     cfg["admin_title"] = incoming.get("admin_title", cfg.get("admin_title", "PUT ADMIN TITLE HERE")).strip() or "PUT ADMIN TITLE HERE"
     cfg["admin_subtitle"] = incoming.get("admin_subtitle", cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE")).strip()
     cfg["ui_lang"] = ui_lang
+    cfg["player_theme"] = player_theme
     cfg["story_title"] = incoming.get("story_title", cfg.get("story_title", "")).strip()
     cfg["story_text"] = incoming.get("story_text", cfg.get("story_text", "")).strip()
     cfg["prologue_title"] = incoming.get("prologue_title", cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE")).strip()
