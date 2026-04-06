@@ -169,6 +169,7 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
       <div class="mb-6 text-[11px] text-zinc-400">{{ config.admin_subtitle or 'Control panel' }}</div>
       <input id="pass" type="password" class="config-input text-center mb-4" placeholder="PASSWORD">
       <button onclick="login()" class="w-full rounded-2xl border border-emerald-400/50 bg-emerald-700/80 py-3 text-sm font-extrabold tracking-[.18em] text-white transition hover:bg-emerald-600">ENTER</button>
+      <div id="login-feedback" class="mt-3 hidden rounded-xl border px-3 py-2 text-[11px] leading-relaxed"></div>
     </div>
   </div>
 
@@ -184,6 +185,7 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
       <input id="new-pass-2" type="password" class="config-input text-center mb-4" placeholder="CONFIRM NEW PASSWORD">
       <button onclick="submitPasswordChange()" class="w-full rounded-2xl border border-amber-400/40 bg-amber-700/80 py-3 text-sm font-extrabold tracking-[.14em] text-white transition hover:bg-amber-600 mb-3">SAVE NEW PASSWORD</button>
       <button onclick="backToLogin()" class="w-full rounded-2xl border border-white/10 bg-zinc-900/70 py-3 text-sm font-extrabold tracking-[.14em] text-zinc-200 transition hover:bg-zinc-800">RETURN</button>
+      <div id="password-feedback" class="mt-3 hidden rounded-xl border px-3 py-2 text-[11px] leading-relaxed"></div>
     </div>
   </div>
 
@@ -420,10 +422,34 @@ async function enterAdminUi() {
   await load();
 }
 
+function setInlineFeedback(id, message, tone='error') {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const tones = {
+    error: 'border-red-500/40 bg-red-950/40 text-red-200',
+    warn: 'border-amber-400/40 bg-amber-950/30 text-amber-100',
+    ok: 'border-emerald-400/40 bg-emerald-950/30 text-emerald-100'
+  };
+
+  el.className = 'mt-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ' + (tones[tone] || tones.error);
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function clearInlineFeedback(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = '';
+  el.classList.add('hidden');
+}
+
 function backToLogin() {
   pass = "";
   document.getElementById('new-pass').value = "";
   document.getElementById('new-pass-2').value = "";
+  clearInlineFeedback('password-feedback');
+  clearInlineFeedback('login-feedback');
   document.getElementById('must-change-screen').classList.add('hidden');
   document.getElementById('main-ui').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -432,6 +458,7 @@ function backToLogin() {
 async function submitPasswordChange() {
   const p1 = document.getElementById('new-pass').value;
   const p2 = document.getElementById('new-pass-2').value;
+  clearInlineFeedback('password-feedback');
 
   let r = await fetch('/api/admin/change-password', {
     method: 'POST',
@@ -453,12 +480,15 @@ async function submitPasswordChange() {
     await enterAdminUi();
     alert('PASSWORD UPDATED');
   } else {
-    alert((data && data.detail) ? String(data.detail).toUpperCase() : 'ERROR CHANGING PASSWORD');
+    const detail = (data && data.detail) ? String(data.detail).toUpperCase() : 'ERROR CHANGING PASSWORD';
+    setInlineFeedback('password-feedback', detail, r.status === 429 ? 'warn' : 'error');
   }
 }
 
 async function login() {
   let p = document.getElementById('pass').value;
+  clearInlineFeedback('login-feedback');
+
   let r = await fetch('/api/admin/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -469,6 +499,7 @@ async function login() {
 
   if (r.ok) {
     pass = p;
+    clearInlineFeedback('login-feedback');
     document.getElementById('login-screen').classList.add('hidden');
 
     if (data && data.must_change) {
@@ -478,7 +509,8 @@ async function login() {
 
     await enterAdminUi();
   } else {
-    alert("DENIED");
+    const detail = (data && data.detail) ? String(data.detail).toUpperCase() : 'DENIED';
+    setInlineFeedback('login-feedback', detail, r.status === 429 ? 'warn' : 'error');
   }
 }
 
