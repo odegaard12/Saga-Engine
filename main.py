@@ -59,7 +59,17 @@ def load_config():
     return cfg
 
 CONFIG = load_config()
-DATA_DIR = CONFIG.get("data_dir", "data")
+
+def resolve_data_dir():
+    env_dir = (os.getenv("SAGA_DATA_DIR") or "").strip()
+    cfg_dir = str(CONFIG.get("data_dir", "data") or "data").strip()
+    data_dir = env_dir or cfg_dir or "data"
+    if not os.path.isabs(data_dir):
+        data_dir = os.path.abspath(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+DATA_DIR = resolve_data_dir()
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
