@@ -921,6 +921,40 @@ body[data-player-theme="glass"] #rune-code{
 <script>
 const USER = "{{user}}";
 
+let lastHeartbeatAt = 0;
+
+async function sendHeartbeat(extra = {}) {
+  const now = Date.now();
+  const force = !!extra.force;
+
+  if (!force && (now - lastHeartbeatAt) < 15000) return;
+  lastHeartbeatAt = now;
+
+  const lat = (typeof extra.lat === 'number') ? extra.lat : (lastRealPos ? lastRealPos.lat : null);
+  const lon = (typeof extra.lon === 'number') ? extra.lon : (lastRealPos ? lastRealPos.lon : null);
+
+  const payload = {
+    user: USER,
+    lat: lat,
+    lon: lon,
+    gps_status: extra.gps_status || (lastRealPos ? 'ok' : 'unknown'),
+    debug_enabled: !!debugMode,
+    source: 'player'
+  };
+
+  try {
+    await fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {}
+}
+
+setInterval(() => {
+  sendHeartbeat({force: true, gps_status: lastRealPos ? 'ok' : 'unknown'});
+}, 30000);
+
 
 // --- RUNAS (HUD SUPERIOR) ---
 const RUNES = [{sym:"◉",label:"NODE"}];
@@ -1092,6 +1126,8 @@ function updateDist(lat, lon) {
         userMarker.setLatLng([lat, lon]);
     }
 
+    sendHeartbeat({lat: lat, lon: lon, gps_status: 'ok'});
+
     if(!currentTarget) return;
 
     const entry = getCurrentEntryRules();
@@ -1248,6 +1284,7 @@ function clearGpsNotice() {
 }
 
 function setGpsUnavailable(reason) {
+    sendHeartbeat({force: true, gps_status: 'unavailable'});
     const dist = document.getElementById('dist-display');
     if (dist) dist.innerText = 'GPS OFF';
 
