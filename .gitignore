@@ -45,3 +45,6 @@ Thumbs.db
 !.env.example
 
 data/admin_auth.json
+
+# Local Python / backup artifacts
+data/*.bak
