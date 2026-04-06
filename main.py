@@ -285,6 +285,131 @@ def _as_bool(value, default=False):
         return False
     return default
 
+VALID_PROFILE_MODES = {"solo", "team"}
+
+def parse_player_entries(raw_players):
+    if isinstance(raw_players, str):
+        items = [line.strip() for line in raw_players.splitlines() if line.strip()]
+    elif isinstance(raw_players, list):
+        items = raw_players
+    else:
+        return ["PLAYER 1", "PLAYER 2"]
+
+    parsed = []
+    for item in items:
+        if isinstance(item, dict):
+            parsed.append(item)
+            continue
+
+        text = _as_str(item).strip()
+        if not text:
+            continue
+
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                obj = json.loads(text)
+                if isinstance(obj, dict):
+                    parsed.append(obj)
+                    continue
+            except Exception:
+                pass
+
+        parsed.append(text)
+
+    return parsed or ["PLAYER 1", "PLAYER 2"]
+
+def normalize_player_profile(raw, index=0):
+    if isinstance(raw, dict):
+        display_name = _as_str(
+            raw.get("display_name") or raw.get("name") or raw.get("id") or f"PLAYER {index + 1}"
+        ).strip() or f"PLAYER {index + 1}"
+
+        profile_id = _as_str(raw.get("id") or display_name).strip() or display_name
+
+        mode = _as_str(raw.get("mode") or "solo").strip().lower()
+        if mode not in VALID_PROFILE_MODES:
+            mode = "solo"
+
+        members_raw = raw.get("members") or []
+        if isinstance(members_raw, str):
+            members = [m.strip() for m in members_raw.split(",") if m.strip()]
+        elif isinstance(members_raw, list):
+            members = [_as_str(m).strip() for m in members_raw if _as_str(m).strip()]
+        else:
+            members = []
+
+        status = _as_str(raw.get("status") or "active").strip().lower() or "active"
+
+        if mode == "solo" and not members and display_name:
+            members = [display_name]
+
+        return {
+            "id": profile_id,
+            "display_name": display_name,
+            "mode": mode,
+            "members": members,
+            "status": status,
+        }
+
+    display_name = _as_str(raw, f"PLAYER {index + 1}").strip() or f"PLAYER {index + 1}"
+    return {
+        "id": display_name,
+        "display_name": display_name,
+        "mode": "solo",
+        "members": [display_name],
+        "status": "active",
+    }
+
+def get_player_profiles(cfg=None):
+    cfg = cfg or load_config()
+    raw_players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
+    return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_players)]
+
+def get_player_profile(user, cfg=None):
+    user_text = _as_str(user).strip()
+    for profile in get_player_profiles(cfg):
+        if profile["id"] == user_text or profile["display_name"] == user_text:
+            return profile
+    return normalize_player_profile(user_text or "PLAYER 1", 0)
+
+HEARTBEAT_STALE_SECONDS = 180
+
+def load_live_positions():
+    data = load_json(POSITIONS_DB, {})
+    return data if isinstance(data, dict) else {}
+
+def save_live_positions(data):
+    save_json(POSITIONS_DB, data)
+
+def project_live_profile_status(profile, raw=None, now=None):
+    now = int(now or time.time())
+    raw = raw if isinstance(raw, dict) else {}
+
+    last_seen = int(raw.get("last_seen") or 0)
+    gps_status = _as_str(raw.get("gps_status") or "unknown").strip().lower() or "unknown"
+
+    if last_seen <= 0:
+        presence = "offline"
+    elif (now - last_seen) <= HEARTBEAT_STALE_SECONDS:
+        presence = "live"
+    else:
+        presence = "stale"
+
+    return {
+        "user": profile.get("id"),
+        "display_name": profile.get("display_name"),
+        "session_mode": profile.get("mode", "solo"),
+        "members": profile.get("members", []),
+        "status": profile.get("status", "active"),
+        "presence": presence,
+        "last_seen": last_seen,
+        "gps_status": gps_status,
+        "lat": _as_float(raw.get("lat")),
+        "lon": _as_float(raw.get("lon")),
+        "source": _as_str(raw.get("source") or "player").strip() or "player",
+        "debug_enabled": _as_bool(raw.get("debug_enabled"), False),
+    }
+
 def _build_success_conditions(raw):
     conditions = [{"kind": "minigame_ok", "value": MINIGAME_OK_CODE}]
 
@@ -591,6 +716,7 @@ async def login(request: Request):
         context={
             "request": request,
             "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
+            "profiles": get_player_profiles(cfg),
             "config": cfg
         }
     )
@@ -604,6 +730,7 @@ async def game(request: Request, name: str):
         context={
             "request": request,
             "user": name,
+            "profile": get_player_profile(name, cfg),
             "config": cfg
         }
     )
@@ -636,7 +763,8 @@ async def get_config():
         "prologue_body": cfg.get("prologue_body", ""),
         "map_center": cfg.get("map_center", [40.4168, -3.7038]),
         "map_zoom": cfg.get("map_zoom", 13),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
+        "player_profiles": get_player_profiles(cfg)
     }
 
 @app.get("/api/state/{user}")
@@ -650,7 +778,11 @@ async def get_state(user: str):
 async def get_game_payload(user: str):
     runtime_stages = get_runtime_stages()
     state = load_json(GAME_DB, {})
-    lvl = state.get(user, 0)
+    profile = get_player_profile(user)
+    profile_id = profile.get("id") or user
+    live_positions = load_live_positions()
+
+    lvl = state.get(profile_id, state.get(user, 0))
     finished = lvl >= len(runtime_stages)
 
     stages = [
@@ -659,9 +791,87 @@ async def get_game_payload(user: str):
     ]
 
     return {
+        "user": profile_id,
+        "display_name": profile.get("display_name", profile_id),
+        "session_mode": profile.get("mode", "solo"),
+        "profile": profile,
+        "live_status": project_live_profile_status(profile, live_positions.get(profile_id)),
         "level": lvl,
         "finished": finished,
         "stages": stages
+    }
+
+@app.post("/api/heartbeat")
+async def heartbeat(request: Request):
+    data = await request.json()
+
+    user = _as_str(data.get("user")).strip()
+    if not user:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "user required"})
+
+    profile = get_player_profile(user)
+    profile_id = profile.get("id") or user
+
+    positions = load_live_positions()
+    current = positions.get(profile_id, {})
+    if not isinstance(current, dict):
+        current = {}
+
+    lat = _as_float(data.get("lat"))
+    lon = _as_float(data.get("lon"))
+
+    if lat is not None and lon is not None:
+        current["lat"] = lat
+        current["lon"] = lon
+
+    current["last_seen"] = int(time.time())
+    current["gps_status"] = _as_str(data.get("gps_status") or current.get("gps_status") or "unknown").strip().lower() or "unknown"
+    current["source"] = _as_str(data.get("source") or "player").strip() or "player"
+    current["debug_enabled"] = _as_bool(data.get("debug_enabled"), False)
+
+    positions[profile_id] = current
+    save_live_positions(positions)
+
+    return {
+        "status": "ok",
+        "user": profile_id,
+        "live_status": project_live_profile_status(profile, current)
+    }
+
+@app.post("/api/admin/mission-status")
+async def admin_mission_status(request: Request):
+    data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+
+    cfg = load_config()
+    runtime_stages = get_runtime_stages()
+    state = load_json(GAME_DB, {})
+    positions = load_live_positions()
+    now = int(time.time())
+
+    items = []
+    for profile in get_player_profiles(cfg):
+        profile_id = profile.get("id")
+        lvl = state.get(profile_id, 0)
+        finished = lvl >= len(runtime_stages)
+
+        current_stage = ""
+        if not finished and 0 <= lvl < len(runtime_stages):
+            current_stage = runtime_stages[lvl]["presentation"]["title"]
+
+        items.append({
+            **project_live_profile_status(profile, positions.get(profile_id), now),
+            "level": lvl,
+            "finished": finished,
+            "current_stage": current_stage,
+        })
+
+    return {
+        "status": "ok",
+        "server_ts": now,
+        "profiles": items
     }
 
 @app.get("/api/admin/stages")
@@ -683,15 +893,9 @@ async def save_config_endpoint(request: Request):
     cfg = load_config()
 
     if "players" in incoming:
-        players = incoming.get("players")
-        if isinstance(players, str):
-            players = [p.strip() for p in players.split("\n") if p.strip()]
-        elif isinstance(players, list):
-            players = [str(p).strip() for p in players if str(p).strip()]
-        else:
-            players = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        players = parse_player_entries(incoming.get("players"))
     else:
-        players = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
 
     ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "en"))).strip().lower()
     if ui_lang not in {"en"}:
