@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +7,7 @@ import os
 import hashlib
 import hmac
 import secrets
+import time
 
 app = FastAPI()
 
@@ -176,6 +177,61 @@ def ensure_admin_auth():
     raise RuntimeError("ADMIN_PASS is required. Set ADMIN_PASS, or enable ALLOW_DEFAULT_ADMIN=1 only for local development.")
 
 ensure_admin_auth()
+
+ADMIN_LOGIN_WINDOW_SECONDS = 600
+ADMIN_LOGIN_MAX_ATTEMPTS = 5
+ADMIN_LOGIN_LOCK_SECONDS = 600
+ADMIN_LOGIN_ATTEMPTS = {}
+
+def get_client_ip(request: Request):
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    client = getattr(request, "client", None)
+    if client and getattr(client, "host", None):
+        return client.host
+    return "unknown"
+
+def prune_admin_login_attempts(now=None):
+    now = now or time.time()
+    stale_keys = []
+    for ip, state in ADMIN_LOGIN_ATTEMPTS.items():
+        locked_until = float(state.get("locked_until") or 0)
+        attempts = [ts for ts in state.get("attempts", []) if now - ts <= ADMIN_LOGIN_WINDOW_SECONDS]
+        if locked_until <= now and not attempts:
+            stale_keys.append(ip)
+        else:
+            state["attempts"] = attempts
+            if locked_until <= now:
+                state["locked_until"] = 0
+    for ip in stale_keys:
+        ADMIN_LOGIN_ATTEMPTS.pop(ip, None)
+
+def get_admin_login_state(ip, now=None):
+    now = now or time.time()
+    prune_admin_login_attempts(now)
+    state = ADMIN_LOGIN_ATTEMPTS.setdefault(ip, {"attempts": [], "locked_until": 0})
+    state["attempts"] = [ts for ts in state.get("attempts", []) if now - ts <= ADMIN_LOGIN_WINDOW_SECONDS]
+    if float(state.get("locked_until") or 0) <= now:
+        state["locked_until"] = 0
+    return state
+
+def clear_admin_login_state(ip):
+    ADMIN_LOGIN_ATTEMPTS.pop(ip, None)
+
+def register_admin_login_failure(ip, now=None):
+    now = now or time.time()
+    state = get_admin_login_state(ip, now)
+    state["attempts"].append(now)
+    if len(state["attempts"]) >= ADMIN_LOGIN_MAX_ATTEMPTS:
+        state["locked_until"] = now + ADMIN_LOGIN_LOCK_SECONDS
+    return state
+
+def get_admin_lock_remaining_seconds(ip, now=None):
+    now = now or time.time()
+    state = get_admin_login_state(ip, now)
+    locked_until = float(state.get("locked_until") or 0)
+    return max(0, int(locked_until - now))
 
 
 MINIGAME_OK_CODE = "OK"
@@ -721,12 +777,36 @@ async def save_stages_endpoint(request: Request):
     return {"status": "ok"}
 
 @app.post("/api/admin/login")
-@app.post("/api/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
+    now = time.time()
+    ip = get_client_ip(request)
+
+    remaining = get_admin_lock_remaining_seconds(ip, now)
+    if remaining > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"too many failed attempts; retry in {remaining}s"
+        )
+
     if verify_admin_password(data.get("password")):
+        clear_admin_login_state(ip)
         return {"status": "ok", "must_change": admin_password_change_required()}
-    return JSONResponse(status_code=403, content={"status": "fail"})
+
+    state = register_admin_login_failure(ip, now)
+    remaining_after_fail = get_admin_lock_remaining_seconds(ip, now)
+
+    if remaining_after_fail > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"too many failed attempts; retry in {remaining_after_fail}s"
+        )
+
+    attempts_left = max(0, ADMIN_LOGIN_MAX_ATTEMPTS - len(state.get("attempts", [])))
+    raise HTTPException(
+        status_code=401,
+        detail=f"invalid password ({attempts_left} attempts left before temporary lock)"
+    )
 
 @app.post("/api/admin/change-password")
 async def admin_change_password(request: Request):
