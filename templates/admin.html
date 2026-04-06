@@ -158,6 +158,291 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
     border-radius: 16px !important;
   }
 
+
+/* === MISSION CONTROL POLISH === */
+@media (min-width: 1280px){
+  .sidebar{
+    width: 440px !important;
+    max-width: 440px !important;
+  }
+}
+
+.mission-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+
+.mission-meta{
+  margin-bottom:14px;
+  font-size:12px;
+  color:#9ca3af;
+  line-height:1.5;
+}
+
+.mission-list{
+  display:grid;
+  gap:16px;
+}
+
+.mission-card{
+  border-radius:22px;
+  padding:18px;
+  border:1px solid rgba(63,63,70,.9);
+  background:rgba(24,24,27,.72);
+  box-shadow:0 10px 24px rgba(0,0,0,.16);
+}
+
+.mission-card.live{
+  border-color:rgba(16,185,129,.35);
+  background:rgba(6,78,59,.15);
+}
+
+.mission-card.stale{
+  border-color:rgba(245,158,11,.40);
+  background:rgba(120,53,15,.14);
+}
+
+.mission-card.offline{
+  border-color:rgba(82,82,91,.85);
+  background:rgba(24,24,27,.72);
+}
+
+.mission-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.mission-card-title{
+  min-width:0;
+}
+
+.mission-card-name{
+  color:#fff;
+  font-size:28px;
+  line-height:1.05;
+  font-weight:800;
+  letter-spacing:.02em;
+  word-break:break-word;
+}
+
+.mission-card-sub{
+  margin-top:6px;
+  color:#a1a1aa;
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+
+.mission-card-members{
+  margin-bottom:14px;
+  color:#cbd5e1;
+  font-size:12px;
+  line-height:1.5;
+}
+
+.mission-card-members .label{
+  color:#71717a;
+  margin-right:6px;
+}
+
+.mission-badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  border:1px solid rgba(82,82,91,.9);
+  padding:6px 10px;
+  font-size:10px;
+  line-height:1;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  background:rgba(24,24,27,.65);
+  color:#e4e4e7;
+}
+
+.mission-badge.live{
+  border-color:rgba(16,185,129,.35);
+  color:#a7f3d0;
+  background:rgba(6,78,59,.22);
+}
+
+.mission-badge.stale{
+  border-color:rgba(245,158,11,.40);
+  color:#fde68a;
+  background:rgba(120,53,15,.22);
+}
+
+.mission-badge.offline{
+  border-color:rgba(82,82,91,.9);
+  color:#d4d4d8;
+  background:rgba(24,24,27,.7);
+}
+
+.mission-stats{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:10px;
+}
+
+.mission-stat{
+  border-radius:16px;
+  border:1px solid rgba(63,63,70,.75);
+  background:rgba(0,0,0,.18);
+  padding:10px 12px;
+}
+
+.mission-stat-label{
+  display:block;
+  margin-bottom:6px;
+  color:#71717a;
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+
+.mission-stat-value{
+  color:#f4f4f5;
+  font-size:13px;
+  line-height:1.4;
+  font-weight:700;
+  word-break:break-word;
+}
+
+@media (max-width: 900px){
+  .mission-card-name{ font-size:22px; }
+  .mission-stats{ grid-template-columns:1fr; }
+}
+
+
+/* === ADMIN DENSITY POLISH V2 === */
+@media (min-width: 1280px){
+  .sidebar{
+    width: 520px !important;
+    max-width: 520px !important;
+  }
+}
+
+.mission-toolbar{
+  margin-bottom:10px !important;
+}
+
+.mission-meta{
+  margin-bottom:10px !important;
+  font-size:11px !important;
+  line-height:1.45 !important;
+}
+
+.mission-list{
+  gap:12px !important;
+}
+
+.mission-card{
+  padding:14px !important;
+  border-radius:18px !important;
+}
+
+.mission-card-head{
+  margin-bottom:10px !important;
+}
+
+.mission-card-name{
+  font-size:18px !important;
+  line-height:1.1 !important;
+}
+
+.mission-card-sub{
+  margin-top:4px !important;
+  font-size:10px !important;
+  letter-spacing:.14em !important;
+}
+
+.mission-card-members{
+  margin-bottom:10px !important;
+  font-size:11px !important;
+}
+
+.mission-badge{
+  padding:5px 8px !important;
+  font-size:9px !important;
+}
+
+.mission-stats{
+  gap:8px !important;
+}
+
+.mission-stat{
+  padding:8px 10px !important;
+  border-radius:14px !important;
+}
+
+.mission-stat-label{
+  margin-bottom:4px !important;
+  font-size:9px !important;
+}
+
+.mission-stat-value{
+  font-size:12px !important;
+  line-height:1.3 !important;
+}
+
+@media (max-width: 900px){
+  .mission-card-name{ font-size:18px !important; }
+}
+
+/* players helper */
+.players-help{
+  margin-top:8px;
+  margin-bottom:2px;
+  color:#a1a1aa;
+  font-size:11px;
+  line-height:1.45;
+}
+
+/* editor polish */
+#editor{
+  background:rgba(5,8,12,.78) !important;
+  backdrop-filter:blur(18px) !important;
+  -webkit-backdrop-filter:blur(18px) !important;
+}
+
+#editor #edit-header{
+  color:#fff !important;
+  letter-spacing:.06em !important;
+}
+
+#editor label{
+  color:#cbd5e1 !important;
+}
+
+#editor .config-input{
+  background:rgba(17,24,39,.82) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  color:#f5f5f5 !important;
+  box-shadow:none !important;
+}
+
+#editor textarea.config-input{
+  min-height:110px !important;
+}
+
+#editor .section{
+  background:rgba(255,255,255,.04) !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+  border-radius:20px !important;
+  padding:16px !important;
+}
+
+#editor button,
+#editor .ctrl-btn{
+  border-radius:14px !important;
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -203,6 +488,20 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
             <a href="/" class="shrink-0 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-[11px] font-extrabold tracking-[.12em] text-zinc-200 no-underline transition hover:border-zinc-500 hover:text-white">⟵ RETURN</a>
           </div>
         </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection('section-mission')">
+        <strong>MISSION CONTROL</strong><span id="arrow-section-mission">▶</span>
+      </div>
+      <div id="section-mission" class="section-body hidden">
+        <div class="mission-toolbar">
+          <div class="text-[10px] uppercase tracking-[.22em] text-zinc-500">Live mission status</div>
+          <button type="button" onclick="loadMissionStatus()" class="ctrl-btn">REFRESH</button>
+        </div>
+        <div id="mission-status-meta" class="mission-meta">No live data yet.</div>
+        <div id="mission-status-list" class="mission-list"></div>
+      </div>
     </div>
 
     <div class="section">
@@ -420,6 +719,7 @@ async function enterAdminUi() {
   map.invalidateSize();
   await loadConfigAdmin();
   await load();
+  await loadMissionStatus();
 }
 
 function setInlineFeedback(id, message, tone='error') {
@@ -514,6 +814,124 @@ async function login() {
   }
 }
 
+function serializePlayersForAdmin(list) {
+  return (list || []).map(item => {
+    if (typeof item === 'string') return item;
+    try { return JSON.stringify(item); } catch (e) { return ''; }
+  }).filter(Boolean).join('\n');
+}
+
+function formatTs(ts) {
+  if (!ts) return '—';
+  try {
+    return new Date(ts * 1000).toLocaleString();
+  } catch (e) {
+    return String(ts);
+  }
+}
+
+function missionTone(presence) {
+  if (presence === 'live') return 'border-emerald-500/30 bg-emerald-950/20';
+  if (presence === 'stale') return 'border-amber-400/30 bg-amber-950/20';
+  return 'border-zinc-700 bg-zinc-950/60';
+}
+
+function missionPresenceBadge(presence) {
+  const tone = (presence === 'live' || presence === 'stale' || presence === 'offline') ? presence : 'offline';
+  return `<span class="mission-badge ${tone}">${presence || 'offline'}</span>`;
+}
+
+function renderMissionStatus(items, serverTs) {
+  const list = document.getElementById('mission-status-list');
+  const meta = document.getElementById('mission-status-meta');
+  if (!list || !meta) return;
+
+  meta.textContent = `Profiles: ${items.length} · Updated: ${formatTs(serverTs)}`;
+
+  if (!items.length) {
+    list.innerHTML = `<div class="mission-card offline"><div class="mission-stat-value">No profiles found.</div></div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    const tone = (item.presence === 'live' || item.presence === 'stale' || item.presence === 'offline') ? item.presence : 'offline';
+    const icon = item.session_mode === 'team' ? '👥' : '👤';
+    const members = (item.members || []).length ? (item.members || []).join(' • ') : '—';
+    const gps = item.gps_status || 'unknown';
+    const coords = (typeof item.lat === 'number' && typeof item.lon === 'number')
+      ? `${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}`
+      : '—';
+    const currentStage = item.finished ? 'FINISHED' : (item.current_stage || '—');
+    const level = Number.isFinite(item.level) ? item.level : 0;
+
+    return `
+      <div class="mission-card ${tone}">
+        <div class="mission-card-head">
+          <div class="mission-card-title">
+            <div class="mission-card-name">${icon} ${item.display_name || item.user}</div>
+            <div class="mission-card-sub">${item.session_mode || 'solo'}</div>
+          </div>
+          <div>${missionPresenceBadge(item.presence)}</div>
+        </div>
+
+        <div class="mission-card-members">
+          <span class="label">Members:</span>${members}
+        </div>
+
+        <div class="mission-stats">
+          <div class="mission-stat">
+            <span class="mission-stat-label">Level</span>
+            <div class="mission-stat-value">${level}</div>
+          </div>
+          <div class="mission-stat">
+            <span class="mission-stat-label">Stage</span>
+            <div class="mission-stat-value">${currentStage}</div>
+          </div>
+          <div class="mission-stat">
+            <span class="mission-stat-label">GPS</span>
+            <div class="mission-stat-value">${gps}</div>
+          </div>
+          <div class="mission-stat">
+            <span class="mission-stat-label">Last seen</span>
+            <div class="mission-stat-value">${formatTs(item.last_seen)}</div>
+          </div>
+          <div class="mission-stat" style="grid-column:1/-1">
+            <span class="mission-stat-label">Position</span>
+            <div class="mission-stat-value">${coords}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadMissionStatus() {
+  const list = document.getElementById('mission-status-list');
+  const meta = document.getElementById('mission-status-meta');
+  if (!list || !meta || !pass) return;
+
+  try {
+    const r = await fetch('/api/admin/mission-status', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ password: pass })
+    });
+
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      meta.textContent = 'Unable to load mission status.';
+      list.innerHTML = `<div class="rounded-2xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-200">${(data && data.detail) ? String(data.detail).toUpperCase() : 'ERROR LOADING MISSION STATUS'}</div>`;
+      return;
+    }
+
+    renderMissionStatus(data.profiles || [], data.server_ts || 0);
+  } catch (e) {
+    meta.textContent = 'Unable to load mission status.';
+    list.innerHTML = `<div class="rounded-2xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-200">NETWORK ERROR LOADING MISSION STATUS</div>`;
+  }
+}
+
 async function loadConfigAdmin() {
   let r = await fetch('/api/config');
   let cfg = await r.json();
@@ -531,7 +949,7 @@ async function loadConfigAdmin() {
   document.getElementById('cfg-map-lat').value = (cfg.map_center || [42.26, -8.86])[0];
   document.getElementById('cfg-map-lon').value = (cfg.map_center || [42.26, -8.86])[1];
   document.getElementById('cfg-map-zoom').value = cfg.map_zoom || 13;
-  document.getElementById('cfg-players').value = (cfg.players || []).join('\n');
+  document.getElementById('cfg-players').value = serializePlayersForAdmin(cfg.players || []);
 
   document.title = cfg.site_name || 'SAGA ENGINE';
   document.getElementById('header-admin-title').textContent = cfg.admin_title || 'SAGA_ADMIN';
@@ -779,7 +1197,7 @@ async function saveAll() {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  [['section-game', false], ['section-players', false], ['section-points', true]].forEach(([id, open]) => {
+  [['section-mission', true], ['section-game', false], ['section-players', false], ['section-points', true]].forEach(([id, open]) => {
     const el = document.getElementById(id);
     const arrow = document.getElementById('arrow-' + id);
     if (el) { if (open) el.classList.remove('hidden'); else el.classList.add('hidden'); }
@@ -788,6 +1206,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const list = document.getElementById('list');
   if (list) list.classList.add('custom-scrollbar');
+
+  setInterval(() => {
+    const mainUi = document.getElementById('main-ui');
+    if (!mainUi || mainUi.classList.contains('hidden')) return;
+    if (!pass) return;
+    loadMissionStatus();
+  }, 10000);
 });
 </script>
 
