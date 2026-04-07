@@ -1459,6 +1459,70 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
   }
 }
 
+
+/* === PLAYERS PREVIEW V1 === */
+.players-preview-list{
+  display:grid;
+  gap:10px;
+  margin-bottom:12px;
+}
+.players-preview-card{
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(13,16,20,.24);
+  border-radius:18px;
+  padding:12px;
+  box-shadow:0 10px 26px rgba(0,0,0,.14);
+}
+.players-preview-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.players-preview-title{
+  color:#fff;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.1;
+}
+.players-preview-sub{
+  color:#a1a1aa;
+  font-size:10px;
+  line-height:1.35;
+  margin-top:4px;
+}
+.players-preview-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+  color:#e5e7eb;
+  font-size:10px;
+  line-height:1;
+  white-space:nowrap;
+}
+.players-preview-meta{
+  display:grid;
+  gap:6px;
+  color:#d4d4d8;
+  font-size:11px;
+  line-height:1.35;
+}
+.players-preview-meta .label{
+  color:#8b8f98;
+  margin-right:6px;
+}
+.players-preview-help{
+  color:#a1a1aa;
+  font-size:10px;
+  line-height:1.45;
+  margin-bottom:10px;
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -1579,7 +1643,11 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
         <strong>PLAYERS</strong><span id="arrow-section-players">▶</span>
       </div>
       <div id="section-players" class="section-body hidden">
-        <label>Players (one per line)</label>
+        
+<div class="players-preview-help">Profiles below are generated from the current config normalization. The raw textarea stays as the active storage/edit path for now.</div>
+<div id="players-preview-list" class="players-preview-list"></div>
+
+<label>Players (one per line)</label>
         <textarea id="cfg-players" class="config-input" style="height:140px"></textarea>
         
       </div>
@@ -1837,6 +1905,57 @@ function serializePlayersForAdmin(list) {
   }).filter(Boolean).join('\n');
 }
 
+function escapePlayersPreviewHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function renderPlayersPreview(cfg) {
+  const list = document.getElementById('players-preview-list');
+  if (!list) return;
+
+  const profiles = Array.isArray(cfg?.player_profiles) ? cfg.player_profiles : [];
+
+  if (!profiles.length) {
+    list.innerHTML = `
+      <div class="players-preview-card">
+        <div class="players-preview-title">No profiles found.</div>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = profiles.map((profile, index) => {
+    const mode = String(profile?.mode || 'solo');
+    const icon = mode === 'team' ? '👥' : '👤';
+    const members = Array.isArray(profile?.members) && profile.members.length ? profile.members.join(', ') : '—';
+    const status = String(profile?.status || 'active');
+
+    return `
+      <div class="players-preview-card">
+        <div class="players-preview-head">
+          <div>
+            <div class="players-preview-title">${icon} ${escapePlayersPreviewHtml(profile?.display_name || profile?.id || `PLAYER ${index + 1}`)}</div>
+            <div class="players-preview-sub">Stable ID: ${escapePlayersPreviewHtml(profile?.id || '')}</div>
+          </div>
+          <div class="players-preview-badge">${escapePlayersPreviewHtml(mode.toUpperCase())}</div>
+        </div>
+
+        <div class="players-preview-meta">
+          <div><span class="label">Members</span>${escapePlayersPreviewHtml(members)}</div>
+          <div><span class="label">Status</span>${escapePlayersPreviewHtml(status)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+
 function formatTs(ts) {
   if (!ts) return '—';
   try {
@@ -2014,7 +2133,9 @@ async function loadConfigAdmin() {
   document.getElementById('cfg-map-zoom').value = cfg.map_zoom || 13;
   document.getElementById('cfg-players').value = serializePlayersForAdmin(cfg.players || []);
 
-  document.title = cfg.site_name || 'SAGA ENGINE';
+  
+    renderPlayersPreview(cfg);
+document.title = cfg.site_name || 'SAGA ENGINE';
   document.getElementById('header-admin-title').textContent = cfg.admin_title || 'SAGA_ADMIN';
   document.getElementById('header-admin-subtitle').textContent = cfg.admin_subtitle || '';
 }
