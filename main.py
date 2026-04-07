@@ -961,6 +961,92 @@ async def reset(request: Request):
     save_json(GAME_DB, state)
     return {"status": "ok"}
 
+
+
+def _clamp_game_level(value, max_level):
+    try:
+        value = int(value)
+    except Exception:
+        value = 0
+    if value < 0:
+        return 0
+    if value > max_level:
+        return max_level
+    return value
+
+@app.post("/api/admin/profile-action")
+async def admin_profile_action(request: Request):
+    data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "bad password"}
+        )
+
+    if admin_password_change_required():
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "password change required"}
+        )
+
+    profile_id = _as_str(data.get("profile_id")).strip()
+    action = _as_str(data.get("action")).strip().lower()
+
+    allowed_actions = {
+        "reset_profile",
+        "level_prev",
+        "level_next",
+        "mark_finished",
+    }
+
+    if action not in allowed_actions:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "invalid action"}
+        )
+
+    cfg = load_config()
+    profiles = {
+        _as_str((p or {}).get("id")).strip(): (p or {})
+        for p in get_player_profiles(cfg)
+    }
+
+    if not profile_id or profile_id not in profiles:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "detail": "unknown profile"}
+        )
+
+    runtime_stages = get_runtime_stages()
+    max_level = len(runtime_stages)
+    state = load_json(GAME_DB, {})
+
+    previous_level = _clamp_game_level(state.get(profile_id, 0), max_level)
+
+    if action == "reset_profile":
+        new_level = 0
+    elif action == "level_prev":
+        new_level = max(0, previous_level - 1)
+    elif action == "level_next":
+        new_level = min(max_level, previous_level + 1)
+    else:  # mark_finished
+        new_level = max_level
+
+    state[profile_id] = new_level
+    save_json(GAME_DB, state)
+
+    return {
+        "status": "ok",
+        "profile_id": profile_id,
+        "action": action,
+        "previous_level": previous_level,
+        "level": new_level,
+        "finished": new_level >= max_level,
+        "total_stages": max_level,
+    }
+
+
 @app.post("/api/admin/save")
 async def save_stages_endpoint(request: Request):
     data = await request.json()

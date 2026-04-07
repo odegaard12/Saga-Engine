@@ -1083,6 +1083,382 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
   }
 }
 
+
+/* === ADMIN USABILITY HOTFIX V2 === */
+
+/* Mission Control: botones utilizables y menos densidad */
+.mission-toolbar .ctrl-btn,
+#mission-status-list .ctrl-btn{
+  width:auto !important;
+  min-width:44px !important;
+  height:28px !important;
+  padding:0 10px !important;
+  border-radius:999px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+}
+
+.mission-toolbar .ctrl-btn{
+  min-width:78px !important;
+}
+
+#mission-status-list .mission-card{
+  padding:12px !important;
+}
+
+#mission-status-list .mission-card-name{
+  font-size:15px !important;
+}
+
+#mission-status-list .mission-card-sub{
+  font-size:9px !important;
+  margin-top:3px !important;
+}
+
+#mission-status-list .mission-card > div:nth-child(2){
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto !important;
+  align-items:start !important;
+  gap:8px !important;
+  margin-top:6px !important;
+}
+
+#mission-status-list .mission-card-members{
+  margin:0 !important;
+  font-size:10px !important;
+  line-height:1.35 !important;
+}
+
+#mission-status-list .mission-card > div:nth-child(2) > div:last-child{
+  display:flex !important;
+  gap:6px !important;
+  flex-wrap:wrap !important;
+  justify-content:flex-end !important;
+}
+
+#mission-status-list .mission-stats{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:6px !important;
+  margin-top:8px !important;
+}
+
+#mission-status-list .mission-stat{
+  padding:7px 8px !important;
+  border-radius:12px !important;
+}
+
+#mission-status-list .mission-stat-label{
+  font-size:8px !important;
+  margin-bottom:3px !important;
+}
+
+#mission-status-list .mission-stat-value{
+  font-size:11px !important;
+  line-height:1.25 !important;
+}
+
+/* Node editor: scroll fiable + acciones siempre alcanzables */
+#editor > div{
+  display:flex !important;
+  flex-direction:column !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-bottom:88px !important;
+}
+
+#editor > div > div:last-child{
+  position:sticky !important;
+  bottom:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:10px !important;
+  margin-top:16px !important;
+  margin-left:-16px !important;
+  margin-right:-16px !important;
+  margin-bottom:-88px !important;
+  padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px) !important;
+  border-top:1px solid rgba(255,255,255,.08) !important;
+  background:linear-gradient(180deg, rgba(5,8,14,0), rgba(5,8,14,.92) 34%) !important;
+  backdrop-filter:blur(18px) !important;
+  z-index:20 !important;
+}
+
+#editor > div > div:last-child > [onclick*="delPoint"]{
+  margin-right:auto !important;
+}
+
+@media (max-width:700px){
+  #editor > div{
+    padding-bottom:96px !important;
+  }
+
+  #editor > div > div:last-child{
+    flex-wrap:wrap !important;
+    margin-left:-14px !important;
+    margin-right:-14px !important;
+    margin-bottom:-96px !important;
+    padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px) !important;
+  }
+}
+
+
+/* === ADMIN REDESIGN CSS PASS SAFE === */
+
+/* Mission Control compacto sobre el markup actual */
+.mission-toolbar .ctrl-btn{
+  width:auto !important;
+  min-width:78px !important;
+  height:30px !important;
+  padding:0 12px !important;
+  border-radius:999px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+}
+
+#mission-status-list{
+  display:grid !important;
+  gap:8px !important;
+}
+
+#mission-status-list .mission-card{
+  padding:10px 12px !important;
+  border-radius:14px !important;
+}
+
+#mission-status-list .mission-card-head{
+  margin-bottom:6px !important;
+  align-items:flex-start !important;
+  gap:8px !important;
+}
+
+#mission-status-list .mission-card-name{
+  font-size:15px !important;
+  line-height:1.05 !important;
+}
+
+#mission-status-list .mission-card-sub{
+  font-size:9px !important;
+  line-height:1.2 !important;
+  margin-top:2px !important;
+}
+
+#mission-status-list .mission-card > div:nth-child(2){
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto !important;
+  gap:8px !important;
+  align-items:start !important;
+  margin-top:6px !important;
+}
+
+#mission-status-list .mission-card-members{
+  margin:0 !important;
+  font-size:10px !important;
+  line-height:1.25 !important;
+}
+
+#mission-status-list .mission-card > div:nth-child(2) > div:last-child{
+  display:flex !important;
+  gap:6px !important;
+  flex-wrap:wrap !important;
+  justify-content:flex-end !important;
+}
+
+#mission-status-list .ctrl-btn{
+  width:auto !important;
+  min-width:38px !important;
+  height:26px !important;
+  padding:0 9px !important;
+  border-radius:999px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+}
+
+#mission-status-list .mission-stats{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:6px !important;
+  margin-top:8px !important;
+}
+
+#mission-status-list .mission-stat{
+  min-height:auto !important;
+  padding:6px 8px !important;
+  border-radius:999px !important;
+  width:auto !important;
+  max-width:100% !important;
+}
+
+#mission-status-list .mission-stat-label{
+  display:inline !important;
+  font-size:8px !important;
+  margin:0 4px 0 0 !important;
+}
+
+#mission-status-list .mission-stat-value{
+  display:inline !important;
+  font-size:10px !important;
+  line-height:1.2 !important;
+}
+
+#mission-status-list .mission-stat:last-child{
+  width:100% !important;
+  border-radius:12px !important;
+  padding:8px 10px !important;
+}
+
+
+/* Neutralizar la banda negra rara del editor v2 */
+#editor.node-editor-v2-ready > div{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  padding-bottom:16px !important;
+}
+
+#editor.node-editor-v2-ready > div > div:last-child{
+  position:static !important;
+  bottom:auto !important;
+  margin:14px 0 0 0 !important;
+  padding:0 !important;
+  border-top:0 !important;
+  background:none !important;
+  backdrop-filter:none !important;
+}
+
+#editor.node-editor-v2-ready .editor-v2-shell{
+  margin-top:14px !important;
+}
+
+#editor.node-editor-v2-ready .editor-actions{
+  position:static !important;
+  bottom:auto !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:10px !important;
+  padding:10px 0 0 0 !important;
+  margin-top:10px !important;
+  border-top:0 !important;
+  background:none !important;
+  backdrop-filter:none !important;
+  z-index:auto !important;
+}
+
+#editor.node-editor-v2-ready .editor-actions [onclick*="delPoint"]{
+  margin-right:auto !important;
+}
+
+#editor.node-editor-v2-ready .editor-actions button{
+  border-radius:999px !important;
+}
+
+@media (max-width:700px){
+  #mission-status-list .mission-card > div:nth-child(2){
+    grid-template-columns:1fr !important;
+  }
+
+  #mission-status-list .mission-card > div:nth-child(2) > div:last-child{
+    justify-content:flex-start !important;
+  }
+
+  #list{
+    max-height:28vh !important;
+  }
+}
+
+
+/* === ADMIN V3 LIST LAYOUT === */
+#mission-status-list{display:grid !important;gap:8px !important;}
+.mission-row{border:1px solid rgba(255,255,255,.06);background:rgba(20,24,31,.78);border-radius:14px;overflow:hidden;}
+.mission-row.live{background:rgba(18,42,35,.62);border-color:rgba(16,185,129,.24);}
+.mission-row.stale{background:rgba(54,42,31,.60);border-color:rgba(245,158,11,.26);}
+.mission-row.offline{background:rgba(20,24,31,.78);border-color:rgba(255,255,255,.06);}
+.mission-row summary{list-style:none;cursor:pointer;padding:10px 12px;}
+.mission-row summary::-webkit-details-marker{display:none;}
+.mission-row-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;}
+.mission-row-name{color:#fff;font-size:15px;line-height:1.05;font-weight:800;word-break:break-word;}
+.mission-row-sub{margin-top:4px;color:#a1a1aa;font-size:10px;line-height:1.25;}
+.mission-row-right{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.mission-row-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.mission-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.05);color:#e5e7eb;font-size:10px;line-height:1.2;}
+.mission-row-body{padding:0 12px 12px;border-top:1px solid rgba(255,255,255,.05);}
+.mission-row-meta{display:grid;gap:6px;padding-top:10px;color:#d4d4d8;font-size:11px;line-height:1.35;}
+.mission-row-meta .label{color:#8b8f98;margin-right:6px;}
+.mission-row-actions{display:flex;flex-wrap:wrap;gap:6px;padding-top:10px;}
+.mission-row-btn{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:26px;padding:0 9px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(17,24,39,.42);color:#e5e7eb;font-size:10px;line-height:1;white-space:nowrap;}
+.mission-row-btn:hover{color:#fff;border-color:rgba(16,185,129,.42);background:rgba(15,22,15,.62);}
+.mission-row-btn.reset{color:#fde68a;border-color:rgba(245,158,11,.24);}
+.mission-row-btn.finish{color:#fecaca;border-color:rgba(248,113,113,.20);}
+.mission-toolbar .ctrl-btn{width:auto !important;min-width:78px !important;height:30px !important;padding:0 12px !important;border-radius:999px !important;font-size:10px !important;line-height:1 !important;}
+#section-points{display:flex !important;flex-direction:column !important;height:auto !important;min-height:260px !important;}
+#list{display:grid !important;gap:8px !important;flex:1 1 auto !important;min-height:120px !important;max-height:34vh !important;overflow-y:auto !important;padding-right:6px !important;}
+#list .node-card{margin-bottom:0 !important;padding:10px 12px !important;border-radius:14px !important;align-items:center !important;gap:10px !important;}
+#list .node-meta{font-size:9px !important;}
+#list .ctrl-btn{width:28px !important;height:28px !important;border-radius:10px !important;font-size:11px !important;}
+#section-points .action-row{position:static !important;bottom:auto !important;margin-top:10px !important;padding:0 !important;border-top:0 !important;background:none !important;backdrop-filter:none !important;}
+@media (max-width:700px){.mission-row-summary{grid-template-columns:1fr !important;}.mission-row-right{justify-content:flex-start !important;}#list{max-height:28vh !important;}}
+
+
+
+
+
+
+
+
+
+/* === NODES CLEAN ROOT FIX === */
+#section-points.hidden{
+  display:none !important;
+}
+#section-points:not(.hidden){
+  display:block !important;
+  margin-top:12px !important;
+}
+
+#list{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:8px !important;
+  max-height:22vh !important;
+  overflow-y:auto !important;
+  padding:0 4px 0 0 !important;
+  margin:0 !important;
+}
+
+#list .node-card{
+  margin:0 !important;
+  padding:10px 12px !important;
+  border-radius:14px !important;
+  background:rgba(13,16,20,.18) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  box-shadow:none !important;
+}
+
+#list .node-card.active{
+  background:rgba(16,185,129,.08) !important;
+  border-color:rgba(16,185,129,.20) !important;
+}
+
+#section-points .action-row{
+  position:static !important;
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:10px !important;
+  margin-top:10px !important;
+  padding:0 !important;
+  border-top:0 !important;
+  background:none !important;
+  backdrop-filter:none !important;
+}
+
+@media (max-width:700px){
+  #list{
+    max-height:20vh !important;
+  }
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -1209,13 +1585,13 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
       </div>
     </div>
 
-      <div class="section flex-grow min-h-0">
+      <div class="section">
         <div class="section-head" onclick="toggleSection('section-points')">
           <strong>NODES</strong><span id="arrow-section-points">▶</span>
         </div>
-        <div id="section-points" class="section-body hidden flex flex-col min-h-0" style="height:100%;">
+        <div id="section-points" class="section-body hidden">
           <div class="text-[10px] text-zinc-500 mb-2">CLICK ON THE MAP TO CREATE A NODE AT THAT POSITION</div>
-          <div id="list" class="flex-grow overflow-y-auto pr-2 custom-scrollbar"></div>
+          <div id="list" class="overflow-y-auto pr-2 custom-scrollbar"></div>
           <div class="action-row">
             <button onclick="addNew()" class="small-btn">+ ADD NODE</button>
             <button onclick="saveAll()" class="rounded-xl border border-emerald-500 bg-emerald-800 px-3 py-2 text-[11px] font-extrabold tracking-[.12em] text-white transition hover:bg-emerald-700">💾 SAVE NODES</button>
@@ -1481,6 +1857,7 @@ function missionPresenceBadge(presence) {
   return `<span class="mission-badge ${tone}">${presence || 'offline'}</span>`;
 }
 
+
 function renderMissionStatus(items, serverTs) {
   const list = document.getElementById('mission-status-list');
   const meta = document.getElementById('mission-status-meta');
@@ -1489,7 +1866,7 @@ function renderMissionStatus(items, serverTs) {
   meta.textContent = `Profiles: ${items.length} · Updated: ${formatTs(serverTs)}`;
 
   if (!items.length) {
-    list.innerHTML = `<div class="mission-card offline"><div class="mission-stat-value">No profiles found.</div></div>`;
+    list.innerHTML = `<div class="mission-row offline"><summary class="mission-row-summary"><div class="mission-row-name">No profiles found.</div></summary></div>`;
     return;
   }
 
@@ -1505,44 +1882,90 @@ function renderMissionStatus(items, serverTs) {
     const level = Number.isFinite(item.level) ? item.level : 0;
 
     return `
-      <div class="mission-card ${tone}">
-        <div class="mission-card-head">
-          <div class="mission-card-title">
-            <div class="mission-card-name">${icon} ${item.display_name || item.user}</div>
-            <div class="mission-card-sub">${item.session_mode || 'solo'}</div>
+      <details class="mission-row ${tone}">
+        <summary>
+          <div class="mission-row-summary">
+            <div>
+              <div class="mission-row-name">${icon} ${item.display_name || item.user}</div>
+              <div class="mission-row-sub">${item.session_mode || 'solo'}</div>
+              <div class="mission-row-chips">
+                <span class="mission-chip">L${level}</span>
+                <span class="mission-chip">${currentStage}</span>
+                <span class="mission-chip">GPS ${gps}</span>
+              </div>
+            </div>
+            <div class="mission-row-right">
+              ${missionPresenceBadge(item.presence)}
+            </div>
           </div>
-          <div>${missionPresenceBadge(item.presence)}</div>
-        </div>
-
-        <div class="mission-card-members">
-          <span class="label">Members:</span>${members}
-        </div>
-
-        <div class="mission-stats">
-          <div class="mission-stat">
-            <span class="mission-stat-label">Level</span>
-            <div class="mission-stat-value">${level}</div>
+        </summary>
+        <div class="mission-row-body">
+          <div class="mission-row-meta">
+            <div><span class="label">Members</span>${members}</div>
+            <div><span class="label">Last seen</span>${formatTs(item.last_seen)}</div>
+            <div><span class="label">Position</span>${coords}</div>
           </div>
-          <div class="mission-stat">
-            <span class="mission-stat-label">Stage</span>
-            <div class="mission-stat-value">${currentStage}</div>
-          </div>
-          <div class="mission-stat">
-            <span class="mission-stat-label">GPS</span>
-            <div class="mission-stat-value">${gps}</div>
-          </div>
-          <div class="mission-stat">
-            <span class="mission-stat-label">Last seen</span>
-            <div class="mission-stat-value">${formatTs(item.last_seen)}</div>
-          </div>
-          <div class="mission-stat" style="grid-column:1/-1">
-            <span class="mission-stat-label">Position</span>
-            <div class="mission-stat-value">${coords}</div>
+          <div class="mission-row-actions">
+            <button type="button" class="mission-row-btn reset" onclick="runMissionProfileAction('${encodeURIComponent(item.user || '')}', 'reset_profile')">Reset</button>
+            <button type="button" class="mission-row-btn" onclick="runMissionProfileAction('${encodeURIComponent(item.user || '')}', 'level_prev')">-1</button>
+            <button type="button" class="mission-row-btn" onclick="runMissionProfileAction('${encodeURIComponent(item.user || '')}', 'level_next')">+1</button>
+            <button type="button" class="mission-row-btn finish" onclick="runMissionProfileAction('${encodeURIComponent(item.user || '')}', 'mark_finished')">Finish</button>
           </div>
         </div>
-      </div>
+      </details>
     `;
   }).join('');
+}
+
+
+async function runMissionProfileAction(profileIdEncoded, action) {
+  const profileId = decodeURIComponent(profileIdEncoded || '');
+  const meta = document.getElementById('mission-status-meta');
+
+  if (!profileId || !pass) return;
+
+  const labels = {
+    reset_profile: 'RESET',
+    level_prev: 'LEVEL -1',
+    level_next: 'LEVEL +1',
+    mark_finished: 'FINISH'
+  };
+
+  if ((action === 'reset_profile' || action === 'mark_finished') &&
+      !confirm(`${labels[action] || action} · ${profileId}?`)) {
+    return;
+  }
+
+  try {
+    if (meta) meta.textContent = `${labels[action] || action} · ${profileId}...`;
+
+    const r = await fetch('/api/admin/profile-action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        password: pass,
+        profile_id: profileId,
+        action: action
+      })
+    });
+
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      if (meta) {
+        meta.textContent = `Action failed · ${profileId}`;
+      }
+      console.error('profile-action failed', action, profileId, data);
+      return;
+    }
+
+    await loadMissionStatus();
+  } catch (e) {
+    if (meta) {
+      meta.textContent = `Network error running action · ${profileId}`;
+    }
+    console.error('profile-action network error', action, profileId, e);
+  }
 }
 
 async function loadMissionStatus() {
@@ -1638,14 +2061,17 @@ async function load() {
   render();
 }
 
+
 function render() {
   map.eachLayer(l => { if(l instanceof L.Marker || l instanceof L.Circle) map.removeLayer(l); });
   const list = document.getElementById('list');
+  if (!list) return;
   list.innerHTML = "";
 
   stages.forEach((s, i) => {
-      const entryMode = String(getStageEntryValue(s, "mode", getStageEntryValue(s, "entry_mode", "gps")) || "gps").toLowerCase();
-      const radius = Number(s.radius || 0);
+    const entryMode = String(getStageEntryValue(s, "mode", getStageEntryValue(s, "entry_mode", "gps")) || "gps").toLowerCase();
+    const radius = Number(s.radius || 0);
+
     let m = L.marker([s.lat, s.lon], {draggable: true, icon: cmsPointIcon}).addTo(map);
     m.bindTooltip(`${i}: ${s.title}`, {permanent:true, direction:'right', className:'bg-black text-white border-0'});
     L.circle([s.lat, s.lon], {radius: s.radius, color: '#333', weight:1}).addTo(map);
@@ -1654,26 +2080,27 @@ function render() {
 
     let item = document.createElement('div');
     item.className = `node-card ${currentIdx === i ? 'active' : ''}`;
-      item.innerHTML = `
-        <div onclick="map.setView([${s.lat}, ${s.lon}], 16); openEditor(${i})" class="flex-grow cursor-pointer min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <div class="text-white text-sm font-bold leading-tight truncate">${i}. ${s.title}</div>
-            <span class="node-badge">${entryMode === 'free' ? 'FREE' : 'GPS'}</span>
-          </div>
-          <div class="node-meta">
-            <span>${s.type}</span>
-            <span>•</span>
-            <span>${radius}m</span>
-          </div>
+    item.innerHTML = `
+      <div onclick="map.setView([${s.lat}, ${s.lon}], 16); openEditor(${i})" class="flex-grow cursor-pointer min-w-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="text-white text-[13px] font-bold leading-tight truncate">${i}. ${s.title}</div>
+          <span class="node-badge">${entryMode === 'free' ? 'FREE' : 'GPS'}</span>
         </div>
-        <div class="flex flex-col gap-2 ml-2 shrink-0">
-          <button type="button" onclick="moveItem(${i}, -1)" class="ctrl-btn" aria-label="Move node up">▲</button>
-          <button type="button" onclick="moveItem(${i}, 1)" class="ctrl-btn" aria-label="Move node down">▼</button>
+        <div class="node-meta mt-1">
+          <span>${s.type}</span>
+          <span>•</span>
+          <span>${radius}m</span>
         </div>
-      `;
+      </div>
+      <div class="flex gap-2 ml-2 shrink-0">
+        <button type="button" onclick="moveItem(${i}, -1)" class="ctrl-btn" aria-label="Move node up">▲</button>
+        <button type="button" onclick="moveItem(${i}, 1)" class="ctrl-btn" aria-label="Move node down">▼</button>
+      </div>
+    `;
     list.appendChild(item);
   });
 }
+
 
 function moveItem(i, dir) {
   if(i + dir < 0 || i + dir >= stages.length) return;
