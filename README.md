@@ -19,17 +19,24 @@ SAGA is currently usable for real route-based and checkpoint-based experiences.
 | Area | Status |
 |---|---|
 | Player selection flow | ✅ Implemented |
-| Player map/game screen | ✅ Implemented |
+| Player map / game screen | ✅ Implemented |
 | Sequential node progression | ✅ Implemented |
 | GPS-based access | ✅ Implemented |
 | Fallback progression via `answer` / `rune` | ✅ Implemented |
 | Mini-game progression | ✅ Implemented |
 | Persistent admin authentication | ✅ Implemented |
 | Forced admin password change flow | ✅ Implemented |
+| Admin login lockout / temporary rate limit | ✅ Implemented |
 | Sanitized player payloads | ✅ Implemented |
 | Runtime node normalization / validation | ✅ Implemented |
+| Player profiles / team-ready sessions | ✅ Implemented |
+| Mission Control | ✅ Implemented |
+| Admin profile recovery actions | ✅ Implemented |
+| Compact admin node list | ✅ Implemented |
+| Improved Node editor reachability | ✅ Implemented |
 | Player theme selector (`classic` / `glass`) | ✅ Implemented |
 | Visible English-first UI | ✅ Implemented |
+| External live data directory via `SAGA_DATA_DIR` | ✅ Implemented |
 
 ---
 
@@ -60,7 +67,8 @@ A node can represent:
 - 📖 a narrative stop
 - 🛠️ a manual recovery / organizer override point
 
-Players move through nodes in order.  
+Players move through nodes in order.
+
 At each node, the engine can combine:
 
 - map location
@@ -82,9 +90,13 @@ At each node, the engine can combine:
 | `/admin` | Admin panel |
 | `/api/config` | Public config payload |
 | `/api/game/{user}` | Sanitized player payload |
+| `/api/admin/login` | Admin login |
+| `/api/admin/change-password` | Admin password change flow |
 | `/api/admin/stages` | Admin stage data |
 | `/api/admin/save-config` | Save global config |
 | `/api/admin/save` | Save stages |
+| `/api/admin/mission-status` | Mission Control live status |
+| `/api/admin/profile-action` | Admin profile recovery actions |
 
 ---
 
@@ -95,7 +107,7 @@ The current player UI includes:
 - 🗺️ map
 - 🎯 active node
 - 📏 distance to target
-- 🔤 answer / rune input
+- 🔤 `answer` / `rune` input
 - 🧪 debug mode
 - 🕹️ mini-game modal
 - 📡 GPS warning UI
@@ -108,19 +120,47 @@ The current player UI includes:
 
 ## 🛠️ Admin Panel
 
-The admin panel currently manages:
+The admin panel currently includes:
 
-| Global Config | Nodes |
-|---|---|
-| site title | node list |
-| admin title / subtitle | node coordinates |
-| login subtitle | node radius |
-| story text | node type |
-| prologue title / subtitle / body | node content |
-| players | node config |
-| map center / zoom | fallback `answer` / `rune` |
-| player theme | entry mode / flags |
-|  | hint / GPS unavailable / locked messages |
+### Global config
+- site title
+- admin title / subtitle
+- login subtitle
+- story text
+- prologue title / subtitle / body
+- map center / zoom
+- players
+- player theme
+
+### Mission Control
+- compact per-profile live status
+- live / stale / offline visibility
+- current level / stage visibility
+- GPS / last seen / position visibility
+- organizer recovery actions:
+  - reset profile
+  - level -1
+  - level +1
+  - mark finished
+
+### Nodes
+- compact node list
+- node coordinates
+- node radius
+- node type
+- node content
+- node config
+- fallback `answer` / `rune`
+- entry mode / flags
+- hint / GPS unavailable / locked messages
+- quick reordering
+- improved node editor usability
+- reachable save / delete actions
+
+### Admin auth / safety
+- persistent admin auth file
+- forced password change flow
+- temporary login lockout on repeated failures
 
 ---
 
@@ -169,8 +209,10 @@ Current player flow uses:
 
 - `GET /api/game/{user}`
 
-The player payload includes only what the player needs:
+The player payload includes only what the player needs, such as:
 
+- current user / display name
+- session mode / profile context
 - level / finished state
 - map-visible stage info
 - current active node runtime info
@@ -218,19 +260,22 @@ Typical fields:
 | `story_text` | Login story text |
 | `map_center` | Default map center |
 | `map_zoom` | Default map zoom |
-| `players` | Available player profiles |
+| `players` | Available player profiles or simple player entries |
 | `ui_lang` | Internal compatibility field |
 | `player_theme` | Player UI theme (`classic` / `glass`) |
-| `data_dir` | Data folder |
 | `prologue_title` | Prologue title |
 | `prologue_subtitle` | Prologue subtitle |
 | `prologue_body` | Prologue body |
 
+> `players` can still be kept simple, but the runtime also supports richer profile / team-ready normalization internally.
+
 ### Public stage schema
 
-Stored in:
+Default/demo stage schema lives in:
 
 - `data/stages.json`
+
+Production live stage data can instead live in the external directory selected through `SAGA_DATA_DIR`.
 
 Current editable schema still supports simple node objects like:
 
@@ -274,13 +319,17 @@ Optional legacy-compatible fields already supported by runtime:
 
 ## 🐳 Deployment
 
-### Current production model
+### Recommended production model
 
-Current production uses a bind mount of the repo into the container:
+Current production uses:
+
+- repo bind mount for app code
+- external live data directory via `SAGA_DATA_DIR`
 
 | Item | Value |
 |---|---|
 | Repo | `~/saga_engine` |
+| Live data dir | `~/saga_engine_data` |
 | Container | `saga_engine_app` |
 | Port | `8096 -> 5000` |
 
@@ -295,7 +344,9 @@ docker run -d \
   --name saga_engine_app \
   -p 8096:5000 \
   -e ADMIN_PASS='YOUR_PASSWORD' \
+  -e SAGA_DATA_DIR=/app_data \
   -v ~/saga_engine:/app \
+  -v ~/saga_engine_data:/app_data \
   --restart unless-stopped \
   saga_engine:latest
 ```
@@ -331,6 +382,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8097
 | `templates/game.html` | Player UI |
 | `templates/admin.html` | Admin panel |
 | `static/minigames_final.js` | Frontend mini-game logic |
+| `data/` | Demo / default data files kept in-repo |
 
 ---
 
@@ -339,23 +391,19 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8097
 Before public or shared deployments:
 
 - do not commit `.env`
-- do not commit `data/admin_auth.json`
+- do not commit live runtime data
 - do not expose `/admin` without protection
 - do not rely on temporary passwords
 - prefer HTTPS for real player usage
 
-### Useful next improvements
+Live runtime data should stay outside the repo-mounted code directory.
 
-- add `SECURITY.md`
-- enable Dependabot alerts
-- enable private vulnerability reporting
-- enable code scanning
-- add a minimal CI smoke test
-- separate live data from the repo-mounted code directory
+Typical live files include:
 
-> Important operational note:
->
-> Current deployment still keeps live data inside the repo-mounted app directory. That works, but it means local runtime data such as `data/stages.json` can diverge from Git-tracked code. A future improvement is to move live data to a separate external data directory.
+- `stages.json`
+- `gamestate.json`
+- `positions.json`
+- `admin_auth.json`
 
 ---
 
@@ -384,7 +432,7 @@ Current direction:
 - improve admin editing of richer node rules
 - improve player UX
 - reduce deploy friction
-- separate live data from code
+- keep live runtime data separated from code
 
 ---
 
