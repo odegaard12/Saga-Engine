@@ -1601,6 +1601,105 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
   color:#fff;
 }
 
+/* === PLAYERS EDITABLE PREVIEW V2.2 === */
+.players-preview-help{
+  margin-bottom:12px;
+  color:#b4bac4;
+}
+.players-preview-list{
+  gap:12px;
+  margin-bottom:14px;
+}
+.players-preview-card{
+  border-color:rgba(255,255,255,.09);
+  background:rgba(15,18,24,.30);
+  box-shadow:0 12px 28px rgba(0,0,0,.16);
+}
+.players-preview-head{
+  align-items:center;
+  margin-bottom:10px;
+}
+.players-preview-title{
+  letter-spacing:.01em;
+}
+.players-preview-sub{
+  color:#9399a5;
+}
+.players-preview-badge{
+  letter-spacing:.12em;
+}
+.players-preview-meta{
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:8px 10px;
+}
+.players-preview-meta > div{
+  min-width:0;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.05);
+  background:rgba(255,255,255,.03);
+}
+.players-preview-toolbar{
+  margin-bottom:12px;
+}
+.players-preview-toolbar-btn{
+  font-weight:700;
+}
+.players-preview-remove-btn{
+  min-width:72px;
+  font-weight:700;
+  border-color:rgba(244,63,94,.22);
+  background:rgba(190,24,93,.12);
+  color:#ffd5df;
+}
+.players-preview-remove-btn:hover{
+  border-color:rgba(244,114,182,.34);
+  background:rgba(190,24,93,.20);
+}
+.players-preview-members{
+  margin-top:12px;
+}
+.players-raw-panel{
+  margin-top:10px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.025);
+  border-radius:16px;
+  overflow:hidden;
+}
+.players-raw-summary{
+  list-style:none;
+  cursor:pointer;
+  padding:12px 14px;
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:#cbd5e1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  user-select:none;
+}
+.players-raw-summary::-webkit-details-marker{
+  display:none;
+}
+.players-raw-summary::after{
+  content:'▼';
+  font-size:10px;
+  color:#94a3b8;
+}
+.players-raw-panel:not([open]) .players-raw-summary::after{
+  content:'▶';
+}
+.players-raw-body{
+  padding:0 14px 14px 14px;
+}
+.players-raw-note{
+  margin:0 0 10px 0;
+  color:#8b93a1;
+  font-size:10px;
+  line-height:1.45;
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -1729,8 +1828,14 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
 </div>
 <div id="players-preview-list" class="players-preview-list"></div>
 
-<label>Players (one per line)</label>
-        <textarea id="cfg-players" class="config-input" style="height:140px"></textarea>
+<details class="players-raw-panel">
+  <summary class="players-raw-summary">Advanced / Raw players</summary>
+  <div class="players-raw-body">
+    <div class="players-raw-note">Fallback raw editor. Leave collapsed for normal use.</div>
+    <label>Players (one per line)</label>
+    <textarea id="cfg-players" class="config-input" style="height:140px"></textarea>
+  </div>
+</details>
         
       </div>
     </div>
