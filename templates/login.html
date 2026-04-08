@@ -47,7 +47,7 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl">
         {% for p in profiles %}
-        <a href="/player/{{ p.id }}" class="player-card p-4 rounded text-center group">
+        <a href="/player/{{ (p.id or '') | replace(' ', '%20') }}" class="player-card p-4 rounded text-center group">
             <div class="text-2xl mb-1">{% if p.mode == 'team' %}👥{% else %}👤{% endif %}</div>
             <div class="font-bold text-lg group-hover:text-white transition">{{ p.display_name }}</div>
             <div class="text-[10px] text-gray-600 group-hover:text-green-500">
