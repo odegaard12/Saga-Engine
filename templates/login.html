@@ -26,49 +26,515 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; }
-        .scan-line { position: fixed; top: 0; left: 0; width: 100%; height: 5px; background: rgba(0, 255, 65, 0.5); animation: scan 3s linear infinite; opacity: 0.3; pointer-events: none; }
-        @keyframes scan { 0% { top: -10%; } 100% { top: 110%; } }
-        .player-card { border: 1px solid #111; background: #0a0a0a; transition: all 0.2s; position: relative; overflow: hidden; }
-        .player-card:hover { border-color: #00ff41; background: #0f1a0f; transform: scale(1.02); }
-        .player-card::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,255,65,0.1), transparent); transition: 0.5s; }
-        .player-card:hover::after { left: 100%; }
-        .glitch { text-shadow: 2px 0 #fff, -2px 0 #00ff41; animation: glitch 1s infinite alternate-reverse; }
-        @keyframes glitch { 0% { transform: skew(0deg); } 20% { transform: skew(-2deg); } 40% { transform: skew(2deg); } 100% { transform: skew(0deg); } }
-    </style>
+/* === LOGIN SHELL V2 === */
+:root{
+  --bg-0:#04070d;
+  --bg-1:#0b1220;
+  --line:rgba(255,255,255,.08);
+  --line-strong:rgba(56,189,248,.24);
+  --card:rgba(10,14,24,.78);
+  --card-soft:rgba(255,255,255,.04);
+  --text:#e5f0ff;
+  --muted:#97a6ba;
+  --accent:#60a5fa;
+  --accent-2:#22d3ee;
+  --ok:#34d399;
+}
+html,body{
+  min-height:100%;
+  margin:0;
+}
+body{
+  background:
+    radial-gradient(circle at top, rgba(34,211,238,.12), transparent 34%),
+    radial-gradient(circle at 85% 15%, rgba(96,165,250,.16), transparent 28%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-0));
+  color:var(--text);
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;
+  position:relative;
+  overflow-x:hidden;
+}
+.scan-line{
+  position:fixed;
+  inset:0 auto auto 0;
+  width:100%;
+  height:2px;
+  background:linear-gradient(90deg, transparent, rgba(96,165,250,.40), transparent);
+  animation:scan 4s linear infinite;
+  opacity:.35;
+  pointer-events:none;
+  z-index:1;
+}
+@keyframes scan{
+  0%{ transform:translateY(-10vh); }
+  100%{ transform:translateY(110vh); }
+}
+.login-shell{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size:24px 24px;
+  mask-image:linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.25));
+  z-index:0;
+}
+.login-wrap{
+  position:relative;
+  z-index:2;
+  width:min(1100px, 100%);
+  margin:0 auto;
+  padding:32px 0 22px 0;
+}
+.login-hero{
+  margin:0 auto 24px auto;
+  max-width:920px;
+  padding:24px;
+  border:1px solid var(--line);
+  border-radius:28px;
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  box-shadow:0 20px 60px rgba(0,0,0,.30);
+  backdrop-filter:blur(18px);
+}
+.login-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-height:30px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid var(--line-strong);
+  background:rgba(96,165,250,.10);
+  color:#dbeafe;
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  font-weight:700;
+}
+.login-title{
+  margin-top:16px;
+  font-size:clamp(34px, 6vw, 64px);
+  line-height:.95;
+  font-weight:900;
+  letter-spacing:-.04em;
+  color:#fff;
+}
+.login-sub{
+  margin-top:12px;
+  max-width:700px;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.65;
+}
+.login-grid{
+  display:grid;
+  grid-template-columns:repeat(1, minmax(0,1fr));
+  gap:14px;
+}
+@media (min-width:720px){
+  .login-grid{
+    grid-template-columns:repeat(2, minmax(0,1fr));
+  }
+}
+.player-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:24px;
+  padding:18px;
+  transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  box-shadow:0 16px 38px rgba(0,0,0,.22);
+}
+.player-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(96,165,250,.32);
+  background:linear-gradient(180deg, rgba(16,23,37,.92), rgba(10,14,24,.86));
+  box-shadow:0 24px 46px rgba(0,0,0,.32);
+}
+.player-card::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg, rgba(96,165,250,.14), transparent 35%, transparent 68%, rgba(34,211,238,.08));
+  opacity:.85;
+  pointer-events:none;
+}
+.player-card-top{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.player-icon{
+  width:52px;
+  height:52px;
+  border-radius:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  font-size:26px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.player-mode-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+  color:#dbe7f7;
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:800;
+}
+.player-name{
+  position:relative;
+  z-index:1;
+  margin-top:16px;
+  font-size:22px;
+  line-height:1.05;
+  font-weight:900;
+  color:#fff;
+}
+.player-meta{
+  position:relative;
+  z-index:1;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:700;
+}
+.player-members{
+  position:relative;
+  z-index:1;
+  margin-top:14px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.06);
+  background:var(--card-soft);
+  color:#c7d4e6;
+  font-size:12px;
+  line-height:1.55;
+}
+.player-enter{
+  position:relative;
+  z-index:1;
+  margin-top:16px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:42px;
+  padding:0 14px;
+  border-radius:14px;
+  border:1px solid rgba(96,165,250,.22);
+  background:linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,.10));
+  color:#f8fbff;
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  font-weight:800;
+}
+.admin-entry{
+  margin:22px auto 0 auto;
+  width:fit-content;
+}
+.admin-entry a{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:40px;
+  padding:0 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+  color:#98a8bc;
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:700;
+  transition:.18s ease;
+}
+.admin-entry a:hover{
+  color:#fff;
+  border-color:rgba(96,165,250,.26);
+  background:rgba(96,165,250,.08);
+}
+
+/* === LOGIN SHELL V2.1 COMPACT FIX === */
+.login-wrap{
+  width:min(1040px, 100%);
+  padding:18px 0 18px 0;
+}
+.login-hero{
+  margin:0 auto 18px auto;
+  max-width:none;
+  padding:20px 22px;
+  border-radius:24px;
+}
+.login-title{
+  font-size:clamp(28px, 5vw, 56px);
+}
+.login-sub{
+  margin-top:10px;
+  font-size:13px;
+  line-height:1.55;
+}
+.login-grid{
+  gap:12px;
+}
+.player-card{
+  padding:16px;
+  border-radius:22px;
+}
+.player-name{
+  margin-top:12px;
+  font-size:18px;
+}
+.player-meta{
+  margin-top:6px;
+  font-size:10px;
+}
+.player-members{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  font-size:11px;
+}
+.player-enter{
+  margin-top:12px;
+  min-height:40px;
+  border-radius:13px;
+}
+.admin-entry{
+  margin-top:18px;
+}
+@media (min-width: 1180px){
+  .login-grid{
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+}
+@media (max-width: 720px){
+  .login-wrap{
+    padding:14px 0 14px 0;
+  }
+  .login-hero{
+    padding:16px;
+    border-radius:20px;
+    margin-bottom:14px;
+  }
+  .login-title{
+    font-size:clamp(24px, 11vw, 40px);
+    line-height:.98;
+  }
+  .login-sub{
+    font-size:12px;
+  }
+  .player-card{
+    padding:14px;
+    border-radius:18px;
+  }
+}
+
+
+/* === LOGIN VISUAL PASS V2.2 === */
+body{
+  background:
+    radial-gradient(circle at 18% 0%, rgba(59,130,246,.16), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(16,185,129,.08), transparent 22%),
+    linear-gradient(180deg, #04070c 0%, #06101a 55%, #03060b 100%);
+}
+
+.scan-line{
+  opacity:.12 !important;
+  height:3px !important;
+}
+
+.login-shell{
+  opacity:.46;
+  background:
+    linear-gradient(90deg, rgba(59,130,246,.07) 1px, transparent 1px) 0 0/38px 38px,
+    linear-gradient(0deg, rgba(59,130,246,.05) 1px, transparent 1px) 0 0/38px 38px !important;
+}
+
+.login-wrap{
+  width:min(1080px, 100%);
+}
+
+.login-hero{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(148,163,184,.14) !important;
+  background:
+    radial-gradient(circle at 70% 20%, rgba(59,130,246,.14), transparent 28%),
+    linear-gradient(180deg, rgba(8,12,20,.82), rgba(4,7,12,.94)) !important;
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+.login-hero::after{
+  content:"";
+  position:absolute;
+  left:22px;
+  right:22px;
+  bottom:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(96,165,250,.30), transparent);
+  pointer-events:none;
+}
+
+.login-title{
+  color:#f8fbff !important;
+  text-shadow:
+    0 0 18px rgba(255,255,255,.05),
+    0 0 28px rgba(59,130,246,.14);
+}
+
+.login-sub{
+  color:#9fb0c6 !important;
+}
+
+.player-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(148,163,184,.12) !important;
+  background:
+    linear-gradient(180deg, rgba(6,10,16,.92), rgba(4,7,12,.98)) !important;
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+.player-card::before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(96,165,250,.20), transparent);
+  pointer-events:none;
+}
+
+.player-card:hover{
+  transform:translateY(-2px) !important;
+  border-color:rgba(96,165,250,.24) !important;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(59,130,246,.10), transparent 24%),
+    linear-gradient(180deg, rgba(8,12,20,.94), rgba(4,7,12,.99)) !important;
+  box-shadow:
+    0 24px 48px rgba(0,0,0,.28),
+    0 0 0 1px rgba(96,165,250,.06) inset;
+}
+
+.player-name{
+  color:#f8fbff;
+  letter-spacing:-.02em;
+}
+
+.player-meta{
+  color:#b8c4d6 !important;
+}
+
+.player-members{
+  border:1px solid rgba(148,163,184,.10);
+  background:rgba(255,255,255,.03);
+  color:#92a3ba !important;
+}
+
+.player-enter{
+  border:1px solid rgba(96,165,250,.26) !important;
+  background:
+    linear-gradient(180deg, rgba(17,24,39,.88), rgba(8,47,73,.88)) !important;
+  color:#eff6ff !important;
+  box-shadow:0 10px 24px rgba(0,0,0,.18);
+}
+
+.player-enter:hover{
+  border-color:rgba(96,165,250,.40) !important;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,.96), rgba(12,74,110,.92)) !important;
+}
+
+.admin-entry a{
+  border-color:rgba(148,163,184,.16) !important;
+  color:#aab8ca !important;
+  background:rgba(255,255,255,.02);
+}
+
+.admin-entry a:hover{
+  border-color:rgba(96,165,250,.26) !important;
+  color:#eef6ff !important;
+  background:rgba(59,130,246,.07);
+}
+
+@media (max-width: 720px){
+  .login-hero::after{
+    left:16px;
+    right:16px;
+  }
+}
+
+</style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-6">
+<body class="min-h-screen p-5 sm:p-6">
     <div class="scan-line"></div>
-    
-    <div class="text-center mb-8">
-        <h1 class="text-6xl font-bold mb-2 tracking-tighter text-white glitch">{{ config.site_name }}</h1>
-        <p class="text-xs text-gray-500 uppercase tracking-widest">{{ config.story_title or config.admin_subtitle }}</p>
-    </div>
+    <div class="login-shell"></div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl">
-        {% for p in profiles %}
-        <a href="/player/{{ p.id }}" class="player-card p-4 rounded text-center group">
-            <div class="text-2xl mb-1">{% if p.mode == 'team' %}👥{% else %}👤{% endif %}</div>
-            <div class="font-bold text-lg group-hover:text-white transition">{{ p.display_name }}</div>
-            <div class="text-[10px] text-gray-600 group-hover:text-green-500">
-                {% if p.mode == 'team' %}
-                TEAM · {{ p.members|length }} MEMBERS
-                {% else %}
-                SOLO · ACTIVE
+    <main class="login-wrap">
+        <section class="login-hero">
+            <div class="login-kicker">SAGA ENGINE · PLAYER ACCESS</div>
+            <h1 class="login-title">{{ config.site_name }}</h1>
+            <p class="login-sub">
+                {{ config.story_title or config.admin_subtitle }}
+                {% if config.story_text %}
+                <br>{{ config.story_text }}
                 {% endif %}
-            </div>
-            {% if p.mode == 'team' and p.members %}
-            <div class="mt-2 text-[10px] text-zinc-500 leading-relaxed">{{ p.members | join(' • ') }}</div>
-            {% endif %}
-        </a>
-        {% endfor %}
-    </div>
+            </p>
+        </section>
 
-    <div class="mt-12 opacity-50 hover:opacity-100 transition">
-        <a href="/admin" class="border border-gray-800 text-gray-600 px-4 py-2 rounded text-xs uppercase tracking-widest hover:border-green-800 hover:text-green-500">
-            🔧 Control Panel
-        </a>
-    </div>
+        <section class="login-grid">
+            {% for p in profiles %}
+            <a href="/player/{{ (p.id or '') | replace(' ', '%20') }}" class="player-card group">
+                <div class="player-card-top">
+                    <div class="player-icon">{% if p.mode == 'team' %}👥{% else %}👤{% endif %}</div>
+                    <div class="player-mode-badge">{% if p.mode == 'team' %}TEAM{% else %}SOLO{% endif %}</div>
+                </div>
 
+                <div class="player-name">{{ p.display_name }}</div>
+
+                <div class="player-meta">
+                    {% if p.mode == 'team' %}
+                    {{ p.members|length }} members ready
+                    {% else %}
+                    Individual session
+                    {% endif %}
+                </div>
+
+                {% if p.mode == 'team' and p.members %}
+                <div class="player-members">{{ p.members | join(' • ') }}</div>
+                {% else %}
+                <div class="player-members">Direct access to the active mission profile.</div>
+                {% endif %}
+
+                <div class="player-enter">Enter session</div>
+            </a>
+            {% endfor %}
+        </section>
+
+        <div class="admin-entry">
+            <a href="/admin">🔧 Control Panel</a>
+        </div>
+    </main>
 </body>
 </html>

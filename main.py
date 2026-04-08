@@ -365,11 +365,44 @@ def get_player_profiles(cfg=None):
     raw_players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
     return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_players)]
 
+def profile_matches_user(profile, user_text):
+    user_text = _as_str(user_text).strip()
+    if not user_text:
+        return False
+
+    if _as_str(profile.get("id")).strip() == user_text:
+        return True
+
+    if _as_str(profile.get("display_name")).strip() == user_text:
+        return True
+
+    for member in profile.get("members", []):
+        if _as_str(member).strip() == user_text:
+            return True
+
+    return False
+
+
 def get_player_profile(user, cfg=None):
+    cfg = cfg or load_config()
     user_text = _as_str(user).strip()
-    for profile in get_player_profiles(cfg):
-        if profile["id"] == user_text or profile["display_name"] == user_text:
+    profiles = get_player_profiles(cfg)
+
+    # 1) exact stable-id match first
+    for profile in profiles:
+        if _as_str(profile.get("id")).strip() == user_text:
             return profile
+
+    # 2) then visible display-name match
+    for profile in profiles:
+        if _as_str(profile.get("display_name")).strip() == user_text:
+            return profile
+
+    # 3) then team member alias -> canonical team profile
+    for profile in profiles:
+        if profile_matches_user(profile, user_text):
+            return profile
+
     return normalize_player_profile(user_text or "PLAYER 1", 0)
 
 HEARTBEAT_STALE_SECONDS = 180
@@ -771,8 +804,10 @@ async def get_config():
 async def get_state(user: str):
     stages = load_json(STAGES_DB, [])
     state = load_json(GAME_DB, {})
-    lvl = state.get(user, 0)
-    return {"level": lvl, "finished": lvl >= len(stages)}
+    profile = get_player_profile(user)
+    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
+    lvl = state.get(profile_id, state.get(user, 0))
+    return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
 
 @app.get("/api/game/{user}")
 async def get_game_payload(user: str):
@@ -937,29 +972,35 @@ async def advance(request: Request):
     user = data.get("user")
     code = (data.get("code") or "").strip().upper()
 
+    profile = get_player_profile(user)
+    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
+
     stages = get_runtime_stages()
     state = load_json(GAME_DB, {})
-    lvl = state.get(user, 0)
+    lvl = state.get(profile_id, state.get(user, 0))
 
     if lvl < len(stages):
         current_node = stages[lvl]
 
         if stage_accepts_code(current_node, code):
-            state[user] = lvl + 1
+            state[profile_id] = lvl + 1
             save_json(GAME_DB, state)
-            return {"status": "ok"}
+            return {"status": "ok", "user": profile_id}
 
-    return {"status": "fail"}
+    return {"status": "fail", "user": profile_id}
 
 @app.post("/api/reset")
 @app.post("/api/reset")
 async def reset(request: Request):
     data = await request.json()
     user = data.get("user")
+    profile = get_player_profile(user)
+    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
+
     state = load_json(GAME_DB, {})
-    state[user] = 0
+    state[profile_id] = 0
     save_json(GAME_DB, state)
-    return {"status": "ok"}
+    return {"status": "ok", "user": profile_id}
 
 
 
