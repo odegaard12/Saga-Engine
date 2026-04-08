@@ -1700,6 +1700,180 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
   line-height:1.45;
 }
 
+/* === PLAYERS TEAMS V3C === */
+.players-preview-help{
+  margin-bottom:12px;
+  color:#b4bac4;
+}
+.players-preview-list{
+  gap:12px;
+  margin-bottom:14px;
+}
+.players-preview-card{
+  border-color:rgba(255,255,255,.09);
+  background:rgba(15,18,24,.30);
+  box-shadow:0 12px 28px rgba(0,0,0,.16);
+}
+.players-preview-card.team-mode{
+  border-color:rgba(96,165,250,.22);
+  background:rgba(15,23,42,.34);
+  box-shadow:0 12px 28px rgba(0,0,0,.18), inset 0 0 0 1px rgba(96,165,250,.07);
+}
+.players-preview-head{
+  align-items:center;
+  margin-bottom:10px;
+}
+.players-preview-title{
+  letter-spacing:.01em;
+}
+.players-preview-card.team-mode .players-preview-title{
+  color:#dbeafe;
+}
+.players-preview-sub{
+  color:#9399a5;
+}
+.players-preview-badge{
+  letter-spacing:.12em;
+}
+.players-preview-meta{
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:8px 10px;
+}
+.players-preview-meta > div{
+  min-width:0;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.05);
+  background:rgba(255,255,255,.03);
+}
+.players-preview-toolbar{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+}
+.players-preview-toolbar-btn{
+  flex:1;
+  min-height:38px;
+  padding:9px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(17,24,39,.42);
+  color:#e5e7eb;
+  font-size:11px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  font-weight:700;
+}
+.players-preview-toolbar-btn:hover{
+  background:rgba(24,32,45,.60);
+  border-color:rgba(255,255,255,.16);
+}
+.players-preview-card-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.players-preview-remove-btn{
+  min-width:72px;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  border:1px solid rgba(244,63,94,.22);
+  background:rgba(190,24,93,.12);
+  color:#ffd5df;
+  font-size:10px;
+  line-height:1;
+  white-space:nowrap;
+  font-weight:700;
+}
+.players-preview-remove-btn:hover{
+  border-color:rgba(244,114,182,.34);
+  background:rgba(190,24,93,.20);
+  color:#fff;
+}
+.players-preview-members{
+  margin-top:12px;
+}
+.players-preview-member-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:10px;
+}
+.players-preview-member-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+  color:#e5e7eb;
+  font-size:11px;
+}
+.players-preview-member-chip.locked{
+  border-style:dashed;
+  color:#94a3b8;
+}
+.players-preview-member-chip-btn{
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font-size:11px;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.players-preview-member-chip-btn:hover{
+  background:rgba(244,63,94,.20);
+  border-color:rgba(244,63,94,.30);
+}
+.players-preview-member-addrow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 88px;
+  gap:10px;
+}
+.players-preview-member-addbtn{
+  min-height:38px;
+  border-radius:12px;
+  border:1px solid rgba(96,165,250,.24);
+  background:rgba(30,41,59,.30);
+  color:#dbeafe;
+  font-size:11px;
+  font-weight:700;
+}
+.players-preview-member-addbtn:hover{
+  border-color:rgba(96,165,250,.42);
+  background:rgba(30,41,59,.45);
+  color:#fff;
+}
+.players-preview-members .players-preview-field[data-player-field="members"]{
+  display:none;
+}
+.players-preview-teamname-note{
+  margin-top:6px;
+  font-size:10px;
+  line-height:1.4;
+  color:#93c5fd;
+}
+.players-preview-inline-note{
+  margin-top:8px;
+  font-size:10px;
+  line-height:1.4;
+  color:#94a3b8;
+}
+.players-preview-inline-note.warn{
+  color:#fcd34d;
+}
+.players-preview-inline-note.info{
+  color:#93c5fd;
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -1821,7 +1995,7 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
       </div>
       <div id="section-players" class="section-body hidden">
         
-<div class="players-preview-help">Profiles below are generated from the current config normalization. The raw textarea stays as the active storage/edit path for now.</div>
+<div class="players-preview-help">Use cards for normal editing. Open raw only for fallback or recovery.</div>
 <div class="players-preview-toolbar">
   <button type="button" class="players-preview-toolbar-btn" onclick="addPlayerFromPreview()">+ Add player</button>
   <button type="button" class="players-preview-toolbar-btn" onclick="refreshPlayersPreviewFromRaw()">Refresh from raw</button>
@@ -2103,11 +2277,11 @@ function escapePlayersPreviewHtml(value) {
 }
 
 function normalizePlayersEditorEntry(raw, index=0) {
-  const fallbackName = `PLAYER ${index + 1}`;
+  const fallbackId = `PLAYER ${index + 1}`;
 
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    const displayName = String(raw.display_name || raw.name || raw.id || fallbackName).trim() || fallbackName;
-    const profileId = String(raw.id || displayName).trim() || displayName;
+    const stableId = String(raw.id || raw.display_name || raw.name || fallbackId).trim() || fallbackId;
+    const displayName = String(raw.display_name || raw.name || raw.id || fallbackId).trim() || stableId;
 
     let mode = String(raw.mode || 'solo').trim().toLowerCase();
     if (mode !== 'team') mode = 'solo';
@@ -2119,29 +2293,27 @@ function normalizePlayersEditorEntry(raw, index=0) {
       members = raw.members.split(',').map(item => item.trim()).filter(Boolean);
     }
 
-    if (mode === 'solo' && !members.length) members = [displayName];
-
-    const status = String(raw.status || 'active').trim().toLowerCase() || 'active';
+    if (mode === 'solo' && !members.length) members = [stableId];
 
     return {
       source: 'json',
-      id: profileId,
+      id: stableId,
       display_name: displayName,
       mode,
       members,
-      status
+      status: 'active'
     };
   }
 
   const text = String(raw ?? '').trim();
-  const displayName = text || fallbackName;
+  const stableId = text || fallbackId;
 
   return {
     source: 'text',
-    id: displayName,
-    display_name: displayName,
+    id: stableId,
+    display_name: stableId,
     mode: 'solo',
-    members: [displayName],
+    members: [stableId],
     status: 'active'
   };
 }
@@ -2168,41 +2340,261 @@ function readPlayersEditorState(rawText=null) {
   return sourceText.split('\n').map((line, index) => parsePlayersAdminLine(line, index)).filter(Boolean);
 }
 
-function serializePlayersEditorEntry(entry) {
-  const profileId = String(entry?.id || entry?.display_name || '').trim() || 'PLAYER 1';
-  const displayName = String(entry?.display_name || profileId).trim() || profileId;
+function getPlayersStableId(entry, index=0) {
+  return String(entry?.id || entry?.display_name || `PLAYER ${index + 1}`).trim() || `PLAYER ${index + 1}`;
+}
 
-  let mode = String(entry?.mode || 'solo').trim().toLowerCase();
-  if (mode !== 'team') mode = 'solo';
+function getPlayersDisplayName(entry, index=0) {
+  return String(entry?.display_name || entry?.id || `PLAYER ${index + 1}`).trim() || `PLAYER ${index + 1}`;
+}
+
+function getPlayersEntryMode(entry) {
+  return String(entry?.mode || 'solo').trim().toLowerCase() === 'team' ? 'team' : 'solo';
+}
+
+function getPlayersTeamMembers(entry, index=0) {
+  const captain = getPlayersStableId(entry, index);
+  if (getPlayersEntryMode(entry) !== 'team') return [captain];
 
   let members = Array.isArray(entry?.members)
     ? entry.members.map(item => String(item ?? '').trim()).filter(Boolean)
     : [];
 
-  if (mode === 'solo') {
-    members = [displayName];
-  } else if (!members.length) {
-    members = [displayName];
+  members = members.filter((item, idx) => members.indexOf(item) === idx);
+
+  if (!members.includes(captain)) {
+    members = [captain, ...members.filter(item => item !== captain)];
+  } else {
+    members = [captain, ...members.filter(item => item !== captain)];
   }
 
-  const status = String(entry?.status || 'active').trim().toLowerCase() || 'active';
+  return members.length ? members : [captain];
+}
 
-  const canBePlainText =
-    mode === 'solo' &&
-    status === 'active' &&
-    profileId === displayName &&
-    members.length === 1 &&
-    members[0] === displayName;
+function playerNumberFromId(id) {
+  const m = String(id || '').trim().match(/^PLAYER\s+(\d+)$/i);
+  return m ? Number(m[1]) : null;
+}
 
-  if (canBePlainText) return displayName;
+function sortPlayersEntries(entries) {
+  return [...(entries || [])].sort((a, b) => {
+    const ida = getPlayersStableId(a);
+    const idb = getPlayersStableId(b);
+    const na = playerNumberFromId(ida);
+    const nb = playerNumberFromId(idb);
+
+    if (na !== null && nb !== null && na !== nb) return na - nb;
+    if (na !== null && nb === null) return -1;
+    if (na === null && nb !== null) return 1;
+
+    return ida.localeCompare(idb, undefined, { numeric: true, sensitivity: 'base' });
+  });
+}
+
+function nextPlayersEditorLabel(entries) {
+  const used = new Set();
+
+  (entries || []).forEach((entry, index) => {
+    used.add(getPlayersStableId(entry, index));
+    if (getPlayersEntryMode(entry) === 'team') {
+      getPlayersTeamMembers(entry, index).forEach(member => used.add(String(member || '').trim()));
+    }
+  });
+
+  let n = 1;
+  while (used.has(`PLAYER ${n}`)) n += 1;
+  return `PLAYER ${n}`;
+}
+
+function normalizePlayersEntriesForTeams(entries) {
+  const raw = (entries || []).map((entry, index) => normalizePlayersEditorEntry(entry, index));
+  const assignedExtras = new Set();
+  const usedTopIds = new Set();
+  const normalized = [];
+
+  function nextFreeTopId() {
+    let n = 1;
+    while (usedTopIds.has(`PLAYER ${n}`) || assignedExtras.has(`PLAYER ${n}`)) n += 1;
+    return `PLAYER ${n}`;
+  }
+
+  raw.forEach((entry, index) => {
+    let stableId = getPlayersStableId(entry, index);
+    let displayName = getPlayersDisplayName(entry, index);
+    const originalStableId = stableId;
+    const mode = getPlayersEntryMode(entry);
+
+    if (mode === 'team') {
+      if (usedTopIds.has(stableId) || assignedExtras.has(stableId)) {
+        stableId = nextFreeTopId();
+        if (displayName === originalStableId) displayName = stableId;
+      }
+
+      usedTopIds.add(stableId);
+
+      const teamMembers = getPlayersTeamMembers({ ...entry, id: stableId }, index);
+      const extras = [];
+
+      teamMembers.slice(1).forEach(member => {
+        const clean = String(member || '').trim();
+        if (!clean) return;
+        if (clean === stableId) return;
+        if (assignedExtras.has(clean)) return;
+        assignedExtras.add(clean);
+        extras.push(clean);
+      });
+
+      normalized.push({
+        source: 'json',
+        id: stableId,
+        display_name: String(displayName || stableId).trim() || stableId,
+        mode: 'team',
+        members: [stableId, ...extras],
+        status: 'active'
+      });
+      return;
+    }
+
+    if (assignedExtras.has(stableId)) {
+      return;
+    }
+
+    if (usedTopIds.has(stableId)) {
+      stableId = nextFreeTopId();
+      if (displayName === originalStableId) displayName = stableId;
+    }
+
+    usedTopIds.add(stableId);
+
+    normalized.push({
+      source: entry.source || 'json',
+      id: stableId,
+      display_name: String(displayName || stableId).trim() || stableId,
+      mode: 'solo',
+      members: [stableId],
+      status: 'active'
+    });
+  });
+
+  return sortPlayersEntries(normalized);
+}
+
+function serializePlayersEditorEntry(entry) {
+  const stableId = getPlayersStableId(entry);
+  const displayName = getPlayersDisplayName(entry);
+  const mode = getPlayersEntryMode(entry);
+  const members = mode === 'team'
+    ? getPlayersTeamMembers({ ...entry, id: stableId, display_name: displayName })
+    : [stableId];
+
+  const canBePlainText = mode === 'solo' && displayName === stableId;
+  if (canBePlainText) return stableId;
 
   return JSON.stringify({
-    id: profileId,
+    id: stableId,
     display_name: displayName,
     mode,
     members,
-    status
+    status: 'active'
   });
+}
+
+function rewritePlayersFromEntries(entries) {
+  const textarea = document.getElementById('cfg-players');
+  if (!textarea) return;
+  const normalized = normalizePlayersEntriesForTeams(entries);
+  textarea.value = normalized.map(serializePlayersEditorEntry).filter(Boolean).join('\n');
+}
+
+function appendSoloEntryIfMissing(entries, stableId) {
+  const clean = String(stableId || '').trim();
+  if (!clean) return;
+  const exists = (entries || []).some((entry, index) => getPlayersStableId(entry, index) === clean);
+  if (!exists) entries.push(clean);
+}
+
+function addPlayerFromPreview() {
+  const entries = normalizePlayersEntriesForTeams(readPlayersEditorState());
+  entries.push(nextPlayersEditorLabel(entries));
+  rewritePlayersFromEntries(entries);
+  renderPlayersPreview();
+}
+
+function removePlayerFromPreview(index) {
+  const entries = normalizePlayersEntriesForTeams(readPlayersEditorState());
+  if (!Number.isInteger(index) || index < 0 || index >= entries.length) return;
+
+  const entry = entries[index];
+  const released = getPlayersEntryMode(entry) === 'team' ? getPlayersTeamMembers(entry, index).slice(1) : [];
+  entries.splice(index, 1);
+  released.forEach(stableId => appendSoloEntryIfMissing(entries, stableId));
+  rewritePlayersFromEntries(entries);
+  renderPlayersPreview();
+}
+
+function refreshPlayersPreviewFromRaw() {
+  renderPlayersPreview();
+}
+
+function getAvailableSoloOptions(entries, teamIndex) {
+  return (entries || [])
+    .map((entry, index) => ({
+      index,
+      stableId: getPlayersStableId(entry, index),
+      displayName: getPlayersDisplayName(entry, index),
+      mode: getPlayersEntryMode(entry)
+    }))
+    .filter(item => item.index !== teamIndex && item.mode === 'solo')
+    .map(item => ({
+      stableId: item.stableId,
+      displayName: item.displayName
+    }));
+}
+
+function addSelectedMemberToTeam(teamIndex) {
+  const list = document.getElementById('players-preview-list');
+  const select = list?.querySelector(`[data-player-member-select="${teamIndex}"]`);
+  const selected = String(select?.value || '').trim();
+  if (!selected) return;
+
+  let entries = normalizePlayersEntriesForTeams(readPlayersEditorState());
+  if (!entries[teamIndex]) return;
+
+  const entry = entries[teamIndex];
+  const captain = getPlayersStableId(entry, teamIndex);
+  let members = getPlayersTeamMembers(entry, teamIndex);
+
+  if (selected !== captain && !members.includes(selected)) {
+    members.push(selected);
+  }
+
+  entry.mode = 'team';
+  entry.members = members;
+  entries[teamIndex] = entry;
+
+  entries = entries.filter((item, index) => !(index !== teamIndex && getPlayersEntryMode(item) === 'solo' && getPlayersStableId(item, index) === selected));
+
+  rewritePlayersFromEntries(entries);
+  renderPlayersPreview();
+}
+
+function removeMemberFromTeam(teamIndex, memberEncoded) {
+  const memberLabel = decodeURIComponent(memberEncoded || '');
+  let entries = normalizePlayersEntriesForTeams(readPlayersEditorState());
+  if (!entries[teamIndex]) return;
+
+  const entry = entries[teamIndex];
+  const captain = getPlayersStableId(entry, teamIndex);
+  if (!memberLabel || memberLabel === captain) return;
+
+  const members = getPlayersTeamMembers(entry, teamIndex).filter(item => item !== memberLabel);
+  entry.mode = 'team';
+  entry.members = members;
+  entries[teamIndex] = entry;
+
+  appendSoloEntryIfMissing(entries, memberLabel);
+  rewritePlayersFromEntries(entries);
+  renderPlayersPreview();
 }
 
 function syncPlayersTextareaFromPreview() {
@@ -2213,8 +2605,6 @@ function syncPlayersTextareaFromPreview() {
   const cards = Array.from(list.querySelectorAll('[data-player-card="1"]'));
   const entries = cards.map((card, index) => {
     const stableId = String(card.getAttribute('data-player-id') || `PLAYER ${index + 1}`).trim() || `PLAYER ${index + 1}`;
-    const status = String(card.getAttribute('data-player-status') || 'active').trim().toLowerCase() || 'active';
-
     const displayNameInput = card.querySelector('[data-player-field="display_name"]');
     const modeInput = card.querySelector('[data-player-field="mode"]');
     const membersInput = card.querySelector('[data-player-field="members"]');
@@ -2222,53 +2612,51 @@ function syncPlayersTextareaFromPreview() {
     const displayName = String(displayNameInput?.value || stableId).trim() || stableId;
     const mode = String(modeInput?.value || 'solo').trim().toLowerCase() === 'team' ? 'team' : 'solo';
     const members = mode === 'team'
-      ? String(membersInput?.value || '').split(',').map(item => item.trim()).filter(Boolean)
-      : [displayName];
+      ? String(membersInput?.value || stableId).split(',').map(item => item.trim()).filter(Boolean)
+      : [stableId];
 
     return {
       id: stableId,
       display_name: displayName,
       mode,
       members,
-      status
+      status: 'active'
     };
   });
 
-  textarea.value = entries.map(serializePlayersEditorEntry).filter(Boolean).join('\n');
+  rewritePlayersFromEntries(entries);
 }
 
-function nextPlayersEditorLabel(entries) {
-  const used = new Set((entries || []).map(entry => String(entry?.id || entry?.display_name || '').trim()).filter(Boolean));
-  let n = 1;
-  while (used.has(`PLAYER ${n}`)) n += 1;
-  return `PLAYER ${n}`;
-}
+function handlePlayerModeSelectChange(card) {
+  if (!card) return;
+  const index = Number(card.getAttribute('data-player-index'));
+  if (!Number.isInteger(index)) return;
 
-function addPlayerFromPreview() {
-  const textarea = document.getElementById('cfg-players');
-  if (!textarea) return;
+  let entries = normalizePlayersEntriesForTeams(readPlayersEditorState());
+  if (!entries[index]) return;
 
-  const entries = readPlayersEditorState();
-  const nextLabel = nextPlayersEditorLabel(entries);
-  const lines = String(textarea.value || '').split('\n').map(line => line.trim()).filter(Boolean);
-  lines.push(nextLabel);
-  textarea.value = lines.join('\n');
-  renderPlayersPreview();
-}
+  const modeInput = card.querySelector('[data-player-field="mode"]');
+  if (!modeInput) return;
 
-function removePlayerFromPreview(index) {
-  const textarea = document.getElementById('cfg-players');
-  if (!textarea) return;
+  const entry = entries[index];
+  const captain = getPlayersStableId(entry, index);
+  const targetMode = String(modeInput.value || 'solo').trim().toLowerCase() === 'team' ? 'team' : 'solo';
 
-  const entries = readPlayersEditorState();
-  if (!Number.isInteger(index) || index < 0 || index >= entries.length) return;
+  if (targetMode === 'team') {
+    entry.mode = 'team';
+    entry.members = getPlayersTeamMembers(entry, index);
+    entries[index] = entry;
+    rewritePlayersFromEntries(entries);
+    renderPlayersPreview();
+    return;
+  }
 
-  entries.splice(index, 1);
-  textarea.value = entries.map(serializePlayersEditorEntry).filter(Boolean).join('\n');
-  renderPlayersPreview();
-}
-
-function refreshPlayersPreviewFromRaw() {
+  const released = getPlayersEntryMode(entry) === 'team' ? getPlayersTeamMembers(entry, index).slice(1) : [];
+  entry.mode = 'solo';
+  entry.members = [captain];
+  entries[index] = entry;
+  released.forEach(stableId => appendSoloEntryIfMissing(entries, stableId));
+  rewritePlayersFromEntries(entries);
   renderPlayersPreview();
 }
 
@@ -2288,12 +2676,17 @@ function bindPlayersEditor() {
   list.addEventListener('input', (event) => {
     const field = event.target?.getAttribute?.('data-player-field');
     if (!field) return;
-    syncPlayersTextareaFromPreview();
+    if (field === 'display_name') syncPlayersTextareaFromPreview();
   });
 
   list.addEventListener('change', (event) => {
     const field = event.target?.getAttribute?.('data-player-field');
     if (!field) return;
+    const card = event.target?.closest?.('[data-player-card="1"]') || null;
+    if (field === 'mode' && card) {
+      handlePlayerModeSelectChange(card);
+      return;
+    }
     syncPlayersTextareaFromPreview();
     renderPlayersPreview();
   });
@@ -2314,7 +2707,11 @@ function renderPlayersPreview(cfg=null) {
     textarea.value = fallbackRaw;
   }
 
-  const entries = readPlayersEditorState(sourceText);
+  const entries = normalizePlayersEntriesForTeams(readPlayersEditorState(sourceText));
+  const normalizedRaw = entries.map(serializePlayersEditorEntry).filter(Boolean).join('\n');
+  if (normalizedRaw.trim() !== String(textarea.value || '').trim()) {
+    textarea.value = normalizedRaw;
+  }
 
   if (!entries.length) {
     list.innerHTML = `
@@ -2326,23 +2723,43 @@ function renderPlayersPreview(cfg=null) {
   }
 
   list.innerHTML = entries.map((entry, index) => {
-    const mode = entry.mode === 'team' ? 'team' : 'solo';
+    const mode = getPlayersEntryMode(entry);
     const icon = mode === 'team' ? '👥' : '👤';
-    const membersText = mode === 'team'
-      ? (Array.isArray(entry.members) && entry.members.length ? entry.members.join(', ') : '')
-      : '';
-    const status = String(entry.status || 'active');
-    const source = entry.source === 'json' ? 'JSON LINE' : 'TEXT LINE';
+    const stableId = getPlayersStableId(entry, index);
+    const displayName = getPlayersDisplayName(entry, index);
+    const teamMembers = mode === 'team' ? getPlayersTeamMembers(entry, index) : [stableId];
+    const extraMembers = mode === 'team' ? teamMembers.slice(1) : [];
+    const rosterText = mode === 'team' ? teamMembers.join(', ') : displayName;
+    const summaryText = mode === 'team' ? `${teamMembers.length} linked profiles` : '1 profile';
+    const fieldLabel = mode === 'team' ? 'Team name' : 'Player name';
+    const memberOptions = mode === 'team' ? getAvailableSoloOptions(entries, index) : [];
+    const memberOptionsHtml = memberOptions.length
+      ? memberOptions.map(item => {
+          const optionLabel = item.displayName === item.stableId ? item.displayName : `${item.displayName} · ${item.stableId}`;
+          return `<option value="${escapePlayersPreviewHtml(item.stableId)}">${escapePlayersPreviewHtml(optionLabel)}</option>`;
+        }).join('')
+      : '<option value="">No available players</option>';
+    const extraMembersHtml = extraMembers.length
+      ? extraMembers.map(stableId => `
+          <span class="players-preview-member-chip">
+            ${escapePlayersPreviewHtml(stableId)}
+            <button type="button" class="players-preview-member-chip-btn" onclick="removeMemberFromTeam(${index}, '${encodeURIComponent(stableId)}')">×</button>
+          </span>
+        `).join('')
+      : '<span class="players-preview-member-chip locked">No extra members yet</span>';
+    const teamNote = mode === 'team'
+      ? (teamMembers.length >= 2 ? `${teamMembers.length} members configured.` : 'Team mode works best with 2+ members.')
+      : 'Solo profile.';
 
     return `
-      <div class="players-preview-card"
+      <div class="players-preview-card ${mode === 'team' ? 'team-mode' : ''}"
            data-player-card="1"
-           data-player-id="${escapePlayersPreviewHtml(entry.id || `PLAYER ${index + 1}`)}"
-           data-player-status="${escapePlayersPreviewHtml(status)}">
+           data-player-index="${index}"
+           data-player-id="${escapePlayersPreviewHtml(stableId)}">
         <div class="players-preview-head">
           <div>
-            <div class="players-preview-title">${icon} ${escapePlayersPreviewHtml(entry.display_name || entry.id || `PLAYER ${index + 1}`)}</div>
-            <div class="players-preview-sub">Stable ID: ${escapePlayersPreviewHtml(entry.id || '')} · Source: ${escapePlayersPreviewHtml(source)}</div>
+            <div class="players-preview-title">${icon} ${escapePlayersPreviewHtml(displayName)}</div>
+            <div class="players-preview-sub">Stable ID: ${escapePlayersPreviewHtml(stableId)}</div>
           </div>
           <div class="players-preview-card-actions">
             <div class="players-preview-badge">${escapePlayersPreviewHtml(mode.toUpperCase())}</div>
@@ -2351,16 +2768,17 @@ function renderPlayersPreview(cfg=null) {
         </div>
 
         <div class="players-preview-meta">
-          <div><span class="label">Members</span>${escapePlayersPreviewHtml(mode === 'team' ? (membersText || '—') : (entry.display_name || entry.id || '—'))}</div>
-          <div><span class="label">Status</span>${escapePlayersPreviewHtml(status)}</div>
+          <div><span class="label">Roster</span>${escapePlayersPreviewHtml(rosterText || '—')}</div>
+          <div><span class="label">Profiles</span>${escapePlayersPreviewHtml(summaryText)}</div>
         </div>
 
         <div class="players-preview-edit-grid">
           <div>
-            <div class="players-preview-field-label">Display name</div>
+            <div class="players-preview-field-label">${escapePlayersPreviewHtml(fieldLabel)}</div>
             <input class="players-preview-field"
                    data-player-field="display_name"
-                   value="${escapePlayersPreviewHtml(entry.display_name || '')}">
+                   value="${escapePlayersPreviewHtml(displayName)}">
+            ${mode === 'team' ? '<div class="players-preview-teamname-note">Visible team label. Stable ID stays unchanged.</div>' : ''}
           </div>
           <div>
             <div class="players-preview-field-label">Mode</div>
@@ -2372,11 +2790,20 @@ function renderPlayersPreview(cfg=null) {
         </div>
 
         <div class="players-preview-members" style="${mode === 'team' ? '' : 'display:none;'}">
-          <div class="players-preview-field-label">Members (comma separated)</div>
+          <div class="players-preview-field-label">Team members</div>
           <input class="players-preview-field"
                  data-player-field="members"
-                 value="${escapePlayersPreviewHtml(membersText)}"
-                 placeholder="PLAYER 1, PLAYER 2">
+                 value="${escapePlayersPreviewHtml(teamMembers.join(', '))}"
+                 placeholder="">
+          <div class="players-preview-member-chips">${extraMembersHtml}</div>
+          <div class="players-preview-member-addrow">
+            <select class="players-preview-field" data-player-member-select="${index}">
+              <option value="">Add existing player</option>
+              ${memberOptionsHtml}
+            </select>
+            <button type="button" class="players-preview-member-addbtn" onclick="addSelectedMemberToTeam(${index})">Add</button>
+          </div>
+          <div class="players-preview-inline-note ${mode === 'team' && teamMembers.length < 2 ? 'warn' : 'info'}">${escapePlayersPreviewHtml(teamNote)}</div>
         </div>
       </div>
     `;
