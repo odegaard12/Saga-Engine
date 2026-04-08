@@ -1523,6 +1523,40 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
   margin-bottom:10px;
 }
 
+/* === PLAYERS EDITABLE PREVIEW V2 === */
+.players-preview-edit-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 110px;
+  gap:10px;
+  margin-top:10px;
+}
+.players-preview-field-label{
+  display:block;
+  margin-bottom:4px;
+  color:#8b8f98;
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.players-preview-field{
+  width:100%;
+  min-height:38px;
+  padding:9px 10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(13,16,20,.28);
+  color:#fff;
+  font-size:12px;
+  outline:none;
+}
+.players-preview-field:focus{
+  border-color:rgba(52,211,153,.42);
+  box-shadow:0 0 0 3px rgba(16,185,129,.10);
+}
+.players-preview-members{
+  margin-top:10px;
+}
+
 </style>
   </head>
   <body class="h-screen flex overflow-hidden">
@@ -1915,13 +1949,186 @@ function escapePlayersPreviewHtml(value) {
   }[ch]));
 }
 
-function renderPlayersPreview(cfg) {
+function normalizePlayersEditorEntry(raw, index=0) {
+  const fallbackName = `PLAYER ${index + 1}`;
+
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const displayName = String(raw.display_name || raw.name || raw.id || fallbackName).trim() || fallbackName;
+    const profileId = String(raw.id || displayName).trim() || displayName;
+
+    let mode = String(raw.mode || 'solo').trim().toLowerCase();
+    if (mode !== 'team') mode = 'solo';
+
+    let members = [];
+    if (Array.isArray(raw.members)) {
+      members = raw.members.map(item => String(item ?? '').trim()).filter(Boolean);
+    } else if (typeof raw.members === 'string') {
+      members = raw.members.split(',').map(item => item.trim()).filter(Boolean);
+    }
+
+    if (mode === 'solo' && !members.length) members = [displayName];
+
+    const status = String(raw.status || 'active').trim().toLowerCase() || 'active';
+
+    return {
+      source: 'json',
+      id: profileId,
+      display_name: displayName,
+      mode,
+      members,
+      status
+    };
+  }
+
+  const text = String(raw ?? '').trim();
+  const displayName = text || fallbackName;
+
+  return {
+    source: 'text',
+    id: displayName,
+    display_name: displayName,
+    mode: 'solo',
+    members: [displayName],
+    status: 'active'
+  };
+}
+
+function parsePlayersAdminLine(line, index=0) {
+  const text = String(line ?? '').trim();
+  if (!text) return null;
+
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const obj = JSON.parse(text);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        return normalizePlayersEditorEntry(obj, index);
+      }
+    } catch (e) {}
+  }
+
+  return normalizePlayersEditorEntry(text, index);
+}
+
+function readPlayersEditorState(rawText=null) {
+  const textarea = document.getElementById('cfg-players');
+  const sourceText = rawText !== null ? String(rawText) : String(textarea?.value || '');
+  return sourceText.split('\n').map((line, index) => parsePlayersAdminLine(line, index)).filter(Boolean);
+}
+
+function serializePlayersEditorEntry(entry) {
+  const profileId = String(entry?.id || entry?.display_name || '').trim() || 'PLAYER 1';
+  const displayName = String(entry?.display_name || profileId).trim() || profileId;
+
+  let mode = String(entry?.mode || 'solo').trim().toLowerCase();
+  if (mode !== 'team') mode = 'solo';
+
+  let members = Array.isArray(entry?.members)
+    ? entry.members.map(item => String(item ?? '').trim()).filter(Boolean)
+    : [];
+
+  if (mode === 'solo') {
+    members = [displayName];
+  } else if (!members.length) {
+    members = [displayName];
+  }
+
+  const status = String(entry?.status || 'active').trim().toLowerCase() || 'active';
+
+  const canBePlainText =
+    mode === 'solo' &&
+    status === 'active' &&
+    profileId === displayName &&
+    members.length === 1 &&
+    members[0] === displayName;
+
+  if (canBePlainText) return displayName;
+
+  return JSON.stringify({
+    id: profileId,
+    display_name: displayName,
+    mode,
+    members,
+    status
+  });
+}
+
+function syncPlayersTextareaFromPreview() {
+  const textarea = document.getElementById('cfg-players');
   const list = document.getElementById('players-preview-list');
-  if (!list) return;
+  if (!textarea || !list) return;
 
-  const profiles = Array.isArray(cfg?.player_profiles) ? cfg.player_profiles : [];
+  const cards = Array.from(list.querySelectorAll('[data-player-card="1"]'));
+  const entries = cards.map((card, index) => {
+    const stableId = String(card.getAttribute('data-player-id') || `PLAYER ${index + 1}`).trim() || `PLAYER ${index + 1}`;
+    const status = String(card.getAttribute('data-player-status') || 'active').trim().toLowerCase() || 'active';
 
-  if (!profiles.length) {
+    const displayNameInput = card.querySelector('[data-player-field="display_name"]');
+    const modeInput = card.querySelector('[data-player-field="mode"]');
+    const membersInput = card.querySelector('[data-player-field="members"]');
+
+    const displayName = String(displayNameInput?.value || stableId).trim() || stableId;
+    const mode = String(modeInput?.value || 'solo').trim().toLowerCase() === 'team' ? 'team' : 'solo';
+    const members = mode === 'team'
+      ? String(membersInput?.value || '').split(',').map(item => item.trim()).filter(Boolean)
+      : [displayName];
+
+    return {
+      id: stableId,
+      display_name: displayName,
+      mode,
+      members,
+      status
+    };
+  });
+
+  textarea.value = entries.map(serializePlayersEditorEntry).filter(Boolean).join('\n');
+}
+
+let playersEditorBound = false;
+
+function bindPlayersEditor() {
+  if (playersEditorBound) return;
+
+  const textarea = document.getElementById('cfg-players');
+  const list = document.getElementById('players-preview-list');
+  if (!textarea || !list) return;
+
+  textarea.addEventListener('input', () => {
+    renderPlayersPreview();
+  });
+
+  list.addEventListener('input', (event) => {
+    const field = event.target?.getAttribute?.('data-player-field');
+    if (!field) return;
+    syncPlayersTextareaFromPreview();
+  });
+
+  list.addEventListener('change', (event) => {
+    const field = event.target?.getAttribute?.('data-player-field');
+    if (!field) return;
+    syncPlayersTextareaFromPreview();
+    renderPlayersPreview();
+  });
+
+  playersEditorBound = true;
+}
+
+function renderPlayersPreview(cfg=null) {
+  const list = document.getElementById('players-preview-list');
+  const textarea = document.getElementById('cfg-players');
+  if (!list || !textarea) return;
+
+  const textareaValue = String(textarea.value || '');
+  const fallbackRaw = serializePlayersForAdmin(cfg?.players || []);
+  const sourceText = textareaValue.trim() ? textareaValue : fallbackRaw;
+
+  if (!textareaValue.trim() && fallbackRaw) {
+    textarea.value = fallbackRaw;
+  }
+
+  const entries = readPlayersEditorState(sourceText);
+
+  if (!entries.length) {
     list.innerHTML = `
       <div class="players-preview-card">
         <div class="players-preview-title">No profiles found.</div>
@@ -1930,31 +2137,60 @@ function renderPlayersPreview(cfg) {
     return;
   }
 
-  list.innerHTML = profiles.map((profile, index) => {
-    const mode = String(profile?.mode || 'solo');
+  list.innerHTML = entries.map((entry, index) => {
+    const mode = entry.mode === 'team' ? 'team' : 'solo';
     const icon = mode === 'team' ? '👥' : '👤';
-    const members = Array.isArray(profile?.members) && profile.members.length ? profile.members.join(', ') : '—';
-    const status = String(profile?.status || 'active');
+    const membersText = mode === 'team'
+      ? (Array.isArray(entry.members) && entry.members.length ? entry.members.join(', ') : '')
+      : '';
+    const status = String(entry.status || 'active');
+    const source = entry.source === 'json' ? 'JSON LINE' : 'TEXT LINE';
 
     return `
-      <div class="players-preview-card">
+      <div class="players-preview-card"
+           data-player-card="1"
+           data-player-id="${escapePlayersPreviewHtml(entry.id || `PLAYER ${index + 1}`)}"
+           data-player-status="${escapePlayersPreviewHtml(status)}">
         <div class="players-preview-head">
           <div>
-            <div class="players-preview-title">${icon} ${escapePlayersPreviewHtml(profile?.display_name || profile?.id || `PLAYER ${index + 1}`)}</div>
-            <div class="players-preview-sub">Stable ID: ${escapePlayersPreviewHtml(profile?.id || '')}</div>
+            <div class="players-preview-title">${icon} ${escapePlayersPreviewHtml(entry.display_name || entry.id || `PLAYER ${index + 1}`)}</div>
+            <div class="players-preview-sub">Stable ID: ${escapePlayersPreviewHtml(entry.id || '')} · Source: ${escapePlayersPreviewHtml(source)}</div>
           </div>
           <div class="players-preview-badge">${escapePlayersPreviewHtml(mode.toUpperCase())}</div>
         </div>
 
         <div class="players-preview-meta">
-          <div><span class="label">Members</span>${escapePlayersPreviewHtml(members)}</div>
+          <div><span class="label">Members</span>${escapePlayersPreviewHtml(mode === 'team' ? (membersText || '—') : (entry.display_name || entry.id || '—'))}</div>
           <div><span class="label">Status</span>${escapePlayersPreviewHtml(status)}</div>
+        </div>
+
+        <div class="players-preview-edit-grid">
+          <div>
+            <div class="players-preview-field-label">Display name</div>
+            <input class="players-preview-field"
+                   data-player-field="display_name"
+                   value="${escapePlayersPreviewHtml(entry.display_name || '')}">
+          </div>
+          <div>
+            <div class="players-preview-field-label">Mode</div>
+            <select class="players-preview-field" data-player-field="mode">
+              <option value="solo"${mode === 'solo' ? ' selected' : ''}>solo</option>
+              <option value="team"${mode === 'team' ? ' selected' : ''}>team</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="players-preview-members" style="${mode === 'team' ? '' : 'display:none;'}">
+          <div class="players-preview-field-label">Members (comma separated)</div>
+          <input class="players-preview-field"
+                 data-player-field="members"
+                 value="${escapePlayersPreviewHtml(membersText)}"
+                 placeholder="PLAYER 1, PLAYER 2">
         </div>
       </div>
     `;
   }).join('');
 }
-
 
 function formatTs(ts) {
   if (!ts) return '—';
@@ -2134,7 +2370,8 @@ async function loadConfigAdmin() {
   document.getElementById('cfg-players').value = serializePlayersForAdmin(cfg.players || []);
 
   
-    renderPlayersPreview(cfg);
+      bindPlayersEditor();
+  renderPlayersPreview(cfg);
 document.title = cfg.site_name || 'SAGA ENGINE';
   document.getElementById('header-admin-title').textContent = cfg.admin_title || 'SAGA_ADMIN';
   document.getElementById('header-admin-subtitle').textContent = cfg.admin_subtitle || '';
