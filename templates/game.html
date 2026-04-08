@@ -865,9 +865,253 @@ body[data-player-theme="glass"] #rune-code{
   }
 }
 
+
+/* === PLAYER SHELL V2 === */
+:root{
+  --player-shell-bg:rgba(7,10,16,.76);
+  --player-shell-line:rgba(255,255,255,.08);
+  --player-shell-line-strong:rgba(96,165,250,.26);
+  --player-shell-text:#f8fbff;
+  --player-shell-muted:#9eb0c8;
+  --player-shell-soft:rgba(255,255,255,.04);
+}
+body.player-shell-v2-ready{
+  background:#06080d;
+}
+#player-shell-v2{
+  position:fixed;
+  top:calc(12px + env(safe-area-inset-top));
+  left:12px;
+  right:12px;
+  z-index:3200;
+  pointer-events:none;
+}
+.player-shell-v2-card{
+  width:min(100%, 860px);
+  margin:0 auto;
+  padding:12px 14px;
+  border-radius:22px;
+  border:1px solid var(--player-shell-line);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03)),
+    linear-gradient(135deg, rgba(96,165,250,.11), rgba(34,211,238,.03));
+  box-shadow:0 18px 45px rgba(0,0,0,.30);
+  backdrop-filter:blur(16px);
+}
+.player-shell-v2-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.player-shell-v2-kicker{
+  color:#dbeafe;
+  font-size:10px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  font-weight:800;
+}
+.player-shell-v2-title{
+  margin-top:4px;
+  color:#fff;
+  font-size:18px;
+  line-height:1.05;
+  font-weight:900;
+  letter-spacing:-.02em;
+}
+.player-shell-v2-sub{
+  margin-top:5px;
+  color:var(--player-shell-muted);
+  font-size:11px;
+  line-height:1.45;
+}
+.player-shell-v2-progress{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid var(--player-shell-line-strong);
+  background:rgba(59,130,246,.12);
+  color:#eff6ff;
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:800;
+  white-space:nowrap;
+}
+.player-shell-v2-pills{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+.player-shell-v2-pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:var(--player-shell-soft);
+  color:#d9e4f4;
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:800;
+}
+.player-shell-v2-pill.gps-ok{
+  border-color:rgba(52,211,153,.28);
+  background:rgba(16,185,129,.12);
+  color:#d1fae5;
+}
+.player-shell-v2-pill.gps-unknown{
+  border-color:rgba(245,158,11,.24);
+  background:rgba(245,158,11,.10);
+  color:#fde68a;
+}
+.player-shell-v2-pill.gps-off{
+  border-color:rgba(248,113,113,.22);
+  background:rgba(239,68,68,.10);
+  color:#fecaca;
+}
+body.player-shell-v2-ready .top-nav{
+  top:calc(100px + env(safe-area-inset-top)) !important;
+}
+body.player-shell-v2-ready .nav-btn{
+  min-height:32px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(7,10,16,.82);
+  color:#dbe7f8;
+  box-shadow:0 10px 24px rgba(0,0,0,.22);
+  backdrop-filter:blur(14px);
+}
+body.player-shell-v2-ready .hud-panel{
+  left:12px;
+  right:12px;
+  bottom:12px;
+  width:auto;
+  padding:18px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top:none;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:24px;
+  background:
+    linear-gradient(180deg, rgba(10,14,22,.86), rgba(5,7,12,.94)),
+    linear-gradient(135deg, rgba(96,165,250,.06), transparent 45%);
+  box-shadow:0 20px 48px rgba(0,0,0,.34);
+  backdrop-filter:blur(18px);
+}
+body.player-shell-v2-ready .btn-action{
+  clip-path:none;
+  border:none;
+  border-radius:16px;
+  background:linear-gradient(180deg, rgba(37,99,235,.95), rgba(29,78,216,.92));
+  color:#fff;
+  font-size:14px;
+  letter-spacing:.14em;
+  box-shadow:0 14px 30px rgba(29,78,216,.30);
+}
+body.player-shell-v2-ready .btn-action:disabled{
+  background:linear-gradient(180deg, rgba(51,65,85,.88), rgba(30,41,59,.88));
+  color:#cbd5e1;
+  opacity:.74;
+  box-shadow:none;
+}
+body.player-shell-v2-ready #rune-bar,
+body.player-shell-v2-ready .rune-bar{
+  border-color:rgba(255,255,255,.08) !important;
+  background:rgba(7,10,16,.78) !important;
+  box-shadow:0 12px 26px rgba(0,0,0,.22) !important;
+}
+body.player-shell-v2-ready #prologue{
+  background:
+    radial-gradient(circle at top, rgba(96,165,250,.18), transparent 36%),
+    radial-gradient(circle at 80% 20%, rgba(34,211,238,.12), transparent 28%),
+    rgba(3,5,10,.94);
+}
+body.player-shell-v2-ready .prologue-card{
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:26px;
+  clip-path:none;
+  background:linear-gradient(180deg, rgba(9,13,21,.88), rgba(5,7,12,.96));
+  box-shadow:0 24px 60px rgba(0,0,0,.40);
+}
+body[data-player-theme="glass"].player-shell-v2-ready .player-shell-v2-card,
+body[data-player-theme="glass"].player-shell-v2-ready .hud-panel,
+body[data-player-theme="glass"].player-shell-v2-ready .nav-btn{
+  background:
+    linear-gradient(180deg, rgba(15,23,42,.64), rgba(15,23,42,.50)),
+    linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+}
+@media (max-width:560px){
+  #player-shell-v2{
+    left:10px;
+    right:10px;
+    top:calc(10px + env(safe-area-inset-top));
+  }
+  .player-shell-v2-card{
+    padding:11px 12px;
+    border-radius:20px;
+  }
+  .player-shell-v2-title{
+    font-size:16px;
+  }
+  .player-shell-v2-sub{
+    font-size:10px;
+  }
+  .player-shell-v2-progress{
+    min-height:30px;
+    padding:0 10px;
+    font-size:10px;
+  }
+  body.player-shell-v2-ready .top-nav{
+    top:calc(92px + env(safe-area-inset-top)) !important;
+    gap:6px !important;
+  }
+  body.player-shell-v2-ready .hud-panel{
+    left:10px;
+    right:10px;
+    bottom:10px;
+    border-radius:20px;
+    padding:16px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  body.player-shell-v2-ready .btn-action{
+    font-size:13px;
+    padding:13px;
+  }
+}
+
 </style>
 </head>
 <body data-player-theme="{{ config.player_theme or 'classic' }}">
+
+<div id="player-shell-v2" aria-hidden="true">
+  <div class="player-shell-v2-card">
+    <div class="player-shell-v2-row">
+      <div>
+        <div id="player-shell-v2-kicker" class="player-shell-v2-kicker">{% if profile.mode == 'team' %}TEAM SESSION{% else %}PLAYER SESSION{% endif %}</div>
+        <div id="player-shell-v2-title" class="player-shell-v2-title">{{ profile.display_name or user }}</div>
+        <div id="player-shell-v2-sub" class="player-shell-v2-sub">
+          {% if profile.mode == 'team' %}
+          {{ profile.members|length if profile.members else 1 }} members linked
+          {% else %}
+          Individual mission profile
+          {% endif %}
+        </div>
+      </div>
+      <div id="player-shell-v2-progress" class="player-shell-v2-progress">Stage</div>
+    </div>
+    <div class="player-shell-v2-pills">
+      <span id="player-shell-v2-mode" class="player-shell-v2-pill">{% if profile.mode == 'team' %}Team{% else %}Solo{% endif %}</span>
+      <span id="player-shell-v2-gps" class="player-shell-v2-pill gps-unknown">GPS Unknown</span>
+      <span id="player-shell-v2-node" class="player-shell-v2-pill">Awaiting node</span>
+    </div>
+  </div>
+</div>
+
 <div id="map"></div>
 
 <div id="prologue">
@@ -1052,6 +1296,8 @@ async function requestPermissions() {
 
 async function loadState() {
     let payload = await fetch('/api/game/' + USER).then(r => r.json());
+    window.__SAGA_LAST_PAYLOAD = payload;
+    updatePlayerShell(payload);
     let state = { level: payload.level, finished: payload.finished };
     let stages = payload.stages || [];
 
@@ -2379,6 +2625,108 @@ function beep(f,d) {
     }
 }
 function closeGame() { document.getElementById('game-modal').classList.remove('active'); window.ondeviceorientation=null; if(noiseGain) noiseGain.gain.value=0; }
+
+/* === PLAYER SHELL V2 === */
+function setPlayerShellText(id, value){
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value ?? '');
+}
+
+function setPlayerShellGpsTone(status){
+  const el = document.getElementById('player-shell-v2-gps');
+  if (!el) return;
+  el.classList.remove('gps-ok', 'gps-unknown', 'gps-off');
+
+  const tone = String(status || '').trim().toLowerCase();
+  if (tone === 'ok' || tone === 'live') {
+    el.classList.add('gps-ok');
+    return;
+  }
+  if (tone === 'unknown' || tone === 'stale') {
+    el.classList.add('gps-unknown');
+    return;
+  }
+  el.classList.add('gps-off');
+}
+
+function inferShellGpsStatus(payload){
+  const live = payload && payload.live_status ? payload.live_status : {};
+  const raw = String(live.gps_status || '').trim().toLowerCase();
+  if (raw) return raw;
+
+  const badge = document.getElementById('gps-badge');
+  const badgeText = String(badge?.textContent || '').toLowerCase();
+  if (badgeText.includes('ok')) return 'ok';
+  if (badgeText.includes('unavailable')) return 'unavailable';
+  if (badgeText.includes('unknown')) return 'unknown';
+  return 'unknown';
+}
+
+function updatePlayerShell(payload){
+  try{
+    document.body.classList.add('player-shell-v2-ready');
+
+    const data = payload || window.__SAGA_LAST_PAYLOAD || null;
+    const profile = data?.profile || {};
+    const displayName = profile.display_name || data?.display_name || "{{ profile.display_name or user }}";
+    const mode = String(data?.session_mode || profile.mode || "{{ profile.mode or 'solo' }}").trim().toLowerCase() === 'team' ? 'team' : 'solo';
+    const members = Array.isArray(profile.members) ? profile.members.filter(Boolean) : [];
+    const stages = Array.isArray(data?.stages) ? data.stages : [];
+    const level = Number.isFinite(Number(data?.level)) ? Number(data.level) : 0;
+    const finished = !!data?.finished;
+    const currentNode = (!finished && stages[level]) ? stages[level] : null;
+    const totalStages = stages.length;
+    const gpsStatus = inferShellGpsStatus(data);
+
+    setPlayerShellText('player-shell-v2-kicker', mode === 'team' ? 'TEAM SESSION' : 'PLAYER SESSION');
+    setPlayerShellText('player-shell-v2-title', displayName);
+
+    if (mode === 'team') {
+      setPlayerShellText('player-shell-v2-sub', `${members.length || 1} members linked`);
+      setPlayerShellText('player-shell-v2-mode', `Team · ${members.length || 1}`);
+    } else {
+      setPlayerShellText('player-shell-v2-sub', 'Individual mission profile');
+      setPlayerShellText('player-shell-v2-mode', 'Solo');
+    }
+
+    setPlayerShellText(
+      'player-shell-v2-progress',
+      finished ? 'Complete' : `Stage ${Math.min(level + 1, Math.max(totalStages, 1))}${totalStages ? ` / ${totalStages}` : ''}`
+    );
+
+    setPlayerShellText(
+      'player-shell-v2-node',
+      finished ? 'Mission complete' : (currentNode?.title || 'Awaiting node')
+    );
+
+    const gpsLabel =
+      gpsStatus === 'ok' ? 'GPS OK' :
+      gpsStatus === 'unknown' ? 'GPS Unknown' :
+      'GPS Limited';
+
+    setPlayerShellText('player-shell-v2-gps', gpsLabel);
+    setPlayerShellGpsTone(gpsStatus);
+  }catch(e){
+    console.error('player-shell-v2 update error', e);
+  }
+}
+
+function refreshPlayerShellGpsFromDom(){
+  try{
+    if (!window.__SAGA_LAST_PAYLOAD) return;
+    updatePlayerShell(window.__SAGA_LAST_PAYLOAD);
+  }catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    document.body.classList.add('player-shell-v2-ready');
+    updatePlayerShell(window.__SAGA_LAST_PAYLOAD || null);
+    setInterval(refreshPlayerShellGpsFromDom, 1600);
+  }catch(e){}
+});
+
+
 async function winGame() { beep(1000,0.2); setTimeout(()=>beep(1500,0.4),200); document.getElementById('game-canvas').innerHTML="<h1 class='text-4xl text-center animate-pulse text-green-500'>NODE ACTIVE</h1>"; await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:'OK'})}); setTimeout(()=>{closeGame();loadState()},2000); }
 async function checkRune() { let c=document.getElementById('rune-code').value.toUpperCase(); let r=await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:c})}); let d=await r.json(); if(d.status==='ok'){beep(1200,0.5);loadState();document.getElementById('rune-code').value="";} else alert("INVALID CODE"); }
 function toggleDebug(){debugMode=!debugMode;var b=document.getElementById('debug-btn');if(b){b.innerText=debugMode?'DEBUG':'DEBUG';b.classList.toggle('debug-on',debugMode);b.classList.toggle('debug-off',!debugMode);}if(!debugMode){try{var u=new URL(location.href);u.searchParams.set('v',Date.now());location.href=u.toString();}catch(e){location.reload();}return;}loadState();}
