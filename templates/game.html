@@ -1229,6 +1229,286 @@ body.player-shell-v2-ready .hud-panel{
   }
 }
 
+
+/* === PLAYER VISUAL PASS V2.2 === */
+:root{
+  --saga-panel-bg:linear-gradient(180deg, rgba(8,12,20,.86), rgba(4,7,12,.94));
+  --saga-panel-line:rgba(148,163,184,.14);
+  --saga-panel-soft:rgba(255,255,255,.04);
+  --saga-panel-text:#f8fbff;
+  --saga-panel-muted:#a7b6c9;
+  --saga-panel-accent:rgba(96,165,250,.24);
+  --saga-panel-green:rgba(16,185,129,.18);
+  --saga-panel-amber:rgba(245,158,11,.18);
+  --saga-panel-red:rgba(239,68,68,.18);
+}
+
+body.player-shell-v2-ready{
+  background:
+    radial-gradient(circle at 65% 18%, rgba(59,130,246,.10), transparent 20%),
+    linear-gradient(180deg, #04070c 0%, #06101a 55%, #03060b 100%) !important;
+}
+
+#player-shell-v2{
+  left:14px !important;
+  right:auto !important;
+  width:min(calc(100vw - 28px), 430px) !important;
+  top:calc(12px + env(safe-area-inset-top)) !important;
+  z-index:3200 !important;
+}
+
+.player-shell-v2-card{
+  width:100% !important;
+  margin:0 !important;
+  padding:11px 13px !important;
+  border-radius:22px !important;
+  border:1px solid var(--saga-panel-line) !important;
+  background:
+    radial-gradient(circle at 72% 18%, rgba(59,130,246,.14), transparent 26%),
+    linear-gradient(180deg, rgba(10,15,24,.78), rgba(5,8,13,.94)) !important;
+  box-shadow:
+    0 20px 48px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+.player-shell-v2-title{
+  color:var(--saga-panel-text) !important;
+  font-size:16px !important;
+  letter-spacing:-.02em !important;
+}
+
+.player-shell-v2-sub{
+  color:var(--saga-panel-muted) !important;
+  font-size:10px !important;
+  line-height:1.35 !important;
+}
+
+.player-shell-v2-progress{
+  min-height:30px !important;
+  padding:0 10px !important;
+  border-radius:999px !important;
+  border:1px solid var(--saga-panel-accent) !important;
+  background:rgba(37,99,235,.10) !important;
+  color:#eff6ff !important;
+  font-size:10px !important;
+}
+
+.player-shell-v2-pills{
+  margin-top:10px !important;
+  gap:6px !important;
+}
+
+.player-shell-v2-pill{
+  min-height:24px !important;
+  padding:0 9px !important;
+  border-radius:999px !important;
+  border:1px solid rgba(148,163,184,.12) !important;
+  background:var(--saga-panel-soft) !important;
+  color:#dbe7f8 !important;
+  font-size:9px !important;
+}
+
+.player-shell-v2-pill.gps-ok{
+  border-color:rgba(16,185,129,.28) !important;
+  background:var(--saga-panel-green) !important;
+  color:#d1fae5 !important;
+}
+.player-shell-v2-pill.gps-unknown{
+  border-color:rgba(245,158,11,.25) !important;
+  background:var(--saga-panel-amber) !important;
+  color:#fde68a !important;
+}
+.player-shell-v2-pill.gps-off{
+  border-color:rgba(239,68,68,.22) !important;
+  background:var(--saga-panel-red) !important;
+  color:#fecaca !important;
+}
+
+body.player-shell-v2-ready .top-nav{
+  top:calc(16px + env(safe-area-inset-top)) !important;
+  left:auto !important;
+  right:14px !important;
+  width:auto !important;
+  max-width:calc(100vw - 480px) !important;
+  transform:none !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  z-index:3400 !important;
+}
+
+body.player-shell-v2-ready .nav-btn{
+  min-height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  border:1px solid rgba(148,163,184,.14) !important;
+  background:
+    linear-gradient(180deg, rgba(10,14,22,.86), rgba(6,9,15,.94)) !important;
+  color:#e5edf8 !important;
+  box-shadow:0 10px 22px rgba(0,0,0,.20) !important;
+  backdrop-filter:blur(12px);
+}
+
+body.player-shell-v2-ready #rune-bar,
+body.player-shell-v2-ready .rune-bar,
+body.player-shell-v2-ready #runes-bar,
+body.player-shell-v2-ready .runes-bar{
+  top:calc(178px + env(safe-area-inset-top)) !important;
+  left:18px !important;
+  right:auto !important;
+  transform:none !important;
+  width:auto !important;
+  max-width:min(calc(100vw - 36px), 220px) !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+  padding:8px 10px !important;
+  border-radius:18px !important;
+  border:1px solid rgba(148,163,184,.12) !important;
+  background:
+    linear-gradient(180deg, rgba(8,12,20,.82), rgba(4,7,12,.92)) !important;
+  box-shadow:0 14px 28px rgba(0,0,0,.24) !important;
+  z-index:3350 !important;
+}
+
+body.player-shell-v2-ready .rune{
+  width:38px !important;
+  height:38px !important;
+  border-radius:12px !important;
+  border:1px solid rgba(16,185,129,.20) !important;
+  background:rgba(2,9,6,.96) !important;
+  color:#22c55e !important;
+  box-shadow:none !important;
+}
+
+body.player-shell-v2-ready .rune.on{
+  border-color:rgba(34,197,94,.38) !important;
+  box-shadow:
+    0 0 0 1px rgba(34,197,94,.08) inset,
+    0 0 16px rgba(34,197,94,.20) !important;
+}
+
+body.player-shell-v2-ready .hud-panel{
+  left:14px !important;
+  right:14px !important;
+  bottom:14px !important;
+  width:auto !important;
+  padding:18px 16px calc(16px + env(safe-area-inset-bottom)) !important;
+  border:1px solid rgba(148,163,184,.12) !important;
+  border-radius:26px !important;
+  border-top:none !important;
+  background:
+    radial-gradient(circle at 70% 0%, rgba(59,130,246,.10), transparent 24%),
+    linear-gradient(180deg, rgba(6,10,17,.88), rgba(3,6,11,.96)) !important;
+  box-shadow:
+    0 24px 50px rgba(0,0,0,.34),
+    inset 0 1px 0 rgba(255,255,255,.03) !important;
+}
+
+body.player-shell-v2-ready .btn-action{
+  clip-path:none !important;
+  border-radius:16px !important;
+  border:1px solid rgba(96,165,250,.20) !important;
+  background:
+    linear-gradient(180deg, rgba(14,116,144,.92), rgba(21,128,61,.84)) !important;
+  color:#ffffff !important;
+  font-size:14px !important;
+  letter-spacing:.12em !important;
+  box-shadow:0 14px 28px rgba(0,0,0,.24) !important;
+}
+
+body.player-shell-v2-ready .btn-action:disabled{
+  border-color:rgba(148,163,184,.10) !important;
+  background:
+    linear-gradient(180deg, rgba(51,65,85,.86), rgba(30,41,59,.92)) !important;
+  color:#cbd5e1 !important;
+  opacity:.78 !important;
+  box-shadow:none !important;
+}
+
+body.player-shell-v2-ready #rune-code{
+  border-radius:14px !important;
+  border:1px solid rgba(148,163,184,.14) !important;
+  background:rgba(3,7,13,.96) !important;
+  color:#f8fbff !important;
+}
+
+body.player-shell-v2-ready #prologue{
+  background:
+    radial-gradient(circle at top, rgba(59,130,246,.16), transparent 30%),
+    radial-gradient(circle at 80% 18%, rgba(16,185,129,.08), transparent 20%),
+    rgba(3,5,10,.95) !important;
+}
+
+body.player-shell-v2-ready .prologue-card{
+  border:1px solid rgba(148,163,184,.12) !important;
+  border-radius:26px !important;
+  clip-path:none !important;
+  background:
+    linear-gradient(180deg, rgba(9,13,21,.90), rgba(5,7,12,.97)) !important;
+  box-shadow:0 26px 60px rgba(0,0,0,.40) !important;
+}
+
+@media (max-width: 900px){
+  #player-shell-v2{
+    left:10px !important;
+    right:10px !important;
+    width:auto !important;
+    max-width:none !important;
+  }
+
+  body.player-shell-v2-ready .top-nav{
+    top:calc(118px + env(safe-area-inset-top)) !important;
+    left:10px !important;
+    right:10px !important;
+    width:auto !important;
+    max-width:none !important;
+    justify-content:center !important;
+  }
+
+  body.player-shell-v2-ready #rune-bar,
+  body.player-shell-v2-ready .rune-bar,
+  body.player-shell-v2-ready #runes-bar,
+  body.player-shell-v2-ready .runes-bar{
+    top:calc(170px + env(safe-area-inset-top)) !important;
+    left:10px !important;
+    right:10px !important;
+    max-width:none !important;
+  }
+
+  body.player-shell-v2-ready .hud-panel{
+    left:10px !important;
+    right:10px !important;
+    bottom:10px !important;
+  }
+}
+
+@media (max-width: 560px){
+  .player-shell-v2-card{
+    padding:10px 11px !important;
+  }
+
+  .player-shell-v2-title{
+    font-size:15px !important;
+  }
+
+  .player-shell-v2-progress{
+    min-height:28px !important;
+    padding:0 8px !important;
+    font-size:9px !important;
+  }
+
+  body.player-shell-v2-ready .top-nav{
+    top:calc(110px + env(safe-area-inset-top)) !important;
+    gap:6px !important;
+  }
+
+  body.player-shell-v2-ready #rune-bar,
+  body.player-shell-v2-ready .rune-bar,
+  body.player-shell-v2-ready #runes-bar,
+  body.player-shell-v2-ready .runes-bar{
+    top:calc(158px + env(safe-area-inset-top)) !important;
+  }
+}
+
 </style>
 </head>
 <body data-player-theme="{{ config.player_theme or 'classic' }}">
