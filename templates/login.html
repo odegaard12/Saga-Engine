@@ -485,6 +485,169 @@ body{
   }
 }
 
+
+
+/* === LOGIN CONSOLIDATED VISUAL PASS V1 === */
+body{
+  background:
+    radial-gradient(circle at 12% 0%, rgba(16,185,129,.10), transparent 20%),
+    radial-gradient(circle at 88% 10%, rgba(59,130,246,.08), transparent 18%),
+    linear-gradient(180deg, #eef3ec 0%, #e8efe6 48%, #e2ebdf 100%) !important;
+  color: #10231a !important;
+}
+
+.scan-line,
+.login-shell{
+  opacity: .18 !important;
+}
+
+.login-wrap{
+  width: min(1180px, 100%) !important;
+}
+
+.login-hero{
+  border-radius: 26px !important;
+  border: 1px solid rgba(15,23,42,.08) !important;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(59,130,246,.08), transparent 18%),
+    linear-gradient(180deg, rgba(255,255,255,.84), rgba(248,250,247,.92)) !important;
+  box-shadow:
+    0 18px 48px rgba(15,23,42,.08),
+    inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+
+.login-kicker{
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(5,150,105,.18) !important;
+  background: rgba(236,253,245,.88) !important;
+  color: #065f46 !important;
+  letter-spacing: .18em !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+.login-title{
+  color: #0f172a !important;
+  max-width: 12ch !important;
+  line-height: .92 !important;
+  letter-spacing: -.04em !important;
+  text-shadow: none !important;
+}
+
+.login-sub{
+  color: #334155 !important;
+  max-width: 56ch !important;
+  line-height: 1.6 !important;
+  font-size: 15px !important;
+}
+
+.login-grid{
+  gap: 16px !important;
+}
+
+.player-card{
+  border-radius: 24px !important;
+  border: 1px solid rgba(15,23,42,.08) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.82), rgba(245,248,244,.92)) !important;
+  box-shadow:
+    0 16px 36px rgba(15,23,42,.07),
+    inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+
+.player-card:hover{
+  transform: translateY(-4px) !important;
+  border-color: rgba(5,150,105,.16) !important;
+  box-shadow:
+    0 24px 44px rgba(15,23,42,.10),
+    0 0 0 1px rgba(5,150,105,.04) inset !important;
+}
+
+.player-icon{
+  width: 58px !important;
+  height: 58px !important;
+  border-radius: 18px !important;
+  background: rgba(240,253,244,.9) !important;
+  border: 1px solid rgba(5,150,105,.10) !important;
+}
+
+.player-mode-badge{
+  border-color: rgba(15,23,42,.08) !important;
+  background: rgba(248,250,252,.94) !important;
+  color: #334155 !important;
+}
+
+.player-name{
+  color: #0f172a !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+
+.player-meta{
+  color: #065f46 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .12em !important;
+  font-size: 11px !important;
+}
+
+.player-members{
+  border: 1px solid rgba(15,23,42,.06) !important;
+  background: rgba(248,250,252,.9) !important;
+  color: #475569 !important;
+}
+
+.player-enter{
+  min-height: 46px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(5,150,105,.20) !important;
+  background:
+    linear-gradient(180deg, rgba(15,118,110,.92), rgba(22,163,74,.88)) !important;
+  color: #ffffff !important;
+  letter-spacing: .14em !important;
+  box-shadow: 0 10px 24px rgba(5,150,105,.18) !important;
+}
+
+.player-enter:hover{
+  border-color: rgba(5,150,105,.30) !important;
+}
+
+.admin-entry a{
+  min-height: 44px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(15,23,42,.08) !important;
+  background: rgba(255,255,255,.74) !important;
+  color: #334155 !important;
+}
+
+.admin-entry a:hover{
+  border-color: rgba(5,150,105,.16) !important;
+  background: rgba(236,253,245,.86) !important;
+  color: #065f46 !important;
+}
+
+@media (max-width: 720px){
+  .login-hero{
+    border-radius: 22px !important;
+  }
+
+  .player-card{
+    border-radius: 20px !important;
+  }
+
+  .player-name{
+    font-size: 22px !important;
+  }
+
+  .login-sub{
+    font-size: 14px !important;
+  }
+}
+
+
 </style>
 </head>
 <body class="min-h-screen p-5 sm:p-6">
@@ -493,13 +656,11 @@ body{
 
     <main class="login-wrap">
         <section class="login-hero">
-            <div class="login-kicker">SAGA ENGINE · PLAYER ACCESS</div>
-            <h1 class="login-title">{{ config.site_name }}</h1>
+            <div class="login-kicker">MISSION CONTROL</div>
+            <h1 class="login-title">{{ config.site_name or "MISSION CONTROL" }}</h1>
             <p class="login-sub">
-                {{ config.story_title or config.admin_subtitle }}
-                {% if config.story_text %}
-                <br>{{ config.story_text }}
-                {% endif %}
+                {{ config.story_title or "Select an active operator profile." }}
+                <br>{{ config.story_text or "Access the live field interface and continue the active mission." }}
             </p>
         </section>
 
@@ -517,23 +678,23 @@ body{
                     {% if p.mode == 'team' %}
                     {{ p.members|length }} members ready
                     {% else %}
-                    Individual session
+                    Field operator profile
                     {% endif %}
                 </div>
 
                 {% if p.mode == 'team' and p.members %}
                 <div class="player-members">{{ p.members | join(' • ') }}</div>
                 {% else %}
-                <div class="player-members">Direct access to the active mission profile.</div>
+                <div class="player-members">Direct link to the live objective stream.</div>
                 {% endif %}
 
-                <div class="player-enter">Enter session</div>
+                <div class="player-enter">Open mission</div>
             </a>
             {% endfor %}
         </section>
 
         <div class="admin-entry">
-            <a href="/admin">🔧 Control Panel</a>
+            <a href="/admin">🔧 Mission Control</a>
         </div>
     </main>
 </body>
