@@ -1965,6 +1965,370 @@ body.player-shell-v2-ready .prologue-btn{
 }
 
 
+
+
+/* === PLAYER DESKTOP COMPACT PASS V1 === */
+@media (min-width: 901px){
+  :root{
+    --player-shell-left: 14px;
+    --player-shell-top: calc(10px + env(safe-area-inset-top));
+    --player-shell-w: 360px;
+    --player-shell-gap: 10px;
+  }
+
+  #player-shell-v2{
+    width: min(calc(100vw - 28px), var(--player-shell-w)) !important;
+  }
+
+  .player-shell-v2-card{
+    padding: 9px 11px !important;
+    border-radius: 18px !important;
+  }
+
+  .player-shell-v2-kicker{
+    font-size: 9px !important;
+    letter-spacing: .16em !important;
+  }
+
+  .player-shell-v2-title{
+    font-size: 15px !important;
+  }
+
+  .player-shell-v2-sub{
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    margin-top: 3px !important;
+    max-width: 26ch !important;
+  }
+
+  .player-shell-v2-progress{
+    min-height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+
+  .player-shell-v2-pills{
+    margin-top: 7px !important;
+    gap: 6px !important;
+  }
+
+  .player-shell-v2-pill{
+    min-height: 24px !important;
+    padding: 0 8px !important;
+    font-size: 8px !important;
+  }
+
+  body.player-shell-v2-ready #rune-bar.mission-progress{
+    top: calc(112px + env(safe-area-inset-top)) !important;
+    width: min(calc(100vw - 28px), 220px) !important;
+    max-width: min(calc(100vw - 28px), 220px) !important;
+  }
+
+  .mission-progress-inner{
+    min-height: 38px !important;
+    padding: 6px 9px !important;
+    gap: 8px !important;
+    border-radius: 14px !important;
+  }
+
+  .mission-progress-label{
+    font-size: 8px !important;
+  }
+
+  .mission-progress-value{
+    font-size: 10px !important;
+  }
+
+  body.player-shell-v2-ready #mission-rune.rune{
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 14px !important;
+  }
+
+  body.player-shell-v2-ready .top-nav{
+    top: calc(10px + env(safe-area-inset-top)) !important;
+    left: calc(var(--player-shell-left) + var(--player-shell-w) + var(--player-shell-gap)) !important;
+    right: 14px !important;
+    gap: 8px !important;
+  }
+
+  body.player-shell-v2-ready .nav-btn{
+    min-height: 34px !important;
+    padding: 0 13px !important;
+    font-size: 9px !important;
+    letter-spacing: .12em !important;
+  }
+
+  body.player-shell-v2-ready .hud-panel{
+    bottom: 10px !important;
+    width: min(calc(100vw - 20px), 1180px) !important;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom)) !important;
+    border-radius: 20px !important;
+  }
+
+  body.player-shell-v2-ready .hud-panel > .flex.justify-between.items-end{
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  body.player-shell-v2-ready #target-name{
+    font-size: 17px !important;
+  }
+
+  body.player-shell-v2-ready #dist-display{
+    font-size: 26px !important;
+  }
+
+  body.player-shell-v2-ready .btn-action{
+    min-height: 50px !important;
+    border-radius: 14px !important;
+    font-size: 13px !important;
+    letter-spacing: .11em !important;
+  }
+
+  body.player-shell-v2-ready #rune-code{
+    min-height: 44px !important;
+    border-radius: 13px !important;
+    font-size: 12px !important;
+  }
+
+  body.player-shell-v2-ready .hud-panel .flex.gap-2.border-t{
+    padding-top: 9px !important;
+  }
+
+  body.player-shell-v2-ready .hud-panel .flex.gap-2.border-t button{
+    min-height: 44px !important;
+    border-radius: 13px !important;
+    font-size: 11px !important;
+  }
+}
+
+
+
+
+/* === PLAYER DESKTOP TUNE V2 === */
+@media (min-width: 901px){
+  /* top nav a bit less tiny */
+  body.player-shell-v2-ready .top-nav{
+    top: calc(12px + env(safe-area-inset-top)) !important;
+    gap: 10px !important;
+  }
+
+  body.player-shell-v2-ready .nav-btn{
+    min-height: 38px !important;
+    padding: 0 15px !important;
+    font-size: 10px !important;
+    letter-spacing: .13em !important;
+  }
+
+  /* mission status clearly below shell */
+  body.player-shell-v2-ready #rune-bar.mission-progress{
+    top: calc(126px + env(safe-area-inset-top)) !important;
+    width: min(calc(100vw - 28px), 240px) !important;
+    max-width: min(calc(100vw - 28px), 240px) !important;
+  }
+
+  .mission-progress-inner{
+    min-height: 40px !important;
+    padding: 6px 10px !important;
+    gap: 8px !important;
+    border-radius: 15px !important;
+  }
+
+  .mission-progress-label{
+    font-size: 8px !important;
+  }
+
+  .mission-progress-value{
+    font-size: 11px !important;
+  }
+
+  body.player-shell-v2-ready #mission-rune.rune{
+    width: 27px !important;
+    height: 27px !important;
+    font-size: 14px !important;
+  }
+}
+
+
+
+
+/* === PLAYER MOBILE FIX PASS V1 === */
+
+/* better warning contrast everywhere */
+.player-shell-v2-pill.gps-unknown,
+.player-shell-v2-pill.gps-off,
+.player-shell-v2-pill.gps-limited{
+  background: rgba(254,226,226,.98) !important;
+  color: #991b1b !important;
+  border-color: rgba(239,68,68,.28) !important;
+  font-weight: 800 !important;
+}
+
+/* mobile/tablet shell flow */
+@media (max-width: 900px){
+  #player-shell-v2{
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  .player-shell-v2-card{
+    padding: 10px 11px !important;
+    border-radius: 18px !important;
+  }
+
+  .player-shell-v2-row{
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .player-shell-v2-title{
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  .player-shell-v2-sub{
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    max-width: 22ch !important;
+  }
+
+  .player-shell-v2-progress{
+    min-height: 34px !important;
+    padding: 0 11px !important;
+    font-size: 10px !important;
+  }
+
+  .player-shell-v2-pills{
+    margin-top: 8px !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .player-shell-v2-pill{
+    min-height: 24px !important;
+    padding: 0 8px !important;
+    font-size: 9px !important;
+  }
+
+  /* nav below shell, centered, no overlap */
+  body.player-shell-v2-ready .top-nav{
+    top: calc(138px + env(safe-area-inset-top)) !important;
+    left: 10px !important;
+    right: 10px !important;
+    justify-content: center !important;
+    gap: 8px !important;
+  }
+
+  body.player-shell-v2-ready .nav-btn{
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 9px !important;
+    letter-spacing: .11em !important;
+  }
+
+  /* mission status clearly below nav */
+  body.player-shell-v2-ready #rune-bar.mission-progress{
+    top: calc(186px + env(safe-area-inset-top)) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: fit-content !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  .mission-progress-inner{
+    min-height: 38px !important;
+    padding: 6px 9px !important;
+    gap: 8px !important;
+  }
+
+  .mission-progress-label{
+    font-size: 8px !important;
+  }
+
+  .mission-progress-value{
+    font-size: 10px !important;
+  }
+
+  body.player-shell-v2-ready #mission-rune.rune{
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* phone-specific stacking */
+@media (max-width: 560px){
+  .player-shell-v2-card{
+    padding: 9px 10px !important;
+    border-radius: 16px !important;
+  }
+
+  .player-shell-v2-row{
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .player-shell-v2-title{
+    font-size: 14px !important;
+  }
+
+  .player-shell-v2-sub{
+    font-size: 9px !important;
+    max-width: 18ch !important;
+  }
+
+  .player-shell-v2-progress{
+    min-height: 30px !important;
+    padding: 0 9px !important;
+    font-size: 9px !important;
+  }
+
+  .player-shell-v2-pills{
+    margin-top: 7px !important;
+    gap: 5px !important;
+  }
+
+  .player-shell-v2-pill{
+    min-height: 22px !important;
+    padding: 0 7px !important;
+    font-size: 8px !important;
+  }
+
+  body.player-shell-v2-ready .top-nav{
+    top: calc(126px + env(safe-area-inset-top)) !important;
+    gap: 6px !important;
+  }
+
+  body.player-shell-v2-ready .nav-btn{
+    min-height: 34px !important;
+    padding: 0 10px !important;
+    font-size: 8px !important;
+  }
+
+  body.player-shell-v2-ready #rune-bar.mission-progress{
+    top: calc(170px + env(safe-area-inset-top)) !important;
+  }
+
+  .mission-progress-inner{
+    min-height: 36px !important;
+    padding: 5px 8px !important;
+  }
+
+  .mission-progress-value{
+    font-size: 9px !important;
+  }
+
+  /* push HUD a bit lower visually from upper blocks */
+  body.player-shell-v2-ready .hud-panel{
+    margin-top: 8px !important;
+  }
+}
+
+
 </style>
 </head>
 <body data-player-theme="{{ config.player_theme or 'classic' }}">
