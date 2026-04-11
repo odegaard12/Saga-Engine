@@ -439,3 +439,29 @@ Current direction:
 ## 📄 License
 
 MIT recommended.
+
+## Frontend migration status
+
+The current production/test runtime still uses the existing FastAPI + template-based frontend.
+
+A new frontend workspace has been introduced under `frontend/` to prepare the migration of the **player experience** to a more modern mobile-first architecture.
+
+### Migration direction
+- keep the current FastAPI backend
+- keep Docker-based deployment
+- migrate the player frontend incrementally
+- target a modern installable web app flow first
+- keep open a later packaging path for iPhone / Android
+
+### Current scope
+Initial migration work is focused on:
+- player shell
+- mission HUD
+- map interaction
+- debug simulation flow
+- player mission state rendering
+
+Architecture notes and migration planning live in:
+- `docs/architecture/adr-001-player-frontend-migration.md`
+- `docs/architecture/frontend-migration-plan.md`
+
