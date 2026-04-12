@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/player/PlayerApp.tsx","./src/player/components/PlayerHud.tsx","./src/player/components/PlayerShell.tsx","./src/shared/api.ts","./src/types/player.ts"],"version":"5.9.3"}
