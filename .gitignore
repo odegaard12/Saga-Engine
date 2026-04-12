@@ -48,3 +48,10 @@ data/admin_auth.json
 
 # Local Python / backup artifacts
 data/*.bak
+
+# Frontend local artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+*.bak.*
