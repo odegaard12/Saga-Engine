@@ -1,44 +1,17 @@
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
-  gpsState: PlayerGpsStatus
-  inRange: boolean
-  distanceMeters: number | null
 }
 
-export function PlayerShell({
-  payload,
-  currentStage,
-  gpsState,
-  inRange,
-  distanceMeters,
-}: PlayerShellProps) {
+export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const mode = payload.mode || payload.profile?.mode || 'solo'
   const members = payload.members || payload.profile?.members || []
   const title = payload.display_name || payload.profile?.display_name || payload.user
   const objective = payload.finished
     ? 'Mission complete'
     : currentStage?.title || 'Awaiting node'
-
-  const gpsLabel =
-    gpsState === 'ready'
-      ? 'GPS · READY'
-      : gpsState === 'stale'
-      ? 'GPS · LAST KNOWN'
-      : gpsState === 'searching'
-      ? 'GPS · SEARCHING'
-      : gpsState === 'error'
-      ? 'GPS · ERROR'
-      : 'GPS · UNAVAILABLE'
-
-  const rangeLabel =
-    distanceMeters === null
-      ? 'RANGE · ---'
-      : inRange
-      ? `RANGE · INSIDE (${distanceMeters} M)`
-      : `RANGE · ${distanceMeters} M`
 
   return (
     <section style={shellWrap}>
@@ -64,8 +37,7 @@ export function PlayerShell({
 
         <div style={signalRow}>
           <span style={pillStrong}>{mode === 'team' ? `TEAM · ${members.length || 1}` : 'SOLO OPERATOR'}</span>
-          <span style={pillBase}>{gpsLabel}</span>
-          <span style={inRange ? pillSuccess : pillBase}>{rangeLabel}</span>
+          <span style={pillBase}>GPS · UNKNOWN</span>
           <span style={pillWide}>OBJECTIVE · {objective}</span>
         </div>
       </div>
@@ -74,16 +46,16 @@ export function PlayerShell({
 }
 
 const shellWrap: React.CSSProperties = {
-  marginBottom: 6,
+  marginBottom: 10,
 }
 
 const shellCard: React.CSSProperties = {
-  borderRadius: 22,
+  borderRadius: 24,
   border: '1px solid rgba(255,255,255,.12)',
   background: 'linear-gradient(180deg, rgba(15,23,42,.82), rgba(15,23,42,.64))',
   boxShadow: '0 24px 64px rgba(2,6,23,.18)',
   backdropFilter: 'blur(14px)',
-  padding: '14px 16px 12px',
+  padding: '16px 16px 14px',
   color: '#f8fafc',
 }
 
@@ -101,7 +73,7 @@ const identityBlock: React.CSSProperties = {
 
 const kicker: React.CSSProperties = {
   color: 'rgba(167,243,208,.92)',
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.18em',
   textTransform: 'uppercase',
@@ -109,25 +81,25 @@ const kicker: React.CSSProperties = {
 
 const titleStyle: React.CSSProperties = {
   color: '#f8fafc',
-  fontSize: 24,
+  fontSize: 28,
   fontWeight: 900,
   lineHeight: 1,
-  marginTop: 4,
+  marginTop: 6,
   letterSpacing: '-0.03em',
 }
 
 const subStyle: React.CSSProperties = {
   color: 'rgba(226,232,240,.82)',
-  fontSize: 12,
-  lineHeight: 1.35,
-  marginTop: 6,
+  fontSize: 13,
+  lineHeight: 1.4,
+  marginTop: 8,
   maxWidth: '40ch',
 }
 
 const stageBox: React.CSSProperties = {
-  minWidth: 82,
-  padding: '8px 12px',
-  borderRadius: 16,
+  minWidth: 86,
+  padding: '10px 12px',
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.06)',
   textAlign: 'right',
@@ -143,7 +115,7 @@ const stageLabel: React.CSSProperties = {
 
 const stageValue: React.CSSProperties = {
   color: '#f8fafc',
-  fontSize: 24,
+  fontSize: 26,
   fontWeight: 900,
   lineHeight: 1,
   marginTop: 4,
@@ -153,11 +125,11 @@ const signalRow: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
-  marginTop: 12,
+  marginTop: 14,
 }
 
 const pillBase: React.CSSProperties = {
-  minHeight: 28,
+  minHeight: 30,
   display: 'inline-flex',
   alignItems: 'center',
   padding: '0 11px',
@@ -175,13 +147,6 @@ const pillStrong: React.CSSProperties = {
   background: 'rgba(16,185,129,.16)',
   border: '1px solid rgba(16,185,129,.22)',
   color: '#d1fae5',
-}
-
-const pillSuccess: React.CSSProperties = {
-  ...pillBase,
-  background: 'rgba(34,197,94,.16)',
-  border: '1px solid rgba(34,197,94,.26)',
-  color: '#dcfce7',
 }
 
 const pillWide: React.CSSProperties = {

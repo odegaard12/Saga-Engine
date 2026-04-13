@@ -1,37 +1,15 @@
-import type { PlayerGpsStatus, PlayerStage } from '../../types/player'
+import type { PlayerStage } from '../../types/player'
 
 interface PlayerHudProps {
   currentStage: PlayerStage | null
   level: number
   finished: boolean
-  gpsState: PlayerGpsStatus
-  distanceMeters: number | null
-  inRange: boolean
 }
 
-export function PlayerHud({
-  currentStage,
-  level,
-  finished,
-  gpsState,
-  distanceMeters,
-  inRange,
-}: PlayerHudProps) {
+export function PlayerHud({ currentStage, level, finished }: PlayerHudProps) {
   const lat = typeof currentStage?.lat === 'number' ? currentStage.lat.toFixed(5) : '---'
   const lon = typeof currentStage?.lon === 'number' ? currentStage.lon.toFixed(5) : '---'
   const radius = typeof currentStage?.radius === 'number' ? `${currentStage.radius} m` : '---'
-  const distance = distanceMeters === null ? '---' : `${distanceMeters} m`
-
-  const gpsLabel =
-    gpsState === 'ready'
-      ? 'GPS READY'
-      : gpsState === 'stale'
-      ? 'GPS STALE'
-      : gpsState === 'searching'
-      ? 'GPS SEARCHING'
-      : gpsState === 'error'
-      ? 'GPS ERROR'
-      : 'GPS UNAVAILABLE'
 
   return (
     <section style={hudWrap}>
@@ -45,21 +23,6 @@ export function PlayerHud({
 
         <div style={stageBadge}>
           {finished ? 'DONE' : `STAGE ${level + 1}`}
-        </div>
-      </div>
-
-      <div style={statsRow}>
-        <div style={statCard}>
-          <div style={statLabel}>DISTANCE</div>
-          <div style={statValue}>{distance}</div>
-        </div>
-        <div style={statCard}>
-          <div style={statLabel}>GPS</div>
-          <div style={statValue}>{gpsLabel}</div>
-        </div>
-        <div style={inRange ? statCardSuccess : statCard}>
-          <div style={statLabel}>RANGE</div>
-          <div style={statValue}>{inRange ? 'INSIDE' : 'OUTSIDE'}</div>
         </div>
       </div>
 
@@ -80,7 +43,7 @@ export function PlayerHud({
 
       <div style={actionRow}>
         <button style={mainButton} disabled>
-          {finished ? 'MISSION COMPLETE' : inRange ? 'OBJECTIVE IN RANGE' : 'OBJECTIVE LOCKED'}
+          {finished ? 'MISSION COMPLETE' : 'OBJECTIVE LOCKED'}
         </button>
 
         <div style={codeStack}>
@@ -155,7 +118,7 @@ const statsRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 10,
-  marginBottom: 10,
+  marginBottom: 14,
 }
 
 const statCard: React.CSSProperties = {
@@ -164,12 +127,6 @@ const statCard: React.CSSProperties = {
   background: 'rgba(255,255,255,.05)',
   padding: '12px 12px 10px',
   minWidth: 0,
-}
-
-const statCardSuccess: React.CSSProperties = {
-  ...statCard,
-  background: 'rgba(34,197,94,.12)',
-  border: '1px solid rgba(34,197,94,.24)',
 }
 
 const statLabel: React.CSSProperties = {
@@ -194,7 +151,6 @@ const actionRow: React.CSSProperties = {
   gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
   gap: 12,
   alignItems: 'stretch',
-  marginTop: 4,
 }
 
 const mainButton: React.CSSProperties = {
