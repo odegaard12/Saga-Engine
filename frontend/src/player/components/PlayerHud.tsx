@@ -17,202 +17,183 @@ export function PlayerHud({
   distanceMeters,
   inRange,
 }: PlayerHudProps) {
-  const lat = typeof currentStage?.lat === 'number' ? currentStage.lat.toFixed(5) : '---'
-  const lon = typeof currentStage?.lon === 'number' ? currentStage.lon.toFixed(5) : '---'
-  const radius = typeof currentStage?.radius === 'number' ? `${currentStage.radius} m` : '---'
-  const distance = distanceMeters === null ? '---' : `${distanceMeters} m`
-
   const gpsLabel =
     gpsState === 'ready'
-      ? 'GPS READY'
+      ? 'READY'
       : gpsState === 'stale'
-      ? 'GPS STALE'
+      ? 'LAST KNOWN'
       : gpsState === 'searching'
-      ? 'GPS SEARCHING'
+      ? 'SEARCHING'
       : gpsState === 'error'
-      ? 'GPS ERROR'
-      : 'GPS UNAVAILABLE'
+      ? 'ERROR'
+      : 'UNAVAILABLE'
+
+  const primaryText = finished
+    ? 'MISSION COMPLETE'
+    : inRange
+    ? 'OBJECTIVE IN RANGE'
+    : 'MOVE TO TARGET'
 
   return (
     <section style={hudWrap}>
-      <div style={hudHeader}>
+      <div style={hudTop}>
         <div>
-          <div style={label}>MISSION CONTROL</div>
-          <div style={objectiveTitle}>
+          <div style={eyebrow}>OBJECTIVE DOCK</div>
+          <div style={headline}>
             {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
           </div>
         </div>
 
-        <div style={stageBadge}>
-          {finished ? 'DONE' : `STAGE ${level + 1}`}
-        </div>
+        <div style={stageBadge}>{finished ? 'DONE' : `S${level + 1}`}</div>
       </div>
 
-      <div style={statsRow}>
-        <div style={statCard}>
-          <div style={statLabel}>DISTANCE</div>
-          <div style={statValue}>{distance}</div>
-        </div>
-        <div style={statCard}>
-          <div style={statLabel}>GPS</div>
-          <div style={statValue}>{gpsLabel}</div>
-        </div>
-        <div style={inRange ? statCardSuccess : statCard}>
-          <div style={statLabel}>RANGE</div>
-          <div style={statValue}>{inRange ? 'INSIDE' : 'OUTSIDE'}</div>
-        </div>
-      </div>
-
-      <div style={statsRow}>
-        <div style={statCard}>
-          <div style={statLabel}>LAT</div>
-          <div style={statValue}>{lat}</div>
-        </div>
-        <div style={statCard}>
-          <div style={statLabel}>LON</div>
-          <div style={statValue}>{lon}</div>
-        </div>
-        <div style={statCard}>
-          <div style={statLabel}>RADIUS</div>
-          <div style={statValue}>{radius}</div>
-        </div>
+      <div style={metricsRow}>
+        <MetricPill label="DIST" value={distanceMeters === null ? '---' : `${distanceMeters} m`} highlight={inRange} />
+        <MetricPill label="GPS" value={gpsLabel} />
+        <MetricPill label="RANGE" value={inRange ? 'INSIDE' : 'OUTSIDE'} highlight={inRange} />
+        <MetricPill label="LAT" value={typeof currentStage?.lat === 'number' ? currentStage.lat.toFixed(5) : '---'} />
+        <MetricPill label="LON" value={typeof currentStage?.lon === 'number' ? currentStage.lon.toFixed(5) : '---'} />
+        <MetricPill label="RAD" value={typeof currentStage?.radius === 'number' ? `${currentStage.radius} m` : '---'} />
       </div>
 
       <div style={actionRow}>
         <button style={mainButton} disabled>
-          {finished ? 'MISSION COMPLETE' : inRange ? 'OBJECTIVE IN RANGE' : 'OBJECTIVE LOCKED'}
+          {primaryText}
         </button>
 
-        <div style={codeStack}>
-          <input
-            style={codeInput}
-            placeholder="ENTER RUNE OR ACCESS CODE"
-            disabled
-          />
-          <button style={enterButton} disabled>
-            ENTER
-          </button>
-        </div>
-      </div>
+        <input
+          style={codeInput}
+          placeholder="ENTER RUNE OR ACCESS CODE"
+          disabled
+        />
 
-      <div style={footerNote}>
-        React player foundation · command surface loaded
+        <button style={enterButton} disabled>
+          ENTER
+        </button>
       </div>
     </section>
   )
 }
 
-const hudWrap: React.CSSProperties = {
-  borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.82), rgba(15,23,42,.64))',
-  boxShadow: '0 24px 64px rgba(2,6,23,.18)',
-  backdropFilter: 'blur(14px)',
-  padding: 16,
-  color: '#f8fafc',
+function MetricPill({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
+  return (
+    <div style={highlight ? metricPillHighlight : metricPill}>
+      <span style={metricLabel}>{label}</span>
+      <span style={metricValue}>{value}</span>
+    </div>
+  )
 }
 
-const hudHeader: React.CSSProperties = {
+const hudWrap: React.CSSProperties = {
+  pointerEvents: 'auto',
+  borderRadius: 24,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.84), rgba(15,23,42,.68))',
+  boxShadow: '0 22px 60px rgba(2,6,23,.16)',
+  backdropFilter: 'blur(14px)',
+  padding: 14,
+  color: '#f8fafc',
+  display: 'grid',
+  gap: 12,
+}
+
+const hudTop: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
-  gap: 16,
-  marginBottom: 14,
+  gap: 12,
 }
 
-const label: React.CSSProperties = {
+const eyebrow: React.CSSProperties = {
   color: 'rgba(167,243,208,.92)',
-  fontSize: 11,
-  fontWeight: 800,
+  fontSize: 10,
+  fontWeight: 900,
   letterSpacing: '0.18em',
-  textTransform: 'uppercase',
 }
 
-const objectiveTitle: React.CSSProperties = {
+const headline: React.CSSProperties = {
   color: '#f8fafc',
-  fontSize: 24,
+  fontSize: 22,
   fontWeight: 900,
-  lineHeight: 1.02,
+  lineHeight: 1.04,
   letterSpacing: '-0.03em',
   marginTop: 6,
 }
 
 const stageBadge: React.CSSProperties = {
-  minHeight: 34,
+  minHeight: 32,
   display: 'inline-flex',
   alignItems: 'center',
   padding: '0 12px',
   borderRadius: 999,
-  border: '1px solid rgba(96,165,250,.24)',
+  border: '1px solid rgba(59,130,246,.24)',
   background: 'rgba(59,130,246,.16)',
   color: '#dbeafe',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
   whiteSpace: 'nowrap',
 }
 
-const statsRow: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 10,
-  marginBottom: 10,
+const metricsRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
 }
 
-const statCard: React.CSSProperties = {
-  borderRadius: 18,
+const metricPill: React.CSSProperties = {
+  minHeight: 34,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '0 12px',
+  borderRadius: 999,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.05)',
-  padding: '12px 12px 10px',
-  minWidth: 0,
 }
 
-const statCardSuccess: React.CSSProperties = {
-  ...statCard,
+const metricPillHighlight: React.CSSProperties = {
+  ...metricPill,
   background: 'rgba(34,197,94,.12)',
   border: '1px solid rgba(34,197,94,.24)',
 }
 
-const statLabel: React.CSSProperties = {
+const metricLabel: React.CSSProperties = {
   color: 'rgba(148,163,184,.92)',
   fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.14em',
 }
 
-const statValue: React.CSSProperties = {
+const metricValue: React.CSSProperties = {
   color: '#f8fafc',
-  fontSize: 15,
+  fontSize: 13,
   fontWeight: 800,
-  marginTop: 6,
-  lineHeight: 1.15,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
 }
 
 const actionRow: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-  gap: 12,
-  alignItems: 'stretch',
-  marginTop: 4,
+  gridTemplateColumns: 'minmax(220px, 1.1fr) minmax(0, 1fr) 132px',
+  gap: 10,
 }
 
 const mainButton: React.CSSProperties = {
   width: '100%',
-  minHeight: 116,
-  borderRadius: 20,
+  minHeight: 52,
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(30,41,59,.96), rgba(15,23,42,.96))',
-  color: 'rgba(226,232,240,.88)',
+  background: 'linear-gradient(180deg, rgba(30,41,59,.98), rgba(15,23,42,.98))',
+  color: 'rgba(240,249,255,.92)',
   fontSize: 14,
   fontWeight: 900,
-  letterSpacing: '0.18em',
-}
-
-const codeStack: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateRows: '1fr auto',
-  gap: 10,
+  letterSpacing: '0.14em',
 }
 
 const codeInput: React.CSSProperties = {
@@ -238,11 +219,4 @@ const enterButton: React.CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.1em',
   padding: '0 16px',
-}
-
-const footerNote: React.CSSProperties = {
-  marginTop: 12,
-  color: 'rgba(148,163,184,.86)',
-  fontSize: 12,
-  lineHeight: 1.4,
 }

@@ -37,10 +37,7 @@ function getPlayerPosition(payload: PlayerGamePayload) {
   const lat = payload.live_status?.lat
   const lon = payload.live_status?.lon
 
-  if (typeof lat !== 'number' || typeof lon !== 'number') {
-    return null
-  }
-
+  if (typeof lat !== 'number' || typeof lon !== 'number') return null
   return { lat, lon }
 }
 
@@ -88,7 +85,6 @@ export default function PlayerApp() {
     }
 
     run()
-
     return () => {
       cancelled = true
     }
@@ -97,10 +93,7 @@ export default function PlayerApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Loading player app"
-          body="Fetching player mission payload..."
-        />
+        <StatusCard title="Loading player app" body="Fetching player mission payload..." />
       </ScreenFrame>
     )
   }
@@ -108,10 +101,7 @@ export default function PlayerApp() {
   if (state.status === 'error') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Player app error"
-          body={state.message}
-        />
+        <StatusCard title="Player app error" body={state.message} />
       </ScreenFrame>
     )
   }
@@ -119,10 +109,7 @@ export default function PlayerApp() {
   if (state.status !== 'ready') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Player app state"
-          body="Unexpected player state."
-        />
+        <StatusCard title="Player app state" body="Unexpected player state." />
       </ScreenFrame>
     )
   }
@@ -131,6 +118,7 @@ export default function PlayerApp() {
   const currentStage = getCurrentStage(payload)
   const playerPosition = getPlayerPosition(payload)
   const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+
   const distanceMeters =
     currentStage && playerPosition
       ? Math.round(
@@ -148,8 +136,15 @@ export default function PlayerApp() {
 
   return (
     <ScreenFrame>
-      <div style={layout}>
-        <div style={topStack}>
+      <div style={appViewport}>
+        <MapSurface
+          currentStage={currentStage}
+          playerPosition={playerPosition}
+          gpsState={gpsState}
+          debugSimulation={Boolean(payload.live_status?.debug_enabled)}
+        />
+
+        <div style={topOverlay}>
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
@@ -157,23 +152,18 @@ export default function PlayerApp() {
             inRange={inRange}
             distanceMeters={distanceMeters}
           />
-
-          <MapSurface
-            currentStage={currentStage}
-            playerPosition={playerPosition}
-            gpsState={gpsState}
-            debugSimulation={Boolean(payload.live_status?.debug_enabled)}
-          />
         </div>
 
-        <PlayerHud
-          currentStage={currentStage}
-          level={payload.level}
-          finished={payload.finished}
-          gpsState={gpsState}
-          distanceMeters={distanceMeters}
-          inRange={inRange}
-        />
+        <div style={bottomOverlay}>
+          <PlayerHud
+            currentStage={currentStage}
+            level={payload.level}
+            finished={payload.finished}
+            gpsState={gpsState}
+            distanceMeters={distanceMeters}
+            inRange={inRange}
+          />
+        </div>
       </div>
     </ScreenFrame>
   )
@@ -194,25 +184,36 @@ function StatusCard({ title, body }: { title: string; body: string }) {
 
 const frame: React.CSSProperties = {
   minHeight: '100vh',
-  background: 'linear-gradient(180deg, #eef3ec 0%, #e8efe6 48%, #e2ebdf 100%)',
-  padding: 16,
+  background:
+    'radial-gradient(circle at top, rgba(30,41,59,.18), transparent 36%), linear-gradient(180deg, #e9f0e7 0%, #e4ece2 48%, #dde7db 100%)',
+  padding: 12,
   fontFamily: 'system-ui, sans-serif',
   color: '#10231a',
 }
 
-const layout: React.CSSProperties = {
+const appViewport: React.CSSProperties = {
+  position: 'relative',
   width: '100%',
-  maxWidth: 1180,
+  maxWidth: 1320,
   margin: '0 auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 16,
 }
 
-const topStack: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 14,
+const topOverlay: React.CSSProperties = {
+  position: 'absolute',
+  top: 12,
+  left: 12,
+  right: 12,
+  zIndex: 1200,
+  pointerEvents: 'none',
+}
+
+const bottomOverlay: React.CSSProperties = {
+  position: 'absolute',
+  left: 12,
+  right: 12,
+  bottom: 12,
+  zIndex: 1200,
+  pointerEvents: 'none',
 }
 
 const statusCard: React.CSSProperties = {
