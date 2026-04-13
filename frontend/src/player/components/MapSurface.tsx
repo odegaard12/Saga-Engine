@@ -51,8 +51,6 @@ export function MapSurface({
   currentStage,
   className,
   playerPosition,
-  gpsState = 'unavailable',
-  debugSimulation = false,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -113,15 +111,18 @@ export function MapSurface({
 
     const radiusLayer = L.circle(center, {
       radius: stageMapData.radius,
+      color: '#22c55e',
       weight: 2,
       opacity: 0.95,
+      fillColor: '#22c55e',
       fillOpacity: 0.12,
     }).addTo(map)
 
     const markerLayer = L.circleMarker(center, {
       radius: 9,
       weight: 3,
-      opacity: 1,
+      color: '#22c55e',
+      fillColor: '#dcfce7',
       fillOpacity: 0.95,
     })
       .addTo(map)
@@ -135,7 +136,7 @@ export function MapSurface({
 
     if (!playerPosition) {
       map.fitBounds(radiusLayer.getBounds(), {
-        padding: [36, 36],
+        padding: [48, 48],
         maxZoom: 17,
         animate: false,
       })
@@ -161,7 +162,8 @@ export function MapSurface({
       {
         radius: 7,
         weight: 2,
-        opacity: 1,
+        color: '#3b82f6',
+        fillColor: '#dbeafe',
         fillOpacity: 0.95,
       }
     )
@@ -182,7 +184,7 @@ export function MapSurface({
           [stageMapData.lat, stageMapData.lon],
           [playerPosition.lat, playerPosition.lon]
         )
-        map.fitBounds(bounds.pad(0.3), {
+        map.fitBounds(bounds.pad(0.28), {
           maxZoom: 17,
           animate: false,
         })
@@ -196,88 +198,13 @@ export function MapSurface({
     map.invalidateSize({ pan: false })
   }, [playerPosition, stageMapData])
 
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const id = window.setTimeout(() => {
-      map.invalidateSize({ pan: false })
-    }, 0)
-
-    return () => window.clearTimeout(id)
-  }, [stageMapData, gpsState, debugSimulation])
-
-  const hasStage = !!stageMapData
-  const gpsLabel =
-    gpsState === 'ready'
-      ? 'GPS: READY'
-      : gpsState === 'stale'
-      ? 'GPS: LAST KNOWN'
-      : gpsState === 'searching'
-      ? 'GPS: SEARCHING'
-      : gpsState === 'error'
-      ? 'GPS: ERROR'
-      : 'GPS: UNAVAILABLE'
-
-  const playerLabel =
-    gpsState === 'ready'
-      ? 'PLAYER FIX'
-      : gpsState === 'stale'
-      ? 'PLAYER LAST KNOWN'
-      : playerPosition
-      ? 'PLAYER DATA'
-      : 'PLAYER ---'
-
   return (
-    <section className={className}>
-      <div className="map-surface">
-        <div
-          ref={mapRootRef}
-          className="map-surface__canvas"
-          aria-label="Current node map"
-        />
-
-        <div className="map-surface__overlay map-surface__overlay--top">
-          <div className="map-surface__title-block">
-            <span className="map-surface__eyebrow">MAP SURFACE</span>
-            <span className="map-surface__title">
-              {currentStage?.title || 'Awaiting node'}
-            </span>
-          </div>
-
-          <div className="map-surface__overlay-right">
-            <span className="map-surface__badge">
-              {hasStage ? 'NODE ONLINE' : 'NO NODE GPS'}
-            </span>
-
-            <span className="map-surface__meta">
-              {gpsLabel}
-              {debugSimulation ? ' · SIM' : ''}
-            </span>
-          </div>
-        </div>
-
-        <div className="map-surface__overlay map-surface__overlay--bottom">
-          <span className="map-surface__chip">
-            {typeof currentStage?.lat === 'number'
-              ? `LAT ${currentStage.lat.toFixed(5)}`
-              : 'LAT ---'}
-          </span>
-          <span className="map-surface__chip">
-            {typeof currentStage?.lon === 'number'
-              ? `LON ${currentStage.lon.toFixed(5)}`
-              : 'LON ---'}
-          </span>
-          <span className="map-surface__chip">
-            {typeof currentStage?.radius === 'number'
-              ? `RADIUS ${currentStage.radius} M`
-              : 'RADIUS ---'}
-          </span>
-          <span className="map-surface__chip map-surface__chip--player">
-            {playerLabel}
-          </span>
-        </div>
-      </div>
+    <section className={['map-surface', className].filter(Boolean).join(' ')}>
+      <div
+        ref={mapRootRef}
+        className="map-surface__canvas"
+        aria-label="Current node map"
+      />
     </section>
   )
 }
