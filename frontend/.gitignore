@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 *.bak
 *.fixbak
+
+.backup_chatgpt_*
