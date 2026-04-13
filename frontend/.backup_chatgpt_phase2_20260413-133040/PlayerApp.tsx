@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchPlayerGame } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
+import type { PlayerGamePayload, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
@@ -18,49 +18,6 @@ function getUserFromUrl(): string {
 function getCurrentStage(payload: PlayerGamePayload): PlayerStage | null {
   if (payload.finished) return null
   return payload.current_stage || payload.stages?.[payload.level] || null
-}
-
-function normalizeGpsStatus(status?: string): PlayerGpsStatus {
-  if (!status) return 'unavailable'
-  const value = status.toLowerCase()
-
-  if (value === 'ok' || value === 'ready' || value === 'active' || value === 'available') {
-    return 'ready'
-  }
-  if (value === 'stale') return 'stale'
-  if (value === 'searching' || value === 'pending') return 'searching'
-  if (value === 'error' || value === 'denied') return 'error'
-  return 'unavailable'
-}
-
-function getPlayerPosition(payload: PlayerGamePayload) {
-  const lat = payload.live_status?.lat
-  const lon = payload.live_status?.lon
-
-  if (typeof lat !== 'number' || typeof lon !== 'number') {
-    return null
-  }
-
-  return { lat, lon }
-}
-
-function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-  const earthRadius = 6371000
-
-  const dLat = toRad(b.lat - a.lat)
-  const dLon = toRad(b.lon - a.lon)
-  const lat1 = toRad(a.lat)
-  const lat2 = toRad(b.lat)
-
-  const sinLat = Math.sin(dLat / 2)
-  const sinLon = Math.sin(dLon / 2)
-
-  const h =
-    sinLat * sinLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
-
-  return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
 export default function PlayerApp() {
@@ -129,50 +86,19 @@ export default function PlayerApp() {
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
-  const playerPosition = getPlayerPosition(payload)
-  const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
-  const distanceMeters =
-    currentStage && playerPosition
-      ? Math.round(
-          getDistanceMeters(playerPosition, {
-            lat: currentStage.lat,
-            lon: currentStage.lon,
-          })
-        )
-      : null
-
-  const inRange =
-    currentStage && distanceMeters !== null
-      ? distanceMeters <= currentStage.radius
-      : false
 
   return (
     <ScreenFrame>
       <div style={layout}>
         <div style={topStack}>
-          <PlayerShell
-            payload={payload}
-            currentStage={currentStage}
-            gpsState={gpsState}
-            inRange={inRange}
-            distanceMeters={distanceMeters}
-          />
-
-          <MapSurface
-            currentStage={currentStage}
-            playerPosition={playerPosition}
-            gpsState={gpsState}
-            debugSimulation={Boolean(payload.live_status?.debug_enabled)}
-          />
+          <PlayerShell payload={payload} currentStage={currentStage} />
+          <MapSurface currentStage={currentStage} />
         </div>
 
         <PlayerHud
           currentStage={currentStage}
           level={payload.level}
           finished={payload.finished}
-          gpsState={gpsState}
-          distanceMeters={distanceMeters}
-          inRange={inRange}
         />
       </div>
     </ScreenFrame>
@@ -195,18 +121,18 @@ function StatusCard({ title, body }: { title: string; body: string }) {
 const frame: React.CSSProperties = {
   minHeight: '100vh',
   background: 'linear-gradient(180deg, #eef3ec 0%, #e8efe6 48%, #e2ebdf 100%)',
-  padding: 16,
+  padding: 12,
   fontFamily: 'system-ui, sans-serif',
   color: '#10231a',
 }
 
 const layout: React.CSSProperties = {
   width: '100%',
-  maxWidth: 1180,
+  maxWidth: 980,
   margin: '0 auto',
   display: 'flex',
   flexDirection: 'column',
-  gap: 16,
+  gap: 14,
 }
 
 const topStack: React.CSSProperties = {
@@ -214,6 +140,7 @@ const topStack: React.CSSProperties = {
   flexDirection: 'column',
   gap: 14,
 }
+
 
 const statusCard: React.CSSProperties = {
   borderRadius: 20,
