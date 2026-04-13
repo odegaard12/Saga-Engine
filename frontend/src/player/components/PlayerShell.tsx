@@ -18,163 +18,159 @@ export function PlayerShell({
   const mode = payload.mode || payload.profile?.mode || 'solo'
   const members = payload.members || payload.profile?.members || []
   const title = payload.display_name || payload.profile?.display_name || payload.user
-  const objective = payload.finished
-    ? 'Mission complete'
-    : currentStage?.title || 'Awaiting node'
 
   const gpsLabel =
     gpsState === 'ready'
-      ? 'GPS · READY'
+      ? 'GPS READY'
       : gpsState === 'stale'
-      ? 'GPS · LAST KNOWN'
+      ? 'GPS LAST KNOWN'
       : gpsState === 'searching'
-      ? 'GPS · SEARCHING'
+      ? 'GPS SEARCHING'
       : gpsState === 'error'
-      ? 'GPS · ERROR'
-      : 'GPS · UNAVAILABLE'
+      ? 'GPS ERROR'
+      : 'GPS UNAVAILABLE'
 
   const rangeLabel =
     distanceMeters === null
-      ? 'RANGE · ---'
+      ? 'RANGE ---'
       : inRange
-      ? `RANGE · INSIDE (${distanceMeters} M)`
-      : `RANGE · ${distanceMeters} M`
+      ? `IN RANGE · ${distanceMeters} M`
+      : `${distanceMeters} M OUT`
 
   return (
-    <section style={shellWrap}>
+    <header style={shellWrap}>
       <div style={shellCard}>
-        <div style={shellTopRow}>
-          <div style={identityBlock}>
-            <div style={kicker}>
-              {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
-            </div>
-            <div style={titleStyle}>{title}</div>
-            <div style={subStyle}>
-              {mode === 'team'
-                ? `${members.length || 1} members linked to current field run`
-                : 'Linked to live field objective'}
-            </div>
+        <div style={leftZone}>
+          <div style={identityLine}>
+            <span style={kicker}>{mode === 'team' ? 'TEAM' : 'OPERATOR'}</span>
+            <span style={dot}>•</span>
+            <span style={mutedSmall}>{mode === 'team' ? `${members.length || 1} LINKED` : 'SOLO SESSION'}</span>
           </div>
 
-          <div style={stageBox}>
-            <div style={stageLabel}>STAGE</div>
-            <div style={stageValue}>{payload.finished ? 'DONE' : payload.level + 1}</div>
+          <div style={titleRow}>
+            <div style={titleStyle}>{title}</div>
+            <div style={objectiveStyle}>
+              {payload.finished ? 'MISSION COMPLETE' : currentStage?.title || 'AWAITING NODE'}
+            </div>
           </div>
         </div>
 
-        <div style={signalRow}>
-          <span style={pillStrong}>{mode === 'team' ? `TEAM · ${members.length || 1}` : 'SOLO OPERATOR'}</span>
+        <div style={rightZone}>
+          <span style={pillStrong}>{payload.finished ? 'DONE' : `STAGE ${payload.level + 1}`}</span>
           <span style={pillBase}>{gpsLabel}</span>
           <span style={inRange ? pillSuccess : pillBase}>{rangeLabel}</span>
-          <span style={pillWide}>OBJECTIVE · {objective}</span>
         </div>
       </div>
-    </section>
+    </header>
   )
 }
 
 const shellWrap: React.CSSProperties = {
-  marginBottom: 6,
+  pointerEvents: 'auto',
 }
 
 const shellCard: React.CSSProperties = {
   borderRadius: 22,
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.82), rgba(15,23,42,.64))',
-  boxShadow: '0 24px 64px rgba(2,6,23,.18)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.84), rgba(15,23,42,.68))',
+  boxShadow: '0 22px 60px rgba(2,6,23,.16)',
   backdropFilter: 'blur(14px)',
-  padding: '14px 16px 12px',
+  padding: '12px 14px',
   color: '#f8fafc',
-}
-
-const shellTopRow: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'flex-start',
   gap: 14,
+  alignItems: 'center',
+  flexWrap: 'wrap',
 }
 
-const identityBlock: React.CSSProperties = {
+const leftZone: React.CSSProperties = {
   minWidth: 0,
-  flex: 1,
+  flex: '1 1 420px',
+}
+
+const rightZone: React.CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+  flex: '0 1 auto',
+}
+
+const identityLine: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  minWidth: 0,
 }
 
 const kicker: React.CSSProperties = {
-  color: 'rgba(167,243,208,.92)',
+  color: 'rgba(167,243,208,.94)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.18em',
+}
+
+const dot: React.CSSProperties = {
+  color: 'rgba(148,163,184,.7)',
+  fontSize: 12,
+}
+
+const mutedSmall: React.CSSProperties = {
+  color: 'rgba(148,163,184,.9)',
   fontSize: 10,
   fontWeight: 800,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
+  letterSpacing: '0.14em',
+}
+
+const titleRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: 10,
+  marginTop: 6,
 }
 
 const titleStyle: React.CSSProperties = {
   color: '#f8fafc',
-  fontSize: 24,
+  fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
-  marginTop: 4,
   letterSpacing: '-0.03em',
 }
 
-const subStyle: React.CSSProperties = {
-  color: 'rgba(226,232,240,.82)',
-  fontSize: 12,
-  lineHeight: 1.35,
-  marginTop: 6,
-  maxWidth: '40ch',
-}
-
-const stageBox: React.CSSProperties = {
-  minWidth: 82,
-  padding: '8px 12px',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.06)',
-  textAlign: 'right',
-  flexShrink: 0,
-}
-
-const stageLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.16em',
-}
-
-const stageValue: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1,
-  marginTop: 4,
-}
-
-const signalRow: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 12,
+const objectiveStyle: React.CSSProperties = {
+  color: 'rgba(226,232,240,.86)',
+  fontSize: 13,
+  fontWeight: 700,
+  lineHeight: 1.2,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  maxWidth: '52ch',
 }
 
 const pillBase: React.CSSProperties = {
-  minHeight: 28,
+  minHeight: 30,
   display: 'inline-flex',
   alignItems: 'center',
   padding: '0 11px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(255,255,255,.06)',
-  color: 'rgba(226,232,240,.9)',
+  color: 'rgba(226,232,240,.92)',
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.04em',
+  whiteSpace: 'nowrap',
 }
 
 const pillStrong: React.CSSProperties = {
   ...pillBase,
-  background: 'rgba(16,185,129,.16)',
-  border: '1px solid rgba(16,185,129,.22)',
-  color: '#d1fae5',
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(59,130,246,.26)',
+  color: '#dbeafe',
 }
 
 const pillSuccess: React.CSSProperties = {
@@ -182,9 +178,4 @@ const pillSuccess: React.CSSProperties = {
   background: 'rgba(34,197,94,.16)',
   border: '1px solid rgba(34,197,94,.26)',
   color: '#dcfce7',
-}
-
-const pillWide: React.CSSProperties = {
-  ...pillBase,
-  maxWidth: '100%',
 }
