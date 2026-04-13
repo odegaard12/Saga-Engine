@@ -1,5 +1,4 @@
 export type PlayerMode = 'solo' | 'team'
-export type PlayerGpsStatus = 'ready' | 'unavailable' | 'stale' | 'searching' | 'error' | string
 
 export interface PlayerProfile {
   id: string
@@ -46,28 +45,12 @@ export interface PlayerStage {
   messages?: StageMessages
 }
 
-export interface PlayerLiveStatus {
-  user?: string
-  display_name?: string
-  session_mode?: PlayerMode | string
-  members?: string[]
-  status?: string
-  presence?: string
-  last_seen?: number
-  gps_status?: PlayerGpsStatus
-  lat?: number | null
-  lon?: number | null
-  source?: string
-  debug_enabled?: boolean
-}
-
 export interface PlayerGamePayload {
   user: string
   display_name?: string
   mode?: PlayerMode
   members?: string[]
   profile?: PlayerProfile
-  live_status?: PlayerLiveStatus
   level: number
   finished: boolean
   stages: PlayerStage[]
