@@ -68,10 +68,8 @@ export function MapSurface({
 
     const map = L.map(mapRootRef.current, {
       zoomControl: false,
-      attributionControl: true,
+      attributionControl: false,
     })
-
-    L.control.zoom({ position: 'topright' }).addTo(map)
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
