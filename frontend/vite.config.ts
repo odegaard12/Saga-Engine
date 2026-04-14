@@ -15,6 +15,15 @@ export default defineConfig({
         target: 'http://127.0.0.1:8097',
         changeOrigin: true,
       },
+      '/admin': {
+        target: 'http://127.0.0.1:8097',
+        changeOrigin: true,
+      },
+      '/legacy': {
+        target: 'http://127.0.0.1:8097',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/legacy/, ''),
+      },
     },
   },
 })

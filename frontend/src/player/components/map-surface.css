@@ -23,10 +23,8 @@
   font: inherit;
 }
 
-.map-surface .leaflet-control-zoom,
 .map-surface .leaflet-control-attribution {
-  border: none;
-  box-shadow: none;
+  display: none !important;
 }
 
 .map-surface .leaflet-top.leaflet-right {
