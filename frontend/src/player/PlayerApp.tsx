@@ -162,6 +162,10 @@ export default function PlayerApp() {
             gpsState={gpsState}
             distanceMeters={distanceMeters}
             inRange={inRange}
+            debugEnabled={Boolean(payload.live_status?.debug_enabled)}
+            legacyPlayerHref={`/player/${encodeURIComponent(payload.user)}`}
+            legacyLoginHref="/legacy/"
+            adminHref="/admin"
           />
         </div>
       </div>
