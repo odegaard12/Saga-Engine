@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { advancePlayer, fetchPlayerGame } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
@@ -80,7 +80,9 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
+  const [mapNotice, setMapNotice] = useState<string | null>(null)
 
+  const noticeTimerRef = useRef<number | null>(null)
   const user = useMemo(() => getUserFromUrl(), [])
 
   useEffect(() => {
@@ -109,6 +111,27 @@ export default function PlayerApp() {
       cancelled = true
     }
   }, [user])
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current)
+      }
+    }
+  }, [])
+
+  function showMapNotice(message: string) {
+    setMapNotice(message)
+
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+
+    noticeTimerRef.current = window.setTimeout(() => {
+      setMapNotice(null)
+      noticeTimerRef.current = null
+    }, 2200)
+  }
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -190,6 +213,7 @@ export default function PlayerApp() {
   function handleToggleDebug() {
     vibrate(8)
     setLocalDebugEnabled((current) => !current)
+    showMapNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.')
   }
 
   function openInteraction() {
@@ -214,7 +238,32 @@ export default function PlayerApp() {
     }
 
     vibrate(8)
-    setActivePanel('details')
+
+    if (!currentStage) {
+      showMapNotice('Complete the previous stage before interacting here.')
+      return
+    }
+
+    if (runtime.reason === 'out_of_range') {
+      showMapNotice(
+        distanceMeters !== null
+          ? `Too far away. Move closer to the node.`
+          : `Too far from the node.`
+      )
+      return
+    }
+
+    if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
+      showMapNotice('Waiting for a reliable GPS fix.')
+      return
+    }
+
+    if (runtime.reason === 'missing_stage') {
+      showMapNotice('Complete the previous stage first.')
+      return
+    }
+
+    showMapNotice('Interaction is not available yet.')
   }
 
   async function handleSubmitCode(code: string) {
@@ -271,6 +320,7 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
+            mapNotice={mapNotice}
             legacyPlayerHref={legacyPlayerHref}
             legacyLoginHref={legacyLoginHref}
             adminHref={adminHref}

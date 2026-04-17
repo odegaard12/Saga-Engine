@@ -9,6 +9,7 @@ interface PlayerHudProps {
   distanceMeters: number | null
   inRange: boolean
   debugEnabled: boolean
+  mapNotice: string | null
   legacyPlayerHref: string
   legacyLoginHref: string
   adminHref: string
@@ -74,9 +75,10 @@ export function PlayerHud({
   legacyLoginHref,
   adminHref,
   debugEnabled,
+  mapNotice,
 }: PlayerHudProps) {
-  const isCompact =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const compact =
+    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
 
   const placeholderStage = isPlaceholderStage(currentStage)
   const distanceDisplay = getDistanceDisplay(finished, distanceMeters, inRange)
@@ -89,8 +91,9 @@ export function PlayerHud({
       <section
         style={{
           ...tray,
-          width: isCompact ? '100%' : 'min(100%, 760px)',
-          padding: isCompact ? 12 : 14,
+          width: compact ? '100%' : 'min(100%, 760px)',
+          padding: compact ? 12 : 14,
+          gap: compact ? 9 : 10,
         }}
       >
         <div style={missionRow}>
@@ -99,7 +102,7 @@ export function PlayerHud({
             <div
               style={{
                 ...headline,
-                fontSize: isCompact ? 18 : 22,
+                fontSize: compact ? 18 : 22,
               }}
             >
               {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
@@ -113,9 +116,15 @@ export function PlayerHud({
               {placeholderStage && !finished ? (
                 <span style={mutedBadge}>DRAFT NODE</span>
               ) : null}
+
+              {debugEnabled && !finished ? (
+                <span style={debugBadge}>DEBUG ON</span>
+              ) : null}
             </div>
           </div>
         </div>
+
+        {mapNotice ? <div style={mapNoticeCard}>{mapNotice}</div> : null}
 
         <div style={summaryGrid}>
           <SummaryCard
@@ -209,7 +218,7 @@ export function PlayerHud({
           <aside
             style={{
               ...menuSheet,
-              width: isCompact ? '100%' : 'min(100%, 520px)',
+              width: compact ? '100%' : 'min(100%, 520px)',
             }}
             aria-modal="true"
             role="dialog"
@@ -338,7 +347,7 @@ function getPrimaryStyle(
 ): React.CSSProperties {
   const base: React.CSSProperties = {
     width: '100%',
-    minHeight: 56,
+    minHeight: 54,
     borderRadius: 18,
     fontSize: 14,
     fontWeight: 900,
@@ -411,7 +420,6 @@ const tray: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
   color: '#0f172a',
   display: 'grid',
-  gap: 10,
   animation: 'sagaTrayIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
@@ -448,34 +456,48 @@ const metaInline: React.CSSProperties = {
   marginTop: 8,
 }
 
-const stageBadge: React.CSSProperties = {
+const badgeBase: React.CSSProperties = {
   minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
 }
 
+const stageBadge: React.CSSProperties = {
+  ...badgeBase,
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
+}
+
 const mutedBadge: React.CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 10px',
-  borderRadius: 999,
+  ...badgeBase,
   border: '1px solid rgba(148,163,184,.16)',
   background: 'rgba(241,245,249,.94)',
   color: '#475569',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
+}
+
+const debugBadge: React.CSSProperties = {
+  ...badgeBase,
+  border: '1px solid rgba(22,163,74,.20)',
+  background: 'rgba(220,252,231,.98)',
+  color: '#166534',
+}
+
+const mapNoticeCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(59,130,246,.14)',
+  background: 'rgba(239,246,255,.96)',
+  color: '#1d4ed8',
+  fontSize: 13,
+  fontWeight: 800,
+  lineHeight: 1.35,
+  padding: '12px 14px',
 }
 
 const summaryGrid: React.CSSProperties = {

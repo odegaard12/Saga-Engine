@@ -11,8 +11,15 @@ interface PlayerShellProps {
 export function PlayerShell({
   payload,
 }: PlayerShellProps) {
-  const isCompact =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const width =
+    typeof window !== 'undefined' && window.innerWidth <= 430
+      ? 'min(100%, 272px)'
+      : typeof window !== 'undefined' && window.innerWidth <= 560
+      ? 'min(100%, 292px)'
+      : 'min(100%, 360px)'
+
+  const compact =
+    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
@@ -31,8 +38,9 @@ export function PlayerShell({
         <div
           style={{
             ...rail,
-            width: isCompact ? 'min(100%, 300px)' : 'min(100%, 380px)',
-            padding: isCompact ? '12px 14px' : '14px 16px',
+            width,
+            padding: compact ? '10px 12px' : '12px 14px',
+            gap: compact ? 4 : 6,
           }}
         >
           <div style={eyebrow}>
@@ -42,13 +50,20 @@ export function PlayerShell({
           <div
             style={{
               ...name,
-              fontSize: isCompact ? 15 : 18,
+              fontSize: compact ? 15 : 18,
             }}
           >
             {title}
           </div>
 
-          <div style={sessionText}>{sessionLine}</div>
+          <div
+            style={{
+              ...sessionText,
+              fontSize: compact ? 12 : 13,
+            }}
+          >
+            {sessionLine}
+          </div>
         </div>
       </header>
     </>
@@ -65,7 +80,6 @@ const wrap: React.CSSProperties = {
 const rail: React.CSSProperties = {
   margin: '0 auto',
   display: 'grid',
-  gap: 6,
   alignItems: 'center',
   borderRadius: 20,
   border: '1px solid rgba(15,23,42,.08)',
@@ -94,9 +108,8 @@ const name: React.CSSProperties = {
 
 const sessionText: React.CSSProperties = {
   color: '#475569',
-  fontSize: 13,
   fontWeight: 700,
-  lineHeight: 1.25,
+  lineHeight: 1.2,
 }
 
 const shellAnimations = `
