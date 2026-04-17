@@ -1002,9 +1002,21 @@ async def advance(request: Request):
     return {"status": "fail", "user": profile_id}
 
 @app.post("/api/reset")
-@app.post("/api/reset")
 async def reset(request: Request):
     data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "bad password"}
+        )
+
+    if admin_password_change_required():
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "password change required"}
+        )
+
     user = data.get("user")
     profile = get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"

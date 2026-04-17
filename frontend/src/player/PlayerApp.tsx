@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchPlayerGame } from '../shared/api'
+import { advancePlayer, fetchPlayerGame } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
+import { InteractionSheet } from './components/InteractionSheet'
+import { deriveStageRuntime, type PlayerPanel } from './runtime'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -37,10 +39,7 @@ function getPlayerPosition(payload: PlayerGamePayload) {
   const lat = payload.live_status?.lat
   const lon = payload.live_status?.lon
 
-  if (typeof lat !== 'number' || typeof lon !== 'number') {
-    return null
-  }
-
+  if (typeof lat !== 'number' || typeof lon !== 'number') return null
   return { lat, lon }
 }
 
@@ -65,6 +64,11 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
 
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
+  const [interactionOpen, setInteractionOpen] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
   const user = useMemo(() => getUserFromUrl(), [])
 
   useEffect(() => {
@@ -97,10 +101,7 @@ export default function PlayerApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Loading player app"
-          body="Fetching player mission payload..."
-        />
+        <StatusCard title="Loading player app" body="Fetching player mission payload..." />
       </ScreenFrame>
     )
   }
@@ -108,10 +109,7 @@ export default function PlayerApp() {
   if (state.status === 'error') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Player app error"
-          body={state.message}
-        />
+        <StatusCard title="Player app error" body={state.message} />
       </ScreenFrame>
     )
   }
@@ -119,10 +117,7 @@ export default function PlayerApp() {
   if (state.status !== 'ready') {
     return (
       <ScreenFrame>
-        <StatusCard
-          title="Player app state"
-          body="Unexpected player state."
-        />
+        <StatusCard title="Player app state" body="Unexpected player state." />
       </ScreenFrame>
     )
   }
@@ -131,6 +126,7 @@ export default function PlayerApp() {
   const currentStage = getCurrentStage(payload)
   const playerPosition = getPlayerPosition(payload)
   const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+
   const distanceMeters =
     currentStage && playerPosition
       ? Math.round(
@@ -146,10 +142,68 @@ export default function PlayerApp() {
       ? distanceMeters <= currentStage.radius
       : false
 
+  const runtime = deriveStageRuntime({
+    currentStage,
+    finished: payload.finished,
+    distanceMeters,
+    gpsState,
+    debugEnabled: Boolean(payload.live_status?.debug_enabled),
+  })
+
+  const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
+  const legacyLoginHref = '/legacy/'
+  const adminHref = '/admin'
+
+  async function refreshPayload() {
+    const nextPayload = await fetchPlayerGame(user)
+    setState({ status: 'ready', payload: nextPayload })
+  }
+
+  function togglePanel(panel: Exclude<PlayerPanel, null>) {
+    setActivePanel((current) => (current === panel ? null : panel))
+  }
+
+  function handlePrimaryAction() {
+    if (!runtime.canEnter) return
+    setSubmitError(null)
+    setActivePanel(null)
+    setInteractionOpen(true)
+  }
+
+  async function handleSubmitCode(code: string) {
+    try {
+      setSubmitting(true)
+      setSubmitError(null)
+
+      const result = await advancePlayer(payload.user, code)
+      if (result.status !== 'ok') {
+        setSubmitError('Invalid code for the current stage.')
+        return
+      }
+
+      setInteractionOpen(false)
+      await refreshPayload()
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Unknown submit error'
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+
   return (
     <ScreenFrame>
-      <div style={layout}>
-        <div style={topStack}>
+      <div style={appViewport}>
+        <MapSurface
+          currentStage={currentStage}
+          playerPosition={playerPosition}
+          gpsState={gpsState}
+          debugSimulation={Boolean(payload.live_status?.debug_enabled)}
+        />
+
+        <div style={topOverlay}>
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
@@ -157,24 +211,46 @@ export default function PlayerApp() {
             inRange={inRange}
             distanceMeters={distanceMeters}
           />
-
-          <MapSurface
-            currentStage={currentStage}
-            playerPosition={playerPosition}
-            gpsState={gpsState}
-            debugSimulation={Boolean(payload.live_status?.debug_enabled)}
-          />
         </div>
 
-        <PlayerHud
-          currentStage={currentStage}
-          level={payload.level}
-          finished={payload.finished}
-          gpsState={gpsState}
-          distanceMeters={distanceMeters}
-          inRange={inRange}
-        />
+        <div style={bottomOverlay}>
+          <PlayerHud
+            currentStage={currentStage}
+            level={payload.level}
+            finished={payload.finished}
+            gpsState={gpsState}
+            distanceMeters={distanceMeters}
+            inRange={inRange}
+            debugEnabled={Boolean(payload.live_status?.debug_enabled)}
+            legacyPlayerHref={legacyPlayerHref}
+            legacyLoginHref={legacyLoginHref}
+            adminHref={adminHref}
+            detailsOpen={activePanel === 'details'}
+            menuOpen={activePanel === 'menu'}
+            primaryLabel={runtime.primaryLabel}
+            primaryTone={runtime.primaryTone}
+            primaryDisabled={!runtime.canEnter}
+            helperText={runtime.helperText}
+            onPrimaryAction={handlePrimaryAction}
+            onToggleDetails={() => togglePanel('details')}
+            onToggleMenu={() => togglePanel('menu')}
+          />
+        </div>
       </div>
+
+      <InteractionSheet
+        open={interactionOpen}
+        user={payload.user}
+        currentStage={currentStage}
+        helperText={runtime.helperText}
+        legacyPlayerHref={legacyPlayerHref}
+        submitting={submitting}
+        errorMessage={submitError}
+        onClose={() => {
+          if (!submitting) setInteractionOpen(false)
+        }}
+        onSubmitCode={handleSubmitCode}
+      />
     </ScreenFrame>
   )
 }
@@ -194,25 +270,36 @@ function StatusCard({ title, body }: { title: string; body: string }) {
 
 const frame: React.CSSProperties = {
   minHeight: '100vh',
-  background: 'linear-gradient(180deg, #eef3ec 0%, #e8efe6 48%, #e2ebdf 100%)',
-  padding: 16,
+  background:
+    'radial-gradient(circle at top, rgba(30,41,59,.18), transparent 36%), linear-gradient(180deg, #e9f0e7 0%, #e4ece2 48%, #dde7db 100%)',
+  padding: 12,
   fontFamily: 'system-ui, sans-serif',
   color: '#10231a',
 }
 
-const layout: React.CSSProperties = {
+const appViewport: React.CSSProperties = {
+  position: 'relative',
   width: '100%',
-  maxWidth: 1180,
+  maxWidth: 1320,
   margin: '0 auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 16,
 }
 
-const topStack: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 14,
+const topOverlay: React.CSSProperties = {
+  position: 'absolute',
+  top: 12,
+  left: 12,
+  right: 12,
+  zIndex: 1200,
+  pointerEvents: 'none',
+}
+
+const bottomOverlay: React.CSSProperties = {
+  position: 'absolute',
+  left: 12,
+  right: 12,
+  bottom: 12,
+  zIndex: 1200,
+  pointerEvents: 'none',
 }
 
 const statusCard: React.CSSProperties = {
