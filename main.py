@@ -123,7 +123,6 @@ def is_weak_admin_password(password):
         "admin",
         "password",
         "12345678",
-        "Pelochito13"
     }
     return len(p) < 10 or p in weak
 
@@ -909,9 +908,22 @@ async def admin_mission_status(request: Request):
         "profiles": items
     }
 
-@app.get("/api/admin/stages")
-@app.get("/api/admin/stages")
-async def get_stages():
+@app.post("/api/admin/stages")
+async def get_stages(request: Request):
+    data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "bad password"}
+        )
+
+    if admin_password_change_required():
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "password change required"}
+        )
+
     return load_json(STAGES_DB, [])
 
 @app.post("/api/admin/save-config")
