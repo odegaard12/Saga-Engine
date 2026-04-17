@@ -15,176 +15,200 @@ export function PlayerShell({
   inRange,
   distanceMeters,
 }: PlayerShellProps) {
-  const mode = payload.mode || payload.profile?.mode || 'solo'
-  const members = payload.members || payload.profile?.members || []
+  const isCompact =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
-  const objective = payload.finished
-    ? 'Mission complete'
-    : currentStage?.title || 'Awaiting node'
 
   const gpsLabel =
     gpsState === 'ready'
-      ? 'GPS · READY'
+      ? 'GPS READY'
       : gpsState === 'stale'
-      ? 'GPS · LAST KNOWN'
+      ? 'GPS LAST KNOWN'
       : gpsState === 'searching'
-      ? 'GPS · SEARCHING'
+      ? 'GPS SEARCHING'
       : gpsState === 'error'
-      ? 'GPS · ERROR'
-      : 'GPS · UNAVAILABLE'
+      ? 'GPS ERROR'
+      : 'GPS UNAVAILABLE'
 
   const rangeLabel =
     distanceMeters === null
-      ? 'RANGE · ---'
+      ? 'RANGE ---'
       : inRange
-      ? `RANGE · INSIDE (${distanceMeters} M)`
-      : `RANGE · ${distanceMeters} M`
+      ? `RANGE ${distanceMeters}M`
+      : `RANGE ${distanceMeters}M OUT`
 
   return (
-    <section style={shellWrap}>
-      <div style={shellCard}>
-        <div style={shellTopRow}>
-          <div style={identityBlock}>
-            <div style={kicker}>
-              {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
-            </div>
-            <div style={titleStyle}>{title}</div>
-            <div style={subStyle}>
-              {mode === 'team'
-                ? `${members.length || 1} members linked to current field run`
-                : 'Linked to live field objective'}
-            </div>
+    <header style={wrap}>
+      <div
+        style={{
+          ...rail,
+          width: isCompact ? 'min(100%, 320px)' : 'min(100%, 760px)',
+          gridTemplateColumns: '1fr',
+          gap: isCompact ? 8 : 10,
+          padding: isCompact ? '10px 12px' : '10px 14px',
+        }}
+      >
+        <div style={identity}>
+          <div style={eyebrow}>
+            {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
           </div>
 
-          <div style={stageBox}>
-            <div style={stageLabel}>STAGE</div>
-            <div style={stageValue}>{payload.finished ? 'DONE' : payload.level + 1}</div>
+          <div
+            style={{
+              ...name,
+              fontSize: isCompact ? 15 : 18,
+            }}
+          >
+            {title}
+          </div>
+
+          <div
+            style={{
+              ...objective,
+              fontSize: isCompact ? 12 : 13,
+              whiteSpace: 'normal',
+              overflow: 'visible',
+              textOverflow: 'clip',
+            }}
+          >
+            {currentStage?.title || 'Awaiting node'}
           </div>
         </div>
 
-        <div style={signalRow}>
-          <span style={pillStrong}>{mode === 'team' ? `TEAM · ${members.length || 1}` : 'SOLO OPERATOR'}</span>
-          <span style={pillBase}>{gpsLabel}</span>
-          <span style={inRange ? pillSuccess : pillBase}>{rangeLabel}</span>
-          <span style={pillWide}>OBJECTIVE · {objective}</span>
+        <div
+          style={{
+            ...chips,
+            justifyContent: 'flex-start',
+          }}
+        >
+          <span style={stageChip}>
+            {payload.finished ? 'DONE' : `STAGE ${payload.level + 1}`}
+          </span>
+          <span style={getGpsChipStyle(gpsState)}>{gpsLabel}</span>
+          <span style={getRangeChipStyle(inRange)}>{rangeLabel}</span>
         </div>
       </div>
-    </section>
+    </header>
   )
 }
 
-const shellWrap: React.CSSProperties = {
-  marginBottom: 6,
+function getGpsChipStyle(gpsState: PlayerGpsStatus): React.CSSProperties {
+  if (gpsState === 'ready') {
+    return {
+      ...chipBase,
+      border: '1px solid rgba(22,163,74,.20)',
+      background: 'rgba(220,252,231,.95)',
+      color: '#166534',
+    }
+  }
+
+  if (gpsState === 'stale' || gpsState === 'searching') {
+    return {
+      ...chipBase,
+      border: '1px solid rgba(245,158,11,.22)',
+      background: 'rgba(254,243,199,.96)',
+      color: '#92400e',
+    }
+  }
+
+  return {
+    ...chipBase,
+    border: '1px solid rgba(239,68,68,.18)',
+    background: 'rgba(254,226,226,.96)',
+    color: '#991b1b',
+  }
 }
 
-const shellCard: React.CSSProperties = {
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.82), rgba(15,23,42,.64))',
-  boxShadow: '0 24px 64px rgba(2,6,23,.18)',
-  backdropFilter: 'blur(14px)',
-  padding: '14px 16px 12px',
-  color: '#f8fafc',
+function getRangeChipStyle(inRange: boolean): React.CSSProperties {
+  if (inRange) {
+    return {
+      ...chipBase,
+      border: '1px solid rgba(22,163,74,.18)',
+      background: 'rgba(220,252,231,.95)',
+      color: '#166534',
+    }
+  }
+
+  return {
+    ...chipBase,
+    border: '1px solid rgba(15,23,42,.08)',
+    background: 'rgba(248,250,252,.96)',
+    color: '#334155',
+  }
 }
 
-const shellTopRow: React.CSSProperties = {
+const wrap: React.CSSProperties = {
+  pointerEvents: 'none',
+  width: '100%',
   display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 14,
+  justifyContent: 'center',
 }
 
-const identityBlock: React.CSSProperties = {
+const rail: React.CSSProperties = {
+  margin: '0 auto',
+  display: 'grid',
+  alignItems: 'center',
+  borderRadius: 20,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(255,255,255,.90)',
+  boxShadow: '0 12px 28px rgba(15,23,42,.07)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  pointerEvents: 'auto',
+  boxSizing: 'border-box',
+}
+
+const identity: React.CSSProperties = {
   minWidth: 0,
-  flex: 1,
 }
 
-const kicker: React.CSSProperties = {
-  color: 'rgba(167,243,208,.92)',
+const eyebrow: React.CSSProperties = {
+  color: '#047857',
   fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
-}
-
-const titleStyle: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 24,
   fontWeight: 900,
-  lineHeight: 1,
-  marginTop: 4,
-  letterSpacing: '-0.03em',
-}
-
-const subStyle: React.CSSProperties = {
-  color: 'rgba(226,232,240,.82)',
-  fontSize: 12,
-  lineHeight: 1.35,
-  marginTop: 6,
-  maxWidth: '40ch',
-}
-
-const stageBox: React.CSSProperties = {
-  minWidth: 82,
-  padding: '8px 12px',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.06)',
-  textAlign: 'right',
-  flexShrink: 0,
-}
-
-const stageLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 800,
   letterSpacing: '0.16em',
 }
 
-const stageValue: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 24,
+const name: React.CSSProperties = {
+  marginTop: 4,
+  color: '#0f172a',
   fontWeight: 900,
   lineHeight: 1,
-  marginTop: 4,
+  letterSpacing: '-0.03em',
 }
 
-const signalRow: React.CSSProperties = {
+const objective: React.CSSProperties = {
+  marginTop: 4,
+  color: '#475569',
+  fontWeight: 700,
+  lineHeight: 1.2,
+}
+
+const chips: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
-  marginTop: 12,
 }
 
-const pillBase: React.CSSProperties = {
-  minHeight: 28,
+const chipBase: React.CSSProperties = {
+  minHeight: 30,
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '0 11px',
+  justifyContent: 'center',
+  padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  color: 'rgba(226,232,240,.9)',
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: '0.04em',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
 }
 
-const pillStrong: React.CSSProperties = {
-  ...pillBase,
-  background: 'rgba(16,185,129,.16)',
-  border: '1px solid rgba(16,185,129,.22)',
-  color: '#d1fae5',
-}
-
-const pillSuccess: React.CSSProperties = {
-  ...pillBase,
-  background: 'rgba(34,197,94,.16)',
-  border: '1px solid rgba(34,197,94,.26)',
-  color: '#dcfce7',
-}
-
-const pillWide: React.CSSProperties = {
-  ...pillBase,
-  maxWidth: '100%',
+const stageChip: React.CSSProperties = {
+  ...chipBase,
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
 }
