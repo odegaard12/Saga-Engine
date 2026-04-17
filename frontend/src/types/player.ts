@@ -65,6 +65,7 @@ export interface PlayerGamePayload {
   user: string
   display_name?: string
   mode?: PlayerMode
+  session_mode?: PlayerMode
   members?: string[]
   profile?: PlayerProfile
   live_status?: PlayerLiveStatus
@@ -72,4 +73,21 @@ export interface PlayerGamePayload {
   finished: boolean
   stages: PlayerStage[]
   current_stage?: PlayerStage | null
+}
+
+export interface PublicConfig {
+  site_name?: string
+  admin_title?: string
+  admin_subtitle?: string
+  ui_lang?: string
+  player_theme?: string
+  story_title?: string
+  story_text?: string
+  prologue_title?: string
+  prologue_subtitle?: string
+  prologue_body?: string
+  map_center?: [number, number]
+  map_zoom?: number
+  players?: string[]
+  player_profiles?: PlayerProfile[]
 }
