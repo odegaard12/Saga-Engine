@@ -3032,8 +3032,21 @@ async function saveConfigAdmin() {
 }
 
 async function load() {
-  let r = await fetch('/api/admin/stages');
-  stages = await r.json();
+  let r = await fetch('/api/admin/stages', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ password: pass })
+  });
+
+  let data = await r.json().catch(() => ({}));
+
+  if (!r.ok) {
+    const detail = (data && data.detail) ? String(data.detail).toUpperCase() : 'ERROR LOADING STAGES';
+    alert(detail);
+    return;
+  }
+
+  stages = Array.isArray(data) ? data : [];
   render();
 }
 

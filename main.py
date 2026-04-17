@@ -123,7 +123,6 @@ def is_weak_admin_password(password):
         "admin",
         "password",
         "12345678",
-        "Pelochito13"
     }
     return len(p) < 10 or p in weak
 
@@ -406,6 +405,62 @@ def get_player_profile(user, cfg=None):
     return normalize_player_profile(user_text or "PLAYER 1", 0)
 
 HEARTBEAT_STALE_SECONDS = 180
+HEARTBEAT_MIN_INTERVAL_SECONDS = 5
+HEARTBEAT_RATE_WINDOW_SECONDS = 3600
+HEARTBEAT_LAST_SEEN_BY_KEY = {}
+
+VALID_HEARTBEAT_GPS_STATUS = {
+    "ok",
+    "unknown",
+    "unavailable",
+    "stale",
+    "searching",
+    "error",
+    "denied",
+}
+
+VALID_HEARTBEAT_SOURCES = {
+    "player",
+    "device",
+    "legacy",
+    "react",
+    "pwa",
+}
+
+def get_heartbeat_client_ip(request: Request):
+    client = getattr(request, "client", None)
+    if client and getattr(client, "host", None):
+        return client.host
+    return "unknown"
+
+def prune_heartbeat_rate_state(now=None):
+    now = now or time.time()
+    stale_keys = [
+        key for key, ts in HEARTBEAT_LAST_SEEN_BY_KEY.items()
+        if now - float(ts or 0) > HEARTBEAT_RATE_WINDOW_SECONDS
+    ]
+    for key in stale_keys:
+        HEARTBEAT_LAST_SEEN_BY_KEY.pop(key, None)
+
+def normalize_heartbeat_gps_status(value):
+    status = _as_str(value or "unknown").strip().lower() or "unknown"
+    return status if status in VALID_HEARTBEAT_GPS_STATUS else "unknown"
+
+def normalize_heartbeat_source(value):
+    source = _as_str(value or "player").strip().lower() or "player"
+    return source if source in VALID_HEARTBEAT_SOURCES else "player"
+
+def resolve_known_player_profile(user, cfg=None):
+    cfg = cfg or load_config()
+    user_text = _as_str(user).strip()
+    if not user_text:
+        return None
+
+    for profile in get_player_profiles(cfg):
+        if profile_matches_user(profile, user_text):
+            return profile
+
+    return None
 
 def load_live_positions():
     data = load_json(POSITIONS_DB, {})
@@ -842,30 +897,88 @@ async def heartbeat(request: Request):
 
     user = _as_str(data.get("user")).strip()
     if not user:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "user required"})
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "user required"}
+        )
 
-    profile = get_player_profile(user)
+    cfg = load_config()
+    profile = resolve_known_player_profile(user, cfg)
+    if not profile:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "detail": "unknown profile"}
+        )
+
     profile_id = profile.get("id") or user
+
+    now = time.time()
+    ip = get_heartbeat_client_ip(request)
+    rate_key = f"{ip}:{profile_id}"
+
+    prune_heartbeat_rate_state(now)
+    last_seen_for_key = float(HEARTBEAT_LAST_SEEN_BY_KEY.get(rate_key) or 0)
+    if last_seen_for_key and (now - last_seen_for_key) < HEARTBEAT_MIN_INTERVAL_SECONDS:
+        retry_after = max(1, int(HEARTBEAT_MIN_INTERVAL_SECONDS - (now - last_seen_for_key)))
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(retry_after)},
+            content={"status": "error", "detail": f"heartbeat too frequent; retry in {retry_after}s"}
+        )
+
+    lat_present = data.get("lat") is not None
+    lon_present = data.get("lon") is not None
+
+    if lat_present != lon_present:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "lat and lon must be sent together"}
+        )
+
+    lat = _as_float(data.get("lat"))
+    lon = _as_float(data.get("lon"))
+
+    if lat_present and (lat is None or lon is None):
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "invalid coordinates"}
+        )
+
+    if lat is not None and not (-90 <= lat <= 90):
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "lat out of range"}
+        )
+
+    if lon is not None and not (-180 <= lon <= 180):
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "lon out of range"}
+        )
 
     positions = load_live_positions()
     current = positions.get(profile_id, {})
     if not isinstance(current, dict):
         current = {}
 
-    lat = _as_float(data.get("lat"))
-    lon = _as_float(data.get("lon"))
-
     if lat is not None and lon is not None:
         current["lat"] = lat
         current["lon"] = lon
 
-    current["last_seen"] = int(time.time())
-    current["gps_status"] = _as_str(data.get("gps_status") or current.get("gps_status") or "unknown").strip().lower() or "unknown"
-    current["source"] = _as_str(data.get("source") or "player").strip() or "player"
-    current["debug_enabled"] = _as_bool(data.get("debug_enabled"), False)
+    current["last_seen"] = int(now)
+    current["gps_status"] = normalize_heartbeat_gps_status(
+        data.get("gps_status") or current.get("gps_status") or "unknown"
+    )
+    current["source"] = normalize_heartbeat_source(
+        data.get("source") or current.get("source") or "player"
+    )
+
+    # Public heartbeat must not be able to toggle debug state remotely.
+    current["debug_enabled"] = False
 
     positions[profile_id] = current
     save_live_positions(positions)
+    HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
 
     return {
         "status": "ok",
@@ -909,9 +1022,22 @@ async def admin_mission_status(request: Request):
         "profiles": items
     }
 
-@app.get("/api/admin/stages")
-@app.get("/api/admin/stages")
-async def get_stages():
+@app.post("/api/admin/stages")
+async def get_stages(request: Request):
+    data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "bad password"}
+        )
+
+    if admin_password_change_required():
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "password change required"}
+        )
+
     return load_json(STAGES_DB, [])
 
 @app.post("/api/admin/save-config")
@@ -990,9 +1116,21 @@ async def advance(request: Request):
     return {"status": "fail", "user": profile_id}
 
 @app.post("/api/reset")
-@app.post("/api/reset")
 async def reset(request: Request):
     data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "bad password"}
+        )
+
+    if admin_password_change_required():
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "detail": "password change required"}
+        )
+
     user = data.get("user")
     profile = get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
