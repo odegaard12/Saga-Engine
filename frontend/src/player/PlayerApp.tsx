@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { advancePlayer, fetchPlayerGame } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
@@ -11,6 +11,13 @@ type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload }
+
+function vibrate(pattern: number | number[]) {
+  if (typeof window === 'undefined') return
+  if (!('navigator' in window)) return
+  if (typeof window.navigator.vibrate !== 'function') return
+  window.navigator.vibrate(pattern)
+}
 
 function getUserFromUrl(): string {
   const params = new URLSearchParams(window.location.search)
@@ -62,6 +69,10 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
+function canShowLiveDistance(gpsState: PlayerGpsStatus): boolean {
+  return gpsState === 'ready' || gpsState === 'stale'
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -69,7 +80,9 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
+  const [mapNotice, setMapNotice] = useState<string | null>(null)
 
+  const noticeTimerRef = useRef<number | null>(null)
   const user = useMemo(() => getUserFromUrl(), [])
 
   useEffect(() => {
@@ -98,6 +111,27 @@ export default function PlayerApp() {
       cancelled = true
     }
   }, [user])
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current)
+      }
+    }
+  }, [])
+
+  function showMapNotice(message: string) {
+    setMapNotice(message)
+
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+
+    noticeTimerRef.current = window.setTimeout(() => {
+      setMapNotice(null)
+      noticeTimerRef.current = null
+    }, 2200)
+  }
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -128,7 +162,7 @@ export default function PlayerApp() {
   const playerPosition = getPlayerPosition(payload)
   const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
 
-  const distanceMeters =
+  const rawDistanceMeters =
     currentStage && playerPosition
       ? Math.round(
           getDistanceMeters(playerPosition, {
@@ -136,6 +170,11 @@ export default function PlayerApp() {
             lon: currentStage.lon,
           })
         )
+      : null
+
+  const distanceMeters =
+    rawDistanceMeters !== null && canShowLiveDistance(gpsState)
+      ? rawDistanceMeters
       : null
 
   const inRange =
@@ -172,14 +211,59 @@ export default function PlayerApp() {
   }
 
   function handleToggleDebug() {
+    vibrate(8)
     setLocalDebugEnabled((current) => !current)
+    showMapNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.')
+  }
+
+  function openInteraction() {
+    setSubmitError(null)
+    setActivePanel(null)
+    setInteractionOpen(true)
   }
 
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
-    setSubmitError(null)
-    setActivePanel(null)
-    setInteractionOpen(true)
+    vibrate([10, 16, 10])
+    openInteraction()
+  }
+
+  function handleMapNodeTap() {
+    if (payload.finished) return
+
+    if (runtime.canEnter) {
+      vibrate([10, 16, 10])
+      openInteraction()
+      return
+    }
+
+    vibrate(8)
+
+    if (!currentStage) {
+      showMapNotice('Complete the previous stage before interacting here.')
+      return
+    }
+
+    if (runtime.reason === 'out_of_range') {
+      showMapNotice(
+        distanceMeters !== null
+          ? `Too far away. Move closer to the node.`
+          : `Too far from the node.`
+      )
+      return
+    }
+
+    if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
+      showMapNotice('Waiting for a reliable GPS fix.')
+      return
+    }
+
+    if (runtime.reason === 'missing_stage') {
+      showMapNotice('Complete the previous stage first.')
+      return
+    }
+
+    showMapNotice('Interaction is not available yet.')
   }
 
   async function handleSubmitCode(code: string) {
@@ -212,6 +296,7 @@ export default function PlayerApp() {
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={effectiveDebugEnabled}
+          onNodeTap={handleMapNodeTap}
         />
 
         <div style={topScrim} />
@@ -235,6 +320,7 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
+            mapNotice={mapNotice}
             legacyPlayerHref={legacyPlayerHref}
             legacyLoginHref={legacyLoginHref}
             adminHref={adminHref}
