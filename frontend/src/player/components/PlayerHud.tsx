@@ -21,6 +21,8 @@ interface PlayerHudProps {
   onPrimaryAction: () => void
   onToggleDetails: () => void
   onToggleMenu: () => void
+  onCloseMenu: () => void
+  onToggleDebug: () => void
 }
 
 export function PlayerHud({
@@ -38,20 +40,36 @@ export function PlayerHud({
   onPrimaryAction,
   onToggleDetails,
   onToggleMenu,
+  onCloseMenu,
+  onToggleDebug,
   legacyPlayerHref,
   legacyLoginHref,
   adminHref,
   debugEnabled,
 }: PlayerHudProps) {
+  const isCompact =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
   return (
     <>
       <style>{menuAnimations}</style>
 
-      <section style={tray}>
+      <section
+        style={{
+          ...tray,
+          width: isCompact ? '100%' : 'min(100%, 760px)',
+          padding: isCompact ? 12 : 14,
+        }}
+      >
         <div style={missionRow}>
           <div style={missionCopy}>
             <div style={eyebrow}>MISSION</div>
-            <div style={headline}>
+            <div
+              style={{
+                ...headline,
+                fontSize: isCompact ? 18 : 22,
+              }}
+            >
               {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
             </div>
             <div style={subline}>STAGE {level + 1}</div>
@@ -119,9 +137,17 @@ export function PlayerHud({
 
       {menuOpen ? (
         <div style={menuOverlay}>
-          <div style={menuBackdrop} onClick={onToggleMenu} />
+          <div style={menuBackdrop} onClick={onCloseMenu} />
 
-          <aside style={menuSheet} aria-modal="true" role="dialog">
+          <aside
+            style={{
+              ...menuSheet,
+              width: isCompact ? '100%' : 'min(100%, 520px)',
+            }}
+            aria-modal="true"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div style={menuHeader}>
               <div>
                 <div style={menuEyebrow}>FIELD MENU</div>
@@ -132,7 +158,11 @@ export function PlayerHud({
                 type="button"
                 aria-label="Close menu"
                 style={closeButton}
-                onClick={onToggleMenu}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onCloseMenu()
+                }}
               >
                 ×
               </button>
@@ -148,21 +178,47 @@ export function PlayerHud({
 
               <div style={menuMetaCard}>
                 <div style={menuMetaLabel}>DEBUG</div>
-                <div style={menuMetaValue}>{debugEnabled ? 'ON' : 'OFF'}</div>
+                <div style={menuMetaValue}>{debugEnabled ? 'LOCAL ON' : 'OFF'}</div>
               </div>
             </div>
 
+            <div style={menuSectionLabel}>TEST TOOLS</div>
             <div style={menuLinksGrid}>
-              <a href={legacyPlayerHref} style={menuLink}>
-                LEGACY PLAYER
-              </a>
+              <button
+                type="button"
+                style={debugEnabled ? debugButtonActive : debugButton}
+                onClick={onToggleDebug}
+              >
+                {debugEnabled ? 'DISABLE LOCAL DEBUG' : 'ENABLE LOCAL DEBUG'}
+              </button>
+            </div>
 
-              <a href={legacyLoginHref} style={menuLink}>
+            <div style={menuHintCard}>
+              <div style={menuHintLabel}>LOCAL TEST MODE</div>
+              <div style={menuHintText}>
+                This only affects the React test runtime. It does not change the backend
+                heartbeat security model or enable public debug remotely.
+              </div>
+            </div>
+
+            <div style={menuSectionLabel}>ENTRY</div>
+            <div style={menuLinksGrid}>
+              <a href={legacyLoginHref} style={menuLinkPrimary}>
                 MISSION ENTRY
               </a>
+            </div>
 
+            <div style={menuSectionLabel}>TOOLS</div>
+            <div style={menuLinksGrid}>
               <a href={adminHref} style={menuLink}>
                 ADMIN
+              </a>
+            </div>
+
+            <div style={menuSectionLabel}>FALLBACK</div>
+            <div style={menuLinksGrid}>
+              <a href={legacyPlayerHref} style={menuLinkMuted}>
+                CLASSIC RUNTIME
               </a>
             </div>
           </aside>
@@ -251,7 +307,6 @@ function getSecondaryStyle(active: boolean): React.CSSProperties {
 
 const tray: React.CSSProperties = {
   pointerEvents: 'auto',
-  width: 'min(100%, 820px)',
   margin: '0 auto',
   borderRadius: 24,
   border: '1px solid rgba(15,23,42,.08)',
@@ -259,7 +314,6 @@ const tray: React.CSSProperties = {
   boxShadow: '0 18px 40px rgba(15,23,42,.08)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
-  padding: 14,
   color: '#0f172a',
   display: 'grid',
   gap: 10,
@@ -286,7 +340,6 @@ const eyebrow: React.CSSProperties = {
 const headline: React.CSSProperties = {
   marginTop: 6,
   color: '#0f172a',
-  fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
   letterSpacing: '-0.03em',
@@ -310,7 +363,7 @@ const helper: React.CSSProperties = {
 const actionsRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
+  gap: 8,
 }
 
 const detailsGrid: React.CSSProperties = {
@@ -352,6 +405,7 @@ const menuOverlay: React.CSSProperties = {
   alignItems: 'flex-end',
   justifyContent: 'center',
   padding: 12,
+  pointerEvents: 'auto',
 }
 
 const menuBackdrop: React.CSSProperties = {
@@ -365,15 +419,16 @@ const menuBackdrop: React.CSSProperties = {
 
 const menuSheet: React.CSSProperties = {
   position: 'relative',
-  width: 'min(100%, 560px)',
+  zIndex: 2,
   borderRadius: 24,
   border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.96)',
+  background: 'rgba(255,255,255,.98)',
   boxShadow: '0 28px 60px rgba(15,23,42,.18)',
-  padding: 16,
+  padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'grid',
   gap: 14,
   animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  pointerEvents: 'auto',
 }
 
 const menuHeader: React.CSSProperties = {
@@ -413,6 +468,8 @@ const closeButton: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   boxShadow: '0 10px 24px rgba(239,68,68,.14)',
+  cursor: 'pointer',
+  pointerEvents: 'auto',
 }
 
 const menuMetaRow: React.CSSProperties = {
@@ -444,25 +501,87 @@ const menuMetaValue: React.CSSProperties = {
   wordBreak: 'break-word',
 }
 
+const menuSectionLabel: React.CSSProperties = {
+  color: '#64748b',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+}
+
 const menuLinksGrid: React.CSSProperties = {
   display: 'grid',
   gap: 10,
 }
 
-const menuLink: React.CSSProperties = {
+const menuLinkBase: React.CSSProperties = {
   minHeight: 48,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 14px',
   borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  color: '#0f172a',
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '0.08em',
   textDecoration: 'none',
+}
+
+const menuLinkPrimary: React.CSSProperties = {
+  ...menuLinkBase,
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
+}
+
+const menuLink: React.CSSProperties = {
+  ...menuLinkBase,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  color: '#0f172a',
+}
+
+const menuLinkMuted: React.CSSProperties = {
+  ...menuLinkBase,
+  border: '1px solid rgba(148,163,184,.16)',
+  background: 'rgba(241,245,249,.94)',
+  color: '#475569',
+}
+
+const debugButton: React.CSSProperties = {
+  ...menuLinkBase,
+  border: '1px solid rgba(245,158,11,.18)',
+  background: 'rgba(254,243,199,.98)',
+  color: '#92400e',
+  cursor: 'pointer',
+}
+
+const debugButtonActive: React.CSSProperties = {
+  ...menuLinkBase,
+  border: '1px solid rgba(22,163,74,.20)',
+  background: 'rgba(220,252,231,.98)',
+  color: '#166534',
+  cursor: 'pointer',
+}
+
+const menuHintCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  padding: 12,
+}
+
+const menuHintLabel: React.CSSProperties = {
+  color: '#64748b',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+}
+
+const menuHintText: React.CSSProperties = {
+  marginTop: 8,
+  color: '#475569',
+  fontSize: 13,
+  lineHeight: 1.45,
 }
 
 const menuAnimations = `
