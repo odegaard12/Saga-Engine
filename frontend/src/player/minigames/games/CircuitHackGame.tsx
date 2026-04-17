@@ -42,7 +42,6 @@ function readTarget(config: Record<string, unknown> | undefined): string[] {
 
 export function CircuitHackGame({
   stage,
-  helperText,
   submitting = false,
   onWin,
 }: PlayerMinigameProps) {
@@ -58,9 +57,9 @@ export function CircuitHackGame({
 
   const rings: RingDef[] = useMemo(
     () => [
-      { label: 'DIRECTION START', options: directionOptions },
-      { label: 'GUARD ORDER', options: guardOptions },
-      { label: 'DIRECTION END', options: directionOptions },
+      { label: 'START', options: directionOptions },
+      { label: 'GUARD', options: guardOptions },
+      { label: 'END', options: directionOptions },
     ],
     [directionOptions, guardOptions]
   )
@@ -68,9 +67,7 @@ export function CircuitHackGame({
   const target = useMemo(() => readTarget(config), [config])
 
   const [indices, setIndices] = useState([0, 0, 0])
-  const [status, setStatus] = useState(
-    stage.content?.trim() || helperText || 'Rotate each dial to align the node.'
-  )
+  const [status, setStatus] = useState('Rotate the three dials to align the node.')
   const [statusTone, setStatusTone] = useState<'idle' | 'ok' | 'bad'>('idle')
   const [working, setWorking] = useState(false)
 
@@ -88,7 +85,7 @@ export function CircuitHackGame({
       )
     )
 
-    setStatus('Rotate each dial to align the node.')
+    setStatus('Rotate the three dials to align the node.')
     setStatusTone('idle')
   }
 
@@ -98,7 +95,7 @@ export function CircuitHackGame({
     const ok = values.every((value, i) => value === target[i])
 
     if (!ok) {
-      setStatus('Misalignment detected. Check the three dial values and try again.')
+      setStatus('Alignment mismatch. Review the three dials and retry.')
       setStatusTone('bad')
       return
     }
@@ -109,7 +106,7 @@ export function CircuitHackGame({
       setStatusTone('ok')
       await onWin()
     } catch {
-      setStatus('Alignment succeeded, but mission advance failed. Try again.')
+      setStatus('Node alignment passed, but mission sync failed. Retry.')
       setStatusTone('bad')
     } finally {
       setWorking(false)
@@ -118,10 +115,13 @@ export function CircuitHackGame({
 
   return (
     <section style={wrap}>
-      <div style={headerLabel}>NATIVE REACT MINIGAME</div>
-      <div style={title}>Circuit hack</div>
-      <div style={subtitle}>
-        Align the three dials to restore the node handshake.
+      <div style={headerRow}>
+        <div>
+          <div style={eyebrow}>CIRCUIT HACK</div>
+          <div style={title}>Align the node</div>
+        </div>
+
+        <div style={hintChip}>3 DIALS</div>
       </div>
 
       <div style={ringsRow}>
@@ -135,6 +135,7 @@ export function CircuitHackGame({
           >
             <div style={dialLabel}>{ring.label}</div>
             <div style={dialValue}>{values[index]}</div>
+            <div style={dialHint}>TAP TO ROTATE</div>
           </button>
         ))}
       </div>
@@ -145,7 +146,7 @@ export function CircuitHackGame({
         onClick={validate}
         disabled={submitting || working}
       >
-        {working ? 'SYNCING…' : 'VALIDATE ALIGNMENT'}
+        {working ? 'SYNCING NODE…' : 'SYNC NODE'}
       </button>
 
       <div
@@ -165,33 +166,51 @@ export function CircuitHackGame({
 }
 
 const wrap: React.CSSProperties = {
-  borderRadius: 18,
+  borderRadius: 20,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  background: 'rgba(255,255,255,.04)',
   padding: 14,
   display: 'grid',
   gap: 12,
 }
 
-const headerLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
+const headerRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 10,
+}
+
+const eyebrow: React.CSSProperties = {
+  color: 'rgba(167,243,208,.96)',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
 const title: React.CSSProperties = {
+  marginTop: 6,
   color: '#f8fafc',
-  fontSize: 22,
+  fontSize: 24,
   fontWeight: 900,
   lineHeight: 1.05,
   letterSpacing: '-0.03em',
 }
 
-const subtitle: React.CSSProperties = {
+const hintChip: React.CSSProperties = {
+  minHeight: 30,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 10px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.06)',
   color: '#cbd5e1',
-  fontSize: 13,
-  lineHeight: 1.45,
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+  whiteSpace: 'nowrap',
 }
 
 const ringsRow: React.CSSProperties = {
@@ -201,14 +220,16 @@ const ringsRow: React.CSSProperties = {
 }
 
 const dialButton: React.CSSProperties = {
-  minHeight: 128,
+  minHeight: 132,
   borderRadius: 18,
-  border: '1px solid rgba(34,197,94,.20)',
+  border: '1px solid rgba(34,197,94,.16)',
   background:
-    'radial-gradient(circle at top, rgba(34,197,94,.12), rgba(2,6,23,.18))',
+    'linear-gradient(180deg, rgba(30,41,59,.88), rgba(15,23,42,.96))',
   color: '#f8fafc',
   display: 'grid',
-  placeItems: 'center',
+  alignContent: 'center',
+  justifyItems: 'center',
+  gap: 8,
   padding: 12,
   textAlign: 'center',
   cursor: 'pointer',
@@ -218,7 +239,7 @@ const dialLabel: React.CSSProperties = {
   color: 'rgba(148,163,184,.92)',
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.14em',
+  letterSpacing: '0.16em',
   textTransform: 'uppercase',
 }
 
@@ -231,28 +252,35 @@ const dialValue: React.CSSProperties = {
   wordBreak: 'break-word',
 }
 
+const dialHint: React.CSSProperties = {
+  color: '#86efac',
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.10em',
+}
+
 const validateButton: React.CSSProperties = {
-  minHeight: 50,
+  minHeight: 52,
   borderRadius: 16,
-  border: '1px solid rgba(34,197,94,.26)',
+  border: '1px solid rgba(34,197,94,.24)',
   background:
-    'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.18))',
+    'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.16))',
   color: '#dcfce7',
   fontSize: 12,
   fontWeight: 900,
-  letterSpacing: '0.10em',
+  letterSpacing: '0.12em',
   padding: '0 16px',
 }
 
 const statusBox: React.CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
+  minHeight: 46,
+  borderRadius: 16,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(2,6,23,.34)',
+  background: 'rgba(15,23,42,.42)',
   color: '#cbd5e1',
   fontSize: 13,
-  lineHeight: 1.4,
-  padding: '10px 12px',
+  lineHeight: 1.45,
+  padding: '12px 14px',
 }
 
 const statusOk: React.CSSProperties = {
