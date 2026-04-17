@@ -29,6 +29,18 @@ export function InteractionSheet({
   const [code, setCode] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
 
+  const stageId = currentStage?.id ?? null
+  const stageType = currentStage?.type ?? null
+  const minigameDefinition = stageType
+    ? resolveMinigameDefinition(stageType)
+    : null
+  const hasNativeMinigame = Boolean(minigameDefinition)
+
+  useEffect(() => {
+    setCode('')
+    setShowRecovery(!hasNativeMinigame)
+  }, [stageId, hasNativeMinigame])
+
   if (!open || !currentStage) return null
 
   const typeLabel = (currentStage.type || 'interaction')
@@ -37,13 +49,6 @@ export function InteractionSheet({
 
   const narrative = currentStage.content?.trim() || ''
   const hint = currentStage.messages?.hint?.trim() || ''
-  const minigameDefinition = resolveMinigameDefinition(currentStage.type)
-  const hasNativeMinigame = Boolean(minigameDefinition)
-
-  useEffect(() => {
-    setCode('')
-    setShowRecovery(!hasNativeMinigame)
-  }, [currentStage?.id, hasNativeMinigame])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
