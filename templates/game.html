@@ -2387,7 +2387,6 @@ body.player-shell-v2-ready .prologue-btn{
 </div>
 <div class="flex gap-2">
         <button onclick="toggleDebug()" id="debug-btn" class="nav-btn border-zinc-600 text-zinc-400">DEBUG</button>
-        <button id="reset-btn" onclick="resetMission()" class="nav-btn border-red-900 text-red-500">RESTART</button>
     </div>
 </div>
 
@@ -2520,20 +2519,12 @@ async function requestPermissions() {
 
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button id="fin-login" class="btn-action" style="min-width:200px">RETURN TO LOGIN</button>
-              <button id="fin-reset" class="btn-action" style="min-width:200px;border-color:#b91c1c;background:#b91c1c">RESTART SESSION</button>
             </div>
           </div>
         `;
         document.body.appendChild(ov);
 
         document.getElementById("fin-login").onclick = ()=>{ window.location.href = "/"; };
-        document.getElementById("fin-reset").onclick = async ()=>{
-          if(!confirm("¿Reiniciar la partida?")) return;
-          try{
-            await fetch('/api/reset', {method:'POST', body: JSON.stringify({user: USER})});
-          }catch(e){}
-          window.location.href = "/";
-        };
       }else{
         ov.style.display="flex";
       }
@@ -4004,7 +3995,7 @@ document.addEventListener('DOMContentLoaded', function(){
 async function winGame() { beep(1000,0.2); setTimeout(()=>beep(1500,0.4),200); document.getElementById('game-canvas').innerHTML="<h1 class='text-4xl text-center animate-pulse text-green-500'>NODE ACTIVE</h1>"; await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:'OK'})}); setTimeout(()=>{closeGame();loadState()},2000); }
 async function checkRune() { let c=document.getElementById('rune-code').value.toUpperCase(); let r=await fetch('/api/advance',{method:'POST',body:JSON.stringify({user:USER,code:c})}); let d=await r.json(); if(d.status==='ok'){beep(1200,0.5);loadState();document.getElementById('rune-code').value="";} else alert("INVALID CODE"); }
 function toggleDebug(){debugMode=!debugMode;var b=document.getElementById('debug-btn');if(b){b.innerText=debugMode?'DEBUG':'DEBUG';b.classList.toggle('debug-on',debugMode);b.classList.toggle('debug-off',!debugMode);}if(!debugMode){try{var u=new URL(location.href);u.searchParams.set('v',Date.now());location.href=u.toString();}catch(e){location.reload();}return;}loadState();}
-function resetMission() { if(confirm("RESTART SESSION?")) fetch('/api/reset',{method:'POST',body:JSON.stringify({user:USER})}).then(()=>location.reload()); }
+function resetMission() { alert("SESSION RESET IS ADMIN-ONLY"); }
 
 loadState();
 

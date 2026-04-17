@@ -51,8 +51,6 @@ export function MapSurface({
   currentStage,
   className,
   playerPosition,
-  gpsState = 'unavailable',
-  debugSimulation = false,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -69,11 +67,9 @@ export function MapSurface({
     if (!mapRootRef.current || mapRef.current) return
 
     const map = L.map(mapRootRef.current, {
-      zoomControl: false,
-      attributionControl: true,
+      zoomControl: true,
+      attributionControl: false,
     })
-
-    L.control.zoom({ position: 'topright' }).addTo(map)
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -113,15 +109,18 @@ export function MapSurface({
 
     const radiusLayer = L.circle(center, {
       radius: stageMapData.radius,
+      color: '#22c55e',
       weight: 2,
       opacity: 0.95,
-      fillOpacity: 0.12,
+      fillColor: '#22c55e',
+      fillOpacity: 0.10,
     }).addTo(map)
 
     const markerLayer = L.circleMarker(center, {
-      radius: 9,
+      radius: 8,
       weight: 3,
-      opacity: 1,
+      color: '#16a34a',
+      fillColor: '#dcfce7',
       fillOpacity: 0.95,
     })
       .addTo(map)
@@ -135,8 +134,8 @@ export function MapSurface({
 
     if (!playerPosition) {
       map.fitBounds(radiusLayer.getBounds(), {
-        padding: [36, 36],
-        maxZoom: 17,
+        padding: [56, 56],
+        maxZoom: 16,
         animate: false,
       })
     }
@@ -161,7 +160,8 @@ export function MapSurface({
       {
         radius: 7,
         weight: 2,
-        opacity: 1,
+        color: '#2563eb',
+        fillColor: '#dbeafe',
         fillOpacity: 0.95,
       }
     )
@@ -182,12 +182,12 @@ export function MapSurface({
           [stageMapData.lat, stageMapData.lon],
           [playerPosition.lat, playerPosition.lon]
         )
-        map.fitBounds(bounds.pad(0.3), {
-          maxZoom: 17,
+        map.fitBounds(bounds.pad(0.30), {
+          maxZoom: 16,
           animate: false,
         })
       } else {
-        map.setView([stageMapData.lat, stageMapData.lon], 16, {
+        map.setView([stageMapData.lat, stageMapData.lon], 15, {
           animate: false,
         })
       }
@@ -196,90 +196,35 @@ export function MapSurface({
     map.invalidateSize({ pan: false })
   }, [playerPosition, stageMapData])
 
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const id = window.setTimeout(() => {
-      map.invalidateSize({ pan: false })
-    }, 0)
-
-    return () => window.clearTimeout(id)
-  }, [stageMapData, gpsState, debugSimulation])
-
-  const hasStage = !!stageMapData
-  const gpsLabel =
-    gpsState === 'ready'
-      ? 'GPS: READY'
-      : gpsState === 'stale'
-      ? 'GPS: LAST KNOWN'
-      : gpsState === 'searching'
-      ? 'GPS: SEARCHING'
-      : gpsState === 'error'
-      ? 'GPS: ERROR'
-      : 'GPS: UNAVAILABLE'
-
-  const playerLabel =
-    gpsState === 'ready'
-      ? 'PLAYER FIX'
-      : gpsState === 'stale'
-      ? 'PLAYER LAST KNOWN'
-      : playerPosition
-      ? 'PLAYER DATA'
-      : 'PLAYER ---'
-
   return (
-    <section className={className}>
-      <div className="map-surface">
-        <div
-          ref={mapRootRef}
-          className="map-surface__canvas"
-          aria-label="Current node map"
-        />
-
-        <div className="map-surface__overlay map-surface__overlay--top">
-          <div className="map-surface__title-block">
-            <span className="map-surface__eyebrow">MAP SURFACE</span>
-            <span className="map-surface__title">
-              {currentStage?.title || 'Awaiting node'}
-            </span>
-          </div>
-
-          <div className="map-surface__overlay-right">
-            <span className="map-surface__badge">
-              {hasStage ? 'NODE ONLINE' : 'NO NODE GPS'}
-            </span>
-
-            <span className="map-surface__meta">
-              {gpsLabel}
-              {debugSimulation ? ' · SIM' : ''}
-            </span>
-          </div>
-        </div>
-
-        <div className="map-surface__overlay map-surface__overlay--bottom">
-          <span className="map-surface__chip">
-            {typeof currentStage?.lat === 'number'
-              ? `LAT ${currentStage.lat.toFixed(5)}`
-              : 'LAT ---'}
-          </span>
-          <span className="map-surface__chip">
-            {typeof currentStage?.lon === 'number'
-              ? `LON ${currentStage.lon.toFixed(5)}`
-              : 'LON ---'}
-          </span>
-          <span className="map-surface__chip">
-            {typeof currentStage?.radius === 'number'
-              ? `RADIUS ${currentStage.radius} M`
-              : 'RADIUS ---'}
-          </span>
-          <span className="map-surface__chip map-surface__chip--player">
-            {playerLabel}
-          </span>
-        </div>
-      </div>
+    <section
+      className={['map-surface', className].filter(Boolean).join(' ')}
+      style={surface}
+    >
+      <div
+        ref={mapRootRef}
+        aria-label="Current node map"
+        style={canvas}
+      />
     </section>
   )
+}
+
+const surface: React.CSSProperties = {
+  position: 'relative',
+  width: '100%',
+  height: '100%',
+  minHeight: 0,
+  borderRadius: 28,
+  overflow: 'hidden',
+  border: '1px solid rgba(15,23,42,.10)',
+  background: '#dfe8dd',
+  boxShadow: '0 18px 40px rgba(15,23,42,.08)',
+}
+
+const canvas: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
 }
 
 export default MapSurface
