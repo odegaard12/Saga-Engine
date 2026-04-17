@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
@@ -27,6 +27,7 @@ export function InteractionSheet({
   onSubmitCode,
 }: InteractionSheetProps) {
   const [code, setCode] = useState('')
+  const [showRecovery, setShowRecovery] = useState(false)
 
   if (!open || !currentStage) return null
 
@@ -34,10 +35,15 @@ export function InteractionSheet({
     .replace(/_/g, ' ')
     .toUpperCase()
 
-  const narrative = currentStage.content?.trim() || helperText
+  const narrative = currentStage.content?.trim() || ''
   const hint = currentStage.messages?.hint?.trim() || ''
   const minigameDefinition = resolveMinigameDefinition(currentStage.type)
   const hasNativeMinigame = Boolean(minigameDefinition)
+
+  useEffect(() => {
+    setCode('')
+    setShowRecovery(!hasNativeMinigame)
+  }, [currentStage?.id, hasNativeMinigame])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -51,42 +57,43 @@ export function InteractionSheet({
   }
 
   return (
-    <div style={overlay}>
-      <div style={backdrop} onClick={submitting ? undefined : onClose} />
+    <>
+      <style>{sheetAnimations}</style>
 
-      <section style={sheet} aria-modal="true" role="dialog">
-        <div style={headerRow}>
-          <div style={headerCopy}>
-            <div style={eyebrow}>INTERACTION</div>
-            <div style={title}>{currentStage.title}</div>
-            <div style={metaRow}>
-              <span style={typeBadge}>{typeLabel}</span>
-              <span style={metaText}>USER {user}</span>
+      <div style={overlay}>
+        <div style={backdrop} onClick={submitting ? undefined : onClose} />
+
+        <section style={sheet} aria-modal="true" role="dialog">
+          <div style={headerRow}>
+            <div style={headerCopy}>
+              <div style={eyebrow}>INTERACTION</div>
+              <div style={title}>{currentStage.title}</div>
+              <div style={metaRow}>
+                <span style={typeBadge}>{typeLabel}</span>
+                <span style={metaText}>USER {user}</span>
+                {hasNativeMinigame && minigameDefinition ? (
+                  <span style={nativeBadge}>{minigameDefinition.label}</span>
+                ) : null}
+              </div>
             </div>
+
+            <button
+              type="button"
+              style={closeButton}
+              onClick={onClose}
+              disabled={submitting}
+            >
+              CLOSE
+            </button>
           </div>
 
-          <button
-            type="button"
-            style={closeButton}
-            onClick={onClose}
-            disabled={submitting}
-          >
-            CLOSE
-          </button>
-        </div>
-
-        <div style={contentStack}>
-          {narrative ? (
-            <section style={card}>
-              <div style={cardLabel}>MISSION CONTEXT</div>
-              <div style={cardText}>{narrative}</div>
-            </section>
-          ) : null}
-
-          {hint ? (
-            <section style={card}>
-              <div style={cardLabel}>HINT</div>
-              <div style={cardText}>{hint}</div>
+          {(narrative || hint || helperText) ? (
+            <section style={contextCard}>
+              <div style={contextLabel}>MISSION CONTEXT</div>
+              <div style={contextText}>
+                {narrative || helperText || 'No narrative provided for this node.'}
+              </div>
+              {hint ? <div style={hintText}>Hint: {hint}</div> : null}
             </section>
           ) : null}
 
@@ -99,60 +106,66 @@ export function InteractionSheet({
               onWin={handleNativeWin}
             />
           ) : (
-            <section style={card}>
-              <div style={cardLabel}>CURRENT BRIDGE MODE</div>
-              <div style={cardText}>
-                React already controls the player shell and submission flow. Until
-                this interaction gets a native React module, you can submit a
-                manual stage code here or open the legacy player for the full
-                interaction.
+            <section style={bridgeCard}>
+              <div style={bridgeLabel}>BRIDGE MODE</div>
+              <div style={bridgeText}>
+                This interaction still uses the bridge flow. Submit a stage code
+                manually or open the legacy runtime for the full interaction.
               </div>
             </section>
           )}
-        </div>
 
-        <form style={formWrap} onSubmit={handleSubmit}>
-          <label htmlFor="interaction-code" style={inputLabel}>
-            {hasNativeMinigame ? 'MANUAL FALLBACK CODE' : 'ENTER STAGE CODE'}
-          </label>
-
-          <div style={inputRow}>
-            <input
-              id="interaction-code"
-              value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
-              placeholder="ENTER CODE..."
-              autoComplete="off"
-              spellCheck={false}
-              style={input}
-              disabled={submitting}
-            />
-
+          <section style={recoveryWrap}>
             <button
-              type="submit"
-              style={submitButton}
-              disabled={submitting || !code.trim()}
+              type="button"
+              style={recoveryToggle}
+              onClick={() => setShowRecovery((current) => !current)}
             >
-              {submitting ? 'SUBMITTING...' : 'SUBMIT'}
+              {showRecovery ? 'HIDE RECOVERY TOOLS' : 'SHOW RECOVERY TOOLS'}
             </button>
-          </div>
 
-          {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
-        </form>
+            {showRecovery ? (
+              <div style={recoveryPanel}>
+                <form style={formWrap} onSubmit={handleSubmit}>
+                  <label htmlFor="interaction-code" style={inputLabel}>
+                    MANUAL FALLBACK CODE
+                  </label>
 
-        <div style={footerActions}>
-          {hasNativeMinigame && minigameDefinition ? (
-            <div style={footerNote}>
-              Native module active: {minigameDefinition.label}
-            </div>
-          ) : null}
+                  <div style={inputRow}>
+                    <input
+                      id="interaction-code"
+                      value={code}
+                      onChange={(event) => setCode(event.target.value.toUpperCase())}
+                      placeholder="ENTER CODE..."
+                      autoComplete="off"
+                      spellCheck={false}
+                      style={input}
+                      disabled={submitting}
+                    />
 
-          <a href={legacyPlayerHref} style={legacyLink}>
-            OPEN LEGACY INTERACTION
-          </a>
-        </div>
-      </section>
-    </div>
+                    <button
+                      type="submit"
+                      style={submitButton}
+                      disabled={submitting || !code.trim()}
+                    >
+                      {submitting ? 'SUBMITTING...' : 'SUBMIT'}
+                    </button>
+                  </div>
+
+                  {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
+                </form>
+
+                <div style={footerActions}>
+                  <a href={legacyPlayerHref} style={legacyLink}>
+                    OPEN LEGACY INTERACTION
+                  </a>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </section>
+      </div>
+    </>
   )
 }
 
@@ -169,8 +182,10 @@ const overlay: React.CSSProperties = {
 const backdrop: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.56)',
+  background: 'rgba(2,6,23,.58)',
   backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
+  animation: 'sagaFadeIn 160ms ease-out',
 }
 
 const sheet: React.CSSProperties = {
@@ -181,12 +196,13 @@ const sheet: React.CSSProperties = {
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.14)',
   background:
-    'linear-gradient(180deg, rgba(15,23,42,.94), rgba(15,23,42,.88))',
+    'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.90))',
   boxShadow: '0 30px 70px rgba(2,6,23,.42)',
   color: '#f8fafc',
   padding: 18,
   display: 'grid',
   gap: 16,
+  animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const headerRow: React.CSSProperties = {
@@ -223,34 +239,37 @@ const metaRow: React.CSSProperties = {
   marginTop: 10,
 }
 
-const typeBadge: React.CSSProperties = {
+const chipBase: React.CSSProperties = {
   minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
   borderRadius: 999,
-  background: 'rgba(59,130,246,.16)',
-  border: '1px solid rgba(96,165,250,.20)',
-  color: '#dbeafe',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
 }
 
+const typeBadge: React.CSSProperties = {
+  ...chipBase,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.20)',
+  color: '#dbeafe',
+}
+
 const metaText: React.CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 10px',
-  borderRadius: 999,
+  ...chipBase,
   background: 'rgba(255,255,255,.06)',
   border: '1px solid rgba(255,255,255,.08)',
   color: '#cbd5e1',
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.12em',
+}
+
+const nativeBadge: React.CSSProperties = {
+  ...chipBase,
+  background: 'rgba(34,197,94,.12)',
+  border: '1px solid rgba(34,197,94,.18)',
+  color: '#dcfce7',
 }
 
 const closeButton: React.CSSProperties = {
@@ -268,31 +287,80 @@ const closeButton: React.CSSProperties = {
   letterSpacing: '0.10em',
 }
 
-const contentStack: React.CSSProperties = {
-  display: 'grid',
-  gap: 12,
-}
-
-const card: React.CSSProperties = {
+const contextCard: React.CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.05)',
   padding: 14,
+  display: 'grid',
+  gap: 8,
 }
 
-const cardLabel: React.CSSProperties = {
+const contextLabel: React.CSSProperties = {
   color: 'rgba(148,163,184,.92)',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
-const cardText: React.CSSProperties = {
-  marginTop: 8,
+const contextText: React.CSSProperties = {
   color: '#e2e8f0',
   fontSize: 14,
   lineHeight: 1.55,
   whiteSpace: 'pre-wrap',
+}
+
+const hintText: React.CSSProperties = {
+  color: '#fde68a',
+  fontSize: 13,
+  lineHeight: 1.45,
+}
+
+const bridgeCard: React.CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
+  padding: 14,
+  display: 'grid',
+  gap: 8,
+}
+
+const bridgeLabel: React.CSSProperties = {
+  color: 'rgba(148,163,184,.92)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+}
+
+const bridgeText: React.CSSProperties = {
+  color: '#e2e8f0',
+  fontSize: 14,
+  lineHeight: 1.55,
+}
+
+const recoveryWrap: React.CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const recoveryToggle: React.CSSProperties = {
+  minHeight: 46,
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
+  color: '#cbd5e1',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+}
+
+const recoveryPanel: React.CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.04)',
+  padding: 14,
+  display: 'grid',
+  gap: 12,
 }
 
 const formWrap: React.CSSProperties = {
@@ -358,21 +426,6 @@ const footerActions: React.CSSProperties = {
   alignItems: 'center',
 }
 
-const footerNote: React.CSSProperties = {
-  minHeight: 44,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 14px',
-  borderRadius: 14,
-  border: '1px solid rgba(34,197,94,.18)',
-  background: 'rgba(34,197,94,.10)',
-  color: '#dcfce7',
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-}
-
 const legacyLink: React.CSSProperties = {
   minHeight: 44,
   display: 'inline-flex',
@@ -388,3 +441,21 @@ const legacyLink: React.CSSProperties = {
   letterSpacing: '0.08em',
   textDecoration: 'none',
 }
+
+const sheetAnimations = `
+@keyframes sagaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sagaSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`
