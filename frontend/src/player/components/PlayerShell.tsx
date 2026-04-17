@@ -8,6 +8,13 @@ interface PlayerShellProps {
   distanceMeters: number | null
 }
 
+function isPlaceholderStage(stage: PlayerStage | null): boolean {
+  if (!stage) return false
+  const title = String(stage.title || '').trim().toUpperCase()
+  const content = String(stage.content || '').trim().toUpperCase()
+  return title === 'NEW NODE' || content === 'PUT NODE TEXT HERE'
+}
+
 export function PlayerShell({
   payload,
   currentStage,
@@ -20,6 +27,7 @@ export function PlayerShell({
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
+  const placeholderStage = isPlaceholderStage(currentStage)
 
   const gpsLabel =
     gpsState === 'ready'
@@ -33,64 +41,81 @@ export function PlayerShell({
       : 'GPS UNAVAILABLE'
 
   const rangeLabel =
-    distanceMeters === null
-      ? 'RANGE ---'
+    payload.finished
+      ? 'ROUTE COMPLETE'
+      : distanceMeters === null
+      ? gpsState === 'stale'
+        ? 'RANGE STALE'
+        : gpsState === 'searching'
+        ? 'RANGE PENDING'
+        : 'NO LIVE RANGE'
       : inRange
       ? `RANGE ${distanceMeters}M`
       : `RANGE ${distanceMeters}M OUT`
 
   return (
-    <header style={wrap}>
-      <div
-        style={{
-          ...rail,
-          width: isCompact ? 'min(100%, 320px)' : 'min(100%, 760px)',
-          gridTemplateColumns: '1fr',
-          gap: isCompact ? 8 : 10,
-          padding: isCompact ? '10px 12px' : '10px 14px',
-        }}
-      >
-        <div style={identity}>
-          <div style={eyebrow}>
-            {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
-          </div>
+    <>
+      <style>{shellAnimations}</style>
 
-          <div
-            style={{
-              ...name,
-              fontSize: isCompact ? 15 : 18,
-            }}
-          >
-            {title}
-          </div>
-
-          <div
-            style={{
-              ...objective,
-              fontSize: isCompact ? 12 : 13,
-              whiteSpace: 'normal',
-              overflow: 'visible',
-              textOverflow: 'clip',
-            }}
-          >
-            {currentStage?.title || 'Awaiting node'}
-          </div>
-        </div>
-
+      <header style={wrap}>
         <div
           style={{
-            ...chips,
-            justifyContent: 'flex-start',
+            ...rail,
+            width: isCompact ? 'min(100%, 340px)' : 'min(100%, 760px)',
+            gridTemplateColumns: '1fr',
+            gap: isCompact ? 8 : 10,
+            padding: isCompact ? '10px 12px' : '10px 14px',
           }}
         >
-          <span style={stageChip}>
-            {payload.finished ? 'DONE' : `STAGE ${payload.level + 1}`}
-          </span>
-          <span style={getGpsChipStyle(gpsState)}>{gpsLabel}</span>
-          <span style={getRangeChipStyle(inRange)}>{rangeLabel}</span>
+          <div style={identity}>
+            <div style={eyebrow}>
+              {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
+            </div>
+
+            <div
+              style={{
+                ...name,
+                fontSize: isCompact ? 15 : 18,
+              }}
+            >
+              {title}
+            </div>
+
+            <div
+              style={{
+                ...objective,
+                fontSize: isCompact ? 12 : 13,
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                textOverflow: 'clip',
+              }}
+            >
+              {payload.finished
+                ? 'Mission complete'
+                : currentStage?.title || 'Awaiting node'}
+            </div>
+          </div>
+
+          <div
+            style={{
+              ...chips,
+              justifyContent: 'flex-start',
+            }}
+          >
+            <span style={stageChip}>
+              {payload.finished ? 'DONE' : `STAGE ${payload.level + 1}`}
+            </span>
+            <span style={getGpsChipStyle(gpsState)}>{gpsLabel}</span>
+            <span style={getRangeChipStyle(inRange, distanceMeters, payload.finished)}>
+              {rangeLabel}
+            </span>
+            {placeholderStage && !payload.finished ? (
+              <span style={draftChip}>DRAFT CONTENT</span>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   )
 }
 
@@ -121,13 +146,35 @@ function getGpsChipStyle(gpsState: PlayerGpsStatus): React.CSSProperties {
   }
 }
 
-function getRangeChipStyle(inRange: boolean): React.CSSProperties {
-  if (inRange) {
+function getRangeChipStyle(
+  inRange: boolean,
+  distanceMeters: number | null,
+  finished: boolean
+): React.CSSProperties {
+  if (finished) {
+    return {
+      ...chipBase,
+      border: '1px solid rgba(59,130,246,.16)',
+      background: 'rgba(219,234,254,.96)',
+      color: '#1e3a8a',
+    }
+  }
+
+  if (distanceMeters !== null && inRange) {
     return {
       ...chipBase,
       border: '1px solid rgba(22,163,74,.18)',
       background: 'rgba(220,252,231,.95)',
       color: '#166534',
+    }
+  }
+
+  if (distanceMeters !== null) {
+    return {
+      ...chipBase,
+      border: '1px solid rgba(245,158,11,.18)',
+      background: 'rgba(255,251,235,.96)',
+      color: '#92400e',
     }
   }
 
@@ -158,6 +205,7 @@ const rail: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
   pointerEvents: 'auto',
   boxSizing: 'border-box',
+  animation: 'sagaRailIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const identity: React.CSSProperties = {
@@ -212,3 +260,23 @@ const stageChip: React.CSSProperties = {
   background: 'rgba(219,234,254,.96)',
   color: '#1e3a8a',
 }
+
+const draftChip: React.CSSProperties = {
+  ...chipBase,
+  border: '1px solid rgba(148,163,184,.16)',
+  background: 'rgba(241,245,249,.94)',
+  color: '#475569',
+}
+
+const shellAnimations = `
+@keyframes sagaRailIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`

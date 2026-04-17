@@ -62,6 +62,10 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
+function canShowLiveDistance(gpsState: PlayerGpsStatus): boolean {
+  return gpsState === 'ready' || gpsState === 'stale'
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -128,7 +132,7 @@ export default function PlayerApp() {
   const playerPosition = getPlayerPosition(payload)
   const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
 
-  const distanceMeters =
+  const rawDistanceMeters =
     currentStage && playerPosition
       ? Math.round(
           getDistanceMeters(playerPosition, {
@@ -136,6 +140,11 @@ export default function PlayerApp() {
             lon: currentStage.lon,
           })
         )
+      : null
+
+  const distanceMeters =
+    rawDistanceMeters !== null && canShowLiveDistance(gpsState)
+      ? rawDistanceMeters
       : null
 
   const inRange =
