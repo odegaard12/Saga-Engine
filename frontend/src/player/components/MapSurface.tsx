@@ -9,6 +9,7 @@ type MapSurfaceProps = {
   playerPosition?: { lat: number; lon: number } | null
   gpsState?: PlayerGpsStatus
   debugSimulation?: boolean
+  onNodeTap?: () => void
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -51,6 +52,7 @@ export function MapSurface({
   currentStage,
   className,
   playerPosition,
+  onNodeTap,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -67,7 +69,7 @@ export function MapSurface({
     if (!mapRootRef.current || mapRef.current) return
 
     const map = L.map(mapRootRef.current, {
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: false,
     })
 
@@ -111,9 +113,10 @@ export function MapSurface({
       radius: stageMapData.radius,
       color: '#22c55e',
       weight: 2,
-      opacity: 0.95,
+      opacity: 0.85,
       fillColor: '#22c55e',
-      fillOpacity: 0.10,
+      fillOpacity: 0.08,
+      className: 'saga-node-radius',
     }).addTo(map)
 
     const markerLayer = L.circleMarker(center, {
@@ -121,13 +124,14 @@ export function MapSurface({
       weight: 3,
       color: '#16a34a',
       fillColor: '#dcfce7',
-      fillOpacity: 0.95,
-    })
-      .addTo(map)
-      .bindTooltip(stageMapData.name, {
-        direction: 'top',
-        offset: [0, -8],
-      })
+      fillOpacity: 0.98,
+      className: 'saga-node-core',
+    }).addTo(map)
+
+    if (onNodeTap) {
+      radiusLayer.on('click', onNodeTap)
+      markerLayer.on('click', onNodeTap)
+    }
 
     nodeRadiusRef.current = radiusLayer
     nodeMarkerRef.current = markerLayer
@@ -141,7 +145,7 @@ export function MapSurface({
     }
 
     map.invalidateSize({ pan: false })
-  }, [stageMapData, playerPosition])
+  }, [stageMapData, playerPosition, onNodeTap])
 
   useEffect(() => {
     const map = mapRef.current
@@ -163,13 +167,9 @@ export function MapSurface({
         color: '#2563eb',
         fillColor: '#dbeafe',
         fillOpacity: 0.95,
+        className: 'saga-player-dot',
       }
-    )
-      .addTo(map)
-      .bindTooltip('Player position', {
-        direction: 'top',
-        offset: [0, -8],
-      })
+    ).addTo(map)
 
     if (stageMapData) {
       const distance = getDistanceMeters(playerPosition, {
@@ -197,16 +197,20 @@ export function MapSurface({
   }, [playerPosition, stageMapData])
 
   return (
-    <section
-      className={['map-surface', className].filter(Boolean).join(' ')}
-      style={surface}
-    >
-      <div
-        ref={mapRootRef}
-        aria-label="Current node map"
-        style={canvas}
-      />
-    </section>
+    <>
+      <style>{mapAnimations}</style>
+
+      <section
+        className={['map-surface', className].filter(Boolean).join(' ')}
+        style={surface}
+      >
+        <div
+          ref={mapRootRef}
+          aria-label="Current node map"
+          style={canvas}
+        />
+      </section>
+    </>
   )
 }
 
@@ -226,5 +230,37 @@ const canvas: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
 }
+
+const mapAnimations = `
+.saga-node-radius {
+  animation: sagaNodePulse 1800ms ease-out infinite;
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.saga-node-core {
+  cursor: pointer;
+  filter: drop-shadow(0 0 8px rgba(34,197,94,.28));
+}
+
+.saga-player-dot {
+  filter: drop-shadow(0 0 8px rgba(37,99,235,.22));
+}
+
+@keyframes sagaNodePulse {
+  0% {
+    stroke-opacity: .9;
+    fill-opacity: .10;
+  }
+  50% {
+    stroke-opacity: .55;
+    fill-opacity: .04;
+  }
+  100% {
+    stroke-opacity: .9;
+    fill-opacity: .10;
+  }
+}
+`
 
 export default MapSurface

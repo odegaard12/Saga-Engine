@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
@@ -15,6 +15,13 @@ interface InteractionSheetProps {
   onSubmitCode: (code: string) => Promise<void>
 }
 
+function vibrate(pattern: number | number[]) {
+  if (typeof window === 'undefined') return
+  if (!('navigator' in window)) return
+  if (typeof window.navigator.vibrate !== 'function') return
+  window.navigator.vibrate(pattern)
+}
+
 export function InteractionSheet({
   open,
   user,
@@ -28,6 +35,10 @@ export function InteractionSheet({
 }: InteractionSheetProps) {
   const [code, setCode] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+
+  const touchStartYRef = useRef<number | null>(null)
+  const touchStartXRef = useRef<number | null>(null)
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.type ?? null
@@ -39,7 +50,14 @@ export function InteractionSheet({
   useEffect(() => {
     setCode('')
     setShowRecovery(!hasNativeMinigame)
+    setDragOffset(0)
   }, [stageId, hasNativeMinigame])
+
+  useEffect(() => {
+    if (open && currentStage) {
+      vibrate(10)
+    }
+  }, [open, stageId])
 
   if (!open || !currentStage) return null
 
@@ -58,7 +76,44 @@ export function InteractionSheet({
   }
 
   async function handleNativeWin() {
+    vibrate([12, 20, 12])
     await onSubmitCode('OK')
+  }
+
+  function handleClose() {
+    vibrate(10)
+    onClose()
+  }
+
+  function handleTouchStart(event: React.TouchEvent<HTMLElement>) {
+    if (event.touches.length !== 1) return
+    touchStartYRef.current = event.touches[0].clientY
+    touchStartXRef.current = event.touches[0].clientX
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLElement>) {
+    if (touchStartYRef.current === null || touchStartXRef.current === null) return
+    const deltaY = event.touches[0].clientY - touchStartYRef.current
+    const deltaX = event.touches[0].clientX - touchStartXRef.current
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) return
+    if (deltaY <= 0) {
+      setDragOffset(0)
+      return
+    }
+
+    setDragOffset(Math.min(deltaY, 140))
+  }
+
+  function handleTouchEnd() {
+    if (dragOffset > 90 && !submitting) {
+      vibrate([8, 12, 8])
+      onClose()
+    }
+
+    setDragOffset(0)
+    touchStartYRef.current = null
+    touchStartXRef.current = null
   }
 
   return (
@@ -66,9 +121,27 @@ export function InteractionSheet({
       <style>{sheetAnimations}</style>
 
       <div style={overlay}>
-        <div style={backdrop} onClick={submitting ? undefined : onClose} />
+        <div style={backdrop} onClick={submitting ? undefined : handleClose} />
 
-        <section style={sheet} aria-modal="true" role="dialog">
+        <section
+          style={{
+            ...sheet,
+            transform: `translateY(${dragOffset}px)`,
+            transition:
+              dragOffset === 0
+                ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease-out'
+                : 'none',
+          }}
+          aria-modal="true"
+          role="dialog"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div style={dragHandleWrap}>
+            <div style={dragHandle} />
+          </div>
+
           <div style={headerRow}>
             <div style={headerCopy}>
               <div style={eyebrow}>INTERACTION</div>
@@ -85,7 +158,7 @@ export function InteractionSheet({
             <button
               type="button"
               style={closeButton}
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             >
               CLOSE
@@ -124,7 +197,10 @@ export function InteractionSheet({
             <button
               type="button"
               style={recoveryToggle}
-              onClick={() => setShowRecovery((current) => !current)}
+              onClick={() => {
+                vibrate(8)
+                setShowRecovery((current) => !current)
+              }}
             >
               {showRecovery ? 'HIDE RECOVERY TOOLS' : 'SHOW RECOVERY TOOLS'}
             </button>
@@ -204,10 +280,25 @@ const sheet: React.CSSProperties = {
     'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.90))',
   boxShadow: '0 30px 70px rgba(2,6,23,.42)',
   color: '#f8fafc',
-  padding: 18,
+  padding: 14,
   display: 'grid',
-  gap: 16,
+  gap: 14,
   animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  willChange: 'transform',
+}
+
+const dragHandleWrap: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingTop: 2,
+}
+
+const dragHandle: React.CSSProperties = {
+  width: 44,
+  height: 5,
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.18)',
 }
 
 const headerRow: React.CSSProperties = {

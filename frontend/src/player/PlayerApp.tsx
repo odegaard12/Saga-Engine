@@ -12,6 +12,13 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload }
 
+function vibrate(pattern: number | number[]) {
+  if (typeof window === 'undefined') return
+  if (!('navigator' in window)) return
+  if (typeof window.navigator.vibrate !== 'function') return
+  window.navigator.vibrate(pattern)
+}
+
 function getUserFromUrl(): string {
   const params = new URLSearchParams(window.location.search)
   return params.get('user') || 'PLAYER 1'
@@ -181,14 +188,33 @@ export default function PlayerApp() {
   }
 
   function handleToggleDebug() {
+    vibrate(8)
     setLocalDebugEnabled((current) => !current)
+  }
+
+  function openInteraction() {
+    setSubmitError(null)
+    setActivePanel(null)
+    setInteractionOpen(true)
   }
 
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
-    setSubmitError(null)
-    setActivePanel(null)
-    setInteractionOpen(true)
+    vibrate([10, 16, 10])
+    openInteraction()
+  }
+
+  function handleMapNodeTap() {
+    if (payload.finished) return
+
+    if (runtime.canEnter) {
+      vibrate([10, 16, 10])
+      openInteraction()
+      return
+    }
+
+    vibrate(8)
+    setActivePanel('details')
   }
 
   async function handleSubmitCode(code: string) {
@@ -221,6 +247,7 @@ export default function PlayerApp() {
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={effectiveDebugEnabled}
+          onNodeTap={handleMapNodeTap}
         />
 
         <div style={topScrim} />
