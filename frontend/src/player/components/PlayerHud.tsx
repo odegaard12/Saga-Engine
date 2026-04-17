@@ -29,129 +29,150 @@ export function PlayerHud({
   finished,
   gpsState,
   distanceMeters,
-  inRange,
-  debugEnabled,
-  legacyPlayerHref,
-  legacyLoginHref,
-  adminHref,
-  detailsOpen,
-  menuOpen,
   primaryLabel,
   primaryTone,
   primaryDisabled,
   helperText,
+  detailsOpen,
+  menuOpen,
   onPrimaryAction,
   onToggleDetails,
   onToggleMenu,
+  legacyPlayerHref,
+  legacyLoginHref,
+  adminHref,
+  debugEnabled,
 }: PlayerHudProps) {
-  const rangeText = finished ? 'DONE' : inRange ? 'INSIDE' : 'OUTSIDE'
-
   return (
-    <section style={hudWrap}>
-      <div style={topRow}>
-        <div style={titleBlock}>
-          <div style={eyebrow}>MISSION</div>
-          <div style={headline}>
-            {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
+    <>
+      <style>{menuAnimations}</style>
+
+      <section style={tray}>
+        <div style={missionRow}>
+          <div style={missionCopy}>
+            <div style={eyebrow}>MISSION</div>
+            <div style={headline}>
+              {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
+            </div>
+            <div style={subline}>STAGE {level + 1}</div>
           </div>
-          <div style={subline}>STAGE {level + 1}</div>
         </div>
-
-        <div style={rangePill}>
-          <span style={rangeLabel}>RANGE</span>
-          <span style={rangeValue}>{rangeText}</span>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        style={getMainButtonStyle(primaryTone, primaryDisabled)}
-        disabled={primaryDisabled}
-        onClick={onPrimaryAction}
-      >
-        {primaryLabel}
-      </button>
-
-      <div style={helperCopy}>{helperText}</div>
-
-      <div style={bottomControls}>
-        <button
-          type="button"
-          style={getSecondaryButtonStyle(detailsOpen)}
-          onClick={onToggleDetails}
-        >
-          {detailsOpen ? 'HIDE DETAILS' : 'DETAILS'}
-        </button>
 
         <button
           type="button"
-          style={getSecondaryButtonStyle(menuOpen)}
-          onClick={onToggleMenu}
+          style={getPrimaryStyle(primaryTone, primaryDisabled)}
+          disabled={primaryDisabled}
+          onClick={onPrimaryAction}
         >
-          {menuOpen ? 'CLOSE MENU' : 'MENU'}
+          {primaryLabel}
         </button>
-      </div>
 
-      {detailsOpen ? (
-        <div style={detailsGrid}>
-          <DetailCard
-            label="DISTANCE"
-            value={distanceMeters === null ? '---' : `${distanceMeters} m`}
-          />
-          <DetailCard
-            label="GPS"
-            value={String(gpsState || 'unknown').replace(/_/g, ' ').toUpperCase()}
-          />
-          <DetailCard
-            label="LAT"
-            value={
-              typeof currentStage?.lat === 'number'
-                ? currentStage.lat.toFixed(5)
-                : '---'
-            }
-          />
-          <DetailCard
-            label="RADIUS"
-            value={
-              typeof currentStage?.radius === 'number'
-                ? `${currentStage.radius} m`
-                : '---'
-            }
-          />
+        <div style={helper}>{helperText}</div>
+
+        <div style={actionsRow}>
+          <button
+            type="button"
+            style={getSecondaryStyle(detailsOpen)}
+            onClick={onToggleDetails}
+          >
+            {detailsOpen ? 'HIDE DETAILS' : 'DETAILS'}
+          </button>
+
+          <button
+            type="button"
+            style={getSecondaryStyle(menuOpen)}
+            onClick={onToggleMenu}
+          >
+            {menuOpen ? 'CLOSE MENU' : 'MENU'}
+          </button>
         </div>
-      ) : null}
+
+        {detailsOpen ? (
+          <div style={detailsGrid}>
+            <DetailCard
+              label="DISTANCE"
+              value={distanceMeters === null ? '---' : `${distanceMeters} m`}
+            />
+            <DetailCard
+              label="GPS"
+              value={String(gpsState || 'unknown').replace(/_/g, ' ').toUpperCase()}
+            />
+            <DetailCard
+              label="LAT"
+              value={
+                typeof currentStage?.lat === 'number'
+                  ? currentStage.lat.toFixed(5)
+                  : '---'
+              }
+            />
+            <DetailCard
+              label="RADIUS"
+              value={
+                typeof currentStage?.radius === 'number'
+                  ? `${currentStage.radius} m`
+                  : '---'
+              }
+            />
+          </div>
+        ) : null}
+      </section>
 
       {menuOpen ? (
-        <div style={menuPanel}>
-          <div style={menuInfoCard}>
-            <div style={menuInfoLabel}>DEBUG</div>
-            <div style={menuInfoValue}>{debugEnabled ? 'ON' : 'OFF'}</div>
-          </div>
+        <div style={menuOverlay}>
+          <div style={menuBackdrop} onClick={onToggleMenu} />
 
-          <a href={legacyPlayerHref} style={menuLink}>
-            LEGACY PLAYER
-          </a>
+          <aside style={menuSheet} aria-modal="true" role="dialog">
+            <div style={menuHeader}>
+              <div>
+                <div style={menuEyebrow}>FIELD MENU</div>
+                <div style={menuTitle}>Mission controls</div>
+              </div>
 
-          <a href={legacyLoginHref} style={menuLink}>
-            MISSION ENTRY
-          </a>
+              <button
+                type="button"
+                aria-label="Close menu"
+                style={closeButton}
+                onClick={onToggleMenu}
+              >
+                ×
+              </button>
+            </div>
 
-          <a href={adminHref} style={menuLink}>
-            ADMIN
-          </a>
+            <div style={menuMetaRow}>
+              <div style={menuMetaCard}>
+                <div style={menuMetaLabel}>NODE</div>
+                <div style={menuMetaValue}>
+                  {currentStage?.title || 'Awaiting node'}
+                </div>
+              </div>
+
+              <div style={menuMetaCard}>
+                <div style={menuMetaLabel}>DEBUG</div>
+                <div style={menuMetaValue}>{debugEnabled ? 'ON' : 'OFF'}</div>
+              </div>
+            </div>
+
+            <div style={menuLinksGrid}>
+              <a href={legacyPlayerHref} style={menuLink}>
+                LEGACY PLAYER
+              </a>
+
+              <a href={legacyLoginHref} style={menuLink}>
+                MISSION ENTRY
+              </a>
+
+              <a href={adminHref} style={menuLink}>
+                ADMIN
+              </a>
+            </div>
+          </aside>
         </div>
       ) : null}
-    </section>
+    </>
   )
 }
 
-function DetailCard({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
+function DetailCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={detailCard}>
       <div style={detailLabel}>{label}</div>
@@ -160,168 +181,133 @@ function DetailCard({
   )
 }
 
-function getMainButtonStyle(
+function getPrimaryStyle(
   tone: PrimaryActionTone,
   disabled: boolean
 ): React.CSSProperties {
   const base: React.CSSProperties = {
     width: '100%',
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: 18,
     fontSize: 14,
     fontWeight: 900,
     letterSpacing: '0.12em',
-    boxShadow:
-      '0 10px 24px rgba(2,6,23,.22), inset 0 1px 0 rgba(255,255,255,.04)',
   }
 
   if (disabled || tone === 'locked') {
     return {
       ...base,
       border: '1px solid rgba(148,163,184,.18)',
-      background:
-        'linear-gradient(180deg, rgba(51,65,85,.90), rgba(30,41,59,.92))',
-      color: '#cbd5e1',
+      background: 'rgba(226,232,240,.96)',
+      color: '#64748b',
     }
   }
 
   if (tone === 'gps') {
     return {
       ...base,
-      border: '1px solid rgba(245,158,11,.22)',
-      background:
-        'linear-gradient(180deg, rgba(245,158,11,.18), rgba(180,83,9,.14))',
-      color: '#fde68a',
+      border: '1px solid rgba(245,158,11,.24)',
+      background: 'rgba(254,243,199,.98)',
+      color: '#92400e',
     }
   }
 
   if (tone === 'done') {
     return {
       ...base,
-      border: '1px solid rgba(96,165,250,.18)',
-      background:
-        'linear-gradient(180deg, rgba(59,130,246,.18), rgba(37,99,235,.14))',
-      color: '#dbeafe',
+      border: '1px solid rgba(59,130,246,.16)',
+      background: 'rgba(219,234,254,.96)',
+      color: '#1e3a8a',
     }
   }
 
   return {
     ...base,
-    border: '1px solid rgba(34,197,94,.24)',
-    background:
-      'linear-gradient(180deg, rgba(34,197,94,.26), rgba(22,163,74,.18))',
-    color: '#dcfce7',
+    border: '1px solid rgba(22,163,74,.18)',
+    background: 'linear-gradient(180deg, #16a34a, #15803d)',
+    color: '#ffffff',
+    boxShadow: '0 10px 24px rgba(22,163,74,.22)',
   }
 }
 
-function getSecondaryButtonStyle(active: boolean): React.CSSProperties {
+function getSecondaryStyle(active: boolean): React.CSSProperties {
   return {
-    minHeight: 42,
+    minHeight: 46,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
     border: active
-      ? '1px solid rgba(96,165,250,.24)'
-      : '1px solid rgba(255,255,255,.08)',
-    background: active ? 'rgba(59,130,246,.12)' : 'rgba(255,255,255,.05)',
-    color: '#f8fafc',
+      ? '1px solid rgba(59,130,246,.18)'
+      : '1px solid rgba(15,23,42,.08)',
+    background: active ? 'rgba(219,234,254,.96)' : 'rgba(248,250,252,.96)',
+    color: active ? '#1e3a8a' : '#334155',
     fontSize: 12,
     fontWeight: 900,
     letterSpacing: '0.08em',
     padding: '0 12px',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.03)',
   }
 }
 
-const hudWrap: React.CSSProperties = {
+const tray: React.CSSProperties = {
   pointerEvents: 'auto',
-  width: 'min(100%, 960px)',
+  width: 'min(100%, 820px)',
   margin: '0 auto',
   borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.12)',
-  background:
-    'linear-gradient(180deg, rgba(15,23,42,.88), rgba(15,23,42,.74))',
-  boxShadow:
-    '0 20px 48px rgba(2,6,23,.18), inset 0 1px 0 rgba(255,255,255,.05)',
-  backdropFilter: 'blur(18px)',
-  padding: 12,
-  color: '#f8fafc',
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(255,255,255,.92)',
+  boxShadow: '0 18px 40px rgba(15,23,42,.08)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  padding: 14,
+  color: '#0f172a',
   display: 'grid',
   gap: 10,
 }
 
-const topRow: React.CSSProperties = {
+const missionRow: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   gap: 12,
 }
 
-const titleBlock: React.CSSProperties = {
+const missionCopy: React.CSSProperties = {
   minWidth: 0,
-  flex: '1 1 auto',
 }
 
 const eyebrow: React.CSSProperties = {
-  color: 'rgba(167,243,208,.92)',
+  color: '#047857',
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.18em',
+  letterSpacing: '0.16em',
 }
 
 const headline: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 16,
-  fontWeight: 900,
-  lineHeight: 1.08,
-  letterSpacing: '-0.03em',
   marginTop: 6,
-  wordBreak: 'break-word',
+  color: '#0f172a',
+  fontSize: 22,
+  fontWeight: 900,
+  lineHeight: 1,
+  letterSpacing: '-0.03em',
 }
 
 const subline: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
+  marginTop: 6,
+  color: '#64748b',
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.12em',
-  marginTop: 6,
 }
 
-const rangePill: React.CSSProperties = {
-  minHeight: 32,
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  whiteSpace: 'nowrap',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
-}
-
-const rangeLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.14em',
-}
-
-const rangeValue: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 13,
-  fontWeight: 800,
-}
-
-const helperCopy: React.CSSProperties = {
-  color: '#cbd5e1',
-  fontSize: 13,
+const helper: React.CSSProperties = {
+  color: '#475569',
+  fontSize: 14,
   lineHeight: 1.45,
   minHeight: 18,
 }
 
-const bottomControls: React.CSSProperties = {
+const actionsRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 10,
@@ -335,21 +321,21 @@ const detailsGrid: React.CSSProperties = {
 
 const detailCard: React.CSSProperties = {
   borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
   padding: '12px 12px 10px',
   minWidth: 0,
 }
 
 const detailLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
+  color: '#64748b',
   fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.14em',
 }
 
 const detailValue: React.CSSProperties = {
-  color: '#f8fafc',
+  color: '#0f172a',
   fontSize: 14,
   fontWeight: 800,
   marginTop: 6,
@@ -358,46 +344,141 @@ const detailValue: React.CSSProperties = {
   textOverflow: 'ellipsis',
 }
 
-const menuPanel: React.CSSProperties = {
+const menuOverlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 4000,
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  padding: 12,
+}
+
+const menuBackdrop: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'rgba(15,23,42,.34)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
+  animation: 'sagaFadeIn 160ms ease-out',
+}
+
+const menuSheet: React.CSSProperties = {
+  position: 'relative',
+  width: 'min(100%, 560px)',
+  borderRadius: 24,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(255,255,255,.96)',
+  boxShadow: '0 28px 60px rgba(15,23,42,.18)',
+  padding: 16,
+  display: 'grid',
+  gap: 14,
+  animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const menuHeader: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+
+const menuEyebrow: React.CSSProperties = {
+  color: '#047857',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+}
+
+const menuTitle: React.CSSProperties = {
+  marginTop: 6,
+  color: '#0f172a',
+  fontSize: 22,
+  fontWeight: 900,
+  lineHeight: 1,
+  letterSpacing: '-0.03em',
+}
+
+const closeButton: React.CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 999,
+  border: '1px solid rgba(239,68,68,.18)',
+  background: 'rgba(239,68,68,.14)',
+  color: '#b91c1c',
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 10px 24px rgba(239,68,68,.14)',
+}
+
+const menuMetaRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 10,
 }
 
-const menuInfoCard: React.CSSProperties = {
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  padding: 10,
+const menuMetaCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  padding: 12,
 }
 
-const menuInfoLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
+const menuMetaLabel: React.CSSProperties = {
+  color: '#64748b',
   fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.14em',
 }
 
-const menuInfoValue: React.CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 13,
-  fontWeight: 800,
+const menuMetaValue: React.CSSProperties = {
   marginTop: 6,
+  color: '#0f172a',
+  fontSize: 14,
+  fontWeight: 800,
+  lineHeight: 1.2,
   wordBreak: 'break-word',
 }
 
+const menuLinksGrid: React.CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
 const menuLink: React.CSSProperties = {
-  minHeight: 42,
+  minHeight: 48,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  color: '#f8fafc',
+  padding: '0 14px',
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  color: '#0f172a',
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '0.08em',
   textDecoration: 'none',
 }
+
+const menuAnimations = `
+@keyframes sagaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sagaSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`
