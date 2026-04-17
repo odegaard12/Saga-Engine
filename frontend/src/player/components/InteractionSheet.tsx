@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
+import { resolveMinigameDefinition } from '../minigames/registry'
+import { MinigameHost } from './MinigameHost'
 
 interface InteractionSheetProps {
   open: boolean
@@ -34,12 +36,18 @@ export function InteractionSheet({
 
   const narrative = currentStage.content?.trim() || helperText
   const hint = currentStage.messages?.hint?.trim() || ''
+  const minigameDefinition = resolveMinigameDefinition(currentStage.type)
+  const hasNativeMinigame = Boolean(minigameDefinition)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalized = code.trim().toUpperCase()
     if (!normalized || submitting) return
     await onSubmitCode(normalized)
+  }
+
+  async function handleNativeWin() {
+    await onSubmitCode('OK')
   }
 
   return (
@@ -82,20 +90,30 @@ export function InteractionSheet({
             </section>
           ) : null}
 
-          <section style={card}>
-            <div style={cardLabel}>CURRENT BRIDGE MODE</div>
-            <div style={cardText}>
-              React already controls the player shell and submission flow. Until
-              this minigame gets a native React wrapper, you can either submit a
-              manual stage code here or open the legacy player for the full
-              interaction.
-            </div>
-          </section>
+          {minigameDefinition ? (
+            <MinigameHost
+              definition={minigameDefinition}
+              stage={currentStage}
+              helperText={helperText}
+              submitting={submitting}
+              onWin={handleNativeWin}
+            />
+          ) : (
+            <section style={card}>
+              <div style={cardLabel}>CURRENT BRIDGE MODE</div>
+              <div style={cardText}>
+                React already controls the player shell and submission flow. Until
+                this interaction gets a native React module, you can submit a
+                manual stage code here or open the legacy player for the full
+                interaction.
+              </div>
+            </section>
+          )}
         </div>
 
         <form style={formWrap} onSubmit={handleSubmit}>
           <label htmlFor="interaction-code" style={inputLabel}>
-            ENTER STAGE CODE
+            {hasNativeMinigame ? 'MANUAL FALLBACK CODE' : 'ENTER STAGE CODE'}
           </label>
 
           <div style={inputRow}>
@@ -123,6 +141,12 @@ export function InteractionSheet({
         </form>
 
         <div style={footerActions}>
+          {hasNativeMinigame && minigameDefinition ? (
+            <div style={footerNote}>
+              Native module active: {minigameDefinition.label}
+            </div>
+          ) : null}
+
           <a href={legacyPlayerHref} style={legacyLink}>
             OPEN LEGACY INTERACTION
           </a>
@@ -331,6 +355,22 @@ const footerActions: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 10,
+  alignItems: 'center',
+}
+
+const footerNote: React.CSSProperties = {
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 14px',
+  borderRadius: 14,
+  border: '1px solid rgba(34,197,94,.18)',
+  background: 'rgba(34,197,94,.10)',
+  color: '#dcfce7',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
 }
 
 const legacyLink: React.CSSProperties = {
