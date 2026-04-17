@@ -9,6 +9,7 @@ interface PlayerHudProps {
   distanceMeters: number | null
   inRange: boolean
   debugEnabled: boolean
+  mapNotice: string | null
   legacyPlayerHref: string
   legacyLoginHref: string
   adminHref: string
@@ -25,12 +26,40 @@ interface PlayerHudProps {
   onToggleDebug: () => void
 }
 
+function isPlaceholderStage(stage: PlayerStage | null): boolean {
+  if (!stage) return false
+  const title = String(stage.title || '').trim().toUpperCase()
+  const content = String(stage.content || '').trim().toUpperCase()
+  return title === 'NEW NODE' || content === 'PUT NODE TEXT HERE'
+}
+
+function getGpsDisplay(gpsState: string): string {
+  const value = String(gpsState || 'unknown').toLowerCase()
+  if (value === 'ready') return 'LIVE GPS'
+  if (value === 'stale') return 'LAST KNOWN'
+  if (value === 'searching') return 'SEARCHING'
+  if (value === 'error') return 'GPS ERROR'
+  return 'UNAVAILABLE'
+}
+
+function getDistanceDisplay(
+  finished: boolean,
+  distanceMeters: number | null,
+  inRange: boolean
+): string {
+  if (finished) return 'ROUTE COMPLETE'
+  if (distanceMeters === null) return 'NO LIVE RANGE'
+  if (inRange) return `IN RANGE · ${distanceMeters} M`
+  return `${distanceMeters} M AWAY`
+}
+
 export function PlayerHud({
   currentStage,
   level,
   finished,
   gpsState,
   distanceMeters,
+  inRange,
   primaryLabel,
   primaryTone,
   primaryDisabled,
@@ -46,9 +75,14 @@ export function PlayerHud({
   legacyLoginHref,
   adminHref,
   debugEnabled,
+  mapNotice,
 }: PlayerHudProps) {
-  const isCompact =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const compact =
+    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
+
+  const placeholderStage = isPlaceholderStage(currentStage)
+  const distanceDisplay = getDistanceDisplay(finished, distanceMeters, inRange)
+  const gpsDisplay = getGpsDisplay(gpsState)
 
   return (
     <>
@@ -57,23 +91,52 @@ export function PlayerHud({
       <section
         style={{
           ...tray,
-          width: isCompact ? '100%' : 'min(100%, 760px)',
-          padding: isCompact ? 12 : 14,
+          width: compact ? '100%' : 'min(100%, 760px)',
+          padding: compact ? 12 : 14,
+          gap: compact ? 9 : 10,
         }}
       >
         <div style={missionRow}>
           <div style={missionCopy}>
-            <div style={eyebrow}>MISSION</div>
+            <div style={eyebrow}>{finished ? 'MISSION STATUS' : 'MISSION'}</div>
             <div
               style={{
                 ...headline,
-                fontSize: isCompact ? 18 : 22,
+                fontSize: compact ? 18 : 22,
               }}
             >
               {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
             </div>
-            <div style={subline}>STAGE {level + 1}</div>
+
+            <div style={metaInline}>
+              <span style={stageBadge}>
+                {finished ? 'DONE' : `STAGE ${level + 1}`}
+              </span>
+
+              {placeholderStage && !finished ? (
+                <span style={mutedBadge}>DRAFT NODE</span>
+              ) : null}
+
+              {debugEnabled && !finished ? (
+                <span style={debugBadge}>DEBUG ON</span>
+              ) : null}
+            </div>
           </div>
+        </div>
+
+        {mapNotice ? <div style={mapNoticeCard}>{mapNotice}</div> : null}
+
+        <div style={summaryGrid}>
+          <SummaryCard
+            label="PROXIMITY"
+            value={distanceDisplay}
+            emphasis={finished ? 'info' : inRange ? 'good' : 'neutral'}
+          />
+          <SummaryCard
+            label="GPS FEED"
+            value={gpsDisplay}
+            emphasis={gpsState === 'ready' ? 'good' : gpsState === 'stale' ? 'warn' : 'neutral'}
+          />
         </div>
 
         <button
@@ -85,7 +148,20 @@ export function PlayerHud({
           {primaryLabel}
         </button>
 
-        <div style={helper}>{helperText}</div>
+        <div
+          style={{
+            ...helperCard,
+            ...(finished
+              ? helperInfo
+              : primaryTone === 'gps'
+              ? helperWarn
+              : primaryTone === 'ready'
+              ? helperGood
+              : null),
+          }}
+        >
+          {helperText}
+        </div>
 
         <div style={actionsRow}>
           <button
@@ -109,7 +185,7 @@ export function PlayerHud({
           <div style={detailsGrid}>
             <DetailCard
               label="DISTANCE"
-              value={distanceMeters === null ? '---' : `${distanceMeters} m`}
+              value={distanceMeters === null ? 'NO LIVE RANGE' : `${distanceMeters} m`}
             />
             <DetailCard
               label="GPS"
@@ -142,7 +218,7 @@ export function PlayerHud({
           <aside
             style={{
               ...menuSheet,
-              width: isCompact ? '100%' : 'min(100%, 520px)',
+              width: compact ? '100%' : 'min(100%, 520px)',
             }}
             aria-modal="true"
             role="dialog"
@@ -172,7 +248,7 @@ export function PlayerHud({
               <div style={menuMetaCard}>
                 <div style={menuMetaLabel}>NODE</div>
                 <div style={menuMetaValue}>
-                  {currentStage?.title || 'Awaiting node'}
+                  {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
                 </div>
               </div>
 
@@ -237,13 +313,41 @@ function DetailCard({ label, value }: { label: string; value: string }) {
   )
 }
 
+function SummaryCard({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string
+  value: string
+  emphasis: 'good' | 'warn' | 'info' | 'neutral'
+}) {
+  return (
+    <div
+      style={{
+        ...summaryCard,
+        ...(emphasis === 'good'
+          ? summaryGood
+          : emphasis === 'warn'
+          ? summaryWarn
+          : emphasis === 'info'
+          ? summaryInfo
+          : null),
+      }}
+    >
+      <div style={summaryLabel}>{label}</div>
+      <div style={summaryValue}>{value}</div>
+    </div>
+  )
+}
+
 function getPrimaryStyle(
   tone: PrimaryActionTone,
   disabled: boolean
 ): React.CSSProperties {
   const base: React.CSSProperties = {
     width: '100%',
-    minHeight: 56,
+    minHeight: 54,
     borderRadius: 18,
     fontSize: 14,
     fontWeight: 900,
@@ -316,7 +420,7 @@ const tray: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
   color: '#0f172a',
   display: 'grid',
-  gap: 10,
+  animation: 'sagaTrayIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const missionRow: React.CSSProperties = {
@@ -345,19 +449,127 @@ const headline: React.CSSProperties = {
   letterSpacing: '-0.03em',
 }
 
-const subline: React.CSSProperties = {
-  marginTop: 6,
-  color: '#64748b',
-  fontSize: 11,
-  fontWeight: 800,
+const metaInline: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 8,
+}
+
+const badgeBase: React.CSSProperties = {
+  minHeight: 28,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 10px',
+  borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 900,
   letterSpacing: '0.12em',
 }
 
-const helper: React.CSSProperties = {
+const stageBadge: React.CSSProperties = {
+  ...badgeBase,
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
+}
+
+const mutedBadge: React.CSSProperties = {
+  ...badgeBase,
+  border: '1px solid rgba(148,163,184,.16)',
+  background: 'rgba(241,245,249,.94)',
+  color: '#475569',
+}
+
+const debugBadge: React.CSSProperties = {
+  ...badgeBase,
+  border: '1px solid rgba(22,163,74,.20)',
+  background: 'rgba(220,252,231,.98)',
+  color: '#166534',
+}
+
+const mapNoticeCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(59,130,246,.14)',
+  background: 'rgba(239,246,255,.96)',
+  color: '#1d4ed8',
+  fontSize: 13,
+  fontWeight: 800,
+  lineHeight: 1.35,
+  padding: '12px 14px',
+}
+
+const summaryGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 10,
+}
+
+const summaryCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  padding: '12px 12px 10px',
+  minWidth: 0,
+}
+
+const summaryGood: React.CSSProperties = {
+  border: '1px solid rgba(22,163,74,.18)',
+  background: 'rgba(220,252,231,.92)',
+}
+
+const summaryWarn: React.CSSProperties = {
+  border: '1px solid rgba(245,158,11,.18)',
+  background: 'rgba(255,251,235,.96)',
+}
+
+const summaryInfo: React.CSSProperties = {
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+}
+
+const summaryLabel: React.CSSProperties = {
+  color: '#64748b',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+}
+
+const summaryValue: React.CSSProperties = {
+  marginTop: 6,
+  color: '#0f172a',
+  fontSize: 14,
+  fontWeight: 900,
+  lineHeight: 1.2,
+}
+
+const helperCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
   color: '#475569',
   fontSize: 14,
   lineHeight: 1.45,
-  minHeight: 18,
+  padding: '12px 14px',
+}
+
+const helperGood: React.CSSProperties = {
+  border: '1px solid rgba(22,163,74,.18)',
+  background: 'rgba(220,252,231,.92)',
+  color: '#166534',
+}
+
+const helperWarn: React.CSSProperties = {
+  border: '1px solid rgba(245,158,11,.18)',
+  background: 'rgba(255,251,235,.96)',
+  color: '#92400e',
+}
+
+const helperInfo: React.CSSProperties = {
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
 }
 
 const actionsRow: React.CSSProperties = {
@@ -588,6 +800,17 @@ const menuAnimations = `
 @keyframes sagaFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes sagaTrayIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes sagaSheetUp {
