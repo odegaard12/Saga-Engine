@@ -78,7 +78,7 @@ export function PlayerHud({
   mapNotice,
 }: PlayerHudProps) {
   const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const placeholderStage = isPlaceholderStage(currentStage)
   const distanceDisplay = getDistanceDisplay(finished, distanceMeters, inRange)
@@ -92,8 +92,9 @@ export function PlayerHud({
         style={{
           ...tray,
           width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 12 : 14,
-          gap: compact ? 9 : 10,
+          padding: compact ? 10 : 14,
+          gap: compact ? 8 : 10,
+          borderRadius: compact ? 22 : 24,
         }}
       >
         <div style={missionRow}>
@@ -102,13 +103,13 @@ export function PlayerHud({
             <div
               style={{
                 ...headline,
-                fontSize: compact ? 18 : 22,
+                fontSize: compact ? 17 : 22,
               }}
             >
               {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
             </div>
 
-            <div style={metaInline}>
+            <div style={{ ...metaInline, gap: compact ? 6 : 8, marginTop: compact ? 6 : 8 }}>
               <span style={stageBadge}>
                 {finished ? 'DONE' : `STAGE ${level + 1}`}
               </span>
@@ -118,7 +119,7 @@ export function PlayerHud({
               ) : null}
 
               {debugEnabled && !finished ? (
-                <span style={debugBadge}>DEBUG ON</span>
+                <span style={debugBadge}>DEBUG</span>
               ) : null}
             </div>
           </div>
@@ -126,22 +127,24 @@ export function PlayerHud({
 
         {mapNotice ? <div style={mapNoticeCard}>{mapNotice}</div> : null}
 
-        <div style={summaryGrid}>
+        <div style={{ ...summaryGrid, gap: compact ? 8 : 10 }}>
           <SummaryCard
             label="PROXIMITY"
             value={distanceDisplay}
             emphasis={finished ? 'info' : inRange ? 'good' : 'neutral'}
+            compact={compact}
           />
           <SummaryCard
             label="GPS FEED"
             value={gpsDisplay}
             emphasis={gpsState === 'ready' ? 'good' : gpsState === 'stale' ? 'warn' : 'neutral'}
+            compact={compact}
           />
         </div>
 
         <button
           type="button"
-          style={getPrimaryStyle(primaryTone, primaryDisabled)}
+          style={getPrimaryStyle(primaryTone, primaryDisabled, compact)}
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
         >
@@ -151,6 +154,8 @@ export function PlayerHud({
         <div
           style={{
             ...helperCard,
+            fontSize: compact ? 13 : 14,
+            padding: compact ? '10px 12px' : '12px 14px',
             ...(finished
               ? helperInfo
               : primaryTone === 'gps'
@@ -163,10 +168,10 @@ export function PlayerHud({
           {helperText}
         </div>
 
-        <div style={actionsRow}>
+        <div style={{ ...actionsRow, gap: compact ? 6 : 8 }}>
           <button
             type="button"
-            style={getSecondaryStyle(detailsOpen)}
+            style={getSecondaryStyle(detailsOpen, compact)}
             onClick={onToggleDetails}
           >
             {detailsOpen ? 'HIDE DETAILS' : 'DETAILS'}
@@ -174,7 +179,7 @@ export function PlayerHud({
 
           <button
             type="button"
-            style={getSecondaryStyle(menuOpen)}
+            style={getSecondaryStyle(menuOpen, compact)}
             onClick={onToggleMenu}
           >
             {menuOpen ? 'CLOSE MENU' : 'MENU'}
@@ -182,14 +187,16 @@ export function PlayerHud({
         </div>
 
         {detailsOpen ? (
-          <div style={detailsGrid}>
+          <div style={{ ...detailsGrid, gap: compact ? 8 : 10 }}>
             <DetailCard
               label="DISTANCE"
               value={distanceMeters === null ? 'NO LIVE RANGE' : `${distanceMeters} m`}
+              compact={compact}
             />
             <DetailCard
               label="GPS"
               value={String(gpsState || 'unknown').replace(/_/g, ' ').toUpperCase()}
+              compact={compact}
             />
             <DetailCard
               label="LAT"
@@ -198,6 +205,7 @@ export function PlayerHud({
                   ? currentStage.lat.toFixed(5)
                   : '---'
               }
+              compact={compact}
             />
             <DetailCard
               label="RADIUS"
@@ -206,6 +214,7 @@ export function PlayerHud({
                   ? `${currentStage.radius} m`
                   : '---'
               }
+              compact={compact}
             />
           </div>
         ) : null}
@@ -304,11 +313,19 @@ export function PlayerHud({
   )
 }
 
-function DetailCard({ label, value }: { label: string; value: string }) {
+function DetailCard({
+  label,
+  value,
+  compact,
+}: {
+  label: string
+  value: string
+  compact: boolean
+}) {
   return (
-    <div style={detailCard}>
-      <div style={detailLabel}>{label}</div>
-      <div style={detailValue}>{value}</div>
+    <div style={{ ...detailCard, padding: compact ? '10px 10px 8px' : '12px 12px 10px' }}>
+      <div style={{ ...detailLabel, fontSize: compact ? 9 : 10 }}>{label}</div>
+      <div style={{ ...detailValue, fontSize: compact ? 13 : 14 }}>{value}</div>
     </div>
   )
 }
@@ -317,15 +334,19 @@ function SummaryCard({
   label,
   value,
   emphasis,
+  compact,
 }: {
   label: string
   value: string
   emphasis: 'good' | 'warn' | 'info' | 'neutral'
+  compact: boolean
 }) {
   return (
     <div
       style={{
         ...summaryCard,
+        minHeight: compact ? 78 : 88,
+        padding: compact ? '10px 10px 8px' : '12px 12px 10px',
         ...(emphasis === 'good'
           ? summaryGood
           : emphasis === 'warn'
@@ -335,23 +356,24 @@ function SummaryCard({
           : null),
       }}
     >
-      <div style={summaryLabel}>{label}</div>
-      <div style={summaryValue}>{value}</div>
+      <div style={{ ...summaryLabel, fontSize: compact ? 9 : 10 }}>{label}</div>
+      <div style={{ ...summaryValue, fontSize: compact ? 13 : 14 }}>{value}</div>
     </div>
   )
 }
 
 function getPrimaryStyle(
   tone: PrimaryActionTone,
-  disabled: boolean
+  disabled: boolean,
+  compact: boolean
 ): React.CSSProperties {
   const base: React.CSSProperties = {
     width: '100%',
-    minHeight: 54,
-    borderRadius: 18,
-    fontSize: 14,
+    minHeight: compact ? 48 : 54,
+    borderRadius: compact ? 16 : 18,
+    fontSize: compact ? 13 : 14,
     fontWeight: 900,
-    letterSpacing: '0.12em',
+    letterSpacing: '0.10em',
   }
 
   if (disabled || tone === 'locked') {
@@ -390,19 +412,19 @@ function getPrimaryStyle(
   }
 }
 
-function getSecondaryStyle(active: boolean): React.CSSProperties {
+function getSecondaryStyle(active: boolean, compact: boolean): React.CSSProperties {
   return {
-    minHeight: 46,
+    minHeight: compact ? 42 : 46,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: compact ? 14 : 16,
     border: active
       ? '1px solid rgba(59,130,246,.18)'
       : '1px solid rgba(15,23,42,.08)',
     background: active ? 'rgba(219,234,254,.96)' : 'rgba(248,250,252,.96)',
     color: active ? '#1e3a8a' : '#334155',
-    fontSize: 12,
+    fontSize: compact ? 11 : 12,
     fontWeight: 900,
     letterSpacing: '0.08em',
     padding: '0 12px',
@@ -412,7 +434,6 @@ function getSecondaryStyle(active: boolean): React.CSSProperties {
 const tray: React.CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
-  borderRadius: 24,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(255,255,255,.92)',
   boxShadow: '0 18px 40px rgba(15,23,42,.08)',
@@ -442,7 +463,7 @@ const eyebrow: React.CSSProperties = {
 }
 
 const headline: React.CSSProperties = {
-  marginTop: 6,
+  marginTop: 4,
   color: '#0f172a',
   fontWeight: 900,
   lineHeight: 1,
@@ -452,12 +473,10 @@ const headline: React.CSSProperties = {
 const metaInline: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 8,
 }
 
 const badgeBase: React.CSSProperties = {
-  minHeight: 28,
+  minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -490,27 +509,25 @@ const debugBadge: React.CSSProperties = {
 }
 
 const mapNoticeCard: React.CSSProperties = {
-  borderRadius: 16,
+  borderRadius: 14,
   border: '1px solid rgba(59,130,246,.14)',
   background: 'rgba(239,246,255,.96)',
   color: '#1d4ed8',
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 800,
   lineHeight: 1.35,
-  padding: '12px 14px',
+  padding: '10px 12px',
 }
 
 const summaryGrid: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
 }
 
 const summaryCard: React.CSSProperties = {
   borderRadius: 16,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(248,250,252,.96)',
-  padding: '12px 12px 10px',
   minWidth: 0,
 }
 
@@ -531,7 +548,6 @@ const summaryInfo: React.CSSProperties = {
 
 const summaryLabel: React.CSSProperties = {
   color: '#64748b',
-  fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.14em',
 }
@@ -539,9 +555,8 @@ const summaryLabel: React.CSSProperties = {
 const summaryValue: React.CSSProperties = {
   marginTop: 6,
   color: '#0f172a',
-  fontSize: 14,
   fontWeight: 900,
-  lineHeight: 1.2,
+  lineHeight: 1.15,
 }
 
 const helperCard: React.CSSProperties = {
@@ -549,9 +564,7 @@ const helperCard: React.CSSProperties = {
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(248,250,252,.96)',
   color: '#475569',
-  fontSize: 14,
-  lineHeight: 1.45,
-  padding: '12px 14px',
+  lineHeight: 1.4,
 }
 
 const helperGood: React.CSSProperties = {
@@ -575,33 +588,28 @@ const helperInfo: React.CSSProperties = {
 const actionsRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
 }
 
 const detailsGrid: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
 }
 
 const detailCard: React.CSSProperties = {
   borderRadius: 16,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(248,250,252,.96)',
-  padding: '12px 12px 10px',
   minWidth: 0,
 }
 
 const detailLabel: React.CSSProperties = {
   color: '#64748b',
-  fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.14em',
 }
 
 const detailValue: React.CSSProperties = {
   color: '#0f172a',
-  fontSize: 14,
   fontWeight: 800,
   marginTop: 6,
   lineHeight: 1.15,
