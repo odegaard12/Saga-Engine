@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
+import { GAME_CATALOG } from '../player/minigames/gameCatalog'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -12,12 +13,12 @@ function normalizeProfiles(config: PublicConfig): PlayerProfile[] {
     return config.player_profiles
   }
 
-  return (config.players || []).map((player, index) => ({
+  return (config.players || []).map((player) => ({
     id: player,
     display_name: player,
     mode: 'solo',
     members: [player],
-    status: index === 0 ? 'active' : 'active',
+    status: 'active',
   }))
 }
 
@@ -56,15 +57,24 @@ export default function LoginApp() {
     return normalizeProfiles(state.config)
   }, [state])
 
+  const activeModules = useMemo(
+    () => GAME_CATALOG.filter((game) => game.status !== 'planned'),
+    []
+  )
+
+  const upcomingModules = useMemo(
+    () => GAME_CATALOG.filter((game) => game.status === 'planned').slice(0, 4),
+    []
+  )
+
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
-        <div style={scanLine} />
-        <div style={gridOverlay} />
+        <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
-          <h1 style={heroTitle}>Loading terminal</h1>
-          <p style={heroText}>Fetching operator profiles and mission entry configuration.</p>
+          <div style={heroKicker}>MISSION ENTRY</div>
+          <h1 style={heroTitle}>Loading session map</h1>
+          <p style={heroText}>Fetching operator profiles and runtime modules.</p>
         </section>
       </main>
     )
@@ -73,10 +83,9 @@ export default function LoginApp() {
   if (state.status === 'error') {
     return (
       <main style={pageWrap}>
-        <div style={scanLine} />
-        <div style={gridOverlay} />
+        <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
+          <div style={heroKicker}>MISSION ENTRY</div>
           <h1 style={heroTitle}>Config error</h1>
           <p style={heroText}>{state.message}</p>
         </section>
@@ -86,102 +95,128 @@ export default function LoginApp() {
 
   if (state.status !== 'ready') return null
 
-  if (state.status !== 'ready') return null
-
   const config = state.config
   const title = config.site_name || 'SAGA ENGINE'
-  const storyTitle = config.story_title || 'SELECT OPERATOR'
+  const storyTitle = config.story_title || 'Select operator'
   const storyText =
     config.story_text || 'Choose an active profile to enter the live mission interface.'
 
+  const mobile =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
   return (
     <main style={pageWrap}>
-      <div style={scanLine} />
-      <div style={gridOverlay} />
+      <div style={ambientGlow} />
 
-      <div style={contentWrap}>
+      <div
+        style={{
+          ...contentWrap,
+          padding: mobile
+            ? 'calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 18px)'
+            : '24px 18px 28px',
+        }}
+      >
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
+          <div style={heroTopRow}>
+            <div style={heroKicker}>MISSION ENTRY</div>
+            <a href="/admin" style={adminLink}>
+              ADMIN
+            </a>
+          </div>
+
           <h1 style={heroTitle}>{title}</h1>
           <p style={heroSub}>{storyTitle}</p>
           <p style={heroText}>{storyText}</p>
+
+          <div style={moduleStrip}>
+            {activeModules.map((game) => (
+              <span key={game.id} style={moduleChipActive}>
+                {game.label}
+              </span>
+            ))}
+          </div>
         </section>
 
-        <section style={grid}>
-          {profiles.map((profile) => {
-            const members = profile.members || [profile.display_name]
-            return (
-              <article key={profile.id} style={playerCard}>
-                <div style={playerTop}>
-                  <div style={playerIcon}>⌁</div>
-                  <div style={modeBadge}>{profile.mode || 'solo'}</div>
+        <section style={sectionBlock}>
+          <div style={sectionEyebrow}>OPERATORS</div>
+          <div style={grid}>
+            {profiles.map((profile) => {
+              const members = profile.members || [profile.display_name]
+              const isTeam = profile.mode === 'team'
+
+              return (
+                <article key={profile.id} style={playerCard}>
+                  <div style={playerTop}>
+                    <div style={playerIcon}>{isTeam ? '◎' : '⌁'}</div>
+                    <div style={modeBadge}>{profile.mode || 'solo'}</div>
+                  </div>
+
+                  <div style={playerName}>{profile.display_name}</div>
+                  <div style={playerMeta}>
+                    {isTeam ? 'Team-ready session' : 'Field operator'}
+                  </div>
+
+                  <div style={membersBox}>{members.join(' · ')}</div>
+
+                  <button
+                    type="button"
+                    style={enterButton}
+                    onClick={() => {
+                      window.location.href = `/?user=${encodeURIComponent(profile.id)}`
+                    }}
+                  >
+                    OPEN MISSION
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+
+        <section style={sectionBlock}>
+          <div style={sectionEyebrow}>NEXT GAMEPLAY TRACK</div>
+          <div style={roadmapGrid}>
+            {upcomingModules.map((game) => (
+              <article key={game.id} style={roadmapCard}>
+                <div style={roadmapTop}>
+                  <div style={roadmapTitle}>{game.label}</div>
+                  <div style={roadmapCategory}>{game.category}</div>
                 </div>
 
-                <div style={playerName}>{profile.display_name}</div>
-                <div style={playerMeta}>
-                  {profile.mode === 'team' ? 'Team mission profile' : 'Field operator profile'}
+                <div style={roadmapFlags}>
+                  {game.supportsTeam ? <span style={flagChip}>TEAM</span> : null}
+                  {game.needsGps ? <span style={flagChip}>GPS</span> : null}
+                  {game.needsMotion ? <span style={flagChip}>MOTION</span> : null}
+                  {game.needsMic ? <span style={flagChip}>MIC</span> : null}
                 </div>
 
-                <div style={membersBox}>
-                  {members.join(' · ')}
-                </div>
-
-                <button
-                  type="button"
-                  style={enterButton}
-                  onClick={() => {
-                    window.location.href = `/?user=${encodeURIComponent(profile.id)}`
-                  }}
-                >
-                  OPEN MISSION
-                </button>
+                <div style={roadmapText}>{game.notes}</div>
               </article>
-            )
-          })}
+            ))}
+          </div>
         </section>
-
-        <div style={adminEntry}>
-          <a href="/admin" style={adminLink}>
-            ADMIN ACCESS
-          </a>
-        </div>
       </div>
     </main>
   )
 }
 
 const pageWrap: React.CSSProperties = {
-  minHeight: '100vh',
+  minHeight: '100dvh',
   background:
-    'radial-gradient(circle at top, rgba(34,211,238,.12), transparent 34%), radial-gradient(circle at 85% 15%, rgba(96,165,250,.16), transparent 28%), linear-gradient(180deg, #0b1220, #04070d)',
-  color: '#e5f0ff',
+    'radial-gradient(circle at top, rgba(34,197,94,.10), transparent 34%), radial-gradient(circle at 85% 18%, rgba(59,130,246,.10), transparent 28%), linear-gradient(180deg, #eef3ed, #e8efea)',
+  color: '#0f172a',
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
   position: 'relative',
   overflowX: 'hidden',
-  padding: 18,
 }
 
-const scanLine: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: 2,
-  background: 'linear-gradient(90deg, transparent, rgba(96,165,250,.40), transparent)',
-  opacity: 0.35,
-  pointerEvents: 'none',
-  zIndex: 1,
-}
-
-const gridOverlay: React.CSSProperties = {
+const ambientGlow: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
   pointerEvents: 'none',
-  backgroundImage:
-    'linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px)',
-  backgroundSize: '24px 24px',
-  opacity: 0.6,
-  zIndex: 0,
+  background:
+    'linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,0)), radial-gradient(circle at 20% 10%, rgba(255,255,255,.30), transparent 24%)',
+  opacity: 0.8,
 }
 
 const contentWrap: React.CSSProperties = {
@@ -189,16 +224,24 @@ const contentWrap: React.CSSProperties = {
   zIndex: 2,
   width: 'min(1040px, 100%)',
   margin: '0 auto',
+  display: 'grid',
+  gap: 16,
 }
 
 const heroCard: React.CSSProperties = {
-  margin: '0 auto 18px auto',
-  padding: '20px 22px',
-  border: '1px solid rgba(255,255,255,.08)',
+  padding: '18px 18px 16px',
+  border: '1px solid rgba(15,23,42,.08)',
   borderRadius: 24,
-  background: 'linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))',
-  boxShadow: '0 20px 60px rgba(0,0,0,.30)',
-  backdropFilter: 'blur(18px)',
+  background: 'rgba(255,255,255,.88)',
+  boxShadow: '0 18px 40px rgba(15,23,42,.06)',
+  backdropFilter: 'blur(12px)',
+}
+
+const heroTopRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 10,
 }
 
 const heroKicker: React.CSSProperties = {
@@ -207,75 +250,127 @@ const heroKicker: React.CSSProperties = {
   minHeight: 30,
   padding: '0 12px',
   borderRadius: 999,
-  border: '1px solid rgba(56,189,248,.24)',
-  background: 'rgba(96,165,250,.10)',
-  color: '#dbeafe',
-  fontSize: 11,
+  border: '1px solid rgba(34,197,94,.16)',
+  background: 'rgba(220,252,231,.92)',
+  color: '#166534',
+  fontSize: 10,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
-  fontWeight: 800,
+  fontWeight: 900,
+}
+
+const adminLink: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 32,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  color: '#334155',
+  fontSize: 10,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  fontWeight: 900,
+  textDecoration: 'none',
 }
 
 const heroTitle: React.CSSProperties = {
-  marginTop: 16,
-  fontSize: 'clamp(32px, 6vw, 58px)',
+  marginTop: 14,
+  fontSize: 'clamp(30px, 6vw, 50px)',
   lineHeight: 0.96,
   fontWeight: 900,
   letterSpacing: '-0.04em',
-  color: '#fff',
+  color: '#0f172a',
 }
 
 const heroSub: React.CSSProperties = {
-  marginTop: 12,
-  color: '#c7d4e6',
-  fontSize: 13,
-  letterSpacing: '0.16em',
+  marginTop: 10,
+  color: '#166534',
+  fontSize: 12,
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  fontWeight: 800,
+  fontWeight: 900,
 }
 
 const heroText: React.CSSProperties = {
-  marginTop: 10,
-  maxWidth: 700,
-  color: '#97a6ba',
-  fontSize: 13,
-  lineHeight: 1.55,
+  marginTop: 8,
+  maxWidth: 680,
+  color: '#475569',
+  fontSize: 14,
+  lineHeight: 1.5,
+}
+
+const moduleStrip: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 14,
+}
+
+const moduleChipActive: React.CSSProperties = {
+  minHeight: 28,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 10px',
+  borderRadius: 999,
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+}
+
+const sectionBlock: React.CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const sectionEyebrow: React.CSSProperties = {
+  color: '#047857',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+  paddingLeft: 2,
 }
 
 const grid: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: 12,
 }
 
 const playerCard: React.CSSProperties = {
-  position: 'relative',
-  overflow: 'hidden',
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(10,14,24,.78)',
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(255,255,255,.88)',
   borderRadius: 22,
-  padding: 16,
-  boxShadow: '0 16px 38px rgba(0,0,0,.22)',
-  backdropFilter: 'blur(16px)',
+  padding: 14,
+  boxShadow: '0 12px 28px rgba(15,23,42,.06)',
+  display: 'grid',
+  gap: 10,
 }
 
 const playerTop: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
-  gap: 14,
+  gap: 12,
 }
 
 const playerIcon: React.CSSProperties = {
-  width: 52,
-  height: 52,
-  borderRadius: 18,
+  width: 46,
+  height: 46,
+  borderRadius: 16,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.08)',
-  fontSize: 24,
+  background: 'rgba(248,250,252,.96)',
+  border: '1px solid rgba(15,23,42,.08)',
+  fontSize: 22,
+  color: '#166534',
 }
 
 const modeBadge: React.CSSProperties = {
@@ -284,78 +379,125 @@ const modeBadge: React.CSSProperties = {
   minHeight: 28,
   padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#dbe7f7',
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  color: '#334155',
   fontSize: 10,
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  fontWeight: 800,
+  fontWeight: 900,
 }
 
 const playerName: React.CSSProperties = {
-  marginTop: 12,
   fontSize: 18,
   lineHeight: 1.05,
   fontWeight: 900,
-  color: '#fff',
+  color: '#0f172a',
 }
 
 const playerMeta: React.CSSProperties = {
-  marginTop: 6,
-  color: '#97a6ba',
-  fontSize: 10,
-  letterSpacing: '0.14em',
+  color: '#64748b',
+  fontSize: 11,
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
   fontWeight: 800,
 }
 
 const membersBox: React.CSSProperties = {
-  marginTop: 10,
   padding: '10px 12px',
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.06)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#c7d4e6',
-  fontSize: 11,
-  lineHeight: 1.5,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  color: '#475569',
+  fontSize: 12,
+  lineHeight: 1.45,
 }
 
 const enterButton: React.CSSProperties = {
-  marginTop: 12,
+  minHeight: 42,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 40,
-  padding: '0 14px',
-  borderRadius: 13,
-  border: '1px solid rgba(96,165,250,.22)',
-  background: 'linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,.10))',
-  color: '#f8fbff',
+  borderRadius: 14,
+  border: '1px solid rgba(22,163,74,.18)',
+  background: 'linear-gradient(180deg, #16a34a, #15803d)',
+  color: '#ffffff',
   fontSize: 11,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
-  fontWeight: 800,
+  fontWeight: 900,
+  boxShadow: '0 10px 24px rgba(22,163,74,.18)',
 }
 
-const adminEntry: React.CSSProperties = {
-  margin: '18px auto 0 auto',
-  width: 'fit-content',
+const roadmapGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 12,
 }
 
-const adminLink: React.CSSProperties = {
+const roadmapCard: React.CSSProperties = {
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(255,255,255,.80)',
+  borderRadius: 20,
+  padding: 14,
+  boxShadow: '0 12px 28px rgba(15,23,42,.05)',
+  display: 'grid',
+  gap: 10,
+}
+
+const roadmapTop: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 10,
+}
+
+const roadmapTitle: React.CSSProperties = {
+  color: '#0f172a',
+  fontSize: 16,
+  fontWeight: 900,
+  lineHeight: 1.08,
+}
+
+const roadmapCategory: React.CSSProperties = {
+  minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 40,
-  padding: '0 14px',
+  padding: '0 9px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#98a8bc',
-  fontSize: 11,
-  letterSpacing: '0.14em',
+  border: '1px solid rgba(59,130,246,.16)',
+  background: 'rgba(219,234,254,.96)',
+  color: '#1e3a8a',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
   textTransform: 'uppercase',
-  fontWeight: 800,
-  textDecoration: 'none',
+}
+
+const roadmapFlags: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+}
+
+const flagChip: React.CSSProperties = {
+  minHeight: 24,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 8px',
+  borderRadius: 999,
+  border: '1px solid rgba(148,163,184,.16)',
+  background: 'rgba(241,245,249,.96)',
+  color: '#475569',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+}
+
+const roadmapText: React.CSSProperties = {
+  color: '#475569',
+  fontSize: 13,
+  lineHeight: 1.45,
 }

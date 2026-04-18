@@ -13,13 +13,13 @@ export function PlayerShell({
 }: PlayerShellProps) {
   const width =
     typeof window !== 'undefined' && window.innerWidth <= 430
-      ? 'min(100%, 272px)'
+      ? 'min(100%, 240px)'
       : typeof window !== 'undefined' && window.innerWidth <= 560
-      ? 'min(100%, 292px)'
-      : 'min(100%, 360px)'
+      ? 'min(100%, 260px)'
+      : 'min(100%, 340px)'
 
   const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
@@ -27,8 +27,8 @@ export function PlayerShell({
   const sessionLine = payload.finished
     ? 'Mission complete'
     : mode === 'team'
-    ? 'Connected to team session'
-    : 'Live field session'
+    ? 'Team session'
+    : 'Live session'
 
   return (
     <>
@@ -39,8 +39,9 @@ export function PlayerShell({
           style={{
             ...rail,
             width,
-            padding: compact ? '10px 12px' : '12px 14px',
-            gap: compact ? 4 : 6,
+            padding: compact ? '8px 10px' : '12px 14px',
+            gap: compact ? 3 : 6,
+            borderRadius: compact ? 18 : 20,
           }}
         >
           <div style={eyebrow}>
@@ -50,7 +51,7 @@ export function PlayerShell({
           <div
             style={{
               ...name,
-              fontSize: compact ? 15 : 18,
+              fontSize: compact ? 14 : 18,
             }}
           >
             {title}
@@ -59,7 +60,7 @@ export function PlayerShell({
           <div
             style={{
               ...sessionText,
-              fontSize: compact ? 12 : 13,
+              fontSize: compact ? 11 : 13,
             }}
           >
             {sessionLine}
@@ -81,10 +82,9 @@ const rail: React.CSSProperties = {
   margin: '0 auto',
   display: 'grid',
   alignItems: 'center',
-  borderRadius: 20,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(255,255,255,.90)',
-  boxShadow: '0 12px 28px rgba(15,23,42,.07)',
+  boxShadow: '0 10px 24px rgba(15,23,42,.06)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
   pointerEvents: 'auto',
