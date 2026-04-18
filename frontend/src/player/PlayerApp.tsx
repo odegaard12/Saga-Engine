@@ -85,6 +85,9 @@ export default function PlayerApp() {
   const noticeTimerRef = useRef<number | null>(null)
   const user = useMemo(() => getUserFromUrl(), [])
 
+  const isPhone =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
   useEffect(() => {
     let cancelled = false
 
@@ -135,7 +138,7 @@ export default function PlayerApp() {
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
-      <ScreenFrame>
+      <ScreenFrame mobile={isPhone}>
         <StatusCard title="Loading player app" body="Fetching player mission payload..." />
       </ScreenFrame>
     )
@@ -143,7 +146,7 @@ export default function PlayerApp() {
 
   if (state.status === 'error') {
     return (
-      <ScreenFrame>
+      <ScreenFrame mobile={isPhone}>
         <StatusCard title="Player app error" body={state.message} />
       </ScreenFrame>
     )
@@ -151,7 +154,7 @@ export default function PlayerApp() {
 
   if (state.status !== 'ready') {
     return (
-      <ScreenFrame>
+      <ScreenFrame mobile={isPhone}>
         <StatusCard title="Player app state" body="Unexpected player state." />
       </ScreenFrame>
     )
@@ -247,8 +250,8 @@ export default function PlayerApp() {
     if (runtime.reason === 'out_of_range') {
       showMapNotice(
         distanceMeters !== null
-          ? `Too far away. Move closer to the node.`
-          : `Too far from the node.`
+          ? 'Too far away. Move closer to the node.'
+          : 'Too far from the node.'
       )
       return
     }
@@ -289,8 +292,8 @@ export default function PlayerApp() {
   }
 
   return (
-    <ScreenFrame>
-      <div style={viewport}>
+    <ScreenFrame mobile={isPhone}>
+      <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
           playerPosition={playerPosition}
@@ -299,9 +302,9 @@ export default function PlayerApp() {
           onNodeTap={handleMapNodeTap}
         />
 
-        <div style={topScrim} />
+        <div style={getTopScrimStyle(isPhone)} />
 
-        <div style={topOverlay}>
+        <div style={getTopOverlayStyle(isPhone)}>
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
@@ -311,7 +314,7 @@ export default function PlayerApp() {
           />
         </div>
 
-        <div style={bottomOverlay}>
+        <div style={getBottomOverlayStyle(isPhone)}>
           <PlayerHud
             currentStage={currentStage}
             level={payload.level}
@@ -356,8 +359,29 @@ export default function PlayerApp() {
   )
 }
 
-function ScreenFrame({ children }: { children: React.ReactNode }) {
-  return <main style={frame}>{children}</main>
+function ScreenFrame({
+  children,
+  mobile,
+}: {
+  children: React.ReactNode
+  mobile: boolean
+}) {
+  return (
+    <main
+      style={{
+        minHeight: mobile ? '100dvh' : '100svh',
+        height: mobile ? '100dvh' : 'auto',
+        background:
+          'linear-gradient(180deg, #eef3ed 0%, #e8efea 48%, #e2ebe3 100%)',
+        padding: mobile ? 0 : 12,
+        fontFamily: 'system-ui, sans-serif',
+        color: '#10231a',
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </main>
+  )
 }
 
 function StatusCard({ title, body }: { title: string; body: string }) {
@@ -369,61 +393,61 @@ function StatusCard({ title, body }: { title: string; body: string }) {
   )
 }
 
-const frame: React.CSSProperties = {
-  minHeight: '100svh',
-  background:
-    'linear-gradient(180deg, #eef3ed 0%, #e8efea 48%, #e2ebe3 100%)',
-  padding: 12,
-  fontFamily: 'system-ui, sans-serif',
-  color: '#10231a',
+function getViewportStyle(mobile: boolean): React.CSSProperties {
+  return {
+    position: 'relative',
+    width: '100%',
+    maxWidth: mobile ? '100%' : 1320,
+    height: mobile ? '100dvh' : 'calc(100svh - 24px)',
+    minHeight: mobile ? '100dvh' : 620,
+    maxHeight: mobile ? '100dvh' : 980,
+    margin: '0 auto',
+    overflow: 'hidden',
+  }
 }
 
-const viewport: React.CSSProperties = {
-  position: 'relative',
-  width: '100%',
-  maxWidth: 1320,
-  height: 'calc(100svh - 24px)',
-  minHeight: 620,
-  maxHeight: 980,
-  margin: '0 auto',
+function getTopScrimStyle(mobile: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: mobile ? 110 : 132,
+    zIndex: 1100,
+    pointerEvents: 'none',
+    borderTopLeftRadius: mobile ? 0 : 28,
+    borderTopRightRadius: mobile ? 0 : 28,
+    background:
+      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+  }
 }
 
-const topScrim: React.CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  height: 132,
-  zIndex: 1100,
-  pointerEvents: 'none',
-  borderTopLeftRadius: 28,
-  borderTopRightRadius: 28,
-  background:
-    'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 12,
+    left: mobile ? 10 : 12,
+    right: mobile ? 10 : 12,
+    zIndex: 1200,
+    pointerEvents: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  }
 }
 
-const topOverlay: React.CSSProperties = {
-  position: 'absolute',
-  top: 12,
-  left: 12,
-  right: 12,
-  zIndex: 1200,
-  pointerEvents: 'none',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'flex-start',
-}
-
-const bottomOverlay: React.CSSProperties = {
-  position: 'absolute',
-  left: 12,
-  right: 12,
-  bottom: 12,
-  zIndex: 1200,
-  pointerEvents: 'none',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'flex-end',
+function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    left: mobile ? 10 : 12,
+    right: mobile ? 10 : 12,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
+    zIndex: 1200,
+    pointerEvents: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  }
 }
 
 const statusCard: React.CSSProperties = {
