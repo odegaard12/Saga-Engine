@@ -22,6 +22,13 @@ function vibrate(pattern: number | number[]) {
   window.navigator.vibrate(pattern)
 }
 
+function isMeaningfulNarrative(stage: PlayerStage | null) {
+  const text = String(stage?.content || '').trim().toUpperCase()
+  if (!text) return false
+  if (text === 'PUT NODE TEXT HERE') return false
+  return true
+}
+
 export function InteractionSheet({
   open,
   user,
@@ -49,7 +56,7 @@ export function InteractionSheet({
 
   useEffect(() => {
     setCode('')
-    setShowRecovery(!hasNativeMinigame)
+    setShowRecovery(false)
     setDragOffset(0)
   }, [stageId, hasNativeMinigame])
 
@@ -65,7 +72,8 @@ export function InteractionSheet({
     .replace(/_/g, ' ')
     .toUpperCase()
 
-  const narrative = currentStage.content?.trim() || ''
+  const hasNarrative = isMeaningfulNarrative(currentStage)
+  const narrative = hasNarrative ? currentStage.content?.trim() || '' : ''
   const hint = currentStage.messages?.hint?.trim() || ''
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -144,14 +152,9 @@ export function InteractionSheet({
 
           <div style={headerRow}>
             <div style={headerCopy}>
-              <div style={eyebrow}>INTERACTION</div>
               <div style={title}>{currentStage.title}</div>
               <div style={metaRow}>
                 <span style={typeBadge}>{typeLabel}</span>
-                <span style={metaText}>USER {user}</span>
-                {hasNativeMinigame && minigameDefinition ? (
-                  <span style={nativeBadge}>{minigameDefinition.label}</span>
-                ) : null}
               </div>
             </div>
 
@@ -161,17 +164,14 @@ export function InteractionSheet({
               onClick={handleClose}
               disabled={submitting}
             >
-              CLOSE
+              ×
             </button>
           </div>
 
-          {(narrative || hint || helperText) ? (
+          {hasNarrative ? (
             <section style={contextCard}>
-              <div style={contextLabel}>MISSION CONTEXT</div>
-              <div style={contextText}>
-                {narrative || helperText || 'No narrative provided for this node.'}
-              </div>
-              {hint ? <div style={hintText}>Hint: {hint}</div> : null}
+              <div style={contextText}>{narrative}</div>
+              {hint ? <div style={hintText}>{hint}</div> : null}
             </section>
           ) : null}
 
@@ -185,10 +185,8 @@ export function InteractionSheet({
             />
           ) : (
             <section style={bridgeCard}>
-              <div style={bridgeLabel}>BRIDGE MODE</div>
               <div style={bridgeText}>
-                This interaction still uses the bridge flow. Submit a stage code
-                manually or open the legacy runtime for the full interaction.
+                This node still uses the legacy interaction flow.
               </div>
             </section>
           )}
@@ -202,22 +200,18 @@ export function InteractionSheet({
                 setShowRecovery((current) => !current)
               }}
             >
-              {showRecovery ? 'HIDE RECOVERY TOOLS' : 'SHOW RECOVERY TOOLS'}
+              {showRecovery ? 'Hide fallback' : 'Fallback'}
             </button>
 
             {showRecovery ? (
               <div style={recoveryPanel}>
                 <form style={formWrap} onSubmit={handleSubmit}>
-                  <label htmlFor="interaction-code" style={inputLabel}>
-                    MANUAL FALLBACK CODE
-                  </label>
-
                   <div style={inputRow}>
                     <input
                       id="interaction-code"
                       value={code}
                       onChange={(event) => setCode(event.target.value.toUpperCase())}
-                      placeholder="ENTER CODE..."
+                      placeholder="CODE"
                       autoComplete="off"
                       spellCheck={false}
                       style={input}
@@ -229,7 +223,7 @@ export function InteractionSheet({
                       style={submitButton}
                       disabled={submitting || !code.trim()}
                     >
-                      {submitting ? 'SUBMITTING...' : 'SUBMIT'}
+                      {submitting ? '...' : 'OK'}
                     </button>
                   </div>
 
@@ -238,7 +232,7 @@ export function InteractionSheet({
 
                 <div style={footerActions}>
                   <a href={legacyPlayerHref} style={legacyLink}>
-                    OPEN LEGACY INTERACTION
+                    Open legacy
                   </a>
                 </div>
               </div>
@@ -263,9 +257,9 @@ const overlay: React.CSSProperties = {
 const backdrop: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.58)',
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
+  background: 'rgba(2,6,23,.56)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   animation: 'sagaFadeIn 160ms ease-out',
 }
 
@@ -275,9 +269,9 @@ const sheet: React.CSSProperties = {
   maxHeight: 'calc(100vh - 24px)',
   overflowY: 'auto',
   borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.14)',
+  border: '1px solid rgba(255,255,255,.10)',
   background:
-    'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.90))',
+    'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.92))',
   boxShadow: '0 30px 70px rgba(2,6,23,.42)',
   color: '#f8fafc',
   padding: 14,
@@ -295,7 +289,7 @@ const dragHandleWrap: React.CSSProperties = {
 }
 
 const dragHandle: React.CSSProperties = {
-  width: 44,
+  width: 42,
   height: 5,
   borderRadius: 999,
   background: 'rgba(255,255,255,.18)',
@@ -312,15 +306,7 @@ const headerCopy: React.CSSProperties = {
   minWidth: 0,
 }
 
-const eyebrow: React.CSSProperties = {
-  color: 'rgba(167,243,208,.96)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-}
-
 const title: React.CSSProperties = {
-  marginTop: 6,
   color: '#f8fafc',
   fontSize: 24,
   fontWeight: 900,
@@ -335,8 +321,8 @@ const metaRow: React.CSSProperties = {
   marginTop: 10,
 }
 
-const chipBase: React.CSSProperties = {
-  minHeight: 28,
+const typeBadge: React.CSSProperties = {
+  minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -345,58 +331,33 @@ const chipBase: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
-}
-
-const typeBadge: React.CSSProperties = {
-  ...chipBase,
-  background: 'rgba(59,130,246,.16)',
-  border: '1px solid rgba(96,165,250,.20)',
-  color: '#dbeafe',
-}
-
-const metaText: React.CSSProperties = {
-  ...chipBase,
   background: 'rgba(255,255,255,.06)',
   border: '1px solid rgba(255,255,255,.08)',
   color: '#cbd5e1',
 }
 
-const nativeBadge: React.CSSProperties = {
-  ...chipBase,
-  background: 'rgba(34,197,94,.12)',
-  border: '1px solid rgba(34,197,94,.18)',
-  color: '#dcfce7',
-}
-
 const closeButton: React.CSSProperties = {
-  minHeight: 38,
+  width: 38,
+  height: 38,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 14px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(255,255,255,.06)',
   color: '#f8fafc',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
+  fontSize: 22,
+  fontWeight: 800,
+  lineHeight: 1,
 }
 
 const contextCard: React.CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  background: 'rgba(255,255,255,.04)',
   padding: 14,
   display: 'grid',
   gap: 8,
-}
-
-const contextLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
 }
 
 const contextText: React.CSSProperties = {
@@ -415,23 +376,14 @@ const hintText: React.CSSProperties = {
 const bridgeCard: React.CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  background: 'rgba(255,255,255,.04)',
   padding: 14,
-  display: 'grid',
-  gap: 8,
-}
-
-const bridgeLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
 }
 
 const bridgeText: React.CSSProperties = {
-  color: '#e2e8f0',
+  color: '#cbd5e1',
   fontSize: 14,
-  lineHeight: 1.55,
+  lineHeight: 1.5,
 }
 
 const recoveryWrap: React.CSSProperties = {
@@ -440,35 +392,28 @@ const recoveryWrap: React.CSSProperties = {
 }
 
 const recoveryToggle: React.CSSProperties = {
-  minHeight: 46,
-  borderRadius: 16,
+  minHeight: 42,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
+  background: 'rgba(255,255,255,.04)',
   color: '#cbd5e1',
   fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
+  fontWeight: 800,
+  letterSpacing: '0.04em',
 }
 
 const recoveryPanel: React.CSSProperties = {
-  borderRadius: 18,
+  borderRadius: 16,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  padding: 14,
+  background: 'rgba(255,255,255,.03)',
+  padding: 12,
   display: 'grid',
-  gap: 12,
+  gap: 10,
 }
 
 const formWrap: React.CSSProperties = {
   display: 'grid',
   gap: 8,
-}
-
-const inputLabel: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
 }
 
 const inputRow: React.CSSProperties = {
@@ -478,8 +423,8 @@ const inputRow: React.CSSProperties = {
 }
 
 const input: React.CSSProperties = {
-  minHeight: 52,
-  borderRadius: 16,
+  minHeight: 46,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(2,6,23,.50)',
   color: '#f8fafc',
@@ -492,12 +437,12 @@ const input: React.CSSProperties = {
 }
 
 const submitButton: React.CSSProperties = {
-  minHeight: 52,
-  minWidth: 140,
+  minHeight: 46,
+  minWidth: 64,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 16,
+  borderRadius: 14,
   border: '1px solid rgba(34,197,94,.26)',
   background:
     'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.18))',
@@ -523,18 +468,17 @@ const footerActions: React.CSSProperties = {
 }
 
 const legacyLink: React.CSSProperties = {
-  minHeight: 44,
+  minHeight: 38,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 14px',
-  borderRadius: 14,
-  border: '1px solid rgba(96,165,250,.18)',
-  background: 'rgba(59,130,246,.10)',
-  color: '#dbeafe',
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.04)',
+  color: '#cbd5e1',
   fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
+  fontWeight: 800,
   textDecoration: 'none',
 }
 

@@ -70,11 +70,6 @@ export default function LoginApp() {
     []
   )
 
-  const plannedModules = useMemo(
-    () => GAME_CATALOG.filter((game) => game.status === 'planned').slice(0, 4),
-    []
-  )
-
   const standalone = isStandaloneMode()
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -82,9 +77,8 @@ export default function LoginApp() {
       <main style={pageWrap}>
         <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION ENTRY</div>
-          <h1 style={heroTitle}>Loading session map</h1>
-          <p style={heroText}>Fetching operator profiles and runtime modules.</p>
+          <div style={heroLabel}>MISSION ENTRY</div>
+          <h1 style={heroTitle}>Loading mission</h1>
         </section>
       </main>
     )
@@ -95,7 +89,7 @@ export default function LoginApp() {
       <main style={pageWrap}>
         <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION ENTRY</div>
+          <div style={heroLabel}>MISSION ENTRY</div>
           <h1 style={heroTitle}>Config error</h1>
           <p style={heroText}>{state.message}</p>
         </section>
@@ -106,10 +100,10 @@ export default function LoginApp() {
   if (state.status !== 'ready') return null
 
   const config = state.config
-  const title = config.site_name || 'SAGA ENGINE'
-  const storyTitle = config.story_title || 'Select operator'
-  const storyText =
-    config.story_text || 'Choose an active profile to enter the live mission interface.'
+  const title = config.site_name || 'SAGA'
+  const subtitle = config.story_title || 'Choose operator'
+  const body =
+    config.story_text || 'Select a profile to enter the mission.'
 
   const mobile =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
@@ -122,40 +116,25 @@ export default function LoginApp() {
         style={{
           ...contentWrap,
           padding: mobile
-            ? 'calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 18px)'
+            ? 'calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 18px)'
             : '24px 18px 28px',
         }}
       >
         <section style={heroCard}>
-          <div style={heroTopRow}>
-            <div style={heroKicker}>MISSION ENTRY</div>
+          <div style={heroTop}>
+            <div style={heroLabel}>MISSION ENTRY</div>
             <a href="/admin" style={adminLink}>
               ADMIN
             </a>
           </div>
 
           <h1 style={heroTitle}>{title}</h1>
-          <p style={heroSub}>{storyTitle}</p>
-          <p style={heroText}>{storyText}</p>
+          <p style={heroSub}>{subtitle}</p>
+          <p style={heroText}>{body}</p>
 
-          <div style={statsRow}>
-            <div style={statCard}>
-              <div style={statLabel}>REACT NATIVE</div>
-              <div style={statValue}>{nativeModules.length}</div>
-            </div>
-            <div style={statCard}>
-              <div style={statLabel}>PLANNED</div>
-              <div style={statValue}>{plannedModules.length}</div>
-            </div>
-            <div style={statCard}>
-              <div style={statLabel}>MODE</div>
-              <div style={statValue}>{standalone ? 'APP' : 'WEB'}</div>
-            </div>
-          </div>
-
-          <div style={moduleStrip}>
+          <div style={nativeStrip}>
             {nativeModules.map((game) => (
-              <span key={game.id} style={moduleChipActive}>
+              <span key={game.id} style={nativeChip}>
                 {game.label}
               </span>
             ))}
@@ -163,73 +142,39 @@ export default function LoginApp() {
         </section>
 
         {!standalone ? (
-          <section style={installCard}>
-            <div style={installEyebrow}>BETTER MOBILE MODE</div>
-            <div style={installTitle}>Add SAGA to your Home Screen</div>
-            <div style={installText}>
-              On iPhone: Share → Add to Home Screen. The player feels more app-like
-              and avoids extra browser UI.
-            </div>
+          <section style={installHint}>
+            Add to Home Screen for the cleanest mobile mode.
           </section>
         ) : null}
 
-        <section style={sectionBlock}>
-          <div style={sectionEyebrow}>OPERATORS</div>
-          <div style={grid}>
-            {profiles.map((profile) => {
-              const members = profile.members || [profile.display_name]
-              const isTeam = profile.mode === 'team'
+        <section style={operatorsWrap}>
+          {profiles.map((profile) => {
+            const isTeam = profile.mode === 'team'
+            const members = profile.members || [profile.display_name]
 
-              return (
-                <article key={profile.id} style={playerCard}>
-                  <div style={playerTop}>
-                    <div style={playerIcon}>{isTeam ? '◎' : '⌁'}</div>
-                    <div style={modeBadge}>{profile.mode || 'solo'}</div>
-                  </div>
-
-                  <div style={playerName}>{profile.display_name}</div>
-                  <div style={playerMeta}>
-                    {isTeam ? 'Team-ready session' : 'Field operator'}
-                  </div>
-
-                  <div style={membersBox}>{members.join(' · ')}</div>
-
-                  <button
-                    type="button"
-                    style={enterButton}
-                    onClick={() => {
-                      window.location.href = `/?user=${encodeURIComponent(profile.id)}`
-                    }}
-                  >
-                    OPEN MISSION
-                  </button>
-                </article>
-              )
-            })}
-          </div>
-        </section>
-
-        <section style={sectionBlock}>
-          <div style={sectionEyebrow}>NEXT GAMEPLAY TRACK</div>
-          <div style={roadmapGrid}>
-            {plannedModules.map((game) => (
-              <article key={game.id} style={roadmapCard}>
-                <div style={roadmapTop}>
-                  <div style={roadmapTitle}>{game.label}</div>
-                  <div style={roadmapCategory}>{game.category}</div>
+            return (
+              <article key={profile.id} style={operatorCard}>
+                <div style={operatorHead}>
+                  <div style={operatorName}>{profile.display_name}</div>
+                  <div style={modePill}>{isTeam ? 'TEAM' : 'SOLO'}</div>
                 </div>
 
-                <div style={roadmapFlags}>
-                  {game.supportsTeam ? <span style={flagChip}>TEAM</span> : null}
-                  {game.needsGps ? <span style={flagChip}>GPS</span> : null}
-                  {game.needsMotion ? <span style={flagChip}>MOTION</span> : null}
-                  {game.needsMic ? <span style={flagChip}>MIC</span> : null}
+                <div style={operatorMeta}>
+                  {isTeam ? members.join(' · ') : 'Field operator'}
                 </div>
 
-                <div style={roadmapText}>{game.notes}</div>
+                <button
+                  type="button"
+                  style={enterButton}
+                  onClick={() => {
+                    window.location.href = `/?user=${encodeURIComponent(profile.id)}`
+                  }}
+                >
+                  ENTER
+                </button>
               </article>
-            ))}
-          </div>
+            )
+          })}
         </section>
       </div>
     </main>
@@ -239,7 +184,7 @@ export default function LoginApp() {
 const pageWrap: React.CSSProperties = {
   minHeight: '100dvh',
   background:
-    'radial-gradient(circle at top, rgba(34,197,94,.10), transparent 34%), radial-gradient(circle at 85% 18%, rgba(59,130,246,.10), transparent 28%), linear-gradient(180deg, #eef3ed, #e8efea)',
+    'radial-gradient(circle at top, rgba(34,197,94,.08), transparent 32%), linear-gradient(180deg, #eef3ed, #e8efea)',
   color: '#0f172a',
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
   position: 'relative',
@@ -251,40 +196,40 @@ const ambientGlow: React.CSSProperties = {
   inset: 0,
   pointerEvents: 'none',
   background:
-    'linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,0)), radial-gradient(circle at 20% 10%, rgba(255,255,255,.30), transparent 24%)',
-  opacity: 0.8,
+    'linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,0)), radial-gradient(circle at 20% 10%, rgba(255,255,255,.28), transparent 24%)',
+  opacity: 0.85,
 }
 
 const contentWrap: React.CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(1040px, 100%)',
+  width: 'min(880px, 100%)',
   margin: '0 auto',
   display: 'grid',
-  gap: 16,
+  gap: 14,
 }
 
 const heroCard: React.CSSProperties = {
   padding: '18px 18px 16px',
   border: '1px solid rgba(15,23,42,.08)',
   borderRadius: 24,
-  background: 'rgba(255,255,255,.88)',
+  background: 'rgba(255,255,255,.90)',
   boxShadow: '0 18px 40px rgba(15,23,42,.06)',
   backdropFilter: 'blur(12px)',
 }
 
-const heroTopRow: React.CSSProperties = {
+const heroTop: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 10,
 }
 
-const heroKicker: React.CSSProperties = {
+const heroLabel: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  minHeight: 30,
-  padding: '0 12px',
+  minHeight: 28,
+  padding: '0 10px',
   borderRadius: 999,
   border: '1px solid rgba(34,197,94,.16)',
   background: 'rgba(220,252,231,.92)',
@@ -299,8 +244,8 @@ const adminLink: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 32,
-  padding: '0 12px',
+  minHeight: 30,
+  padding: '0 10px',
   borderRadius: 999,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(248,250,252,.96)',
@@ -314,7 +259,7 @@ const adminLink: React.CSSProperties = {
 
 const heroTitle: React.CSSProperties = {
   marginTop: 14,
-  fontSize: 'clamp(30px, 6vw, 50px)',
+  fontSize: 'clamp(28px, 6vw, 44px)',
   lineHeight: 0.96,
   fontWeight: 900,
   letterSpacing: '-0.04em',
@@ -332,50 +277,21 @@ const heroSub: React.CSSProperties = {
 
 const heroText: React.CSSProperties = {
   marginTop: 8,
-  maxWidth: 680,
+  maxWidth: 560,
   color: '#475569',
   fontSize: 14,
   lineHeight: 1.5,
 }
 
-const statsRow: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 10,
-  marginTop: 14,
-}
-
-const statCard: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  padding: '12px 12px 10px',
-}
-
-const statLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-}
-
-const statValue: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
-  fontSize: 20,
-  fontWeight: 900,
-  lineHeight: 1,
-}
-
-const moduleStrip: React.CSSProperties = {
+const nativeStrip: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
   marginTop: 14,
 }
 
-const moduleChipActive: React.CSSProperties = {
-  minHeight: 28,
+const nativeChip: React.CSSProperties = {
+  minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -389,90 +305,52 @@ const moduleChipActive: React.CSSProperties = {
   letterSpacing: '0.12em',
 }
 
-const installCard: React.CSSProperties = {
-  padding: '14px 16px',
+const installHint: React.CSSProperties = {
+  padding: '12px 14px',
+  borderRadius: 16,
   border: '1px solid rgba(59,130,246,.12)',
-  borderRadius: 20,
   background: 'rgba(239,246,255,.90)',
-  boxShadow: '0 12px 28px rgba(15,23,42,.05)',
-}
-
-const installEyebrow: React.CSSProperties = {
   color: '#1d4ed8',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
+  fontSize: 12,
+  fontWeight: 800,
+  lineHeight: 1.4,
 }
 
-const installTitle: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
-  fontSize: 20,
-  fontWeight: 900,
-  lineHeight: 1.05,
-}
-
-const installText: React.CSSProperties = {
-  marginTop: 8,
-  color: '#475569',
-  fontSize: 13,
-  lineHeight: 1.45,
-}
-
-const sectionBlock: React.CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
-
-const sectionEyebrow: React.CSSProperties = {
-  color: '#047857',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-  paddingLeft: 2,
-}
-
-const grid: React.CSSProperties = {
+const operatorsWrap: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: 12,
 }
 
-const playerCard: React.CSSProperties = {
+const operatorCard: React.CSSProperties = {
   border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.88)',
+  background: 'rgba(255,255,255,.90)',
   borderRadius: 22,
   padding: 14,
   boxShadow: '0 12px 28px rgba(15,23,42,.06)',
   display: 'grid',
-  gap: 10,
+  gap: 12,
 }
 
-const playerTop: React.CSSProperties = {
+const operatorHead: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   gap: 12,
 }
 
-const playerIcon: React.CSSProperties = {
-  width: 46,
-  height: 46,
-  borderRadius: 16,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(248,250,252,.96)',
-  border: '1px solid rgba(15,23,42,.08)',
-  fontSize: 22,
-  color: '#166534',
+const operatorName: React.CSSProperties = {
+  fontSize: 18,
+  lineHeight: 1.05,
+  fontWeight: 900,
+  color: '#0f172a',
 }
 
-const modeBadge: React.CSSProperties = {
+const modePill: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  minHeight: 28,
-  padding: '0 10px',
+  minHeight: 24,
+  padding: '0 8px',
   borderRadius: 999,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(248,250,252,.96)',
@@ -483,27 +361,8 @@ const modeBadge: React.CSSProperties = {
   fontWeight: 900,
 }
 
-const playerName: React.CSSProperties = {
-  fontSize: 18,
-  lineHeight: 1.05,
-  fontWeight: 900,
-  color: '#0f172a',
-}
-
-const playerMeta: React.CSSProperties = {
+const operatorMeta: React.CSSProperties = {
   color: '#64748b',
-  fontSize: 11,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const membersBox: React.CSSProperties = {
-  padding: '10px 12px',
-  borderRadius: 14,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  color: '#475569',
   fontSize: 12,
   lineHeight: 1.45,
 }
@@ -522,77 +381,4 @@ const enterButton: React.CSSProperties = {
   textTransform: 'uppercase',
   fontWeight: 900,
   boxShadow: '0 10px 24px rgba(22,163,74,.18)',
-}
-
-const roadmapGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 12,
-}
-
-const roadmapCard: React.CSSProperties = {
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.80)',
-  borderRadius: 20,
-  padding: 14,
-  boxShadow: '0 12px 28px rgba(15,23,42,.05)',
-  display: 'grid',
-  gap: 10,
-}
-
-const roadmapTop: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 10,
-}
-
-const roadmapTitle: React.CSSProperties = {
-  color: '#0f172a',
-  fontSize: 16,
-  fontWeight: 900,
-  lineHeight: 1.08,
-}
-
-const roadmapCategory: React.CSSProperties = {
-  minHeight: 26,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 9px',
-  borderRadius: 999,
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
-
-const roadmapFlags: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-}
-
-const flagChip: React.CSSProperties = {
-  minHeight: 24,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 8px',
-  borderRadius: 999,
-  border: '1px solid rgba(148,163,184,.16)',
-  background: 'rgba(241,245,249,.96)',
-  color: '#475569',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-}
-
-const roadmapText: React.CSSProperties = {
-  color: '#475569',
-  fontSize: 13,
-  lineHeight: 1.45,
 }

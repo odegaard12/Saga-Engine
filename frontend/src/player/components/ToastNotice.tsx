@@ -26,18 +26,17 @@ export function ToastNotice({ notice }: { notice: UiNotice }) {
 }
 
 const toastWrap: React.CSSProperties = {
-  minHeight: 40,
+  minHeight: 38,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  maxWidth: 'min(92vw, 540px)',
-  padding: '10px 14px',
+  maxWidth: 'min(92vw, 440px)',
+  padding: '9px 14px',
   borderRadius: 999,
   boxShadow: '0 10px 26px rgba(15,23,42,.14)',
   fontSize: 12,
-  lineHeight: 1.35,
-  fontWeight: 900,
-  letterSpacing: '0.04em',
+  lineHeight: 1.3,
+  fontWeight: 800,
   textAlign: 'center',
   animation: 'sagaToastIn 180ms cubic-bezier(0.22, 1, 0.36, 1)',
   backdropFilter: 'blur(10px)',
