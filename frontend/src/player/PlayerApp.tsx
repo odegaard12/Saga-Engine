@@ -5,12 +5,17 @@ import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
+import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload }
+
+type NoticeTone = 'info' | 'warn' | 'success'
+
+type OverlayState = 'activate' | 'node' | 'finish' | null
 
 function vibrate(pattern: number | number[]) {
   if (typeof window === 'undefined') return
@@ -80,9 +85,11 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
-  const [mapNotice, setMapNotice] = useState<string | null>(null)
+  const [uiNotice, setUiNotice] = useState<UiNotice>(null)
+  const [overlayState, setOverlayState] = useState<OverlayState>(null)
 
   const noticeTimerRef = useRef<number | null>(null)
+  const overlayTimerRef = useRef<number | null>(null)
   const user = useMemo(() => getUserFromUrl(), [])
 
   const isPhone =
@@ -120,20 +127,36 @@ export default function PlayerApp() {
       if (noticeTimerRef.current !== null) {
         window.clearTimeout(noticeTimerRef.current)
       }
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current)
+      }
     }
   }, [])
 
-  function showMapNotice(message: string) {
-    setMapNotice(message)
+  function showNotice(message: string, tone: NoticeTone) {
+    setUiNotice({ message, tone })
 
     if (noticeTimerRef.current !== null) {
       window.clearTimeout(noticeTimerRef.current)
     }
 
     noticeTimerRef.current = window.setTimeout(() => {
-      setMapNotice(null)
+      setUiNotice(null)
       noticeTimerRef.current = null
     }, 2200)
+  }
+
+  function showOverlay(state: OverlayState) {
+    setOverlayState(state)
+
+    if (overlayTimerRef.current !== null) {
+      window.clearTimeout(overlayTimerRef.current)
+    }
+
+    overlayTimerRef.current = window.setTimeout(() => {
+      setOverlayState(null)
+      overlayTimerRef.current = null
+    }, state === 'finish' ? 1800 : 900)
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -203,6 +226,7 @@ export default function PlayerApp() {
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
     setState({ status: 'ready', payload: nextPayload })
+    return nextPayload
   }
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
@@ -216,7 +240,7 @@ export default function PlayerApp() {
   function handleToggleDebug() {
     vibrate(8)
     setLocalDebugEnabled((current) => !current)
-    showMapNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.')
+    showNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.', 'success')
   }
 
   function openInteraction() {
@@ -228,6 +252,7 @@ export default function PlayerApp() {
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
     vibrate([10, 16, 10])
+    showOverlay('activate')
     openInteraction()
   }
 
@@ -236,6 +261,7 @@ export default function PlayerApp() {
 
     if (runtime.canEnter) {
       vibrate([10, 16, 10])
+      showOverlay('activate')
       openInteraction()
       return
     }
@@ -243,30 +269,31 @@ export default function PlayerApp() {
     vibrate(8)
 
     if (!currentStage) {
-      showMapNotice('Complete the previous stage before interacting here.')
+      showNotice('Complete the previous stage before interacting here.', 'warn')
       return
     }
 
     if (runtime.reason === 'out_of_range') {
-      showMapNotice(
+      showNotice(
         distanceMeters !== null
           ? 'Too far away. Move closer to the node.'
-          : 'Too far from the node.'
+          : 'Too far from the node.',
+        'warn'
       )
       return
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showMapNotice('Waiting for a reliable GPS fix.')
+      showNotice('Waiting for a reliable GPS fix.', 'info')
       return
     }
 
     if (runtime.reason === 'missing_stage') {
-      showMapNotice('Complete the previous stage first.')
+      showNotice('Complete the previous stage first.', 'warn')
       return
     }
 
-    showMapNotice('Interaction is not available yet.')
+    showNotice('Interaction is not available yet.', 'info')
   }
 
   async function handleSubmitCode(code: string) {
@@ -277,15 +304,25 @@ export default function PlayerApp() {
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
         setSubmitError('Invalid code for the current stage.')
+        showNotice('The code was not accepted for this stage.', 'warn')
         return
       }
 
       setInteractionOpen(false)
-      await refreshPayload()
+      const nextPayload = await refreshPayload()
+
+      if (nextPayload.finished) {
+        showOverlay('finish')
+        showNotice('Mission complete.', 'success')
+      } else {
+        showOverlay('node')
+        showNotice('Node cleared.', 'success')
+      }
     } catch (error) {
-      setSubmitError(
+      const message =
         error instanceof Error ? error.message : 'Unknown submit error'
-      )
+      setSubmitError(message)
+      showNotice('Mission sync failed. Try again.', 'warn')
     } finally {
       setSubmitting(false)
     }
@@ -314,6 +351,12 @@ export default function PlayerApp() {
           />
         </div>
 
+        <div style={getToastOverlayStyle(isPhone)}>
+          <ToastNotice notice={uiNotice} />
+        </div>
+
+        {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
+
         <div style={getBottomOverlayStyle(isPhone)}>
           <PlayerHud
             currentStage={currentStage}
@@ -323,7 +366,7 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
-            mapNotice={mapNotice}
+            mapNotice={null}
             legacyPlayerHref={legacyPlayerHref}
             legacyLoginHref={legacyLoginHref}
             adminHref={adminHref}
@@ -393,6 +436,34 @@ function StatusCard({ title, body }: { title: string; body: string }) {
   )
 }
 
+function CelebrationOverlay({ state }: { state: OverlayState }) {
+  if (!state) return null
+
+  const label =
+    state === 'activate'
+      ? 'Node ready'
+      : state === 'node'
+      ? 'Node cleared'
+      : 'Mission complete'
+
+  const toneStyle =
+    state === 'activate'
+      ? overlayInfo
+      : state === 'node'
+      ? overlaySuccess
+      : overlayFinish
+
+  return (
+    <>
+      <style>{overlayAnimations}</style>
+      <div style={overlayWrap}>
+        <div style={{ ...pulseRing, ...toneStyle }} />
+        <div style={{ ...overlayPill, ...toneStyle }}>{label}</div>
+      </div>
+    </>
+  )
+}
+
 function getViewportStyle(mobile: boolean): React.CSSProperties {
   return {
     position: 'relative',
@@ -436,6 +507,20 @@ function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
+function getToastOverlayStyle(mobile: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    left: mobile ? 12 : 16,
+    right: mobile ? 12 : 16,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 152px)' : 176,
+    zIndex: 1250,
+    pointerEvents: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+}
+
 function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
   return {
     position: 'absolute',
@@ -449,6 +534,81 @@ function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
     alignItems: 'flex-end',
   }
 }
+
+const overlayWrap: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 1235,
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const pulseRing: React.CSSProperties = {
+  position: 'absolute',
+  width: 180,
+  height: 180,
+  borderRadius: '50%',
+  opacity: 0.22,
+  animation: 'sagaPulseRing 720ms ease-out forwards',
+}
+
+const overlayPill: React.CSSProperties = {
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 16px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  boxShadow: '0 14px 30px rgba(15,23,42,.12)',
+  animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const overlayInfo: React.CSSProperties = {
+  background: 'rgba(239,246,255,.96)',
+  border: '1px solid rgba(59,130,246,.16)',
+  color: '#1d4ed8',
+}
+
+const overlaySuccess: React.CSSProperties = {
+  background: 'rgba(220,252,231,.96)',
+  border: '1px solid rgba(22,163,74,.18)',
+  color: '#166534',
+}
+
+const overlayFinish: React.CSSProperties = {
+  background: 'rgba(250,245,255,.96)',
+  border: '1px solid rgba(168,85,247,.18)',
+  color: '#7e22ce',
+}
+
+const overlayAnimations = `
+@keyframes sagaPulseRing {
+  from {
+    transform: scale(.42);
+    opacity: .28;
+  }
+  to {
+    transform: scale(1.24);
+    opacity: 0;
+  }
+}
+
+@keyframes sagaOverlayPop {
+  from {
+    transform: scale(.94);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+`
 
 const statusCard: React.CSSProperties = {
   borderRadius: 20,
