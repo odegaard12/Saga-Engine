@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react'
 import type { PlayerStage } from '../../types/player'
 import type { PlayerMinigameDefinition } from '../minigames/types'
+import { tokens } from '../ui/tokens'
 
 interface MinigameHostProps {
   definition: PlayerMinigameDefinition
@@ -20,9 +22,7 @@ export function MinigameHost({
 
   return (
     <section style={wrap}>
-      <div style={metaRow}>
-        <span style={labelPill}>{definition.label}</span>
-      </div>
+      <div style={labelPill}>{definition.label}</div>
 
       <Component
         stage={stage}
@@ -34,27 +34,22 @@ export function MinigameHost({
   )
 }
 
-const wrap: React.CSSProperties = {
+const wrap: CSSProperties = {
   display: 'grid',
   gap: 10,
 }
 
-const metaRow: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-}
-
-const labelPill: React.CSSProperties = {
+const labelPill: CSSProperties = {
   minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  width: 'fit-content',
   padding: '0 10px',
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.06)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: '#cbd5e1',
+  borderRadius: tokens.radius.pill,
+  background: tokens.colors.slateSoft,
+  border: `1px solid ${tokens.colors.slateLine}`,
+  color: tokens.colors.slateMuted,
   fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.12em',

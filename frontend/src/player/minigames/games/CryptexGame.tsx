@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type { PlayerMinigameProps } from '../types'
+import { tokens } from '../../ui/tokens'
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -113,7 +114,7 @@ export function CryptexGame({
         onClick={validate}
         disabled={submitting || working}
       >
-        {working ? 'SYNC…' : 'UNLOCK'}
+        {working ? 'Sync…' : 'Unlock'}
       </button>
 
       <div
@@ -132,27 +133,26 @@ export function CryptexGame({
   )
 }
 
-const wrap: React.CSSProperties = {
+const wrap: CSSProperties = {
   borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
+  border: `1px solid ${tokens.colors.slateLine}`,
+  background: tokens.colors.slateSoft,
   padding: 14,
   display: 'grid',
   gap: 12,
 }
 
-const ringsRow: React.CSSProperties = {
+const ringsRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))',
   gap: 10,
 }
 
-const ringCard: React.CSSProperties = {
-  minHeight: 132,
+const ringCard: CSSProperties = {
+  minHeight: 128,
   borderRadius: 18,
-  border: '1px solid rgba(59,130,246,.16)',
-  background:
-    'linear-gradient(180deg, rgba(30,41,59,.88), rgba(15,23,42,.96))',
+  border: `1px solid ${tokens.colors.slateLine}`,
+  background: 'linear-gradient(180deg, rgba(30,41,59,.88), rgba(15,23,42,.96))',
   color: '#f8fafc',
   display: 'grid',
   alignContent: 'center',
@@ -161,11 +161,11 @@ const ringCard: React.CSSProperties = {
   padding: 10,
 }
 
-const stepButton: React.CSSProperties = {
+const stepButton: CSSProperties = {
   width: 34,
   height: 34,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.12)',
+  borderRadius: tokens.radius.pill,
+  border: `1px solid ${tokens.colors.slateLine}`,
   background: 'rgba(255,255,255,.06)',
   color: '#f8fafc',
   fontSize: 20,
@@ -176,7 +176,7 @@ const stepButton: React.CSSProperties = {
   justifyContent: 'center',
 }
 
-const ringLetter: React.CSSProperties = {
+const ringLetter: CSSProperties = {
   color: '#ffffff',
   fontSize: 28,
   fontWeight: 900,
@@ -184,12 +184,11 @@ const ringLetter: React.CSSProperties = {
   letterSpacing: '0.06em',
 }
 
-const validateButton: React.CSSProperties = {
-  minHeight: 48,
+const validateButton: CSSProperties = {
+  minHeight: 46,
   borderRadius: 16,
-  border: '1px solid rgba(34,197,94,.24)',
-  background:
-    'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.16))',
+  border: `1px solid ${tokens.colors.brandLine}`,
+  background: 'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.16))',
   color: '#dcfce7',
   fontSize: 12,
   fontWeight: 900,
@@ -197,25 +196,25 @@ const validateButton: React.CSSProperties = {
   padding: '0 16px',
 }
 
-const statusBox: React.CSSProperties = {
-  minHeight: 42,
+const statusBox: CSSProperties = {
+  minHeight: 40,
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.08)',
+  border: `1px solid ${tokens.colors.slateLine}`,
   background: 'rgba(15,23,42,.42)',
-  color: '#cbd5e1',
+  color: tokens.colors.slateMuted,
   fontSize: 13,
   lineHeight: 1.4,
   padding: '10px 12px',
 }
 
-const statusOk: React.CSSProperties = {
-  border: '1px solid rgba(34,197,94,.24)',
+const statusOk: CSSProperties = {
+  border: `1px solid ${tokens.colors.brandLine}`,
   background: 'rgba(20,83,45,.26)',
   color: '#dcfce7',
 }
 
-const statusBad: React.CSSProperties = {
-  border: '1px solid rgba(239,68,68,.22)',
+const statusBad: CSSProperties = {
+  border: `1px solid ${tokens.colors.dangerLine}`,
   background: 'rgba(127,29,29,.24)',
   color: '#fecaca',
 }
