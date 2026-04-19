@@ -22,6 +22,14 @@ function normalizeProfiles(config: PublicConfig): PlayerProfile[] {
   }))
 }
 
+function isStandaloneMode() {
+  if (typeof window === 'undefined') return false
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
+  )
+}
+
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
 
@@ -57,15 +65,17 @@ export default function LoginApp() {
     return normalizeProfiles(state.config)
   }, [state])
 
-  const activeModules = useMemo(
-    () => GAME_CATALOG.filter((game) => game.status !== 'planned'),
+  const nativeModules = useMemo(
+    () => GAME_CATALOG.filter((game) => game.status === 'react_native'),
     []
   )
 
-  const upcomingModules = useMemo(
+  const plannedModules = useMemo(
     () => GAME_CATALOG.filter((game) => game.status === 'planned').slice(0, 4),
     []
   )
+
+  const standalone = isStandaloneMode()
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -128,14 +138,40 @@ export default function LoginApp() {
           <p style={heroSub}>{storyTitle}</p>
           <p style={heroText}>{storyText}</p>
 
+          <div style={statsRow}>
+            <div style={statCard}>
+              <div style={statLabel}>REACT NATIVE</div>
+              <div style={statValue}>{nativeModules.length}</div>
+            </div>
+            <div style={statCard}>
+              <div style={statLabel}>PLANNED</div>
+              <div style={statValue}>{plannedModules.length}</div>
+            </div>
+            <div style={statCard}>
+              <div style={statLabel}>MODE</div>
+              <div style={statValue}>{standalone ? 'APP' : 'WEB'}</div>
+            </div>
+          </div>
+
           <div style={moduleStrip}>
-            {activeModules.map((game) => (
+            {nativeModules.map((game) => (
               <span key={game.id} style={moduleChipActive}>
                 {game.label}
               </span>
             ))}
           </div>
         </section>
+
+        {!standalone ? (
+          <section style={installCard}>
+            <div style={installEyebrow}>BETTER MOBILE MODE</div>
+            <div style={installTitle}>Add SAGA to your Home Screen</div>
+            <div style={installText}>
+              On iPhone: Share → Add to Home Screen. The player feels more app-like
+              and avoids extra browser UI.
+            </div>
+          </section>
+        ) : null}
 
         <section style={sectionBlock}>
           <div style={sectionEyebrow}>OPERATORS</div>
@@ -176,7 +212,7 @@ export default function LoginApp() {
         <section style={sectionBlock}>
           <div style={sectionEyebrow}>NEXT GAMEPLAY TRACK</div>
           <div style={roadmapGrid}>
-            {upcomingModules.map((game) => (
+            {plannedModules.map((game) => (
               <article key={game.id} style={roadmapCard}>
                 <div style={roadmapTop}>
                   <div style={roadmapTitle}>{game.label}</div>
@@ -302,6 +338,35 @@ const heroText: React.CSSProperties = {
   lineHeight: 1.5,
 }
 
+const statsRow: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 10,
+  marginTop: 14,
+}
+
+const statCard: React.CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.96)',
+  padding: '12px 12px 10px',
+}
+
+const statLabel: React.CSSProperties = {
+  color: '#64748b',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+}
+
+const statValue: React.CSSProperties = {
+  marginTop: 6,
+  color: '#0f172a',
+  fontSize: 20,
+  fontWeight: 900,
+  lineHeight: 1,
+}
+
 const moduleStrip: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -322,6 +387,36 @@ const moduleChipActive: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
+}
+
+const installCard: React.CSSProperties = {
+  padding: '14px 16px',
+  border: '1px solid rgba(59,130,246,.12)',
+  borderRadius: 20,
+  background: 'rgba(239,246,255,.90)',
+  boxShadow: '0 12px 28px rgba(15,23,42,.05)',
+}
+
+const installEyebrow: React.CSSProperties = {
+  color: '#1d4ed8',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+}
+
+const installTitle: React.CSSProperties = {
+  marginTop: 6,
+  color: '#0f172a',
+  fontSize: 20,
+  fontWeight: 900,
+  lineHeight: 1.05,
+}
+
+const installText: React.CSSProperties = {
+  marginTop: 8,
+  color: '#475569',
+  fontSize: 13,
+  lineHeight: 1.45,
 }
 
 const sectionBlock: React.CSSProperties = {

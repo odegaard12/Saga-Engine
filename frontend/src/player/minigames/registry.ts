@@ -1,4 +1,6 @@
 import { CircuitHackGame } from './games/CircuitHackGame'
+import { CryptexGame } from './games/CryptexGame'
+import { SimonSaysGame } from './games/SimonSaysGame'
 import type { PlayerMinigameDefinition } from './types'
 
 const REGISTRY: Record<string, PlayerMinigameDefinition> = {
@@ -8,6 +10,20 @@ const REGISTRY: Record<string, PlayerMinigameDefinition> = {
     version: 'v1',
     supportsManualFallback: true,
     component: CircuitHackGame,
+  },
+  cryptex: {
+    type: 'cryptex',
+    label: 'Cryptex',
+    version: 'v1',
+    supportsManualFallback: true,
+    component: CryptexGame,
+  },
+  simon_says: {
+    type: 'simon_says',
+    label: 'Simon Says',
+    version: 'v1',
+    supportsManualFallback: true,
+    component: SimonSaysGame,
   },
 }
 
