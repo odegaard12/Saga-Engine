@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
@@ -14,7 +14,6 @@ type LoadState =
   | { status: 'ready'; payload: PlayerGamePayload }
 
 type NoticeTone = 'info' | 'warn' | 'success'
-
 type OverlayState = 'activate' | 'node' | 'finish' | null
 
 function vibrate(pattern: number | number[]) {
@@ -464,7 +463,7 @@ function CelebrationOverlay({ state }: { state: OverlayState }) {
   )
 }
 
-function getViewportStyle(mobile: boolean): React.CSSProperties {
+function getViewportStyle(mobile: boolean): CSSProperties {
   return {
     position: 'relative',
     width: '100%',
@@ -477,7 +476,7 @@ function getViewportStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getTopScrimStyle(mobile: boolean): React.CSSProperties {
+function getTopScrimStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     top: 0,
@@ -493,7 +492,7 @@ function getTopScrimStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
+function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 12,
@@ -507,12 +506,12 @@ function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getToastOverlayStyle(mobile: boolean): React.CSSProperties {
+function getToastOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     left: mobile ? 12 : 16,
     right: mobile ? 12 : 16,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 152px)' : 176,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 154px)' : 176,
     zIndex: 1250,
     pointerEvents: 'none',
     display: 'flex',
@@ -521,12 +520,12 @@ function getToastOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
+function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 10px)' : 12,
     zIndex: 1200,
     pointerEvents: 'none',
     display: 'flex',
@@ -535,7 +534,7 @@ function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-const overlayWrap: React.CSSProperties = {
+const overlayWrap: CSSProperties = {
   position: 'absolute',
   inset: 0,
   zIndex: 1235,
@@ -545,16 +544,16 @@ const overlayWrap: React.CSSProperties = {
   justifyContent: 'center',
 }
 
-const pulseRing: React.CSSProperties = {
+const pulseRing: CSSProperties = {
   position: 'absolute',
-  width: 180,
-  height: 180,
+  width: 190,
+  height: 190,
   borderRadius: '50%',
   opacity: 0.22,
   animation: 'sagaPulseRing 720ms ease-out forwards',
 }
 
-const overlayPill: React.CSSProperties = {
+const overlayPill: CSSProperties = {
   minHeight: 42,
   display: 'inline-flex',
   alignItems: 'center',
@@ -568,19 +567,19 @@ const overlayPill: React.CSSProperties = {
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const overlayInfo: React.CSSProperties = {
+const overlayInfo: CSSProperties = {
   background: 'rgba(239,246,255,.96)',
   border: '1px solid rgba(59,130,246,.16)',
   color: '#1d4ed8',
 }
 
-const overlaySuccess: React.CSSProperties = {
+const overlaySuccess: CSSProperties = {
   background: 'rgba(220,252,231,.96)',
   border: '1px solid rgba(22,163,74,.18)',
   color: '#166534',
 }
 
-const overlayFinish: React.CSSProperties = {
+const overlayFinish: CSSProperties = {
   background: 'rgba(250,245,255,.96)',
   border: '1px solid rgba(168,85,247,.18)',
   color: '#7e22ce',
@@ -610,7 +609,7 @@ const overlayAnimations = `
 }
 `
 
-const statusCard: React.CSSProperties = {
+const statusCard: CSSProperties = {
   borderRadius: 20,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(255,255,255,.9)',
@@ -620,13 +619,13 @@ const statusCard: React.CSSProperties = {
   margin: '0 auto',
 }
 
-const statusTitle: React.CSSProperties = {
+const statusTitle: CSSProperties = {
   fontSize: 20,
   fontWeight: 800,
   color: '#0f172a',
 }
 
-const statusBody: React.CSSProperties = {
+const statusBody: CSSProperties = {
   fontSize: 14,
   color: '#475569',
   marginTop: 8,
