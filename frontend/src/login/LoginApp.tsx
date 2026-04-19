@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { GAME_CATALOG } from '../player/minigames/gameCatalog'
+import { tokens } from '../player/ui/tokens'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -75,9 +76,10 @@ export default function LoginApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
+        <style>{loginAnimations}</style>
         <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroLabel}>MISSION ENTRY</div>
+          <div style={labelPill}>MISSION ENTRY</div>
           <h1 style={heroTitle}>Loading mission</h1>
         </section>
       </main>
@@ -87,11 +89,12 @@ export default function LoginApp() {
   if (state.status === 'error') {
     return (
       <main style={pageWrap}>
+        <style>{loginAnimations}</style>
         <div style={ambientGlow} />
         <section style={heroCard}>
-          <div style={heroLabel}>MISSION ENTRY</div>
+          <div style={labelPill}>MISSION ENTRY</div>
           <h1 style={heroTitle}>Config error</h1>
-          <p style={heroText}>{state.message}</p>
+          <p style={heroBody}>{state.message}</p>
         </section>
       </main>
     )
@@ -102,14 +105,14 @@ export default function LoginApp() {
   const config = state.config
   const title = config.site_name || 'SAGA'
   const subtitle = config.story_title || 'Choose operator'
-  const body =
-    config.story_text || 'Select a profile to enter the mission.'
+  const body = config.story_text || 'Select a profile to enter the mission.'
 
   const mobile =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   return (
     <main style={pageWrap}>
+      <style>{loginAnimations}</style>
       <div style={ambientGlow} />
 
       <div
@@ -122,19 +125,19 @@ export default function LoginApp() {
       >
         <section style={heroCard}>
           <div style={heroTop}>
-            <div style={heroLabel}>MISSION ENTRY</div>
+            <div style={labelPill}>MISSION ENTRY</div>
             <a href="/admin" style={adminLink}>
-              ADMIN
+              Admin
             </a>
           </div>
 
           <h1 style={heroTitle}>{title}</h1>
           <p style={heroSub}>{subtitle}</p>
-          <p style={heroText}>{body}</p>
+          <p style={heroBody}>{body}</p>
 
-          <div style={nativeStrip}>
+          <div style={chipRow}>
             {nativeModules.map((game) => (
-              <span key={game.id} style={nativeChip}>
+              <span key={game.id} style={moduleChip}>
                 {game.label}
               </span>
             ))}
@@ -147,7 +150,7 @@ export default function LoginApp() {
           </section>
         ) : null}
 
-        <section style={operatorsWrap}>
+        <section style={operatorGrid}>
           {profiles.map((profile) => {
             const isTeam = profile.mode === 'team'
             const members = profile.members || [profile.display_name]
@@ -170,7 +173,7 @@ export default function LoginApp() {
                     window.location.href = `/?user=${encodeURIComponent(profile.id)}`
                   }}
                 >
-                  ENTER
+                  Enter
                 </button>
               </article>
             )
@@ -181,17 +184,17 @@ export default function LoginApp() {
   )
 }
 
-const pageWrap: React.CSSProperties = {
+const pageWrap: CSSProperties = {
   minHeight: '100dvh',
   background:
     'radial-gradient(circle at top, rgba(34,197,94,.08), transparent 32%), linear-gradient(180deg, #eef3ed, #e8efea)',
-  color: '#0f172a',
+  color: tokens.colors.ink,
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
   position: 'relative',
   overflowX: 'hidden',
 }
 
-const ambientGlow: React.CSSProperties = {
+const ambientGlow: CSSProperties = {
   position: 'fixed',
   inset: 0,
   pointerEvents: 'none',
@@ -200,160 +203,160 @@ const ambientGlow: React.CSSProperties = {
   opacity: 0.85,
 }
 
-const contentWrap: React.CSSProperties = {
+const contentWrap: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(880px, 100%)',
+  width: 'min(820px, 100%)',
   margin: '0 auto',
   display: 'grid',
   gap: 14,
 }
 
-const heroCard: React.CSSProperties = {
+const heroCard: CSSProperties = {
   padding: '18px 18px 16px',
-  border: '1px solid rgba(15,23,42,.08)',
-  borderRadius: 24,
-  background: 'rgba(255,255,255,.90)',
-  boxShadow: '0 18px 40px rgba(15,23,42,.06)',
+  border: `1px solid ${tokens.colors.border}`,
+  borderRadius: tokens.radius.panel,
+  background: tokens.colors.surfaceOverlay,
+  boxShadow: tokens.shadow.soft,
   backdropFilter: 'blur(12px)',
+  animation: 'sagaLoginRise 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const heroTop: React.CSSProperties = {
+const heroTop: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 10,
 }
 
-const heroLabel: React.CSSProperties = {
+const labelPill: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   minHeight: 28,
   padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(34,197,94,.16)',
-  background: 'rgba(220,252,231,.92)',
-  color: '#166534',
+  borderRadius: tokens.radius.pill,
+  border: `1px solid ${tokens.colors.brandLine}`,
+  background: tokens.colors.brandSoft,
+  color: tokens.colors.brand,
   fontSize: 10,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
   fontWeight: 900,
 }
 
-const adminLink: React.CSSProperties = {
+const adminLink: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   minHeight: 30,
   padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
+  borderRadius: tokens.radius.pill,
+  border: `1px solid ${tokens.colors.border}`,
+  background: tokens.colors.surfaceSoft,
   color: '#334155',
-  fontSize: 10,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  fontWeight: 900,
+  fontSize: 11,
+  fontWeight: 800,
   textDecoration: 'none',
 }
 
-const heroTitle: React.CSSProperties = {
+const heroTitle: CSSProperties = {
   marginTop: 14,
   fontSize: 'clamp(28px, 6vw, 44px)',
   lineHeight: 0.96,
   fontWeight: 900,
   letterSpacing: '-0.04em',
-  color: '#0f172a',
+  color: tokens.colors.ink,
 }
 
-const heroSub: React.CSSProperties = {
+const heroSub: CSSProperties = {
   marginTop: 10,
-  color: '#166534',
+  color: tokens.colors.brand,
   fontSize: 12,
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
   fontWeight: 900,
 }
 
-const heroText: React.CSSProperties = {
+const heroBody: CSSProperties = {
   marginTop: 8,
   maxWidth: 560,
-  color: '#475569',
+  color: tokens.colors.soft,
   fontSize: 14,
   lineHeight: 1.5,
 }
 
-const nativeStrip: React.CSSProperties = {
+const chipRow: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
   marginTop: 14,
 }
 
-const nativeChip: React.CSSProperties = {
+const moduleChip: CSSProperties = {
   minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
+  borderRadius: tokens.radius.pill,
+  border: `1px solid ${tokens.colors.infoLine}`,
+  background: tokens.colors.infoSoft,
+  color: tokens.colors.info,
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
 }
 
-const installHint: React.CSSProperties = {
+const installHint: CSSProperties = {
   padding: '12px 14px',
   borderRadius: 16,
-  border: '1px solid rgba(59,130,246,.12)',
-  background: 'rgba(239,246,255,.90)',
-  color: '#1d4ed8',
+  border: `1px solid ${tokens.colors.infoLine}`,
+  background: tokens.colors.infoSoft,
+  color: tokens.colors.info,
   fontSize: 12,
   fontWeight: 800,
   lineHeight: 1.4,
 }
 
-const operatorsWrap: React.CSSProperties = {
+const operatorGrid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: 12,
 }
 
-const operatorCard: React.CSSProperties = {
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.90)',
+const operatorCard: CSSProperties = {
+  border: `1px solid ${tokens.colors.border}`,
+  background: tokens.colors.surface,
   borderRadius: 22,
   padding: 14,
-  boxShadow: '0 12px 28px rgba(15,23,42,.06)',
+  boxShadow: tokens.shadow.soft,
   display: 'grid',
   gap: 12,
+  animation: 'sagaLoginRise 240ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const operatorHead: React.CSSProperties = {
+const operatorHead: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   gap: 12,
 }
 
-const operatorName: React.CSSProperties = {
+const operatorName: CSSProperties = {
   fontSize: 18,
   lineHeight: 1.05,
   fontWeight: 900,
-  color: '#0f172a',
+  color: tokens.colors.ink,
 }
 
-const modePill: React.CSSProperties = {
+const modePill: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   minHeight: 24,
   padding: '0 8px',
-  borderRadius: 999,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
+  borderRadius: tokens.radius.pill,
+  border: `1px solid ${tokens.colors.border}`,
+  background: tokens.colors.surfaceSoft,
   color: '#334155',
   fontSize: 10,
   letterSpacing: '0.14em',
@@ -361,24 +364,37 @@ const modePill: React.CSSProperties = {
   fontWeight: 900,
 }
 
-const operatorMeta: React.CSSProperties = {
-  color: '#64748b',
+const operatorMeta: CSSProperties = {
+  color: tokens.colors.muted,
   fontSize: 12,
   lineHeight: 1.45,
 }
 
-const enterButton: React.CSSProperties = {
+const enterButton: CSSProperties = {
   minHeight: 42,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   borderRadius: 14,
-  border: '1px solid rgba(22,163,74,.18)',
+  border: `1px solid ${tokens.colors.brandLine}`,
   background: 'linear-gradient(180deg, #16a34a, #15803d)',
   color: '#ffffff',
   fontSize: 11,
-  letterSpacing: '0.16em',
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
   fontWeight: 900,
   boxShadow: '0 10px 24px rgba(22,163,74,.18)',
 }
+
+const loginAnimations = `
+@keyframes sagaLoginRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`
