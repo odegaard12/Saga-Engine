@@ -90,33 +90,68 @@ export function PlayerHud({
           gap: compact ? 8 : 10,
         }}
       >
-        <div style={titleRow}>
-          <div style={titleBlock}>
-            <div style={eyebrow}>{finished ? 'MISSION' : 'NODE'}</div>
-            <div style={{ ...title, fontSize: compact ? 18 : 22 }}>
-              {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
+        {finished ? (
+          <>
+            <div style={completeHero}>
+              <div style={completeLabel}>MISSION</div>
+              <div style={completeTitle}>Mission complete</div>
+              <div style={completeText}>
+                The route is finished. You can review details or open the menu.
+              </div>
             </div>
-          </div>
 
-          <div style={titleMeta}>
-            <span style={stagePill}>{finished ? 'DONE' : `STAGE ${level + 1}`}</span>
-            {debugEnabled ? <span style={debugPill}>DEBUG</span> : null}
-          </div>
-        </div>
+            <div style={metricRow}>
+              <MetricPill label="Status" value="Complete" tone="good" />
+              <MetricPill label="GPS" value={gpsDisplay} tone="neutral" />
+            </div>
 
-        <div style={metricRow}>
-          <MetricPill label="Range" value={distanceDisplay} tone={finished ? 'info' : inRange ? 'good' : 'neutral'} />
-          <MetricPill label="GPS" value={gpsDisplay} tone={gpsState === 'ready' ? 'good' : gpsState === 'stale' ? 'warn' : 'neutral'} />
-        </div>
+            <button
+              type="button"
+              style={getPrimaryStyle('done', true, compact)}
+              disabled
+            >
+              Mission complete
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={titleRow}>
+              <div style={titleBlock}>
+                <div style={eyebrow}>MISSION</div>
+                <div style={{ ...title, fontSize: compact ? 18 : 22 }}>
+                  {currentStage?.title || 'Awaiting node'}
+                </div>
+              </div>
 
-        <button
-          type="button"
-          style={getPrimaryStyle(primaryTone, primaryDisabled, compact)}
-          disabled={primaryDisabled}
-          onClick={onPrimaryAction}
-        >
-          {primaryLabel}
-        </button>
+              <div style={titleMeta}>
+                <span style={stagePill}>{`STAGE ${level + 1}`}</span>
+                {debugEnabled ? <span style={debugPill}>DEBUG</span> : null}
+              </div>
+            </div>
+
+            <div style={metricRow}>
+              <MetricPill
+                label="Range"
+                value={distanceDisplay}
+                tone={inRange ? 'good' : 'neutral'}
+              />
+              <MetricPill
+                label="GPS"
+                value={gpsDisplay}
+                tone={gpsState === 'ready' ? 'good' : gpsState === 'stale' ? 'warn' : 'neutral'}
+              />
+            </div>
+
+            <button
+              type="button"
+              style={getPrimaryStyle(primaryTone, primaryDisabled, compact)}
+              disabled={primaryDisabled}
+              onClick={onPrimaryAction}
+            >
+              {primaryLabel}
+            </button>
+          </>
+        )}
 
         <div style={helperLine}>{helperText}</div>
 
@@ -296,6 +331,7 @@ function getPrimaryStyle(
     background: 'linear-gradient(180deg, #16a34a, #15803d)',
     color: '#ffffff',
     boxShadow: '0 10px 24px rgba(22,163,74,.22)',
+    animation: tone === 'ready' ? 'sagaPrimaryPulse 1.8s ease-in-out infinite' : 'none',
   }
 }
 
@@ -327,6 +363,32 @@ const tray: CSSProperties = {
   color: tokens.colors.ink,
   display: 'grid',
   animation: 'sagaHudRise 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const completeHero: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+}
+
+const completeLabel: CSSProperties = {
+  color: tokens.colors.brand,
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+}
+
+const completeTitle: CSSProperties = {
+  color: tokens.colors.ink,
+  fontSize: 28,
+  fontWeight: 900,
+  lineHeight: 0.98,
+  letterSpacing: '-0.04em',
+}
+
+const completeText: CSSProperties = {
+  color: tokens.colors.soft,
+  fontSize: 13,
+  lineHeight: 1.4,
 }
 
 const titleRow: CSSProperties = {
@@ -607,6 +669,21 @@ const hudAnimations = `
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sagaPrimaryPulse {
+  0% {
+    box-shadow: 0 10px 24px rgba(22,163,74,.18);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 14px 30px rgba(22,163,74,.28);
+    transform: scale(1.01);
+  }
+  100% {
+    box-shadow: 0 10px 24px rgba(22,163,74,.18);
+    transform: scale(1);
   }
 }
 `
