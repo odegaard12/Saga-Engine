@@ -1,6 +1,10 @@
+import type { CSSProperties } from 'react'
+import { tokens } from '../ui/tokens'
+
+export type UiNoticeTone = 'info' | 'warn' | 'success'
 export type UiNotice = {
   message: string
-  tone: 'info' | 'warn' | 'success'
+  tone: UiNoticeTone
 } | null
 
 export function ToastNotice({ notice }: { notice: UiNotice }) {
@@ -25,15 +29,15 @@ export function ToastNotice({ notice }: { notice: UiNotice }) {
   )
 }
 
-const toastWrap: React.CSSProperties = {
+const toastWrap: CSSProperties = {
   minHeight: 38,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  maxWidth: 'min(92vw, 440px)',
+  maxWidth: 'min(92vw, 420px)',
   padding: '9px 14px',
-  borderRadius: 999,
-  boxShadow: '0 10px 26px rgba(15,23,42,.14)',
+  borderRadius: tokens.radius.pill,
+  boxShadow: tokens.shadow.soft,
   fontSize: 12,
   lineHeight: 1.3,
   fontWeight: 800,
@@ -43,22 +47,22 @@ const toastWrap: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
 }
 
-const toastInfo: React.CSSProperties = {
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(239,246,255,.94)',
-  color: '#1d4ed8',
+const toastInfo: CSSProperties = {
+  border: `1px solid ${tokens.colors.infoLine}`,
+  background: tokens.colors.infoSoft,
+  color: tokens.colors.info,
 }
 
-const toastWarn: React.CSSProperties = {
-  border: '1px solid rgba(245,158,11,.18)',
-  background: 'rgba(255,251,235,.95)',
-  color: '#92400e',
+const toastWarn: CSSProperties = {
+  border: `1px solid ${tokens.colors.warnLine}`,
+  background: tokens.colors.warnSoft,
+  color: tokens.colors.warn,
 }
 
-const toastSuccess: React.CSSProperties = {
-  border: '1px solid rgba(22,163,74,.18)',
-  background: 'rgba(220,252,231,.95)',
-  color: '#166534',
+const toastSuccess: CSSProperties = {
+  border: `1px solid ${tokens.colors.brandLine}`,
+  background: tokens.colors.brandSoft,
+  color: tokens.colors.brand,
 }
 
 const toastAnimations = `
