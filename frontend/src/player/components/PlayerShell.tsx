@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
+import { tokens } from '../ui/tokens'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -11,24 +13,11 @@ interface PlayerShellProps {
 export function PlayerShell({
   payload,
 }: PlayerShellProps) {
-  const width =
-    typeof window !== 'undefined' && window.innerWidth <= 430
-      ? 'min(100%, 240px)'
-      : typeof window !== 'undefined' && window.innerWidth <= 560
-      ? 'min(100%, 260px)'
-      : 'min(100%, 340px)'
-
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
-
-  const sessionLine = payload.finished
-    ? 'Mission complete'
-    : mode === 'team'
-    ? 'Team session'
-    : 'Live session'
 
   return (
     <>
@@ -38,82 +27,81 @@ export function PlayerShell({
         <div
           style={{
             ...rail,
-            width,
-            padding: compact ? '8px 10px' : '12px 14px',
-            gap: compact ? 3 : 6,
+            width: compact ? 'min(100%, 250px)' : 'min(100%, 320px)',
+            padding: compact ? '8px 10px' : '10px 12px',
             borderRadius: compact ? 18 : 20,
           }}
         >
-          <div style={eyebrow}>
-            {mode === 'team' ? 'TEAM CHANNEL' : 'FIELD OPERATOR'}
+          <div style={topRow}>
+            <div style={eyebrow}>{mode === 'team' ? 'TEAM' : 'FIELD'}</div>
+            <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
           </div>
 
-          <div
-            style={{
-              ...name,
-              fontSize: compact ? 14 : 18,
-            }}
-          >
-            {title}
-          </div>
-
-          <div
-            style={{
-              ...sessionText,
-              fontSize: compact ? 11 : 13,
-            }}
-          >
-            {sessionLine}
-          </div>
+          <div style={{ ...name, fontSize: compact ? 15 : 18 }}>{title}</div>
         </div>
       </header>
     </>
   )
 }
 
-const wrap: React.CSSProperties = {
+const wrap: CSSProperties = {
   pointerEvents: 'none',
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
 }
 
-const rail: React.CSSProperties = {
+const rail: CSSProperties = {
   margin: '0 auto',
   display: 'grid',
-  alignItems: 'center',
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.90)',
-  boxShadow: '0 10px 24px rgba(15,23,42,.06)',
+  gap: 6,
+  border: `1px solid ${tokens.colors.border}`,
+  background: tokens.colors.surfaceOverlay,
+  boxShadow: tokens.shadow.soft,
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
   pointerEvents: 'auto',
   boxSizing: 'border-box',
-  animation: 'sagaRailIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaShellIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const eyebrow: React.CSSProperties = {
-  color: '#047857',
+const topRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+}
+
+const eyebrow: CSSProperties = {
+  color: tokens.colors.brand,
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
-const name: React.CSSProperties = {
-  color: '#0f172a',
+const modePill: CSSProperties = {
+  minHeight: 22,
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0 8px',
+  borderRadius: tokens.radius.pill,
+  background: tokens.colors.surfaceSoft,
+  border: `1px solid ${tokens.colors.border}`,
+  color: '#334155',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+}
+
+const name: CSSProperties = {
+  color: tokens.colors.ink,
   fontWeight: 900,
   lineHeight: 1,
   letterSpacing: '-0.03em',
 }
 
-const sessionText: React.CSSProperties = {
-  color: '#475569',
-  fontWeight: 700,
-  lineHeight: 1.2,
-}
-
 const shellAnimations = `
-@keyframes sagaRailIn {
+@keyframes sagaShellIn {
   from {
     opacity: 0;
     transform: translateY(-8px) scale(.99);
