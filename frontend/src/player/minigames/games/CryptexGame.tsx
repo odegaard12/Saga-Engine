@@ -30,7 +30,7 @@ export function CryptexGame({
 }: PlayerMinigameProps) {
   const targetWord = useMemo(() => readTargetWord(stage), [stage])
   const [indices, setIndices] = useState(() => targetWord.split('').map(() => 0))
-  const [status, setStatus] = useState('Rotate each ring until the lock matches.')
+  const [status, setStatus] = useState('Align the lock.')
   const [statusTone, setStatusTone] = useState<'idle' | 'ok' | 'bad'>('idle')
   const [working, setWorking] = useState(false)
 
@@ -52,7 +52,7 @@ export function CryptexGame({
       })
     )
 
-    setStatus('Rotate each ring until the lock matches.')
+    setStatus('Align the lock.')
     setStatusTone('idle')
   }
 
@@ -61,18 +61,18 @@ export function CryptexGame({
 
     const candidate = letters.join('')
     if (candidate !== targetWord) {
-      setStatus('Incorrect alignment. Recheck the rings and try again.')
+      setStatus('Not correct.')
       setStatusTone('bad')
       return
     }
 
     try {
       setWorking(true)
-      setStatus('Cryptex unlocked. Synchronizing node…')
+      setStatus('Unlocking node…')
       setStatusTone('ok')
       await onWin()
     } catch {
-      setStatus('Unlock succeeded, but mission sync failed. Retry.')
+      setStatus('Sync failed. Retry.')
       setStatusTone('bad')
     } finally {
       setWorking(false)
@@ -81,14 +81,6 @@ export function CryptexGame({
 
   return (
     <section style={wrap}>
-      <div style={headerRow}>
-        <div>
-          <div style={eyebrow}>CRYPTEX</div>
-          <div style={title}>Unlock the word lock</div>
-        </div>
-        <div style={metaChip}>{targetWord.length} RINGS</div>
-      </div>
-
       <div style={ringsRow}>
         {letters.map((letter, index) => (
           <div key={`${index}-${letter}`} style={ringCard}>
@@ -101,7 +93,6 @@ export function CryptexGame({
               +
             </button>
 
-            <div style={ringIndex}>RING {index + 1}</div>
             <div style={ringLetter}>{letter}</div>
 
             <button
@@ -122,7 +113,7 @@ export function CryptexGame({
         onClick={validate}
         disabled={submitting || working}
       >
-        {working ? 'SYNCING CRYPTEX…' : 'UNLOCK NODE'}
+        {working ? 'SYNC…' : 'UNLOCK'}
       </button>
 
       <div
@@ -150,45 +141,6 @@ const wrap: React.CSSProperties = {
   gap: 12,
 }
 
-const headerRow: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 10,
-}
-
-const eyebrow: React.CSSProperties = {
-  color: 'rgba(167,243,208,.96)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-}
-
-const title: React.CSSProperties = {
-  marginTop: 6,
-  color: '#f8fafc',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1.05,
-  letterSpacing: '-0.03em',
-}
-
-const metaChip: React.CSSProperties = {
-  minHeight: 30,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#cbd5e1',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  whiteSpace: 'nowrap',
-}
-
 const ringsRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))',
@@ -196,7 +148,7 @@ const ringsRow: React.CSSProperties = {
 }
 
 const ringCard: React.CSSProperties = {
-  minHeight: 136,
+  minHeight: 132,
   borderRadius: 18,
   border: '1px solid rgba(59,130,246,.16)',
   background:
@@ -205,7 +157,7 @@ const ringCard: React.CSSProperties = {
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'center',
-  gap: 8,
+  gap: 10,
   padding: 10,
 }
 
@@ -224,13 +176,6 @@ const stepButton: React.CSSProperties = {
   justifyContent: 'center',
 }
 
-const ringIndex: React.CSSProperties = {
-  color: 'rgba(148,163,184,.92)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-}
-
 const ringLetter: React.CSSProperties = {
   color: '#ffffff',
   fontSize: 28,
@@ -240,7 +185,7 @@ const ringLetter: React.CSSProperties = {
 }
 
 const validateButton: React.CSSProperties = {
-  minHeight: 52,
+  minHeight: 48,
   borderRadius: 16,
   border: '1px solid rgba(34,197,94,.24)',
   background:
@@ -253,14 +198,14 @@ const validateButton: React.CSSProperties = {
 }
 
 const statusBox: React.CSSProperties = {
-  minHeight: 46,
-  borderRadius: 16,
+  minHeight: 42,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(15,23,42,.42)',
   color: '#cbd5e1',
   fontSize: 13,
-  lineHeight: 1.45,
-  padding: '12px 14px',
+  lineHeight: 1.4,
+  padding: '10px 12px',
 }
 
 const statusOk: React.CSSProperties = {

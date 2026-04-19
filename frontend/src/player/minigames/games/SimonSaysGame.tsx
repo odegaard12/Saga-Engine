@@ -33,7 +33,7 @@ export function SimonSaysGame({
 }: PlayerMinigameProps) {
   const targetSequence = useMemo(() => readSequence(stage), [stage])
   const [input, setInput] = useState<string[]>([])
-  const [status, setStatus] = useState('Repeat the signal pattern in the correct order.')
+  const [status, setStatus] = useState('Repeat the pattern.')
   const [statusTone, setStatusTone] = useState<'idle' | 'ok' | 'bad'>('idle')
   const [working, setWorking] = useState(false)
 
@@ -47,7 +47,7 @@ export function SimonSaysGame({
 
     if (!prefixOk) {
       setInput([])
-      setStatus('Wrong input. Pattern reset.')
+      setStatus('Wrong pattern.')
       setStatusTone('bad')
       return
     }
@@ -57,18 +57,18 @@ export function SimonSaysGame({
       return
     }
 
-    setStatus(`Pattern progress: ${next.length}/${targetSequence.length}`)
+    setStatus(`${next.length}/${targetSequence.length}`)
     setStatusTone('idle')
   }
 
   async function validateComplete() {
     try {
       setWorking(true)
-      setStatus('Pattern matched. Synchronizing node…')
+      setStatus('Syncing…')
       setStatusTone('ok')
       await onWin()
     } catch {
-      setStatus('Pattern matched, but mission sync failed. Retry.')
+      setStatus('Sync failed.')
       setStatusTone('bad')
     } finally {
       setWorking(false)
@@ -79,24 +79,12 @@ export function SimonSaysGame({
   function clearInput() {
     if (submitting || working) return
     setInput([])
-    setStatus('Pattern cleared.')
+    setStatus('Cleared.')
     setStatusTone('idle')
   }
 
   return (
     <section style={wrap}>
-      <div style={headerRow}>
-        <div>
-          <div style={eyebrow}>SIMON SAYS</div>
-          <div style={title}>Repeat the signal sequence</div>
-        </div>
-        <div style={metaChip}>{targetSequence.length} STEPS</div>
-      </div>
-
-      <div style={sequenceBox}>
-        TARGET: {targetSequence.join(' · ')}
-      </div>
-
       <div style={padsGrid}>
         {Object.entries(PAD_META).map(([key, meta]) => (
           <button
@@ -116,7 +104,7 @@ export function SimonSaysGame({
 
       <div style={statusRow}>
         <div style={progressBox}>
-          INPUT: {input.length ? input.join(' · ') : '—'}
+          {input.length ? input.join(' · ') : '—'}
         </div>
 
         <button
@@ -152,57 +140,6 @@ const wrap: React.CSSProperties = {
   padding: 14,
   display: 'grid',
   gap: 12,
-}
-
-const headerRow: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 10,
-}
-
-const eyebrow: React.CSSProperties = {
-  color: 'rgba(167,243,208,.96)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-}
-
-const title: React.CSSProperties = {
-  marginTop: 6,
-  color: '#f8fafc',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1.05,
-  letterSpacing: '-0.03em',
-}
-
-const metaChip: React.CSSProperties = {
-  minHeight: 30,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#cbd5e1',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  whiteSpace: 'nowrap',
-}
-
-const sequenceBox: React.CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(15,23,42,.42)',
-  color: '#cbd5e1',
-  fontSize: 12,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  padding: '12px 14px',
 }
 
 const padsGrid: React.CSSProperties = {
@@ -242,7 +179,7 @@ const progressBox: React.CSSProperties = {
 
 const clearButton: React.CSSProperties = {
   minHeight: 42,
-  minWidth: 94,
+  minWidth: 88,
   borderRadius: 14,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.06)',
@@ -254,14 +191,14 @@ const clearButton: React.CSSProperties = {
 }
 
 const statusBox: React.CSSProperties = {
-  minHeight: 46,
-  borderRadius: 16,
+  minHeight: 42,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(15,23,42,.42)',
   color: '#cbd5e1',
   fontSize: 13,
-  lineHeight: 1.45,
-  padding: '12px 14px',
+  lineHeight: 1.4,
+  padding: '10px 12px',
 }
 
 const statusOk: React.CSSProperties = {
