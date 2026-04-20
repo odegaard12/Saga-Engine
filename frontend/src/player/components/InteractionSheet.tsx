@@ -49,7 +49,7 @@ export function InteractionSheet({
   const touchStartXRef = useRef<number | null>(null)
 
   const stageId = currentStage?.id ?? null
-  const stageType = currentStage?.type ?? null
+  const stageType = currentStage?.minigame?.type ?? currentStage?.type ?? null
   const minigameDefinition = stageType
     ? resolveMinigameDefinition(stageType)
     : null

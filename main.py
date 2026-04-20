@@ -284,6 +284,311 @@ def _as_bool(value, default=False):
         return False
     return default
 
+
+MINIGAME_SPECS = {
+    "circuit_hack": {"label": "Circuit Hack"},
+    "cryptex": {"label": "Cryptex"},
+    "simon_says": {"label": "Simon Says"},
+    "digital_tuner": {"label": "Digital Tuner"},
+    "radio_azimuth": {"label": "Radio Azimuth"},
+    "gyro_storm": {"label": "Gyro Storm"},
+    "switchboard": {"label": "Switchboard"},
+    "compass_blow": {"label": "Compass Blow"},
+}
+
+def _clamp_int(value, default, minimum=None, maximum=None):
+    num = _as_float(value, default)
+    try:
+        out = int(round(float(num)))
+    except Exception:
+        out = int(default)
+    if minimum is not None:
+        out = max(int(minimum), out)
+    if maximum is not None:
+        out = min(int(maximum), out)
+    return out
+
+def _coerce_binary_flag(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(int(value))
+    text = _as_str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
+
+def _normalize_string_list(value, fallback, allowed=None, min_items=1, max_items=None, uppercase=True):
+    if not isinstance(value, list):
+        return list(fallback)
+    allowed_set = set(allowed) if allowed else None
+    items = []
+    for item in value:
+        text = _as_str(item).strip()
+        if uppercase:
+            text = text.upper()
+        if not text:
+            continue
+        if allowed_set and text not in allowed_set:
+            continue
+        items.append(text)
+    if max_items is not None:
+        items = items[:max_items]
+    if len(items) < min_items:
+        return list(fallback)
+    return items
+
+def _normalize_frequency_label(value, default="104.6"):
+    text = _as_str(value).strip().lower().replace("mhz", "").strip()
+    num = _as_float(text, None)
+    if num is None:
+        num = _as_float(default, 104.6)
+    return f"{float(num):.1f}"
+
+def _normalize_degree_label(value, default="135°"):
+    text = _as_str(value).strip().upper().replace("°", "").strip()
+    num = _as_float(text, None)
+    if num is None:
+        text = _as_str(default).strip().upper().replace("°", "").strip()
+        num = _as_float(text, 135)
+    return f"{int(round(float(num))) % 360}°"
+
+def get_minigame_spec(minigame_type):
+    normalized = _as_str(minigame_type).strip().lower()
+    if normalized not in MINIGAME_SPECS:
+        normalized = "circuit_hack"
+    return MINIGAME_SPECS[normalized]
+
+def normalize_minigame_config(minigame_type, raw_cfg):
+    raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+    normalized_type = _as_str(minigame_type).strip().lower()
+    if normalized_type not in SUPPORTED_MINIGAME_TYPES:
+        normalized_type = "circuit_hack"
+
+    if normalized_type == "circuit_hack":
+        default_target = ["EAST", "SECOND", "SOUTH"]
+        target = raw.get("target")
+        if isinstance(target, list) and len(target) == 3:
+            target = [_as_str(item).strip().upper() for item in target]
+        else:
+            target = [
+                _as_str(raw.get("target_start") or default_target[0]).strip().upper(),
+                _as_str(raw.get("target_guard") or default_target[1]).strip().upper(),
+                _as_str(raw.get("target_end") or default_target[2]).strip().upper(),
+            ]
+        if not all(target):
+            target = list(default_target)
+        return {
+            "target": target,
+            "target_start": target[0],
+            "target_guard": target[1],
+            "target_end": target[2],
+            "direction_options": _normalize_string_list(
+                raw.get("direction_options"),
+                ["NORTH", "EAST", "SOUTH", "WEST", "CENTER"],
+                min_items=2,
+            ),
+            "guard_options": _normalize_string_list(
+                raw.get("guard_options"),
+                ["FIRST", "SECOND", "THIRD", "FOURTH", "FIFTH"],
+                min_items=2,
+            ),
+        }
+
+    if normalized_type == "cryptex":
+        raw_word = _as_str(raw.get("target_word") or raw.get("word") or "SAGA").upper()
+        target_word = "".join(ch for ch in raw_word if "A" <= ch <= "Z")[:5]
+        if len(target_word) < 3:
+            target_word = "SAGA"
+        mode = _as_str(raw.get("mode") or "dial_navigation").strip().lower() or "dial_navigation"
+        return {
+            "target_word": target_word,
+            "word": target_word,
+            "mode": mode,
+        }
+
+    if normalized_type == "simon_says":
+        raw_sequence = raw.get("sequence")
+        if isinstance(raw_sequence, str):
+            sequence = [ch for ch in raw_sequence.upper() if ch in {"A", "B", "C", "D"}][:8]
+        else:
+            sequence = _normalize_string_list(
+                raw_sequence,
+                ["A", "B", "C", "D"],
+                allowed={"A", "B", "C", "D"},
+                min_items=3,
+                max_items=8,
+            )
+        if len(sequence) < 3:
+            sequence = ["A", "B", "C", "D"]
+        return {"sequence": sequence}
+
+    if normalized_type == "digital_tuner":
+        raw_options = raw.get("options")
+        if isinstance(raw_options, list):
+            options = [_normalize_frequency_label(item) for item in raw_options if _as_str(item).strip()]
+        else:
+            options = ["87.5", "92.3", "99.1", "104.6", "108.0"]
+        if len(options) < 3:
+            options = ["87.5", "92.3", "99.1", "104.6", "108.0"]
+        target = _normalize_frequency_label(raw.get("target_frequency") or raw.get("target") or "104.6")
+        return {
+            "options": options,
+            "target_frequency": target,
+            "target": target,
+        }
+
+    if normalized_type == "radio_azimuth":
+        raw_options = raw.get("options")
+        if isinstance(raw_options, list):
+            options = [_normalize_degree_label(item) for item in raw_options if _as_str(item).strip()]
+        else:
+            options = ["0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"]
+        if len(options) < 4:
+            options = ["0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"]
+        target = _normalize_degree_label(raw.get("target_bearing") or raw.get("target") or "135°")
+        return {
+            "options": options,
+            "target_bearing": target,
+            "target": target,
+        }
+
+    if normalized_type == "gyro_storm":
+        action_map = {"U": "UP", "R": "RIGHT", "D": "DOWN", "L": "LEFT"}
+        raw_sequence = raw.get("sequence") or raw.get("pattern")
+        if isinstance(raw_sequence, list):
+            sequence = _normalize_string_list(
+                raw_sequence,
+                ["UP", "RIGHT", "DOWN", "LEFT"],
+                allowed={"UP", "RIGHT", "DOWN", "LEFT"},
+                min_items=3,
+                max_items=8,
+            )
+        else:
+            text = _as_str(raw_sequence).strip().upper()
+            if any(token in text for token in ["UP", "RIGHT", "DOWN", "LEFT"]):
+                parts = [part.strip() for part in text.replace("|", ",").replace(";", ",").split(",")]
+                sequence = [part for part in parts if part in {"UP", "RIGHT", "DOWN", "LEFT"}]
+            else:
+                sequence = [action_map[ch] for ch in text if ch in action_map]
+            if len(sequence) < 3:
+                sequence = ["UP", "RIGHT", "DOWN", "LEFT"]
+
+        duration = _clamp_int(raw.get("duration"), 10, 1, 120)
+        return {
+            "sequence": sequence,
+            "pattern": "".join(step[0] for step in sequence),
+            "duration": duration,
+        }
+
+    if normalized_type == "switchboard":
+        source = raw.get("target")
+        if not isinstance(source, list):
+            source = raw.get("switches")
+
+        target = []
+        if isinstance(source, list):
+            for item in source[:4]:
+                flag = _coerce_binary_flag(item)
+                if flag is None:
+                    target = []
+                    break
+                target.append(flag)
+
+        if len(target) != 4:
+            target = [True, False, True, True]
+
+        return {
+            "target": target,
+            "switches": [1 if item else 0 for item in target],
+        }
+
+    if normalized_type == "compass_blow":
+        source = raw.get("target")
+        if isinstance(source, list):
+            target = _normalize_string_list(
+                source,
+                ["N", "E", "S"],
+                allowed={"N", "E", "S", "W"},
+                min_items=3,
+                max_items=3,
+            )
+        else:
+            pattern = [ch for ch in _as_str(raw.get("pattern") or "").strip().upper() if ch in {"N", "E", "S", "W"}][:3]
+            target = pattern if len(pattern) == 3 else ["N", "E", "S"]
+
+        return {
+            "target": target,
+            "pattern": "".join(target),
+            "strict": _as_bool(raw.get("strict"), False),
+        }
+
+    return {}
+
+def validate_minigame_config(minigame_type, raw_cfg):
+    raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+    normalized_type = _as_str(minigame_type).strip().lower()
+    errors = []
+
+    def add(field, detail):
+        errors.append((field, detail))
+
+    if normalized_type == "circuit_hack":
+        if "target" in raw and (not isinstance(raw.get("target"), list) or len(raw.get("target") or []) != 3):
+            add("config.target", "circuit_hack target must contain exactly 3 values")
+    elif normalized_type == "cryptex":
+        if "target_word" in raw or "word" in raw:
+            word = normalize_minigame_config(normalized_type, raw).get("target_word", "")
+            if len(word) < 3:
+                add("config.target_word", "cryptex target word must contain at least 3 letters")
+    elif normalized_type == "simon_says":
+        if "sequence" in raw:
+            sequence = normalize_minigame_config(normalized_type, raw).get("sequence", [])
+            if len(sequence) < 3:
+                add("config.sequence", "simon_says sequence must contain at least 3 steps")
+    elif normalized_type == "digital_tuner":
+        if "options" in raw:
+            options = normalize_minigame_config(normalized_type, raw).get("options", [])
+            if len(options) < 3:
+                add("config.options", "digital_tuner options must contain at least 3 values")
+    elif normalized_type == "radio_azimuth":
+        if "options" in raw:
+            options = normalize_minigame_config(normalized_type, raw).get("options", [])
+            if len(options) < 4:
+                add("config.options", "radio_azimuth options must contain at least 4 values")
+    elif normalized_type == "gyro_storm":
+        if "sequence" in raw or "pattern" in raw:
+            sequence = normalize_minigame_config(normalized_type, raw).get("sequence", [])
+            if len(sequence) < 3:
+                add("config.sequence", "gyro_storm sequence must contain at least 3 steps")
+    elif normalized_type == "switchboard":
+        if "target" in raw or "switches" in raw:
+            target = normalize_minigame_config(normalized_type, raw).get("target", [])
+            if len(target) != 4:
+                add("config.target", "switchboard target must contain exactly 4 switch values")
+    elif normalized_type == "compass_blow":
+        if "target" in raw or "pattern" in raw:
+            target = normalize_minigame_config(normalized_type, raw).get("target", [])
+            if len(target) != 3:
+                add("config.target", "compass_blow target must contain exactly 3 directions")
+    return errors
+
+def build_stage_minigame_runtime(node):
+    interaction = node.get("interaction") or {}
+    minigame_type = _as_str(interaction.get("type") or "circuit_hack").strip().lower() or "circuit_hack"
+    if minigame_type not in SUPPORTED_MINIGAME_TYPES:
+        minigame_type = "circuit_hack"
+    spec = get_minigame_spec(minigame_type)
+    config = normalize_minigame_config(minigame_type, interaction.get("config") or {})
+    return {
+        "type": minigame_type,
+        "label": spec.get("label") or minigame_type.replace("_", " ").title(),
+        "version": "v1",
+        "config": config,
+    }
+
 VALID_PROFILE_MODES = {"solo", "team"}
 
 def parse_player_entries(raw_players):
@@ -539,6 +844,12 @@ def normalize_stage(raw):
         default=(entry_mode != "free")
     )
 
+    interaction_type = _as_str(raw.get("type") or "circuit_hack").strip().lower() or "circuit_hack"
+    if interaction_type not in SUPPORTED_MINIGAME_TYPES:
+        interaction_type = "circuit_hack"
+
+    interaction_config = normalize_minigame_config(interaction_type, cfg)
+
     return {
         "id": raw.get("id"),
         "version": 2,
@@ -568,8 +879,8 @@ def normalize_stage(raw):
             ),
         },
         "interaction": {
-            "type": _as_str(raw.get("type") or "circuit_hack").strip() or "circuit_hack",
-            "config": cfg,
+            "type": interaction_type,
+            "config": interaction_config,
         },
         "success": {
             "mode": "any_of",
@@ -673,12 +984,18 @@ def validate_stage(raw_stage, idx=None):
     if not title:
         add("title", "title is required")
 
-    interaction_type = node["interaction"]["type"]
+    raw_interaction_type = _as_str(raw_stage.get("type") if isinstance(raw_stage, dict) else "").strip().lower()
+    interaction_type = raw_interaction_type or node["interaction"]["type"]
     if interaction_type not in SUPPORTED_MINIGAME_TYPES:
         add("type", f"unsupported minigame type: {interaction_type}")
 
-    if not isinstance(node["interaction"]["config"], dict):
+    raw_config = raw_stage.get("config") if isinstance(raw_stage, dict) else {}
+    if raw_config is not None and not isinstance(raw_config, dict):
         add("config", "config must be an object")
+        raw_config = {}
+
+    for field, detail in validate_minigame_config(node["interaction"]["type"], raw_config):
+        add(field, detail)
 
     entry_mode = node["entry"]["mode"]
     if entry_mode not in {"gps", "free"}:
@@ -742,6 +1059,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
             "config": node["interaction"]["config"],
+            "minigame": build_stage_minigame_runtime(node),
             "entry": node["entry"],
             "messages": node["messages"],
         })
