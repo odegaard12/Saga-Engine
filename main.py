@@ -1193,6 +1193,10 @@ async def get_game_payload(user: str):
     lvl = state.get(profile_id, state.get(user, 0))
     finished = lvl >= len(runtime_stages)
 
+    current_stage = None
+    if not finished and 0 <= lvl < len(runtime_stages):
+        current_stage = project_stage_for_player(runtime_stages[lvl], include_runtime=True)
+
     stages = [
         project_stage_for_player(stage, include_runtime=(i == lvl and not finished))
         for i, stage in enumerate(runtime_stages)
@@ -1206,7 +1210,8 @@ async def get_game_payload(user: str):
         "live_status": project_live_profile_status(profile, live_positions.get(profile_id)),
         "level": lvl,
         "finished": finished,
-        "stages": stages
+        "stages": stages,
+        "current_stage": current_stage
     }
 
 @app.post("/api/heartbeat")
