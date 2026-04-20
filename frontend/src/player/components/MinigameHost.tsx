@@ -19,13 +19,20 @@ export function MinigameHost({
   onWin,
 }: MinigameHostProps) {
   const Component = definition.component
+  const componentStage = stage.minigame?.config
+    ? {
+        ...stage,
+        type: stage.minigame.type || stage.type,
+        config: stage.minigame.config,
+      }
+    : stage
 
   return (
     <section style={wrap}>
       <div style={labelPill}>{definition.label}</div>
 
       <Component
-        stage={stage}
+        stage={componentStage}
         helperText={helperText}
         submitting={submitting}
         onWin={onWin}
