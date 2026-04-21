@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { advancePlayer, fetchPlayerGame } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
@@ -6,7 +6,7 @@ import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
-import { deriveStageRuntime, type PlayerPanel } from './runtime'
+import { deriveStageRuntime } from './runtime'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -79,11 +79,9 @@ function canShowLiveDistance(gpsState: PlayerGpsStatus): boolean {
 
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
-  const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
 
@@ -145,8 +143,8 @@ export default function PlayerApp() {
     }, 2200)
   }
 
-  function showOverlay(state: OverlayState) {
-    setOverlayState(state)
+  function showOverlay(nextState: OverlayState) {
+    setOverlayState(nextState)
 
     if (overlayTimerRef.current !== null) {
       window.clearTimeout(overlayTimerRef.current)
@@ -155,13 +153,13 @@ export default function PlayerApp() {
     overlayTimerRef.current = window.setTimeout(() => {
       setOverlayState(null)
       overlayTimerRef.current = null
-    }, state === 'finish' ? 1800 : 900)
+    }, nextState === 'finish' ? 1800 : 900)
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Loading player app" body="Fetching player mission payload..." />
+        <StatusCard title="Loading mission" body="Fetching player payload..." />
       </ScreenFrame>
     )
   }
@@ -207,20 +205,13 @@ export default function PlayerApp() {
       ? distanceMeters <= currentStage.radius
       : false
 
-  const effectiveDebugEnabled =
-    Boolean(payload.live_status?.debug_enabled) || localDebugEnabled
-
   const runtime = deriveStageRuntime({
     currentStage,
     finished: payload.finished,
     distanceMeters,
     gpsState,
-    debugEnabled: effectiveDebugEnabled,
+    debugEnabled: Boolean(payload.live_status?.debug_enabled),
   })
-
-  const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
-  const legacyLoginHref = '/legacy/'
-  const adminHref = '/admin'
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
@@ -228,23 +219,9 @@ export default function PlayerApp() {
     return nextPayload
   }
 
-  function togglePanel(panel: Exclude<PlayerPanel, null>) {
-    setActivePanel((current) => (current === panel ? null : panel))
-  }
-
-  function closeMenu() {
-    setActivePanel((current) => (current === 'menu' ? null : current))
-  }
-
-  function handleToggleDebug() {
-    vibrate(8)
-    setLocalDebugEnabled((current) => !current)
-    showNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.', 'success')
-  }
-
   function openInteraction() {
+    if (!currentStage || !runtime.canEnter) return
     setSubmitError(null)
-    setActivePanel(null)
     setInteractionOpen(true)
   }
 
@@ -256,27 +233,26 @@ export default function PlayerApp() {
   }
 
   function handleMapNodeTap() {
-    if (payload.finished) return
-
-    if (runtime.canEnter) {
-      vibrate([10, 16, 10])
-      showOverlay('activate')
-      openInteraction()
+    if (payload.finished) {
+      showNotice('This route is already complete.', 'info')
       return
     }
 
-    vibrate(8)
+    if (runtime.canEnter) {
+      handlePrimaryAction()
+      return
+    }
 
     if (!currentStage) {
-      showNotice('Complete the previous stage before interacting here.', 'warn')
+      showNotice('No active node is available yet.', 'warn')
       return
     }
 
     if (runtime.reason === 'out_of_range') {
       showNotice(
         distanceMeters !== null
-          ? 'Too far away. Move closer to the node.'
-          : 'Too far from the node.',
+          ? `Move closer. Current distance: ${distanceMeters}m.`
+          : 'Move closer to the node.',
         'warn'
       )
       return
@@ -287,12 +263,7 @@ export default function PlayerApp() {
       return
     }
 
-    if (runtime.reason === 'missing_stage') {
-      showNotice('Complete the previous stage first.', 'warn')
-      return
-    }
-
-    showNotice('Interaction is not available yet.', 'info')
+    showNotice('This node is not ready yet.', 'info')
   }
 
   async function handleSubmitCode(code: string) {
@@ -303,7 +274,7 @@ export default function PlayerApp() {
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
         setSubmitError('Invalid code for the current stage.')
-        showNotice('The code was not accepted for this stage.', 'warn')
+        showNotice('The code was not accepted for this node.', 'warn')
         return
       }
 
@@ -334,7 +305,7 @@ export default function PlayerApp() {
           currentStage={currentStage}
           playerPosition={playerPosition}
           gpsState={gpsState}
-          debugSimulation={effectiveDebugEnabled}
+          debugSimulation={Boolean(payload.live_status?.debug_enabled)}
           onNodeTap={handleMapNodeTap}
         />
 
@@ -344,9 +315,6 @@ export default function PlayerApp() {
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
-            gpsState={gpsState}
-            inRange={inRange}
-            distanceMeters={distanceMeters}
           />
         </div>
 
@@ -364,32 +332,20 @@ export default function PlayerApp() {
             gpsState={gpsState}
             distanceMeters={distanceMeters}
             inRange={inRange}
-            debugEnabled={effectiveDebugEnabled}
-            mapNotice={null}
-            legacyPlayerHref={legacyPlayerHref}
-            legacyLoginHref={legacyLoginHref}
-            adminHref={adminHref}
-            detailsOpen={activePanel === 'details'}
-            menuOpen={activePanel === 'menu'}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
-            helperText={runtime.helperText}
+            statusLabel={runtime.statusLabel}
+            summary={runtime.summary}
             onPrimaryAction={handlePrimaryAction}
-            onToggleDetails={() => togglePanel('details')}
-            onToggleMenu={() => togglePanel('menu')}
-            onCloseMenu={closeMenu}
-            onToggleDebug={handleToggleDebug}
           />
         </div>
       </div>
 
       <InteractionSheet
         open={interactionOpen}
-        user={payload.user}
         currentStage={currentStage}
-        helperText={runtime.helperText}
-        legacyPlayerHref={legacyPlayerHref}
+        summaryText={runtime.summary}
         submitting={submitting}
         errorMessage={submitError}
         onClose={() => {
@@ -405,7 +361,7 @@ function ScreenFrame({
   children,
   mobile,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   mobile: boolean
 }) {
   return (
@@ -413,11 +369,10 @@ function ScreenFrame({
       style={{
         minHeight: mobile ? '100dvh' : '100svh',
         height: mobile ? '100dvh' : 'auto',
-        background:
-          'linear-gradient(180deg, #eef3ed 0%, #e8efea 48%, #e2ebe3 100%)',
+        background: 'linear-gradient(180deg, #020617 0%, #07111c 100%)',
         padding: mobile ? 0 : 12,
         fontFamily: 'system-ui, sans-serif',
-        color: '#10231a',
+        color: '#f8fafc',
         overflow: 'hidden',
       }}
     >
@@ -482,22 +437,22 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 110 : 132,
+    height: mobile ? 132 : 160,
     zIndex: 1100,
     pointerEvents: 'none',
     borderTopLeftRadius: mobile ? 0 : 28,
     borderTopRightRadius: mobile ? 0 : 28,
     background:
-      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+      'linear-gradient(180deg, rgba(2,6,23,.82) 0%, rgba(2,6,23,.52) 48%, rgba(2,6,23,0) 100%)',
   }
 }
 
 function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 12,
-    left: mobile ? 10 : 12,
-    right: mobile ? 10 : 12,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 14,
+    left: mobile ? 0 : 12,
+    right: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'none',
     display: 'flex',
@@ -511,7 +466,7 @@ function getToastOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 12 : 16,
     right: mobile ? 12 : 16,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 154px)' : 176,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 174px)' : 190,
     zIndex: 1250,
     pointerEvents: 'none',
     display: 'flex',
@@ -523,9 +478,9 @@ function getToastOverlayStyle(mobile: boolean): CSSProperties {
 function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    left: mobile ? 10 : 12,
-    right: mobile ? 10 : 12,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 10px)' : 12,
+    left: mobile ? 0 : 12,
+    right: mobile ? 0 : 12,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : 12,
     zIndex: 1200,
     pointerEvents: 'none',
     display: 'flex',
@@ -563,7 +518,7 @@ const overlayPill: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  boxShadow: '0 14px 30px rgba(15,23,42,.12)',
+  boxShadow: '0 14px 30px rgba(15,23,42,.22)',
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
@@ -611,23 +566,23 @@ const overlayAnimations = `
 
 const statusCard: CSSProperties = {
   borderRadius: 20,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.9)',
-  boxShadow: '0 18px 40px rgba(15,23,42,.06)',
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(7,17,28,.82)',
+  boxShadow: '0 18px 40px rgba(0,0,0,.26)',
   padding: 20,
   maxWidth: 760,
-  margin: '0 auto',
+  margin: '40px auto',
 }
 
 const statusTitle: CSSProperties = {
   fontSize: 20,
   fontWeight: 800,
-  color: '#0f172a',
+  color: '#ffffff',
 }
 
 const statusBody: CSSProperties = {
   fontSize: 14,
-  color: '#475569',
+  color: '#cbd5e1',
   marginTop: 8,
   lineHeight: 1.5,
 }

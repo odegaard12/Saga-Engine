@@ -1,114 +1,117 @@
 import type { CSSProperties } from 'react'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
-import { tokens } from '../ui/tokens'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
-  gpsState: PlayerGpsStatus
-  inRange: boolean
-  distanceMeters: number | null
 }
 
 export function PlayerShell({
   payload,
+  currentStage,
 }: PlayerShellProps) {
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
-  const title = payload.display_name || payload.profile?.display_name || payload.user
+  const identity = payload.display_name || payload.profile?.display_name || payload.user
+  const nodeLabel = payload.finished
+    ? 'Mission complete'
+    : currentStage?.title || 'Awaiting node'
 
   return (
-    <>
-      <style>{shellAnimations}</style>
-
-      <header style={wrap}>
-        <div
-          style={{
-            ...rail,
-            width: compact ? 'min(100%, 250px)' : 'min(100%, 320px)',
-            padding: compact ? '8px 10px' : '10px 12px',
-            borderRadius: compact ? 18 : 20,
-          }}
-        >
-          <div style={topRow}>
-            <div style={eyebrow}>{mode === 'team' ? 'TEAM' : 'FIELD'}</div>
-            <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
+    <header style={wrap}>
+      <div
+        style={{
+          ...panel,
+          width: compact ? 'calc(100% - 20px)' : 'min(100%, 760px)',
+          padding: compact ? '10px 12px' : '12px 14px',
+        }}
+      >
+        <div style={row}>
+          <div style={metaBlock}>
+            <div style={eyebrow}>{mode === 'team' ? 'TEAM SESSION' : 'FIELD SESSION'}</div>
+            <div style={identityText}>{identity}</div>
           </div>
 
-          <div style={{ ...name, fontSize: compact ? 15 : 18 }}>{title}</div>
+          <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
         </div>
-      </header>
-    </>
+
+        <div style={nodeLabelText}>{nodeLabel}</div>
+      </div>
+    </header>
   )
 }
 
 const wrap: CSSProperties = {
-  pointerEvents: 'none',
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
+  pointerEvents: 'none',
 }
 
-const rail: CSSProperties = {
-  margin: '0 auto',
-  display: 'grid',
-  gap: 6,
-  border: `1px solid ${tokens.colors.border}`,
-  background: tokens.colors.surfaceOverlay,
-  boxShadow: tokens.shadow.soft,
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+const panel: CSSProperties = {
   pointerEvents: 'auto',
-  boxSizing: 'border-box',
-  animation: 'sagaShellIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  borderRadius: 24,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'linear-gradient(180deg, rgba(7,17,28,.88), rgba(7,17,28,.76))',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: '0 18px 46px rgba(0,0,0,.28)',
+  color: '#f8fafc',
+  display: 'grid',
+  gap: 8,
 }
 
-const topRow: CSSProperties = {
+const row: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 10,
+  gap: 12,
+}
+
+const metaBlock: CSSProperties = {
+  minWidth: 0,
 }
 
 const eyebrow: CSSProperties = {
-  color: tokens.colors.brand,
+  color: '#86efac',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
-const modePill: CSSProperties = {
-  minHeight: 22,
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '0 8px',
-  borderRadius: tokens.radius.pill,
-  background: tokens.colors.surfaceSoft,
-  border: `1px solid ${tokens.colors.border}`,
-  color: '#334155',
-  fontSize: 10,
+const identityText: CSSProperties = {
+  marginTop: 4,
+  color: '#ffffff',
+  fontSize: 18,
   fontWeight: 900,
-  letterSpacing: '0.12em',
-}
-
-const name: CSSProperties = {
-  color: tokens.colors.ink,
-  fontWeight: 900,
-  lineHeight: 1,
+  lineHeight: 1.05,
   letterSpacing: '-0.03em',
 }
 
-const shellAnimations = `
-@keyframes sagaShellIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+const nodeLabelText: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: 13,
+  fontWeight: 700,
+  lineHeight: 1.35,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 }
-`
+
+const modePill: CSSProperties = {
+  minHeight: 26,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 10px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.06)',
+  color: '#e2e8f0',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  whiteSpace: 'nowrap',
+}
