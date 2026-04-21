@@ -3,13 +3,23 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PlayerGpsStatus, PlayerStage } from '../../types/player'
 
+type FocusRequest =
+  | {
+      target: 'player' | 'node'
+      token: number
+    }
+  | null
+
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
   className?: string
   playerPosition?: { lat: number; lon: number } | null
   gpsState?: PlayerGpsStatus
   debugSimulation?: boolean
+  followPlayer?: boolean
+  focusRequest?: FocusRequest
   onNodeTap?: () => void
+  onDebugSetPosition?: (position: { lat: number; lon: number }) => void
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -48,11 +58,50 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
+function focusNode(map: L.Map, stageMapData: ReturnType<typeof resolveStageMapData>) {
+  if (!stageMapData) return
+  map.setView([stageMapData.lat, stageMapData.lon], 16, { animate: false })
+}
+
+function focusPlayer(
+  map: L.Map,
+  playerPosition: { lat: number; lon: number } | null | undefined,
+  stageMapData: ReturnType<typeof resolveStageMapData>
+) {
+  if (!playerPosition) return
+
+  if (stageMapData) {
+    const distance = getDistanceMeters(playerPosition, {
+      lat: stageMapData.lat,
+      lon: stageMapData.lon,
+    })
+
+    if (distance <= 350) {
+      const bounds = L.latLngBounds(
+        [stageMapData.lat, stageMapData.lon],
+        [playerPosition.lat, playerPosition.lon]
+      )
+      map.fitBounds(bounds.pad(0.30), {
+        maxZoom: 16,
+        animate: false,
+      })
+      return
+    }
+  }
+
+  map.setView([playerPosition.lat, playerPosition.lon], 16, { animate: false })
+}
+
 export function MapSurface({
   currentStage,
   className,
   playerPosition,
+  gpsState,
+  debugSimulation,
+  followPlayer = true,
+  focusRequest = null,
   onNodeTap,
+  onDebugSetPosition,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -79,19 +128,30 @@ export function MapSurface({
     }).addTo(map)
 
     map.setView([42.4333, -8.65], 13)
+
+    const handleMapClick = (event: L.LeafletMouseEvent) => {
+      if (!debugSimulation || !onDebugSetPosition) return
+      onDebugSetPosition({
+        lat: event.latlng.lat,
+        lon: event.latlng.lng,
+      })
+    }
+
+    map.on('click', handleMapClick)
     mapRef.current = map
 
     return () => {
       playerMarkerRef.current?.remove()
       nodeMarkerRef.current?.remove()
       nodeRadiusRef.current?.remove()
+      map.off('click', handleMapClick)
       map.remove()
       mapRef.current = null
       playerMarkerRef.current = null
       nodeMarkerRef.current = null
       nodeRadiusRef.current = null
     }
-  }, [])
+  }, [debugSimulation, onDebugSetPosition])
 
   useEffect(() => {
     const map = mapRef.current
@@ -129,8 +189,8 @@ export function MapSurface({
     }).addTo(map)
 
     if (onNodeTap) {
-      radiusLayer.on('click', onNodeTap)
-      markerLayer.on('click', onNodeTap)
+      radiusLayer.on('click', () => onNodeTap())
+      markerLayer.on('click', () => onNodeTap())
     }
 
     nodeRadiusRef.current = radiusLayer
@@ -171,30 +231,25 @@ export function MapSurface({
       }
     ).addTo(map)
 
-    if (stageMapData) {
-      const distance = getDistanceMeters(playerPosition, {
-        lat: stageMapData.lat,
-        lon: stageMapData.lon,
-      })
-
-      if (distance <= 350) {
-        const bounds = L.latLngBounds(
-          [stageMapData.lat, stageMapData.lon],
-          [playerPosition.lat, playerPosition.lon]
-        )
-        map.fitBounds(bounds.pad(0.30), {
-          maxZoom: 16,
-          animate: false,
-        })
-      } else {
-        map.setView([stageMapData.lat, stageMapData.lon], 15, {
-          animate: false,
-        })
-      }
+    if (followPlayer) {
+      focusPlayer(map, playerPosition, stageMapData)
     }
 
     map.invalidateSize({ pan: false })
-  }, [playerPosition, stageMapData])
+  }, [playerPosition, stageMapData, followPlayer])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !focusRequest) return
+
+    if (focusRequest.target === 'node') {
+      focusNode(map, stageMapData)
+    } else {
+      focusPlayer(map, playerPosition, stageMapData)
+    }
+
+    map.invalidateSize({ pan: false })
+  }, [focusRequest, playerPosition, stageMapData])
 
   return (
     <>
@@ -203,6 +258,8 @@ export function MapSurface({
       <section
         className={['map-surface', className].filter(Boolean).join(' ')}
         style={surface}
+        data-gps-state={gpsState || 'unknown'}
+        data-debug={debugSimulation ? 'on' : 'off'}
       >
         <div
           ref={mapRootRef}
