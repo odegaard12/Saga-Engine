@@ -15,6 +15,12 @@ type LoadState =
 
 type NoticeTone = 'info' | 'warn' | 'success'
 type OverlayState = 'activate' | 'node' | 'finish' | null
+type FocusRequest =
+  | {
+      target: 'player' | 'node'
+      token: number
+    }
+  | null
 
 function vibrate(pattern: number | number[]) {
   if (typeof window === 'undefined') return
@@ -84,6 +90,9 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
+  const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [followPlayer, setFollowPlayer] = useState(true)
+  const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
 
@@ -184,8 +193,9 @@ export default function PlayerApp() {
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
-  const playerPosition = getPlayerPosition(payload)
-  const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+  const livePlayerPosition = getPlayerPosition(payload)
+  const playerPosition = localDebugPosition || livePlayerPosition
+  const gpsState = localDebugPosition ? 'ready' : normalizeGpsStatus(payload.live_status?.gps_status)
 
   const rawDistanceMeters =
     currentStage && playerPosition
@@ -208,7 +218,7 @@ export default function PlayerApp() {
       : false
 
   const effectiveDebugEnabled =
-    Boolean(payload.live_status?.debug_enabled) || localDebugEnabled
+    Boolean(payload.live_status?.debug_enabled) || localDebugEnabled || Boolean(localDebugPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -220,6 +230,7 @@ export default function PlayerApp() {
 
   const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
   const legacyLoginHref = '/legacy/'
+  const shellLoginHref = '/'
   const adminHref = '/admin'
 
   async function refreshPayload() {
@@ -238,8 +249,47 @@ export default function PlayerApp() {
 
   function handleToggleDebug() {
     vibrate(8)
-    setLocalDebugEnabled((current) => !current)
-    showNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.', 'success')
+    const next = !localDebugEnabled
+    setLocalDebugEnabled(next)
+
+    if (!next) {
+      setLocalDebugPosition(null)
+      setFollowPlayer(true)
+    }
+
+    showNotice(
+      next ? 'Local debug enabled. Tap the map to place GPS.' : 'Local debug disabled.',
+      'success'
+    )
+  }
+
+  function handleFocusPlayer() {
+    vibrate(8)
+    setFocusRequest({ target: 'player', token: Date.now() })
+  }
+
+  function handleFocusNode() {
+    vibrate(8)
+    setFocusRequest({ target: 'node', token: Date.now() })
+  }
+
+  function handleToggleFollow() {
+    vibrate(8)
+    setFollowPlayer((current) => {
+      const next = !current
+      showNotice(next ? 'Map follow enabled.' : 'Map follow paused.', 'info')
+      return next
+    })
+  }
+
+  function handleMapDebugSetPosition(position: { lat: number; lon: number }) {
+    if (!localDebugEnabled) return
+    setLocalDebugPosition(position)
+    setFollowPlayer(true)
+    showNotice(
+      `Debug GPS moved to ${position.lat.toFixed(5)}, ${position.lon.toFixed(5)}.`,
+      'success'
+    )
   }
 
   function openInteraction() {
@@ -334,8 +384,11 @@ export default function PlayerApp() {
           currentStage={currentStage}
           playerPosition={playerPosition}
           gpsState={gpsState}
-          debugSimulation={effectiveDebugEnabled}
+          debugSimulation={localDebugEnabled}
+          followPlayer={followPlayer}
+          focusRequest={focusRequest}
           onNodeTap={handleMapNodeTap}
+          onDebugSetPosition={handleMapDebugSetPosition}
         />
 
         <div style={getTopScrimStyle(isPhone)} />
@@ -347,6 +400,14 @@ export default function PlayerApp() {
             gpsState={gpsState}
             inRange={inRange}
             distanceMeters={distanceMeters}
+            debugEnabled={localDebugEnabled}
+            followPlayer={followPlayer}
+            hasPlayerPosition={Boolean(playerPosition)}
+            loginHref={shellLoginHref}
+            onToggleDebug={handleToggleDebug}
+            onFocusPlayer={handleFocusPlayer}
+            onFocusNode={handleFocusNode}
+            onToggleFollow={handleToggleFollow}
           />
         </div>
 
@@ -482,13 +543,13 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 110 : 132,
+    height: mobile ? 130 : 144,
     zIndex: 1100,
     pointerEvents: 'none',
     borderTopLeftRadius: mobile ? 0 : 28,
     borderTopRightRadius: mobile ? 0 : 28,
     background:
-      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+      'linear-gradient(180deg, rgba(238,243,237,.22) 0%, rgba(238,243,237,.08) 52%, rgba(238,243,237,0) 100%)',
   }
 }
 
