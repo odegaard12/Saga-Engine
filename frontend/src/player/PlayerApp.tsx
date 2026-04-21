@@ -95,6 +95,7 @@ export default function PlayerApp() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -154,8 +155,8 @@ export default function PlayerApp() {
     }, 2200)
   }
 
-  function showOverlay(state: OverlayState) {
-    setOverlayState(state)
+  function showOverlay(nextState: OverlayState) {
+    setOverlayState(nextState)
 
     if (overlayTimerRef.current !== null) {
       window.clearTimeout(overlayTimerRef.current)
@@ -164,7 +165,7 @@ export default function PlayerApp() {
     overlayTimerRef.current = window.setTimeout(() => {
       setOverlayState(null)
       overlayTimerRef.current = null
-    }, state === 'finish' ? 1800 : 900)
+    }, nextState === 'finish' ? 1800 : 900)
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -218,7 +219,9 @@ export default function PlayerApp() {
       : false
 
   const effectiveDebugEnabled =
-    Boolean(payload.live_status?.debug_enabled) || localDebugEnabled || Boolean(localDebugPosition)
+    Boolean(payload.live_status?.debug_enabled) ||
+    localDebugEnabled ||
+    Boolean(localDebugPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -229,7 +232,6 @@ export default function PlayerApp() {
   })
 
   const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
-  const legacyLoginHref = '/legacy/'
   const shellLoginHref = '/'
   const adminHref = '/admin'
 
@@ -240,61 +242,88 @@ export default function PlayerApp() {
   }
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
+    setToolsOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
-  function closeMenu() {
-    setActivePanel((current) => (current === 'menu' ? null : current))
+  function openTools() {
+    setActivePanel(null)
+    setToolsOpen((current) => !current)
+  }
+
+  function closeTools() {
+    setToolsOpen(false)
+  }
+
+  function handleOpenEntry() {
+    vibrate(10)
+    window.location.assign(shellLoginHref)
   }
 
   function handleToggleDebug() {
-    vibrate(8)
-    const next = !localDebugEnabled
-    setLocalDebugEnabled(next)
+    const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
 
-    if (!next) {
+    if (currentlyActive) {
+      setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
       setFollowPlayer(true)
+      showNotice('Debug tap disabled. Live GPS restored.', 'info')
+      vibrate(8)
+      return
     }
 
-    showNotice(
-      next ? 'Local debug enabled. Tap the map to place GPS.' : 'Local debug disabled.',
-      'success'
-    )
+    setLocalDebugEnabled(true)
+    showNotice('Debug tap enabled. Tap the map to place simulated GPS.', 'success')
+    vibrate([10, 16, 10])
+  }
+
+  function handleDebugSetPosition(position: { lat: number; lon: number }) {
+    setLocalDebugEnabled(true)
+    setLocalDebugPosition(position)
+    setFollowPlayer(true)
+    setFocusRequest({ target: 'player', token: Date.now() })
+    showNotice('Simulated GPS updated from map tap.', 'success')
+    vibrate([10, 12, 10])
   }
 
   function handleFocusPlayer() {
-    vibrate(8)
+    if (!playerPosition) {
+      showNotice('No player position is available yet.', 'warn')
+      vibrate(8)
+      return
+    }
+
     setFocusRequest({ target: 'player', token: Date.now() })
+    setFollowPlayer(true)
+    showNotice('Centered on player.', 'info')
+    vibrate(8)
   }
 
   function handleFocusNode() {
-    vibrate(8)
+    if (!currentStage) {
+      showNotice('No active node is available right now.', 'warn')
+      vibrate(8)
+      return
+    }
+
     setFocusRequest({ target: 'node', token: Date.now() })
+    showNotice('Centered on node.', 'info')
+    vibrate(8)
   }
 
   function handleToggleFollow() {
-    vibrate(8)
     setFollowPlayer((current) => {
       const next = !current
-      showNotice(next ? 'Map follow enabled.' : 'Map follow paused.', 'info')
+      showNotice(next ? 'Player follow enabled.' : 'Free map enabled.', 'info')
+      vibrate(8)
       return next
     })
-  }
-
-  function handleMapDebugSetPosition(position: { lat: number; lon: number }) {
-    if (!localDebugEnabled) return
-    setLocalDebugPosition(position)
-    setFollowPlayer(true)
-    showNotice(
-      `Debug GPS moved to ${position.lat.toFixed(5)}, ${position.lon.toFixed(5)}.`,
-      'success'
-    )
   }
 
   function openInteraction() {
     setSubmitError(null)
     setActivePanel(null)
+    setToolsOpen(false)
     setInteractionOpen(true)
   }
 
@@ -384,11 +413,11 @@ export default function PlayerApp() {
           currentStage={currentStage}
           playerPosition={playerPosition}
           gpsState={gpsState}
-          debugSimulation={localDebugEnabled}
+          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
           followPlayer={followPlayer}
           focusRequest={focusRequest}
+          onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
-          onDebugSetPosition={handleMapDebugSetPosition}
         />
 
         <div style={getTopScrimStyle(isPhone)} />
@@ -398,12 +427,14 @@ export default function PlayerApp() {
             payload={payload}
             currentStage={currentStage}
             gpsState={gpsState}
-            inRange={inRange}
             distanceMeters={distanceMeters}
-            debugEnabled={localDebugEnabled}
+            debugEnabled={effectiveDebugEnabled}
             followPlayer={followPlayer}
-            hasPlayerPosition={Boolean(playerPosition)}
-            loginHref={shellLoginHref}
+            toolsOpen={toolsOpen}
+            shellLoginHref={shellLoginHref}
+            onOpenEntry={handleOpenEntry}
+            onOpenTools={openTools}
+            onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
             onFocusPlayer={handleFocusPlayer}
             onFocusNode={handleFocusNode}
@@ -426,21 +457,14 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
-            mapNotice={null}
-            legacyPlayerHref={legacyPlayerHref}
-            legacyLoginHref={legacyLoginHref}
-            adminHref={adminHref}
-            detailsOpen={activePanel === 'details'}
-            menuOpen={activePanel === 'menu'}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
             helperText={runtime.helperText}
+            detailsOpen={activePanel === 'details'}
             onPrimaryAction={handlePrimaryAction}
             onToggleDetails={() => togglePanel('details')}
-            onToggleMenu={() => togglePanel('menu')}
-            onCloseMenu={closeMenu}
-            onToggleDebug={handleToggleDebug}
+            onOpenTools={openTools}
           />
         </div>
       </div>
@@ -543,13 +567,13 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 130 : 144,
+    height: mobile ? 132 : 144,
     zIndex: 1100,
     pointerEvents: 'none',
     borderTopLeftRadius: mobile ? 0 : 28,
     borderTopRightRadius: mobile ? 0 : 28,
     background:
-      'linear-gradient(180deg, rgba(238,243,237,.22) 0%, rgba(238,243,237,.08) 52%, rgba(238,243,237,0) 100%)',
+      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
   }
 }
 

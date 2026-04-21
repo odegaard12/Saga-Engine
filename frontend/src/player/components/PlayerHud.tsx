@@ -79,56 +79,72 @@ export function PlayerHud({
 
   return (
     <>
-      <style>{animations}</style>
+      <style>{hudAnimations}</style>
 
       <section
         style={{
           ...tray,
           width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 10 : 14,
-          gap: compact ? 8 : 10,
+          padding: compact ? 14 : 16,
+          gap: compact ? 10 : 12,
         }}
       >
         {finished ? (
-          <div style={hero}>
-            <div style={eyebrow}>MISSION</div>
-            <div style={title}>Mission complete</div>
-            <div style={helper}>{helperText}</div>
-          </div>
-        ) : (
-          <div style={hero}>
-            <div style={eyebrow}>MISSION</div>
-            <div style={title}>{currentStage?.title || 'Awaiting node'}</div>
-            <div style={subRow}>
-              <span style={pill}>STAGE {level + 1}</span>
-              <span style={pill}>{gpsDisplay}</span>
-              <span style={pill}>{distanceDisplay}</span>
-              {debugEnabled ? <span style={pillActive}>DEBUG</span> : null}
+          <>
+            <div style={heroBlock}>
+              <div style={eyebrow}>MISSION</div>
+              <div style={heroTitle}>Mission complete</div>
+              <div style={heroText}>
+                The route is finished. You can review details or open the menu.
+              </div>
             </div>
-          </div>
-        )}
 
-        {!finished ? (
-          <button
-            type="button"
-            style={getPrimaryStyle(primaryTone, primaryDisabled, compact)}
-            disabled={primaryDisabled}
-            onClick={onPrimaryAction}
-          >
-            {primaryLabel}
-          </button>
+            <div style={chipRow}>
+              <MetricChip label="Status" value="Complete" tone="good" />
+              <MetricChip label="GPS" value={gpsDisplay} tone="neutral" />
+            </div>
+
+            <button
+              type="button"
+              style={getPrimaryStyle('done', true, compact)}
+              disabled
+            >
+              Mission complete
+            </button>
+          </>
         ) : (
-          <button type="button" style={getPrimaryStyle('done', true, compact)} disabled>
-            Mission complete
-          </button>
+          <>
+            <div style={heroBlock}>
+              <div style={eyebrow}>MISSION</div>
+              <div style={{ ...heroTitle, fontSize: compact ? 20 : 24 }}>
+                {currentStage?.title || 'Awaiting node'}
+              </div>
+
+              <div style={chipRow}>
+                <MetricChip label="Stage" value={`${level + 1}`} tone="neutral" />
+                <MetricChip label="GPS" value={gpsDisplay} tone={gpsState === 'ready' ? 'good' : 'neutral'} />
+                <MetricChip label="Range" value={distanceDisplay} tone={inRange ? 'good' : 'neutral'} />
+                {debugEnabled ? <MetricChip label="Mode" value="Debug" tone="warn" /> : null}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              style={getPrimaryStyle(primaryTone, primaryDisabled, compact)}
+              disabled={primaryDisabled}
+              onClick={onPrimaryAction}
+            >
+              {primaryLabel}
+            </button>
+          </>
         )}
 
-        <div style={helper}>{helperText}</div>
+        <div style={helperLine}>{helperText}</div>
 
         <div style={actionRow}>
           <button
             type="button"
-            style={getGhostButton(detailsOpen, compact)}
+            style={detailsOpen ? glassGhostActive : glassGhost}
             onClick={onToggleDetails}
           >
             {detailsOpen ? 'Hide details' : 'Details'}
@@ -136,7 +152,7 @@ export function PlayerHud({
 
           <button
             type="button"
-            style={getGhostButton(menuOpen, compact)}
+            style={menuOpen ? glassGhostActive : glassGhost}
             onClick={onToggleMenu}
           >
             {menuOpen ? 'Close menu' : 'Menu'}
@@ -145,10 +161,7 @@ export function PlayerHud({
 
         {detailsOpen ? (
           <div style={detailGrid}>
-            <DetailCard
-              label="Distance"
-              value={distanceMeters === null ? 'No range' : `${distanceMeters} m`}
-            />
+            <DetailCard label="Distance" value={distanceMeters === null ? 'No range' : `${distanceMeters} m`} />
             <DetailCard label="GPS" value={gpsDisplay} />
             <DetailCard
               label="Radius"
@@ -161,12 +174,13 @@ export function PlayerHud({
           </div>
         ) : null}
 
-        {mapNotice ? <div style={mapNoticeStyle}>{mapNotice}</div> : null}
+        {mapNotice ? <div style={hiddenNotice}>{mapNotice}</div> : null}
       </section>
 
       {menuOpen ? (
         <div style={menuOverlay}>
           <div style={menuBackdrop} onClick={onCloseMenu} />
+
           <aside
             style={{
               ...menuSheet,
@@ -177,7 +191,8 @@ export function PlayerHud({
             onClick={(event) => event.stopPropagation()}
           >
             <div style={menuHeader}>
-              <div style={menuTitle}>Mission menu</div>
+              <div style={menuTitle}>Field menu</div>
+
               <button
                 type="button"
                 aria-label="Close menu"
@@ -194,7 +209,7 @@ export function PlayerHud({
 
             <button
               type="button"
-              style={debugEnabled ? menuButtonActive : menuButton}
+              style={debugEnabled ? menuButtonDangerActive : menuButton}
               onClick={onToggleDebug}
             >
               {debugEnabled ? 'Disable local debug' : 'Enable local debug'}
@@ -218,6 +233,34 @@ export function PlayerHud({
   )
 }
 
+function MetricChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: 'good' | 'warn' | 'info' | 'neutral'
+}) {
+  return (
+    <div
+      style={{
+        ...metricChip,
+        ...(tone === 'good'
+          ? metricGood
+          : tone === 'warn'
+          ? metricWarn
+          : tone === 'info'
+          ? metricInfo
+          : null),
+      }}
+    >
+      <span style={metricLabel}>{label}</span>
+      <span style={metricValue}>{value}</span>
+    </div>
+  )
+}
+
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={detailCard}>
@@ -234,8 +277,8 @@ function getPrimaryStyle(
 ): CSSProperties {
   const base: CSSProperties = {
     width: '100%',
-    minHeight: compact ? 48 : 52,
-    borderRadius: 16,
+    minHeight: compact ? 52 : 56,
+    borderRadius: 18,
     fontSize: compact ? 13 : 14,
     fontWeight: 900,
     letterSpacing: '0.08em',
@@ -244,17 +287,18 @@ function getPrimaryStyle(
   if (disabled || tone === 'locked') {
     return {
       ...base,
-      border: '1px solid rgba(255,255,255,.10)',
-      background: 'rgba(148,163,184,.22)',
-      color: '#cbd5e1',
+      border: '1px solid rgba(255,255,255,.12)',
+      background: 'rgba(255,255,255,.10)',
+      color: 'rgba(226,232,240,.82)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
     }
   }
 
   if (tone === 'gps') {
     return {
       ...base,
-      border: '1px solid rgba(245,158,11,.24)',
-      background: 'rgba(245,158,11,.16)',
+      border: '1px solid rgba(251,191,36,.24)',
+      background: 'rgba(217,119,6,.16)',
       color: '#fde68a',
     }
   }
@@ -262,135 +306,164 @@ function getPrimaryStyle(
   if (tone === 'done') {
     return {
       ...base,
-      border: '1px solid rgba(59,130,246,.24)',
-      background: 'rgba(59,130,246,.16)',
+      border: '1px solid rgba(96,165,250,.24)',
+      background: 'rgba(59,130,246,.14)',
       color: '#dbeafe',
     }
   }
 
   return {
     ...base,
-    border: '1px solid rgba(22,163,74,.24)',
-    background: 'linear-gradient(180deg, rgba(22,163,74,.92), rgba(21,128,61,.92))',
+    border: '1px solid rgba(74,222,128,.22)',
+    background: 'linear-gradient(180deg, #22c55e, #16a34a)',
     color: '#ffffff',
-    boxShadow: '0 10px 24px rgba(22,163,74,.22)',
-    animation: 'sagaPrimaryPulse 1.8s ease-in-out infinite',
-  }
-}
-
-function getGhostButton(active: boolean, compact: boolean): CSSProperties {
-  return {
-    minHeight: compact ? 40 : 44,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    border: active ? '1px solid rgba(59,130,246,.24)' : '1px solid rgba(255,255,255,.10)',
-    background: active ? 'rgba(59,130,246,.14)' : 'rgba(2,6,23,.68)',
-    color: active ? '#dbeafe' : '#e2e8f0',
-    fontSize: compact ? 11 : 12,
-    fontWeight: 800,
-    padding: '0 12px',
+    boxShadow: '0 14px 28px rgba(22,163,74,.26)',
   }
 }
 
 const tray: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(2,6,23,.88), rgba(15,23,42,.74))',
-  boxShadow: '0 18px 40px rgba(2,6,23,.20)',
-  backdropFilter: 'blur(14px)',
-  WebkitBackdropFilter: 'blur(14px)',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(13,23,42,.76), rgba(20,32,58,.64))',
+  boxShadow:
+    '0 26px 60px rgba(2,6,23,.26), inset 0 1px 0 rgba(255,255,255,.08)',
+  backdropFilter: 'blur(20px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(150%)',
   color: '#f8fafc',
   display: 'grid',
   animation: 'sagaHudRise 220ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const hero: CSSProperties = {
+const heroBlock: CSSProperties = {
   display: 'grid',
   gap: 6,
 }
 
 const eyebrow: CSSProperties = {
-  color: '#6ee7b7',
+  color: '#86efac',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
-const title: CSSProperties = {
+const heroTitle: CSSProperties = {
   color: '#ffffff',
-  fontSize: 24,
+  fontSize: 26,
   fontWeight: 900,
   lineHeight: 0.98,
   letterSpacing: '-0.04em',
 }
 
-const subRow: CSSProperties = {
+const heroText: CSSProperties = {
+  color: 'rgba(226,232,240,.82)',
+  fontSize: 13,
+  lineHeight: 1.45,
+}
+
+const chipRow: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
+  marginTop: 2,
 }
 
-const pill: CSSProperties = {
-  minHeight: 24,
+const metricChip: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center',
+  gap: 8,
   padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  color: '#cbd5e1',
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.08)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
+}
+
+const metricGood: CSSProperties = {
+  background: 'rgba(34,197,94,.16)',
+  border: '1px solid rgba(74,222,128,.18)',
+}
+
+const metricWarn: CSSProperties = {
+  background: 'rgba(245,158,11,.16)',
+  border: '1px solid rgba(251,191,36,.18)',
+}
+
+const metricInfo: CSSProperties = {
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.18)',
+}
+
+const metricLabel: CSSProperties = {
+  color: 'rgba(226,232,240,.74)',
   fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.10em',
+}
+
+const metricValue: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.02em',
 }
 
-const pillActive: CSSProperties = {
-  ...pill,
-  border: '1px solid rgba(22,163,74,.24)',
-  background: 'rgba(22,163,74,.16)',
-  color: '#dcfce7',
-}
-
-const helper: CSSProperties = {
-  color: '#cbd5e1',
+const helperLine: CSSProperties = {
+  color: 'rgba(226,232,240,.78)',
   fontSize: 13,
-  lineHeight: 1.4,
+  lineHeight: 1.45,
 }
 
 const actionRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 10,
+}
+
+const glassGhost: CSSProperties = {
+  minHeight: 42,
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(2,6,23,.30)',
+  color: '#f8fafc',
+  fontSize: 12,
+  fontWeight: 800,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
+}
+
+const glassGhostActive: CSSProperties = {
+  ...glassGhost,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.18)',
+  color: '#dbeafe',
 }
 
 const detailGrid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 10,
 }
 
 const detailCard: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  padding: '10px 12px',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
+  padding: '12px 12px',
   minWidth: 0,
 }
 
 const detailLabel: CSSProperties = {
-  color: '#94a3b8',
+  color: 'rgba(226,232,240,.70)',
   fontSize: 10,
   fontWeight: 800,
   letterSpacing: '0.14em',
 }
 
 const detailValue: CSSProperties = {
-  color: '#f8fafc',
+  color: '#ffffff',
   fontSize: 13,
   fontWeight: 800,
   marginTop: 6,
@@ -399,10 +472,8 @@ const detailValue: CSSProperties = {
   textOverflow: 'ellipsis',
 }
 
-const mapNoticeStyle: CSSProperties = {
-  color: '#fde68a',
-  fontSize: 12,
-  lineHeight: 1.35,
+const hiddenNotice: CSSProperties = {
+  display: 'none',
 }
 
 const menuOverlay: CSSProperties = {
@@ -419,24 +490,29 @@ const menuOverlay: CSSProperties = {
 const menuBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(15,23,42,.34)',
-  backdropFilter: 'blur(4px)',
-  WebkitBackdropFilter: 'blur(4px)',
+  background: 'rgba(2,6,23,.34)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
   animation: 'sagaFadeIn 160ms ease-out',
 }
 
 const menuSheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(2,6,23,.96)',
-  boxShadow: '0 18px 40px rgba(2,6,23,.24)',
+  borderRadius: 28,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(13,23,42,.86), rgba(20,32,58,.78))',
+  boxShadow:
+    '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
   padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'grid',
   gap: 12,
   animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
   pointerEvents: 'auto',
+  color: '#f8fafc',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
 }
 
 const menuHeader: CSSProperties = {
@@ -458,9 +534,9 @@ const closeButton: CSSProperties = {
   width: 38,
   height: 38,
   borderRadius: 999,
-  border: '1px solid rgba(239,68,68,.24)',
-  background: 'rgba(239,68,68,.14)',
-  color: '#fecaca',
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
   fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
@@ -471,22 +547,19 @@ const closeButton: CSSProperties = {
 
 const menuButton: CSSProperties = {
   minHeight: 46,
-  borderRadius: 16,
-  border: '1px solid rgba(245,158,11,.24)',
-  background: 'rgba(245,158,11,.14)',
-  color: '#fde68a',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
   fontSize: 12,
   fontWeight: 900,
 }
 
-const menuButtonActive: CSSProperties = {
-  minHeight: 46,
-  borderRadius: 16,
-  border: '1px solid rgba(22,163,74,.24)',
-  background: 'rgba(22,163,74,.16)',
-  color: '#dcfce7',
-  fontSize: 12,
-  fontWeight: 900,
+const menuButtonDangerActive: CSSProperties = {
+  ...menuButton,
+  background: 'rgba(220,38,38,.18)',
+  border: '1px solid rgba(248,113,113,.22)',
+  color: '#fee2e2',
 }
 
 const menuLink: CSSProperties = {
@@ -494,10 +567,10 @@ const menuLink: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.05)',
-  color: '#f8fafc',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#ffffff',
   fontSize: 12,
   fontWeight: 800,
   textDecoration: 'none',
@@ -505,10 +578,10 @@ const menuLink: CSSProperties = {
 
 const menuLinkMuted: CSSProperties = {
   ...menuLink,
-  color: '#cbd5e1',
+  color: 'rgba(226,232,240,.82)',
 }
 
-const animations = `
+const hudAnimations = `
 @keyframes sagaFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -533,21 +606,6 @@ const animations = `
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes sagaPrimaryPulse {
-  0% {
-    box-shadow: 0 10px 24px rgba(22,163,74,.18);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 14px 30px rgba(22,163,74,.28);
-    transform: scale(1.01);
-  }
-  100% {
-    box-shadow: 0 10px 24px rgba(22,163,74,.18);
-    transform: scale(1);
   }
 }
 `
