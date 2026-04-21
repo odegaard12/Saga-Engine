@@ -1,5 +1,7 @@
-import { useState, type CSSProperties } from 'react'
+import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
+
+type MaybeAction = (() => void) | undefined
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -8,22 +10,26 @@ interface PlayerShellProps {
   distanceMeters: number | null
   debugEnabled: boolean
   followPlayer: boolean
-  onOpenEntry: () => void
-  onToggleDebug: () => void
-  onFocusPlayer: () => void
-  onFocusNode: () => void
-  onToggleFollow: () => void
+  toolsOpen: boolean
+  shellLoginHref?: string
+  onOpenEntry?: () => void
+  onOpenTools: () => void
+  onCloseTools: () => void
+  onToggleDebug?: () => void
+  onFocusPlayer?: () => void
+  onFocusNode?: () => void
+  onToggleFollow?: () => void
 }
 
-function getGpsDisplay(gpsState: PlayerGpsStatus): string {
+function getGpsLabel(gpsState: PlayerGpsStatus): string {
   if (gpsState === 'ready') return 'GPS LIVE'
   if (gpsState === 'stale') return 'GPS LAST'
-  if (gpsState === 'searching') return 'SEARCHING'
+  if (gpsState === 'searching') return 'GPS SEARCH'
   if (gpsState === 'error') return 'GPS ERROR'
   return 'GPS OFF'
 }
 
-function getRangeDisplay(distanceMeters: number | null): string {
+function getRangeLabel(distanceMeters: number | null): string {
   if (distanceMeters === null) return 'NO RANGE'
   return `${distanceMeters}M`
 }
@@ -35,7 +41,11 @@ export function PlayerShell({
   distanceMeters,
   debugEnabled,
   followPlayer,
+  toolsOpen,
+  shellLoginHref,
   onOpenEntry,
+  onOpenTools,
+  onCloseTools,
   onToggleDebug,
   onFocusPlayer,
   onFocusNode,
@@ -44,294 +54,341 @@ export function PlayerShell({
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
-  const [toolsOpen, setToolsOpen] = useState(false)
-
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
-  const title = payload.display_name || payload.profile?.display_name || payload.user
-  const stageTitle = currentStage?.title || 'Awaiting active node'
+  const playerName = payload.display_name || payload.profile?.display_name || payload.user
+  const stageName = currentStage?.title || 'Awaiting node'
+  const gpsLabel = getGpsLabel(gpsState)
+  const rangeLabel = getRangeLabel(distanceMeters)
+
+  function runAction(action?: MaybeAction) {
+    return () => {
+      if (action) action()
+      onCloseTools()
+    }
+  }
+
+  function handleEntry() {
+    if (onOpenEntry) {
+      onOpenEntry()
+      onCloseTools()
+      return
+    }
+    if (shellLoginHref && typeof window !== 'undefined') {
+      onCloseTools()
+      window.location.href = shellLoginHref
+    }
+  }
 
   return (
-    <>
-      <style>{shellAnimations}</style>
+    <div style={wrap}>
+      <section
+        style={{
+          ...card,
+          width: compact ? '100%' : 'min(100%, 760px)',
+          padding: compact ? 14 : 16,
+          borderRadius: compact ? 28 : 30,
+        }}
+      >
+        <div style={topRow}>
+          <div style={eyebrow}>FIELD SESSION</div>
+          <div style={soloPill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
+        </div>
 
-      <header style={wrap}>
-        <section
-          style={{
-            ...rail,
-            width: compact ? '100%' : 'min(100%, 760px)',
-            padding: compact ? '14px 14px 12px' : '16px 16px 14px',
-            borderRadius: compact ? 26 : 30,
-          }}
-        >
-          <div style={topRow}>
-            <div style={eyebrow}>FIELD SESSION</div>
-            <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
-          </div>
+        <div style={{ ...playerTitle, fontSize: compact ? 16 : 18 }}>{playerName}</div>
+        <div style={stageTitle}>{stageName}</div>
 
-          <div style={{ ...name, fontSize: compact ? 19 : 24 }}>{title}</div>
-          <div style={stageName}>{stageTitle}</div>
+        <div style={chipRow}>
+          <span style={chip}>{gpsLabel}</span>
+          <span style={chipMuted}>{rangeLabel}</span>
+          {followPlayer ? <span style={chipInfo}>FOLLOW</span> : null}
+          {debugEnabled ? <span style={chipDanger}>DEBUG</span> : null}
+        </div>
 
-          <div style={metaRow}>
-            <span style={metaPill}>{getGpsDisplay(gpsState)}</span>
-            <span style={metaPill}>{getRangeDisplay(distanceMeters)}</span>
-            {followPlayer ? <span style={metaPillBlue}>FOLLOW</span> : null}
-            {debugEnabled ? <span style={metaPillRed}>DEBUG</span> : null}
-          </div>
+        <div style={toolbarRow}>
+          <div />
+          <button
+            type="button"
+            onClick={toolsOpen ? onCloseTools : onOpenTools}
+            style={toolsOpen ? toolsButtonActive : toolsButton}
+          >
+            {toolsOpen ? 'CLOSE' : 'TOOLS'}
+          </button>
+        </div>
 
-          <div style={toolsRow}>
-            <button
-              type="button"
-              style={toolsOpen ? toolsButtonActive : toolsButton}
-              onClick={() => setToolsOpen((v) => !v)}
-            >
-              {toolsOpen ? 'CLOSE' : 'TOOLS'}
-            </button>
-          </div>
-
-          {toolsOpen ? (
-            <div style={utilityPanel}>
-              <div
-                style={{
-                  ...utilityGrid,
-                  gridTemplateColumns: compact
-                    ? 'repeat(3, minmax(0, 1fr))'
-                    : 'repeat(5, minmax(0, 1fr))',
-                }}
-              >
-                <button type="button" style={utilityButton} onClick={onOpenEntry}>
-                  ← LOGIN
-                </button>
-
-                <button
-                  type="button"
-                  style={debugEnabled ? utilityButtonDangerActive : utilityButtonDanger}
-                  onClick={onToggleDebug}
-                >
-                  {debugEnabled ? 'DEBUG ON' : 'DEBUG'}
-                </button>
-
-                <button type="button" style={utilityButton} onClick={onFocusPlayer}>
-                  PLAYER
-                </button>
-
-                <button type="button" style={utilityButton} onClick={onFocusNode}>
-                  NODE
-                </button>
-
-                <button
-                  type="button"
-                  style={followPlayer ? utilityButtonBlue : utilityButton}
-                  onClick={onToggleFollow}
-                >
-                  {followPlayer ? 'FOLLOW' : 'FREE MAP'}
-                </button>
-              </div>
-
-              {debugEnabled ? (
-                <div style={debugHint}>
-                  Debug map tap active. Tap on the map to place simulated GPS.
-                </div>
-              ) : null}
+        {toolsOpen ? (
+          <section style={toolsPanel}>
+            <div style={toolsHeader}>
+              <div style={toolsTitle}>Field tools</div>
+              <button type="button" style={closeButton} onClick={onCloseTools}>
+                ×
+              </button>
             </div>
-          ) : null}
-        </section>
-      </header>
-    </>
+
+            <div style={toolsGrid}>
+              <button type="button" style={toolButton} onClick={handleEntry}>
+                ← LOGIN
+              </button>
+
+              <button
+                type="button"
+                style={debugEnabled ? toolButtonDangerActive : toolButtonDanger}
+                onClick={runAction(onToggleDebug)}
+              >
+                {debugEnabled ? 'DEBUG ON' : 'DEBUG'}
+              </button>
+
+              <button type="button" style={toolButton} onClick={runAction(onFocusPlayer)}>
+                PLAYER
+              </button>
+
+              <button type="button" style={toolButton} onClick={runAction(onFocusNode)}>
+                NODE
+              </button>
+
+              <button
+                type="button"
+                style={followPlayer ? toolButtonInfoActive : toolButtonInfo}
+                onClick={runAction(onToggleFollow)}
+              >
+                {followPlayer ? 'FOLLOW ON' : 'FOLLOW'}
+              </button>
+            </div>
+          </section>
+        ) : null}
+      </section>
+    </div>
   )
 }
 
 const wrap: CSSProperties = {
-  pointerEvents: 'none',
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
+  pointerEvents: 'auto',
 }
 
-const rail: CSSProperties = {
-  margin: '0 auto',
+const card: CSSProperties = {
+  background:
+    'linear-gradient(180deg, rgba(37,45,61,.84) 0%, rgba(86,92,108,.78) 100%)',
+  border: '1px solid rgba(255,255,255,.20)',
+  boxShadow: '0 22px 60px rgba(15,23,42,.24), inset 0 1px 0 rgba(255,255,255,.16)',
+  backdropFilter: 'blur(22px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(22px) saturate(150%)',
+  color: '#ffffff',
   display: 'grid',
   gap: 10,
-  border: '1px solid rgba(255,255,255,.14)',
-  background:
-    'linear-gradient(180deg, rgba(13,23,42,.72), rgba(20,32,58,.60))',
-  boxShadow:
-    '0 24px 60px rgba(2,6,23,.28), inset 0 1px 0 rgba(255,255,255,.10)',
-  backdropFilter: 'blur(20px) saturate(150%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-  pointerEvents: 'auto',
-  boxSizing: 'border-box',
-  animation: 'sagaShellIn 240ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const topRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: 10,
+  gap: 12,
 }
 
 const eyebrow: CSSProperties = {
-  color: '#86efac',
-  fontSize: 10,
+  color: '#b8ffd9',
+  fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.16em',
+  textTransform: 'uppercase',
 }
 
-const modePill: CSSProperties = {
-  minHeight: 24,
+const soloPill: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '0 10px',
+  justifyContent: 'center',
+  padding: '0 12px',
   borderRadius: 999,
-  background: 'rgba(255,255,255,.10)',
-  border: '1px solid rgba(255,255,255,.14)',
-  color: '#f8fafc',
-  fontSize: 10,
+  background: 'rgba(255,255,255,.16)',
+  border: '1px solid rgba(255,255,255,.18)',
+  color: '#ffffff',
+  fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.10em',
 }
 
-const name: CSSProperties = {
-  color: '#ffffff',
+const playerTitle: CSSProperties = {
   fontWeight: 900,
   lineHeight: 1,
-  letterSpacing: '-0.04em',
-  textShadow: '0 1px 0 rgba(0,0,0,.12)',
+  letterSpacing: '-0.03em',
+  color: '#ffffff',
 }
 
-const stageName: CSSProperties = {
-  color: 'rgba(226,232,240,.92)',
-  fontSize: 13,
+const stageTitle: CSSProperties = {
+  color: 'rgba(255,255,255,.92)',
+  fontSize: 14,
   fontWeight: 800,
   lineHeight: 1.2,
 }
 
-const metaRow: CSSProperties = {
+const chipRow: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
 }
 
-const pillBase: CSSProperties = {
-  minHeight: 26,
+const chipBase: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 11px',
+  padding: '0 12px',
   borderRadius: 999,
-  fontSize: 10,
+  border: '1px solid rgba(255,255,255,.16)',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.06em',
+}
+
+const chip: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(255,255,255,.14)',
+  color: '#ffffff',
+}
+
+const chipMuted: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(255,255,255,.10)',
+  color: 'rgba(255,255,255,.88)',
+}
+
+const chipInfo: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(96,165,250,.24)',
+  border: '1px solid rgba(96,165,250,.30)',
+  color: '#dbeafe',
+}
+
+const chipDanger: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(239,68,68,.20)',
+  border: '1px solid rgba(239,68,68,.26)',
+  color: '#fecaca',
+}
+
+const toolbarRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 12,
+  marginTop: 2,
+}
+
+const toolsButtonBase: CSSProperties = {
+  minHeight: 42,
+  minWidth: 92,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 18px',
+  borderRadius: 999,
+  fontSize: 13,
   fontWeight: 900,
   letterSpacing: '0.10em',
-  border: '1px solid rgba(255,255,255,.12)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
-}
-
-const metaPill: CSSProperties = {
-  ...pillBase,
-  background: 'rgba(255,255,255,.09)',
-  color: '#e2e8f0',
-}
-
-const metaPillBlue: CSSProperties = {
-  ...pillBase,
-  background: 'rgba(59,130,246,.22)',
-  color: '#dbeafe',
-  border: '1px solid rgba(96,165,250,.24)',
-}
-
-const metaPillRed: CSSProperties = {
-  ...pillBase,
-  background: 'rgba(220,38,38,.18)',
-  color: '#fecaca',
-  border: '1px solid rgba(248,113,113,.24)',
-}
-
-const toolsRow: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
 }
 
 const toolsButton: CSSProperties = {
-  minHeight: 36,
-  minWidth: 90,
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#f8fafc',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
+  ...toolsButtonBase,
+  background: 'rgba(255,255,255,.14)',
+  border: '1px solid rgba(255,255,255,.18)',
+  color: '#ffffff',
 }
 
 const toolsButtonActive: CSSProperties = {
-  ...toolsButton,
-  background: 'rgba(255,255,255,.14)',
+  ...toolsButtonBase,
+  background: 'rgba(255,255,255,.20)',
+  border: '1px solid rgba(255,255,255,.24)',
+  color: '#ffffff',
 }
 
-const utilityPanel: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  paddingTop: 2,
-}
-
-const utilityGrid: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-}
-
-const utilityButton: CSSProperties = {
-  minHeight: 40,
-  borderRadius: 16,
+const toolsPanel: CSSProperties = {
+  marginTop: 6,
+  borderRadius: 24,
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#f8fafc',
-  fontSize: 11,
+  background: 'linear-gradient(180deg, rgba(18,30,58,.82), rgba(45,58,84,.72))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+  padding: 14,
+  display: 'grid',
+  gap: 12,
+}
+
+const toolsHeader: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+
+const toolsTitle: CSSProperties = {
+  fontSize: 18,
   fontWeight: 900,
-  letterSpacing: '0.08em',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
+  color: '#ffffff',
+  lineHeight: 1,
+  letterSpacing: '-0.03em',
 }
 
-const utilityButtonDanger: CSSProperties = {
-  ...utilityButton,
-  color: '#d1d5db',
+const closeButton: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.18)',
+  background: 'rgba(255,255,255,.12)',
+  color: '#ffffff',
+  fontSize: 28,
+  fontWeight: 900,
+  lineHeight: 1,
 }
 
-const utilityButtonDangerActive: CSSProperties = {
-  ...utilityButton,
-  background: 'linear-gradient(180deg, rgba(220,38,38,.28), rgba(127,29,29,.24))',
-  border: '1px solid rgba(248,113,113,.26)',
+const toolsGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 10,
+}
+
+const toolButtonBase: CSSProperties = {
+  minHeight: 48,
+  borderRadius: 18,
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '0.06em',
+  color: '#ffffff',
+}
+
+const toolButton: CSSProperties = {
+  ...toolButtonBase,
+  background: 'rgba(255,255,255,.12)',
+  border: '1px solid rgba(255,255,255,.16)',
+}
+
+const toolButtonDanger: CSSProperties = {
+  ...toolButtonBase,
+  background: 'rgba(127,29,29,.24)',
+  border: '1px solid rgba(239,68,68,.22)',
+  color: '#fecaca',
+}
+
+const toolButtonDangerActive: CSSProperties = {
+  ...toolButtonBase,
+  background: 'rgba(185,28,28,.34)',
+  border: '1px solid rgba(248,113,113,.30)',
   color: '#fee2e2',
-  boxShadow: '0 10px 24px rgba(127,29,29,.16)',
 }
 
-const utilityButtonBlue: CSSProperties = {
-  ...utilityButton,
-  background: 'linear-gradient(180deg, rgba(59,130,246,.24), rgba(37,99,235,.20))',
-  border: '1px solid rgba(96,165,250,.24)',
+const toolButtonInfo: CSSProperties = {
+  ...toolButtonBase,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.22)',
   color: '#dbeafe',
 }
 
-const debugHint: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(248,113,113,.18)',
-  background: 'rgba(127,29,29,.16)',
-  color: '#fee2e2',
-  fontSize: 12,
-  fontWeight: 700,
-  lineHeight: 1.4,
-  padding: '10px 12px',
+const toolButtonInfoActive: CSSProperties = {
+  ...toolButtonBase,
+  background: 'rgba(59,130,246,.28)',
+  border: '1px solid rgba(96,165,250,.30)',
+  color: '#eff6ff',
 }
-
-const shellAnimations = `
-@keyframes sagaShellIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-`

@@ -95,6 +95,7 @@ export default function PlayerApp() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -241,11 +242,17 @@ export default function PlayerApp() {
   }
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
+    setToolsOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
-  function closeMenu() {
-    setActivePanel((current) => (current === 'menu' ? null : current))
+  function openTools() {
+    setActivePanel(null)
+    setToolsOpen((current) => !current)
+  }
+
+  function closeTools() {
+    setToolsOpen(false)
   }
 
   function handleOpenEntry() {
@@ -316,6 +323,7 @@ export default function PlayerApp() {
   function openInteraction() {
     setSubmitError(null)
     setActivePanel(null)
+    setToolsOpen(false)
     setInteractionOpen(true)
   }
 
@@ -422,7 +430,11 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             debugEnabled={effectiveDebugEnabled}
             followPlayer={followPlayer}
+            toolsOpen={toolsOpen}
+            shellLoginHref={shellLoginHref}
             onOpenEntry={handleOpenEntry}
+            onOpenTools={openTools}
+            onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
             onFocusPlayer={handleFocusPlayer}
             onFocusNode={handleFocusNode}
@@ -445,21 +457,14 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
-            mapNotice={null}
-            legacyPlayerHref={legacyPlayerHref}
-            legacyLoginHref={shellLoginHref}
-            adminHref={adminHref}
-            detailsOpen={activePanel === 'details'}
-            menuOpen={activePanel === 'menu'}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
             helperText={runtime.helperText}
+            detailsOpen={activePanel === 'details'}
             onPrimaryAction={handlePrimaryAction}
             onToggleDetails={() => togglePanel('details')}
-            onToggleMenu={() => togglePanel('menu')}
-            onCloseMenu={closeMenu}
-            onToggleDebug={handleToggleDebug}
+            onOpenTools={openTools}
           />
         </div>
       </div>
