@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import type { PlayerStage } from '../../types/player'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
-import { tokens } from '../ui/tokens'
 
 interface InteractionSheetProps {
   open: boolean
@@ -64,7 +63,7 @@ export function InteractionSheet({
     if (open && currentStage) {
       vibrate(10)
     }
-  }, [open, stageId])
+  }, [open, stageId, currentStage])
 
   if (!open || !currentStage) return null
 
@@ -131,10 +130,7 @@ export function InteractionSheet({
           style={{
             ...sheet,
             transform: `translateY(${dragOffset}px)`,
-            transition:
-              dragOffset === 0
-                ? `transform ${tokens.motion.smooth}, opacity ${tokens.motion.fast}`
-                : 'none',
+            transition: dragOffset === 0 ? 'transform 180ms ease, opacity 160ms ease' : 'none',
           }}
           aria-modal="true"
           role="dialog"
@@ -148,7 +144,9 @@ export function InteractionSheet({
 
           <div style={headerRow}>
             <div style={headerCopy}>
+              <div style={eyebrow}>NODE</div>
               <div style={title}>{currentStage.title}</div>
+              <div style={subTitle}>PLAYER · {user}</div>
             </div>
 
             <button
@@ -258,13 +256,13 @@ const backdrop: CSSProperties = {
 
 const sheet: CSSProperties = {
   position: 'relative',
-  width: 'min(100%, 720px)',
+  width: 'min(100%, 840px)',
   maxHeight: 'calc(100vh - 24px)',
   overflowY: 'auto',
   borderRadius: 28,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: 'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.92))',
-  boxShadow: tokens.shadow.sheet,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'linear-gradient(180deg, rgba(2,6,23,.98), rgba(15,23,42,.94))',
+  boxShadow: '0 18px 40px rgba(2,6,23,.30)',
   color: '#f8fafc',
   padding: 14,
   display: 'grid',
@@ -283,7 +281,7 @@ const dragHandleWrap: CSSProperties = {
 const dragHandle: CSSProperties = {
   width: 42,
   height: 5,
-  borderRadius: tokens.radius.pill,
+  borderRadius: 999,
   background: 'rgba(255,255,255,.18)',
 }
 
@@ -296,6 +294,15 @@ const headerRow: CSSProperties = {
 
 const headerCopy: CSSProperties = {
   minWidth: 0,
+  display: 'grid',
+  gap: 6,
+}
+
+const eyebrow: CSSProperties = {
+  color: '#6ee7b7',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
 }
 
 const title: CSSProperties = {
@@ -306,15 +313,22 @@ const title: CSSProperties = {
   letterSpacing: '-0.03em',
 }
 
+const subTitle: CSSProperties = {
+  color: '#94a3b8',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+}
+
 const closeButton: CSSProperties = {
   width: 38,
   height: 38,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: tokens.colors.slateSoft,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
   color: '#f8fafc',
   fontSize: 22,
   fontWeight: 800,
@@ -323,8 +337,8 @@ const closeButton: CSSProperties = {
 
 const contextCard: CSSProperties = {
   borderRadius: 18,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: tokens.colors.slateSoft,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
   padding: 14,
   display: 'grid',
   gap: 8,
@@ -345,13 +359,13 @@ const hintText: CSSProperties = {
 
 const bridgeCard: CSSProperties = {
   borderRadius: 18,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: tokens.colors.slateSoft,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
   padding: 14,
 }
 
 const bridgeText: CSSProperties = {
-  color: tokens.colors.slateMuted,
+  color: '#cbd5e1',
   fontSize: 14,
   lineHeight: 1.5,
 }
@@ -364,9 +378,9 @@ const recoveryWrap: CSSProperties = {
 const recoveryToggle: CSSProperties = {
   minHeight: 42,
   borderRadius: 14,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: tokens.colors.slateSoft,
-  color: tokens.colors.slateMuted,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
+  color: '#e2e8f0',
   fontSize: 12,
   fontWeight: 800,
   letterSpacing: '0.04em',
@@ -374,7 +388,7 @@ const recoveryToggle: CSSProperties = {
 
 const recoveryPanel: CSSProperties = {
   borderRadius: 16,
-  border: `1px solid ${tokens.colors.slateLine}`,
+  border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.03)',
   padding: 12,
   display: 'grid',
@@ -395,7 +409,7 @@ const inputRow: CSSProperties = {
 const input: CSSProperties = {
   minHeight: 46,
   borderRadius: 14,
-  border: `1px solid ${tokens.colors.slateLine}`,
+  border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(2,6,23,.50)',
   color: '#f8fafc',
   fontSize: 14,
@@ -413,7 +427,7 @@ const submitButton: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   borderRadius: 14,
-  border: `1px solid ${tokens.colors.brandLine}`,
+  border: '1px solid rgba(22,163,74,.24)',
   background: 'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.18))',
   color: '#dcfce7',
   fontSize: 12,
@@ -442,10 +456,10 @@ const legacyLink: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 12px',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.slateLine}`,
-  background: tokens.colors.slateSoft,
-  color: tokens.colors.slateMuted,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
+  color: '#e2e8f0',
   fontSize: 12,
   fontWeight: 800,
   textDecoration: 'none',
