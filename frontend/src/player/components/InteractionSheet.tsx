@@ -1,12 +1,14 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
 
 interface InteractionSheetProps {
   open: boolean
+  user: string
   currentStage: PlayerStage | null
-  summaryText: string
+  helperText: string
+  legacyPlayerHref: string
   submitting: boolean
   errorMessage: string | null
   onClose: () => void
@@ -29,8 +31,10 @@ function isMeaningfulNarrative(stage: PlayerStage | null) {
 
 export function InteractionSheet({
   open,
+  user,
   currentStage,
-  summaryText,
+  helperText,
+  legacyPlayerHref,
   submitting,
   errorMessage,
   onClose,
@@ -38,6 +42,10 @@ export function InteractionSheet({
 }: InteractionSheetProps) {
   const [code, setCode] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+
+  const touchStartYRef = useRef<number | null>(null)
+  const touchStartXRef = useRef<number | null>(null)
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.minigame?.type ?? currentStage?.type ?? null
@@ -48,24 +56,20 @@ export function InteractionSheet({
   useEffect(() => {
     setCode('')
     setShowRecovery(false)
+    setDragOffset(0)
   }, [stageId])
 
   useEffect(() => {
     if (open && currentStage) {
-      vibrate([8, 12, 8])
+      vibrate(10)
     }
   }, [open, stageId, currentStage])
 
   if (!open || !currentStage) return null
 
-  const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 760 : false
-
   const hasNarrative = isMeaningfulNarrative(currentStage)
   const narrative = hasNarrative ? currentStage.content?.trim() || '' : ''
   const hint = currentStage.messages?.hint?.trim() || ''
-  const minigameLabel = currentStage.minigame?.label || minigameDefinition?.label || 'Node workspace'
-  const versionLabel = currentStage.minigame?.version || minigameDefinition?.version || 'v1'
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -80,26 +84,69 @@ export function InteractionSheet({
   }
 
   function handleClose() {
-    if (submitting) return
     vibrate(10)
     onClose()
   }
 
+  function handleTouchStart(event: React.TouchEvent<HTMLElement>) {
+    if (event.touches.length !== 1) return
+    touchStartYRef.current = event.touches[0].clientY
+    touchStartXRef.current = event.touches[0].clientX
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLElement>) {
+    if (touchStartYRef.current === null || touchStartXRef.current === null) return
+    const deltaY = event.touches[0].clientY - touchStartYRef.current
+    const deltaX = event.touches[0].clientX - touchStartXRef.current
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) return
+    if (deltaY <= 0) {
+      setDragOffset(0)
+      return
+    }
+
+    setDragOffset(Math.min(deltaY, 140))
+  }
+
+  function handleTouchEnd() {
+    if (dragOffset > 90 && !submitting) {
+      vibrate([8, 12, 8])
+      onClose()
+    }
+
+    setDragOffset(0)
+    touchStartYRef.current = null
+    touchStartXRef.current = null
+  }
+
   return (
     <>
-      <style>{workspaceAnimations}</style>
+      <style>{sheetAnimations}</style>
 
       <div style={overlay}>
-        <div style={backdrop} onClick={handleClose} />
+        <div style={backdrop} onClick={submitting ? undefined : handleClose} />
 
-        <section style={workspace} aria-modal="true" role="dialog">
-          <header style={header}>
+        <section
+          style={{
+            ...sheet,
+            transform: `translateY(${dragOffset}px)`,
+            transition: dragOffset === 0 ? 'transform 180ms ease, opacity 160ms ease' : 'none',
+          }}
+          aria-modal="true"
+          role="dialog"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div style={dragHandleWrap}>
+            <div style={dragHandle} />
+          </div>
+
+          <div style={headerRow}>
             <div style={headerCopy}>
-              <div style={eyebrow}>NODE WORKSPACE</div>
+              <div style={eyebrow}>NODE</div>
               <div style={title}>{currentStage.title}</div>
-              <div style={subtitle}>
-                {minigameLabel} · {String(versionLabel).toUpperCase()}
-              </div>
+              <div style={subTitle}>PLAYER · {user}</div>
             </div>
 
             <button
@@ -110,95 +157,78 @@ export function InteractionSheet({
             >
               ×
             </button>
-          </header>
-
-          <div
-            style={{
-              ...contentGrid,
-              gridTemplateColumns: compact ? '1fr' : 'minmax(320px, 380px) minmax(0, 1fr)',
-            }}
-          >
-            <aside style={briefingPanel}>
-              <section style={briefCard}>
-                <div style={sectionEyebrow}>MISSION BRIEF</div>
-                <div style={sectionBody}>{summaryText}</div>
-              </section>
-
-              {hasNarrative ? (
-                <section style={briefCard}>
-                  <div style={sectionEyebrow}>NODE TEXT</div>
-                  <div style={sectionBody}>{narrative}</div>
-                </section>
-              ) : null}
-
-              {hint ? (
-                <section style={hintCard}>
-                  <div style={sectionEyebrow}>FIELD HINT</div>
-                  <div style={sectionBody}>{hint}</div>
-                </section>
-              ) : null}
-
-              <section style={fallbackWrap}>
-                <button
-                  type="button"
-                  style={fallbackToggle}
-                  onClick={() => setShowRecovery((current) => !current)}
-                >
-                  {showRecovery ? 'HIDE FALLBACK' : 'OPEN FALLBACK'}
-                </button>
-
-                {showRecovery ? (
-                  <div style={fallbackPanel}>
-                    <div style={fallbackCopy}>
-                      Manual recovery should be the exception, not the main flow.
-                    </div>
-
-                    <form style={formWrap} onSubmit={handleSubmit}>
-                      <input
-                        id="interaction-code"
-                        value={code}
-                        onChange={(event) => setCode(event.target.value.toUpperCase())}
-                        placeholder="ENTER CODE"
-                        autoComplete="off"
-                        spellCheck={false}
-                        style={input}
-                        disabled={submitting}
-                      />
-
-                      <button
-                        type="submit"
-                        style={submitButton}
-                        disabled={submitting || !code.trim()}
-                      >
-                        {submitting ? 'SYNC...' : 'SUBMIT'}
-                      </button>
-                    </form>
-
-                    {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
-                  </div>
-                ) : null}
-              </section>
-            </aside>
-
-            <main style={playPanel}>
-              {minigameDefinition ? (
-                <MinigameHost
-                  definition={minigameDefinition}
-                  stage={currentStage}
-                  helperText={summaryText}
-                  submitting={submitting}
-                  onWin={handleNativeWin}
-                />
-              ) : (
-                <section style={bridgeCard}>
-                  <div style={bridgeTitle}>No native interaction is available yet.</div>
-                  <div style={bridgeBody}>
-                    This node still needs a proper React-native gameplay implementation.
-                  </div>
-                </section>
-              )}
-            </main>
           </div>
+
+          {hasNarrative ? (
+            <section style={contextCard}>
+              <div style={contextText}>{narrative}</div>
+              {hint ? <div style={hintText}>{hint}</div> : null}
+            </section>
+          ) : null}
+
+          {minigameDefinition ? (
+            <MinigameHost
+              definition={minigameDefinition}
+              stage={currentStage}
+              helperText={helperText}
+              submitting={submitting}
+              onWin={handleNativeWin}
+            />
+          ) : (
+            <section style={bridgeCard}>
+              <div style={bridgeText}>
+                {helperText || 'This node still uses the legacy interaction flow.'}
+              </div>
+            </section>
+          )}
+
+          <section style={recoveryWrap}>
+            <button
+              type="button"
+              style={recoveryToggle}
+              onClick={() => {
+                vibrate(8)
+                setShowRecovery((current) => !current)
+              }}
+            >
+              {showRecovery ? 'Hide fallback' : 'Fallback'}
+            </button>
+
+            {showRecovery ? (
+              <div style={recoveryPanel}>
+                <form style={formWrap} onSubmit={handleSubmit}>
+                  <div style={inputRow}>
+                    <input
+                      id="interaction-code"
+                      value={code}
+                      onChange={(event) => setCode(event.target.value.toUpperCase())}
+                      placeholder="CODE"
+                      autoComplete="off"
+                      spellCheck={false}
+                      style={input}
+                      disabled={submitting}
+                    />
+
+                    <button
+                      type="submit"
+                      style={submitButton}
+                      disabled={submitting || !code.trim()}
+                    >
+                      {submitting ? '...' : 'OK'}
+                    </button>
+                  </div>
+
+                  {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
+                </form>
+
+                <div style={footerActions}>
+                  <a href={legacyPlayerHref} style={legacyLink}>
+                    Open legacy
+                  </a>
+                </div>
+              </div>
+            ) : null}
+          </section>
         </section>
       </div>
     </>
@@ -209,176 +239,178 @@ const overlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
   zIndex: 4000,
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  padding: 12,
 }
 
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.78)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  background: 'rgba(2,6,23,.56)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   animation: 'sagaFadeIn 160ms ease-out',
 }
 
-const workspace: CSSProperties = {
+const sheet: CSSProperties = {
   position: 'relative',
-  zIndex: 2,
-  width: '100%',
-  height: '100dvh',
-  maxHeight: '100dvh',
-  overflow: 'auto',
-  padding:
-    'max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px))',
-  background:
-    'radial-gradient(circle at top, rgba(22,163,74,.14), transparent 30%), linear-gradient(180deg, #020617 0%, #07111c 100%)',
+  width: 'min(100%, 840px)',
+  maxHeight: 'calc(100vh - 24px)',
+  overflowY: 'auto',
+  borderRadius: 28,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'linear-gradient(180deg, rgba(2,6,23,.98), rgba(15,23,42,.94))',
+  boxShadow: '0 18px 40px rgba(2,6,23,.30)',
   color: '#f8fafc',
+  padding: 14,
   display: 'grid',
-  gap: 16,
+  gap: 14,
+  animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  willChange: 'transform',
 }
 
-const header: CSSProperties = {
+const dragHandleWrap: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingTop: 2,
+}
+
+const dragHandle: CSSProperties = {
+  width: 42,
+  height: 5,
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.18)',
+}
+
+const headerRow: CSSProperties = {
+  display: 'flex',
   justifyContent: 'space-between',
+  alignItems: 'flex-start',
   gap: 12,
 }
 
 const headerCopy: CSSProperties = {
   minWidth: 0,
+  display: 'grid',
+  gap: 6,
 }
 
 const eyebrow: CSSProperties = {
-  color: '#86efac',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-}
-
-const title: CSSProperties = {
-  marginTop: 6,
-  color: '#ffffff',
-  fontSize: 30,
-  fontWeight: 900,
-  lineHeight: 0.96,
-  letterSpacing: '-0.04em',
-}
-
-const subtitle: CSSProperties = {
-  marginTop: 8,
-  color: '#94a3b8',
-  fontSize: 13,
-  fontWeight: 800,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
-
-const closeButton: CSSProperties = {
-  width: 42,
-  height: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#f8fafc',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1,
-}
-
-const contentGrid: CSSProperties = {
-  display: 'grid',
-  gap: 16,
-  alignItems: 'start',
-}
-
-const briefingPanel: CSSProperties = {
-  display: 'grid',
-  gap: 12,
-  alignSelf: 'start',
-}
-
-const playPanel: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  gap: 12,
-  alignSelf: 'start',
-}
-
-const briefCard: CSSProperties = {
-  borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.62)',
-  padding: 14,
-  display: 'grid',
-  gap: 8,
-}
-
-const hintCard: CSSProperties = {
-  borderRadius: 20,
-  border: '1px solid rgba(245,158,11,.14)',
-  background: 'rgba(120,53,15,.24)',
-  padding: 14,
-  display: 'grid',
-  gap: 8,
-}
-
-const sectionEyebrow: CSSProperties = {
-  color: '#cbd5e1',
+  color: '#6ee7b7',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
 }
 
-const sectionBody: CSSProperties = {
+const title: CSSProperties = {
+  color: '#f8fafc',
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1.05,
+  letterSpacing: '-0.03em',
+}
+
+const subTitle: CSSProperties = {
+  color: '#94a3b8',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+}
+
+const closeButton: CSSProperties = {
+  width: 38,
+  height: 38,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
+  color: '#f8fafc',
+  fontSize: 22,
+  fontWeight: 800,
+  lineHeight: 1,
+}
+
+const contextCard: CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
+  padding: 14,
+  display: 'grid',
+  gap: 8,
+}
+
+const contextText: CSSProperties = {
   color: '#e2e8f0',
   fontSize: 14,
   lineHeight: 1.55,
   whiteSpace: 'pre-wrap',
 }
 
-const fallbackWrap: CSSProperties = {
+const hintText: CSSProperties = {
+  color: '#fde68a',
+  fontSize: 13,
+  lineHeight: 1.45,
+}
+
+const bridgeCard: CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.05)',
+  padding: 14,
+}
+
+const bridgeText: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: 14,
+  lineHeight: 1.5,
+}
+
+const recoveryWrap: CSSProperties = {
   display: 'grid',
   gap: 10,
 }
 
-const fallbackToggle: CSSProperties = {
-  minHeight: 44,
-  borderRadius: 16,
+const recoveryToggle: CSSProperties = {
+  minHeight: 42,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.05)',
+  background: 'rgba(255,255,255,.06)',
   color: '#e2e8f0',
   fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
+  fontWeight: 800,
+  letterSpacing: '0.04em',
 }
 
-const fallbackPanel: CSSProperties = {
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.52)',
+const recoveryPanel: CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.03)',
   padding: 12,
   display: 'grid',
   gap: 10,
 }
 
-const fallbackCopy: CSSProperties = {
-  color: '#94a3b8',
-  fontSize: 13,
-  lineHeight: 1.45,
-}
-
 const formWrap: CSSProperties = {
   display: 'grid',
+  gap: 8,
+}
+
+const inputRow: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
   gap: 10,
 }
 
 const input: CSSProperties = {
-  minHeight: 48,
-  borderRadius: 16,
+  minHeight: 46,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(2,6,23,.62)',
+  background: 'rgba(2,6,23,.50)',
   color: '#f8fafc',
   fontSize: 14,
   fontWeight: 800,
@@ -389,14 +421,19 @@ const input: CSSProperties = {
 }
 
 const submitButton: CSSProperties = {
-  minHeight: 48,
-  borderRadius: 16,
-  border: '1px solid rgba(34,197,94,.24)',
-  background: 'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.16))',
+  minHeight: 46,
+  minWidth: 64,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 14,
+  border: '1px solid rgba(22,163,74,.24)',
+  background: 'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.18))',
   color: '#dcfce7',
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '0.10em',
+  padding: '0 16px',
 }
 
 const errorText: CSSProperties = {
@@ -406,31 +443,42 @@ const errorText: CSSProperties = {
   lineHeight: 1.4,
 }
 
-const bridgeCard: CSSProperties = {
-  borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.62)',
-  padding: 18,
-  display: 'grid',
+const footerActions: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
   gap: 10,
+  alignItems: 'center',
 }
 
-const bridgeTitle: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 20,
-  fontWeight: 900,
-  lineHeight: 1.05,
+const legacyLink: CSSProperties = {
+  minHeight: 38,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.06)',
+  color: '#e2e8f0',
+  fontSize: 12,
+  fontWeight: 800,
+  textDecoration: 'none',
 }
 
-const bridgeBody: CSSProperties = {
-  color: '#cbd5e1',
-  fontSize: 14,
-  lineHeight: 1.5,
-}
-
-const workspaceAnimations = `
+const sheetAnimations = `
 @keyframes sagaFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes sagaSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 `

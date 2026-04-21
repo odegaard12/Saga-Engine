@@ -1,20 +1,21 @@
 import type { PlayerGpsStatus, PlayerStage } from '../types/player'
 
-export type PrimaryActionTone = 'accent' | 'neutral' | 'warn' | 'success'
+export type PlayerPanel = 'details' | 'menu' | null
+export type PrimaryActionTone = 'ready' | 'gps' | 'locked' | 'done'
 
 export interface StageRuntimeState {
   canEnter: boolean
   reason:
     | 'finished'
     | 'missing_stage'
-    | 'ready'
+    | 'free_entry'
+    | 'within_radius'
+    | 'out_of_range'
     | 'gps_unavailable'
     | 'distance_unknown'
-    | 'out_of_range'
   primaryLabel: string
   primaryTone: PrimaryActionTone
-  statusLabel: string
-  summary: string
+  helperText: string
 }
 
 export function deriveStageRuntime(args: {
@@ -31,9 +32,8 @@ export function deriveStageRuntime(args: {
       canEnter: false,
       reason: 'finished',
       primaryLabel: 'MISSION COMPLETE',
-      primaryTone: 'success',
-      statusLabel: 'Complete',
-      summary: 'This route has already been completed.',
+      primaryTone: 'done',
+      helperText: 'This session has already completed all stages.',
     }
   }
 
@@ -41,10 +41,9 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'missing_stage',
-      primaryLabel: 'NO ACTIVE NODE',
-      primaryTone: 'neutral',
-      statusLabel: 'Waiting',
-      summary: 'No active node is available right now.',
+      primaryLabel: 'AWAITING NODE',
+      primaryTone: 'locked',
+      helperText: 'No active stage is available right now.',
     }
   }
 
@@ -56,25 +55,23 @@ export function deriveStageRuntime(args: {
   if (!requireProximity) {
     return {
       canEnter: true,
-      reason: 'ready',
-      primaryLabel: 'ENTER NODE',
-      primaryTone: 'accent',
-      statusLabel: 'Ready',
-      summary:
+      reason: 'free_entry',
+      primaryLabel: 'OPEN INTERACTION',
+      primaryTone: 'ready',
+      helperText:
         currentStage.messages?.hint ||
         currentStage.content ||
-        'This node can be opened immediately.',
+        'Interaction available.',
     }
   }
 
   if (debugEnabled && allowDebugBypass) {
     return {
       canEnter: true,
-      reason: 'ready',
-      primaryLabel: 'ENTER NODE',
-      primaryTone: 'accent',
-      statusLabel: 'Debug ready',
-      summary: 'Debug bypass is active for this node.',
+      reason: 'within_radius',
+      primaryLabel: 'OPEN INTERACTION',
+      primaryTone: 'ready',
+      helperText: 'Debug bypass active.',
     }
   }
 
@@ -83,11 +80,10 @@ export function deriveStageRuntime(args: {
       canEnter: false,
       reason: 'gps_unavailable',
       primaryLabel: 'GPS REQUIRED',
-      primaryTone: 'warn',
-      statusLabel: 'GPS required',
-      summary:
+      primaryTone: 'gps',
+      helperText:
         currentStage.messages?.gps_unavailable ||
-        'A reliable GPS fix is required before entering this node.',
+        'GPS is unavailable for this stage.',
     }
   }
 
@@ -95,34 +91,31 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'distance_unknown',
-      primaryLabel: 'LOCATING NODE',
-      primaryTone: 'neutral',
-      statusLabel: 'Locating',
-      summary: 'Waiting for a reliable distance calculation.',
+      primaryLabel: 'LOCATING TARGET',
+      primaryTone: 'gps',
+      helperText: 'Waiting for a reliable position fix.',
     }
   }
 
   if (distanceMeters <= currentStage.radius) {
     return {
       canEnter: true,
-      reason: 'ready',
-      primaryLabel: 'ENTER NODE',
-      primaryTone: 'accent',
-      statusLabel: 'In range',
-      summary:
+      reason: 'within_radius',
+      primaryLabel: 'OPEN INTERACTION',
+      primaryTone: 'ready',
+      helperText:
         currentStage.messages?.hint ||
         currentStage.content ||
-        'The node is in range and ready.',
+        'Target in range.',
     }
   }
 
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'MOVE CLOSER',
-    primaryTone: 'neutral',
-    statusLabel: 'Locked',
-    summary:
+    primaryLabel: 'MOVE TO TARGET',
+    primaryTone: 'locked',
+    helperText:
       currentStage.messages?.locked ||
       `Move inside the ${currentStage.radius} m interaction radius.`,
   }
