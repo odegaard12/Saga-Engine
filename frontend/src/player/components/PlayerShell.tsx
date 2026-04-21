@@ -1,33 +1,30 @@
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
   gpsState: PlayerGpsStatus
-  inRange: boolean
   distanceMeters: number | null
   debugEnabled: boolean
   followPlayer: boolean
-  hasPlayerPosition: boolean
-  loginHref: string
+  onOpenEntry: () => void
   onToggleDebug: () => void
   onFocusPlayer: () => void
   onFocusNode: () => void
   onToggleFollow: () => void
 }
 
-function getGpsLabel(gpsState: PlayerGpsStatus, hasPlayerPosition: boolean) {
-  if (hasPlayerPosition && gpsState === 'ready') return 'GPS LIVE'
-  if (hasPlayerPosition && gpsState === 'stale') return 'GPS LAST'
-  if (gpsState === 'searching') return 'GPS SEARCH'
+function getGpsDisplay(gpsState: PlayerGpsStatus): string {
+  if (gpsState === 'ready') return 'GPS LIVE'
+  if (gpsState === 'stale') return 'GPS LAST'
+  if (gpsState === 'searching') return 'SEARCHING'
   if (gpsState === 'error') return 'GPS ERROR'
   return 'GPS OFF'
 }
 
-function getRangeLabel(distanceMeters: number | null, inRange: boolean) {
+function getRangeDisplay(distanceMeters: number | null): string {
   if (distanceMeters === null) return 'NO RANGE'
-  if (inRange) return 'IN RANGE'
   return `${distanceMeters}M`
 }
 
@@ -35,12 +32,10 @@ export function PlayerShell({
   payload,
   currentStage,
   gpsState,
-  inRange,
   distanceMeters,
   debugEnabled,
   followPlayer,
-  hasPlayerPosition,
-  loginHref,
+  onOpenEntry,
   onToggleDebug,
   onFocusPlayer,
   onFocusNode,
@@ -49,80 +44,97 @@ export function PlayerShell({
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
+  const [toolsOpen, setToolsOpen] = useState(false)
+
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const title = payload.display_name || payload.profile?.display_name || payload.user
-  const gpsLabel = getGpsLabel(gpsState, hasPlayerPosition)
-  const rangeLabel = getRangeLabel(distanceMeters, inRange)
+  const stageTitle = currentStage?.title || 'Awaiting active node'
 
   return (
     <>
       <style>{shellAnimations}</style>
 
       <header style={wrap}>
-        <div style={mainRail}>
-          <div
-            style={{
-              ...sessionCard,
-              width: compact ? '100%' : 'min(100%, 420px)',
-            }}
-          >
-            <div style={sessionTop}>
-              <div style={eyebrow}>FIELD SESSION</div>
-              <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
-            </div>
-
-            <div style={name}>{title}</div>
-            <div style={stageTitle}>{currentStage?.title || 'Awaiting node'}</div>
-
-            <div style={metaRow}>
-              <span style={metaPill}>{gpsLabel}</span>
-              <span style={metaPill}>{rangeLabel}</span>
-              {debugEnabled ? <span style={metaPillActive}>DEBUG TAP</span> : null}
-              {followPlayer ? <span style={metaPillFollow}>FOLLOW</span> : null}
-            </div>
+        <section
+          style={{
+            ...rail,
+            width: compact ? '100%' : 'min(100%, 760px)',
+            padding: compact ? '14px 14px 12px' : '16px 16px 14px',
+            borderRadius: compact ? 26 : 30,
+          }}
+        >
+          <div style={topRow}>
+            <div style={eyebrow}>FIELD SESSION</div>
+            <div style={modePill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
           </div>
 
-          <div
-            style={{
-              ...utilityRail,
-              width: compact ? '100%' : 'min(100%, 420px)',
-            }}
-          >
-            <a href={loginHref} style={utilityLink}>
-              ENTRY
-            </a>
+          <div style={{ ...name, fontSize: compact ? 19 : 24 }}>{title}</div>
+          <div style={stageName}>{stageTitle}</div>
 
+          <div style={metaRow}>
+            <span style={metaPill}>{getGpsDisplay(gpsState)}</span>
+            <span style={metaPill}>{getRangeDisplay(distanceMeters)}</span>
+            {followPlayer ? <span style={metaPillBlue}>FOLLOW</span> : null}
+            {debugEnabled ? <span style={metaPillRed}>DEBUG</span> : null}
+          </div>
+
+          <div style={toolsRow}>
             <button
               type="button"
-              style={debugEnabled ? utilityButtonActive : utilityButton}
-              onClick={onToggleDebug}
+              style={toolsOpen ? toolsButtonActive : toolsButton}
+              onClick={() => setToolsOpen((v) => !v)}
             >
-              {debugEnabled ? 'DEBUG ON' : 'DEBUG'}
-            </button>
-
-            <button type="button" style={utilityButton} onClick={onFocusPlayer}>
-              PLAYER
-            </button>
-
-            <button type="button" style={utilityButton} onClick={onFocusNode}>
-              NODE
-            </button>
-
-            <button
-              type="button"
-              style={followPlayer ? utilityButtonFollow : utilityButton}
-              onClick={onToggleFollow}
-            >
-              {followPlayer ? 'FOLLOW' : 'FREE MAP'}
+              {toolsOpen ? 'CLOSE' : 'TOOLS'}
             </button>
           </div>
 
-          {debugEnabled ? (
-            <div style={hintRail}>
-              DEBUG TAP MODE ACTIVE · TAP THE MAP TO PLACE LOCAL GPS
+          {toolsOpen ? (
+            <div style={utilityPanel}>
+              <div
+                style={{
+                  ...utilityGrid,
+                  gridTemplateColumns: compact
+                    ? 'repeat(3, minmax(0, 1fr))'
+                    : 'repeat(5, minmax(0, 1fr))',
+                }}
+              >
+                <button type="button" style={utilityButton} onClick={onOpenEntry}>
+                  ← LOGIN
+                </button>
+
+                <button
+                  type="button"
+                  style={debugEnabled ? utilityButtonDangerActive : utilityButtonDanger}
+                  onClick={onToggleDebug}
+                >
+                  {debugEnabled ? 'DEBUG ON' : 'DEBUG'}
+                </button>
+
+                <button type="button" style={utilityButton} onClick={onFocusPlayer}>
+                  PLAYER
+                </button>
+
+                <button type="button" style={utilityButton} onClick={onFocusNode}>
+                  NODE
+                </button>
+
+                <button
+                  type="button"
+                  style={followPlayer ? utilityButtonBlue : utilityButton}
+                  onClick={onToggleFollow}
+                >
+                  {followPlayer ? 'FOLLOW' : 'FREE MAP'}
+                </button>
+              </div>
+
+              {debugEnabled ? (
+                <div style={debugHint}>
+                  Debug map tap active. Tap on the map to place simulated GPS.
+                </div>
+              ) : null}
             </div>
           ) : null}
-        </div>
+        </section>
       </header>
     </>
   )
@@ -135,29 +147,23 @@ const wrap: CSSProperties = {
   justifyContent: 'center',
 }
 
-const mainRail: CSSProperties = {
-  width: '100%',
-  display: 'grid',
-  gap: 8,
-}
-
-const sessionCard: CSSProperties = {
-  pointerEvents: 'auto',
+const rail: CSSProperties = {
   margin: '0 auto',
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(2,6,23,.88), rgba(15,23,42,.72))',
-  boxShadow: '0 18px 40px rgba(2,6,23,.20)',
-  backdropFilter: 'blur(14px)',
-  WebkitBackdropFilter: 'blur(14px)',
-  padding: '12px 14px',
   display: 'grid',
-  gap: 8,
-  color: '#f8fafc',
-  animation: 'sagaShellIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  gap: 10,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(13,23,42,.72), rgba(20,32,58,.60))',
+  boxShadow:
+    '0 24px 60px rgba(2,6,23,.28), inset 0 1px 0 rgba(255,255,255,.10)',
+  backdropFilter: 'blur(20px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+  pointerEvents: 'auto',
+  boxSizing: 'border-box',
+  animation: 'sagaShellIn 240ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const sessionTop: CSSProperties = {
+const topRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -165,7 +171,7 @@ const sessionTop: CSSProperties = {
 }
 
 const eyebrow: CSSProperties = {
-  color: '#6ee7b7',
+  color: '#86efac',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
@@ -175,11 +181,10 @@ const modePill: CSSProperties = {
   minHeight: 24,
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center',
   padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
+  background: 'rgba(255,255,255,.10)',
+  border: '1px solid rgba(255,255,255,.14)',
   color: '#f8fafc',
   fontSize: 10,
   fontWeight: 900,
@@ -188,19 +193,17 @@ const modePill: CSSProperties = {
 
 const name: CSSProperties = {
   color: '#ffffff',
-  fontSize: 30,
   fontWeight: 900,
-  lineHeight: 0.95,
-  letterSpacing: '-0.05em',
+  lineHeight: 1,
+  letterSpacing: '-0.04em',
+  textShadow: '0 1px 0 rgba(0,0,0,.12)',
 }
 
-const stageTitle: CSSProperties = {
-  color: '#cbd5e1',
+const stageName: CSSProperties = {
+  color: 'rgba(226,232,240,.92)',
   fontSize: 13,
   fontWeight: 800,
   lineHeight: 1.2,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
 }
 
 const metaRow: CSSProperties = {
@@ -210,107 +213,114 @@ const metaRow: CSSProperties = {
 }
 
 const pillBase: CSSProperties = {
-  minHeight: 24,
+  minHeight: 26,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 10px',
+  padding: '0 11px',
   borderRadius: 999,
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.10em',
+  border: '1px solid rgba(255,255,255,.12)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
 }
 
 const metaPill: CSSProperties = {
   ...pillBase,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  color: '#cbd5e1',
+  background: 'rgba(255,255,255,.09)',
+  color: '#e2e8f0',
 }
 
-const metaPillActive: CSSProperties = {
+const metaPillBlue: CSSProperties = {
   ...pillBase,
-  border: '1px solid rgba(22,163,74,.28)',
-  background: 'rgba(22,163,74,.18)',
-  color: '#dcfce7',
-}
-
-const metaPillFollow: CSSProperties = {
-  ...pillBase,
-  border: '1px solid rgba(59,130,246,.24)',
-  background: 'rgba(37,99,235,.16)',
+  background: 'rgba(59,130,246,.22)',
   color: '#dbeafe',
+  border: '1px solid rgba(96,165,250,.24)',
 }
 
-const utilityRail: CSSProperties = {
-  pointerEvents: 'auto',
-  margin: '0 auto',
+const metaPillRed: CSSProperties = {
+  ...pillBase,
+  background: 'rgba(220,38,38,.18)',
+  color: '#fecaca',
+  border: '1px solid rgba(248,113,113,.24)',
+}
+
+const toolsRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+}
+
+const toolsButton: CSSProperties = {
+  minHeight: 36,
+  minWidth: 90,
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
+}
+
+const toolsButtonActive: CSSProperties = {
+  ...toolsButton,
+  background: 'rgba(255,255,255,.14)',
+}
+
+const utilityPanel: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+  gap: 8,
+  paddingTop: 2,
+}
+
+const utilityGrid: CSSProperties = {
+  display: 'grid',
   gap: 8,
 }
 
 const utilityButton: CSSProperties = {
   minHeight: 40,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(2,6,23,.68)',
-  color: '#e2e8f0',
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
 }
 
-const utilityButtonActive: CSSProperties = {
+const utilityButtonDanger: CSSProperties = {
   ...utilityButton,
-  border: '1px solid rgba(22,163,74,.28)',
-  background: 'rgba(22,163,74,.18)',
-  color: '#dcfce7',
+  color: '#d1d5db',
 }
 
-const utilityButtonFollow: CSSProperties = {
+const utilityButtonDangerActive: CSSProperties = {
   ...utilityButton,
-  border: '1px solid rgba(59,130,246,.24)',
-  background: 'rgba(37,99,235,.16)',
+  background: 'linear-gradient(180deg, rgba(220,38,38,.28), rgba(127,29,29,.24))',
+  border: '1px solid rgba(248,113,113,.26)',
+  color: '#fee2e2',
+  boxShadow: '0 10px 24px rgba(127,29,29,.16)',
+}
+
+const utilityButtonBlue: CSSProperties = {
+  ...utilityButton,
+  background: 'linear-gradient(180deg, rgba(59,130,246,.24), rgba(37,99,235,.20))',
+  border: '1px solid rgba(96,165,250,.24)',
   color: '#dbeafe',
 }
 
-const utilityLink: CSSProperties = {
-  minHeight: 40,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(2,6,23,.68)',
-  color: '#f8fafc',
-  textDecoration: 'none',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-}
-
-const hintRail: CSSProperties = {
-  pointerEvents: 'none',
-  margin: '0 auto',
-  width: 'min(100%, 420px)',
-  minHeight: 28,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(22,163,74,.22)',
-  background: 'rgba(22,163,74,.14)',
-  color: '#dcfce7',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  textAlign: 'center',
+const debugHint: CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(248,113,113,.18)',
+  background: 'rgba(127,29,29,.16)',
+  color: '#fee2e2',
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.4,
+  padding: '10px 12px',
 }
 
 const shellAnimations = `
