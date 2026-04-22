@@ -426,19 +426,6 @@ export default function PlayerApp() {
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
-            gpsState={gpsState}
-            distanceMeters={distanceMeters}
-            debugEnabled={effectiveDebugEnabled}
-            followPlayer={followPlayer}
-            toolsOpen={toolsOpen}
-            shellLoginHref={shellLoginHref}
-            onOpenEntry={handleOpenEntry}
-            onOpenTools={openTools}
-            onCloseTools={closeTools}
-            onToggleDebug={handleToggleDebug}
-            onFocusPlayer={handleFocusPlayer}
-            onFocusNode={handleFocusNode}
-            onToggleFollow={handleToggleFollow}
           />
         </div>
 
@@ -457,6 +444,11 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
+            followPlayer={followPlayer}
+            toolsOpen={toolsOpen}
+            legacyPlayerHref={legacyPlayerHref}
+            legacyLoginHref={shellLoginHref}
+            adminHref={adminHref}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
@@ -465,6 +457,8 @@ export default function PlayerApp() {
             onPrimaryAction={handlePrimaryAction}
             onToggleDetails={() => togglePanel('details')}
             onOpenTools={openTools}
+            onCloseTools={closeTools}
+            onToggleDebug={handleToggleDebug}
           />
         </div>
       </div>
