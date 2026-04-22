@@ -710,7 +710,7 @@ def get_player_profile(user, cfg=None):
     return normalize_player_profile(user_text or "PLAYER 1", 0)
 
 HEARTBEAT_STALE_SECONDS = 180
-HEARTBEAT_MIN_INTERVAL_SECONDS = 5
+HEARTBEAT_MIN_INTERVAL_SECONDS = 2
 HEARTBEAT_RATE_WINDOW_SECONDS = 3600
 HEARTBEAT_LAST_SEEN_BY_KEY = {}
 
@@ -1212,6 +1212,26 @@ async def get_game_payload(user: str):
         "finished": finished,
         "stages": stages,
         "current_stage": current_stage
+    }
+
+@app.get("/api/team/{user}")
+async def get_team_payload(user: str):
+    cfg = load_config()
+    current_profile = get_player_profile(user, cfg)
+    current_profile_id = current_profile.get("id") or _as_str(user).strip() or "PLAYER 1"
+    live_positions = load_live_positions()
+    now = int(time.time())
+
+    profiles = []
+    for profile in get_player_profiles(cfg):
+        projected = project_live_profile_status(profile, live_positions.get(profile.get("id")), now)
+        projected["is_self"] = _as_str(profile.get("id")).strip() == _as_str(current_profile_id).strip()
+        profiles.append(projected)
+
+    return {
+        "status": "ok",
+        "user": current_profile_id,
+        "profiles": profiles
     }
 
 @app.post("/api/heartbeat")
