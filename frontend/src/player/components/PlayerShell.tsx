@@ -1,55 +1,45 @@
 import type { CSSProperties } from 'react'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../../types/player'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
-  gpsState: PlayerGpsStatus
-  distanceMeters: number | null
-  debugEnabled: boolean
-  followPlayer: boolean
-  toolsOpen?: boolean
-  shellLoginHref?: string
-  onOpenEntry?: () => void
-  onOpenTools?: () => void
-  onCloseTools?: () => void
-  onToggleDebug?: () => void
-  onFocusPlayer?: () => void
-  onFocusNode?: () => void
-  onToggleFollow?: () => void
 }
 
-function getGpsLabel(gpsState: PlayerGpsStatus): string {
-  if (gpsState === 'ready') return 'GPS LIVE'
-  if (gpsState === 'stale') return 'GPS LAST'
-  if (gpsState === 'searching') return 'GPS SEARCH'
-  if (gpsState === 'error') return 'GPS ERROR'
-  return 'GPS OFF'
+function getProgress(payload: PlayerGamePayload) {
+  const stages = Array.isArray(payload.stages) ? payload.stages : []
+  const total = stages.length
+
+  if (total === 0) {
+    return { total: 0, current: 0, activeIndex: -1 }
+  }
+
+  if (payload.finished) {
+    return { total, current: total, activeIndex: total - 1 }
+  }
+
+  const activeIndex =
+    typeof payload.level === 'number'
+      ? Math.max(0, Math.min(payload.level, total - 1))
+      : 0
+
+  return {
+    total,
+    current: activeIndex + 1,
+    activeIndex,
+  }
 }
 
-function getRangeLabel(distanceMeters: number | null): string {
-  if (distanceMeters === null) return 'NO RANGE'
-  return `${distanceMeters}M`
-}
-
-export function PlayerShell(props: PlayerShellProps) {
-  const {
-    payload,
-    currentStage,
-    gpsState,
-    distanceMeters,
-    debugEnabled,
-    followPlayer,
-  } = props
-
+export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
-  const stageName = currentStage?.title || 'Awaiting node'
-  const gpsLabel = getGpsLabel(gpsState)
-  const rangeLabel = getRangeLabel(distanceMeters)
+  const stageName = currentStage?.title || (payload.finished ? 'Mission complete' : 'Awaiting node')
+  const progress = getProgress(payload)
+
+  const dots = Array.from({ length: progress.total })
 
   return (
     <div style={wrap}>
@@ -69,11 +59,32 @@ export function PlayerShell(props: PlayerShellProps) {
         <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{playerName}</div>
         <div style={stageTitle}>{stageName}</div>
 
-        <div style={chipRow}>
-          <span style={chip}>{gpsLabel}</span>
-          <span style={chipMuted}>{rangeLabel}</span>
-          {followPlayer ? <span style={chipInfo}>FOLLOW</span> : null}
-          {debugEnabled ? <span style={chipDanger}>DEBUG</span> : null}
+        <div style={progressRow}>
+          <div style={dotsWrap}>
+            {dots.length > 0 ? (
+              dots.map((_, index) => {
+                const done = index < progress.current - (payload.finished ? 0 : 1)
+                const active = index === progress.activeIndex && !payload.finished
+                const completed = payload.finished || done
+
+                return (
+                  <span
+                    key={index}
+                    style={{
+                      ...dot,
+                      ...(active ? dotActive : completed ? dotDone : dotIdle),
+                    }}
+                  />
+                )
+              })
+            ) : (
+              <span style={progressEmpty}>No route</span>
+            )}
+          </div>
+
+          <div style={countPill}>
+            {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
+          </div>
         </div>
       </section>
     </div>
@@ -143,48 +154,63 @@ const stageTitle: CSSProperties = {
   lineHeight: 1.2,
 }
 
-const chipRow: CSSProperties = {
+const progressRow: CSSProperties = {
   display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
   marginTop: 2,
 }
 
-const chipBase: CSSProperties = {
-  minHeight: 30,
+const dotsWrap: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flex: 1,
+  minWidth: 0,
+}
+
+const dot: CSSProperties = {
+  width: 10,
+  height: 10,
+  borderRadius: 999,
+  flex: '0 0 auto',
+  border: '1px solid rgba(255,255,255,.18)',
+}
+
+const dotIdle: CSSProperties = {
+  background: 'rgba(255,255,255,.20)',
+}
+
+const dotDone: CSSProperties = {
+  background: 'rgba(34,197,94,.88)',
+  border: '1px solid rgba(134,239,172,.55)',
+  boxShadow: '0 0 0 3px rgba(34,197,94,.14)',
+}
+
+const dotActive: CSSProperties = {
+  background: '#ffffff',
+  border: '1px solid rgba(255,255,255,.92)',
+  boxShadow: '0 0 0 4px rgba(255,255,255,.12)',
+}
+
+const countPill: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 12px',
   borderRadius: 999,
+  background: 'rgba(255,255,255,.12)',
   border: '1px solid rgba(255,255,255,.16)',
+  color: '#ffffff',
   fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.08em',
 }
 
-const chip: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(255,255,255,.16)',
-  color: '#ffffff',
-}
-
-const chipMuted: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(255,255,255,.10)',
-  color: 'rgba(255,255,255,.90)',
-}
-
-const chipInfo: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(96,165,250,.22)',
-  border: '1px solid rgba(96,165,250,.28)',
-  color: '#dbeafe',
-}
-
-const chipDanger: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(239,68,68,.18)',
-  border: '1px solid rgba(239,68,68,.24)',
-  color: '#fecaca',
+const progressEmpty: CSSProperties = {
+  color: 'rgba(255,255,255,.72)',
+  fontSize: 11,
+  fontWeight: 800,
 }
