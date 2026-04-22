@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { PlayerGpsStatus, PlayerStage } from '../../types/player'
+import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 
 type FocusRequest =
   | {
@@ -21,6 +21,8 @@ type MapSurfaceProps = {
   followPlayer?: boolean
   focusRequest?: FocusRequest
   nodeState?: NodeVisualState
+  otherPlayers?: TeamProfileLiveStatus[]
+  selfLabel?: string
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
 }
@@ -100,6 +102,24 @@ function getNodeVisualConfig(nodeState: NodeVisualState) {
   }
 }
 
+function getInitials(label?: string) {
+  const cleaned = String(label || '').trim()
+  if (!cleaned) return '?'
+  const parts = cleaned.split(/\s+/).slice(0, 2)
+  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
+}
+
+function createAvatarIcon(label: string, kind: 'self' | 'live' | 'recent' | 'offline') {
+  const initials = getInitials(label)
+
+  return L.divIcon({
+    className: 'saga-avatar-icon-wrap',
+    html: `<div class="saga-avatar-pin saga-avatar-pin--${kind}">${initials}</div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  })
+}
+
 export function MapSurface({
   currentStage,
   className,
@@ -108,6 +128,8 @@ export function MapSurface({
   followPlayer = true,
   focusRequest,
   nodeState = 'locked',
+  otherPlayers = [],
+  selfLabel = 'ME',
   onDebugSetPosition,
   onNodeTap,
 }: MapSurfaceProps) {
@@ -115,7 +137,8 @@ export function MapSurface({
   const mapRef = useRef<L.Map | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
-  const playerMarkerRef = useRef<L.CircleMarker | null>(null)
+  const playerMarkerRef = useRef<L.Marker | null>(null)
+  const otherPlayerLayersRef = useRef<L.Layer[]>([])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -142,6 +165,8 @@ export function MapSurface({
       playerMarkerRef.current?.remove()
       nodeMarkerRef.current?.remove()
       nodeRadiusRef.current?.remove()
+      otherPlayerLayersRef.current.forEach((layer) => layer.remove())
+      otherPlayerLayersRef.current = []
       map.remove()
       mapRef.current = null
       playerMarkerRef.current = null
@@ -237,17 +262,18 @@ export function MapSurface({
       return
     }
 
-    playerMarkerRef.current = L.circleMarker(
+    playerMarkerRef.current = L.marker(
       [playerPosition.lat, playerPosition.lon],
       {
-        radius: 7,
-        weight: 2,
-        color: '#2563eb',
-        fillColor: '#dbeafe',
-        fillOpacity: 0.95,
-        className: 'saga-player-dot',
+        icon: createAvatarIcon(selfLabel, 'self'),
+        keyboard: false,
       }
     ).addTo(map)
+
+    playerMarkerRef.current.bindTooltip(selfLabel, {
+      direction: 'top',
+      opacity: 0.92,
+    })
 
     if (followPlayer) {
       if (stageMapData) {
@@ -281,7 +307,40 @@ export function MapSurface({
     }
 
     map.invalidateSize({ pan: false })
-  }, [playerPosition, stageMapData, followPlayer])
+  }, [playerPosition, stageMapData, followPlayer, selfLabel])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    otherPlayerLayersRef.current.forEach((layer) => layer.remove())
+    otherPlayerLayersRef.current = []
+
+    for (const player of otherPlayers) {
+      if (player.is_self) continue
+      if (typeof player.lat !== 'number' || typeof player.lon !== 'number') continue
+
+      const presence = String(player.presence || 'offline').toLowerCase()
+      const kind =
+        presence === 'offline'
+          ? 'offline'
+          : presence === 'stale'
+          ? 'recent'
+          : 'live'
+
+      const marker = L.marker([player.lat, player.lon], {
+        icon: createAvatarIcon(player.display_name || player.user, kind),
+        keyboard: false,
+      }).addTo(map)
+
+      marker.bindTooltip(player.display_name || player.user, {
+        direction: 'top',
+        opacity: 0.92,
+      })
+
+      otherPlayerLayersRef.current.push(marker)
+    }
+  }, [otherPlayers])
 
   useEffect(() => {
     const map = mapRef.current
@@ -377,8 +436,49 @@ const mapAnimations = `
   filter: drop-shadow(0 0 14px rgba(34,197,94,.38));
 }
 
-.saga-player-dot {
-  filter: drop-shadow(0 0 8px rgba(37,99,235,.22));
+.saga-avatar-icon-wrap {
+  background: transparent;
+  border: none;
+}
+
+.saga-avatar-pin {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  border: 2px solid rgba(255,255,255,.92);
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.saga-avatar-pin--self {
+  background: rgba(37,99,235,.96);
+  color: #ffffff;
+  box-shadow: 0 0 0 5px rgba(37,99,235,.22), 0 10px 22px rgba(15,23,42,.22);
+}
+
+.saga-avatar-pin--live {
+  background: rgba(249,115,22,.95);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(249,115,22,.20);
+}
+
+.saga-avatar-pin--recent {
+  background: rgba(249,115,22,.78);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(249,115,22,.14);
+}
+
+.saga-avatar-pin--offline {
+  background: rgba(148,163,184,.88);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(148,163,184,.14);
 }
 
 @keyframes sagaNodeHaloLocked {
