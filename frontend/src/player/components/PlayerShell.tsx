@@ -4,6 +4,10 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
+  teamOpen?: boolean
+  teamCount?: number
+  teamLiveCount?: number
+  onOpenTeam?: () => void
 }
 
 function getProgress(payload: PlayerGamePayload) {
@@ -30,7 +34,14 @@ function getProgress(payload: PlayerGamePayload) {
   }
 }
 
-export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
+export function PlayerShell({
+  payload,
+  currentStage,
+  teamOpen = false,
+  teamCount = 0,
+  teamLiveCount = 0,
+  onOpenTeam,
+}: PlayerShellProps) {
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -39,7 +50,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const stageName = currentStage?.title || (payload.finished ? 'Mission complete' : 'Awaiting node')
   const progress = getProgress(payload)
 
-  const dots = Array.from({ length: progress.total })
+  const nodes = Array.from({ length: progress.total })
 
   return (
     <div style={wrap}>
@@ -53,28 +64,57 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
       >
         <div style={topRow}>
           <div style={eyebrow}>FIELD SESSION</div>
-          <div style={soloPill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
+
+          <div style={pillRow}>
+            <div style={soloPill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
+
+            <button
+              type="button"
+              style={teamOpen ? teamButtonActive : teamButton}
+              onClick={onOpenTeam}
+            >
+              <span>PLAYERS</span>
+              <span style={teamCountPill}>{teamCount}</span>
+              {teamLiveCount > 0 ? <span style={teamLiveDot} /> : null}
+            </button>
+          </div>
         </div>
 
         <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{playerName}</div>
         <div style={stageTitle}>{stageName}</div>
 
         <div style={progressRow}>
-          <div style={dotsWrap}>
-            {dots.length > 0 ? (
-              dots.map((_, index) => {
-                const done = index < progress.current - (payload.finished ? 0 : 1)
-                const active = index === progress.activeIndex && !payload.finished
-                const completed = payload.finished || done
+          <div style={routeWrap}>
+            {nodes.length > 0 ? (
+              nodes.map((_, index) => {
+                const nodeDone = payload.finished || index < progress.current - 1
+                const nodeActive = index === progress.activeIndex && !payload.finished
+                const connectorDone = payload.finished || index < progress.current - 1
 
                 return (
-                  <span
+                  <div
                     key={index}
                     style={{
-                      ...dot,
-                      ...(active ? dotActive : completed ? dotDone : dotIdle),
+                      ...routeSegment,
+                      flex: index === nodes.length - 1 ? '0 0 auto' : 1,
                     }}
-                  />
+                  >
+                    <span
+                      style={{
+                        ...routeNode,
+                        ...(nodeActive ? routeNodeActive : nodeDone ? routeNodeDone : routeNodeIdle),
+                      }}
+                    />
+
+                    {index < nodes.length - 1 ? (
+                      <span
+                        style={{
+                          ...routeConnector,
+                          ...(connectorDone ? routeConnectorDone : routeConnectorIdle),
+                        }}
+                      />
+                    ) : null}
+                  </div>
                 )
               })
             ) : (
@@ -117,6 +157,12 @@ const topRow: CSSProperties = {
   gap: 12,
 }
 
+const pillRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+}
+
 const eyebrow: CSSProperties = {
   color: '#c8ffe1',
   fontSize: 11,
@@ -140,6 +186,52 @@ const soloPill: CSSProperties = {
   letterSpacing: '0.10em',
 }
 
+const teamButton: CSSProperties = {
+  minHeight: 28,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  padding: '0 10px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(15,23,42,.26)',
+  color: '#ffffff',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+}
+
+const teamButtonActive: CSSProperties = {
+  ...teamButton,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.20)',
+  color: '#dbeafe',
+}
+
+const teamCountPill: CSSProperties = {
+  minWidth: 18,
+  height: 18,
+  padding: '0 6px',
+  borderRadius: 999,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(255,255,255,.16)',
+  color: '#ffffff',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.04em',
+}
+
+const teamLiveDot: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
+  background: '#22c55e',
+  boxShadow: '0 0 0 3px rgba(34,197,94,.18)',
+}
+
 const playerTitle: CSSProperties = {
   fontWeight: 900,
   lineHeight: 1,
@@ -158,40 +250,61 @@ const progressRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: 10,
-  marginTop: 2,
+  gap: 12,
+  marginTop: 4,
 }
 
-const dotsWrap: CSSProperties = {
+const routeWrap: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
   flex: 1,
   minWidth: 0,
 }
 
-const dot: CSSProperties = {
+const routeSegment: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '10px minmax(10px, 1fr)',
+  alignItems: 'center',
+  gap: 6,
+  minWidth: 10,
+}
+
+const routeNode: CSSProperties = {
   width: 10,
   height: 10,
   borderRadius: 999,
-  flex: '0 0 auto',
   border: '1px solid rgba(255,255,255,.18)',
+  flex: '0 0 auto',
 }
 
-const dotIdle: CSSProperties = {
-  background: 'rgba(255,255,255,.20)',
+const routeNodeIdle: CSSProperties = {
+  background: 'rgba(255,255,255,.18)',
 }
 
-const dotDone: CSSProperties = {
+const routeNodeDone: CSSProperties = {
   background: 'rgba(34,197,94,.88)',
   border: '1px solid rgba(134,239,172,.55)',
-  boxShadow: '0 0 0 3px rgba(34,197,94,.14)',
+  boxShadow: '0 0 0 3px rgba(34,197,94,.12)',
 }
 
-const dotActive: CSSProperties = {
+const routeNodeActive: CSSProperties = {
   background: '#ffffff',
   border: '1px solid rgba(255,255,255,.92)',
   boxShadow: '0 0 0 4px rgba(255,255,255,.12)',
+}
+
+const routeConnector: CSSProperties = {
+  height: 3,
+  borderRadius: 999,
+  width: '100%',
+}
+
+const routeConnectorIdle: CSSProperties = {
+  background: 'rgba(255,255,255,.16)',
+}
+
+const routeConnectorDone: CSSProperties = {
+  background: 'linear-gradient(90deg, rgba(34,197,94,.88), rgba(134,239,172,.64))',
 }
 
 const countPill: CSSProperties = {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchPlayerGame } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
+import { advancePlayer, fetchPlayerGame, fetchTeamStatus, sendHeartbeat } from '../shared/api'
+import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
+import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 
@@ -96,6 +97,8 @@ export default function PlayerApp() {
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [teamOpen, setTeamOpen] = useState(false)
+  const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -130,6 +133,93 @@ export default function PlayerApp() {
       cancelled = true
     }
   }, [user])
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadTeam() {
+      try {
+        const team = await fetchTeamStatus(user)
+        if (!cancelled) {
+          setTeamProfiles(Array.isArray(team.profiles) ? team.profiles : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setTeamProfiles([])
+        }
+      }
+    }
+
+    loadTeam()
+    intervalId = window.setInterval(loadTeam, 1000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+    const readyPayload: PlayerGamePayload = state.payload
+
+    let intervalId: number | null = null
+
+    async function publishHeartbeat() {
+      try {
+        const secureLiveGpsContext =
+          typeof window !== 'undefined' &&
+          window.isSecureContext &&
+          window.location.protocol === 'https:'
+
+        const rawLivePlayerPosition = getPlayerPosition(readyPayload)
+        const rawGpsState = normalizeGpsStatus(readyPayload.live_status?.gps_status)
+
+        const effectivePosition = localDebugPosition
+          ? localDebugPosition
+          : secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
+          ? rawLivePlayerPosition
+          : null
+
+        await sendHeartbeat({
+          user,
+          ...(effectivePosition
+            ? {
+                lat: effectivePosition.lat,
+                lon: effectivePosition.lon,
+                gps_status: 'ok',
+              }
+            : {
+                gps_status: 'unavailable',
+              }),
+          source: localDebugPosition ? 'react' : 'player',
+        })
+      } catch {
+        // ignore heartbeat errors in the UI loop
+      }
+    }
+
+    publishHeartbeat()
+    intervalId = window.setInterval(publishHeartbeat, 2000)
+
+    return () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [
+    user,
+    state.status,
+    state.status === 'ready' ? state.payload.live_status?.lat : null,
+    state.status === 'ready' ? state.payload.live_status?.lon : null,
+    state.status === 'ready' ? state.payload.live_status?.gps_status : null,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+  ])
+
+
 
   useEffect(() => {
     return () => {
@@ -256,6 +346,16 @@ export default function PlayerApp() {
       ? 'Live GPS is unavailable here. Use local debug tap or open the published HTTPS player.'
       : runtime.helperText
 
+  const teamOtherProfiles = teamProfiles.filter(
+    (member) => !member.is_self && member.user !== payload.user
+  )
+  const teamLiveCount = teamOtherProfiles.filter(
+    (member) => String(member.presence || '').toLowerCase() === 'live'
+  ).length
+  const teamVisibleCount = teamOtherProfiles.filter(
+    (member) => String(member.presence || '').toLowerCase() !== 'offline'
+  ).length
+
   const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
   const adminHref = '/admin'
@@ -268,16 +368,28 @@ export default function PlayerApp() {
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
+    setTeamOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
   function openTools() {
     setActivePanel(null)
+    setTeamOpen(false)
     setToolsOpen((current) => !current)
   }
 
   function closeTools() {
     setToolsOpen(false)
+  }
+
+  function openTeam() {
+    setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen((current) => !current)
+  }
+
+  function closeTeam() {
+    setTeamOpen(false)
   }
 
   function handleOpenEntry() {
@@ -292,6 +404,11 @@ export default function PlayerApp() {
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
       setFollowPlayer(true)
+      void sendHeartbeat({
+        user,
+        gps_status: 'unavailable',
+        source: 'react',
+      })
       showNotice('Debug tap disabled. Live GPS restored.', 'info')
       vibrate(8)
       return
@@ -307,6 +424,13 @@ export default function PlayerApp() {
     setLocalDebugPosition(position)
     setFollowPlayer(true)
     setFocusRequest({ target: 'player', token: Date.now() })
+    void sendHeartbeat({
+      user,
+      lat: position.lat,
+      lon: position.lon,
+      gps_status: 'ok',
+      source: 'react',
+    })
     showNotice('Simulated GPS updated from map tap.', 'success')
     vibrate([10, 12, 10])
   }
@@ -349,6 +473,7 @@ export default function PlayerApp() {
     setSubmitError(null)
     setActivePanel(null)
     setToolsOpen(false)
+    setTeamOpen(false)
     setInteractionOpen(true)
   }
 
@@ -443,6 +568,8 @@ export default function PlayerApp() {
           followPlayer={followPlayer}
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
+          otherPlayers={teamOtherProfiles}
+          selfLabel={'ME'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
         />
@@ -453,6 +580,10 @@ export default function PlayerApp() {
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
+            teamOpen={teamOpen}
+            teamCount={teamVisibleCount}
+            teamLiveCount={teamLiveCount}
+            onOpenTeam={openTeam}
           />
         </div>
 
@@ -489,6 +620,13 @@ export default function PlayerApp() {
           />
         </div>
       </div>
+
+      <TeamSheet
+        open={teamOpen}
+        players={teamOtherProfiles}
+        currentPosition={playerPosition}
+        onClose={closeTeam}
+      />
 
       <InteractionSheet
         open={interactionOpen}

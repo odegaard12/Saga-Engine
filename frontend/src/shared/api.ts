@@ -1,4 +1,4 @@
-import type { PlayerGamePayload, PublicConfig } from '../types/player'
+import type { PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../types/player'
 
 type AdvanceResponse = {
   status: 'ok' | 'fail'
@@ -50,6 +50,30 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   return res.json() as Promise<PublicConfig>
 }
 
+export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
+  const res = await fetch(`/api/team/${encodeURIComponent(user)}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to load team payload: HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<TeamStatusPayload>
+}
+
 export function advancePlayer(user: string, code: string) {
   return postJson<AdvanceResponse>('/api/advance', { user, code })
+}
+
+export function sendHeartbeat(args: {
+  user: string
+  lat?: number
+  lon?: number
+  gps_status?: string
+  source?: string
+}) {
+  return postJson('/api/heartbeat', args)
 }

@@ -69,6 +69,18 @@ export interface PlayerLiveStatus {
   debug_enabled?: boolean
 }
 
+export interface TeamProfileLiveStatus extends PlayerLiveStatus {
+  user: string
+  display_name: string
+  is_self?: boolean
+}
+
+export interface TeamStatusPayload {
+  status: 'ok'
+  user: string
+  profiles: TeamProfileLiveStatus[]
+}
+
 export interface PlayerGamePayload {
   user: string
   display_name?: string
