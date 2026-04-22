@@ -1,7 +1,7 @@
 import type { PlayerGpsStatus, PlayerStage } from '../types/player'
 
 export type PlayerPanel = 'details' | 'menu' | null
-export type PrimaryActionTone = 'ready' | 'gps' | 'locked' | 'done'
+export type PrimaryActionTone = 'ready' | 'gps' | 'locked' | 'warn' | 'done'
 
 export interface StageRuntimeState {
   canEnter: boolean
@@ -48,11 +48,20 @@ export function deriveStageRuntime(args: {
   }
 
   const entry = currentStage.entry ?? {}
-  const requireProximity = entry.mode !== 'free' && entry.require_proximity !== false
-  const allowDebugBypass = entry.allow_debug_bypass !== false
+  const mappedStage =
+    typeof currentStage.lat === 'number' &&
+    typeof currentStage.lon === 'number' &&
+    typeof currentStage.radius === 'number' &&
+    currentStage.radius > 0
+
+  const explicitFreeEntry =
+    entry.mode === 'free' &&
+    entry.require_proximity === false &&
+    !mappedStage
+
   const gpsAvailable = gpsState === 'ready' || gpsState === 'stale'
 
-  if (!requireProximity) {
+  if (explicitFreeEntry) {
     return {
       canEnter: true,
       reason: 'free_entry',
@@ -65,25 +74,16 @@ export function deriveStageRuntime(args: {
     }
   }
 
-  if (debugEnabled && allowDebugBypass) {
-    return {
-      canEnter: true,
-      reason: 'within_radius',
-      primaryLabel: 'OPEN INTERACTION',
-      primaryTone: 'ready',
-      helperText: 'Debug bypass active.',
-    }
-  }
-
   if (!gpsAvailable) {
     return {
       canEnter: false,
       reason: 'gps_unavailable',
-      primaryLabel: 'GPS REQUIRED',
+      primaryLabel: debugEnabled ? 'SET DEBUG GPS' : 'GPS REQUIRED',
       primaryTone: 'gps',
-      helperText:
-        currentStage.messages?.gps_unavailable ||
-        'GPS is unavailable for this stage.',
+      helperText: debugEnabled
+        ? 'Tap the map to place a simulated GPS position.'
+        : currentStage.messages?.gps_unavailable ||
+          'GPS is unavailable for this stage.',
     }
   }
 
@@ -113,8 +113,8 @@ export function deriveStageRuntime(args: {
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'MOVE TO TARGET',
-    primaryTone: 'locked',
+    primaryLabel: 'TOO FAR',
+    primaryTone: 'warn',
     helperText:
       currentStage.messages?.locked ||
       `Move inside the ${currentStage.radius} m interaction radius.`,
