@@ -194,9 +194,27 @@ export default function PlayerApp() {
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
-  const livePlayerPosition = getPlayerPosition(payload)
+
+  const rawLivePlayerPosition = getPlayerPosition(payload)
+  const secureLiveGpsContext =
+    typeof window !== 'undefined' &&
+    window.isSecureContext &&
+    window.location.protocol === 'https:'
+
+  const rawGpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+
+  const gpsState = localDebugPosition
+    ? 'ready'
+    : secureLiveGpsContext
+    ? rawGpsState
+    : 'unavailable'
+
+  const livePlayerPosition =
+    secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
+      ? rawLivePlayerPosition
+      : null
+
   const playerPosition = localDebugPosition || livePlayerPosition
-  const gpsState = localDebugPosition ? 'ready' : normalizeGpsStatus(payload.live_status?.gps_status)
 
   const rawDistanceMeters =
     currentStage && playerPosition
@@ -230,6 +248,13 @@ export default function PlayerApp() {
     gpsState,
     debugEnabled: effectiveDebugEnabled,
   })
+
+  const hudHelperText =
+    !localDebugPosition &&
+    !secureLiveGpsContext &&
+    runtime.reason === 'gps_unavailable'
+      ? 'Live GPS is unavailable here. Use local debug tap or open the published HTTPS player.'
+      : runtime.helperText
 
   const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
@@ -329,6 +354,7 @@ export default function PlayerApp() {
 
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
+    setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
     showOverlay('activate')
     openInteraction()
@@ -337,17 +363,17 @@ export default function PlayerApp() {
   function handleMapNodeTap() {
     if (payload.finished) return
 
-    if (runtime.canEnter) {
-      vibrate([10, 16, 10])
-      showOverlay('activate')
-      openInteraction()
-      return
-    }
-
     vibrate(8)
 
     if (!currentStage) {
       showNotice('Complete the previous stage before interacting here.', 'warn')
+      return
+    }
+
+    setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (runtime.canEnter) {
+      showNotice('Target in range. Use Open Interaction.', 'info')
       return
     }
 
@@ -362,7 +388,7 @@ export default function PlayerApp() {
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showNotice('Waiting for a reliable GPS fix.', 'info')
+      showNotice('Position is not ready yet.', 'info')
       return
     }
 
@@ -416,6 +442,7 @@ export default function PlayerApp() {
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
           followPlayer={followPlayer}
           focusRequest={focusRequest}
+          nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
         />
@@ -452,7 +479,7 @@ export default function PlayerApp() {
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
-            helperText={runtime.helperText}
+            helperText={hudHelperText}
             detailsOpen={activePanel === 'details'}
             onPrimaryAction={handlePrimaryAction}
             onToggleDetails={() => togglePanel('details')}

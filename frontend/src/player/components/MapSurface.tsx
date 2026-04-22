@@ -10,6 +10,8 @@ type FocusRequest =
     }
   | null
 
+type NodeVisualState = 'locked' | 'ready' | 'engaging'
+
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
   className?: string
@@ -18,6 +20,7 @@ type MapSurfaceProps = {
   debugSimulation?: boolean
   followPlayer?: boolean
   focusRequest?: FocusRequest
+  nodeState?: NodeVisualState
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
 }
@@ -58,6 +61,45 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
+function getNodeVisualConfig(nodeState: NodeVisualState) {
+  if (nodeState === 'engaging') {
+    return {
+      ringColor: '#22c55e',
+      ringWeight: 3,
+      ringOpacity: 0.96,
+      ringFillOpacity: 0.14,
+      markerRadius: 8,
+      markerWeight: 3,
+      markerStroke: '#16a34a',
+      markerFill: '#ffffff',
+    }
+  }
+
+  if (nodeState === 'ready') {
+    return {
+      ringColor: '#22c55e',
+      ringWeight: 3,
+      ringOpacity: 0.88,
+      ringFillOpacity: 0.10,
+      markerRadius: 8,
+      markerWeight: 3,
+      markerStroke: '#16a34a',
+      markerFill: '#dcfce7',
+    }
+  }
+
+  return {
+    ringColor: '#22c55e',
+    ringWeight: 2,
+    ringOpacity: 0.70,
+    ringFillOpacity: 0.06,
+    markerRadius: 8,
+    markerWeight: 3,
+    markerStroke: '#16a34a',
+    markerFill: '#dcfce7',
+  }
+}
+
 export function MapSurface({
   currentStage,
   className,
@@ -65,6 +107,7 @@ export function MapSurface({
   debugSimulation,
   followPlayer = true,
   focusRequest,
+  nodeState = 'locked',
   onDebugSetPosition,
   onNodeTap,
 }: MapSurfaceProps) {
@@ -140,25 +183,26 @@ export function MapSurface({
       return
     }
 
+    const visual = getNodeVisualConfig(nodeState)
     const center: L.LatLngExpression = [stageMapData.lat, stageMapData.lon]
 
     const radiusLayer = L.circle(center, {
       radius: stageMapData.radius,
-      color: '#22c55e',
-      weight: 2,
-      opacity: 0.85,
-      fillColor: '#22c55e',
-      fillOpacity: 0.08,
-      className: 'saga-node-radius',
+      color: visual.ringColor,
+      weight: visual.ringWeight,
+      opacity: visual.ringOpacity,
+      fillColor: visual.ringColor,
+      fillOpacity: visual.ringFillOpacity,
+      className: `saga-node-radius saga-node-radius--${nodeState}`,
     }).addTo(map)
 
     const markerLayer = L.circleMarker(center, {
-      radius: 8,
-      weight: 3,
-      color: '#16a34a',
-      fillColor: '#dcfce7',
+      radius: visual.markerRadius,
+      weight: visual.markerWeight,
+      color: visual.markerStroke,
+      fillColor: visual.markerFill,
       fillOpacity: 0.98,
-      className: 'saga-node-core',
+      className: `saga-node-core saga-node-core--${nodeState}`,
     }).addTo(map)
 
     if (onNodeTap) {
@@ -173,12 +217,13 @@ export function MapSurface({
       map.fitBounds(radiusLayer.getBounds(), {
         padding: [56, 56],
         maxZoom: 16,
-        animate: false,
+        animate: true,
+        duration: 0.45,
       })
     }
 
     map.invalidateSize({ pan: false })
-  }, [stageMapData, playerPosition, onNodeTap])
+  }, [stageMapData, playerPosition, onNodeTap, nodeState])
 
   useEffect(() => {
     const map = mapRef.current
@@ -218,16 +263,19 @@ export function MapSurface({
           )
           map.fitBounds(bounds.pad(0.30), {
             maxZoom: 16,
-            animate: false,
+            animate: true,
+            duration: 0.55,
           })
         } else {
           map.setView([stageMapData.lat, stageMapData.lon], 15, {
-            animate: false,
+            animate: true,
+            duration: 0.55,
           })
         }
       } else {
         map.setView([playerPosition.lat, playerPosition.lon], 16, {
-          animate: false,
+          animate: true,
+          duration: 0.55,
         })
       }
     }
@@ -240,16 +288,18 @@ export function MapSurface({
     if (!map || !focusRequest) return
 
     if (focusRequest.target === 'player' && playerPosition) {
-      map.setView([playerPosition.lat, playerPosition.lon], 17, {
-        animate: false,
+      map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
+        animate: true,
+        duration: 0.45,
       })
       map.invalidateSize({ pan: false })
       return
     }
 
     if (focusRequest.target === 'node' && stageMapData) {
-      map.setView([stageMapData.lat, stageMapData.lon], 16, {
-        animate: false,
+      map.flyTo([stageMapData.lat, stageMapData.lon], 17, {
+        animate: true,
+        duration: 0.45,
       })
       map.invalidateSize({ pan: false })
     }
@@ -295,33 +345,58 @@ const canvas: React.CSSProperties = {
 
 const mapAnimations = `
 .saga-node-radius {
-  animation: sagaNodePulse 1800ms ease-out infinite;
   transform-origin: center;
   cursor: pointer;
 }
 
+.saga-node-radius--locked {
+  animation: sagaNodeHaloLocked 2200ms ease-in-out infinite;
+}
+
+.saga-node-radius--ready {
+  animation: sagaNodeHaloReady 1100ms ease-in-out infinite;
+}
+
+.saga-node-radius--engaging {
+  animation: sagaNodeHaloEngaging 520ms ease-in-out 3;
+}
+
 .saga-node-core {
   cursor: pointer;
-  filter: drop-shadow(0 0 8px rgba(34,197,94,.28));
+}
+
+.saga-node-core--locked {
+  filter: drop-shadow(0 0 6px rgba(34,197,94,.18));
+}
+
+.saga-node-core--ready {
+  filter: drop-shadow(0 0 10px rgba(34,197,94,.28));
+}
+
+.saga-node-core--engaging {
+  filter: drop-shadow(0 0 14px rgba(34,197,94,.38));
 }
 
 .saga-player-dot {
   filter: drop-shadow(0 0 8px rgba(37,99,235,.22));
 }
 
-@keyframes sagaNodePulse {
-  0% {
-    stroke-opacity: .9;
-    fill-opacity: .10;
-  }
-  50% {
-    stroke-opacity: .55;
-    fill-opacity: .04;
-  }
-  100% {
-    stroke-opacity: .9;
-    fill-opacity: .10;
-  }
+@keyframes sagaNodeHaloLocked {
+  0% { stroke-opacity: .72; fill-opacity: .06; }
+  50% { stroke-opacity: .40; fill-opacity: .02; }
+  100% { stroke-opacity: .72; fill-opacity: .06; }
+}
+
+@keyframes sagaNodeHaloReady {
+  0% { stroke-opacity: .94; fill-opacity: .12; }
+  50% { stroke-opacity: .36; fill-opacity: .02; }
+  100% { stroke-opacity: .94; fill-opacity: .12; }
+}
+
+@keyframes sagaNodeHaloEngaging {
+  0% { stroke-opacity: 1; fill-opacity: .16; }
+  50% { stroke-opacity: .30; fill-opacity: .01; }
+  100% { stroke-opacity: 1; fill-opacity: .16; }
 }
 `
 
