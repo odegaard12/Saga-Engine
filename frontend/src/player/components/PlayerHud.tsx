@@ -49,7 +49,6 @@ function getRangeDisplay(
 
 export function PlayerHud({
   currentStage,
-  level,
   finished,
   gpsState,
   distanceMeters,
@@ -93,11 +92,10 @@ export function PlayerHud({
         </div>
 
         <div style={chipRow}>
-          <span style={chipMuted}>{`STAGE ${level + 1}`}</span>
           <span style={chip}>{rangeDisplay}</span>
           {followPlayer ? <span style={chipInfo}>FOLLOW</span> : null}
           {debugEnabled ? <span style={chipDebug}>DEBUG</span> : null}
-          <span style={chipMuted}>{gpsDisplay}</span>
+          {!debugEnabled ? <span style={chipMuted}>{gpsDisplay}</span> : null}
         </div>
 
         <button
@@ -249,6 +247,16 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
       background: 'rgba(168,85,247,.18)',
       border: '1px solid rgba(196,181,253,.24)',
       color: '#f3e8ff',
+    }
+  }
+
+  if (tone === 'warn') {
+    return {
+      ...primaryBase,
+      background: 'rgba(127,29,29,.22)',
+      border: '1px solid rgba(248,113,113,.28)',
+      color: '#fee2e2',
+      boxShadow: '0 10px 24px rgba(127,29,29,.12)',
     }
   }
 
