@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
-import { GAME_CATALOG } from '../player/minigames/gameCatalog'
-import { tokens } from '../player/ui/tokens'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -23,12 +21,36 @@ function normalizeProfiles(config: PublicConfig): PlayerProfile[] {
   }))
 }
 
-function isStandaloneMode() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
-  )
+function looksPlaceholder(value?: string) {
+  const text = String(value || '').trim()
+  if (!text) return true
+  return text.toUpperCase().startsWith('PUT ')
+}
+
+function resolveLoginCopy(config: PublicConfig) {
+  const title = !looksPlaceholder(config.site_name) ? config.site_name! : 'SAGA'
+  const subtitle = !looksPlaceholder(config.story_title)
+    ? config.story_title!
+    : 'Enter mission'
+  const body = !looksPlaceholder(config.story_text)
+    ? config.story_text!
+    : 'Tap an operator to continue.'
+  return { title, subtitle, body }
+}
+
+function getInitials(name: string) {
+  const cleaned = String(name || '').trim()
+  if (!cleaned) return '?'
+  const parts = cleaned.split(/\s+/).slice(0, 2)
+  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
+}
+
+function getMeta(profile: PlayerProfile) {
+  if (profile.mode === 'team') {
+    const members = profile.members || [profile.display_name]
+    return members.join(' · ')
+  }
+  return ''
 }
 
 export default function LoginApp() {
@@ -66,22 +88,28 @@ export default function LoginApp() {
     return normalizeProfiles(state.config)
   }, [state])
 
-  const nativeModules = useMemo(
-    () => GAME_CATALOG.filter((game) => game.status === 'react_native'),
-    []
-  )
-
-  const standalone = isStandaloneMode()
+  const mobile =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
         <style>{loginAnimations}</style>
-        <div style={ambientGlow} />
-        <section style={heroCard}>
-          <div style={labelPill}>MISSION ENTRY</div>
-          <h1 style={heroTitle}>Loading mission</h1>
-        </section>
+        <div style={backGlowTop} />
+        <div style={backGlowBottom} />
+        <div style={backVignette} />
+
+        <div style={shellWrap}>
+          <section style={heroCard}>
+            <div style={heroTop}>
+              <div style={eyebrow}>MISSION ENTRY</div>
+            </div>
+            <div style={heroCenter}>
+              <h1 style={heroTitle}>SAGA</h1>
+              <p style={heroSubtitle}>Loading mission</p>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
@@ -90,91 +118,96 @@ export default function LoginApp() {
     return (
       <main style={pageWrap}>
         <style>{loginAnimations}</style>
-        <div style={ambientGlow} />
-        <section style={heroCard}>
-          <div style={labelPill}>MISSION ENTRY</div>
-          <h1 style={heroTitle}>Config error</h1>
-          <p style={heroBody}>{state.message}</p>
-        </section>
+        <div style={backGlowTop} />
+        <div style={backGlowBottom} />
+        <div style={backVignette} />
+
+        <div style={shellWrap}>
+          <section style={heroCard}>
+            <div style={heroTop}>
+              <div style={eyebrow}>MISSION ENTRY</div>
+            </div>
+            <div style={heroCenter}>
+              <h1 style={heroTitle}>Config error</h1>
+              <p style={heroBody}>{state.message}</p>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
 
   if (state.status !== 'ready') return null
 
-  const config = state.config
-  const title = config.site_name || 'SAGA'
-  const subtitle = config.story_title || 'Choose operator'
-  const body = config.story_text || 'Select a profile to enter the mission.'
-
-  const mobile =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const { title, subtitle, body } = resolveLoginCopy(state.config)
 
   return (
     <main style={pageWrap}>
       <style>{loginAnimations}</style>
-      <div style={ambientGlow} />
+      <div style={backGlowTop} />
+      <div style={backGlowBottom} />
+      <div style={backVignette} />
 
       <div
         style={{
-          ...contentWrap,
+          ...shellWrap,
           padding: mobile
-            ? 'calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 18px)'
-            : '24px 18px 28px',
+            ? 'calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px)'
+            : '32px 20px 40px',
         }}
       >
         <section style={heroCard}>
           <div style={heroTop}>
-            <div style={labelPill}>MISSION ENTRY</div>
-            <a href="/admin" style={adminLink}>
+            <div style={eyebrow}>MISSION ENTRY</div>
+
+            <a href="/admin" style={adminButton}>
               Admin
             </a>
           </div>
 
-          <h1 style={heroTitle}>{title}</h1>
-          <p style={heroSub}>{subtitle}</p>
-          <p style={heroBody}>{body}</p>
-
-          <div style={chipRow}>
-            {nativeModules.map((game) => (
-              <span key={game.id} style={moduleChip}>
-                {game.label}
-              </span>
-            ))}
+          <div style={heroCenter}>
+            <h1 style={heroTitle}>{title}</h1>
+            <p style={heroSubtitle}>{subtitle}</p>
+            <p style={heroBody}>{body}</p>
           </div>
         </section>
 
-        {!standalone ? (
-          <section style={installHint}>
-            Add to Home Screen for the cleanest mobile mode.
-          </section>
-        ) : null}
-
-        <section style={operatorGrid}>
-          {profiles.map((profile) => {
+        <section style={listBlock}>
+          {profiles.map((profile, index) => {
             const isTeam = profile.mode === 'team'
-            const members = profile.members || [profile.display_name]
+            const meta = getMeta(profile)
 
             return (
-              <article key={profile.id} style={operatorCard}>
-                <div style={operatorHead}>
-                  <div style={operatorName}>{profile.display_name}</div>
-                  <div style={modePill}>{isTeam ? 'TEAM' : 'SOLO'}</div>
+              <article
+                key={profile.id}
+                style={{
+                  ...playerCard,
+                  animationDelay: `${index * 35}ms`,
+                }}
+              >
+                <div style={playerLeft}>
+                  <div style={avatar}>{getInitials(profile.display_name)}</div>
+
+                  <div style={identity}>
+                    <div style={playerName}>{profile.display_name}</div>
+                    <div style={identityBottom}>
+                      <span style={modePill}>{isTeam ? 'TEAM' : 'SOLO'}</span>
+                      {meta ? <span style={playerMetaInline}>{meta}</span> : null}
+                    </div>
+                  </div>
                 </div>
 
-                <div style={operatorMeta}>
-                  {isTeam ? members.join(' · ') : 'Field operator'}
+                <div style={playerRight}>
+                  <button
+                    type="button"
+                    style={enterButton}
+                    onClick={() => {
+                      window.location.href = `/?user=${encodeURIComponent(profile.id)}`
+                    }}
+                  >
+                    Enter
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  style={enterButton}
-                  onClick={() => {
-                    window.location.href = `/?user=${encodeURIComponent(profile.id)}`
-                  }}
-                >
-                  Enter
-                </button>
               </article>
             )
           })}
@@ -186,211 +219,254 @@ export default function LoginApp() {
 
 const pageWrap: CSSProperties = {
   minHeight: '100dvh',
-  background:
-    'radial-gradient(circle at top, rgba(34,197,94,.08), transparent 32%), linear-gradient(180deg, #eef3ed, #e8efea)',
-  color: tokens.colors.ink,
-  fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
   position: 'relative',
   overflowX: 'hidden',
+  background:
+    'linear-gradient(180deg, #2f3b36 0%, #394540 28%, #47524e 100%)',
+  color: '#ffffff',
+  fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
 }
 
-const ambientGlow: CSSProperties = {
+const backGlowTop: CSSProperties = {
   position: 'fixed',
   inset: 0,
   pointerEvents: 'none',
   background:
-    'linear-gradient(rgba(255,255,255,.04), rgba(255,255,255,0)), radial-gradient(circle at 20% 10%, rgba(255,255,255,.28), transparent 24%)',
-  opacity: 0.85,
+    'radial-gradient(circle at 50% 0%, rgba(34,197,94,.18), transparent 28%)',
 }
 
-const contentWrap: CSSProperties = {
+const backGlowBottom: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  background:
+    'radial-gradient(circle at 84% 18%, rgba(59,130,246,.12), transparent 18%), radial-gradient(circle at 12% 82%, rgba(255,255,255,.06), transparent 18%)',
+}
+
+const backVignette: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  boxShadow: 'inset 0 0 120px rgba(15,23,42,.26)',
+}
+
+const shellWrap: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(820px, 100%)',
+  width: 'min(760px, 100%)',
   margin: '0 auto',
   display: 'grid',
   gap: 14,
 }
 
 const heroCard: CSSProperties = {
-  padding: '18px 18px 16px',
-  border: `1px solid ${tokens.colors.border}`,
-  borderRadius: tokens.radius.panel,
-  background: tokens.colors.surfaceOverlay,
-  boxShadow: tokens.shadow.soft,
-  backdropFilter: 'blur(12px)',
-  animation: 'sagaLoginRise 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  padding: '18px 18px 22px',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.16)',
+  background:
+    'linear-gradient(180deg, rgba(84,91,104,.74) 0%, rgba(110,116,128,.62) 100%)',
+  boxShadow: '0 22px 52px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.10)',
+  backdropFilter: 'blur(20px) saturate(135%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const heroTop: CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
+  justifyContent: 'space-between',
   gap: 10,
 }
 
-const labelPill: CSSProperties = {
+const eyebrow: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   minHeight: 28,
-  padding: '0 10px',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.brandLine}`,
-  background: tokens.colors.brandSoft,
-  color: tokens.colors.brand,
+  padding: '0 11px',
+  borderRadius: 999,
+  border: '1px solid rgba(74,222,128,.18)',
+  background: 'rgba(220,252,231,.88)',
+  color: '#166534',
   fontSize: 10,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
   fontWeight: 900,
 }
 
-const adminLink: CSSProperties = {
+const adminButton: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   minHeight: 30,
-  padding: '0 10px',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.border}`,
-  background: tokens.colors.surfaceSoft,
-  color: '#334155',
+  padding: '0 11px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(255,255,255,.10)',
+  color: '#ffffff',
   fontSize: 11,
   fontWeight: 800,
   textDecoration: 'none',
 }
 
-const heroTitle: CSSProperties = {
-  marginTop: 14,
-  fontSize: 'clamp(28px, 6vw, 44px)',
-  lineHeight: 0.96,
-  fontWeight: 900,
-  letterSpacing: '-0.04em',
-  color: tokens.colors.ink,
+const heroCenter: CSSProperties = {
+  marginTop: 26,
+  display: 'grid',
+  justifyItems: 'center',
+  textAlign: 'center',
+  gap: 10,
 }
 
-const heroSub: CSSProperties = {
-  marginTop: 10,
-  color: tokens.colors.brand,
-  fontSize: 12,
-  letterSpacing: '0.14em',
+const heroTitle: CSSProperties = {
+  margin: 0,
+  fontSize: 'clamp(48px, 11vw, 76px)',
+  lineHeight: 0.9,
+  fontWeight: 900,
+  letterSpacing: '-0.06em',
+  color: '#ffffff',
+  textShadow: '0 10px 26px rgba(15,23,42,.20)',
+}
+
+const heroSubtitle: CSSProperties = {
+  margin: 0,
+  color: '#c8ffe1',
+  fontSize: 13,
+  letterSpacing: '0.22em',
   textTransform: 'uppercase',
   fontWeight: 900,
 }
 
 const heroBody: CSSProperties = {
-  marginTop: 8,
-  maxWidth: 560,
-  color: tokens.colors.soft,
-  fontSize: 14,
+  margin: 0,
+  maxWidth: 420,
+  color: 'rgba(255,255,255,.86)',
+  fontSize: 16,
   lineHeight: 1.5,
 }
 
-const chipRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
+const listBlock: CSSProperties = {
+  display: 'grid',
   gap: 8,
-  marginTop: 14,
 }
 
-const moduleChip: CSSProperties = {
-  minHeight: 26,
+const playerCard: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 10,
+  alignItems: 'center',
+  padding: '12px 12px',
+  borderRadius: 22,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(84,91,104,.68) 0%, rgba(102,108,120,.58) 100%)',
+  boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
+  backdropFilter: 'blur(18px) saturate(130%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animationFillMode: 'both',
+}
+
+const playerLeft: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '40px minmax(0, 1fr)',
+  gap: 10,
+  alignItems: 'center',
+  minWidth: 0,
+}
+
+const avatar: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 999,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 10px',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.infoLine}`,
-  background: tokens.colors.infoSoft,
-  color: tokens.colors.info,
-  fontSize: 10,
+  background: 'rgba(219,234,254,.92)',
+  border: '1px solid rgba(96,165,250,.28)',
+  color: '#1d4ed8',
+  fontSize: 13,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.04em',
 }
 
-const installHint: CSSProperties = {
-  padding: '12px 14px',
-  borderRadius: 16,
-  border: `1px solid ${tokens.colors.infoLine}`,
-  background: tokens.colors.infoSoft,
-  color: tokens.colors.info,
-  fontSize: 12,
-  fontWeight: 800,
-  lineHeight: 1.4,
-}
-
-const operatorGrid: CSSProperties = {
+const identity: CSSProperties = {
+  minWidth: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 12,
+  gap: 6,
 }
 
-const operatorCard: CSSProperties = {
-  border: `1px solid ${tokens.colors.border}`,
-  background: tokens.colors.surface,
-  borderRadius: 22,
-  padding: 14,
-  boxShadow: tokens.shadow.soft,
-  display: 'grid',
-  gap: 12,
-  animation: 'sagaLoginRise 240ms cubic-bezier(0.22, 1, 0.36, 1)',
+const playerName: CSSProperties = {
+  fontSize: 22,
+  lineHeight: 0.96,
+  fontWeight: 900,
+  color: '#ffffff',
+  letterSpacing: '-0.03em',
 }
-
-const operatorHead: CSSProperties = {
+const identityBottom: CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 12,
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
 }
 
-const operatorName: CSSProperties = {
-  fontSize: 18,
-  lineHeight: 1.05,
-  fontWeight: 900,
-  color: tokens.colors.ink,
+const playerMetaInline: CSSProperties = {
+  color: 'rgba(255,255,255,.66)',
+  fontSize: 12,
+  lineHeight: 1.2,
+}
+
+
+const playerMeta: CSSProperties = {
+  marginTop: 3,
+  color: 'rgba(255,255,255,.74)',
+  fontSize: 11,
+  lineHeight: 1.3,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const playerRight: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  minWidth: 132,
 }
 
 const modePill: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  minHeight: 24,
+  minHeight: 22,
   padding: '0 8px',
-  borderRadius: tokens.radius.pill,
-  border: `1px solid ${tokens.colors.border}`,
-  background: tokens.colors.surfaceSoft,
-  color: '#334155',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.10)',
+  color: '#ffffff',
   fontSize: 10,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
   fontWeight: 900,
-}
-
-const operatorMeta: CSSProperties = {
-  color: tokens.colors.muted,
-  fontSize: 12,
-  lineHeight: 1.45,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
 }
 
 const enterButton: CSSProperties = {
-  minHeight: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 14,
-  border: `1px solid ${tokens.colors.brandLine}`,
-  background: 'linear-gradient(180deg, #16a34a, #15803d)',
+  minWidth: 118,
+  minHeight: 34,
+  padding: '0 14px',
+  borderRadius: 12,
+  border: '1px solid rgba(34,197,94,.24)',
+  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
   color: '#ffffff',
-  fontSize: 11,
+  fontSize: 12,
+  fontWeight: 900,
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  fontWeight: 900,
-  boxShadow: '0 10px 24px rgba(22,163,74,.18)',
+  boxShadow: '0 12px 24px rgba(34,197,94,.18)',
 }
 
 const loginAnimations = `
 @keyframes sagaLoginRise {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(.992);
+    transform: translateY(12px) scale(.992);
   }
   to {
     opacity: 1;
