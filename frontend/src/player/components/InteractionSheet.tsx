@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type TouchEvent,
+} from 'react'
 import type { PlayerStage } from '../../types/player'
+import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
 
@@ -49,15 +57,38 @@ export function InteractionSheet({
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.minigame?.type ?? currentStage?.type ?? null
-  const minigameDefinition = stageType
-    ? resolveMinigameDefinition(stageType)
+
+  const resolvedStageMinigame = resolveStageMinigame(currentStage)
+  const resolvedRuntime = resolvedStageMinigame?.resolved ?? null
+  const resolvedSourceType = resolvedStageMinigame?.source.type ?? stageType
+  const resolvedFamily = resolvedRuntime?.family ?? null
+  const legacyBridge = resolvedRuntime?.compatibility === 'legacy_bridge'
+
+  const minigameDefinition = resolvedSourceType
+    ? resolveMinigameDefinition(resolvedSourceType)
     : null
+
+  const hasNativeMinigame = Boolean(minigameDefinition)
+  const shouldRenderFamilyRuntime = Boolean(
+    resolvedRuntime && resolvedRuntime.compatibility === 'native'
+  )
+  const shouldRenderLegacyBridgeInfo = Boolean(
+    resolvedRuntime && resolvedRuntime.compatibility === 'legacy_bridge'
+  )
 
   useEffect(() => {
     setCode('')
-    setShowRecovery(false)
+    setShowRecovery(
+      shouldRenderLegacyBridgeInfo ||
+        (!hasNativeMinigame && !shouldRenderFamilyRuntime)
+    )
     setDragOffset(0)
-  }, [stageId])
+  }, [
+    stageId,
+    hasNativeMinigame,
+    shouldRenderFamilyRuntime,
+    shouldRenderLegacyBridgeInfo,
+  ])
 
   useEffect(() => {
     if (open && currentStage) {
@@ -67,9 +98,15 @@ export function InteractionSheet({
 
   if (!open || !currentStage) return null
 
+  const typeLabel = (resolvedFamily || stageType || 'interaction')
+    .replace(/_/g, ' ')
+    .toUpperCase()
+
   const hasNarrative = isMeaningfulNarrative(currentStage)
   const narrative = hasNarrative ? currentStage.content?.trim() || '' : ''
   const hint = currentStage.messages?.hint?.trim() || ''
+  const contextValue =
+    narrative || helperText || 'No narrative provided for this node.'
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -88,13 +125,13 @@ export function InteractionSheet({
     onClose()
   }
 
-  function handleTouchStart(event: React.TouchEvent<HTMLElement>) {
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
     if (event.touches.length !== 1) return
     touchStartYRef.current = event.touches[0].clientY
     touchStartXRef.current = event.touches[0].clientX
   }
 
-  function handleTouchMove(event: React.TouchEvent<HTMLElement>) {
+  function handleTouchMove(event: TouchEvent<HTMLElement>) {
     if (touchStartYRef.current === null || touchStartXRef.current === null) return
     const deltaY = event.touches[0].clientY - touchStartYRef.current
     const deltaX = event.touches[0].clientX - touchStartXRef.current
@@ -130,7 +167,10 @@ export function InteractionSheet({
           style={{
             ...sheet,
             transform: `translateY(${dragOffset}px)`,
-            transition: dragOffset === 0 ? 'transform 180ms ease, opacity 160ms ease' : 'none',
+            transition:
+              dragOffset === 0
+                ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease-out'
+                : 'none',
           }}
           aria-modal="true"
           role="dialog"
@@ -144,9 +184,23 @@ export function InteractionSheet({
 
           <div style={headerRow}>
             <div style={headerCopy}>
-              <div style={eyebrow}>NODE</div>
+              <div style={eyebrow}>INTERACTION</div>
               <div style={title}>{currentStage.title}</div>
-              <div style={subTitle}>PLAYER · {user}</div>
+
+              <div style={metaRow}>
+                <span style={typeBadge}>{typeLabel}</span>
+                <span style={metaText}>USER {user}</span>
+
+                {resolvedRuntime ? (
+                  <span style={nativeBadge}>
+                    {legacyBridge
+                      ? `${resolvedRuntime.label} · BRIDGE`
+                      : resolvedRuntime.label}
+                  </span>
+                ) : hasNativeMinigame && minigameDefinition ? (
+                  <span style={nativeBadge}>{minigameDefinition.label}</span>
+                ) : null}
+              </div>
             </div>
 
             <button
@@ -155,18 +209,27 @@ export function InteractionSheet({
               onClick={handleClose}
               disabled={submitting}
             >
-              ×
+              CLOSE
             </button>
           </div>
 
-          {hasNarrative ? (
+          {(narrative || hint || helperText) ? (
             <section style={contextCard}>
-              <div style={contextText}>{narrative}</div>
-              {hint ? <div style={hintText}>{hint}</div> : null}
+              <div style={contextLabel}>MISSION CONTEXT</div>
+              <div style={contextText}>{contextValue}</div>
+              {hint ? <div style={hintText}>Hint: {hint}</div> : null}
             </section>
           ) : null}
 
-          {minigameDefinition ? (
+          {shouldRenderFamilyRuntime && resolvedRuntime ? (
+            <FamilyRuntimeHost
+              resolved={resolvedRuntime}
+              stage={currentStage}
+              helperText={helperText}
+              submitting={submitting}
+              onWin={handleNativeWin}
+            />
+          ) : minigameDefinition ? (
             <MinigameHost
               definition={minigameDefinition}
               stage={currentStage}
@@ -174,8 +237,23 @@ export function InteractionSheet({
               submitting={submitting}
               onWin={handleNativeWin}
             />
+          ) : shouldRenderLegacyBridgeInfo && resolvedRuntime ? (
+            <section style={bridgeCard}>
+              <div style={bridgeLabel}>LEGACY BRIDGE READY</div>
+              <div style={bridgeText}>
+                {`This stage resolves through the ${resolvedRuntime.family.replace(/_/g, ' ')} family, but still enters through the legacy bridge. Recovery tools stay available until the family runtime replaces that legacy path.`}
+              </div>
+            </section>
+          ) : resolvedRuntime ? (
+            <section style={bridgeCard}>
+              <div style={bridgeLabel}>RUNTIME FAMILY RESOLVED</div>
+              <div style={bridgeText}>
+                {`This stage resolves to ${resolvedRuntime.label}, but no mounted runtime host is available for this exact path yet.`}
+              </div>
+            </section>
           ) : (
             <section style={bridgeCard}>
+              <div style={bridgeLabel}>BRIDGE MODE</div>
               <div style={bridgeText}>
                 {helperText || 'This node still uses the legacy interaction flow.'}
               </div>
@@ -191,17 +269,23 @@ export function InteractionSheet({
                 setShowRecovery((current) => !current)
               }}
             >
-              {showRecovery ? 'Hide fallback' : 'Fallback'}
+              {showRecovery ? 'HIDE FALLBACK' : 'FALLBACK'}
             </button>
 
             {showRecovery ? (
               <div style={recoveryPanel}>
                 <form style={formWrap} onSubmit={handleSubmit}>
+                  <label htmlFor="interaction-code" style={inputLabel}>
+                    MANUAL FALLBACK CODE
+                  </label>
+
                   <div style={inputRow}>
                     <input
                       id="interaction-code"
                       value={code}
-                      onChange={(event) => setCode(event.target.value.toUpperCase())}
+                      onChange={(event) =>
+                        setCode(event.target.value.toUpperCase())
+                      }
                       placeholder="CODE"
                       autoComplete="off"
                       spellCheck={false}
@@ -248,21 +332,22 @@ const overlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.56)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  background: 'rgba(2,6,23,.58)',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
   animation: 'sagaFadeIn 160ms ease-out',
 }
 
 const sheet: CSSProperties = {
   position: 'relative',
-  width: 'min(100%, 840px)',
+  width: 'min(100%, 760px)',
   maxHeight: 'calc(100vh - 24px)',
   overflowY: 'auto',
   borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(2,6,23,.98), rgba(15,23,42,.94))',
-  boxShadow: '0 18px 40px rgba(2,6,23,.30)',
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.90))',
+  boxShadow: '0 30px 70px rgba(2,6,23,.42)',
   color: '#f8fafc',
   padding: 14,
   display: 'grid',
@@ -279,7 +364,7 @@ const dragHandleWrap: CSSProperties = {
 }
 
 const dragHandle: CSSProperties = {
-  width: 42,
+  width: 44,
   height: 5,
   borderRadius: 999,
   background: 'rgba(255,255,255,.18)',
@@ -294,18 +379,17 @@ const headerRow: CSSProperties = {
 
 const headerCopy: CSSProperties = {
   minWidth: 0,
-  display: 'grid',
-  gap: 6,
 }
 
 const eyebrow: CSSProperties = {
-  color: '#6ee7b7',
+  color: 'rgba(167,243,208,.96)',
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.16em',
+  letterSpacing: '0.18em',
 }
 
 const title: CSSProperties = {
+  marginTop: 6,
   color: '#f8fafc',
   fontSize: 24,
   fontWeight: 900,
@@ -313,26 +397,59 @@ const title: CSSProperties = {
   letterSpacing: '-0.03em',
 }
 
-const subTitle: CSSProperties = {
-  color: '#94a3b8',
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: '0.12em',
+const metaRow: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 10,
 }
 
-const closeButton: CSSProperties = {
-  width: 38,
-  height: 38,
+const chipBase: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  padding: '0 10px',
+  borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+}
+
+const typeBadge: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.20)',
+  color: '#dbeafe',
+}
+
+const metaText: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(255,255,255,.06)',
+  border: '1px solid rgba(255,255,255,.08)',
+  color: 'rgba(255,255,255,.78)',
+}
+
+const nativeBadge: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(34,197,94,.16)',
+  border: '1px solid rgba(74,222,128,.22)',
+  color: '#dcfce7',
+}
+
+const closeButton: CSSProperties = {
+  minHeight: 38,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 12px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(255,255,255,.06)',
   color: '#f8fafc',
-  fontSize: 22,
+  fontSize: 12,
   fontWeight: 800,
-  lineHeight: 1,
+  letterSpacing: '0.10em',
 }
 
 const contextCard: CSSProperties = {
@@ -342,6 +459,14 @@ const contextCard: CSSProperties = {
   padding: 14,
   display: 'grid',
   gap: 8,
+}
+
+const contextLabel: CSSProperties = {
+  color: 'rgba(255,255,255,.64)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
 }
 
 const contextText: CSSProperties = {
@@ -362,6 +487,15 @@ const bridgeCard: CSSProperties = {
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.05)',
   padding: 14,
+}
+
+const bridgeLabel: CSSProperties = {
+  color: 'rgba(255,255,255,.64)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  marginBottom: 6,
 }
 
 const bridgeText: CSSProperties = {
@@ -398,6 +532,14 @@ const recoveryPanel: CSSProperties = {
 const formWrap: CSSProperties = {
   display: 'grid',
   gap: 8,
+}
+
+const inputLabel: CSSProperties = {
+  color: 'rgba(255,255,255,.64)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
 }
 
 const inputRow: CSSProperties = {

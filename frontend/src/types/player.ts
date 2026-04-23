@@ -32,6 +32,13 @@ export interface StageMessages {
 export interface StageConfig {
   [key: string]: unknown
 }
+export interface StageMinigameRuntime {
+  type: string
+  label?: string
+  version?: string
+  config?: StageConfig
+}
+
 
 export interface StageMinigameRuntime {
   type: string
