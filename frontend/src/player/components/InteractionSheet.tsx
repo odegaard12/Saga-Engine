@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
+import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
 
@@ -42,16 +43,30 @@ export function InteractionSheet({
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.type ?? null
-  const minigameDefinition = stageType
-    ? resolveMinigameDefinition(stageType)
+
+  const resolvedStageMinigame = resolveStageMinigame(currentStage)
+  const resolvedRuntime = resolvedStageMinigame?.resolved ?? null
+  const resolvedSourceType = resolvedStageMinigame?.source.type ?? stageType
+  const resolvedFamily = resolvedRuntime?.family ?? null
+  const legacyBridge = resolvedRuntime?.compatibility === 'legacy_bridge'
+
+  const minigameDefinition = resolvedSourceType
+    ? resolveMinigameDefinition(resolvedSourceType)
     : null
+
   const hasNativeMinigame = Boolean(minigameDefinition)
+  const shouldRenderFamilyRuntime = Boolean(
+    resolvedRuntime && resolvedRuntime.compatibility === 'native'
+  )
+  const shouldRenderLegacyBridgeInfo = Boolean(
+    resolvedRuntime && resolvedRuntime.compatibility === 'legacy_bridge'
+  )
 
   useEffect(() => {
     setCode('')
-    setShowRecovery(!hasNativeMinigame)
+    setShowRecovery(shouldRenderLegacyBridgeInfo || (!hasNativeMinigame && !shouldRenderFamilyRuntime))
     setDragOffset(0)
-  }, [stageId, hasNativeMinigame])
+  }, [stageId, hasNativeMinigame, shouldRenderFamilyRuntime, shouldRenderLegacyBridgeInfo])
 
   useEffect(() => {
     if (open && currentStage) {
@@ -61,7 +76,7 @@ export function InteractionSheet({
 
   if (!open || !currentStage) return null
 
-  const typeLabel = (currentStage.type || 'interaction')
+  const typeLabel = (resolvedFamily || currentStage.type || 'interaction')
     .replace(/_/g, ' ')
     .toUpperCase()
 
@@ -149,7 +164,13 @@ export function InteractionSheet({
               <div style={metaRow}>
                 <span style={typeBadge}>{typeLabel}</span>
                 <span style={metaText}>USER {user}</span>
-                {hasNativeMinigame && minigameDefinition ? (
+                {resolvedRuntime ? (
+                  <span style={nativeBadge}>
+                    {legacyBridge
+                      ? `${resolvedRuntime.label} · BRIDGE`
+                      : resolvedRuntime.label}
+                  </span>
+                ) : hasNativeMinigame && minigameDefinition ? (
                   <span style={nativeBadge}>{minigameDefinition.label}</span>
                 ) : null}
               </div>
@@ -175,7 +196,15 @@ export function InteractionSheet({
             </section>
           ) : null}
 
-          {minigameDefinition ? (
+          {shouldRenderFamilyRuntime && resolvedRuntime ? (
+            <FamilyRuntimeHost
+              resolved={resolvedRuntime}
+              stage={currentStage}
+              helperText={helperText}
+              submitting={submitting}
+              onWin={handleNativeWin}
+            />
+          ) : minigameDefinition ? (
             <MinigameHost
               definition={minigameDefinition}
               stage={currentStage}
@@ -183,6 +212,20 @@ export function InteractionSheet({
               submitting={submitting}
               onWin={handleNativeWin}
             />
+          ) : shouldRenderLegacyBridgeInfo && resolvedRuntime ? (
+            <section style={bridgeCard}>
+              <div style={bridgeLabel}>LEGACY BRIDGE READY</div>
+              <div style={bridgeText}>
+                {`This stage resolves through the ${resolvedRuntime.family.replace(/_/g, ' ')} family, but still enters through the legacy bridge. Recovery tools stay available until the family runtime replaces that legacy path.`}
+              </div>
+            </section>
+          ) : resolvedRuntime ? (
+            <section style={bridgeCard}>
+              <div style={bridgeLabel}>RUNTIME FAMILY RESOLVED</div>
+              <div style={bridgeText}>
+                {`This stage resolves to ${resolvedRuntime.label}, but no mounted runtime host is available for this exact path yet.`}
+              </div>
+            </section>
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeLabel}>BRIDGE MODE</div>
