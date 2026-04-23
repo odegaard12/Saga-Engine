@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 
@@ -9,134 +10,92 @@ interface PlayerHudProps {
   distanceMeters: number | null
   inRange: boolean
   debugEnabled: boolean
-  mapNotice: string | null
+  followPlayer: boolean
+  toolsOpen: boolean
   legacyPlayerHref: string
   legacyLoginHref: string
   adminHref: string
-  detailsOpen: boolean
-  menuOpen: boolean
   primaryLabel: string
   primaryTone: PrimaryActionTone
   primaryDisabled: boolean
   helperText: string
+  detailsOpen: boolean
   onPrimaryAction: () => void
   onToggleDetails: () => void
-  onToggleMenu: () => void
-  onCloseMenu: () => void
+  onOpenTools: () => void
+  onCloseTools: () => void
   onToggleDebug: () => void
-}
-
-function isPlaceholderStage(stage: PlayerStage | null): boolean {
-  if (!stage) return false
-  const title = String(stage.title || '').trim().toUpperCase()
-  const content = String(stage.content || '').trim().toUpperCase()
-  return title === 'NEW NODE' || content === 'PUT NODE TEXT HERE'
 }
 
 function getGpsDisplay(gpsState: string): string {
   const value = String(gpsState || 'unknown').toLowerCase()
-  if (value === 'ready') return 'LIVE GPS'
+  if (value === 'ready') return 'GPS LIVE'
   if (value === 'stale') return 'LAST KNOWN'
   if (value === 'searching') return 'SEARCHING'
   if (value === 'error') return 'GPS ERROR'
-  return 'UNAVAILABLE'
+  return 'NO GPS'
 }
 
-function getDistanceDisplay(
+function getRangeDisplay(
   finished: boolean,
   distanceMeters: number | null,
   inRange: boolean
 ): string {
-  if (finished) return 'ROUTE COMPLETE'
-  if (distanceMeters === null) return 'NO LIVE RANGE'
-  if (inRange) return `IN RANGE · ${distanceMeters} M`
-  return `${distanceMeters} M AWAY`
+  if (finished) return 'COMPLETE'
+  if (distanceMeters === null) return 'NO RANGE'
+  if (inRange) return `${distanceMeters}M IN`
+  return `${distanceMeters}M AWAY`
 }
 
 export function PlayerHud({
   currentStage,
-  level,
   finished,
   gpsState,
   distanceMeters,
   inRange,
+  debugEnabled,
+  followPlayer,
+  toolsOpen,
+  legacyPlayerHref,
+  legacyLoginHref,
+  adminHref,
   primaryLabel,
   primaryTone,
   primaryDisabled,
   helperText,
   detailsOpen,
-  menuOpen,
   onPrimaryAction,
   onToggleDetails,
-  onToggleMenu,
-  onCloseMenu,
+  onOpenTools,
+  onCloseTools,
   onToggleDebug,
-  legacyPlayerHref,
-  legacyLoginHref,
-  adminHref,
-  debugEnabled,
-  mapNotice,
 }: PlayerHudProps) {
   const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 430 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
-  const placeholderStage = isPlaceholderStage(currentStage)
-  const distanceDisplay = getDistanceDisplay(finished, distanceMeters, inRange)
   const gpsDisplay = getGpsDisplay(gpsState)
+  const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
 
   return (
     <>
-      <style>{menuAnimations}</style>
-
       <section
         style={{
-          ...tray,
-          width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 12 : 14,
-          gap: compact ? 9 : 10,
+          ...card,
+          width: compact ? '100%' : 'min(100%, 720px)',
+          padding: compact ? 14 : 16,
         }}
       >
-        <div style={missionRow}>
-          <div style={missionCopy}>
-            <div style={eyebrow}>{finished ? 'MISSION STATUS' : 'MISSION'}</div>
-            <div
-              style={{
-                ...headline,
-                fontSize: compact ? 18 : 22,
-              }}
-            >
-              {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
-            </div>
+        <div style={eyebrow}>MISSION</div>
 
-            <div style={metaInline}>
-              <span style={stageBadge}>
-                {finished ? 'DONE' : `STAGE ${level + 1}`}
-              </span>
-
-              {placeholderStage && !finished ? (
-                <span style={mutedBadge}>DRAFT NODE</span>
-              ) : null}
-
-              {debugEnabled && !finished ? (
-                <span style={debugBadge}>DEBUG ON</span>
-              ) : null}
-            </div>
-          </div>
+        <div style={{ ...title, fontSize: compact ? 18 : 22 }}>
+          {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
         </div>
 
-        {mapNotice ? <div style={mapNoticeCard}>{mapNotice}</div> : null}
-
-        <div style={summaryGrid}>
-          <SummaryCard
-            label="PROXIMITY"
-            value={distanceDisplay}
-            emphasis={finished ? 'info' : inRange ? 'good' : 'neutral'}
-          />
-          <SummaryCard
-            label="GPS FEED"
-            value={gpsDisplay}
-            emphasis={gpsState === 'ready' ? 'good' : gpsState === 'stale' ? 'warn' : 'neutral'}
-          />
+        <div style={chipRow}>
+          <span style={chip}>{rangeDisplay}</span>
+          {followPlayer ? <span style={chipInfo}>FOLLOW</span> : null}
+          {debugEnabled ? <span style={chipDebug}>DEBUG</span> : null}
+          {!debugEnabled ? <span style={chipMuted}>{gpsDisplay}</span> : null}
         </div>
 
         <button
@@ -148,155 +107,114 @@ export function PlayerHud({
           {primaryLabel}
         </button>
 
-        <div
-          style={{
-            ...helperCard,
-            ...(finished
-              ? helperInfo
-              : primaryTone === 'gps'
-              ? helperWarn
-              : primaryTone === 'ready'
-              ? helperGood
-              : null),
-          }}
-        >
-          {helperText}
-        </div>
-
-        <div style={actionsRow}>
-          <button
-            type="button"
-            style={getSecondaryStyle(detailsOpen)}
-            onClick={onToggleDetails}
-          >
-            {detailsOpen ? 'HIDE DETAILS' : 'DETAILS'}
-          </button>
-
-          <button
-            type="button"
-            style={getSecondaryStyle(menuOpen)}
-            onClick={onToggleMenu}
-          >
-            {menuOpen ? 'CLOSE MENU' : 'MENU'}
-          </button>
-        </div>
+        <div style={helper}>{helperText}</div>
 
         {detailsOpen ? (
-          <div style={detailsGrid}>
-            <DetailCard
-              label="DISTANCE"
-              value={distanceMeters === null ? 'NO LIVE RANGE' : `${distanceMeters} m`}
-            />
-            <DetailCard
-              label="GPS"
-              value={String(gpsState || 'unknown').replace(/_/g, ' ').toUpperCase()}
-            />
-            <DetailCard
-              label="LAT"
-              value={
-                typeof currentStage?.lat === 'number'
-                  ? currentStage.lat.toFixed(5)
-                  : '---'
-              }
-            />
-            <DetailCard
-              label="RADIUS"
-              value={
-                typeof currentStage?.radius === 'number'
-                  ? `${currentStage.radius} m`
-                  : '---'
-              }
-            />
+          <div style={detailsCard}>
+            <div style={detailRow}>
+              <span style={detailLabel}>Node</span>
+              <span style={detailValue}>{currentStage?.title || '—'}</span>
+            </div>
+            <div style={detailRow}>
+              <span style={detailLabel}>Radius</span>
+              <span style={detailValue}>
+                {typeof currentStage?.radius === 'number' ? `${currentStage.radius} m` : '—'}
+              </span>
+            </div>
+            <div style={detailRow}>
+              <span style={detailLabel}>GPS</span>
+              <span style={detailValue}>{gpsDisplay}</span>
+            </div>
+            <div style={detailRow}>
+              <span style={detailLabel}>Range</span>
+              <span style={detailValue}>{rangeDisplay}</span>
+            </div>
           </div>
         ) : null}
+
+        <div style={actionRow}>
+          <button
+            type="button"
+            style={detailsOpen ? ghostButtonActive : ghostButton}
+            onClick={onToggleDetails}
+          >
+            {detailsOpen ? 'Hide details' : 'Details'}
+          </button>
+
+          <button
+            type="button"
+            style={toolsOpen ? ghostButtonActive : ghostButton}
+            onClick={onOpenTools}
+          >
+            {toolsOpen ? 'Close tools' : 'Tools'}
+          </button>
+        </div>
       </section>
 
-      {menuOpen ? (
-        <div style={menuOverlay}>
-          <div style={menuBackdrop} onClick={onCloseMenu} />
+      {toolsOpen ? (
+        <div style={toolsOverlay}>
+          <div style={toolsBackdrop} onClick={onCloseTools} />
 
           <aside
             style={{
-              ...menuSheet,
-              width: compact ? '100%' : 'min(100%, 520px)',
+              ...toolsSheet,
+              width: compact ? '100%' : 'min(100%, 460px)',
             }}
             aria-modal="true"
             role="dialog"
             onClick={(event) => event.stopPropagation()}
           >
-            <div style={menuHeader}>
-              <div>
-                <div style={menuEyebrow}>FIELD MENU</div>
-                <div style={menuTitle}>Mission controls</div>
-              </div>
+            <div style={toolsHeader}>
+              <div style={toolsTitle}>Tools</div>
 
               <button
                 type="button"
-                aria-label="Close menu"
+                aria-label="Close tools"
                 style={closeButton}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  onCloseMenu()
+                  onCloseTools()
                 }}
               >
                 ×
               </button>
             </div>
 
-            <div style={menuMetaRow}>
-              <div style={menuMetaCard}>
-                <div style={menuMetaLabel}>NODE</div>
-                <div style={menuMetaValue}>
-                  {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
-                </div>
-              </div>
+            <button
+              type="button"
+              style={debugEnabled ? toolsButtonDangerActive : toolsButton}
+              onClick={() => {
+                onToggleDebug()
+                onCloseTools()
+              }}
+            >
+              {debugEnabled ? 'Disable local debug' : 'Enable local debug'}
+            </button>
 
-              <div style={menuMetaCard}>
-                <div style={menuMetaLabel}>DEBUG</div>
-                <div style={menuMetaValue}>{debugEnabled ? 'LOCAL ON' : 'OFF'}</div>
-              </div>
-            </div>
+            <a
+              href={adminHref}
+              style={toolsLink}
+              onClick={onCloseTools}
+            >
+              Admin
+            </a>
 
-            <div style={menuSectionLabel}>TEST TOOLS</div>
-            <div style={menuLinksGrid}>
-              <button
-                type="button"
-                style={debugEnabled ? debugButtonActive : debugButton}
-                onClick={onToggleDebug}
-              >
-                {debugEnabled ? 'DISABLE LOCAL DEBUG' : 'ENABLE LOCAL DEBUG'}
-              </button>
-            </div>
+            <a
+              href={legacyLoginHref}
+              style={toolsLink}
+              onClick={onCloseTools}
+            >
+              Mission entry
+            </a>
 
-            <div style={menuHintCard}>
-              <div style={menuHintLabel}>LOCAL TEST MODE</div>
-              <div style={menuHintText}>
-                This only affects the React test runtime. It does not change the backend
-                heartbeat security model or enable public debug remotely.
-              </div>
-            </div>
-
-            <div style={menuSectionLabel}>ENTRY</div>
-            <div style={menuLinksGrid}>
-              <a href={legacyLoginHref} style={menuLinkPrimary}>
-                MISSION ENTRY
-              </a>
-            </div>
-
-            <div style={menuSectionLabel}>TOOLS</div>
-            <div style={menuLinksGrid}>
-              <a href={adminHref} style={menuLink}>
-                ADMIN
-              </a>
-            </div>
-
-            <div style={menuSectionLabel}>FALLBACK</div>
-            <div style={menuLinksGrid}>
-              <a href={legacyPlayerHref} style={menuLinkMuted}>
-                CLASSIC RUNTIME
-              </a>
-            </div>
+            <a
+              href={legacyPlayerHref}
+              style={toolsLinkMuted}
+              onClick={onCloseTools}
+            >
+              Classic runtime
+            </a>
           </aside>
         </div>
       ) : null}
@@ -304,312 +222,202 @@ export function PlayerHud({
   )
 }
 
-function DetailCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={detailCard}>
-      <div style={detailLabel}>{label}</div>
-      <div style={detailValue}>{value}</div>
-    </div>
-  )
-}
-
-function SummaryCard({
-  label,
-  value,
-  emphasis,
-}: {
-  label: string
-  value: string
-  emphasis: 'good' | 'warn' | 'info' | 'neutral'
-}) {
-  return (
-    <div
-      style={{
-        ...summaryCard,
-        ...(emphasis === 'good'
-          ? summaryGood
-          : emphasis === 'warn'
-          ? summaryWarn
-          : emphasis === 'info'
-          ? summaryInfo
-          : null),
-      }}
-    >
-      <div style={summaryLabel}>{label}</div>
-      <div style={summaryValue}>{value}</div>
-    </div>
-  )
-}
-
-function getPrimaryStyle(
-  tone: PrimaryActionTone,
-  disabled: boolean
-): React.CSSProperties {
-  const base: React.CSSProperties = {
-    width: '100%',
-    minHeight: 54,
-    borderRadius: 18,
-    fontSize: 14,
-    fontWeight: 900,
-    letterSpacing: '0.12em',
-  }
-
+function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSProperties {
   if (disabled || tone === 'locked') {
     return {
-      ...base,
-      border: '1px solid rgba(148,163,184,.18)',
-      background: 'rgba(226,232,240,.96)',
-      color: '#64748b',
+      ...primaryBase,
+      background: 'rgba(148,163,184,.22)',
+      border: '1px solid rgba(255,255,255,.12)',
+      color: 'rgba(255,255,255,.72)',
     }
   }
 
   if (tone === 'gps') {
     return {
-      ...base,
-      border: '1px solid rgba(245,158,11,.24)',
-      background: 'rgba(254,243,199,.98)',
-      color: '#92400e',
+      ...primaryBase,
+      background: 'rgba(59,130,246,.18)',
+      border: '1px solid rgba(96,165,250,.26)',
+      color: '#dbeafe',
     }
   }
 
   if (tone === 'done') {
     return {
-      ...base,
-      border: '1px solid rgba(59,130,246,.16)',
-      background: 'rgba(219,234,254,.96)',
-      color: '#1e3a8a',
+      ...primaryBase,
+      background: 'rgba(168,85,247,.18)',
+      border: '1px solid rgba(196,181,253,.24)',
+      color: '#f3e8ff',
+    }
+  }
+
+  if (tone === 'warn') {
+    return {
+      ...primaryBase,
+      background: 'rgba(127,29,29,.22)',
+      border: '1px solid rgba(248,113,113,.28)',
+      color: '#fee2e2',
+      boxShadow: '0 10px 24px rgba(127,29,29,.12)',
     }
   }
 
   return {
-    ...base,
-    border: '1px solid rgba(22,163,74,.18)',
-    background: 'linear-gradient(180deg, #16a34a, #15803d)',
+    ...primaryBase,
+    background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+    border: '1px solid rgba(34,197,94,.22)',
     color: '#ffffff',
-    boxShadow: '0 10px 24px rgba(22,163,74,.22)',
+    boxShadow: '0 14px 30px rgba(34,197,94,.24)',
   }
 }
 
-function getSecondaryStyle(active: boolean): React.CSSProperties {
-  return {
-    minHeight: 46,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    border: active
-      ? '1px solid rgba(59,130,246,.18)'
-      : '1px solid rgba(15,23,42,.08)',
-    background: active ? 'rgba(219,234,254,.96)' : 'rgba(248,250,252,.96)',
-    color: active ? '#1e3a8a' : '#334155',
-    fontSize: 12,
-    fontWeight: 900,
-    letterSpacing: '0.08em',
-    padding: '0 12px',
-  }
-}
-
-const tray: React.CSSProperties = {
+const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
-  borderRadius: 24,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.92)',
-  boxShadow: '0 18px 40px rgba(15,23,42,.08)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  color: '#0f172a',
   display: 'grid',
-  animation: 'sagaTrayIn 220ms cubic-bezier(0.22, 1, 0.36, 1)',
-}
-
-const missionRow: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
   gap: 12,
+  borderRadius: 28,
+  background:
+    'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+  border: '1px solid rgba(255,255,255,.22)',
+  boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+  backdropFilter: 'blur(24px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
 }
 
-const missionCopy: React.CSSProperties = {
-  minWidth: 0,
-}
-
-const eyebrow: React.CSSProperties = {
-  color: '#047857',
+const eyebrow: CSSProperties = {
+  color: '#bbf7d0',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.16em',
+  textTransform: 'uppercase',
 }
 
-const headline: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
+const title: CSSProperties = {
+  color: '#ffffff',
   fontWeight: 900,
   lineHeight: 1,
   letterSpacing: '-0.03em',
 }
 
-const metaInline: React.CSSProperties = {
+const chipRow: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 8,
-  marginTop: 8,
 }
 
-const badgeBase: React.CSSProperties = {
+const chipBase: CSSProperties = {
   minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
   borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.12)',
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
 }
 
-const stageBadge: React.CSSProperties = {
-  ...badgeBase,
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
+const chip: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(34,197,94,.12)',
+  color: '#ecfdf5',
 }
 
-const mutedBadge: React.CSSProperties = {
-  ...badgeBase,
-  border: '1px solid rgba(148,163,184,.16)',
-  background: 'rgba(241,245,249,.94)',
-  color: '#475569',
+const chipMuted: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(255,255,255,.10)',
+  color: 'rgba(255,255,255,.88)',
 }
 
-const debugBadge: React.CSSProperties = {
-  ...badgeBase,
-  border: '1px solid rgba(22,163,74,.20)',
-  background: 'rgba(220,252,231,.98)',
-  color: '#166534',
+const chipDebug: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(127,29,29,.24)',
+  border: '1px solid rgba(248,113,113,.28)',
+  color: '#fecaca',
 }
 
-const mapNoticeCard: React.CSSProperties = {
+const chipInfo: CSSProperties = {
+  ...chipBase,
+  background: 'rgba(59,130,246,.18)',
+  border: '1px solid rgba(96,165,250,.24)',
+  color: '#dbeafe',
+}
+
+const primaryBase: CSSProperties = {
+  width: '100%',
+  minHeight: 48,
   borderRadius: 16,
-  border: '1px solid rgba(59,130,246,.14)',
-  background: 'rgba(239,246,255,.96)',
-  color: '#1d4ed8',
+  fontSize: 14,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+}
+
+const helper: CSSProperties = {
+  color: 'rgba(255,255,255,.82)',
   fontSize: 13,
-  fontWeight: 800,
-  lineHeight: 1.35,
-  padding: '12px 14px',
-}
-
-const summaryGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const summaryCard: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  padding: '12px 12px 10px',
-  minWidth: 0,
-}
-
-const summaryGood: React.CSSProperties = {
-  border: '1px solid rgba(22,163,74,.18)',
-  background: 'rgba(220,252,231,.92)',
-}
-
-const summaryWarn: React.CSSProperties = {
-  border: '1px solid rgba(245,158,11,.18)',
-  background: 'rgba(255,251,235,.96)',
-}
-
-const summaryInfo: React.CSSProperties = {
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-}
-
-const summaryLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-}
-
-const summaryValue: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
-  fontSize: 14,
-  fontWeight: 900,
-  lineHeight: 1.2,
-}
-
-const helperCard: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  color: '#475569',
-  fontSize: 14,
   lineHeight: 1.45,
-  padding: '12px 14px',
 }
 
-const helperGood: React.CSSProperties = {
-  border: '1px solid rgba(22,163,74,.18)',
-  background: 'rgba(220,252,231,.92)',
-  color: '#166534',
-}
-
-const helperWarn: React.CSSProperties = {
-  border: '1px solid rgba(245,158,11,.18)',
-  background: 'rgba(255,251,235,.96)',
-  color: '#92400e',
-}
-
-const helperInfo: React.CSSProperties = {
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
-}
-
-const actionsRow: React.CSSProperties = {
+const detailsCard: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
+  borderRadius: 18,
+  padding: 12,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(255,255,255,.08)',
 }
 
-const detailsGrid: React.CSSProperties = {
+const detailRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+
+const detailLabel: CSSProperties = {
+  color: 'rgba(255,255,255,.68)',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+}
+
+const detailValue: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 800,
+  textAlign: 'right',
+}
+
+const actionRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 10,
 }
 
-const detailCard: React.CSSProperties = {
+const ghostButton: CSSProperties = {
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  padding: '12px 12px 10px',
-  minWidth: 0,
-}
-
-const detailLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(15,23,42,.32)',
+  color: '#ffffff',
+  fontSize: 12,
   fontWeight: 800,
-  letterSpacing: '0.14em',
 }
 
-const detailValue: React.CSSProperties = {
-  color: '#0f172a',
-  fontSize: 14,
-  fontWeight: 800,
-  marginTop: 6,
-  lineHeight: 1.15,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+const ghostButtonActive: CSSProperties = {
+  ...ghostButton,
+  background: 'rgba(59,130,246,.16)',
+  border: '1px solid rgba(96,165,250,.18)',
+  color: '#dbeafe',
 }
 
-const menuOverlay: React.CSSProperties = {
+const toolsOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
   zIndex: 4000,
@@ -620,207 +428,94 @@ const menuOverlay: React.CSSProperties = {
   pointerEvents: 'auto',
 }
 
-const menuBackdrop: React.CSSProperties = {
+const toolsBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(15,23,42,.34)',
-  backdropFilter: 'blur(4px)',
-  WebkitBackdropFilter: 'blur(4px)',
-  animation: 'sagaFadeIn 160ms ease-out',
+  background: 'rgba(2,6,23,.34)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
 }
 
-const menuSheet: React.CSSProperties = {
+const toolsSheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  borderRadius: 24,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.98)',
-  boxShadow: '0 28px 60px rgba(15,23,42,.18)',
+  borderRadius: 28,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(13,23,42,.86), rgba(20,32,58,.78))',
+  boxShadow:
+    '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
   padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'grid',
-  gap: 14,
-  animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+  gap: 12,
   pointerEvents: 'auto',
+  color: '#f8fafc',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
 }
 
-const menuHeader: React.CSSProperties = {
+const toolsHeader: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   justifyContent: 'space-between',
   gap: 12,
 }
 
-const menuEyebrow: React.CSSProperties = {
-  color: '#047857',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-}
-
-const menuTitle: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
+const toolsTitle: CSSProperties = {
+  color: '#ffffff',
   fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
   letterSpacing: '-0.03em',
 }
 
-const closeButton: React.CSSProperties = {
-  width: 42,
-  height: 42,
+const closeButton: CSSProperties = {
+  width: 38,
+  height: 38,
   borderRadius: 999,
-  border: '1px solid rgba(239,68,68,.18)',
-  background: 'rgba(239,68,68,.14)',
-  color: '#b91c1c',
-  fontSize: 24,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
+  fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: '0 10px 24px rgba(239,68,68,.14)',
-  cursor: 'pointer',
-  pointerEvents: 'auto',
 }
 
-const menuMetaRow: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const menuMetaCard: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  padding: 12,
-}
-
-const menuMetaLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.14em',
-}
-
-const menuMetaValue: React.CSSProperties = {
-  marginTop: 6,
-  color: '#0f172a',
-  fontSize: 14,
-  fontWeight: 800,
-  lineHeight: 1.2,
-  wordBreak: 'break-word',
-}
-
-const menuSectionLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
+const toolsButton: CSSProperties = {
+  minHeight: 46,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
+  fontSize: 12,
   fontWeight: 900,
-  letterSpacing: '0.16em',
 }
 
-const menuLinksGrid: React.CSSProperties = {
-  display: 'grid',
-  gap: 10,
+const toolsButtonDangerActive: CSSProperties = {
+  ...toolsButton,
+  background: 'rgba(220,38,38,.18)',
+  border: '1px solid rgba(248,113,113,.22)',
+  color: '#fee2e2',
 }
 
-const menuLinkBase: React.CSSProperties = {
-  minHeight: 48,
+const toolsLink: CSSProperties = {
+  minHeight: 46,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 14px',
-  borderRadius: 16,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#ffffff',
   fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
+  fontWeight: 800,
   textDecoration: 'none',
 }
 
-const menuLinkPrimary: React.CSSProperties = {
-  ...menuLinkBase,
-  border: '1px solid rgba(59,130,246,.16)',
-  background: 'rgba(219,234,254,.96)',
-  color: '#1e3a8a',
+const toolsLinkMuted: CSSProperties = {
+  ...toolsLink,
+  color: 'rgba(226,232,240,.82)',
 }
-
-const menuLink: React.CSSProperties = {
-  ...menuLinkBase,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  color: '#0f172a',
-}
-
-const menuLinkMuted: React.CSSProperties = {
-  ...menuLinkBase,
-  border: '1px solid rgba(148,163,184,.16)',
-  background: 'rgba(241,245,249,.94)',
-  color: '#475569',
-}
-
-const debugButton: React.CSSProperties = {
-  ...menuLinkBase,
-  border: '1px solid rgba(245,158,11,.18)',
-  background: 'rgba(254,243,199,.98)',
-  color: '#92400e',
-  cursor: 'pointer',
-}
-
-const debugButtonActive: React.CSSProperties = {
-  ...menuLinkBase,
-  border: '1px solid rgba(22,163,74,.20)',
-  background: 'rgba(220,252,231,.98)',
-  color: '#166534',
-  cursor: 'pointer',
-}
-
-const menuHintCard: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(248,250,252,.96)',
-  padding: 12,
-}
-
-const menuHintLabel: React.CSSProperties = {
-  color: '#64748b',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-}
-
-const menuHintText: React.CSSProperties = {
-  marginTop: 8,
-  color: '#475569',
-  fontSize: 13,
-  lineHeight: 1.45,
-}
-
-const menuAnimations = `
-@keyframes sagaFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes sagaTrayIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(.992);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes sagaSheetUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-`

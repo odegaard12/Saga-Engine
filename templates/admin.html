@@ -3327,20 +3327,268 @@ function closeEditor() {
   document.getElementById('editor').classList.add('hidden');
 }
 
+function escapeEditorValue(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function normalizeCsvTokens(value, { upper = true } = {}) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => upper ? item.trim().toUpperCase() : item.trim())
+    .filter(Boolean);
+}
+
+function normalizeBinaryPattern(value) {
+  const items = String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const normalized = item.toLowerCase();
+      if (['1', 'true', 'on', 'yes'].includes(normalized)) return true;
+      if (['0', 'false', 'off', 'no'].includes(normalized)) return false;
+      return null;
+    });
+
+  if (items.length !== 4 || items.some((item) => item === null)) {
+    return [true, false, true, true];
+  }
+
+  return items;
+}
+
+function normalizeFrequencyLabel(value) {
+  const raw = String(value ?? '').toLowerCase().replace('mhz', '').trim();
+  const num = Number(raw);
+  return Number.isFinite(num) ? num.toFixed(1) : '104.6';
+}
+
+function normalizeBearingLabel(value) {
+  const raw = String(value ?? '').toUpperCase().replace('°', '').trim();
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return '135°';
+  const normalized = ((Math.round(num) % 360) + 360) % 360;
+  return `${normalized}°`;
+}
+
+function getMinigameDefaultConfig(type) {
+  if (type === 'circuit_hack') return { target_start: 'EAST', target_guard: 'SECOND', target_end: 'SOUTH' };
+  if (type === 'cryptex') return { target_word: 'SAGA', mode: 'dial_navigation' };
+  if (type === 'simon_says') return { sequence: ['A', 'B', 'C', 'D'] };
+  if (type === 'digital_tuner') return { target_frequency: '104.6', options: ['87.5', '92.3', '99.1', '104.6', '108.0'] };
+  if (type === 'radio_azimuth') return { target_bearing: '135°', options: ['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'] };
+  if (type === 'gyro_storm') return { pattern: 'URDL', duration: 10 };
+  if (type === 'switchboard') return { switches: [1, 0, 1, 1] };
+  if (type === 'compass_blow') return { pattern: 'NES', strict: false };
+  return {};
+}
+
+function normalizeGameConfigForType(type, rawCfg) {
+  const cfg = (rawCfg && typeof rawCfg === 'object') ? rawCfg : {};
+  const defaults = getMinigameDefaultConfig(type);
+
+  if (type === 'circuit_hack') {
+    return {
+      target_start: String(cfg.target_start ?? defaults.target_start).trim().toUpperCase() || defaults.target_start,
+      target_guard: String(cfg.target_guard ?? defaults.target_guard).trim().toUpperCase() || defaults.target_guard,
+      target_end: String(cfg.target_end ?? defaults.target_end).trim().toUpperCase() || defaults.target_end,
+    };
+  }
+
+  if (type === 'cryptex') {
+    const word = String(cfg.target_word ?? cfg.word ?? defaults.target_word).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+    return {
+      target_word: word.length >= 3 ? word : defaults.target_word,
+      mode: String(cfg.mode ?? defaults.mode).trim().toLowerCase() || defaults.mode,
+    };
+  }
+
+  if (type === 'simon_says') {
+    let sequence = Array.isArray(cfg.sequence)
+      ? cfg.sequence.map((item) => String(item ?? '').trim().toUpperCase()).filter((item) => ['A', 'B', 'C', 'D'].includes(item)).slice(0, 8)
+      : normalizeCsvTokens(cfg.sequence ?? '', { upper: true }).filter((item) => ['A', 'B', 'C', 'D'].includes(item)).slice(0, 8);
+    if (sequence.length < 3) sequence = defaults.sequence;
+    return { sequence };
+  }
+
+  if (type === 'digital_tuner') {
+    let options = Array.isArray(cfg.options) ? cfg.options.map((item) => normalizeFrequencyLabel(item)).filter(Boolean) : defaults.options;
+    if (options.length < 3) options = defaults.options;
+    return {
+      target_frequency: normalizeFrequencyLabel(cfg.target_frequency ?? cfg.target ?? defaults.target_frequency),
+      options,
+    };
+  }
+
+  if (type === 'radio_azimuth') {
+    let options = Array.isArray(cfg.options) ? cfg.options.map((item) => normalizeBearingLabel(item)).filter(Boolean) : defaults.options;
+    if (options.length < 4) options = defaults.options;
+    return {
+      target_bearing: normalizeBearingLabel(cfg.target_bearing ?? cfg.target ?? defaults.target_bearing),
+      options,
+    };
+  }
+
+  if (type === 'gyro_storm') {
+    let pattern = String(cfg.pattern ?? '').trim().toUpperCase();
+    if (!pattern) {
+      const sequence = Array.isArray(cfg.sequence) ? cfg.sequence : [];
+      pattern = sequence.map((item) => String(item ?? '').trim().toUpperCase()[0] || '').join('');
+    }
+    pattern = [...pattern].filter((item) => ['U', 'R', 'D', 'L'].includes(item)).join('');
+    if (pattern.length < 3) pattern = defaults.pattern;
+    const duration = Math.max(1, Math.min(120, Number(cfg.duration ?? defaults.duration) || defaults.duration));
+    return { pattern, duration };
+  }
+
+  if (type === 'switchboard') {
+    let switches = Array.isArray(cfg.switches)
+      ? cfg.switches.slice(0, 4).map((item) => Number(item) === 1 ? 1 : 0)
+      : Array.isArray(cfg.target)
+        ? cfg.target.slice(0, 4).map((item) => item ? 1 : 0)
+        : defaults.switches;
+    if (switches.length !== 4) switches = defaults.switches;
+    return { switches };
+  }
+
+  if (type === 'compass_blow') {
+    let pattern = String(cfg.pattern ?? '').trim().toUpperCase();
+    if (!pattern && Array.isArray(cfg.target)) pattern = cfg.target.join('');
+    pattern = [...pattern].filter((item) => ['N', 'E', 'S', 'W'].includes(item)).join('');
+    if (pattern.length !== 3) pattern = defaults.pattern;
+    return { pattern, strict: Boolean(cfg.strict) };
+  }
+
+  return {};
+}
+
+function readGameConfigFromEditor(type) {
+  if (type === 'circuit_hack') {
+    return normalizeGameConfigForType(type, {
+      target_start: document.getElementById('cfg-target-start')?.value || '',
+      target_guard: document.getElementById('cfg-target-guard')?.value || '',
+      target_end: document.getElementById('cfg-target-end')?.value || '',
+    });
+  }
+
+  if (type === 'cryptex') {
+    return normalizeGameConfigForType(type, {
+      target_word: document.getElementById('cfg-target-word')?.value || '',
+      mode: document.getElementById('cfg-mode')?.value || 'dial_navigation',
+    });
+  }
+
+  if (type === 'simon_says') {
+    return normalizeGameConfigForType(type, {
+      sequence: normalizeCsvTokens(document.getElementById('cfg-sequence')?.value || ''),
+    });
+  }
+
+  if (type === 'digital_tuner') {
+    return normalizeGameConfigForType(type, {
+      target_frequency: document.getElementById('cfg-target-frequency')?.value || '',
+      options: normalizeCsvTokens(document.getElementById('cfg-frequency-options')?.value || '', { upper: false }),
+    });
+  }
+
+  if (type === 'radio_azimuth') {
+    return normalizeGameConfigForType(type, {
+      target_bearing: document.getElementById('cfg-target-bearing')?.value || '',
+      options: normalizeCsvTokens(document.getElementById('cfg-bearing-options')?.value || ''),
+    });
+  }
+
+  if (type === 'gyro_storm') {
+    return normalizeGameConfigForType(type, {
+      pattern: document.getElementById('cfg-gyro-sequence')?.value || '',
+      duration: document.getElementById('cfg-duration')?.value || 10,
+    });
+  }
+
+  if (type === 'switchboard') {
+    return normalizeGameConfigForType(type, {
+      switches: normalizeBinaryPattern(document.getElementById('cfg-switch-target')?.value || ''),
+    });
+  }
+
+  if (type === 'compass_blow') {
+    return normalizeGameConfigForType(type, {
+      pattern: document.getElementById('cfg-compass-target')?.value || '',
+      strict: document.getElementById('cfg-compass-strict')?.checked || false,
+    });
+  }
+
+  return {};
+}
+
 function renderGameConfig() {
   const type = document.getElementById('e-type').value;
   const s = stages[currentIdx] || {};
-  const cfg = s.config || {};
+  const cfg = normalizeGameConfigForType(type, s.config || {});
   let html = '';
 
   if (type === 'circuit_hack') {
-    html = `<label>Grid</label><input id="cfg-grid" type="number" class="config-input" value="${cfg.grid || 4}">`;
-  } else if (type === 'gyro_storm') {
-    html = `<label>Duración</label><input id="cfg-duration" type="number" class="config-input" value="${cfg.duration || 10}">`;
-  } else if (type === 'switchboard') {
-    html = `<label>Switches (ej: 1,1,0,1,1)</label><input id="cfg-switches" class="config-input" value="${(cfg.switches || []).join(',')}">`;
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div><label>Start target</label><input id="cfg-target-start" class="config-input" value="${escapeEditorValue(cfg.target_start || 'EAST')}"></div>
+        <div><label>Guard target</label><input id="cfg-target-guard" class="config-input" value="${escapeEditorValue(cfg.target_guard || 'SECOND')}"></div>
+        <div><label>End target</label><input id="cfg-target-end" class="config-input" value="${escapeEditorValue(cfg.target_end || 'SOUTH')}"></div>
+      </div>
+    `;
   } else if (type === 'cryptex') {
-    html = `<label>Modo</label><input id="cfg-mode" class="config-input" value="${cfg.mode || 'dial_navegacion'}">`;
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label>Target word</label><input id="cfg-target-word" class="config-input" value="${escapeEditorValue(cfg.target_word || 'SAGA')}"></div>
+        <div><label>Mode</label><input id="cfg-mode" class="config-input" value="${escapeEditorValue(cfg.mode || 'dial_navigation')}"></div>
+      </div>
+    `;
+  } else if (type === 'simon_says') {
+    html = `
+      <label>Sequence (A,B,C,D)</label>
+      <input id="cfg-sequence" class="config-input" value="${escapeEditorValue((cfg.sequence || ['A','B','C','D']).join(','))}">
+    `;
+  } else if (type === 'digital_tuner') {
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label>Target frequency</label><input id="cfg-target-frequency" class="config-input" value="${escapeEditorValue(cfg.target_frequency || '104.6')}"></div>
+        <div><label>Options</label><input id="cfg-frequency-options" class="config-input" value="${escapeEditorValue((cfg.options || ['87.5','92.3','99.1','104.6','108.0']).join(','))}"></div>
+      </div>
+    `;
+  } else if (type === 'radio_azimuth') {
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label>Target bearing</label><input id="cfg-target-bearing" class="config-input" value="${escapeEditorValue(cfg.target_bearing || '135°')}"></div>
+        <div><label>Options</label><input id="cfg-bearing-options" class="config-input" value="${escapeEditorValue((cfg.options || ['0°','45°','90°','135°','180°','225°','270°','315°']).join(','))}"></div>
+      </div>
+    `;
+  } else if (type === 'gyro_storm') {
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label>Pattern (URDL)</label><input id="cfg-gyro-sequence" class="config-input" value="${escapeEditorValue(cfg.pattern || 'URDL')}"></div>
+        <div><label>Duration (s)</label><input id="cfg-duration" type="number" class="config-input" value="${escapeEditorValue(cfg.duration || 10)}"></div>
+      </div>
+    `;
+  } else if (type === 'switchboard') {
+    html = `
+      <label>Target pattern (1,0,1,1)</label>
+      <input id="cfg-switch-target" class="config-input" value="${escapeEditorValue((cfg.switches || [1,0,1,1]).join(','))}">
+    `;
+  } else if (type === 'compass_blow') {
+    html = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label>Target pattern (NES)</label><input id="cfg-compass-target" class="config-input" value="${escapeEditorValue(cfg.pattern || 'NES')}"></div>
+        <label class="flex items-center gap-2 text-xs text-zinc-300 pt-7">
+          <input id="cfg-compass-strict" type="checkbox"${cfg.strict ? ' checked' : ''}>
+          <span>Strict validation</span>
+        </label>
+      </div>
+    `;
   } else {
     html = `<div class="text-xs text-zinc-500">Sin parámetros extra</div>`;
   }
@@ -3354,17 +3602,7 @@ function applyChanges() {
   s.radius = Number(document.getElementById('e-radius').value || 50);
   s.type = document.getElementById('e-type').value;
   s.content = document.getElementById('e-content').value;
-  s.config = s.config || {};
-
-  if (s.type === 'circuit_hack') {
-    s.config.grid = Number(document.getElementById('cfg-grid')?.value || 4);
-  } else if (s.type === 'gyro_storm') {
-    s.config.duration = Number(document.getElementById('cfg-duration')?.value || 10);
-  } else if (s.type === 'switchboard') {
-    s.config.switches = (document.getElementById('cfg-switches')?.value || '').split(',').map(x => Number(x.trim())).filter(x => !Number.isNaN(x));
-  } else if (s.type === 'cryptex') {
-    s.config.mode = document.getElementById('cfg-mode')?.value || 'dial_navegacion';
-  }
+  s.config = readGameConfigFromEditor(s.type);
 
   const entryMode = (document.getElementById('e-entry-mode')?.value || 'gps').toLowerCase();
   s.entry_mode = entryMode;
