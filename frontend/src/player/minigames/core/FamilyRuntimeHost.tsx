@@ -1,0 +1,57 @@
+import type { PlayerStage } from '../../../types/player'
+import type { ResolvedMinigame } from './resolver'
+import { BearingHuntRuntimeScreen } from '../families/bearingHunt/RuntimeScreen'
+import { CircuitMatrixRuntimeScreen } from '../families/circuitMatrix/RuntimeScreen'
+import { SignalHuntRuntimeScreen } from '../families/signalHunt/RuntimeScreen'
+
+export interface FamilyRuntimeHostProps {
+  resolved: ResolvedMinigame
+  stage: PlayerStage
+  helperText: string
+  submitting: boolean
+  onWin: () => Promise<void>
+}
+
+export function FamilyRuntimeHost({
+  resolved,
+  stage,
+  helperText,
+  submitting,
+  onWin,
+}: FamilyRuntimeHostProps) {
+  if (resolved.family === 'circuit_matrix') {
+    return (
+      <CircuitMatrixRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
+  if (resolved.family === 'bearing_hunt') {
+    return (
+      <BearingHuntRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
+  return (
+    <SignalHuntRuntimeScreen
+      resolved={resolved}
+      stage={stage}
+      helperText={helperText}
+      submitting={submitting}
+      onWin={onWin}
+    />
+  )
+}
+
+export default FamilyRuntimeHost
