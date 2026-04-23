@@ -40,6 +40,13 @@ export interface StageMinigameRuntime {
 }
 
 
+export interface StageMinigameRuntime {
+  type: string
+  label?: string
+  version?: string
+  config?: StageConfig
+}
+
 export interface PlayerStage {
   id?: number | string
   title: string
@@ -67,6 +74,18 @@ export interface PlayerLiveStatus {
   lon?: number | null
   source?: string
   debug_enabled?: boolean
+}
+
+export interface TeamProfileLiveStatus extends PlayerLiveStatus {
+  user: string
+  display_name: string
+  is_self?: boolean
+}
+
+export interface TeamStatusPayload {
+  status: 'ok'
+  user: string
+  profiles: TeamProfileLiveStatus[]
 }
 
 export interface PlayerGamePayload {

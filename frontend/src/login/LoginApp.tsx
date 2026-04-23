@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 
@@ -12,13 +12,45 @@ function normalizeProfiles(config: PublicConfig): PlayerProfile[] {
     return config.player_profiles
   }
 
-  return (config.players || []).map((player, index) => ({
+  return (config.players || []).map((player) => ({
     id: player,
     display_name: player,
     mode: 'solo',
     members: [player],
-    status: index === 0 ? 'active' : 'active',
+    status: 'active',
   }))
+}
+
+function looksPlaceholder(value?: string) {
+  const text = String(value || '').trim()
+  if (!text) return true
+  return text.toUpperCase().startsWith('PUT ')
+}
+
+function resolveLoginCopy(config: PublicConfig) {
+  const title = !looksPlaceholder(config.site_name) ? config.site_name! : 'SAGA'
+  const subtitle = !looksPlaceholder(config.story_title)
+    ? config.story_title!
+    : 'Enter mission'
+  const body = !looksPlaceholder(config.story_text)
+    ? config.story_text!
+    : 'Tap an operator to continue.'
+  return { title, subtitle, body }
+}
+
+function getInitials(name: string) {
+  const cleaned = String(name || '').trim()
+  if (!cleaned) return '?'
+  const parts = cleaned.split(/\s+/).slice(0, 2)
+  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
+}
+
+function getMeta(profile: PlayerProfile) {
+  if (profile.mode === 'team') {
+    const members = profile.members || [profile.display_name]
+    return members.join(' · ')
+  }
+  return ''
 }
 
 export default function LoginApp() {
@@ -56,16 +88,28 @@ export default function LoginApp() {
     return normalizeProfiles(state.config)
   }, [state])
 
+  const mobile =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <main style={pageWrap}>
-        <div style={scanLine} />
-        <div style={gridOverlay} />
-        <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
-          <h1 style={heroTitle}>Loading terminal</h1>
-          <p style={heroText}>Fetching operator profiles and mission entry configuration.</p>
-        </section>
+        <style>{loginAnimations}</style>
+        <div style={backGlowTop} />
+        <div style={backGlowBottom} />
+        <div style={backVignette} />
+
+        <div style={shellWrap}>
+          <section style={heroCard}>
+            <div style={heroTop}>
+              <div style={eyebrow}>MISSION ENTRY</div>
+            </div>
+            <div style={heroCenter}>
+              <h1 style={heroTitle}>SAGA</h1>
+              <p style={heroSubtitle}>Loading mission</p>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
@@ -73,289 +117,360 @@ export default function LoginApp() {
   if (state.status === 'error') {
     return (
       <main style={pageWrap}>
-        <div style={scanLine} />
-        <div style={gridOverlay} />
-        <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
-          <h1 style={heroTitle}>Config error</h1>
-          <p style={heroText}>{state.message}</p>
-        </section>
+        <style>{loginAnimations}</style>
+        <div style={backGlowTop} />
+        <div style={backGlowBottom} />
+        <div style={backVignette} />
+
+        <div style={shellWrap}>
+          <section style={heroCard}>
+            <div style={heroTop}>
+              <div style={eyebrow}>MISSION ENTRY</div>
+            </div>
+            <div style={heroCenter}>
+              <h1 style={heroTitle}>Config error</h1>
+              <p style={heroBody}>{state.message}</p>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
 
   if (state.status !== 'ready') return null
 
-  if (state.status !== 'ready') return null
-
-  const config = state.config
-  const title = config.site_name || 'SAGA ENGINE'
-  const storyTitle = config.story_title || 'SELECT OPERATOR'
-  const storyText =
-    config.story_text || 'Choose an active profile to enter the live mission interface.'
+  const { title, subtitle, body } = resolveLoginCopy(state.config)
 
   return (
     <main style={pageWrap}>
-      <div style={scanLine} />
-      <div style={gridOverlay} />
+      <style>{loginAnimations}</style>
+      <div style={backGlowTop} />
+      <div style={backGlowBottom} />
+      <div style={backVignette} />
 
-      <div style={contentWrap}>
+      <div
+        style={{
+          ...shellWrap,
+          padding: mobile
+            ? 'calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px)'
+            : '32px 20px 40px',
+        }}
+      >
         <section style={heroCard}>
-          <div style={heroKicker}>MISSION CONTROL</div>
-          <h1 style={heroTitle}>{title}</h1>
-          <p style={heroSub}>{storyTitle}</p>
-          <p style={heroText}>{storyText}</p>
+          <div style={heroTop}>
+            <div style={eyebrow}>MISSION ENTRY</div>
+
+            <a href="/admin" style={adminButton}>
+              Admin
+            </a>
+          </div>
+
+          <div style={heroCenter}>
+            <h1 style={heroTitle}>{title}</h1>
+            <p style={heroSubtitle}>{subtitle}</p>
+            <p style={heroBody}>{body}</p>
+          </div>
         </section>
 
-        <section style={grid}>
-          {profiles.map((profile) => {
-            const members = profile.members || [profile.display_name]
+        <section style={listBlock}>
+          {profiles.map((profile, index) => {
+            const isTeam = profile.mode === 'team'
+            const meta = getMeta(profile)
+
             return (
-              <article key={profile.id} style={playerCard}>
-                <div style={playerTop}>
-                  <div style={playerIcon}>⌁</div>
-                  <div style={modeBadge}>{profile.mode || 'solo'}</div>
+              <article
+                key={profile.id}
+                style={{
+                  ...playerCard,
+                  animationDelay: `${index * 35}ms`,
+                }}
+              >
+                <div style={playerLeft}>
+                  <div style={avatar}>{getInitials(profile.display_name)}</div>
+
+                  <div style={identity}>
+                    <div style={playerName}>{profile.display_name}</div>
+                    <div style={identityBottom}>
+                      <span style={modePill}>{isTeam ? 'TEAM' : 'SOLO'}</span>
+                      {meta ? <span style={playerMetaInline}>{meta}</span> : null}
+                    </div>
+                  </div>
                 </div>
 
-                <div style={playerName}>{profile.display_name}</div>
-                <div style={playerMeta}>
-                  {profile.mode === 'team' ? 'Team mission profile' : 'Field operator profile'}
+                <div style={playerRight}>
+                  <button
+                    type="button"
+                    style={enterButton}
+                    onClick={() => {
+                      window.location.href = `/?user=${encodeURIComponent(profile.id)}`
+                    }}
+                  >
+                    Enter
+                  </button>
                 </div>
-
-                <div style={membersBox}>
-                  {members.join(' · ')}
-                </div>
-
-                <button
-                  type="button"
-                  style={enterButton}
-                  onClick={() => {
-                    window.location.href = `/?user=${encodeURIComponent(profile.id)}`
-                  }}
-                >
-                  OPEN MISSION
-                </button>
               </article>
             )
           })}
         </section>
-
-        <div style={adminEntry}>
-          <a href="/admin" style={adminLink}>
-            ADMIN ACCESS
-          </a>
-        </div>
       </div>
     </main>
   )
 }
 
-const pageWrap: React.CSSProperties = {
-  minHeight: '100vh',
-  background:
-    'radial-gradient(circle at top, rgba(34,211,238,.12), transparent 34%), radial-gradient(circle at 85% 15%, rgba(96,165,250,.16), transparent 28%), linear-gradient(180deg, #0b1220, #04070d)',
-  color: '#e5f0ff',
-  fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
+const pageWrap: CSSProperties = {
+  minHeight: '100dvh',
   position: 'relative',
   overflowX: 'hidden',
-  padding: 18,
+  background:
+    'linear-gradient(180deg, #2f3b36 0%, #394540 28%, #47524e 100%)',
+  color: '#ffffff',
+  fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
 }
 
-const scanLine: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: 2,
-  background: 'linear-gradient(90deg, transparent, rgba(96,165,250,.40), transparent)',
-  opacity: 0.35,
-  pointerEvents: 'none',
-  zIndex: 1,
-}
-
-const gridOverlay: React.CSSProperties = {
+const backGlowTop: CSSProperties = {
   position: 'fixed',
   inset: 0,
   pointerEvents: 'none',
-  backgroundImage:
-    'linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px)',
-  backgroundSize: '24px 24px',
-  opacity: 0.6,
-  zIndex: 0,
+  background:
+    'radial-gradient(circle at 50% 0%, rgba(34,197,94,.18), transparent 28%)',
 }
 
-const contentWrap: React.CSSProperties = {
+const backGlowBottom: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  background:
+    'radial-gradient(circle at 84% 18%, rgba(59,130,246,.12), transparent 18%), radial-gradient(circle at 12% 82%, rgba(255,255,255,.06), transparent 18%)',
+}
+
+const backVignette: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  boxShadow: 'inset 0 0 120px rgba(15,23,42,.26)',
+}
+
+const shellWrap: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(1040px, 100%)',
+  width: 'min(760px, 100%)',
   margin: '0 auto',
-}
-
-const heroCard: React.CSSProperties = {
-  margin: '0 auto 18px auto',
-  padding: '20px 22px',
-  border: '1px solid rgba(255,255,255,.08)',
-  borderRadius: 24,
-  background: 'linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))',
-  boxShadow: '0 20px 60px rgba(0,0,0,.30)',
-  backdropFilter: 'blur(18px)',
-}
-
-const heroKicker: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 30,
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(56,189,248,.24)',
-  background: 'rgba(96,165,250,.10)',
-  color: '#dbeafe',
-  fontSize: 11,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const heroTitle: React.CSSProperties = {
-  marginTop: 16,
-  fontSize: 'clamp(32px, 6vw, 58px)',
-  lineHeight: 0.96,
-  fontWeight: 900,
-  letterSpacing: '-0.04em',
-  color: '#fff',
-}
-
-const heroSub: React.CSSProperties = {
-  marginTop: 12,
-  color: '#c7d4e6',
-  fontSize: 13,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const heroText: React.CSSProperties = {
-  marginTop: 10,
-  maxWidth: 700,
-  color: '#97a6ba',
-  fontSize: 13,
-  lineHeight: 1.55,
-}
-
-const grid: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-  gap: 12,
-}
-
-const playerCard: React.CSSProperties = {
-  position: 'relative',
-  overflow: 'hidden',
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(10,14,24,.78)',
-  borderRadius: 22,
-  padding: 16,
-  boxShadow: '0 16px 38px rgba(0,0,0,.22)',
-  backdropFilter: 'blur(16px)',
-}
-
-const playerTop: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
   gap: 14,
 }
 
-const playerIcon: React.CSSProperties = {
-  width: 52,
-  height: 52,
-  borderRadius: 18,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.08)',
-  fontSize: 24,
+const heroCard: CSSProperties = {
+  padding: '18px 18px 22px',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.16)',
+  background:
+    'linear-gradient(180deg, rgba(84,91,104,.74) 0%, rgba(110,116,128,.62) 100%)',
+  boxShadow: '0 22px 52px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.10)',
+  backdropFilter: 'blur(20px) saturate(135%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
-const modeBadge: React.CSSProperties = {
+const heroTop: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+}
+
+const eyebrow: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   minHeight: 28,
-  padding: '0 10px',
+  padding: '0 11px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#dbe7f7',
+  border: '1px solid rgba(74,222,128,.18)',
+  background: 'rgba(220,252,231,.88)',
+  color: '#166534',
   fontSize: 10,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const playerName: React.CSSProperties = {
-  marginTop: 12,
-  fontSize: 18,
-  lineHeight: 1.05,
-  fontWeight: 900,
-  color: '#fff',
-}
-
-const playerMeta: React.CSSProperties = {
-  marginTop: 6,
-  color: '#97a6ba',
-  fontSize: 10,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const membersBox: React.CSSProperties = {
-  marginTop: 10,
-  padding: '10px 12px',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.06)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#c7d4e6',
-  fontSize: 11,
-  lineHeight: 1.5,
-}
-
-const enterButton: React.CSSProperties = {
-  marginTop: 12,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 40,
-  padding: '0 14px',
-  borderRadius: 13,
-  border: '1px solid rgba(96,165,250,.22)',
-  background: 'linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,.10))',
-  color: '#f8fbff',
-  fontSize: 11,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
-  fontWeight: 800,
+  fontWeight: 900,
 }
 
-const adminEntry: React.CSSProperties = {
-  margin: '18px auto 0 auto',
-  width: 'fit-content',
-}
-
-const adminLink: React.CSSProperties = {
+const adminButton: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 40,
-  padding: '0 14px',
+  minHeight: 30,
+  padding: '0 11px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  color: '#98a8bc',
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(255,255,255,.10)',
+  color: '#ffffff',
   fontSize: 11,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
   fontWeight: 800,
   textDecoration: 'none',
 }
+
+const heroCenter: CSSProperties = {
+  marginTop: 26,
+  display: 'grid',
+  justifyItems: 'center',
+  textAlign: 'center',
+  gap: 10,
+}
+
+const heroTitle: CSSProperties = {
+  margin: 0,
+  fontSize: 'clamp(48px, 11vw, 76px)',
+  lineHeight: 0.9,
+  fontWeight: 900,
+  letterSpacing: '-0.06em',
+  color: '#ffffff',
+  textShadow: '0 10px 26px rgba(15,23,42,.20)',
+}
+
+const heroSubtitle: CSSProperties = {
+  margin: 0,
+  color: '#c8ffe1',
+  fontSize: 13,
+  letterSpacing: '0.22em',
+  textTransform: 'uppercase',
+  fontWeight: 900,
+}
+
+const heroBody: CSSProperties = {
+  margin: 0,
+  maxWidth: 420,
+  color: 'rgba(255,255,255,.86)',
+  fontSize: 16,
+  lineHeight: 1.5,
+}
+
+const listBlock: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+}
+
+const playerCard: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 10,
+  alignItems: 'center',
+  padding: '12px 12px',
+  borderRadius: 22,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(84,91,104,.68) 0%, rgba(102,108,120,.58) 100%)',
+  boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
+  backdropFilter: 'blur(18px) saturate(130%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animationFillMode: 'both',
+}
+
+const playerLeft: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '40px minmax(0, 1fr)',
+  gap: 10,
+  alignItems: 'center',
+  minWidth: 0,
+}
+
+const avatar: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 999,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(219,234,254,.92)',
+  border: '1px solid rgba(96,165,250,.28)',
+  color: '#1d4ed8',
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '0.04em',
+}
+
+const identity: CSSProperties = {
+  minWidth: 0,
+  display: 'grid',
+  gap: 6,
+}
+
+const playerName: CSSProperties = {
+  fontSize: 22,
+  lineHeight: 0.96,
+  fontWeight: 900,
+  color: '#ffffff',
+  letterSpacing: '-0.03em',
+}
+const identityBottom: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+}
+
+const playerMetaInline: CSSProperties = {
+  color: 'rgba(255,255,255,.66)',
+  fontSize: 12,
+  lineHeight: 1.2,
+}
+
+
+const playerMeta: CSSProperties = {
+  marginTop: 3,
+  color: 'rgba(255,255,255,.74)',
+  fontSize: 11,
+  lineHeight: 1.3,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const playerRight: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  minWidth: 132,
+}
+
+const modePill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 22,
+  padding: '0 8px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(255,255,255,.10)',
+  color: '#ffffff',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+}
+
+const enterButton: CSSProperties = {
+  minWidth: 118,
+  minHeight: 34,
+  padding: '0 14px',
+  borderRadius: 12,
+  border: '1px solid rgba(34,197,94,.24)',
+  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  boxShadow: '0 12px 24px rgba(34,197,94,.18)',
+}
+
+const loginAnimations = `
+@keyframes sagaLoginRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`

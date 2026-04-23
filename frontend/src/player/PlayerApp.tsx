@@ -1,16 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { advancePlayer, fetchPlayerGame } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage } from '../types/player'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { advancePlayer, fetchPlayerGame, fetchTeamStatus, sendHeartbeat } from '../shared/api'
+import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
+import { TeamSheet } from './components/TeamSheet'
+import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload }
+
+type NoticeTone = 'info' | 'warn' | 'success'
+type OverlayState = 'activate' | 'node' | 'finish' | null
+type FocusRequest =
+  | {
+      target: 'player' | 'node'
+      token: number
+    }
+  | null
 
 function vibrate(pattern: number | number[]) {
   if (typeof window === 'undefined') return
@@ -80,9 +91,17 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
-  const [mapNotice, setMapNotice] = useState<string | null>(null)
+  const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [followPlayer, setFollowPlayer] = useState(true)
+  const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
+  const [uiNotice, setUiNotice] = useState<UiNotice>(null)
+  const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [teamOpen, setTeamOpen] = useState(false)
+  const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
 
   const noticeTimerRef = useRef<number | null>(null)
+  const overlayTimerRef = useRef<number | null>(null)
   const user = useMemo(() => getUserFromUrl(), [])
 
   const isPhone =
@@ -114,26 +133,129 @@ export default function PlayerApp() {
       cancelled = true
     }
   }, [user])
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadTeam() {
+      try {
+        const team = await fetchTeamStatus(user)
+        if (!cancelled) {
+          setTeamProfiles(Array.isArray(team.profiles) ? team.profiles : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setTeamProfiles([])
+        }
+      }
+    }
+
+    loadTeam()
+    intervalId = window.setInterval(loadTeam, 1000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+    const readyPayload: PlayerGamePayload = state.payload
+
+    let intervalId: number | null = null
+
+    async function publishHeartbeat() {
+      try {
+        const secureLiveGpsContext =
+          typeof window !== 'undefined' &&
+          window.isSecureContext &&
+          window.location.protocol === 'https:'
+
+        const rawLivePlayerPosition = getPlayerPosition(readyPayload)
+        const rawGpsState = normalizeGpsStatus(readyPayload.live_status?.gps_status)
+
+        const effectivePosition = localDebugPosition
+          ? localDebugPosition
+          : secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
+          ? rawLivePlayerPosition
+          : null
+
+        await sendHeartbeat({
+          user,
+          ...(effectivePosition
+            ? {
+                lat: effectivePosition.lat,
+                lon: effectivePosition.lon,
+                gps_status: 'ok',
+              }
+            : {
+                gps_status: 'unavailable',
+              }),
+          source: localDebugPosition ? 'react' : 'player',
+        })
+      } catch {
+        // ignore heartbeat errors in the UI loop
+      }
+    }
+
+    publishHeartbeat()
+    intervalId = window.setInterval(publishHeartbeat, 2000)
+
+    return () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [
+    user,
+    state.status,
+    state.status === 'ready' ? state.payload.live_status?.lat : null,
+    state.status === 'ready' ? state.payload.live_status?.lon : null,
+    state.status === 'ready' ? state.payload.live_status?.gps_status : null,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+  ])
+
+
 
   useEffect(() => {
     return () => {
       if (noticeTimerRef.current !== null) {
         window.clearTimeout(noticeTimerRef.current)
       }
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current)
+      }
     }
   }, [])
 
-  function showMapNotice(message: string) {
-    setMapNotice(message)
+  function showNotice(message: string, tone: NoticeTone) {
+    setUiNotice({ message, tone })
 
     if (noticeTimerRef.current !== null) {
       window.clearTimeout(noticeTimerRef.current)
     }
 
     noticeTimerRef.current = window.setTimeout(() => {
-      setMapNotice(null)
+      setUiNotice(null)
       noticeTimerRef.current = null
     }, 2200)
+  }
+
+  function showOverlay(nextState: OverlayState) {
+    setOverlayState(nextState)
+
+    if (overlayTimerRef.current !== null) {
+      window.clearTimeout(overlayTimerRef.current)
+    }
+
+    overlayTimerRef.current = window.setTimeout(() => {
+      setOverlayState(null)
+      overlayTimerRef.current = null
+    }, nextState === 'finish' ? 1800 : 900)
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
@@ -162,8 +284,27 @@ export default function PlayerApp() {
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
-  const playerPosition = getPlayerPosition(payload)
-  const gpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+
+  const rawLivePlayerPosition = getPlayerPosition(payload)
+  const secureLiveGpsContext =
+    typeof window !== 'undefined' &&
+    window.isSecureContext &&
+    window.location.protocol === 'https:'
+
+  const rawGpsState = normalizeGpsStatus(payload.live_status?.gps_status)
+
+  const gpsState = localDebugPosition
+    ? 'ready'
+    : secureLiveGpsContext
+    ? rawGpsState
+    : 'unavailable'
+
+  const livePlayerPosition =
+    secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
+      ? rawLivePlayerPosition
+      : null
+
+  const playerPosition = localDebugPosition || livePlayerPosition
 
   const rawDistanceMeters =
     currentStage && playerPosition
@@ -186,7 +327,9 @@ export default function PlayerApp() {
       : false
 
   const effectiveDebugEnabled =
-    Boolean(payload.live_status?.debug_enabled) || localDebugEnabled
+    Boolean(payload.live_status?.debug_enabled) ||
+    localDebugEnabled ||
+    Boolean(localDebugPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -196,77 +339,190 @@ export default function PlayerApp() {
     debugEnabled: effectiveDebugEnabled,
   })
 
+  const hudHelperText =
+    !localDebugPosition &&
+    !secureLiveGpsContext &&
+    runtime.reason === 'gps_unavailable'
+      ? 'Live GPS is unavailable here. Use local debug tap or open the published HTTPS player.'
+      : runtime.helperText
+
+  const teamOtherProfiles = teamProfiles.filter(
+    (member) => !member.is_self && member.user !== payload.user
+  )
+  const teamLiveCount = teamOtherProfiles.filter(
+    (member) => String(member.presence || '').toLowerCase() === 'live'
+  ).length
+  const teamVisibleCount = teamOtherProfiles.filter(
+    (member) => String(member.presence || '').toLowerCase() !== 'offline'
+  ).length
+
   const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
-  const legacyLoginHref = '/legacy/'
+  const shellLoginHref = '/'
   const adminHref = '/admin'
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
     setState({ status: 'ready', payload: nextPayload })
+    return nextPayload
   }
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
+    setToolsOpen(false)
+    setTeamOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
-  function closeMenu() {
-    setActivePanel((current) => (current === 'menu' ? null : current))
+  function openTools() {
+    setActivePanel(null)
+    setTeamOpen(false)
+    setToolsOpen((current) => !current)
+  }
+
+  function closeTools() {
+    setToolsOpen(false)
+  }
+
+  function openTeam() {
+    setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen((current) => !current)
+  }
+
+  function closeTeam() {
+    setTeamOpen(false)
+  }
+
+  function handleOpenEntry() {
+    vibrate(10)
+    window.location.assign(shellLoginHref)
   }
 
   function handleToggleDebug() {
+    const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
+
+    if (currentlyActive) {
+      setLocalDebugEnabled(false)
+      setLocalDebugPosition(null)
+      setFollowPlayer(true)
+      void sendHeartbeat({
+        user,
+        gps_status: 'unavailable',
+        source: 'react',
+      })
+      showNotice('Debug tap disabled. Live GPS restored.', 'info')
+      vibrate(8)
+      return
+    }
+
+    setLocalDebugEnabled(true)
+    showNotice('Debug tap enabled. Tap the map to place simulated GPS.', 'success')
+    vibrate([10, 16, 10])
+  }
+
+  function handleDebugSetPosition(position: { lat: number; lon: number }) {
+    setLocalDebugEnabled(true)
+    setLocalDebugPosition(position)
+    setFollowPlayer(true)
+    setFocusRequest({ target: 'player', token: Date.now() })
+    void sendHeartbeat({
+      user,
+      lat: position.lat,
+      lon: position.lon,
+      gps_status: 'ok',
+      source: 'react',
+    })
+    showNotice('Simulated GPS updated from map tap.', 'success')
+    vibrate([10, 12, 10])
+  }
+
+  function handleFocusPlayer() {
+    if (!playerPosition) {
+      showNotice('No player position is available yet.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFocusRequest({ target: 'player', token: Date.now() })
+    setFollowPlayer(true)
+    showNotice('Centered on player.', 'info')
     vibrate(8)
-    setLocalDebugEnabled((current) => !current)
-    showMapNotice(localDebugEnabled ? 'Local debug disabled.' : 'Local debug enabled.')
+  }
+
+  function handleFocusNode() {
+    if (!currentStage) {
+      showNotice('No active node is available right now.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFocusRequest({ target: 'node', token: Date.now() })
+    showNotice('Centered on node.', 'info')
+    vibrate(8)
+  }
+
+  function handleToggleFollow() {
+    setFollowPlayer((current) => {
+      const next = !current
+      showNotice(next ? 'Player follow enabled.' : 'Free map enabled.', 'info')
+      vibrate(8)
+      return next
+    })
   }
 
   function openInteraction() {
     setSubmitError(null)
     setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen(false)
     setInteractionOpen(true)
   }
 
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
+    setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
+    showOverlay('activate')
     openInteraction()
   }
 
   function handleMapNodeTap() {
     if (payload.finished) return
 
-    if (runtime.canEnter) {
-      vibrate([10, 16, 10])
-      openInteraction()
-      return
-    }
-
     vibrate(8)
 
     if (!currentStage) {
-      showMapNotice('Complete the previous stage before interacting here.')
+      showNotice('Complete the previous stage before interacting here.', 'warn')
+      return
+    }
+
+    setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (runtime.canEnter) {
+      showNotice('Target in range. Use Open Interaction.', 'info')
       return
     }
 
     if (runtime.reason === 'out_of_range') {
-      showMapNotice(
+      showNotice(
         distanceMeters !== null
           ? 'Too far away. Move closer to the node.'
-          : 'Too far from the node.'
+          : 'Too far from the node.',
+        'warn'
       )
       return
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showMapNotice('Waiting for a reliable GPS fix.')
+      showNotice('Position is not ready yet.', 'info')
       return
     }
 
     if (runtime.reason === 'missing_stage') {
-      showMapNotice('Complete the previous stage first.')
+      showNotice('Complete the previous stage first.', 'warn')
       return
     }
 
-    showMapNotice('Interaction is not available yet.')
+    showNotice('Interaction is not available yet.', 'info')
   }
 
   async function handleSubmitCode(code: string) {
@@ -277,15 +533,25 @@ export default function PlayerApp() {
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
         setSubmitError('Invalid code for the current stage.')
+        showNotice('The code was not accepted for this stage.', 'warn')
         return
       }
 
       setInteractionOpen(false)
-      await refreshPayload()
+      const nextPayload = await refreshPayload()
+
+      if (nextPayload.finished) {
+        showOverlay('finish')
+        showNotice('Mission complete.', 'success')
+      } else {
+        showOverlay('node')
+        showNotice('Node cleared.', 'success')
+      }
     } catch (error) {
-      setSubmitError(
+      const message =
         error instanceof Error ? error.message : 'Unknown submit error'
-      )
+      setSubmitError(message)
+      showNotice('Mission sync failed. Try again.', 'warn')
     } finally {
       setSubmitting(false)
     }
@@ -298,7 +564,13 @@ export default function PlayerApp() {
           currentStage={currentStage}
           playerPosition={playerPosition}
           gpsState={gpsState}
-          debugSimulation={effectiveDebugEnabled}
+          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
+          followPlayer={followPlayer}
+          focusRequest={focusRequest}
+          nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
+          otherPlayers={teamOtherProfiles}
+          selfLabel={'ME'}
+          onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
         />
 
@@ -308,11 +580,18 @@ export default function PlayerApp() {
           <PlayerShell
             payload={payload}
             currentStage={currentStage}
-            gpsState={gpsState}
-            inRange={inRange}
-            distanceMeters={distanceMeters}
+            teamOpen={teamOpen}
+            teamCount={teamVisibleCount}
+            teamLiveCount={teamLiveCount}
+            onOpenTeam={openTeam}
           />
         </div>
+
+        <div style={getToastOverlayStyle(isPhone)}>
+          <ToastNotice notice={uiNotice} />
+        </div>
+
+        {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
         <div style={getBottomOverlayStyle(isPhone)}>
           <PlayerHud
@@ -323,24 +602,31 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
-            mapNotice={mapNotice}
+            followPlayer={followPlayer}
+            toolsOpen={toolsOpen}
             legacyPlayerHref={legacyPlayerHref}
-            legacyLoginHref={legacyLoginHref}
+            legacyLoginHref={shellLoginHref}
             adminHref={adminHref}
-            detailsOpen={activePanel === 'details'}
-            menuOpen={activePanel === 'menu'}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
             primaryDisabled={!runtime.canEnter}
-            helperText={runtime.helperText}
+            helperText={hudHelperText}
+            detailsOpen={activePanel === 'details'}
             onPrimaryAction={handlePrimaryAction}
             onToggleDetails={() => togglePanel('details')}
-            onToggleMenu={() => togglePanel('menu')}
-            onCloseMenu={closeMenu}
+            onOpenTools={openTools}
+            onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
           />
         </div>
       </div>
+
+      <TeamSheet
+        open={teamOpen}
+        players={teamOtherProfiles}
+        currentPosition={playerPosition}
+        onClose={closeTeam}
+      />
 
       <InteractionSheet
         open={interactionOpen}
@@ -393,7 +679,35 @@ function StatusCard({ title, body }: { title: string; body: string }) {
   )
 }
 
-function getViewportStyle(mobile: boolean): React.CSSProperties {
+function CelebrationOverlay({ state }: { state: OverlayState }) {
+  if (!state) return null
+
+  const label =
+    state === 'activate'
+      ? 'Node ready'
+      : state === 'node'
+      ? 'Node cleared'
+      : 'Mission complete'
+
+  const toneStyle =
+    state === 'activate'
+      ? overlayInfo
+      : state === 'node'
+      ? overlaySuccess
+      : overlayFinish
+
+  return (
+    <>
+      <style>{overlayAnimations}</style>
+      <div style={overlayWrap}>
+        <div style={{ ...pulseRing, ...toneStyle }} />
+        <div style={{ ...overlayPill, ...toneStyle }}>{label}</div>
+      </div>
+    </>
+  )
+}
+
+function getViewportStyle(mobile: boolean): CSSProperties {
   return {
     position: 'relative',
     width: '100%',
@@ -406,13 +720,13 @@ function getViewportStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getTopScrimStyle(mobile: boolean): React.CSSProperties {
+function getTopScrimStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 110 : 132,
+    height: mobile ? 132 : 144,
     zIndex: 1100,
     pointerEvents: 'none',
     borderTopLeftRadius: mobile ? 0 : 28,
@@ -422,7 +736,7 @@ function getTopScrimStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
+function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 12,
@@ -436,12 +750,26 @@ function getTopOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
+function getToastOverlayStyle(mobile: boolean): CSSProperties {
+  return {
+    position: 'absolute',
+    left: mobile ? 12 : 16,
+    right: mobile ? 12 : 16,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 154px)' : 176,
+    zIndex: 1250,
+    pointerEvents: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+}
+
+function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 10px)' : 12,
     zIndex: 1200,
     pointerEvents: 'none',
     display: 'flex',
@@ -450,7 +778,82 @@ function getBottomOverlayStyle(mobile: boolean): React.CSSProperties {
   }
 }
 
-const statusCard: React.CSSProperties = {
+const overlayWrap: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 1235,
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const pulseRing: CSSProperties = {
+  position: 'absolute',
+  width: 190,
+  height: 190,
+  borderRadius: '50%',
+  opacity: 0.22,
+  animation: 'sagaPulseRing 720ms ease-out forwards',
+}
+
+const overlayPill: CSSProperties = {
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 16px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  boxShadow: '0 14px 30px rgba(15,23,42,.12)',
+  animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const overlayInfo: CSSProperties = {
+  background: 'rgba(239,246,255,.96)',
+  border: '1px solid rgba(59,130,246,.16)',
+  color: '#1d4ed8',
+}
+
+const overlaySuccess: CSSProperties = {
+  background: 'rgba(220,252,231,.96)',
+  border: '1px solid rgba(22,163,74,.18)',
+  color: '#166534',
+}
+
+const overlayFinish: CSSProperties = {
+  background: 'rgba(250,245,255,.96)',
+  border: '1px solid rgba(168,85,247,.18)',
+  color: '#7e22ce',
+}
+
+const overlayAnimations = `
+@keyframes sagaPulseRing {
+  from {
+    transform: scale(.42);
+    opacity: .28;
+  }
+  to {
+    transform: scale(1.24);
+    opacity: 0;
+  }
+}
+
+@keyframes sagaOverlayPop {
+  from {
+    transform: scale(.94);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+`
+
+const statusCard: CSSProperties = {
   borderRadius: 20,
   border: '1px solid rgba(15,23,42,.08)',
   background: 'rgba(255,255,255,.9)',
@@ -460,13 +863,13 @@ const statusCard: React.CSSProperties = {
   margin: '0 auto',
 }
 
-const statusTitle: React.CSSProperties = {
+const statusTitle: CSSProperties = {
   fontSize: 20,
   fontWeight: 800,
   color: '#0f172a',
 }
 
-const statusBody: React.CSSProperties = {
+const statusBody: CSSProperties = {
   fontSize: 14,
   color: '#475569',
   marginTop: 8,
