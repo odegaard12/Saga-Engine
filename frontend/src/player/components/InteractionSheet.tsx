@@ -30,11 +30,14 @@ function vibrate(pattern: number | number[]) {
   window.navigator.vibrate(pattern)
 }
 
-function isMeaningfulNarrative(stage: PlayerStage | null) {
-  const text = String(stage?.content || '').trim().toUpperCase()
-  if (!text) return false
-  if (text === 'PUT NODE TEXT HERE') return false
-  return true
+function getCompactLine(stage: PlayerStage | null) {
+  const hint = String(stage?.messages?.hint || '').trim()
+  if (hint) return hint
+
+  const text = String(stage?.content || '').trim()
+  if (!text) return ''
+  if (text.toUpperCase() === 'PUT NODE TEXT HERE') return ''
+  return text
 }
 
 export function InteractionSheet({
@@ -54,6 +57,7 @@ export function InteractionSheet({
 
   const touchStartYRef = useRef<number | null>(null)
   const touchStartXRef = useRef<number | null>(null)
+  const dragEnabledRef = useRef(false)
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.minigame?.type ?? currentStage?.type ?? null
@@ -61,34 +65,22 @@ export function InteractionSheet({
   const resolvedStageMinigame = resolveStageMinigame(currentStage)
   const resolvedRuntime = resolvedStageMinigame?.resolved ?? null
   const resolvedSourceType = resolvedStageMinigame?.source.type ?? stageType
-  const resolvedFamily = resolvedRuntime?.family ?? null
-  const legacyBridge = resolvedRuntime?.compatibility === 'legacy_bridge'
 
   const minigameDefinition = resolvedSourceType
     ? resolveMinigameDefinition(resolvedSourceType)
     : null
 
-  const hasNativeMinigame = Boolean(minigameDefinition)
   const shouldRenderFamilyRuntime = Boolean(
     resolvedRuntime && resolvedRuntime.compatibility === 'native'
   )
-  const shouldRenderLegacyBridgeInfo = Boolean(
-    resolvedRuntime && resolvedRuntime.compatibility === 'legacy_bridge'
-  )
+
+  const compactLine = getCompactLine(currentStage)
 
   useEffect(() => {
     setCode('')
-    setShowRecovery(
-      shouldRenderLegacyBridgeInfo ||
-        (!hasNativeMinigame && !shouldRenderFamilyRuntime)
-    )
+    setShowRecovery(false)
     setDragOffset(0)
-  }, [
-    stageId,
-    hasNativeMinigame,
-    shouldRenderFamilyRuntime,
-    shouldRenderLegacyBridgeInfo,
-  ])
+  }, [stageId])
 
   useEffect(() => {
     if (open && currentStage) {
@@ -97,16 +89,6 @@ export function InteractionSheet({
   }, [open, stageId, currentStage])
 
   if (!open || !currentStage) return null
-
-  const typeLabel = (resolvedFamily || stageType || 'interaction')
-    .replace(/_/g, ' ')
-    .toUpperCase()
-
-  const hasNarrative = isMeaningfulNarrative(currentStage)
-  const narrative = hasNarrative ? currentStage.content?.trim() || '' : ''
-  const hint = currentStage.messages?.hint?.trim() || ''
-  const contextValue =
-    narrative || helperText || 'No narrative provided for this node.'
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -126,13 +108,16 @@ export function InteractionSheet({
   }
 
   function handleTouchStart(event: TouchEvent<HTMLElement>) {
+    if (!dragEnabledRef.current) return
     if (event.touches.length !== 1) return
     touchStartYRef.current = event.touches[0].clientY
     touchStartXRef.current = event.touches[0].clientX
   }
 
   function handleTouchMove(event: TouchEvent<HTMLElement>) {
+    if (!dragEnabledRef.current) return
     if (touchStartYRef.current === null || touchStartXRef.current === null) return
+
     const deltaY = event.touches[0].clientY - touchStartYRef.current
     const deltaX = event.touches[0].clientX - touchStartXRef.current
 
@@ -146,14 +131,21 @@ export function InteractionSheet({
   }
 
   function handleTouchEnd() {
+    if (!dragEnabledRef.current) return
+
     if (dragOffset > 90 && !submitting) {
       vibrate([8, 12, 8])
       onClose()
     }
 
+    dragEnabledRef.current = false
     setDragOffset(0)
     touchStartYRef.current = null
     touchStartXRef.current = null
+  }
+
+  function beginDrag() {
+    dragEnabledRef.current = true
   }
 
   return (
@@ -169,38 +161,39 @@ export function InteractionSheet({
             transform: `translateY(${dragOffset}px)`,
             transition:
               dragOffset === 0
-                ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease-out'
+                ? 'transform 180ms ease, opacity 160ms ease'
                 : 'none',
           }}
           aria-modal="true"
           role="dialog"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
         >
-          <div style={dragHandleWrap}>
+          <div
+            style={dragHandleWrap}
+            onTouchStart={(event) => {
+              beginDrag()
+              handleTouchStart(event)
+            }}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div style={dragHandle} />
           </div>
 
           <div style={headerRow}>
             <div style={headerCopy}>
-              <div style={eyebrow}>INTERACTION</div>
               <div style={title}>{currentStage.title}</div>
 
-              <div style={metaRow}>
-                <span style={typeBadge}>{typeLabel}</span>
-                <span style={metaText}>USER {user}</span>
-
+              <div style={subRow}>
                 {resolvedRuntime ? (
-                  <span style={nativeBadge}>
-                    {legacyBridge
-                      ? `${resolvedRuntime.label} · BRIDGE`
-                      : resolvedRuntime.label}
-                  </span>
-                ) : hasNativeMinigame && minigameDefinition ? (
-                  <span style={nativeBadge}>{minigameDefinition.label}</span>
+                  <span style={miniBadge}>{resolvedRuntime.label}</span>
+                ) : minigameDefinition ? (
+                  <span style={miniBadge}>{minigameDefinition.label}</span>
                 ) : null}
+
+                <span style={userText}>{user}</span>
               </div>
+
+              {compactLine ? <div style={compactLineText}>{compactLine}</div> : null}
             </div>
 
             <button
@@ -212,14 +205,6 @@ export function InteractionSheet({
               CLOSE
             </button>
           </div>
-
-          {(narrative || hint || helperText) ? (
-            <section style={contextCard}>
-              <div style={contextLabel}>MISSION CONTEXT</div>
-              <div style={contextText}>{contextValue}</div>
-              {hint ? <div style={hintText}>Hint: {hint}</div> : null}
-            </section>
-          ) : null}
 
           {shouldRenderFamilyRuntime && resolvedRuntime ? (
             <FamilyRuntimeHost
@@ -237,82 +222,56 @@ export function InteractionSheet({
               submitting={submitting}
               onWin={handleNativeWin}
             />
-          ) : shouldRenderLegacyBridgeInfo && resolvedRuntime ? (
-            <section style={bridgeCard}>
-              <div style={bridgeLabel}>LEGACY BRIDGE READY</div>
-              <div style={bridgeText}>
-                {`This stage resolves through the ${resolvedRuntime.family.replace(/_/g, ' ')} family, but still enters through the legacy bridge. Recovery tools stay available until the family runtime replaces that legacy path.`}
-              </div>
-            </section>
-          ) : resolvedRuntime ? (
-            <section style={bridgeCard}>
-              <div style={bridgeLabel}>RUNTIME FAMILY RESOLVED</div>
-              <div style={bridgeText}>
-                {`This stage resolves to ${resolvedRuntime.label}, but no mounted runtime host is available for this exact path yet.`}
-              </div>
-            </section>
           ) : (
             <section style={bridgeCard}>
-              <div style={bridgeLabel}>BRIDGE MODE</div>
               <div style={bridgeText}>
                 {helperText || 'This node still uses the legacy interaction flow.'}
               </div>
             </section>
           )}
 
-          <section style={recoveryWrap}>
+          <div style={footerRow}>
             <button
               type="button"
               style={recoveryToggle}
-              onClick={() => {
-                vibrate(8)
-                setShowRecovery((current) => !current)
-              }}
+              onClick={() => setShowRecovery((current) => !current)}
             >
-              {showRecovery ? 'HIDE FALLBACK' : 'FALLBACK'}
+              {showRecovery ? 'Hide fallback' : 'Fallback'}
             </button>
+          </div>
 
-            {showRecovery ? (
-              <div style={recoveryPanel}>
-                <form style={formWrap} onSubmit={handleSubmit}>
-                  <label htmlFor="interaction-code" style={inputLabel}>
-                    MANUAL FALLBACK CODE
-                  </label>
+          {showRecovery ? (
+            <div style={recoveryPanel}>
+              <form style={formWrap} onSubmit={handleSubmit}>
+                <div style={inputRow}>
+                  <input
+                    id="interaction-code"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value.toUpperCase())}
+                    placeholder="CODE"
+                    autoComplete="off"
+                    spellCheck={false}
+                    style={input}
+                    disabled={submitting}
+                  />
 
-                  <div style={inputRow}>
-                    <input
-                      id="interaction-code"
-                      value={code}
-                      onChange={(event) =>
-                        setCode(event.target.value.toUpperCase())
-                      }
-                      placeholder="CODE"
-                      autoComplete="off"
-                      spellCheck={false}
-                      style={input}
-                      disabled={submitting}
-                    />
-
-                    <button
-                      type="submit"
-                      style={submitButton}
-                      disabled={submitting || !code.trim()}
-                    >
-                      {submitting ? '...' : 'OK'}
-                    </button>
-                  </div>
-
-                  {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
-                </form>
-
-                <div style={footerActions}>
-                  <a href={legacyPlayerHref} style={legacyLink}>
-                    Open legacy
-                  </a>
+                  <button
+                    type="submit"
+                    style={submitButton}
+                    disabled={submitting || !code.trim()}
+                  >
+                    {submitting ? '...' : 'OK'}
+                  </button>
                 </div>
-              </div>
-            ) : null}
-          </section>
+
+                {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
+              </form>
+
+              <a href={legacyPlayerHref} style={legacyLink}>
+                Open legacy
+              </a>
+            </div>
+          ) : null}
         </section>
       </div>
     </>
@@ -332,26 +291,26 @@ const overlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.58)',
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
+  background: 'rgba(2,6,23,.56)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   animation: 'sagaFadeIn 160ms ease-out',
 }
 
 const sheet: CSSProperties = {
   position: 'relative',
-  width: 'min(100%, 760px)',
+  width: 'min(100%, 840px)',
   maxHeight: 'calc(100vh - 24px)',
   overflowY: 'auto',
+  overscrollBehavior: 'contain',
   borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.14)',
-  background:
-    'linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.90))',
-  boxShadow: '0 30px 70px rgba(2,6,23,.42)',
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'linear-gradient(180deg, rgba(2,6,23,.98), rgba(15,23,42,.94))',
+  boxShadow: '0 18px 40px rgba(2,6,23,.30)',
   color: '#f8fafc',
   padding: 14,
   display: 'grid',
-  gap: 14,
+  gap: 10,
   animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
   willChange: 'transform',
 }
@@ -361,10 +320,12 @@ const dragHandleWrap: CSSProperties = {
   justifyContent: 'center',
   alignItems: 'center',
   paddingTop: 2,
+  paddingBottom: 2,
+  touchAction: 'none',
 }
 
 const dragHandle: CSSProperties = {
-  width: 44,
+  width: 42,
   height: 5,
   borderRadius: 999,
   background: 'rgba(255,255,255,.18)',
@@ -379,70 +340,56 @@ const headerRow: CSSProperties = {
 
 const headerCopy: CSSProperties = {
   minWidth: 0,
-}
-
-const eyebrow: CSSProperties = {
-  color: 'rgba(167,243,208,.96)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
+  display: 'grid',
+  gap: 6,
 }
 
 const title: CSSProperties = {
-  marginTop: 6,
   color: '#f8fafc',
-  fontSize: 24,
+  fontSize: 20,
   fontWeight: 900,
-  lineHeight: 1.05,
+  lineHeight: 1.02,
   letterSpacing: '-0.03em',
 }
 
-const metaRow: CSSProperties = {
+const subRow: CSSProperties = {
   display: 'flex',
+  alignItems: 'center',
   flexWrap: 'wrap',
   gap: 8,
-  marginTop: 10,
 }
 
-const chipBase: CSSProperties = {
+const miniBadge: CSSProperties = {
   minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 10px',
+  padding: '0 12px',
   borderRadius: 999,
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-}
-
-const typeBadge: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(59,130,246,.16)',
-  border: '1px solid rgba(96,165,250,.20)',
-  color: '#dbeafe',
-}
-
-const metaText: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(255,255,255,.06)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: 'rgba(255,255,255,.78)',
-}
-
-const nativeBadge: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(34,197,94,.16)',
-  border: '1px solid rgba(74,222,128,.22)',
+  background: 'rgba(22,163,74,.16)',
+  border: '1px solid rgba(34,197,94,.20)',
   color: '#dcfce7',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+}
+
+const userText: CSSProperties = {
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+}
+
+const compactLineText: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: 14,
+  lineHeight: 1.35,
 }
 
 const closeButton: CSSProperties = {
-  minHeight: 38,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
+  minHeight: 40,
+  padding: '0 16px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(255,255,255,.06)',
@@ -452,50 +399,11 @@ const closeButton: CSSProperties = {
   letterSpacing: '0.10em',
 }
 
-const contextCard: CSSProperties = {
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.05)',
-  padding: 14,
-  display: 'grid',
-  gap: 8,
-}
-
-const contextLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.64)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-}
-
-const contextText: CSSProperties = {
-  color: '#e2e8f0',
-  fontSize: 14,
-  lineHeight: 1.55,
-  whiteSpace: 'pre-wrap',
-}
-
-const hintText: CSSProperties = {
-  color: '#fde68a',
-  fontSize: 13,
-  lineHeight: 1.45,
-}
-
 const bridgeCard: CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(255,255,255,.05)',
   padding: 14,
-}
-
-const bridgeLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.64)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  marginBottom: 6,
 }
 
 const bridgeText: CSSProperties = {
@@ -504,20 +412,21 @@ const bridgeText: CSSProperties = {
   lineHeight: 1.5,
 }
 
-const recoveryWrap: CSSProperties = {
-  display: 'grid',
-  gap: 10,
+const footerRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-start',
 }
 
 const recoveryToggle: CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#e2e8f0',
-  fontSize: 12,
+  minHeight: 32,
+  padding: '0 10px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'transparent',
+  color: 'rgba(255,255,255,.66)',
+  fontSize: 11,
   fontWeight: 800,
-  letterSpacing: '0.04em',
+  letterSpacing: '0.08em',
 }
 
 const recoveryPanel: CSSProperties = {
@@ -534,14 +443,6 @@ const formWrap: CSSProperties = {
   gap: 8,
 }
 
-const inputLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.64)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-}
-
 const inputRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) auto',
@@ -549,7 +450,7 @@ const inputRow: CSSProperties = {
 }
 
 const input: CSSProperties = {
-  minHeight: 46,
+  minHeight: 44,
   borderRadius: 14,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(2,6,23,.50)',
@@ -563,8 +464,8 @@ const input: CSSProperties = {
 }
 
 const submitButton: CSSProperties = {
-  minHeight: 46,
-  minWidth: 64,
+  minHeight: 44,
+  minWidth: 62,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -585,15 +486,8 @@ const errorText: CSSProperties = {
   lineHeight: 1.4,
 }
 
-const footerActions: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 10,
-  alignItems: 'center',
-}
-
 const legacyLink: CSSProperties = {
-  minHeight: 38,
+  minHeight: 36,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
