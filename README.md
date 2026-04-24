@@ -18,7 +18,7 @@ It is designed for organizers who want full control over:
 
 SAGA already has a usable backend/runtime for real route-based and checkpoint-based experiences.
 
-At the same time, a new React frontend workspace is being built to evolve the player experience into a more modern mobile-first app flow.
+At the same time, a React frontend workspace is being built to evolve the player experience into a more modern mobile-first app flow.
 
 ### Stable today
 
@@ -64,6 +64,9 @@ Current React frontend scope:
 - Leaflet-based node rendering
 - public config fetch via `/api/config`
 - sanitized player payload consumption via `/api/game/{user}`
+- team presence / live player overlays
+- route-progress top shell
+- interaction-sheet runtime bridge for minigames
 
 ### Important boundary
 
@@ -71,7 +74,6 @@ The production runtime still uses the existing FastAPI + template-based frontend
 
 The React frontend is currently:
 
-- a work in progress
 - a migration workspace
 - not the production frontend yet
 - not at full feature parity with the legacy player flow yet
@@ -143,6 +145,8 @@ At each node, the engine can combine:
 - `/admin` -> admin panel
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
+- `/api/team/{user}` -> team presence / player status payload
+- `/api/heartbeat` -> live player heartbeat updates
 - `/api/admin/login` -> admin login
 - `/api/admin/change-password` -> admin password change flow
 - `/api/admin/stages` -> admin stage data
@@ -180,7 +184,7 @@ The stable player runtime currently supports:
 - persistent GPS badge
 - per-node hint support
 - per-node GPS unavailable messaging
-- `classic` / `glass` player themes
+- classic / glass player themes
 
 ### React player direction
 
@@ -191,15 +195,18 @@ The React player iteration is moving toward:
 - stronger app-like flow
 - React mission entry to player transition
 - cleaner mobile shell and overlays
+- player/team presence visibility
+- faster live sync
+- clearer route progress visualization
 
 ### Still pending on the React side
 
 - stronger interaction logic
 - final top bar / HUD hierarchy
-- full gameplay / mini-game bridge
-- full parity with the legacy player flow
-- final responsive and UX polish
+- full gameplay parity with the legacy player flow
 - richer motion / transitions / microinteractions
+- complete family-native minigame implementations
+- final fullscreen sensor gameplay
 
 ---
 
@@ -218,8 +225,9 @@ The React workspace now includes a first mission entry / login flow that:
 - falls back to `players` when profiles are simple
 - links mission entry to React player
 - exposes admin access from the entry screen
+- aligns visually with the glass/player shell direction
 
-This is the beginning of the new app flow, not the final visual/product version yet.
+This is the beginning of the new app flow, not the final product version yet.
 
 ---
 
@@ -244,13 +252,11 @@ The admin panel currently includes:
 - live / stale / offline visibility
 - current level / stage visibility
 - GPS / last seen / position visibility
-
-### Organizer recovery actions
-
-- reset profile
-- level -1
-- level +1
-- mark finished
+- organizer recovery actions:
+  - reset profile
+  - level -1
+  - level +1
+  - mark finished
 
 ### Nodes
 
@@ -277,7 +283,9 @@ The admin panel currently includes:
 
 ## Supported Mini-Games
 
-Currently supported mini-game types:
+### Legacy runtime mini-game types
+
+These are currently supported by the stable backend/template runtime:
 
 - `digital_tuner`
 - `circuit_hack`
@@ -288,9 +296,64 @@ Currently supported mini-game types:
 - `switchboard`
 - `compass_blow`
 
-These currently belong to the stable backend/template runtime.
+### React runtime foundation
 
-The React migration has not fully migrated mini-games yet.
+The React/frontend runtime now includes a scalable family-based minigame foundation.
+
+Current minigame families:
+
+- `circuit_matrix`
+- `bearing_hunt`
+- `signal_hunt`
+
+Current runtime foundation includes:
+
+- core minigame type system
+- family configs and registry contracts
+- legacy type -> family adaptation
+- stage/runtime resolution helpers
+- `FamilyRuntimeHost`
+- `InteractionSheet` integration for resolved family runtime vs legacy bridge
+- first fullscreen runtime shells for each family
+
+### What the families are for
+
+#### `circuit_matrix`
+
+Logic-heavy games such as:
+
+- path restore
+- switch logic
+- route repair
+- power balancing
+- cryptex-like board logic
+- sequence grids
+
+#### `bearing_hunt`
+
+Sensor/orientation games such as:
+
+- compass lock
+- stable heading hold
+- directional sequence
+- sector scan
+- device orientation challenges
+
+#### `signal_hunt`
+
+Proximity/search games such as:
+
+- source finding
+- hot/cold search
+- signal intensity lock
+- GPS-based tracking
+- audio/haptic guidance hunts
+
+### Important note
+
+Current family runtime screens are foundation shells, not final production gameplay yet.
+
+Legacy paths still work through the bridge, so migration can continue without breaking existing stage types.
 
 ---
 
@@ -322,7 +385,7 @@ Players do not consume raw admin stage data directly.
 
 Current player runtime uses:
 
-    GET /api/game/{user}
+- `GET /api/game/{user}`
 
 The player payload includes only what the player needs, such as:
 
@@ -337,8 +400,8 @@ The player payload includes only what the player needs, such as:
 
 It does not expose fallback secrets such as:
 
-- answer
-- rune
+- `answer`
+- `rune`
 
 ---
 
@@ -363,7 +426,7 @@ Validation currently checks things such as:
 
 Stored in:
 
-    config.json
+- `config.json`
 
 Typical fields include:
 
@@ -388,41 +451,66 @@ Players can still be kept simple, but the runtime also supports richer profile /
 
 Default/demo stage schema lives in:
 
-    data/stages.json
+- `data/stages.json`
 
 Production live stage data can instead live in the external directory selected through `SAGA_DATA_DIR`.
 
 Current editable schema still supports simple node objects like:
 
-    {
-      "id": 0,
-      "title": "NODE TITLE",
-      "lat": 42.0000,
-      "lon": -8.0000,
-      "radius": 50,
-      "type": "circuit_hack",
-      "content": "NODE TEXT",
-      "config": {},
-      "answer": "",
-      "rune": ""
-    }
+```json
+{
+  "id": 0,
+  "title": "NODE TITLE",
+  "lat": 42.0000,
+  "lon": -8.0000,
+  "radius": 50,
+  "type": "circuit_hack",
+  "content": "NODE TEXT",
+  "config": {},
+  "answer": "",
+  "rune": ""
+}
+```
 
 Optional legacy-compatible fields already supported by runtime:
 
-    {
-      "hint": "Fallback hint shown inside the node",
-      "gps_unavailable_message": "Custom message when GPS is unavailable",
-      "locked_message": "Custom message for locked / distance state",
-      "require_proximity": true,
-      "allow_debug_bypass": true,
-      "allow_manual_fallback_without_gps": true,
-      "entry_mode": "gps"
-    }
+```json
+{
+  "hint": "Fallback hint shown inside the node",
+  "gps_unavailable_message": "Custom message when GPS is unavailable",
+  "locked_message": "Custom message for locked / distance state",
+  "require_proximity": true,
+  "allow_debug_bypass": true,
+  "allow_manual_fallback_without_gps": true,
+  "entry_mode": "gps"
+}
+```
 
 Supported `entry_mode` values:
 
 - `gps` -> node is expected to use GPS / distance rules
 - `free` -> node can be entered without proximity requirement
+
+### Runtime-oriented minigame shape
+
+The React/frontend runtime now also supports a richer per-stage runtime minigame block:
+
+```json
+{
+  "minigame": {
+    "type": "bearing_hunt",
+    "version": "v1",
+    "label": "Bearing Hunt",
+    "config": {
+      "objective": "single_lock",
+      "tolerance_deg": 12,
+      "hold_ms": 1200
+    }
+  }
+}
+```
+
+This coexists with legacy `type` + `config` stage data during migration.
 
 ---
 
@@ -444,26 +532,30 @@ Typical production setup:
 
 ### Production deployment example
 
-    docker build -t saga_engine:latest ~/saga_engine
+```bash
+docker build -t saga_engine:latest ~/saga_engine
 
-    docker rm -f saga_engine_app || true
+docker rm -f saga_engine_app || true
 
-    docker run -d \
-      --name saga_engine_app \
-      -p 8096:5000 \
-      -e ADMIN_PASS='YOUR_PASSWORD' \
-      -e SAGA_DATA_DIR=/app_data \
-      -v ~/saga_engine:/app \
-      -v ~/saga_engine_data:/app_data \
-      --restart unless-stopped \
-      saga_engine:latest
+docker run -d \
+  --name saga_engine_app \
+  -p 8096:5000 \
+  -e ADMIN_PASS='YOUR_PASSWORD' \
+  -e SAGA_DATA_DIR=/app_data \
+  -v ~/saga_engine:/app \
+  -v ~/saga_engine_data:/app_data \
+  --restart unless-stopped \
+  saga_engine:latest
+```
 
 ### Production smoke check
 
-    curl -sS -o /tmp/saga_root.html  -w "GET / => HTTP %{http_code}\n" http://127.0.0.1:8096/
-    curl -sS -o /tmp/saga_admin.html -w "GET /admin => HTTP %{http_code}\n" http://127.0.0.1:8096/admin
-    curl -sS -o /tmp/saga_cfg.json   -w "GET /api/config => HTTP %{http_code}\n" http://127.0.0.1:8096/api/config
-    docker logs --since=2m saga_engine_app 2>&1 | tail -n 40
+```bash
+curl -sS -o /tmp/saga_root.html  -w "GET / => HTTP %{http_code}\n" http://127.0.0.1:8096/
+curl -sS -o /tmp/saga_admin.html -w "GET /admin => HTTP %{http_code}\n" http://127.0.0.1:8096/admin
+curl -sS -o /tmp/saga_cfg.json   -w "GET /api/config => HTTP %{http_code}\n" http://127.0.0.1:8096/api/config
+docker logs --since=2m saga_engine_app 2>&1 | tail -n 40
+```
 
 ---
 
@@ -471,10 +563,12 @@ Typical production setup:
 
 ### Backend / test runtime
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install fastapi uvicorn jinja2
-    python -m uvicorn main:app --host 0.0.0.0 --port 8097
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install fastapi uvicorn jinja2
+python -m uvicorn main:app --host 0.0.0.0 --port 8097
+```
 
 Or use the existing Docker-based test container if that is already part of your workflow.
 
@@ -482,13 +576,15 @@ Or use the existing Docker-based test container if that is already part of your 
 
 The new frontend workspace lives in:
 
-    frontend/
+- `frontend/`
 
 Install and run:
 
-    cd frontend
-    npm install
-    npm run dev -- --host 0.0.0.0
+```bash
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0
+```
 
 Default Vite dev behavior:
 
@@ -518,7 +614,7 @@ Useful development URLs:
 - `templates/login.html` -> legacy player selection / login
 - `templates/game.html` -> legacy player UI
 - `templates/admin.html` -> admin panel
-- `static/minigames_final.js` -> frontend mini-game logic
+- `static/minigames_final.js` -> legacy/frontend mini-game logic
 - `data/` -> demo / default data files
 
 ### Frontend workspace
@@ -526,7 +622,9 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
-- `frontend/src/player/components/*` -> player shell / HUD / map surface
+- `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
+- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry, legacy adapter, runtime bridge
+- `frontend/src/player/minigames/families/*` -> family definitions and fullscreen runtime screens
 - `frontend/src/shared/api.ts` -> frontend API calls
 - `frontend/src/types/player.ts` -> shared frontend types
 
@@ -598,8 +696,10 @@ Near-term direction for the new frontend:
 - strengthen mission entry / login flow
 - continue improving the mobile-first player shell
 - refine top bar / HUD / menu logic
-- define gameplay bridge with current runtime and mini-games
-- keep backend untouched while the frontend evolves
+- build full production gameplay on top of the family runtime foundation
+- migrate legacy minigame types toward family-native screens
+- add admin editing for family minigame configuration
+- keep backend stable while the frontend runtime evolves
 - target a stronger installable web app / PWA flow before considering mobile packaging
 
 ### Product potential
