@@ -244,6 +244,9 @@ SUPPORTED_MINIGAME_TYPES = {
     "simon_says",
     "switchboard",
     "compass_blow",
+    "circuit_matrix",
+    "bearing_hunt",
+    "signal_hunt",
 }
 
 def _as_str(value, default=""):
@@ -294,6 +297,9 @@ MINIGAME_SPECS = {
     "gyro_storm": {"label": "Gyro Storm"},
     "switchboard": {"label": "Switchboard"},
     "compass_blow": {"label": "Compass Blow"},
+    "circuit_matrix": {"label": "Circuit Matrix"},
+    "bearing_hunt": {"label": "Bearing Hunt"},
+    "signal_hunt": {"label": "Signal Hunt"},
 }
 
 def _clamp_int(value, default, minimum=None, maximum=None):
@@ -366,6 +372,79 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     normalized_type = _as_str(minigame_type).strip().lower()
     if normalized_type not in SUPPORTED_MINIGAME_TYPES:
         normalized_type = "circuit_hack"
+
+    if normalized_type == "circuit_matrix":
+        out = {
+            "objective": _as_str(raw.get("objective") or "path_restore").strip().lower() or "path_restore",
+            "grid_cols": _clamp_int(raw.get("grid_cols"), 5, 2, 8),
+            "grid_rows": _clamp_int(raw.get("grid_rows"), 5, 2, 8),
+            "difficulty": _clamp_int(raw.get("difficulty"), 2, 1, 5),
+            "max_moves": _clamp_int(raw.get("max_moves"), 0, 0) or None,
+            "max_time_ms": _clamp_int(raw.get("max_time_ms"), 0, 0) or None,
+            "allow_rotate": _as_bool(raw.get("allow_rotate"), True),
+            "allow_toggle": _as_bool(raw.get("allow_toggle"), True),
+            "allow_swap": _as_bool(raw.get("allow_swap"), False),
+            "start_nodes": raw.get("start_nodes") if isinstance(raw.get("start_nodes"), list) else [],
+            "end_nodes": raw.get("end_nodes") if isinstance(raw.get("end_nodes"), list) else [],
+            "target_pattern": raw.get("target_pattern") if isinstance(raw.get("target_pattern"), list) else [],
+            "blocked_cells": raw.get("blocked_cells") if isinstance(raw.get("blocked_cells"), list) else [],
+            "hint_mode": _as_str(raw.get("hint_mode") or "light").strip().lower() or "light",
+            "auto_check": _as_bool(raw.get("auto_check"), True),
+            "success_animation": _as_str(raw.get("success_animation") or "restore").strip().lower() or "restore",
+        }
+        if raw.get("seed") not in (None, ""):
+            out["seed"] = _as_str(raw.get("seed")).strip()
+        return out
+
+    if normalized_type == "bearing_hunt":
+        target_sequence = raw.get("target_sequence_deg")
+        false_targets = raw.get("false_targets")
+
+        out = {
+            "objective": _as_str(raw.get("objective") or "single_lock").strip().lower() or "single_lock",
+            "target_bearing_deg": _as_float(raw.get("target_bearing_deg"), 90),
+            "target_sequence_deg": target_sequence if isinstance(target_sequence, list) else [],
+            "sector_start_deg": _as_float(raw.get("sector_start_deg"), None),
+            "sector_end_deg": _as_float(raw.get("sector_end_deg"), None),
+            "tolerance_deg": _clamp_int(raw.get("tolerance_deg"), 12, 1, 90),
+            "hold_ms": _clamp_int(raw.get("hold_ms"), 1200, 100),
+            "phases": _clamp_int(raw.get("phases"), 1, 1, 10),
+            "timeout_ms": _clamp_int(raw.get("timeout_ms"), 0, 0) or None,
+            "require_stable_orientation": _as_bool(raw.get("require_stable_orientation"), True),
+            "stability_window_ms": _clamp_int(raw.get("stability_window_ms"), 800, 100),
+            "feedback_mode": _as_str(raw.get("feedback_mode") or "mixed").strip().lower() or "mixed",
+            "noise_level": _clamp_int(raw.get("noise_level"), 1, 0, 3),
+            "false_targets": false_targets if isinstance(false_targets, list) else [],
+            "show_numeric_bearing": _as_bool(raw.get("show_numeric_bearing"), False),
+            "show_compass_ring": _as_bool(raw.get("show_compass_ring"), True),
+            "allow_recenter": _as_bool(raw.get("allow_recenter"), True),
+        }
+        return out
+
+    if normalized_type == "signal_hunt":
+        false_peaks = raw.get("false_peaks")
+        dead_zones = raw.get("dead_zones")
+
+        out = {
+            "objective": _as_str(raw.get("objective") or "proximity_lock").strip().lower() or "proximity_lock",
+            "source_lat": _as_float(raw.get("source_lat"), None),
+            "source_lon": _as_float(raw.get("source_lon"), None),
+            "source_radius_m": _as_float(raw.get("source_radius_m"), 20),
+            "lock_threshold": _clamp_int(raw.get("lock_threshold"), 85, 1, 100),
+            "hold_ms": _clamp_int(raw.get("hold_ms"), 1500, 100),
+            "max_signal": _clamp_int(raw.get("max_signal"), 100, 1, 100),
+            "noise_floor": _clamp_int(raw.get("noise_floor"), 4, 0, 100),
+            "jitter": _clamp_int(raw.get("jitter"), 1, 0, 100),
+            "decay_curve": _as_str(raw.get("decay_curve") or "smooth").strip().lower() or "smooth",
+            "timeout_ms": _clamp_int(raw.get("timeout_ms"), 0, 0) or None,
+            "update_rate_ms": _clamp_int(raw.get("update_rate_ms"), 500, 100),
+            "use_audio": _as_bool(raw.get("use_audio"), False),
+            "use_vibration": _as_bool(raw.get("use_vibration"), True),
+            "use_direction_hint": _as_bool(raw.get("use_direction_hint"), False),
+            "false_peaks": false_peaks if isinstance(false_peaks, list) else [],
+            "dead_zones": dead_zones if isinstance(dead_zones, list) else [],
+        }
+        return out
 
     if normalized_type == "circuit_hack":
         default_target = ["EAST", "SECOND", "SOUTH"]
@@ -844,11 +923,24 @@ def normalize_stage(raw):
         default=(entry_mode != "free")
     )
 
-    interaction_type = _as_str(raw.get("type") or "circuit_hack").strip().lower() or "circuit_hack"
+    raw_minigame = raw.get("minigame")
+    if not isinstance(raw_minigame, dict):
+        raw_minigame = {}
+
+    interaction_type = _as_str(
+        raw_minigame.get("type") or raw.get("type") or "circuit_hack"
+    ).strip().lower() or "circuit_hack"
     if interaction_type not in SUPPORTED_MINIGAME_TYPES:
         interaction_type = "circuit_hack"
 
-    interaction_config = normalize_minigame_config(interaction_type, cfg)
+    raw_minigame_config = raw_minigame.get("config")
+    if not isinstance(raw_minigame_config, dict):
+        raw_minigame_config = None
+
+    interaction_config = normalize_minigame_config(
+        interaction_type,
+        raw_minigame_config if raw_minigame_config is not None else cfg
+    )
 
     return {
         "id": raw.get("id"),
@@ -984,12 +1076,20 @@ def validate_stage(raw_stage, idx=None):
     if not title:
         add("title", "title is required")
 
-    raw_interaction_type = _as_str(raw_stage.get("type") if isinstance(raw_stage, dict) else "").strip().lower()
+    raw_minigame = raw_stage.get("minigame") if isinstance(raw_stage, dict) else {}
+    if not isinstance(raw_minigame, dict):
+        raw_minigame = {}
+
+    raw_interaction_type = _as_str(
+        raw_minigame.get("type") or (raw_stage.get("type") if isinstance(raw_stage, dict) else "")
+    ).strip().lower()
     interaction_type = raw_interaction_type or node["interaction"]["type"]
     if interaction_type not in SUPPORTED_MINIGAME_TYPES:
         add("type", f"unsupported minigame type: {interaction_type}")
 
-    raw_config = raw_stage.get("config") if isinstance(raw_stage, dict) else {}
+    raw_config = raw_minigame.get("config") if isinstance(raw_minigame.get("config"), dict) else (
+        raw_stage.get("config") if isinstance(raw_stage, dict) else {}
+    )
     if raw_config is not None and not isinstance(raw_config, dict):
         add("config", "config must be an object")
         raw_config = {}
