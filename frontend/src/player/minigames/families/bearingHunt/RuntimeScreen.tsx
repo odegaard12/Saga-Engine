@@ -11,11 +11,15 @@ interface Props {
 }
 
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'not_required'
-type SensorState = 'checking' | 'ready' | 'blocked' | 'locked'
+type SensorState = 'checking' | 'ready' | 'locked' | 'blocked'
 type BlockedReason = 'none' | 'https' | 'permission' | 'unsupported'
 
 type IOSOrientationEventCtor = {
   requestPermission?: () => Promise<'granted' | 'denied'>
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
 }
 
 function normalizeDegrees(value: number) {
@@ -29,7 +33,7 @@ function shortestAngleDelta(from: number, to: number) {
   return diff
 }
 
-function normalizeHeading(event: DeviceOrientationEvent): number | null {
+function readHeading(event: DeviceOrientationEvent): number | null {
   const withCompass = event as DeviceOrientationEvent & {
     webkitCompassHeading?: number
   }
@@ -48,628 +52,794 @@ function normalizeHeading(event: DeviceOrientationEvent): number | null {
   return null
 }
 
-function getStateLabel(
-  sensorState: SensorState,
-  blockedReason: BlockedReason,
-  permission: PermissionState,
-  heading: number | null
-) {
-  if (sensorState === 'locked') return 'Locked'
-  if (blockedReason === 'https') return 'HTTPS'
-  if (blockedReason === 'permission') return 'Denied'
-  if (blockedReason === 'unsupported') return 'No sensor'
-  if (permission === 'unknown') return 'Enable'
-  if (heading === null) return 'Search'
-  return 'Track'
+function formatDeg(value: number | null) {
+  return value == null ? '--' : `${Math.round(normalizeDegrees(value))}°`
 }
 
-function getStatusLine(
-  permission: PermissionState,
+function directionFromDelta(delta: number | null, tolerance: number) {
+  if (delta == null) return 'Track'
+  const abs = Math.abs(delta)
+  if (abs <= tolerance) return 'Locked'
+  if (abs <= tolerance * 1.8) return delta > 0 ? 'Right a bit' : 'Left a bit'
+  return delta > 0 ? 'Turn right' : 'Turn left'
+}
+
+function statusText(
   blockedReason: BlockedReason,
-  sensorState: SensorState,
-  delta: number | null,
-  tolerance: number
+  permission: PermissionState,
+  sensorState: SensorState
 ) {
   if (blockedReason === 'https') return 'Use HTTPS on iPhone.'
-  if (blockedReason === 'permission') return 'Tap enable and allow motion access.'
-  if (blockedReason === 'unsupported') return 'Orientation not exposed here.'
-  if (permission === 'unknown') return 'Tap enable to use sensors.'
-  if (sensorState === 'locked') return 'Locked.'
-  if (delta === null) return 'Searching.'
-  if (delta <= tolerance) return 'Hold steady.'
-  if (delta <= tolerance * 1.8) return 'Almost there.'
-  return 'Aim to target.'
+  if (blockedReason === 'permission') {
+    return permission === 'denied'
+      ? 'Motion permission denied.'
+      : 'Enable motion access.'
+  }
+  if (blockedReason === 'unsupported') return 'Orientation sensor unavailable.'
+  if (sensorState === 'locked') return 'Target locked.'
+  if (sensorState === 'ready') return 'Aim to target.'
+  return 'Preparing sensors.'
+}
+
+function getIosRequestPermission():
+  | (() => Promise<'granted' | 'denied'>)
+  | null {
+  if (typeof window === 'undefined') return null
+  const ctor = (window as Window & {
+    DeviceOrientationEvent?: IOSOrientationEventCtor
+  }).DeviceOrientationEvent
+  if (ctor && typeof ctor.requestPermission === 'function') {
+    return ctor.requestPermission.bind(ctor)
+  }
+  return null
 }
 
 export function BearingHuntRuntimeScreen({
   resolved,
-  stage: _stage,
-  helperText: _helperText,
+  stage,
+  helperText,
   submitting,
   onWin,
 }: Props) {
-  const cfg = resolved.config
+  const cfg = ((resolved as unknown as { config?: Record<string, unknown> })?.config ?? {}) as Record<
+    string,
+    unknown
+  >
 
-  const target = Number.isFinite(cfg.target_bearing_deg) ? cfg.target_bearing_deg ?? 90 : 90
-  const tolerance = Number.isFinite(cfg.tolerance_deg) ? cfg.tolerance_deg : 18
-  const holdMs = Number.isFinite(cfg.hold_ms) ? cfg.hold_ms : 1200
+  const target = normalizeDegrees(
+    Number(cfg.targetDeg ?? cfg.target_deg ?? cfg.targetHeading ?? cfg.target_heading ?? 90)
+  )
+  const tolerance = clamp(
+    Number(cfg.toleranceDeg ?? cfg.tolerance_deg ?? 18),
+    4,
+    60
+  )
+  const holdMs = clamp(
+    Number(cfg.holdMs ?? cfg.hold_ms ?? 1200),
+    300,
+    6000
+  )
 
   const [permission, setPermission] = useState<PermissionState>('unknown')
   const [sensorState, setSensorState] = useState<SensorState>('checking')
   const [blockedReason, setBlockedReason] = useState<BlockedReason>('none')
-  const [headingDisplay, setHeadingDisplay] = useState<number | null>(null)
-  const [delta, setDelta] = useState<number | null>(null)
+  const [rawHeading, setRawHeading] = useState<number | null>(null)
+  const [displayHeading, setDisplayHeading] = useState<number | null>(null)
   const [holdProgress, setHoldProgress] = useState(0)
-  const [requestingPermission, setRequestingPermission] = useState(false)
+  const [fallbackOpen, setFallbackOpen] = useState(false)
 
   const rawHeadingRef = useRef<number | null>(null)
-  const smoothedHeadingRef = useRef<number | null>(null)
-  const displayHeadingRef = useRef<number | null>(null)
-  const velocityRef = useRef(0)
+  const smoothHeadingRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
-  const lastFrameRef = useRef<number | null>(null)
-  const lockStartRef = useRef<number | null>(null)
+  const holdStartRef = useRef<number | null>(null)
   const wonRef = useRef(false)
 
-  const targetRotation = useMemo(() => normalizeDegrees(target), [target])
-  const stateLabel = getStateLabel(sensorState, blockedReason, permission, headingDisplay)
-  const statusMessage = getStatusLine(permission, blockedReason, sensorState, delta, tolerance)
-  const targetHot = delta !== null && delta <= tolerance * 1.35
+  const isHttps = useMemo(() => {
+    if (typeof window === 'undefined') return true
+    const host = window.location.hostname
+    return (
+      window.location.protocol === 'https:' ||
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '192.168.68.103' ||
+      host === '192.168.68.200'
+    )
+  }, [])
+
+  const delta = useMemo(() => {
+    if (displayHeading == null) return null
+    return shortestAngleDelta(displayHeading, target)
+  }, [displayHeading, target])
+
+  const absDelta = delta == null ? null : Math.abs(delta)
+  const inWindow = absDelta != null && absDelta <= tolerance
+
+  const guidanceTitle = useMemo(() => {
+    if (sensorState === 'locked') return 'Locked'
+    if (blockedReason !== 'none') return 'Blocked'
+    return directionFromDelta(delta, tolerance)
+  }, [sensorState, blockedReason, delta, tolerance])
+
+  const guidanceSub = useMemo(() => {
+    return statusText(blockedReason, permission, sensorState)
+  }, [blockedReason, permission, sensorState])
+
+  const statusChip = useMemo(() => {
+    if (sensorState === 'locked') return 'LOCK'
+    if (blockedReason !== 'none') return 'BLOCKED'
+    return 'TRACK'
+  }, [sensorState, blockedReason])
+
+  async function requestMotionPermission() {
+    const req = getIosRequestPermission()
+    if (!req) {
+      setPermission('not_required')
+      return
+    }
+
+    try {
+      const result = await req()
+      if (result === 'granted') {
+        setPermission('granted')
+        setBlockedReason('none')
+        setSensorState('checking')
+      } else {
+        setPermission('denied')
+        setBlockedReason('permission')
+        setSensorState('blocked')
+      }
+    } catch {
+      setPermission('denied')
+      setBlockedReason('permission')
+      setSensorState('blocked')
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const ctor = window.DeviceOrientationEvent as unknown as IOSOrientationEventCtor | undefined
-    const requiresRequest = typeof ctor?.requestPermission === 'function'
-    const hasOrientationEvent =
-      'DeviceOrientationEvent' in window || 'ondeviceorientation' in window
+    const req = getIosRequestPermission()
 
-    if (!window.isSecureContext) {
-      setPermission('denied')
-      setBlockedReason('https')
-      setSensorState('blocked')
-      return
-    }
-
-    if (!hasOrientationEvent) {
-      setPermission('denied')
+    if (!('DeviceOrientationEvent' in window)) {
+      setPermission('not_required')
       setBlockedReason('unsupported')
       setSensorState('blocked')
       return
     }
 
-    if (requiresRequest) {
+    if (!isHttps) {
+      setBlockedReason('https')
+      setSensorState('blocked')
+      return
+    }
+
+    if (req) {
       setPermission('unknown')
-      setBlockedReason('none')
-      setSensorState('checking')
+      setBlockedReason('permission')
+      setSensorState('blocked')
       return
     }
 
     setPermission('not_required')
     setBlockedReason('none')
-    setSensorState('ready')
-  }, [])
+    setSensorState('checking')
+  }, [isHttps])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!(permission === 'granted' || permission === 'not_required')) return
+    if (blockedReason === 'https') return
+    if (permission === 'unknown') return
+    if (permission === 'denied') return
 
-    wonRef.current = false
-    lockStartRef.current = null
-    setSensorState('ready')
-    setBlockedReason('none')
-
-    function handleOrientation(event: DeviceOrientationEvent) {
-      const nextHeading = normalizeHeading(event)
-
-      if (nextHeading === null) {
-        setSensorState('blocked')
-        setBlockedReason('unsupported')
-        rawHeadingRef.current = null
-        smoothedHeadingRef.current = null
-        setHeadingDisplay(null)
-        setDelta(null)
-        setHoldProgress(0)
-        lockStartRef.current = null
-        return
-      }
-
+    function onOrientation(event: DeviceOrientationEvent) {
+      const next = readHeading(event)
+      if (next == null) return
+      rawHeadingRef.current = next
+      setRawHeading(next)
       setBlockedReason('none')
-      rawHeadingRef.current = nextHeading
-
-      if (smoothedHeadingRef.current === null) {
-        smoothedHeadingRef.current = nextHeading
-      } else {
-        const diff = shortestAngleDelta(smoothedHeadingRef.current, nextHeading)
-        smoothedHeadingRef.current = normalizeDegrees(
-          smoothedHeadingRef.current + diff * 0.22
-        )
-      }
-
-      const current = smoothedHeadingRef.current
-      const nextDelta = Math.abs(shortestAngleDelta(current, target))
-      setDelta(Math.round(nextDelta))
-
-      if (nextDelta <= tolerance) {
-        const now = performance.now()
-
-        if (lockStartRef.current === null) {
-          lockStartRef.current = now
-        }
-
-        const progress = Math.min(100, ((now - lockStartRef.current) / holdMs) * 100)
-        setHoldProgress(progress)
-        setSensorState(progress >= 100 ? 'locked' : 'ready')
-
-        if (progress >= 100 && !wonRef.current) {
-          wonRef.current = true
-          void onWin()
-        }
-      } else {
-        lockStartRef.current = null
-        setHoldProgress(0)
-        setSensorState('ready')
-      }
+      setSensorState((prev) => (prev === 'locked' ? 'locked' : 'ready'))
     }
 
-    window.addEventListener('deviceorientation', handleOrientation, true)
-
+    window.addEventListener('deviceorientation', onOrientation, true)
     return () => {
-      window.removeEventListener('deviceorientation', handleOrientation, true)
+      window.removeEventListener('deviceorientation', onOrientation, true)
     }
-  }, [permission, target, tolerance, holdMs, onWin])
+  }, [permission, blockedReason])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (rawHeading == null) return
+    rawHeadingRef.current = rawHeading
 
-    function frame(now: number) {
-      const last = lastFrameRef.current ?? now
-      const dt = Math.max(0.8, Math.min(2.2, (now - last) / 16.666))
-      lastFrameRef.current = now
+    function tick() {
+      const targetHeading = rawHeadingRef.current
+      const current = smoothHeadingRef.current
 
-      const targetHeading = smoothedHeadingRef.current
-
-      if (targetHeading === null) {
-        setHeadingDisplay(null)
-        velocityRef.current *= 0.82
-        rafRef.current = window.requestAnimationFrame(frame)
+      if (targetHeading == null) {
+        rafRef.current = requestAnimationFrame(tick)
         return
       }
 
-      if (displayHeadingRef.current === null) {
-        displayHeadingRef.current = targetHeading
+      if (current == null) {
+        smoothHeadingRef.current = targetHeading
+        setDisplayHeading(targetHeading)
+        rafRef.current = requestAnimationFrame(tick)
+        return
       }
 
-      const currentDisplay = displayHeadingRef.current
-      const deltaToTarget = shortestAngleDelta(currentDisplay, targetHeading)
-
-      velocityRef.current += deltaToTarget * 0.11 * dt
-      velocityRef.current *= 0.84
-
-      const wobbleBase =
-        sensorState === 'blocked' || sensorState === 'locked'
-          ? 0
-          : Math.min(1.1, Math.abs(velocityRef.current) * 0.08)
-
-      const wobble = Math.sin(now / 180) * wobbleBase
-
-      displayHeadingRef.current = normalizeDegrees(
-        currentDisplay + velocityRef.current + wobble
-      )
-
-      setHeadingDisplay(Math.round(displayHeadingRef.current))
-      rafRef.current = window.requestAnimationFrame(frame)
+      const diff = shortestAngleDelta(current, targetHeading)
+      const eased = normalizeDegrees(current + diff * 0.14)
+      smoothHeadingRef.current = eased
+      setDisplayHeading(eased)
+      rafRef.current = requestAnimationFrame(tick)
     }
 
-    rafRef.current = window.requestAnimationFrame(frame)
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(tick)
 
     return () => {
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current)
-      }
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
-      lastFrameRef.current = null
     }
-  }, [sensorState])
+  }, [rawHeading])
 
-  async function requestSensorPermission() {
-    if (typeof window === 'undefined') return
-
-    const ctor = window.DeviceOrientationEvent as unknown as IOSOrientationEventCtor | undefined
-    if (typeof ctor?.requestPermission !== 'function') {
-      setPermission('not_required')
-      setBlockedReason('none')
-      setSensorState('ready')
+  useEffect(() => {
+    if (sensorState !== 'ready' && sensorState !== 'locked') {
+      holdStartRef.current = null
+      setHoldProgress(0)
       return
     }
 
-    try {
-      setRequestingPermission(true)
-      const result = await ctor.requestPermission()
+    if (!inWindow) {
+      holdStartRef.current = null
+      setHoldProgress(0)
+      return
+    }
 
-      if (result === 'granted') {
-        setPermission('granted')
-        setBlockedReason('none')
-        setSensorState('ready')
+    let localRaf = 0
+
+    const run = (now: number) => {
+      if (holdStartRef.current == null) holdStartRef.current = now
+      const elapsed = now - holdStartRef.current
+      const ratio = clamp(elapsed / holdMs, 0, 1)
+      setHoldProgress(ratio)
+
+      if (ratio >= 1) {
+        if (!wonRef.current && !submitting) {
+          wonRef.current = true
+          setSensorState('locked')
+          void onWin()
+        }
         return
       }
 
-      setPermission('denied')
-      setBlockedReason('permission')
-      setSensorState('blocked')
-    } catch {
-      setPermission('denied')
-      setBlockedReason('permission')
-      setSensorState('blocked')
-    } finally {
-      setRequestingPermission(false)
+      localRaf = requestAnimationFrame(run)
     }
+
+    localRaf = requestAnimationFrame(run)
+    return () => cancelAnimationFrame(localRaf)
+  }, [inWindow, holdMs, onWin, sensorState, submitting])
+
+  const compassRotation = displayHeading == null ? 0 : -displayHeading
+  const targetRotation = target
+  const wobbleRotation =
+    displayHeading == null ? 0 : clamp(shortestAngleDelta(displayHeading, rawHeading ?? displayHeading) * 0.35, -8, 8)
+
+  const cardBase: CSSProperties = {
+    borderRadius: 26,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background:
+      'linear-gradient(180deg, rgba(21,39,97,0.96) 0%, rgba(11,26,73,0.96) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.32)',
+  }
+
+  const chipBase: CSSProperties = {
+    borderRadius: 999,
+    padding: '7px 12px',
+    fontSize: 12,
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    lineHeight: 1,
+    textTransform: 'uppercase',
+    border: '1px solid rgba(255,255,255,0.1)',
+    whiteSpace: 'nowrap',
+  }
+
+  const statCard: CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 18,
+    padding: '12px 12px 14px',
+    background: 'rgba(255,255,255,0.045)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  }
+
+  const labelStyle: CSSProperties = {
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.55)',
+  }
+
+  const valueStyle: CSSProperties = {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: 900,
+    letterSpacing: '-0.02em',
+    color: '#ffffff',
   }
 
   return (
-    <section style={wrap}>
-      <style>{animations}</style>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        color: '#fff',
+      }}
+    >
+      {!!helperText && (
+        <div
+          style={{
+            fontSize: 15,
+            lineHeight: 1.35,
+            color: 'rgba(255,255,255,0.86)',
+            marginTop: 2,
+          }}
+        >
+          {helperText}
+        </div>
+      )}
 
-      <div style={topRow}>
-        <div style={chipRow}>
-          <span style={chip}>{`${target}°`}</span>
-          <span style={chip}>{`±${tolerance}°`}</span>
-          <span style={chip}>{`${(holdMs / 1000).toFixed(1)}s`}</span>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            ...chipBase,
+            color: '#f1d36a',
+            background: 'rgba(215,161,41,0.13)',
+          }}
+        >
+          {Math.round(target)}°
+        </div>
+        <div
+          style={{
+            ...chipBase,
+            color: '#f1d36a',
+            background: 'rgba(215,161,41,0.13)',
+          }}
+        >
+          ±{Math.round(tolerance)}°
+        </div>
+        <div
+          style={{
+            ...chipBase,
+            color: '#f1d36a',
+            background: 'rgba(215,161,41,0.13)',
+          }}
+        >
+          {(holdMs / 1000).toFixed(1)}s
         </div>
 
-        <span style={stateBadge(sensorState, blockedReason, permission)}>
-          {permission === 'unknown'
-            ? 'ENABLE'
-            : sensorState === 'locked'
-            ? 'LOCKED'
-            : sensorState === 'blocked'
-            ? blockedReason === 'https'
-              ? 'HTTPS'
-              : blockedReason === 'permission'
-              ? 'DENIED'
-              : 'BLOCKED'
-            : 'READY'}
-        </span>
+        <div style={{ flex: 1 }} />
+
+        <div
+          style={{
+            ...chipBase,
+            color:
+              sensorState === 'locked'
+                ? '#dfffd4'
+                : blockedReason !== 'none'
+                ? '#ffd8df'
+                : '#d8e7ff',
+            background:
+              sensorState === 'locked'
+                ? 'rgba(45,160,88,0.24)'
+                : blockedReason !== 'none'
+                ? 'rgba(146,43,70,0.34)'
+                : 'rgba(59,102,196,0.34)',
+            minWidth: 86,
+            textAlign: 'center',
+          }}
+        >
+          {statusChip}
+        </div>
       </div>
 
       <div
         style={{
-          ...instrumentCard,
-          boxShadow: targetHot
-            ? '0 0 0 1px rgba(34,197,94,.10), inset 0 1px 0 rgba(255,255,255,.05)'
-            : 'inset 0 1px 0 rgba(255,255,255,.04)',
+          ...cardBase,
+          padding: 14,
         }}
       >
-        <div style={dialWrap}>
-          <div style={dialGlow} />
-          <div style={dialSweep} />
+        <div
+          style={{
+            position: 'relative',
+            borderRadius: 22,
+            padding: '18px 16px 14px',
+            overflow: 'hidden',
+            background:
+              'radial-gradient(circle at 50% 42%, rgba(61,104,228,0.32) 0%, rgba(17,34,90,0.22) 38%, rgba(8,17,52,0.18) 70%, rgba(8,17,52,0) 100%)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              aspectRatio: '1 / 1',
+              maxWidth: 310,
+              margin: '0 auto',
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle at 50% 48%, rgba(35,70,180,0.52) 0%, rgba(14,28,81,0.96) 55%, rgba(3,9,26,1) 100%)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow:
+                'inset 0 12px 22px rgba(255,255,255,0.04), inset 0 -26px 36px rgba(0,0,0,0.32), 0 18px 48px rgba(0,0,0,0.24)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: '7%',
+                borderRadius: '50%',
+                border: '2px dashed rgba(255,255,255,0.18)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: '3%',
+                borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            />
 
-          <svg viewBox="0 0 100 100" style={dialSvg} aria-hidden="true">
-            <circle cx="50" cy="50" r="45" style={outerRing} />
-            <circle cx="50" cy="50" r="34" style={innerRing} />
-
-            <g transform={`rotate(${targetRotation} 50 50)`}>
-              <circle
-                cx="50"
-                cy="11.8"
-                r="5.8"
-                fill="rgba(245,158,11,.18)"
-                style={{ animation: 'bearingTargetPulse 1.9s ease-in-out infinite' }}
-              />
-              <rect x="47.2" y="8.3" width="5.6" height="12.6" rx="2.8" fill="#f59e0b" />
-              <circle cx="50" cy="14.5" r="1.7" fill="#fde68a" />
-            </g>
-
-            {headingDisplay !== null ? (
-              <g transform={`rotate(${headingDisplay} 50 50)`}>
-                <line
-                  x1="50"
-                  y1="50"
-                  x2="50"
-                  y2="22"
-                  stroke="#f8fafc"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
+            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
+              const major = deg % 90 === 0
+              return (
+                <div
+                  key={deg}
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    width: major ? 4 : 2,
+                    height: major ? '18%' : '10%',
+                    transform: `translate(-50%, -100%) rotate(${deg}deg)`,
+                    transformOrigin: '50% 100%',
+                    borderRadius: 999,
+                    background: major
+                      ? 'rgba(255,255,255,0.58)'
+                      : 'rgba(255,255,255,0.28)',
+                  }}
                 />
-                <polygon points="50,12 54,22 46,22" fill="#22c55e" />
-              </g>
-            ) : null}
+              )
+            })}
 
-            <circle cx="50" cy="50" r="5" fill="#f8fafc" />
-            <circle cx="50" cy="50" r="8.5" fill="rgba(248,250,252,.10)" />
-          </svg>
+            {[
+              { label: 'N', deg: 0 },
+              { label: 'E', deg: 90 },
+              { label: 'S', deg: 180 },
+              { label: 'W', deg: 270 },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: `translate(-50%, -50%) rotate(${item.deg}deg) translateY(-122px) rotate(${-item.deg}deg)`,
+                  fontSize: 16,
+                  fontWeight: item.label === 'N' ? 900 : 800,
+                  color: item.label === 'N' ? '#ffffff' : 'rgba(255,255,255,0.86)',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.35)',
+                }}
+              >
+                {item.label}
+              </div>
+            ))}
 
-          <div style={dialReadout}>
-            <div style={dialReadoutValue}>
-              {headingDisplay === null ? '--' : `${headingDisplay}°`}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                transform: `rotate(${targetRotation}deg)`,
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: 50,
+                  height: 14,
+                  borderRadius: 999,
+                  transform: 'translate(92px, -50%)',
+                  background: 'linear-gradient(90deg, #ffb300 0%, #ffd15a 100%)',
+                  boxShadow: '0 0 18px rgba(255,179,0,0.45)',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  transform: 'translate(128px, -50%)',
+                  background: '#ffe17b',
+                  boxShadow: '0 0 0 10px rgba(255,179,0,0.18)',
+                }}
+              />
             </div>
-            <div style={dialReadoutLabel}>HEADING</div>
+
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                transform: `rotate(${compassRotation + wobbleRotation}deg)`,
+                transition: 'transform 80ms linear',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: 8,
+                  height: '34%',
+                  transform: 'translate(-50%, -100%)',
+                  borderRadius: 999,
+                  background: 'linear-gradient(180deg, #ffffff 0%, #eef3ff 100%)',
+                  boxShadow: '0 0 16px rgba(255,255,255,0.12)',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: 0,
+                  height: 0,
+                  transform: 'translate(-50%, -138px)',
+                  borderLeft: '13px solid transparent',
+                  borderRight: '13px solid transparent',
+                  borderBottom: '38px solid #35e06f',
+                  filter: 'drop-shadow(0 4px 8px rgba(18,176,74,0.35))',
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                width: 44,
+                height: 44,
+                transform: 'translate(-50%, -50%)',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f4ff 100%)',
+                boxShadow: '0 0 0 10px rgba(196,215,255,0.16)',
+              }}
+            />
+
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                bottom: 26,
+                transform: 'translateX(-50%)',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  letterSpacing: '0.16em',
+                  color: 'rgba(255,255,255,0.62)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Heading
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 26,
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  letterSpacing: '-0.03em',
+                }}
+              >
+                {formatDeg(displayHeading)}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: 900,
+                letterSpacing: '-0.03em',
+                lineHeight: 1,
+              }}
+            >
+              {delta == null
+                ? 'Track'
+                : Math.abs(delta) <= tolerance
+                ? 'Aligned'
+                : `${delta > 0 ? 'Right' : 'Left'} ${Math.abs(Math.round(delta))}°`}
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 15,
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.72)',
+              }}
+            >
+              {guidanceSub}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              marginTop: 16,
+            }}
+          >
+            <div style={statCard}>
+              <div style={labelStyle}>Target</div>
+              <div style={valueStyle}>{Math.round(target)}°</div>
+            </div>
+            <div style={statCard}>
+              <div style={labelStyle}>Delta</div>
+              <div style={valueStyle}>
+                {delta == null ? '--' : `${Math.abs(Math.round(delta))}°`}
+              </div>
+            </div>
+            <div style={statCard}>
+              <div style={labelStyle}>Hold</div>
+              <div style={valueStyle}>{Math.round(holdProgress * 100)}%</div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              height: 10,
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.08)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round(holdProgress * 100)}%`,
+                height: '100%',
+                borderRadius: 999,
+                background:
+                  sensorState === 'locked'
+                    ? 'linear-gradient(90deg, #31d56e 0%, #7bff9a 100%)'
+                    : inWindow
+                    ? 'linear-gradient(90deg, #ffd053 0%, #ffb000 100%)'
+                    : 'linear-gradient(90deg, #4667be 0%, #698bff 100%)',
+                transition: 'width 100ms linear',
+                boxShadow:
+                  inWindow || sensorState === 'locked'
+                    ? '0 0 12px rgba(255,194,71,0.45)'
+                    : 'none',
+              }}
+            />
           </div>
         </div>
-
-        <div style={statsGrid}>
-          <div style={statCard}>
-            <div style={statLabel}>DELTA</div>
-            <div style={statValue}>{delta === null ? '--' : `${delta}°`}</div>
-          </div>
-
-          <div style={statCard}>
-            <div style={statLabel}>HOLD</div>
-            <div style={statValue}>{`${Math.round(holdProgress)}%`}</div>
-          </div>
-
-          <div style={statCard}>
-            <div style={statLabel}>STATE</div>
-            <div style={statValue}>{stateLabel}</div>
-          </div>
-        </div>
-
-        <div style={progressTrack}>
-          <div style={{ ...progressFill, width: `${holdProgress}%` }} />
-        </div>
-
-        <div style={statusLineStyle}>{statusMessage}</div>
       </div>
 
-      {permission === 'unknown' ? (
+      <div>
         <button
           type="button"
-          style={enableButton}
-          onClick={() => void requestSensorPermission()}
-          disabled={requestingPermission || submitting}
+          onClick={() => setFallbackOpen((v) => !v)}
+          style={{
+            borderRadius: 999,
+            border: '1px solid rgba(255,255,255,0.10)',
+            background: 'rgba(255,255,255,0.03)',
+            color: 'rgba(255,255,255,0.92)',
+            padding: '9px 14px',
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '0.02em',
+          }}
         >
-          {requestingPermission ? 'REQUESTING…' : 'ENABLE SENSORS'}
+          Fallback
         </button>
-      ) : null}
-    </section>
+
+        {fallbackOpen && (
+          <div
+            style={{
+              ...cardBase,
+              marginTop: 10,
+              padding: 14,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                lineHeight: 1.45,
+                color: 'rgba(255,255,255,0.84)',
+              }}
+            >
+              {guidanceSub}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
+                marginTop: 12,
+              }}
+            >
+              {permission === 'unknown' || blockedReason === 'permission' ? (
+                <button
+                  type="button"
+                  onClick={() => void requestMotionPermission()}
+                  style={{
+                    borderRadius: 14,
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: 'rgba(74,118,222,0.32)',
+                    color: '#fff',
+                    padding: '10px 14px',
+                    fontSize: 14,
+                    fontWeight: 800,
+                  }}
+                >
+                  Enable motion
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void onWin()}
+                style={{
+                  borderRadius: 14,
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  opacity: submitting ? 0.6 : 1,
+                }}
+              >
+                {submitting ? 'Working…' : 'Complete anyway'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
-const wrap: CSSProperties = {
-  display: 'grid',
-  gap: 12,
-}
-
-const topRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-}
-
-const chipRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-}
-
-const chip: CSSProperties = {
-  minHeight: 30,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 999,
-  background: 'rgba(245,158,11,.10)',
-  border: '1px solid rgba(245,158,11,.20)',
-  color: '#fde68a',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
-
-const stateBadge = (
-  state: SensorState,
-  blockedReason: BlockedReason,
-  permission: PermissionState
-): CSSProperties => ({
-  minHeight: 32,
-  padding: '0 12px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  color: '#dbeafe',
-  background:
-    permission === 'unknown'
-      ? 'rgba(37,99,235,.16)'
-      : state === 'locked'
-      ? 'rgba(22,163,74,.18)'
-      : blockedReason === 'permission'
-      ? 'rgba(239,68,68,.18)'
-      : blockedReason === 'https'
-      ? 'rgba(168,85,247,.18)'
-      : state === 'blocked'
-      ? 'rgba(239,68,68,.16)'
-      : 'rgba(37,99,235,.16)',
-  border:
-    permission === 'unknown'
-      ? '1px solid rgba(59,130,246,.22)'
-      : state === 'locked'
-      ? '1px solid rgba(34,197,94,.24)'
-      : blockedReason === 'permission'
-      ? '1px solid rgba(248,113,113,.24)'
-      : blockedReason === 'https'
-      ? '1px solid rgba(196,181,253,.24)'
-      : state === 'blocked'
-      ? '1px solid rgba(248,113,113,.20)'
-      : '1px solid rgba(59,130,246,.22)',
-})
-
-const instrumentCard: CSSProperties = {
-  borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'linear-gradient(180deg, rgba(20,31,61,.92), rgba(14,24,48,.94))',
-  padding: 14,
-  display: 'grid',
-  gap: 12,
-  overflow: 'hidden',
-}
-
-const dialWrap: CSSProperties = {
-  position: 'relative',
-  width: 'min(100%, 430px)',
-  aspectRatio: '1 / 1',
-  margin: '0 auto',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle at 50% 50%, rgba(30,64,175,.22), rgba(8,15,34,.94) 72%)',
-  border: '1px solid rgba(255,255,255,.07)',
-  boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,.06), inset 0 -18px 28px rgba(0,0,0,.18), 0 18px 40px rgba(2,6,23,.28)',
-  overflow: 'hidden',
-}
-
-const dialGlow: CSSProperties = {
-  position: 'absolute',
-  inset: '18%',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle, rgba(37,99,235,.18), rgba(37,99,235,0) 70%)',
-  filter: 'blur(10px)',
-  pointerEvents: 'none',
-  animation: 'bearingBreath 4.2s ease-in-out infinite',
-}
-
-const dialSweep: CSSProperties = {
-  position: 'absolute',
-  inset: '-12%',
-  borderRadius: '50%',
-  background:
-    'conic-gradient(from 0deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,.035) 38deg, rgba(255,255,255,0) 90deg)',
-  filter: 'blur(10px)',
-  opacity: 0.55,
-  animation: 'bearingSweep 8s linear infinite',
-  pointerEvents: 'none',
-}
-
-const dialSvg: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-}
-
-const outerRing = {
-  fill: 'none',
-  stroke: 'rgba(255,255,255,.08)',
-  strokeWidth: 1.6,
-}
-
-const innerRing = {
-  fill: 'none',
-  stroke: 'rgba(255,255,255,.16)',
-  strokeWidth: 0.9,
-  strokeDasharray: '1.8 2.4',
-}
-
-const dialReadout: CSSProperties = {
-  position: 'absolute',
-  left: '50%',
-  bottom: 24,
-  transform: 'translateX(-50%)',
-  display: 'grid',
-  gap: 4,
-  justifyItems: 'center',
-}
-
-const dialReadoutValue: CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 28,
-  fontWeight: 900,
-  letterSpacing: '-0.03em',
-  textShadow: '0 2px 10px rgba(2,6,23,.34)',
-}
-
-const dialReadoutLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.68)',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-}
-
-const statsGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const statCard: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.04)',
-  padding: 12,
-  display: 'grid',
-  gap: 6,
-  minHeight: 88,
-}
-
-const statLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.56)',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-}
-
-const statValue: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 16,
-  fontWeight: 900,
-  lineHeight: 1.14,
-}
-
-const progressTrack: CSSProperties = {
-  height: 14,
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.06)',
-  overflow: 'hidden',
-  boxShadow: 'inset 0 1px 2px rgba(0,0,0,.18)',
-}
-
-const progressFill: CSSProperties = {
-  height: '100%',
-  borderRadius: 999,
-  background: 'linear-gradient(90deg, #2563eb, #22c55e)',
-  transition: 'width 100ms linear',
-}
-
-const statusLineStyle: CSSProperties = {
-  color: '#d6ddec',
-  fontSize: 13,
-  fontWeight: 700,
-  lineHeight: 1.3,
-  textAlign: 'center',
-  minHeight: 18,
-}
-
-const enableButton: CSSProperties = {
-  minHeight: 44,
-  borderRadius: 16,
-  border: '1px solid rgba(59,130,246,.26)',
-  background: 'linear-gradient(180deg, rgba(37,99,235,.24), rgba(29,78,216,.18))',
-  color: '#dbeafe',
-  fontSize: 13,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-}
-
-const animations = `
-@keyframes bearingTargetPulse {
-  0%, 100% { opacity: .55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.12); }
-}
-
-@keyframes bearingBreath {
-  0%, 100% { opacity: .65; transform: scale(1); }
-  50% { opacity: .95; transform: scale(1.03); }
-}
-
-@keyframes bearingSweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-`
+export default BearingHuntRuntimeScreen
