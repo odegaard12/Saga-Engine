@@ -1,845 +1,1014 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { PlayerStage } from '../../../../types/player'
-import type { ResolvedBearingHuntMinigame } from '../../core/resolver'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-interface Props {
-  resolved: ResolvedBearingHuntMinigame
-  stage: PlayerStage
-  helperText: string
-  submitting: boolean
-  onWin: () => Promise<void>
+type AnyRecord = Record<string, any>;
+
+export type BearingHuntRuntimeScreenProps = {
+  resolved?: AnyRecord;
+  stage?: AnyRecord;
+  helperText?: string;
+  submitting?: boolean;
+  onWin?: (result?: AnyRecord) => void | Promise<void>;
+
+  minigame?: AnyRecord;
+  interaction?: AnyRecord;
+  payload?: AnyRecord;
+  node?: AnyRecord;
+  onComplete?: (result?: AnyRecord) => void | Promise<void>;
+  onSolved?: (result?: AnyRecord) => void | Promise<void>;
+  onSuccess?: (result?: AnyRecord) => void | Promise<void>;
+  complete?: (result?: AnyRecord) => void | Promise<void>;
+  resolveInteraction?: (result?: AnyRecord) => void | Promise<void>;
+  onClose?: () => void;
+};
+
+type SensorState =
+  | "idle"
+  | "needs_permission"
+  | "requesting"
+  | "searching"
+  | "tracking"
+  | "silent"
+  | "denied"
+  | "unsupported"
+  | "blocked_https";
+
+type CompassEvent = DeviceOrientationEvent & {
+  webkitCompassHeading?: number;
+  webkitCompassAccuracy?: number;
+};
+
+type PermissionableDeviceOrientationEvent = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<"granted" | "denied">;
+};
+
+const STYLES = `
+.bh-root {
+  --bh-text: rgba(255,255,255,.96);
+  --bh-muted: rgba(226,238,255,.54);
+  --bh-soft: rgba(226,238,255,.32);
+  --bh-line: rgba(255,255,255,.12);
+  --bh-glass: rgba(255,255,255,.07);
+  --bh-accent: rgba(112,236,215,1);
+  --bh-accent-soft: rgba(112,236,215,.18);
+
+  width: 100%;
+  margin-top: 8px;
+  color: var(--bh-text);
 }
 
-type PermissionState = 'unknown' | 'granted' | 'denied' | 'not_required'
-type SensorState = 'checking' | 'ready' | 'locked' | 'blocked'
-type BlockedReason = 'none' | 'https' | 'permission' | 'unsupported'
-
-type IOSOrientationEventCtor = {
-  requestPermission?: () => Promise<'granted' | 'denied'>
+.bh-root.is-near {
+  --bh-accent: rgba(146,216,255,1);
+  --bh-accent-soft: rgba(146,216,255,.18);
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value))
+.bh-root.is-window {
+  --bh-accent: rgba(116,248,211,1);
+  --bh-accent-soft: rgba(116,248,211,.28);
 }
 
-function normalizeDegrees(value: number) {
-  return ((value % 360) + 360) % 360
+.bh-root.is-locked {
+  --bh-accent: rgba(177,255,208,1);
+  --bh-accent-soft: rgba(177,255,208,.32);
 }
 
-function shortestAngleDelta(from: number, to: number) {
-  let diff = normalizeDegrees(to) - normalizeDegrees(from)
-  if (diff > 180) diff -= 360
-  if (diff < -180) diff += 360
-  return diff
+.bh-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 14px 14px 13px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.105), transparent 30%),
+    radial-gradient(circle at 82% 22%, var(--bh-accent-soft), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035));
+  border: 1px solid rgba(255,255,255,.115);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    0 16px 42px rgba(0,0,0,.16);
+  backdrop-filter: blur(22px) saturate(1.18);
 }
 
-function readHeading(event: DeviceOrientationEvent): number | null {
-  const withCompass = event as DeviceOrientationEvent & {
-    webkitCompassHeading?: number
+.bh-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.105), transparent 22%),
+    radial-gradient(circle at center, rgba(255,255,255,.045), transparent 52%);
+  opacity: .75;
+}
+
+.bh-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.bh-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bh-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bh-accent);
+  box-shadow: 0 0 16px var(--bh-accent);
+}
+
+.bh-mode-copy {
+  min-width: 0;
+}
+
+.bh-overline {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--bh-muted);
+}
+
+.bh-title {
+  display: none;
+}
+
+.bh-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.075);
+  border: 1px solid rgba(255,255,255,.105);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.09);
+  white-space: nowrap;
+}
+
+.bh-live span {
+  font-size: 10px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--bh-muted);
+}
+
+.bh-live strong {
+  font-size: 12px;
+  color: rgba(255,255,255,.9);
+}
+
+.bh-command {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 5px;
+  text-align: center;
+  margin: 4px 0 11px;
+}
+
+.bh-command-main {
+  font-size: clamp(36px, 9.8vw, 56px);
+  line-height: .9;
+  letter-spacing: -.066em;
+  font-weight: 880;
+  text-transform: uppercase;
+  text-shadow: 0 12px 38px rgba(0,0,0,.28);
+}
+
+.bh-command-main.is-small {
+  font-size: clamp(32px, 8.8vw, 49px);
+}
+
+.bh-command-sub {
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--bh-muted);
+}
+
+.bh-instrument {
+  position: relative;
+  z-index: 2;
+  width: min(61vw, 246px);
+  aspect-ratio: 1;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.bh-ring-progress {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background:
+    conic-gradient(from -90deg, var(--bh-accent) var(--capture-deg), rgba(255,255,255,.085) var(--capture-deg) 360deg);
+  box-shadow:
+    0 0 32px var(--bh-accent-soft),
+    inset 0 0 0 1px rgba(255,255,255,.07);
+}
+
+.bh-ring-progress::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255,255,255,.14), transparent 27%),
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -24px 45px rgba(0,0,0,.18);
+}
+
+.bh-face {
+  position: absolute;
+  inset: 15px;
+  border-radius: 999px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, rgba(255,255,255,.08) 0 1.5px, transparent 2px),
+    radial-gradient(circle at center, transparent 0 43%, rgba(255,255,255,.06) 44%, transparent 45%),
+    radial-gradient(circle at center, transparent 0 68%, rgba(255,255,255,.055) 69%, transparent 70%),
+    conic-gradient(from -90deg, rgba(255,255,255,.12), transparent 16deg 74deg, rgba(255,255,255,.08) 90deg, transparent 106deg 254deg, rgba(255,255,255,.07) 270deg, transparent 286deg);
+  border: 1px solid rgba(255,255,255,.085);
+  box-shadow: inset 0 0 48px rgba(0,0,0,.22);
+}
+
+.bh-face::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 13%;
+  bottom: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, var(--bh-accent), transparent);
+  opacity: .58;
+}
+
+.bh-gate {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 64px;
+  height: 24px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.bh-gate::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 52px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--bh-accent);
+  box-shadow:
+    0 0 18px var(--bh-accent),
+    0 0 44px var(--bh-accent-soft);
+}
+
+.bh-gate::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.bh-orbit {
+  position: absolute;
+  inset: 17px;
+  border-radius: 999px;
+  transform: rotate(var(--target-offset));
+  transition: transform 260ms cubic-bezier(.16,.88,.22,1);
+}
+
+.bh-target {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+}
+
+.bh-target::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--bh-accent);
+  box-shadow:
+    0 0 19px var(--bh-accent),
+    0 0 45px var(--bh-accent-soft);
+}
+
+.bh-target::after {
+  content: "";
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.25);
+  opacity: .52;
+}
+
+.bh-center {
+  position: relative;
+  z-index: 2;
+  width: 35%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 19%, rgba(255,255,255,.18), transparent 32%),
+    rgba(255,255,255,.075);
+  border: 1px solid rgba(255,255,255,.13);
+  box-shadow:
+    0 12px 32px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.13);
+  backdrop-filter: blur(18px);
+}
+
+.bh-center strong {
+  display: block;
+  font-size: clamp(23px, 6.1vw, 34px);
+  line-height: .92;
+  letter-spacing: -.055em;
+}
+
+.bh-center span {
+  display: block;
+  margin-top: 4px;
+  font-size: 8px;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--bh-muted);
+}
+
+.bh-lock-burst {
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(177,255,208,.5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bh-root.is-window .bh-gate::before {
+  animation: bhGate 850ms ease-in-out infinite;
+}
+
+.bh-root.is-locked .bh-lock-burst {
+  animation: bhLock .95s ease-out both;
+}
+
+.bh-capture {
+  display: none;
+}
+
+.bh-metrics {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding-top: 2px;
+}
+
+.bh-readout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.052);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  color: rgba(255,255,255,.88);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.bh-readout span {
+  color: var(--bh-muted);
+  letter-spacing: .02em;
+}
+
+.bh-readout strong {
+  color: rgba(255,255,255,.94);
+  font-weight: 820;
+  letter-spacing: -.015em;
+}
+
+.bh-readout i {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.28);
+}
+
+.bh-sensor {
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
+  padding: 11px;
+  border-radius: 18px;
+  background: rgba(0,0,0,.13);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.bh-sensor-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255,255,255,.82);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.bh-sensor p {
+  margin: 5px 0 0;
+  color: var(--bh-muted);
+  font-size: 12px;
+  line-height: 1.36;
+}
+
+.bh-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.bh-button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: var(--bh-accent);
+  color: rgba(3,12,18,.95);
+  font-size: 12px;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.bh-button.bh-ghost {
+  color: rgba(255,255,255,.82);
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.bh-range {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: rgb(111,231,211);
+}
+
+@keyframes bhGate {
+  0%, 100% { transform: translateX(-50%) scaleX(.92); opacity: .74; }
+  50% { transform: translateX(-50%) scaleX(1.08); opacity: 1; }
+}
+
+@keyframes bhLock {
+  0% { opacity: 0; transform: scale(.88); }
+  22% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+
+@media (max-width: 420px) {
+  .bh-card {
+    border-radius: 26px;
+    padding: 13px;
   }
 
-  if (
-    typeof withCompass.webkitCompassHeading === 'number' &&
-    Number.isFinite(withCompass.webkitCompassHeading)
-  ) {
-    return normalizeDegrees(withCompass.webkitCompassHeading)
+  .bh-instrument {
+    width: min(59vw, 236px);
   }
 
-  if (typeof event.alpha === 'number' && Number.isFinite(event.alpha)) {
-    return normalizeDegrees(360 - event.alpha)
+  .bh-command {
+    margin-bottom: 10px;
+  }
+}
+`;
+
+function normalizeDegrees(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function signedDelta(from: number, to: number): number {
+  return ((to - from + 540) % 360) - 180;
+}
+
+function formatDeg(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return String(Math.round(normalizeDegrees(value))).padStart(3, "0");
+}
+
+function pickNumber(...values: any[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+  return undefined;
+}
+
+function getHeadingFromEvent(event: CompassEvent): number | null {
+  if (typeof event.webkitCompassHeading === "number" && Number.isFinite(event.webkitCompassHeading)) {
+    return normalizeDegrees(event.webkitCompassHeading);
   }
 
-  return null
-}
-
-function formatDeg(value: number | null) {
-  return value == null ? '--' : `${Math.round(normalizeDegrees(value))}°`
-}
-
-function directionFromDelta(delta: number | null, tolerance: number) {
-  if (delta == null) return 'Track'
-  const abs = Math.abs(delta)
-  if (abs <= tolerance) return 'Locked'
-  if (abs <= tolerance * 1.8) return delta > 0 ? 'Right a bit' : 'Left a bit'
-  return delta > 0 ? 'Turn right' : 'Turn left'
-}
-
-function statusText(
-  blockedReason: BlockedReason,
-  permission: PermissionState,
-  sensorState: SensorState
-) {
-  if (blockedReason === 'https') return 'Use HTTPS on iPhone.'
-  if (blockedReason === 'permission') {
-    return permission === 'denied'
-      ? 'Motion permission denied.'
-      : 'Enable motion access.'
+  if (typeof event.alpha === "number" && Number.isFinite(event.alpha)) {
+    return normalizeDegrees(360 - event.alpha);
   }
-  if (blockedReason === 'unsupported') return 'Orientation sensor unavailable.'
-  if (sensorState === 'locked') return 'Target locked.'
-  if (sensorState === 'ready') return 'Aim to target.'
-  return 'Preparing sensors.'
+
+  return null;
 }
 
-function getIosRequestPermission():
-  | (() => Promise<'granted' | 'denied'>)
-  | null {
-  if (typeof window === 'undefined') return null
-  const ctor = (window as Window & {
-    DeviceOrientationEvent?: IOSOrientationEventCtor
-  }).DeviceOrientationEvent
-  if (ctor && typeof ctor.requestPermission === 'function') {
-    return ctor.requestPermission.bind(ctor)
-  }
-  return null
+function getDeviceOrientationConstructor(): PermissionableDeviceOrientationEvent | null {
+  if (typeof window === "undefined") return null;
+  const ctor = window.DeviceOrientationEvent as PermissionableDeviceOrientationEvent | undefined;
+  return ctor ?? null;
 }
 
-export function BearingHuntRuntimeScreen({
-  resolved,
-  stage,
-  helperText,
-  submitting,
-  onWin,
-}: Props) {
-  const cfg = ((resolved as unknown as { config?: Record<string, unknown> })?.config ?? {}) as Record<
-    string,
-    unknown
-  >
+function getConfig(props: BearingHuntRuntimeScreenProps) {
+  const sources = [
+    props.resolved,
+    props.resolved?.config,
+    props.resolved?.payload,
+    props.resolved?.params,
+    props.resolved?.minigame,
+    props.resolved?.minigame?.config,
+    props.resolved?.minigame?.payload,
+    props.stage,
+    props.stage?.minigame,
+    props.stage?.minigame?.config,
+    props.stage?.payload,
+    props.minigame,
+    props.minigame?.config,
+    props.minigame?.payload,
+    props.minigame?.params,
+    props.interaction,
+    props.interaction?.minigame,
+    props.interaction?.minigame?.config,
+    props.interaction?.payload,
+    props.interaction?.params,
+    props.payload,
+    props.payload?.minigame,
+    props.payload?.config,
+    props.payload?.params,
+    props.node,
+    props.node?.minigame,
+  ].filter(Boolean);
 
-  const target = normalizeDegrees(
-    Number(cfg.targetDeg ?? cfg.target_deg ?? cfg.targetHeading ?? cfg.target_heading ?? 90)
-  )
-  const tolerance = clamp(
-    Number(cfg.toleranceDeg ?? cfg.tolerance_deg ?? 18),
-    4,
-    60
-  )
-  const holdMs = clamp(
-    Number(cfg.holdMs ?? cfg.hold_ms ?? 1200),
-    300,
-    6000
-  )
+  const read = (...keys: string[]) => {
+    for (const source of sources) {
+      for (const key of keys) {
+        if (source && source[key] !== undefined && source[key] !== null) return source[key];
+      }
+    }
+    return undefined;
+  };
 
-  const [permission, setPermission] = useState<PermissionState>('unknown')
-  const [sensorState, setSensorState] = useState<SensorState>('checking')
-  const [blockedReason, setBlockedReason] = useState<BlockedReason>('none')
-  const [rawHeading, setRawHeading] = useState<number | null>(null)
-  const [displayHeading, setDisplayHeading] = useState<number | null>(null)
-  const [holdProgress, setHoldProgress] = useState(0)
-  const [fallbackOpen, setFallbackOpen] = useState(false)
+  const targetBearing = normalizeDegrees(
+    pickNumber(read("targetBearing", "target_bearing", "target", "bearing", "azimuth", "targetAzimuth"), 90) ?? 90
+  );
 
-  const rawHeadingRef = useRef<number | null>(null)
-  const smoothHeadingRef = useRef<number | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const holdStartRef = useRef<number | null>(null)
-  const wonRef = useRef(false)
+  const tolerance = Math.max(
+    1,
+    Math.min(90, pickNumber(read("tolerance", "toleranceDeg", "tolerance_degrees", "window", "windowDeg"), 18) ?? 18)
+  );
 
-  const isHttps = useMemo(() => {
-    if (typeof window === 'undefined') return true
-    const host = window.location.hostname
-    return (
-      window.location.protocol === 'https:' ||
-      host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host === '192.168.68.103' ||
-      host === '192.168.68.200'
-    )
-  }, [])
+  const holdMs = Math.max(
+    250,
+    pickNumber(read("holdMs", "hold_ms", "holdTime", "hold_time", "holdDurationMs"), 1200) ?? 1200
+  );
+
+  const title = String(read("title", "name", "label") ?? props.node?.title ?? props.node?.name ?? "Bearing Hunt");
+
+  return {
+    targetBearing,
+    tolerance,
+    holdMs,
+    title,
+  };
+}
+
+export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
+  const { targetBearing, tolerance, holdMs, title } = useMemo(() => getConfig(props), [props]);
+
+  const [sensorState, setSensorState] = useState<SensorState>("idle");
+  const [heading, setHeading] = useState<number | null>(null);
+  const [rawHeading, setRawHeading] = useState<number | null>(null);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+
+  const headingRef = useRef<number | null>(null);
+  const listenerRef = useRef<((event: DeviceOrientationEvent) => void) | null>(null);
+  const captureStartRef = useRef<number | null>(null);
+  const completeSentRef = useRef(false);
+  const windowPulseRef = useRef(false);
+
+  const completionCallback =
+    props.onWin ??
+    props.onComplete ??
+    props.onSolved ??
+    props.onSuccess ??
+    props.complete ??
+    props.resolveInteraction;
+
+  const updateHeading = useCallback((nextRaw: number) => {
+    const normalized = normalizeDegrees(nextRaw);
+    setRawHeading(normalized);
+
+    setHeading((previous) => {
+      const next =
+        previous === null
+          ? normalized
+          : normalizeDegrees(previous + signedDelta(previous, normalized) * 0.16);
+
+      headingRef.current = next;
+      return next;
+    });
+  }, []);
 
   const delta = useMemo(() => {
-    if (displayHeading == null) return null
-    return shortestAngleDelta(displayHeading, target)
-  }, [displayHeading, target])
+    if (heading === null) return null;
+    return signedDelta(heading, targetBearing);
+  }, [heading, targetBearing]);
 
-  const absDelta = delta == null ? null : Math.abs(delta)
-  const inWindow = absDelta != null && absDelta <= tolerance
+  const absDelta = Math.abs(delta ?? 999);
+  const inWindow = !locked && heading !== null && absDelta <= tolerance;
+  const nearWindow = !locked && heading !== null && absDelta <= tolerance * 2.35;
 
-  const guidanceTitle = useMemo(() => {
-    if (sensorState === 'locked') return 'Locked'
-    if (blockedReason !== 'none') return 'Blocked'
-    return directionFromDelta(delta, tolerance)
-  }, [sensorState, blockedReason, delta, tolerance])
+  const completeLock = useCallback(async () => {
+    if (completeSentRef.current) return;
+    completeSentRef.current = true;
+    setLocked(true);
+    setHoldProgress(1);
 
-  const guidanceSub = useMemo(() => {
-    return statusText(blockedReason, permission, sensorState)
-  }, [blockedReason, permission, sensorState])
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.([18, 34, 26]);
+    }
 
-  const statusChip = useMemo(() => {
-    if (sensorState === 'locked') return 'LOCK'
-    if (blockedReason !== 'none') return 'BLOCKED'
-    return 'TRACK'
-  }, [sensorState, blockedReason])
+    const finalHeading = headingRef.current;
 
-  async function requestMotionPermission() {
-    const req = getIosRequestPermission()
-    if (!req) {
-      setPermission('not_required')
-      return
+    await completionCallback?.({
+      type: "bearing_hunt",
+      status: "locked",
+      targetBearing,
+      tolerance,
+      holdMs,
+      heading: finalHeading,
+      delta: finalHeading === null ? null : signedDelta(finalHeading, targetBearing),
+      completedAt: new Date().toISOString(),
+    });
+  }, [completionCallback, holdMs, targetBearing, tolerance]);
+
+  useEffect(() => {
+    if (locked) return;
+
+    let raf = 0;
+
+    const tick = () => {
+      if (inWindow) {
+        const now = performance.now();
+
+        if (captureStartRef.current === null) {
+          captureStartRef.current = now;
+
+          if (!windowPulseRef.current && typeof navigator !== "undefined" && "vibrate" in navigator) {
+            windowPulseRef.current = true;
+            navigator.vibrate?.(10);
+          }
+        }
+
+        const elapsed = now - captureStartRef.current;
+        const progress = Math.min(1, elapsed / holdMs);
+
+        setHoldProgress(progress);
+
+        if (progress >= 1) {
+          void completeLock();
+          return;
+        }
+      } else {
+        captureStartRef.current = null;
+        windowPulseRef.current = false;
+        setHoldProgress((previous) => (previous <= 0 ? 0 : Math.max(0, previous - 0.08)));
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [completeLock, holdMs, inWindow, locked]);
+
+  const startSensors = useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    if (!window.isSecureContext) {
+      setSensorState("blocked_https");
+      return;
+    }
+
+    const OrientationCtor = getDeviceOrientationConstructor();
+
+    if (!OrientationCtor) {
+      setSensorState("unsupported");
+      return;
     }
 
     try {
-      const result = await req()
-      if (result === 'granted') {
-        setPermission('granted')
-        setBlockedReason('none')
-        setSensorState('checking')
-      } else {
-        setPermission('denied')
-        setBlockedReason('permission')
-        setSensorState('blocked')
-      }
-    } catch {
-      setPermission('denied')
-      setBlockedReason('permission')
-      setSensorState('blocked')
-    }
-  }
+      setSensorState("requesting");
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+      if (typeof OrientationCtor.requestPermission === "function") {
+        const result = await OrientationCtor.requestPermission();
 
-    const req = getIosRequestPermission()
-
-    if (!('DeviceOrientationEvent' in window)) {
-      setPermission('not_required')
-      setBlockedReason('unsupported')
-      setSensorState('blocked')
-      return
-    }
-
-    if (!isHttps) {
-      setBlockedReason('https')
-      setSensorState('blocked')
-      return
-    }
-
-    if (req) {
-      setPermission('unknown')
-      setBlockedReason('permission')
-      setSensorState('blocked')
-      return
-    }
-
-    setPermission('not_required')
-    setBlockedReason('none')
-    setSensorState('checking')
-  }, [isHttps])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (blockedReason === 'https') return
-    if (permission === 'unknown') return
-    if (permission === 'denied') return
-
-    function onOrientation(event: DeviceOrientationEvent) {
-      const next = readHeading(event)
-      if (next == null) return
-      rawHeadingRef.current = next
-      setRawHeading(next)
-      setBlockedReason('none')
-      setSensorState((prev) => (prev === 'locked' ? 'locked' : 'ready'))
-    }
-
-    window.addEventListener('deviceorientation', onOrientation, true)
-    return () => {
-      window.removeEventListener('deviceorientation', onOrientation, true)
-    }
-  }, [permission, blockedReason])
-
-  useEffect(() => {
-    if (rawHeading == null) return
-    rawHeadingRef.current = rawHeading
-
-    function tick() {
-      const targetHeading = rawHeadingRef.current
-      const current = smoothHeadingRef.current
-
-      if (targetHeading == null) {
-        rafRef.current = requestAnimationFrame(tick)
-        return
-      }
-
-      if (current == null) {
-        smoothHeadingRef.current = targetHeading
-        setDisplayHeading(targetHeading)
-        rafRef.current = requestAnimationFrame(tick)
-        return
-      }
-
-      const diff = shortestAngleDelta(current, targetHeading)
-      const eased = normalizeDegrees(current + diff * 0.14)
-      smoothHeadingRef.current = eased
-      setDisplayHeading(eased)
-      rafRef.current = requestAnimationFrame(tick)
-    }
-
-    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(tick)
-
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-  }, [rawHeading])
-
-  useEffect(() => {
-    if (sensorState !== 'ready' && sensorState !== 'locked') {
-      holdStartRef.current = null
-      setHoldProgress(0)
-      return
-    }
-
-    if (!inWindow) {
-      holdStartRef.current = null
-      setHoldProgress(0)
-      return
-    }
-
-    let localRaf = 0
-
-    const run = (now: number) => {
-      if (holdStartRef.current == null) holdStartRef.current = now
-      const elapsed = now - holdStartRef.current
-      const ratio = clamp(elapsed / holdMs, 0, 1)
-      setHoldProgress(ratio)
-
-      if (ratio >= 1) {
-        if (!wonRef.current && !submitting) {
-          wonRef.current = true
-          setSensorState('locked')
-          void onWin()
+        if (result !== "granted") {
+          setSensorState("denied");
+          return;
         }
-        return
       }
 
-      localRaf = requestAnimationFrame(run)
+      if (listenerRef.current) {
+        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
+        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+      }
+
+      const handler = (event: DeviceOrientationEvent) => {
+        const next = getHeadingFromEvent(event as CompassEvent);
+        if (next === null) return;
+
+        updateHeading(next);
+        setSensorState("tracking");
+      };
+
+      listenerRef.current = handler;
+
+      window.addEventListener("deviceorientation", handler as EventListener, true);
+      window.addEventListener("deviceorientationabsolute", handler as EventListener, true);
+
+      setSensorState("searching");
+
+      window.setTimeout(() => {
+        if (headingRef.current === null) {
+          setSensorState((current) => (current === "searching" ? "silent" : current));
+        }
+      }, 1800);
+    } catch {
+      setSensorState("denied");
+    }
+  }, [updateHeading]);
+
+  useEffect(() => {
+    const OrientationCtor = getDeviceOrientationConstructor();
+
+    if (!OrientationCtor) {
+      setSensorState("unsupported");
+      return;
     }
 
-    localRaf = requestAnimationFrame(run)
-    return () => cancelAnimationFrame(localRaf)
-  }, [inWindow, holdMs, onWin, sensorState, submitting])
+    if (typeof OrientationCtor.requestPermission === "function") {
+      setSensorState("needs_permission");
+      return;
+    }
 
-  const compassRotation = displayHeading == null ? 0 : -displayHeading
-  const targetRotation = target
-  const wobbleRotation =
-    displayHeading == null ? 0 : clamp(shortestAngleDelta(displayHeading, rawHeading ?? displayHeading) * 0.35, -8, 8)
+    void startSensors();
 
-  const cardBase: CSSProperties = {
-    borderRadius: 26,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background:
-      'linear-gradient(180deg, rgba(21,39,97,0.96) 0%, rgba(11,26,73,0.96) 100%)',
-    boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.32)',
-  }
+    return () => {
+      if (listenerRef.current && typeof window !== "undefined") {
+        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
+        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+      }
+    };
+  }, [startSensors]);
 
-  const chipBase: CSSProperties = {
-    borderRadius: 999,
-    padding: '7px 12px',
-    fontSize: 12,
-    fontWeight: 800,
-    letterSpacing: '0.08em',
-    lineHeight: 1,
-    textTransform: 'uppercase',
-    border: '1px solid rgba(255,255,255,0.1)',
-    whiteSpace: 'nowrap',
-  }
+  useEffect(() => {
+    return () => {
+      if (listenerRef.current && typeof window !== "undefined") {
+        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
+        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+      }
+    };
+  }, []);
 
-  const statCard: CSSProperties = {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 18,
-    padding: '12px 12px 14px',
-    background: 'rgba(255,255,255,0.045)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-  }
+  const command = useMemo(() => {
+    if (locked) {
+      return { main: "LOCKED", sub: "Rumbo capturado", small: false };
+    }
 
-  const labelStyle: CSSProperties = {
-    fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.55)',
-  }
+    if (heading === null) {
+      if (sensorState === "needs_permission") return { main: "READY", sub: "Activa orientación", small: false };
+      if (sensorState === "blocked_https") return { main: "HTTPS", sub: "Sensor bloqueado", small: false };
+      return { main: "SCAN", sub: "Buscando heading", small: false };
+    }
 
-  const valueStyle: CSSProperties = {
-    marginTop: 8,
-    fontSize: 16,
-    fontWeight: 900,
-    letterSpacing: '-0.02em',
-    color: '#ffffff',
-  }
+    if (inWindow) {
+      return { main: "HOLD", sub: "Mantén estable", small: false };
+    }
+
+    const amount = Math.round(absDelta);
+    const direction = (delta ?? 0) >= 0 ? "RIGHT" : "LEFT";
+
+    return {
+      main: `${direction} ${amount}°`,
+      sub: nearWindow ? "Cerca del vector" : "Gira hacia el vector",
+      small: amount >= 100,
+    };
+  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState]);
+
+  const sensorCopy = useMemo(() => {
+    switch (sensorState) {
+      case "needs_permission":
+        return "Safari iPhone necesita un toque para activar orientación real.";
+      case "requesting":
+        return "Solicitando acceso al sensor.";
+      case "searching":
+        return "Sensor activo. Esperando primera lectura estable.";
+      case "tracking":
+        return "Orientación real activa.";
+      case "silent":
+        return "No llega heading. Puedes usar prueba manual discreta.";
+      case "denied":
+        return "Permiso denegado. Revisa movimiento/orientación en Safari.";
+      case "unsupported":
+        return "Este navegador no expone DeviceOrientation.";
+      case "blocked_https":
+        return "Abre el runtime desde HTTPS para usar sensores reales.";
+      default:
+        return "Preparando instrumento.";
+    }
+  }, [sensorState]);
+
+  const statusLabel = props.submitting
+    ? "SYNC"
+    : locked
+      ? "LOCK"
+      : inWindow
+        ? "HOLD"
+        : nearWindow
+          ? "NEAR"
+          : sensorState === "tracking"
+            ? "LIVE"
+            : sensorState === "needs_permission"
+              ? "ARM"
+              : "SCAN";
+
+  const rootClassName = [
+    "bh-root",
+    nearWindow ? "is-near" : "",
+    inWindow ? "is-window" : "",
+    locked ? "is-locked" : "",
+  ].filter(Boolean).join(" ");
+
+  const targetOffset = delta ?? 0;
+  const captureDeg = Math.round(holdProgress * 360);
+  const capturePct = `${Math.round(holdProgress * 100)}%`;
+
+  const styleVars = {
+    "--target-offset": `${targetOffset}deg`,
+    "--capture-deg": `${captureDeg}deg`,
+    "--capture-pct": capturePct,
+  } as React.CSSProperties;
+
+  const showSensorPanel = sensorState !== "tracking" && !locked;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        color: '#fff',
-      }}
-    >
-      {!!helperText && (
-        <div
-          style={{
-            fontSize: 15,
-            lineHeight: 1.35,
-            color: 'rgba(255,255,255,0.86)',
-            marginTop: 2,
-          }}
-        >
-          {helperText}
-        </div>
-      )}
+    <section className={rootClassName} style={styleVars} aria-label="Bearing hunt runtime">
+      <style>{STYLES}</style>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div
-          style={{
-            ...chipBase,
-            color: '#f1d36a',
-            background: 'rgba(215,161,41,0.13)',
-          }}
-        >
-          {Math.round(target)}°
-        </div>
-        <div
-          style={{
-            ...chipBase,
-            color: '#f1d36a',
-            background: 'rgba(215,161,41,0.13)',
-          }}
-        >
-          ±{Math.round(tolerance)}°
-        </div>
-        <div
-          style={{
-            ...chipBase,
-            color: '#f1d36a',
-            background: 'rgba(215,161,41,0.13)',
-          }}
-        >
-          {(holdMs / 1000).toFixed(1)}s
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        <div
-          style={{
-            ...chipBase,
-            color:
-              sensorState === 'locked'
-                ? '#dfffd4'
-                : blockedReason !== 'none'
-                ? '#ffd8df'
-                : '#d8e7ff',
-            background:
-              sensorState === 'locked'
-                ? 'rgba(45,160,88,0.24)'
-                : blockedReason !== 'none'
-                ? 'rgba(146,43,70,0.34)'
-                : 'rgba(59,102,196,0.34)',
-            minWidth: 86,
-            textAlign: 'center',
-          }}
-        >
-          {statusChip}
-        </div>
-      </div>
-
-      <div
-        style={{
-          ...cardBase,
-          padding: 14,
-        }}
-      >
-        <div
-          style={{
-            position: 'relative',
-            borderRadius: 22,
-            padding: '18px 16px 14px',
-            overflow: 'hidden',
-            background:
-              'radial-gradient(circle at 50% 42%, rgba(61,104,228,0.32) 0%, rgba(17,34,90,0.22) 38%, rgba(8,17,52,0.18) 70%, rgba(8,17,52,0) 100%)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}
-        >
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              aspectRatio: '1 / 1',
-              maxWidth: 310,
-              margin: '0 auto',
-              borderRadius: '50%',
-              background:
-                'radial-gradient(circle at 50% 48%, rgba(35,70,180,0.52) 0%, rgba(14,28,81,0.96) 55%, rgba(3,9,26,1) 100%)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow:
-                'inset 0 12px 22px rgba(255,255,255,0.04), inset 0 -26px 36px rgba(0,0,0,0.32), 0 18px 48px rgba(0,0,0,0.24)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: '7%',
-                borderRadius: '50%',
-                border: '2px dashed rgba(255,255,255,0.18)',
-              }}
-            />
-            <div
-              style={{
-                position: 'absolute',
-                inset: '3%',
-                borderRadius: '50%',
-                border: '1px solid rgba(255,255,255,0.07)',
-              }}
-            />
-
-            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
-              const major = deg % 90 === 0
-              return (
-                <div
-                  key={deg}
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    width: major ? 4 : 2,
-                    height: major ? '18%' : '10%',
-                    transform: `translate(-50%, -100%) rotate(${deg}deg)`,
-                    transformOrigin: '50% 100%',
-                    borderRadius: 999,
-                    background: major
-                      ? 'rgba(255,255,255,0.58)'
-                      : 'rgba(255,255,255,0.28)',
-                  }}
-                />
-              )
-            })}
-
-            {[
-              { label: 'N', deg: 0 },
-              { label: 'E', deg: 90 },
-              { label: 'S', deg: 180 },
-              { label: 'W', deg: 270 },
-            ].map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: `translate(-50%, -50%) rotate(${item.deg}deg) translateY(-122px) rotate(${-item.deg}deg)`,
-                  fontSize: 16,
-                  fontWeight: item.label === 'N' ? 900 : 800,
-                  color: item.label === 'N' ? '#ffffff' : 'rgba(255,255,255,0.86)',
-                  textShadow: '0 2px 10px rgba(0,0,0,0.35)',
-                }}
-              >
-                {item.label}
-              </div>
-            ))}
-
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                transform: `rotate(${targetRotation}deg)`,
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  width: 50,
-                  height: 14,
-                  borderRadius: 999,
-                  transform: 'translate(92px, -50%)',
-                  background: 'linear-gradient(90deg, #ffb300 0%, #ffd15a 100%)',
-                  boxShadow: '0 0 18px rgba(255,179,0,0.45)',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  transform: 'translate(128px, -50%)',
-                  background: '#ffe17b',
-                  boxShadow: '0 0 0 10px rgba(255,179,0,0.18)',
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                transform: `rotate(${compassRotation + wobbleRotation}deg)`,
-                transition: 'transform 80ms linear',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  width: 8,
-                  height: '34%',
-                  transform: 'translate(-50%, -100%)',
-                  borderRadius: 999,
-                  background: 'linear-gradient(180deg, #ffffff 0%, #eef3ff 100%)',
-                  boxShadow: '0 0 16px rgba(255,255,255,0.12)',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  width: 0,
-                  height: 0,
-                  transform: 'translate(-50%, -138px)',
-                  borderLeft: '13px solid transparent',
-                  borderRight: '13px solid transparent',
-                  borderBottom: '38px solid #35e06f',
-                  filter: 'drop-shadow(0 4px 8px rgba(18,176,74,0.35))',
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                width: 44,
-                height: 44,
-                transform: 'translate(-50%, -50%)',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f4ff 100%)',
-                boxShadow: '0 0 0 10px rgba(196,215,255,0.16)',
-              }}
-            />
-
-            <div
-              style={{
-                position: 'absolute',
-                left: '50%',
-                bottom: 26,
-                transform: 'translateX(-50%)',
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 900,
-                  letterSpacing: '0.16em',
-                  color: 'rgba(255,255,255,0.62)',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Heading
-              </div>
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 26,
-                  fontWeight: 900,
-                  lineHeight: 1,
-                  letterSpacing: '-0.03em',
-                }}
-              >
-                {formatDeg(displayHeading)}
-              </div>
+      <div className="bh-card">
+        <header className="bh-top">
+          <div className="bh-mode">
+            <span className="bh-pulse" aria-hidden="true" />
+            <div className="bh-mode-copy">
+              <span className="bh-overline">Vector lock</span>
+              <span className="bh-title">{title}</span>
             </div>
           </div>
 
-          <div
-            style={{
-              marginTop: 14,
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 900,
-                letterSpacing: '-0.03em',
-                lineHeight: 1,
-              }}
-            >
-              {delta == null
-                ? 'Track'
-                : Math.abs(delta) <= tolerance
-                ? 'Aligned'
-                : `${delta > 0 ? 'Right' : 'Left'} ${Math.abs(Math.round(delta))}°`}
-            </div>
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: 15,
-                fontWeight: 700,
-                color: 'rgba(255,255,255,0.72)',
-              }}
-            >
-              {guidanceSub}
-            </div>
+          <div className="bh-live">
+            <span>{statusLabel}</span>
+            <strong>{formatDeg(rawHeading ?? heading)}°</strong>
+          </div>
+        </header>
+
+        <div className="bh-command" aria-live="polite">
+          <div className={`bh-command-main ${command.small ? "is-small" : ""}`}>{command.main}</div>
+          <div className="bh-command-sub">{command.sub}</div>
+        </div>
+
+        <div className="bh-instrument">
+          <div className="bh-ring-progress" />
+          <div className="bh-face" />
+          <div className="bh-gate" />
+          <div className="bh-orbit">
+            <div className="bh-target" aria-hidden="true" />
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              marginTop: 16,
-            }}
-          >
-            <div style={statCard}>
-              <div style={labelStyle}>Target</div>
-              <div style={valueStyle}>{Math.round(target)}°</div>
+          <div className="bh-center">
+            <div className="bh-lock-burst" />
+            <div>
+              <strong>{formatDeg(targetBearing)}°</strong>
+              <span>Target</span>
             </div>
-            <div style={statCard}>
-              <div style={labelStyle}>Delta</div>
-              <div style={valueStyle}>
-                {delta == null ? '--' : `${Math.abs(Math.round(delta))}°`}
-              </div>
-            </div>
-            <div style={statCard}>
-              <div style={labelStyle}>Hold</div>
-              <div style={valueStyle}>{Math.round(holdProgress * 100)}%</div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: 14,
-              height: 10,
-              borderRadius: 999,
-              background: 'rgba(255,255,255,0.08)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${Math.round(holdProgress * 100)}%`,
-                height: '100%',
-                borderRadius: 999,
-                background:
-                  sensorState === 'locked'
-                    ? 'linear-gradient(90deg, #31d56e 0%, #7bff9a 100%)'
-                    : inWindow
-                    ? 'linear-gradient(90deg, #ffd053 0%, #ffb000 100%)'
-                    : 'linear-gradient(90deg, #4667be 0%, #698bff 100%)',
-                transition: 'width 100ms linear',
-                boxShadow:
-                  inWindow || sensorState === 'locked'
-                    ? '0 0 12px rgba(255,194,71,0.45)'
-                    : 'none',
-              }}
-            />
           </div>
         </div>
-      </div>
 
-      <div>
-        <button
-          type="button"
-          onClick={() => setFallbackOpen((v) => !v)}
-          style={{
-            borderRadius: 999,
-            border: '1px solid rgba(255,255,255,0.10)',
-            background: 'rgba(255,255,255,0.03)',
-            color: 'rgba(255,255,255,0.92)',
-            padding: '9px 14px',
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: '0.02em',
-          }}
-        >
-          Fallback
-        </button>
+        <div className="bh-capture">
+          <div className="bh-capture-track">
+            <div className="bh-capture-fill" />
+          </div>
+          <span>{capturePct}</span>
+        </div>
 
-        {fallbackOpen && (
-          <div
-            style={{
-              ...cardBase,
-              marginTop: 10,
-              padding: 14,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 14,
-                lineHeight: 1.45,
-                color: 'rgba(255,255,255,0.84)',
-              }}
-            >
-              {guidanceSub}
+        <div className="bh-metrics">
+          <div className="bh-readout">
+            <span>Δ</span>
+            <strong>{heading === null ? "—" : `${Math.round(absDelta)}°`}</strong>
+            <i aria-hidden="true" />
+            <span>ventana</span>
+            <strong>±{Math.round(tolerance)}°</strong>
+            <i aria-hidden="true" />
+            <span>captura</span>
+            <strong>{Math.round(holdMs / 100) / 10}s</strong>
+          </div>
+        </div>
+
+        {showSensorPanel ? (
+          <div className="bh-sensor">
+            <div className="bh-sensor-row">
+              <span>Sensor</span>
+              <span>{statusLabel}</span>
             </div>
+            <p>{sensorCopy}</p>
 
-            <div
-              style={{
-                display: 'flex',
-                gap: 10,
-                flexWrap: 'wrap',
-                marginTop: 12,
-              }}
-            >
-              {permission === 'unknown' || blockedReason === 'permission' ? (
+            <div className="bh-actions">
+              {(sensorState === "needs_permission" ||
+                sensorState === "denied" ||
+                sensorState === "silent" ||
+                sensorState === "blocked_https" ||
+                sensorState === "unsupported") && (
+                <button className="bh-button" type="button" onClick={() => void startSensors()}>
+                  Activar sensor
+                </button>
+              )}
+
+              {(sensorState === "silent" || sensorState === "unsupported" || sensorState === "denied") && (
                 <button
+                  className="bh-button bh-ghost"
                   type="button"
-                  onClick={() => void requestMotionPermission()}
-                  style={{
-                    borderRadius: 14,
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    background: 'rgba(74,118,222,0.32)',
-                    color: '#fff',
-                    padding: '10px 14px',
-                    fontSize: 14,
-                    fontWeight: 800,
+                  onClick={() => {
+                    setManualMode((value) => !value);
+                    if (headingRef.current === null) updateHeading(targetBearing + 72);
                   }}
                 >
-                  Enable motion
+                  Prueba manual
                 </button>
-              ) : null}
-
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void onWin()}
-                style={{
-                  borderRadius: 14,
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
-                  padding: '10px 14px',
-                  fontSize: 14,
-                  fontWeight: 800,
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting ? 'Working…' : 'Complete anyway'}
-              </button>
+              )}
             </div>
+
+            {manualMode ? (
+              <input
+                className="bh-range"
+                type="range"
+                min="0"
+                max="359"
+                value={Math.round(heading ?? targetBearing)}
+                onChange={(event) => updateHeading(Number(event.target.value))}
+              />
+            ) : null}
           </div>
-        )}
+        ) : null}
       </div>
-    </div>
-  )
+    </section>
+  );
 }
 
-export default BearingHuntRuntimeScreen
+export const BearingHuntRuntimeScreen = RuntimeScreen;
+export default RuntimeScreen;
