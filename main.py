@@ -364,14 +364,14 @@ def _normalize_degree_label(value, default="135°"):
 def get_minigame_spec(minigame_type):
     normalized = _as_str(minigame_type).strip().lower()
     if normalized not in MINIGAME_SPECS:
-        normalized = "circuit_hack"
+        normalized = "signal_hunt"
     return MINIGAME_SPECS[normalized]
 
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
     if normalized_type not in SUPPORTED_MINIGAME_TYPES:
-        normalized_type = "circuit_hack"
+        normalized_type = "signal_hunt"
 
     if normalized_type == "circuit_matrix":
         out = {
@@ -656,7 +656,7 @@ def validate_minigame_config(minigame_type, raw_cfg):
 
 def build_stage_minigame_runtime(node):
     interaction = node.get("interaction") or {}
-    minigame_type = _as_str(interaction.get("type") or "circuit_hack").strip().lower() or "circuit_hack"
+    minigame_type = _as_str(interaction.get("type") or "signal_hunt").strip().lower() or "signal_hunt"
     if minigame_type not in SUPPORTED_MINIGAME_TYPES:
         minigame_type = "circuit_hack"
     spec = get_minigame_spec(minigame_type)
@@ -895,6 +895,8 @@ def _build_success_conditions(raw):
 
     return conditions
 
+# RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
+# Evitamos que datos incompletos caigan silenciosamente al legacy circuit_hack.
 def normalize_stage(raw):
     raw = raw or {}
 
@@ -928,10 +930,10 @@ def normalize_stage(raw):
         raw_minigame = {}
 
     interaction_type = _as_str(
-        raw_minigame.get("type") or raw.get("type") or "circuit_hack"
-    ).strip().lower() or "circuit_hack"
+        raw_minigame.get("type") or raw.get("type") or "signal_hunt"
+    ).strip().lower() or "signal_hunt"
     if interaction_type not in SUPPORTED_MINIGAME_TYPES:
-        interaction_type = "circuit_hack"
+        interaction_type = "signal_hunt"
 
     raw_minigame_config = raw_minigame.get("config")
     if not isinstance(raw_minigame_config, dict):
