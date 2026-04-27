@@ -1,83 +1,120 @@
-import { CircuitHackGame } from './games/CircuitHackGame'
-import { CryptexGame } from './games/CryptexGame'
-import { SimonSaysGame } from './games/SimonSaysGame'
-import { DigitalTunerGame } from './games/DigitalTunerGame'
-import { RadioAzimuthGame } from './games/RadioAzimuthGame'
-import { GyroStormGame } from './games/GyroStormGame'
-import { SwitchboardGame } from './games/SwitchboardGame'
-import { CompassBlowGame } from './games/CompassBlowGame'
-import type { PlayerMinigameDefinition } from './types'
+import { createElement } from 'react'
 
-const REGISTRY: Record<string, PlayerMinigameDefinition> = {
-  circuit_hack: {
-    type: 'circuit_hack',
-    label: 'Circuit Hack',
+import type {
+  PlayerMinigameDefinition,
+  PlayerMinigameProps,
+} from './types'
+
+export type RegisteredMinigameType = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+
+export type RegisteredMinigame = PlayerMinigameDefinition & {
+  id: RegisteredMinigameType
+  family: RegisteredMinigameType
+  title: string
+  name: string
+  description: string
+  status: 'native'
+  runtime: 'family-native'
+  emoji: string
+  icon: string
+}
+
+function FamilyNativeRuntimeNotice(_props: PlayerMinigameProps) {
+  return createElement(
+    'div',
+    {
+      className:
+        'rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-200',
+    },
+    createElement(
+      'div',
+      { className: 'mb-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-200' },
+      'Family-native runtime',
+    ),
+    createElement(
+      'p',
+      { className: 'text-zinc-300' },
+      'This minigame is resolved through the family-native runtime host.',
+    ),
+  )
+}
+
+export const MINIGAME_REGISTRY: Record<RegisteredMinigameType, RegisteredMinigame> = {
+  signal_hunt: {
+    type: 'signal_hunt',
+    id: 'signal_hunt',
+    family: 'signal_hunt',
+    label: 'Signal Hunt',
+    title: 'Signal Hunt',
+    name: 'Signal Hunt',
+    description: 'Family-native GPS/proximity signal lock runtime.',
     version: 'v1',
-    supportsManualFallback: true,
-    component: CircuitHackGame,
+    status: 'native',
+    runtime: 'family-native',
+    supportsManualFallback: false,
+    component: FamilyNativeRuntimeNotice,
+    emoji: '📡',
+    icon: '📡',
   },
-  cryptex: {
-    type: 'cryptex',
-    label: 'Cryptex',
+  bearing_hunt: {
+    type: 'bearing_hunt',
+    id: 'bearing_hunt',
+    family: 'bearing_hunt',
+    label: 'Bearing Hunt',
+    title: 'Bearing Hunt',
+    name: 'Bearing Hunt',
+    description: 'Family-native compass and orientation runtime.',
     version: 'v1',
-    supportsManualFallback: true,
-    component: CryptexGame,
+    status: 'native',
+    runtime: 'family-native',
+    supportsManualFallback: false,
+    component: FamilyNativeRuntimeNotice,
+    emoji: '🧭',
+    icon: '🧭',
   },
-  simon_says: {
-    type: 'simon_says',
-    label: 'Simon Says',
+  circuit_matrix: {
+    type: 'circuit_matrix',
+    id: 'circuit_matrix',
+    family: 'circuit_matrix',
+    label: 'Circuit Matrix',
+    title: 'Circuit Matrix',
+    name: 'Circuit Matrix',
+    description: 'Family-native logic/grid runtime.',
     version: 'v1',
-    supportsManualFallback: true,
-    component: SimonSaysGame,
-  },
-  digital_tuner: {
-    type: 'digital_tuner',
-    label: 'Digital Tuner',
-    version: 'v1',
-    supportsManualFallback: true,
-    component: DigitalTunerGame,
-  },
-  radio_azimuth: {
-    type: 'radio_azimuth',
-    label: 'Radio Azimuth',
-    version: 'v1',
-    supportsManualFallback: true,
-    component: RadioAzimuthGame,
-  },
-  gyro_storm: {
-    type: 'gyro_storm',
-    label: 'Gyro Storm',
-    version: 'v1',
-    supportsManualFallback: true,
-    component: GyroStormGame,
-  },
-  switchboard: {
-    type: 'switchboard',
-    label: 'Switchboard',
-    version: 'v1',
-    supportsManualFallback: true,
-    component: SwitchboardGame,
-  },
-  compass_blow: {
-    type: 'compass_blow',
-    label: 'Compass Blow',
-    version: 'v1',
-    supportsManualFallback: true,
-    component: CompassBlowGame,
+    status: 'native',
+    runtime: 'family-native',
+    supportsManualFallback: false,
+    component: FamilyNativeRuntimeNotice,
+    emoji: '🧩',
+    icon: '🧩',
   },
 }
 
-export function resolveMinigameDefinition(
-  type?: string | null
-): PlayerMinigameDefinition | null {
-  const normalized = String(type || '')
-    .trim()
-    .toLowerCase()
+export const minigameRegistry = MINIGAME_REGISTRY
+export const MINIGAMES = MINIGAME_REGISTRY
+export const minigames = MINIGAME_REGISTRY
 
-  if (!normalized) return null
-  return REGISTRY[normalized] || null
+export function listRegisteredMinigames(): RegisteredMinigame[] {
+  return Object.values(MINIGAME_REGISTRY)
 }
 
-export function listRegisteredMinigameTypes(): string[] {
-  return Object.keys(REGISTRY)
+export function getRegisteredMinigame(type: string | null | undefined): RegisteredMinigame | null {
+  const normalized = String(type || '').trim().toLowerCase() as RegisteredMinigameType
+  return MINIGAME_REGISTRY[normalized] || null
+}
+
+export function isRegisteredMinigame(type: string | null | undefined): type is RegisteredMinigameType {
+  return Boolean(getRegisteredMinigame(type))
+}
+
+export function resolveMinigameDefinition(type: string | null | undefined): PlayerMinigameDefinition | null {
+  return getRegisteredMinigame(type)
+}
+
+export function listMinigameDefinitions(): PlayerMinigameDefinition[] {
+  return listRegisteredMinigames()
+}
+
+export function isSupportedMinigame(type: string | null | undefined): type is RegisteredMinigameType {
+  return isRegisteredMinigame(type)
 }

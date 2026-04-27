@@ -648,7 +648,8 @@ Useful development URLs:
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
-- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry and runtime host
+- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host
+- `frontend/src/player/minigames/gameCatalog.ts` and `frontend/src/player/minigames/registry.ts` -> family-native React minigame catalog/registry
 - `frontend/src/player/minigames/families/*` -> family definitions and fullscreen runtime screens
 - `frontend/src/shared/api.ts` -> frontend API calls
 - `frontend/src/types/player.ts` -> shared frontend types
