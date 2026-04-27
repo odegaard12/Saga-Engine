@@ -8,6 +8,7 @@ import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
+import { getPlayerNameFromLocation } from '../shared/playerRoute'
 
 type LoadState =
   | { status: 'idle' | 'loading' }

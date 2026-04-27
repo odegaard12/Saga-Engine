@@ -162,7 +162,7 @@ When running the frontend workspace locally through Vite:
 - `/` -> React mission entry / login flow
 - `/?user=PLAYER 1` -> React player directly
 - `/admin` -> proxied backend admin
-- `/player/...` -> backend React-player redirect to `/?user=...`; legacy player remains under `/legacy/player/...`
+- `/player/...` -> backend-served React player route; legacy player remains under `/legacy/player/...`
 
 This React flow is the preferred player direction. Legacy template routes remain available under `/legacy` until final removal.
 

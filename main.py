@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import json
@@ -9,7 +9,6 @@ import hmac
 import secrets
 import time
 from pathlib import Path
-from urllib.parse import quote
 
 app = FastAPI()
 
@@ -1282,9 +1281,11 @@ async def login(request: Request):
         }
     )
 
-@app.get("/player/{name}")
+@app.get("/player/{name}", response_class=HTMLResponse)
 async def react_player(name: str):
-    return RedirectResponse(url=f"/?user={quote(name)}", status_code=307)
+    # Serve the React app directly. The frontend derives the player from /player/{name}.
+    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
+    return react_index_or_missing()
 
 @app.get("/legacy/player/{name}", response_class=HTMLResponse)
 async def game(request: Request, name: str):
