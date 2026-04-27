@@ -277,9 +277,9 @@ The admin panel currently includes:
 
 ## Supported Mini-Games
 
-### Removed legacy player mini-game types
+### Backend/player minigame policy
 
-The old template player UI and static legacy minigame JavaScript have been removed. Historical types may still appear in imported or old data, but new work should use family-native schemas:
+The normal backend, admin, and React player path now uses only family-native minigame types:
 
 - `signal_hunt`
 - `bearing_hunt`
@@ -316,7 +316,7 @@ The React player runtime should use family-native minigame types as the normal p
 - `bearing_hunt`
 - `circuit_matrix`
 
-Legacy minigame types may remain only as temporary backend import/validation compatibility, but they are no longer part of the React player or admin creation path.
+Legacy minigame types have been removed from the normal backend/admin/player path. New work should use only family-native types.
 
 
 ### What the families are for
@@ -362,7 +362,7 @@ The legacy player template UI has been removed. New gameplay work should use fam
 
 ### Legacy migration boundary
 
-Legacy minigame code remains in the repository while the backend/template runtime is still available, but new React gameplay work should target only family-native runtimes. Legacy type adaptation is migration tooling, not the normal React player path.
+Legacy player/template runtime code has been removed from the normal app surface. New gameplay work should target only family-native runtimes.
 
 ## Runtime Model
 
