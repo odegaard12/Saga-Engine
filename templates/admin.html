@@ -2051,21 +2051,9 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
     </div>
     <label>Mission type</label>
     <select id="e-type" class="config-input mb-4" onchange="renderGameConfig()">
-      <optgroup label="Family native">
-        <option value="signal_hunt">📡 Signal Hunt</option>
-        <option value="bearing_hunt">🧭 Bearing Hunt</option>
-        <option value="circuit_matrix">🧩 Circuit Matrix</option>
-      </optgroup>
-      <optgroup label="Legacy / migration">
-        <option value="circuit_hack">🧩 Circuit Hack</option>
-        <option value="cryptex">🧭 Cryptex</option>
-        <option value="radio_azimuth">📡 Radio Azimuth</option>
-        <option value="gyro_storm">⚖️ Gyro Storm</option>
-        <option value="switchboard">⚡ Switchboard</option>
-        <option value="simon_says">🧠 Simon Says</option>
-        <option value="compass_blow">🎙️ Compass Blow</option>
-        <option value="digital_tuner">📻 Digital Tuner</option>
-      </optgroup>
+      <option value="signal_hunt">📡 Signal Hunt</option>
+      <option value="bearing_hunt">🧭 Bearing Hunt</option>
+      <option value="circuit_matrix">🧩 Circuit Matrix</option>
     </select>
     <div id="game-params" class="bg-black p-4 border border-zinc-800 rounded mb-4"></div>
     <label>Node text</label>
@@ -3314,7 +3302,7 @@ function openEditor
   document.getElementById('edit-header').innerText = s.title || 'NODE';
   document.getElementById('e-title').value = s.title || '';
   document.getElementById('e-radius').value = s.radius || 50;
-  document.getElementById('e-type').value = s.type || 'signal_hunt';
+  document.getElementById('e-type').value = normalizeEditorMinigameType(s.type);
   document.getElementById('e-content').value = s.content || '';
 
   document.getElementById('e-entry-mode').value = entryMode;
@@ -3460,17 +3448,14 @@ const MINIGAME_CONFIG_SCHEMAS = {
     ],
   },
 
-  circuit_hack: {
-    label: 'Circuit Hack',
-    group: 'legacy',
-    description: 'Legacy migration config. Prefer circuit_matrix for new work.',
-    fields: [
-      { key: 'target_start', label: 'Target start', type: 'select', default: 'EAST', options: ['NORTH', 'EAST', 'SOUTH', 'WEST', 'CENTER'] },
-      { key: 'target_guard', label: 'Target guard', type: 'select', default: 'SECOND', options: ['FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'] },
-      { key: 'target_end', label: 'Target end', type: 'select', default: 'SOUTH', options: ['NORTH', 'EAST', 'SOUTH', 'WEST', 'CENTER'] },
-    ],
-  },
 };
+
+const FAMILY_NATIVE_MINIGAME_TYPES = new Set(['signal_hunt', 'bearing_hunt', 'circuit_matrix']);
+
+function normalizeEditorMinigameType(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  return FAMILY_NATIVE_MINIGAME_TYPES.has(normalized) ? normalized : 'signal_hunt';
+}
 
 function adminConfigEscapeHtml(value) {
   return String(value ?? '')
@@ -3557,14 +3542,6 @@ function normalizeGameConfigForType(type, rawCfg) {
   schema.fields.forEach((field) => {
     normalized[field.key] = coerceMinigameFieldValue(field, incoming[field.key]);
   });
-
-  if (type === 'circuit_hack') {
-    normalized.target = [
-      normalized.target_start,
-      normalized.target_guard,
-      normalized.target_end,
-    ];
-  }
 
   return normalized;
 }
@@ -3696,7 +3673,7 @@ function applyChanges() {
   let s = stages[currentIdx];
   s.title = document.getElementById('e-title').value;
   s.radius = Number(document.getElementById('e-radius').value || 50);
-  s.type = document.getElementById('e-type').value;
+  s.type = normalizeEditorMinigameType(document.getElementById('e-type').value);
   s.content = document.getElementById('e-content').value;
   s.config = readGameConfigFromEditor(s.type);
 
