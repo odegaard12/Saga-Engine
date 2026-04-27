@@ -2051,9 +2051,21 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
     </div>
     <label>Mission type</label>
     <select id="e-type" class="config-input mb-4" onchange="renderGameConfig()">
-      <option value="signal_hunt">📡 Signal Hunt</option>
-      <option value="bearing_hunt">🧭 Bearing Hunt</option>
-      <option value="circuit_matrix">🔌 Circuit Matrix</option>
+      <optgroup label="Family native">
+        <option value="signal_hunt">📡 Signal Hunt</option>
+        <option value="bearing_hunt">🧭 Bearing Hunt</option>
+        <option value="circuit_matrix">🧩 Circuit Matrix</option>
+      </optgroup>
+      <optgroup label="Legacy / migration">
+        <option value="circuit_hack">🧩 Circuit Hack</option>
+        <option value="cryptex">🧭 Cryptex</option>
+        <option value="radio_azimuth">📡 Radio Azimuth</option>
+        <option value="gyro_storm">⚖️ Gyro Storm</option>
+        <option value="switchboard">⚡ Switchboard</option>
+        <option value="simon_says">🧠 Simon Says</option>
+        <option value="compass_blow">🎙️ Compass Blow</option>
+        <option value="digital_tuner">📻 Digital Tuner</option>
+      </optgroup>
     </select>
     <div id="game-params" class="bg-black p-4 border border-zinc-800 rounded mb-4"></div>
     <label>Node text</label>
