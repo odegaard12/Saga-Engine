@@ -12,8 +12,8 @@ interface PlayerHudProps {
   debugEnabled: boolean
   followPlayer: boolean
   toolsOpen: boolean
-  legacyPlayerHref: string
-  legacyLoginHref: string
+  playerHref: string
+  loginHref: string
   adminHref: string
   primaryLabel: string
   primaryTone: PrimaryActionTone
@@ -56,8 +56,8 @@ export function PlayerHud({
   debugEnabled,
   followPlayer,
   toolsOpen,
-  legacyPlayerHref,
-  legacyLoginHref,
+  playerHref,
+  loginHref,
   adminHref,
   primaryLabel,
   primaryTone,
@@ -201,7 +201,7 @@ export function PlayerHud({
             </a>
 
             <a
-              href={legacyLoginHref}
+              href={loginHref}
               style={toolsLink}
               onClick={onCloseTools}
             >
@@ -209,7 +209,7 @@ export function PlayerHud({
             </a>
 
             <a
-              href={legacyPlayerHref}
+              href={playerHref}
               style={toolsLinkMuted}
               onClick={onCloseTools}
             >
