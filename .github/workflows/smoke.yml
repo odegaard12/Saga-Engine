@@ -61,10 +61,6 @@ jobs:
           curl -fsSI http://127.0.0.1:8097/ >/dev/null
           curl -fsS http://127.0.0.1:8097/player/PLAYER%201 >/dev/null
           curl -fsSI http://127.0.0.1:8097/player/PLAYER%201 >/dev/null
-          curl -fsS http://127.0.0.1:8097/legacy >/dev/null
-          curl -fsSI http://127.0.0.1:8097/legacy >/dev/null
-          curl -fsS http://127.0.0.1:8097/legacy/player/PLAYER%201 >/dev/null
-          curl -fsSI http://127.0.0.1:8097/legacy/player/PLAYER%201 >/dev/null
           curl -fsS http://127.0.0.1:8097/admin >/dev/null
           curl -fsSI http://127.0.0.1:8097/admin >/dev/null
           curl -fsS http://127.0.0.1:8097/api/config >/dev/null

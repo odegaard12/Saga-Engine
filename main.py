@@ -1211,7 +1211,6 @@ REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
 REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
 REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 templates = Jinja2Templates(directory="templates")
 
@@ -1227,7 +1226,7 @@ def react_index_or_missing():
           <body style="font-family: system-ui; padding: 24px;">
             <h1>SAGA React build missing</h1>
             <p>Run <code>cd frontend && npm run build</code> before serving the React player from FastAPI.</p>
-            <p>Temporary legacy routes remain available under <code>/legacy</code>.</p>
+            <p>Build the React frontend with <code>cd frontend && npm run build</code>, then restart FastAPI.</p>
           </body>
         </html>
         """,
@@ -1268,42 +1267,12 @@ async def saga_no_cache_html(request, call_next):
 async def react_entry():
     return react_index_or_missing()
 
-@app.head("/legacy", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/legacy", response_class=HTMLResponse)
-async def login(request: Request):
-    cfg = load_config()
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={
-            "request": request,
-            "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-            "profiles": get_player_profiles(cfg),
-            "config": cfg
-        }
-    )
-
 @app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
 async def react_player(name: str):
     # Serve the React app directly. The frontend derives the player from /player/{name}.
     # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
     return react_index_or_missing()
-
-@app.head("/legacy/player/{name}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/legacy/player/{name}", response_class=HTMLResponse)
-async def game(request: Request, name: str):
-    cfg = load_config()
-    return templates.TemplateResponse(
-        request=request,
-        name="game.html",
-        context={
-            "request": request,
-            "user": name,
-            "profile": get_player_profile(name, cfg),
-            "config": cfg
-        }
-    )
 
 @app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin", response_class=HTMLResponse)

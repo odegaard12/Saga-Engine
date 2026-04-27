@@ -70,7 +70,7 @@ Current React frontend scope:
 
 ### Important boundary
 
-The production backend can now serve the React player build when `frontend/dist` is available, while legacy template routes remain isolated under `/legacy` during migration.
+The production backend now serves the React player build when `frontend/dist` is available. The legacy player template UI has been removed from the normal app surface.
 
 The React frontend is currently:
 
@@ -90,11 +90,9 @@ The React frontend is currently:
 
 ### Frontend
 
-Legacy template frontend:
+Removed legacy player frontend:
 
-- HTML
-- JavaScript
-- CSS
+- old template player UI removed from the app surface
 
 New frontend workspace:
 
@@ -142,8 +140,6 @@ At each node, the engine can combine:
 
 - `/` -> React mission entry / player app when `frontend/dist` exists
 - `/player/{PLAYER_NAME}` -> backend-served React player route
-- `/legacy` -> legacy player selection / login during migration
-- `/legacy/player/{PLAYER_NAME}` -> legacy player game UI during migration
 - `/admin` -> admin panel
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
@@ -164,9 +160,9 @@ When running the frontend workspace locally through Vite:
 - `/` -> React mission entry / login flow
 - `/?user=PLAYER 1` -> React player directly
 - `/admin` -> proxied backend admin
-- `/player/...` -> backend-served React player route; legacy player remains under `/legacy/player/...`
+- `/player/...` -> backend-served React player route
 
-This React flow is the preferred player direction. Legacy template routes remain available under `/legacy` until final removal.
+This React flow is the active player direction.
 
 ---
 
@@ -205,7 +201,7 @@ The React player iteration is moving toward:
 
 - stronger interaction logic
 - final top bar / HUD hierarchy
-- full gameplay parity with the legacy player flow
+- complete production gameplay polish on the React player flow
 - richer motion / transitions / microinteractions
 - complete family-native minigame implementations
 - final fullscreen sensor gameplay
@@ -213,10 +209,6 @@ The React player iteration is moving toward:
 ---
 
 ## Mission Entry / Login
-
-### Legacy login
-
-The legacy runtime still ships with a template-based player selection/login flow under `/legacy` during migration.
 
 ### React mission entry
 
@@ -627,7 +619,7 @@ Useful development URLs:
 - no `?user` -> React mission entry / login flow
 - with `?user` -> React player flow
 - `/admin` still goes to backend admin
-- legacy template runtime is isolated under `/legacy` while the React build is promoted as the primary player route
+- React build is the primary player route when served by the backend
 
 ---
 
@@ -636,10 +628,7 @@ Useful development URLs:
 ### Backend / runtime
 
 - `main.py` -> FastAPI backend
-- `templates/login.html` -> legacy login template mounted under `/legacy` during migration
-- `templates/game.html` -> legacy player template mounted under `/legacy/player/...` during migration
 - `templates/admin.html` -> admin panel
-- `static/minigames_final.js` -> legacy/frontend mini-game logic
 - `data/` -> demo / default data files
 
 ### Frontend workspace
