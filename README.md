@@ -720,7 +720,7 @@ Near-term direction for the new frontend:
 - continue improving the mobile-first player shell
 - refine top bar / HUD / menu logic
 - build full production gameplay on top of the family runtime foundation
-- migrate legacy minigame types toward family-native screens
+- remove or convert legacy minigame types toward family-native screens
 - add admin editing for family minigame configuration
 - keep backend stable while the frontend runtime evolves
 - target a stronger installable web app / PWA flow before considering mobile packaging
