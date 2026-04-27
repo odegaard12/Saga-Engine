@@ -25,7 +25,7 @@ export function CircuitMatrixRuntimeScreen({
       <div style={title}>{stage.title}</div>
       <div style={body}>
         Logic-family runtime mounted. This is the new fullscreen family shell where
-        grid routing, switchboards, cryptex logic and sequence boards will live.
+        grid routing, route repair, power balancing and sequence-board logic will live.
       </div>
 
       <div style={chipRow}>
