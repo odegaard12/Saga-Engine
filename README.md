@@ -70,7 +70,7 @@ Current React frontend scope:
 
 ### Important boundary
 
-The production runtime still uses the existing FastAPI + template-based frontend.
+The production backend can now serve the React player build when `frontend/dist` is available, while legacy template routes remain isolated under `/legacy` during migration.
 
 The React frontend is currently:
 
@@ -164,7 +164,7 @@ When running the frontend workspace locally through Vite:
 - `/admin` -> proxied backend admin
 - `/player/...` -> proxied legacy player route when needed
 
-This React flow is for development / migration work and does not replace the production template flow yet.
+This React flow is the preferred player direction. Legacy template routes remain available under `/legacy` until final removal.
 
 ---
 
@@ -623,7 +623,7 @@ Useful development URLs:
 - no `?user` -> React mission entry / login flow
 - with `?user` -> React player flow
 - `/admin` still goes to backend admin
-- legacy template runtime still exists for production until the React build is promoted as the primary served player route
+- legacy template runtime is isolated under `/legacy` while the React build is promoted as the primary player route
 
 ---
 
