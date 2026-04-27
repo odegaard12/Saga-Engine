@@ -3,7 +3,6 @@ import {
   getStageResolvedFamily,
   getStageResolvedLabel,
   resolveStageMinigame,
-  stageUsesLegacyBridge,
 } from './runtime-bridge'
 
 const samples: PlayerStage[] = [
@@ -34,7 +33,6 @@ for (const stage of samples) {
     title: stage.title,
     family: getStageResolvedFamily(stage),
     label: getStageResolvedLabel(stage),
-    legacy_bridge_disabled: stageUsesLegacyBridge(stage),
     has_resolved: Boolean(resolved?.resolved),
   })
 }
