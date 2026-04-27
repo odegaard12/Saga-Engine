@@ -100,6 +100,3 @@ export function getStageResolvedLabel(stage: PlayerStage | null | undefined): st
   return resolved.resolved.label || resolved.source.label || null
 }
 
-export function stageUsesLegacyBridge(_stage?: unknown): boolean {
-  return false
-}
