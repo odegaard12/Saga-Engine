@@ -13,7 +13,7 @@ import { signalHuntDefinition } from '../families/signalHunt/definition'
 // Legacy adapters may remain as migration tooling, but the React player resolver does not execute them.
 
 export type NativeMinigameType = MinigameFamily
-export type MinigameCompatibility = 'native' | 'legacy_bridge'
+export type MinigameCompatibility = 'native'
 
 export interface ResolveMinigameInput {
   type?: string | null
@@ -142,15 +142,6 @@ function resolveNativeMinigame(
 
   return resolveSignalHuntNative(input)
 }
-
-
-function resolveLegacyBridgedMinigame(
-  input: ResolveMinigameInput & { type: string }
-): ResolvedMinigame | null {
-  void input
-  return null
-}
-
 export function resolveMinigame(input: ResolveMinigameInput): ResolvedMinigame | null {
   const type = String(input.type || '').trim().toLowerCase()
   if (!type) return null
@@ -161,11 +152,7 @@ export function resolveMinigame(input: ResolveMinigameInput): ResolvedMinigame |
       type,
     })
   }
-
-  return resolveLegacyBridgedMinigame({
-    ...input,
-    type,
-  })
+  return null
 }
 
 export function resolveMinigameOrThrow(input: ResolveMinigameInput): ResolvedMinigame {

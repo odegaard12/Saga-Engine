@@ -34,7 +34,7 @@ for (const stage of samples) {
     title: stage.title,
     family: getStageResolvedFamily(stage),
     label: getStageResolvedLabel(stage),
-    legacy_bridge: stageUsesLegacyBridge(stage),
+    legacy_bridge_disabled: stageUsesLegacyBridge(stage),
     has_resolved: Boolean(resolved?.resolved),
   })
 }

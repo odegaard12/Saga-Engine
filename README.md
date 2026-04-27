@@ -314,7 +314,7 @@ Current runtime foundation includes:
 
 - core minigame type system
 - family configs and registry contracts
-- migration-only legacy type handling
+- native family runtime resolution
 - stage/runtime resolution helpers
 - `FamilyRuntimeHost`
 - `InteractionSheet` integration for resolved family-native runtimes
@@ -329,7 +329,7 @@ The React player runtime should use family-native minigame types as the normal p
 - `bearing_hunt`
 - `circuit_matrix`
 
-Legacy minigame types may remain in the repository for migration, admin import, or historical compatibility work, but they should not be the default React player resolution path.
+Legacy minigame types may remain in backend/template migration areas temporarily, but they are no longer part of the React player resolution path.
 
 
 ### What the families are for
@@ -648,7 +648,7 @@ Useful development URLs:
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
-- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry, runtime host, migration-only legacy adapter
+- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry and runtime host
 - `frontend/src/player/minigames/families/*` -> family definitions and fullscreen runtime screens
 - `frontend/src/shared/api.ts` -> frontend API calls
 - `frontend/src/types/player.ts` -> shared frontend types
