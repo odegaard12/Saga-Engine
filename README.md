@@ -76,7 +76,7 @@ The React frontend is currently:
 
 - a migration workspace
 - served by the backend when frontend/dist exists
-- still being completed toward full feature parity with the old template flow
+- still being completed toward full production gameplay polish
 
 ---
 
@@ -89,10 +89,6 @@ The React frontend is currently:
 - Docker
 
 ### Frontend
-
-Removed legacy player frontend:
-
-- old template player UI removed from the app surface
 
 New frontend workspace:
 
@@ -316,7 +312,7 @@ The React player runtime should use family-native minigame types as the normal p
 - `bearing_hunt`
 - `circuit_matrix`
 
-Legacy minigame types have been removed from the normal backend/admin/player path. New work should use only family-native types.
+New work should use only family-native minigame types.
 
 
 ### What the families are for
@@ -356,13 +352,13 @@ Proximity/search games such as:
 
 Current family runtime screens are foundation shells, not final production gameplay yet.
 
-The legacy player template UI has been removed. New gameplay work should use family-native runtimes as the normal path.
+New gameplay work should use family-native runtimes as the normal path.
 
 ---
 
 ### Legacy migration boundary
 
-Legacy player/template runtime code has been removed from the normal app surface. New gameplay work should target only family-native runtimes.
+New gameplay work should target only family-native runtimes.
 
 ## Runtime Model
 
@@ -707,7 +703,7 @@ Near-term direction for the new frontend:
 - continue improving the mobile-first player shell
 - refine top bar / HUD / menu logic
 - build full production gameplay on top of the family runtime foundation
-- remove or convert legacy minigame types toward family-native screens
+- continue building family-native minigame variants, presets, and schemas
 - add admin editing for family minigame configuration
 - keep backend stable while the frontend runtime evolves
 - target a stronger installable web app / PWA flow before considering mobile packaging
