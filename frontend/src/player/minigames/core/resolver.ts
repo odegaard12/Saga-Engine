@@ -170,17 +170,5 @@ export function getResolvedMinigameLabel(input: ResolveMinigameInput): string | 
 }
 
 export function listSupportedRuntimeTypes(): string[] {
-  return [
-    'circuit_matrix',
-    'bearing_hunt',
-    'signal_hunt',
-    'circuit_hack',
-    'switchboard',
-    'cryptex',
-    'simon_says',
-    'radio_azimuth',
-    'compass_blow',
-    'gyro_storm',
-    'digital_tuner',
-  ]
+  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix']
 }
