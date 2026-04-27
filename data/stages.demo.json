@@ -5,10 +5,13 @@
     "lat": 42.27092610625838,
     "lon": -8.861235380172731,
     "radius": 50,
-    "type": "circuit_hack",
+    "type": "signal_hunt",
     "content": "RECONECTA O SISTEMA.",
     "config": {
-      "grid": 4
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-WIND",
     "rune": "SAGA-START"
@@ -19,10 +22,13 @@
     "lat": 42.2532155817828,
     "lon": -8.87326776981354,
     "radius": 50,
-    "type": "cryptex",
+    "type": "signal_hunt",
     "content": "DIAL NODE · NAVIGATION PUZZLE",
     "config": {
-      "mode": "dial_navegacion"
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-LIGHT",
     "rune": "SAGA-HOME"
@@ -33,9 +39,14 @@
     "lat": 42.25051151999688,
     "lon": -8.87273669242859,
     "radius": 50,
-    "type": "digital_tuner",
+    "type": "signal_hunt",
     "content": "CANLE DE EMERXENCIA.",
-    "config": {},
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
     "answer": "SAGA-VOICE",
     "rune": "SAGA-RED"
   },
@@ -45,10 +56,13 @@
     "lat": 42.25204423297994,
     "lon": -8.868868947029116,
     "radius": 50,
-    "type": "gyro_storm",
+    "type": "signal_hunt",
     "content": "O terreo é inestable e o vento das Cíes forte. Mantén o nivel do sistema firme durante 10 segundos para ancorar a defensa.",
     "config": {
-      "duration": 10
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-EARTH",
     "rune": "SAGA-SAND"
@@ -59,16 +73,13 @@
     "lat": 42.247716009735676,
     "lon": -8.864121437072756,
     "radius": 50,
-    "type": "switchboard",
+    "type": "signal_hunt",
     "content": "A Fragua do sistema está fría.\n\nConsulta o Protocolo de Combustión no tríptico: Abre a admisión externa, pecha o centro e purga o sistema.",
     "config": {
-      "switches": [
-        1,
-        1,
-        0,
-        1,
-        1
-      ]
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-WIND",
     "rune": "SAGA-FIRE"
@@ -79,10 +90,13 @@
     "lat": 42.27795573745799,
     "lon": -8.860795497894289,
     "radius": 50,
-    "type": "simon_says",
+    "type": "signal_hunt",
     "content": "O ARQUIVO (A Memoria).\n\nO Vixía non pode espertar se non recorda como loitar.\nCando restaures os patróns de luz e o Arquivo recupere a súa integridade... liberarás a quinta Runa.",
     "config": {
-      "rounds": 5
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-MEM",
     "rune": "RUNA DA MEMORIA"
@@ -93,15 +107,13 @@
     "lat": 42.27632045563478,
     "lon": -8.861187100410463,
     "radius": 50,
-    "type": "compass_blow",
+    "type": "signal_hunt",
     "content": "IGNICIÓN FINAL.",
     "config": {
-      "intensity": 80,
-      "duration": 12,
-      "calibrate_ms": 1200,
-      "sensitivity": 2.8,
-      "threshold": 0.58,
-      "decay": 0.55
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
     },
     "answer": "SAGA-WAKE",
     "rune": "SAGA-END"

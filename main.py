@@ -237,14 +237,6 @@ def get_admin_lock_remaining_seconds(ip, now=None):
 MINIGAME_OK_CODE = "OK"
 
 SUPPORTED_MINIGAME_TYPES = {
-    "digital_tuner",
-    "circuit_hack",
-    "cryptex",
-    "radio_azimuth",
-    "gyro_storm",
-    "simon_says",
-    "switchboard",
-    "compass_blow",
     "circuit_matrix",
     "bearing_hunt",
     "signal_hunt",
@@ -290,14 +282,6 @@ def _as_bool(value, default=False):
 
 
 MINIGAME_SPECS = {
-    "circuit_hack": {"label": "Circuit Hack"},
-    "cryptex": {"label": "Cryptex"},
-    "simon_says": {"label": "Simon Says"},
-    "digital_tuner": {"label": "Digital Tuner"},
-    "radio_azimuth": {"label": "Radio Azimuth"},
-    "gyro_storm": {"label": "Gyro Storm"},
-    "switchboard": {"label": "Switchboard"},
-    "compass_blow": {"label": "Compass Blow"},
     "circuit_matrix": {"label": "Circuit Matrix"},
     "bearing_hunt": {"label": "Bearing Hunt"},
     "signal_hunt": {"label": "Signal Hunt"},
@@ -447,164 +431,6 @@ def normalize_minigame_config(minigame_type, raw_cfg):
         }
         return out
 
-    if normalized_type == "circuit_hack":
-        default_target = ["EAST", "SECOND", "SOUTH"]
-        target = raw.get("target")
-        if isinstance(target, list) and len(target) == 3:
-            target = [_as_str(item).strip().upper() for item in target]
-        else:
-            target = [
-                _as_str(raw.get("target_start") or default_target[0]).strip().upper(),
-                _as_str(raw.get("target_guard") or default_target[1]).strip().upper(),
-                _as_str(raw.get("target_end") or default_target[2]).strip().upper(),
-            ]
-        if not all(target):
-            target = list(default_target)
-        return {
-            "target": target,
-            "target_start": target[0],
-            "target_guard": target[1],
-            "target_end": target[2],
-            "direction_options": _normalize_string_list(
-                raw.get("direction_options"),
-                ["NORTH", "EAST", "SOUTH", "WEST", "CENTER"],
-                min_items=2,
-            ),
-            "guard_options": _normalize_string_list(
-                raw.get("guard_options"),
-                ["FIRST", "SECOND", "THIRD", "FOURTH", "FIFTH"],
-                min_items=2,
-            ),
-        }
-
-    if normalized_type == "cryptex":
-        raw_word = _as_str(raw.get("target_word") or raw.get("word") or "SAGA").upper()
-        target_word = "".join(ch for ch in raw_word if "A" <= ch <= "Z")[:5]
-        if len(target_word) < 3:
-            target_word = "SAGA"
-        mode = _as_str(raw.get("mode") or "dial_navigation").strip().lower() or "dial_navigation"
-        return {
-            "target_word": target_word,
-            "word": target_word,
-            "mode": mode,
-        }
-
-    if normalized_type == "simon_says":
-        raw_sequence = raw.get("sequence")
-        if isinstance(raw_sequence, str):
-            sequence = [ch for ch in raw_sequence.upper() if ch in {"A", "B", "C", "D"}][:8]
-        else:
-            sequence = _normalize_string_list(
-                raw_sequence,
-                ["A", "B", "C", "D"],
-                allowed={"A", "B", "C", "D"},
-                min_items=3,
-                max_items=8,
-            )
-        if len(sequence) < 3:
-            sequence = ["A", "B", "C", "D"]
-        return {"sequence": sequence}
-
-    if normalized_type == "digital_tuner":
-        raw_options = raw.get("options")
-        if isinstance(raw_options, list):
-            options = [_normalize_frequency_label(item) for item in raw_options if _as_str(item).strip()]
-        else:
-            options = ["87.5", "92.3", "99.1", "104.6", "108.0"]
-        if len(options) < 3:
-            options = ["87.5", "92.3", "99.1", "104.6", "108.0"]
-        target = _normalize_frequency_label(raw.get("target_frequency") or raw.get("target") or "104.6")
-        return {
-            "options": options,
-            "target_frequency": target,
-            "target": target,
-        }
-
-    if normalized_type == "radio_azimuth":
-        raw_options = raw.get("options")
-        if isinstance(raw_options, list):
-            options = [_normalize_degree_label(item) for item in raw_options if _as_str(item).strip()]
-        else:
-            options = ["0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"]
-        if len(options) < 4:
-            options = ["0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"]
-        target = _normalize_degree_label(raw.get("target_bearing") or raw.get("target") or "135°")
-        return {
-            "options": options,
-            "target_bearing": target,
-            "target": target,
-        }
-
-    if normalized_type == "gyro_storm":
-        action_map = {"U": "UP", "R": "RIGHT", "D": "DOWN", "L": "LEFT"}
-        raw_sequence = raw.get("sequence") or raw.get("pattern")
-        if isinstance(raw_sequence, list):
-            sequence = _normalize_string_list(
-                raw_sequence,
-                ["UP", "RIGHT", "DOWN", "LEFT"],
-                allowed={"UP", "RIGHT", "DOWN", "LEFT"},
-                min_items=3,
-                max_items=8,
-            )
-        else:
-            text = _as_str(raw_sequence).strip().upper()
-            if any(token in text for token in ["UP", "RIGHT", "DOWN", "LEFT"]):
-                parts = [part.strip() for part in text.replace("|", ",").replace(";", ",").split(",")]
-                sequence = [part for part in parts if part in {"UP", "RIGHT", "DOWN", "LEFT"}]
-            else:
-                sequence = [action_map[ch] for ch in text if ch in action_map]
-            if len(sequence) < 3:
-                sequence = ["UP", "RIGHT", "DOWN", "LEFT"]
-
-        duration = _clamp_int(raw.get("duration"), 10, 1, 120)
-        return {
-            "sequence": sequence,
-            "pattern": "".join(step[0] for step in sequence),
-            "duration": duration,
-        }
-
-    if normalized_type == "switchboard":
-        source = raw.get("target")
-        if not isinstance(source, list):
-            source = raw.get("switches")
-
-        target = []
-        if isinstance(source, list):
-            for item in source[:4]:
-                flag = _coerce_binary_flag(item)
-                if flag is None:
-                    target = []
-                    break
-                target.append(flag)
-
-        if len(target) != 4:
-            target = [True, False, True, True]
-
-        return {
-            "target": target,
-            "switches": [1 if item else 0 for item in target],
-        }
-
-    if normalized_type == "compass_blow":
-        source = raw.get("target")
-        if isinstance(source, list):
-            target = _normalize_string_list(
-                source,
-                ["N", "E", "S"],
-                allowed={"N", "E", "S", "W"},
-                min_items=3,
-                max_items=3,
-            )
-        else:
-            pattern = [ch for ch in _as_str(raw.get("pattern") or "").strip().upper() if ch in {"N", "E", "S", "W"}][:3]
-            target = pattern if len(pattern) == 3 else ["N", "E", "S"]
-
-        return {
-            "target": target,
-            "pattern": "".join(target),
-            "strict": _as_bool(raw.get("strict"), False),
-        }
-
     return {}
 
 def validate_minigame_config(minigame_type, raw_cfg):
@@ -615,51 +441,13 @@ def validate_minigame_config(minigame_type, raw_cfg):
     def add(field, detail):
         errors.append((field, detail))
 
-    if normalized_type == "circuit_hack":
-        if "target" in raw and (not isinstance(raw.get("target"), list) or len(raw.get("target") or []) != 3):
-            add("config.target", "circuit_hack target must contain exactly 3 values")
-    elif normalized_type == "cryptex":
-        if "target_word" in raw or "word" in raw:
-            word = normalize_minigame_config(normalized_type, raw).get("target_word", "")
-            if len(word) < 3:
-                add("config.target_word", "cryptex target word must contain at least 3 letters")
-    elif normalized_type == "simon_says":
-        if "sequence" in raw:
-            sequence = normalize_minigame_config(normalized_type, raw).get("sequence", [])
-            if len(sequence) < 3:
-                add("config.sequence", "simon_says sequence must contain at least 3 steps")
-    elif normalized_type == "digital_tuner":
-        if "options" in raw:
-            options = normalize_minigame_config(normalized_type, raw).get("options", [])
-            if len(options) < 3:
-                add("config.options", "digital_tuner options must contain at least 3 values")
-    elif normalized_type == "radio_azimuth":
-        if "options" in raw:
-            options = normalize_minigame_config(normalized_type, raw).get("options", [])
-            if len(options) < 4:
-                add("config.options", "radio_azimuth options must contain at least 4 values")
-    elif normalized_type == "gyro_storm":
-        if "sequence" in raw or "pattern" in raw:
-            sequence = normalize_minigame_config(normalized_type, raw).get("sequence", [])
-            if len(sequence) < 3:
-                add("config.sequence", "gyro_storm sequence must contain at least 3 steps")
-    elif normalized_type == "switchboard":
-        if "target" in raw or "switches" in raw:
-            target = normalize_minigame_config(normalized_type, raw).get("target", [])
-            if len(target) != 4:
-                add("config.target", "switchboard target must contain exactly 4 switch values")
-    elif normalized_type == "compass_blow":
-        if "target" in raw or "pattern" in raw:
-            target = normalize_minigame_config(normalized_type, raw).get("target", [])
-            if len(target) != 3:
-                add("config.target", "compass_blow target must contain exactly 3 directions")
     return errors
 
 def build_stage_minigame_runtime(node):
     interaction = node.get("interaction") or {}
     minigame_type = _as_str(interaction.get("type") or "signal_hunt").strip().lower() or "signal_hunt"
     if minigame_type not in SUPPORTED_MINIGAME_TYPES:
-        minigame_type = "circuit_hack"
+        minigame_type = "signal_hunt"
     spec = get_minigame_spec(minigame_type)
     config = normalize_minigame_config(minigame_type, interaction.get("config") or {})
     return {
@@ -897,7 +685,7 @@ def _build_success_conditions(raw):
     return conditions
 
 # RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
-# Evitamos que datos incompletos caigan silenciosamente al legacy circuit_hack.
+# Avoid letting incomplete data silently fall back to old legacy minigames.
 def normalize_stage(raw):
     raw = raw or {}
 
