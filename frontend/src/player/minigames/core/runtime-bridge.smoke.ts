@@ -12,7 +12,7 @@ const samples: PlayerStage[] = [
     lat: 0,
     lon: 0,
     radius: 30,
-    type: 'circuit_hack',
+    type: 'signal_hunt',
     config: {},
   },
   {
