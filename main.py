@@ -1263,10 +1263,12 @@ async def saga_no_cache_html(request, call_next):
 
     return response
 
+@app.head("/", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/", response_class=HTMLResponse)
 async def react_entry():
     return react_index_or_missing()
 
+@app.head("/legacy", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/legacy", response_class=HTMLResponse)
 async def login(request: Request):
     cfg = load_config()
@@ -1281,12 +1283,14 @@ async def login(request: Request):
         }
     )
 
+@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
 async def react_player(name: str):
     # Serve the React app directly. The frontend derives the player from /player/{name}.
     # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
     return react_index_or_missing()
 
+@app.head("/legacy/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/legacy/player/{name}", response_class=HTMLResponse)
 async def game(request: Request, name: str):
     cfg = load_config()
@@ -1301,6 +1305,7 @@ async def game(request: Request, name: str):
         }
     )
 
+@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin", response_class=HTMLResponse)
 async def admin(request: Request):
     cfg = load_config()
