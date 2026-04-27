@@ -314,7 +314,7 @@ Current runtime foundation includes:
 
 - core minigame type system
 - family configs and registry contracts
-- legacy type -> family adaptation
+- migration-only legacy type handling
 - stage/runtime resolution helpers
 - `FamilyRuntimeHost`
 - `InteractionSheet` integration for resolved family-native runtimes

@@ -5,14 +5,12 @@ import type {
 } from './family-types'
 import type { MinigameFamily, MinigameVersion } from './types'
 
-import { adaptLegacyMinigame } from './legacy-adapter'
 import { bearingHuntDefinition } from '../families/bearingHunt/definition'
 import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
 
 // React player policy: family-native runtimes are the normal path.
-// Legacy adapters remain in code for migration tooling, but are disabled for player resolution.
-const ENABLE_LEGACY_MINIGAME_BRIDGE = false
+// Legacy adapters may remain as migration tooling, but the React player resolver does not execute them.
 
 export type NativeMinigameType = MinigameFamily
 export type MinigameCompatibility = 'native' | 'legacy_bridge'
@@ -145,52 +143,12 @@ function resolveNativeMinigame(
   return resolveSignalHuntNative(input)
 }
 
+
 function resolveLegacyBridgedMinigame(
   input: ResolveMinigameInput & { type: string }
 ): ResolvedMinigame | null {
-  if (!ENABLE_LEGACY_MINIGAME_BRIDGE) {
-    return null
-  }
-
-  const adapted = adaptLegacyMinigame(input.type, input.config)
-  if (!adapted) return null
-
-  if (adapted.family === 'circuit_matrix') {
-    return {
-      family: 'circuit_matrix',
-      type: 'circuit_matrix',
-      version: normalizeVersion(input.version),
-      compatibility: 'legacy_bridge',
-      legacy_type: adapted.legacy_type,
-      label: circuitMatrixDefinition.label,
-      definition: circuitMatrixDefinition,
-      config: adapted.config,
-    }
-  }
-
-  if (adapted.family === 'bearing_hunt') {
-    return {
-      family: 'bearing_hunt',
-      type: 'bearing_hunt',
-      version: normalizeVersion(input.version),
-      compatibility: 'legacy_bridge',
-      legacy_type: adapted.legacy_type,
-      label: bearingHuntDefinition.label,
-      definition: bearingHuntDefinition,
-      config: adapted.config,
-    }
-  }
-
-  return {
-    family: 'signal_hunt',
-    type: 'signal_hunt',
-    version: normalizeVersion(input.version),
-    compatibility: 'legacy_bridge',
-    legacy_type: adapted.legacy_type,
-    label: signalHuntDefinition.label,
-    definition: signalHuntDefinition,
-    config: adapted.config,
-  }
+  void input
+  return null
 }
 
 export function resolveMinigame(input: ResolveMinigameInput): ResolvedMinigame | null {
