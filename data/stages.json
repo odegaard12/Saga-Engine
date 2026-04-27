@@ -1,14 +1,61 @@
 [
   {
     "id": 0,
-    "title": "NEW NODE",
+    "title": "SIGNAL HUNT TEST NODE",
     "lat": 40.42839425751665,
     "lon": -3.7320256233215336,
-    "radius": 50,
-    "type": "circuit_hack",
-    "content": "PUT NODE TEXT HERE",
-    "config": {},
+    "radius": 75,
+    "type": "signal_hunt",
+    "content": "Acércate a la fuente hasta bloquear la señal.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_lat": 40.42839425751665,
+      "source_lon": -3.7320256233215336,
+      "source_radius_m": 75,
+      "lock_threshold": 65,
+      "hold_ms": 1500,
+      "max_signal": 100,
+      "noise_floor": 4,
+      "jitter": 2,
+      "decay_curve": "smooth",
+      "timeout_ms": null,
+      "update_rate_ms": 500,
+      "use_audio": false,
+      "use_vibration": true,
+      "use_direction_hint": false,
+      "false_peaks": [],
+      "dead_zones": []
+    },
     "answer": "",
-    "rune": ""
+    "rune": "",
+    "minigame": {
+      "type": "signal_hunt",
+      "label": "Signal Hunt",
+      "version": "v1",
+      "config": {
+        "objective": "proximity_lock",
+        "source_lat": 40.42839425751665,
+        "source_lon": -3.7320256233215336,
+        "source_radius_m": 75,
+        "lock_threshold": 65,
+        "hold_ms": 1500,
+        "max_signal": 100,
+        "noise_floor": 4,
+        "jitter": 2,
+        "decay_curve": "smooth",
+        "timeout_ms": null,
+        "update_rate_ms": 500,
+        "use_audio": false,
+        "use_vibration": true,
+        "use_direction_hint": false,
+        "false_peaks": [],
+        "dead_zones": []
+      }
+    },
+    "messages": {
+      "locked": "Señal capturada.",
+      "gps_unavailable": "GPS no disponible.",
+      "hint": "Acércate a la fuente hasta bloquear la señal."
+    }
   }
 ]
