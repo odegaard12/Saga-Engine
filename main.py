@@ -929,11 +929,19 @@ def normalize_stage(raw):
     if not isinstance(raw_minigame, dict):
         raw_minigame = {}
 
-    interaction_type = _as_str(
-        raw_minigame.get("type") or raw.get("type") or "signal_hunt"
-    ).strip().lower() or "signal_hunt"
-    if interaction_type not in SUPPORTED_MINIGAME_TYPES:
+    raw_interaction_type = _as_str(
+        raw_minigame.get("type") or raw.get("type")
+    ).strip().lower()
+
+    interaction_type_fallback_reason = ""
+    if not raw_interaction_type:
         interaction_type = "signal_hunt"
+        interaction_type_fallback_reason = "missing_minigame_type"
+    elif raw_interaction_type not in SUPPORTED_MINIGAME_TYPES:
+        interaction_type = "signal_hunt"
+        interaction_type_fallback_reason = f"unsupported_minigame_type:{raw_interaction_type}"
+    else:
+        interaction_type = raw_interaction_type
 
     raw_minigame_config = raw_minigame.get("config")
     if not isinstance(raw_minigame_config, dict):
@@ -997,6 +1005,8 @@ def normalize_stage(raw):
                 raw_debug.get("force_unlock", raw.get("force_unlock")),
                 False
             ),
+            "raw_interaction_type": raw_interaction_type,
+            "interaction_type_fallback_reason": interaction_type_fallback_reason,
         },
     }
 
@@ -1077,6 +1087,19 @@ def validate_stage(raw_stage, idx=None):
     title = node["presentation"]["title"]
     if not title:
         add("title", "title is required")
+
+    raw_minigame_for_type = raw_stage.get("minigame") if isinstance(raw_stage, dict) else {}
+    if not isinstance(raw_minigame_for_type, dict):
+        raw_minigame_for_type = {}
+
+    raw_type_for_validation = _as_str(
+        raw_minigame_for_type.get("type") or raw_stage.get("type")
+    ).strip().lower()
+
+    if not raw_type_for_validation:
+        add("type", "minigame type is required")
+    elif raw_type_for_validation not in SUPPORTED_MINIGAME_TYPES:
+        add("type", f"unsupported minigame type: {raw_type_for_validation}")
 
     raw_minigame = raw_stage.get("minigame") if isinstance(raw_stage, dict) else {}
     if not isinstance(raw_minigame, dict):

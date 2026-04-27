@@ -455,7 +455,7 @@ Default/demo stage schema lives in:
 
 Production live stage data can instead live in the external directory selected through `SAGA_DATA_DIR`.
 
-Current editable schema still supports simple node objects like:
+Current editable schema supports simple node objects. New stages should prefer family-native minigame types like:
 
 ```json
 {
@@ -464,9 +464,14 @@ Current editable schema still supports simple node objects like:
   "lat": 42.0000,
   "lon": -8.0000,
   "radius": 50,
-  "type": "circuit_hack",
+  "type": "signal_hunt",
   "content": "NODE TEXT",
-  "config": {},
+  "config": {
+    "objective": "proximity_lock",
+    "source_radius_m": 75,
+    "lock_threshold": 65,
+    "hold_ms": 1500
+  },
   "answer": "",
   "rune": ""
 }
