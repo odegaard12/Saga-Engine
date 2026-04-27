@@ -55,3 +55,6 @@ frontend/dist/
 frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 *.bak.*
+
+# Vite temporary config loader artifacts
+frontend/vite.config.ts.timestamp-*.mjs
