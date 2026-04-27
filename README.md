@@ -277,18 +277,13 @@ The admin panel currently includes:
 
 ## Supported Mini-Games
 
-### Legacy runtime mini-game types
+### Removed legacy player mini-game types
 
-These are currently supported by the stable backend/template runtime:
+The old template player UI and static legacy minigame JavaScript have been removed. Historical types may still appear in imported or old data, but new work should use family-native schemas:
 
-- `digital_tuner`
-- `circuit_hack`
-- `cryptex`
-- `radio_azimuth`
-- `gyro_storm`
-- `simon_says`
-- `switchboard`
-- `compass_blow`
+- `signal_hunt`
+- `bearing_hunt`
+- `circuit_matrix`
 
 ### React runtime foundation
 
@@ -321,7 +316,7 @@ The React player runtime should use family-native minigame types as the normal p
 - `bearing_hunt`
 - `circuit_matrix`
 
-Legacy minigame types may remain in backend/template migration areas temporarily, but they are no longer part of the React player resolution path.
+Legacy minigame types may remain only as temporary backend import/validation compatibility, but they are no longer part of the React player or admin creation path.
 
 
 ### What the families are for
@@ -361,7 +356,7 @@ Proximity/search games such as:
 
 Current family runtime screens are foundation shells, not final production gameplay yet.
 
-Legacy template routes may still exist during migration, but the React player resolver should use family-native runtimes as the normal path.
+The legacy player template UI has been removed. New gameplay work should use family-native runtimes as the normal path.
 
 ---
 
