@@ -140,8 +140,10 @@ At each node, the engine can combine:
 
 ### Stable backend routes
 
-- `/` -> legacy player selection / login
-- `/player/{PLAYER_NAME}` -> legacy player game UI
+- `/` -> React mission entry / player app when `frontend/dist` exists
+- `/player/{PLAYER_NAME}` -> backend-served React player route
+- `/legacy` -> legacy player selection / login during migration
+- `/legacy/player/{PLAYER_NAME}` -> legacy player game UI during migration
 - `/admin` -> admin panel
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
@@ -634,8 +636,8 @@ Useful development URLs:
 ### Backend / runtime
 
 - `main.py` -> FastAPI backend
-- `templates/login.html` -> legacy player selection / login
-- `templates/game.html` -> legacy player UI
+- `templates/login.html` -> legacy login template mounted under `/legacy` during migration
+- `templates/game.html` -> legacy player template mounted under `/legacy/player/...` during migration
 - `templates/admin.html` -> admin panel
 - `static/minigames_final.js` -> legacy/frontend mini-game logic
 - `data/` -> demo / default data files
