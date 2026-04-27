@@ -1,30 +1,86 @@
 import json
-import os
+from pathlib import Path
 
-demo_stages = [
-  {
+DATA_DIR = Path("data")
+STAGES_PATH = DATA_DIR / "stages.json"
+GAMESTATE_PATH = DATA_DIR / "gamestate.json"
+POSITIONS_PATH = DATA_DIR / "positions.json"
+
+DEFAULT_STAGE = {
     "id": 0,
-    "title": "PUT NODE TITLE HERE",
-    "lat": 40.4168,
-    "lon": -3.7038,
-    "radius": 50,
-    "type": "circuit_hack",
-    "content": "PUT NODE TEXT HERE",
-    "config": {"grid": 4},
+    "title": "SIGNAL HUNT TEST NODE",
+    "lat": 40.42839425751665,
+    "lon": -3.7320256233215336,
+    "radius": 75,
+    "type": "signal_hunt",
+    "content": "Acércate a la fuente hasta bloquear la señal.",
+    "config": {
+        "objective": "proximity_lock",
+        "source_lat": 40.42839425751665,
+        "source_lon": -3.7320256233215336,
+        "source_radius_m": 75,
+        "lock_threshold": 65,
+        "hold_ms": 1500,
+        "max_signal": 100,
+        "noise_floor": 4,
+        "jitter": 2,
+        "decay_curve": "smooth",
+        "timeout_ms": None,
+        "update_rate_ms": 500,
+        "use_audio": False,
+        "use_vibration": True,
+        "use_direction_hint": False,
+        "false_peaks": [],
+        "dead_zones": [],
+    },
     "answer": "",
-    "rune": ""
-  }
-]
+    "rune": "",
+    "minigame": {
+        "type": "signal_hunt",
+        "label": "Signal Hunt",
+        "version": "v1",
+        "config": {
+            "objective": "proximity_lock",
+            "source_lat": 40.42839425751665,
+            "source_lon": -3.7320256233215336,
+            "source_radius_m": 75,
+            "lock_threshold": 65,
+            "hold_ms": 1500,
+            "max_signal": 100,
+            "noise_floor": 4,
+            "jitter": 2,
+            "decay_curve": "smooth",
+            "timeout_ms": None,
+            "update_rate_ms": 500,
+            "use_audio": False,
+            "use_vibration": True,
+            "use_direction_hint": False,
+            "false_peaks": [],
+            "dead_zones": [],
+        },
+    },
+    "messages": {
+        "locked": "Señal capturada.",
+        "gps_unavailable": "GPS no disponible.",
+        "hint": "Acércate a la fuente hasta bloquear la señal.",
+    },
+}
 
-os.makedirs("data", exist_ok=True)
 
-with open("data/stages.json", "w", encoding="utf-8") as f:
-    json.dump(demo_stages, f, indent=2, ensure_ascii=False)
+def main() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-with open("data/gamestate.json", "w", encoding="utf-8") as f:
-    f.write("{}\n")
+    STAGES_PATH.write_text(
+        json.dumps([DEFAULT_STAGE], ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    GAMESTATE_PATH.write_text("{}\n", encoding="utf-8")
+    POSITIONS_PATH.write_text("{}\n", encoding="utf-8")
 
-with open("data/positions.json", "w", encoding="utf-8") as f:
-    f.write("{}\n")
+    print(f"Reset family-native demo stages: {STAGES_PATH}")
+    print(f"Reset game state: {GAMESTATE_PATH}")
+    print(f"Reset live positions: {POSITIONS_PATH}")
 
-print("Demo data reset complete.")
+
+if __name__ == "__main__":
+    main()
