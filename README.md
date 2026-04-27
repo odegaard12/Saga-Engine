@@ -306,6 +306,8 @@ Current minigame families:
 - `bearing_hunt`
 - `signal_hunt`
 
+These are mechanic families, not a hard limit of three games. Future gameplay should usually be added as family-native variants, presets, and schemas first, so a mission can grow to 5, 10, or 20 game variants without creating 20 unrelated runtime systems.
+
 Current runtime foundation includes:
 
 - core minigame type system

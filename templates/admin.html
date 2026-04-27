@@ -3326,7 +3326,7 @@ function openEditor
   document.getElementById('e-gps-unavailable-message').value = getStageMessageValue(s, "gps_unavailable", "gps_unavailable_message", "");
   document.getElementById('e-locked-message').value = getStageMessageValue(s, "locked", "locked_message", "");
 
-  renderGameConfig();
+  renderGameConfig(s.config || (s.minigame && s.minigame.config) || {});
   document.getElementById('editor').classList.remove('hidden');
 }
 
@@ -3384,264 +3384,312 @@ function normalizeBearingLabel(value) {
   return `${normalized}°`;
 }
 
+const MINIGAME_CONFIG_SCHEMAS = {
+  signal_hunt: {
+    label: 'Signal Hunt',
+    group: 'family',
+    description: 'Proximity/search gameplay: source finding, hot/cold feedback, GPS lock and signal capture.',
+    fields: [
+      { key: 'objective', label: 'Objective', type: 'select', default: 'proximity_lock', options: ['proximity_lock', 'directional_lock', 'hybrid_trace', 'stability_capture'] },
+      { key: 'source_lat', label: 'Source latitude', type: 'number_or_null', default: null, step: '0.000001' },
+      { key: 'source_lon', label: 'Source longitude', type: 'number_or_null', default: null, step: '0.000001' },
+      { key: 'source_radius_m', label: 'Source radius (m)', type: 'number', default: 75, min: 1, step: 1 },
+      { key: 'lock_threshold', label: 'Lock threshold (%)', type: 'number', default: 65, min: 1, max: 100, step: 1 },
+      { key: 'hold_ms', label: 'Hold time (ms)', type: 'number', default: 1500, min: 100, step: 100 },
+      { key: 'max_signal', label: 'Max signal', type: 'number', default: 100, min: 1, step: 1 },
+      { key: 'noise_floor', label: 'Noise floor', type: 'number', default: 4, min: 0, step: 1 },
+      { key: 'jitter', label: 'Jitter', type: 'number', default: 2, min: 0, step: 1 },
+      { key: 'decay_curve', label: 'Decay curve', type: 'select', default: 'smooth', options: ['linear', 'smooth', 'steep'] },
+      { key: 'timeout_ms', label: 'Timeout ms', type: 'number_or_null', default: null, min: 1000, step: 1000 },
+      { key: 'update_rate_ms', label: 'Update rate ms', type: 'number', default: 500, min: 100, step: 50 },
+      { key: 'use_audio', label: 'Use audio', type: 'checkbox', default: false },
+      { key: 'use_vibration', label: 'Use vibration', type: 'checkbox', default: true },
+      { key: 'use_direction_hint', label: 'Use direction hint', type: 'checkbox', default: false },
+      { key: 'false_peaks', label: 'False peaks JSON', type: 'json', default: [] },
+      { key: 'dead_zones', label: 'Dead zones JSON', type: 'json', default: [] },
+    ],
+  },
+
+  bearing_hunt: {
+    label: 'Bearing Hunt',
+    group: 'family',
+    description: 'Compass/orientation gameplay: bearing lock, sector scans and heading sequences.',
+    fields: [
+      { key: 'objective', label: 'Objective', type: 'select', default: 'single_lock', options: ['single_lock', 'multi_lock', 'sector_scan', 'bearing_sequence'] },
+      { key: 'target_bearing_deg', label: 'Target bearing deg', type: 'number_or_null', default: 90, min: 0, max: 359, step: 1 },
+      { key: 'target_sequence_deg', label: 'Target sequence JSON', type: 'json', default: [] },
+      { key: 'sector_start_deg', label: 'Sector start deg', type: 'number_or_null', default: null, min: 0, max: 359, step: 1 },
+      { key: 'sector_end_deg', label: 'Sector end deg', type: 'number_or_null', default: null, min: 0, max: 359, step: 1 },
+      { key: 'tolerance_deg', label: 'Tolerance deg', type: 'number', default: 12, min: 1, max: 90, step: 1 },
+      { key: 'hold_ms', label: 'Hold time ms', type: 'number', default: 1200, min: 100, step: 100 },
+      { key: 'phases', label: 'Phases', type: 'number_or_null', default: null, min: 1, step: 1 },
+      { key: 'timeout_ms', label: 'Timeout ms', type: 'number_or_null', default: null, min: 1000, step: 1000 },
+      { key: 'require_stable_orientation', label: 'Require stable orientation', type: 'checkbox', default: true },
+      { key: 'stability_window_ms', label: 'Stability window ms', type: 'number', default: 500, min: 100, step: 100 },
+      { key: 'feedback_mode', label: 'Feedback mode', type: 'select', default: 'mixed', options: ['visual', 'haptic', 'audio', 'mixed'] },
+      { key: 'noise_level', label: 'Noise level', type: 'select_number', default: 1, options: [0, 1, 2, 3] },
+      { key: 'false_targets', label: 'False targets JSON', type: 'json', default: [] },
+      { key: 'show_numeric_bearing', label: 'Show numeric bearing', type: 'checkbox', default: true },
+      { key: 'show_compass_ring', label: 'Show compass ring', type: 'checkbox', default: true },
+      { key: 'allow_recenter', label: 'Allow recenter', type: 'checkbox', default: true },
+    ],
+  },
+
+  circuit_matrix: {
+    label: 'Circuit Matrix',
+    group: 'family',
+    description: 'Logic/grid gameplay: path restore, route repair, switch logic and power balance.',
+    fields: [
+      { key: 'objective', label: 'Objective', type: 'select', default: 'path_restore', options: ['path_restore', 'power_balance', 'switch_logic', 'signal_route'] },
+      { key: 'grid_cols', label: 'Grid columns', type: 'number', default: 3, min: 2, max: 9, step: 1 },
+      { key: 'grid_rows', label: 'Grid rows', type: 'number', default: 3, min: 2, max: 9, step: 1 },
+      { key: 'seed', label: 'Seed', type: 'text', default: '' },
+      { key: 'difficulty', label: 'Difficulty', type: 'select_number', default: 2, options: [1, 2, 3, 4, 5] },
+      { key: 'max_moves', label: 'Max moves', type: 'number_or_null', default: null, min: 1, step: 1 },
+      { key: 'max_time_ms', label: 'Max time ms', type: 'number_or_null', default: null, min: 1000, step: 1000 },
+      { key: 'allow_rotate', label: 'Allow rotate', type: 'checkbox', default: true },
+      { key: 'allow_toggle', label: 'Allow toggle', type: 'checkbox', default: true },
+      { key: 'allow_swap', label: 'Allow swap', type: 'checkbox', default: false },
+      { key: 'start_nodes', label: 'Start nodes JSON', type: 'json', default: [] },
+      { key: 'end_nodes', label: 'End nodes JSON', type: 'json', default: [] },
+      { key: 'target_pattern', label: 'Target pattern JSON', type: 'json', default: [] },
+      { key: 'blocked_cells', label: 'Blocked cells JSON', type: 'json', default: [] },
+      { key: 'hint_mode', label: 'Hint mode', type: 'select', default: 'light', options: ['none', 'light', 'guided'] },
+      { key: 'auto_check', label: 'Auto check', type: 'checkbox', default: true },
+      { key: 'success_animation', label: 'Success animation', type: 'select', default: 'restore', options: ['pulse', 'restore', 'flash'] },
+    ],
+  },
+
+  circuit_hack: {
+    label: 'Circuit Hack',
+    group: 'legacy',
+    description: 'Legacy migration config. Prefer circuit_matrix for new work.',
+    fields: [
+      { key: 'target_start', label: 'Target start', type: 'select', default: 'EAST', options: ['NORTH', 'EAST', 'SOUTH', 'WEST', 'CENTER'] },
+      { key: 'target_guard', label: 'Target guard', type: 'select', default: 'SECOND', options: ['FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'] },
+      { key: 'target_end', label: 'Target end', type: 'select', default: 'SOUTH', options: ['NORTH', 'EAST', 'SOUTH', 'WEST', 'CENTER'] },
+    ],
+  },
+};
+
+function adminConfigEscapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function adminConfigClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getConfigFieldId(key) {
+  return `game-config-${String(key).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+function getMinigameSchema(type) {
+  return MINIGAME_CONFIG_SCHEMAS[type] || null;
+}
+
 function getMinigameDefaultConfig(type) {
-  if (type === 'signal_hunt') return {
-    objective: 'proximity_lock',
-    source_radius_m: 75,
-    lock_threshold: 65,
-    hold_ms: 1500,
-    max_signal: 100,
-    noise_floor: 4,
-    jitter: 2,
-    decay_curve: 'smooth',
-    timeout_ms: null,
-    update_rate_ms: 500,
-    use_audio: false,
-    use_vibration: true,
-    use_direction_hint: false,
-    false_peaks: [],
-    dead_zones: []
-  };
-  if (type === 'bearing_hunt') return {
-    objective: 'single_lock',
-    target_bearing_deg: 90,
-    tolerance_deg: 18,
-    hold_ms: 1200,
-    require_stable_orientation: true,
-    feedback_mode: 'mixed',
-    show_numeric_bearing: true,
-    show_compass_ring: true
-  };
-  if (type === 'circuit_matrix') return {
-    objective: 'path_restore',
-    grid_cols: 3,
-    grid_rows: 3,
-    difficulty: 2,
-    max_moves: null,
-    max_time_ms: null,
-    allow_rotate: true,
-    allow_toggle: false,
-    allow_swap: false,
-    hint_mode: 'light',
-    auto_check: true,
-    success_animation: 'restore'
-  };
-  if (type === 'circuit_hack') return { target_start: 'EAST', target_guard: 'SECOND', target_end: 'SOUTH' };
-  if (type === 'cryptex') return { target_word: 'SAGA', mode: 'dial_navigation' };
-  if (type === 'simon_says') return { sequence: ['A', 'B', 'C', 'D'] };
-  if (type === 'digital_tuner') return { target_frequency: '104.6', options: ['87.5', '92.3', '99.1', '104.6', '108.0'] };
-  if (type === 'radio_azimuth') return { target_bearing: '135°', options: ['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'] };
-  if (type === 'gyro_storm') return { pattern: 'URDL', duration: 10 };
-  if (type === 'switchboard') return { switches: [1, 0, 1, 1] };
-  if (type === 'compass_blow') return { pattern: 'NES', strict: false };
-  return {};
+  const schema = getMinigameSchema(type);
+  if (!schema) return {};
+
+  return schema.fields.reduce((acc, field) => {
+    acc[field.key] = adminConfigClone(field.default);
+    return acc;
+  }, {});
+}
+
+function coerceMinigameFieldValue(field, rawValue) {
+  if (rawValue === undefined) return adminConfigClone(field.default);
+
+  if (field.type === 'checkbox') {
+    return !!rawValue;
+  }
+
+  if (field.type === 'number') {
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? n : adminConfigClone(field.default);
+  }
+
+  if (field.type === 'number_or_null') {
+    if (rawValue === '' || rawValue === null) return null;
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? n : adminConfigClone(field.default);
+  }
+
+  if (field.type === 'select_number') {
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? n : adminConfigClone(field.default);
+  }
+
+  if (field.type === 'json') {
+    if (typeof rawValue === 'string') {
+      const text = rawValue.trim();
+      if (!text) return adminConfigClone(field.default);
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        alert(`Invalid JSON for ${field.label}`);
+        return adminConfigClone(field.default);
+      }
+    }
+    return rawValue === undefined ? adminConfigClone(field.default) : rawValue;
+  }
+
+  return String(rawValue ?? field.default ?? '');
 }
 
 function normalizeGameConfigForType(type, rawCfg) {
-  const cfg = (rawCfg && typeof rawCfg === 'object') ? rawCfg : {};
-  const defaults = getMinigameDefaultConfig(type);
+  const schema = getMinigameSchema(type);
+  const incoming =
+    rawCfg && typeof rawCfg === 'object' && !Array.isArray(rawCfg)
+      ? rawCfg
+      : {};
+
+  if (!schema) return { ...incoming };
+
+  const normalized = { ...incoming };
+
+  schema.fields.forEach((field) => {
+    normalized[field.key] = coerceMinigameFieldValue(field, incoming[field.key]);
+  });
 
   if (type === 'circuit_hack') {
-    return {
-      target_start: String(cfg.target_start ?? defaults.target_start).trim().toUpperCase() || defaults.target_start,
-      target_guard: String(cfg.target_guard ?? defaults.target_guard).trim().toUpperCase() || defaults.target_guard,
-      target_end: String(cfg.target_end ?? defaults.target_end).trim().toUpperCase() || defaults.target_end,
-    };
+    normalized.target = [
+      normalized.target_start,
+      normalized.target_guard,
+      normalized.target_end,
+    ];
   }
 
-  if (type === 'cryptex') {
-    const word = String(cfg.target_word ?? cfg.word ?? defaults.target_word).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
-    return {
-      target_word: word.length >= 3 ? word : defaults.target_word,
-      mode: String(cfg.mode ?? defaults.mode).trim().toLowerCase() || defaults.mode,
-    };
+  return normalized;
+}
+
+function renderConfigField(field, config) {
+  const id = getConfigFieldId(field.key);
+  const value = config[field.key] ?? field.default;
+  const label = adminConfigEscapeHtml(field.label);
+
+  if (field.type === 'checkbox') {
+    return `
+      <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2">
+        <span class="text-[10px] uppercase tracking-[.16em] text-zinc-400">${label}</span>
+        <input id="${id}" type="checkbox" ${value ? 'checked' : ''}>
+      </label>
+    `;
   }
 
-  if (type === 'simon_says') {
-    let sequence = Array.isArray(cfg.sequence)
-      ? cfg.sequence.map((item) => String(item ?? '').trim().toUpperCase()).filter((item) => ['A', 'B', 'C', 'D'].includes(item)).slice(0, 8)
-      : normalizeCsvTokens(cfg.sequence ?? '', { upper: true }).filter((item) => ['A', 'B', 'C', 'D'].includes(item)).slice(0, 8);
-    if (sequence.length < 3) sequence = defaults.sequence;
-    return { sequence };
+  if (field.type === 'select' || field.type === 'select_number') {
+    const options = (field.options || []).map((option) => {
+      const selected = String(option) === String(value) ? 'selected' : '';
+      return `<option value="${adminConfigEscapeHtml(option)}" ${selected}>${adminConfigEscapeHtml(option)}</option>`;
+    }).join('');
+
+    return `
+      <label class="grid gap-1">
+        <span class="text-[10px] uppercase tracking-[.16em] text-zinc-400">${label}</span>
+        <select id="${id}" class="config-input">${options}</select>
+      </label>
+    `;
   }
 
-  if (type === 'digital_tuner') {
-    let options = Array.isArray(cfg.options) ? cfg.options.map((item) => normalizeFrequencyLabel(item)).filter(Boolean) : defaults.options;
-    if (options.length < 3) options = defaults.options;
-    return {
-      target_frequency: normalizeFrequencyLabel(cfg.target_frequency ?? cfg.target ?? defaults.target_frequency),
-      options,
-    };
+  if (field.type === 'json') {
+    return `
+      <label class="grid gap-1 md:col-span-2">
+        <span class="text-[10px] uppercase tracking-[.16em] text-zinc-400">${label}</span>
+        <textarea id="${id}" class="config-input min-h-[92px] font-mono text-xs">${adminConfigEscapeHtml(JSON.stringify(value ?? field.default, null, 2))}</textarea>
+      </label>
+    `;
   }
 
-  if (type === 'radio_azimuth') {
-    let options = Array.isArray(cfg.options) ? cfg.options.map((item) => normalizeBearingLabel(item)).filter(Boolean) : defaults.options;
-    if (options.length < 4) options = defaults.options;
-    return {
-      target_bearing: normalizeBearingLabel(cfg.target_bearing ?? cfg.target ?? defaults.target_bearing),
-      options,
-    };
-  }
+  const numberAttrs = field.type === 'number' || field.type === 'number_or_null'
+    ? `type="number" ${field.min !== undefined ? `min="${field.min}"` : ''} ${field.max !== undefined ? `max="${field.max}"` : ''} step="${field.step || 1}"`
+    : 'type="text"';
 
-  if (type === 'gyro_storm') {
-    let pattern = String(cfg.pattern ?? '').trim().toUpperCase();
-    if (!pattern) {
-      const sequence = Array.isArray(cfg.sequence) ? cfg.sequence : [];
-      pattern = sequence.map((item) => String(item ?? '').trim().toUpperCase()[0] || '').join('');
-    }
-    pattern = [...pattern].filter((item) => ['U', 'R', 'D', 'L'].includes(item)).join('');
-    if (pattern.length < 3) pattern = defaults.pattern;
-    const duration = Math.max(1, Math.min(120, Number(cfg.duration ?? defaults.duration) || defaults.duration));
-    return { pattern, duration };
-  }
+  const fieldValue = value === null ? '' : value;
 
-  if (type === 'switchboard') {
-    let switches = Array.isArray(cfg.switches)
-      ? cfg.switches.slice(0, 4).map((item) => Number(item) === 1 ? 1 : 0)
-      : Array.isArray(cfg.target)
-        ? cfg.target.slice(0, 4).map((item) => item ? 1 : 0)
-        : defaults.switches;
-    if (switches.length !== 4) switches = defaults.switches;
-    return { switches };
-  }
-
-  if (type === 'compass_blow') {
-    let pattern = String(cfg.pattern ?? '').trim().toUpperCase();
-    if (!pattern && Array.isArray(cfg.target)) pattern = cfg.target.join('');
-    pattern = [...pattern].filter((item) => ['N', 'E', 'S', 'W'].includes(item)).join('');
-    if (pattern.length !== 3) pattern = defaults.pattern;
-    return { pattern, strict: Boolean(cfg.strict) };
-  }
-
-  return {};
+  return `
+    <label class="grid gap-1">
+      <span class="text-[10px] uppercase tracking-[.16em] text-zinc-400">${label}</span>
+      <input id="${id}" ${numberAttrs} class="config-input" value="${adminConfigEscapeHtml(fieldValue)}">
+    </label>
+  `;
 }
 
 function readGameConfigFromEditor(type) {
-  if (type === 'circuit_hack') {
-    return normalizeGameConfigForType(type, {
-      target_start: document.getElementById('cfg-target-start')?.value || '',
-      target_guard: document.getElementById('cfg-target-guard')?.value || '',
-      target_end: document.getElementById('cfg-target-end')?.value || '',
-    });
+  const schema = getMinigameSchema(type);
+
+  if (!schema) {
+    const raw = document.getElementById('game-config-json')?.value || '{}';
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      alert('Invalid JSON config.');
+      return {};
+    }
   }
 
-  if (type === 'cryptex') {
-    return normalizeGameConfigForType(type, {
-      target_word: document.getElementById('cfg-target-word')?.value || '',
-      mode: document.getElementById('cfg-mode')?.value || 'dial_navigation',
-    });
-  }
+  const config = {};
 
-  if (type === 'simon_says') {
-    return normalizeGameConfigForType(type, {
-      sequence: normalizeCsvTokens(document.getElementById('cfg-sequence')?.value || ''),
-    });
-  }
+  schema.fields.forEach((field) => {
+    const el = document.getElementById(getConfigFieldId(field.key));
+    if (!el) {
+      config[field.key] = adminConfigClone(field.default);
+      return;
+    }
 
-  if (type === 'digital_tuner') {
-    return normalizeGameConfigForType(type, {
-      target_frequency: document.getElementById('cfg-target-frequency')?.value || '',
-      options: normalizeCsvTokens(document.getElementById('cfg-frequency-options')?.value || '', { upper: false }),
-    });
-  }
+    if (field.type === 'checkbox') {
+      config[field.key] = coerceMinigameFieldValue(field, el.checked);
+    } else {
+      config[field.key] = coerceMinigameFieldValue(field, el.value);
+    }
+  });
 
-  if (type === 'radio_azimuth') {
-    return normalizeGameConfigForType(type, {
-      target_bearing: document.getElementById('cfg-target-bearing')?.value || '',
-      options: normalizeCsvTokens(document.getElementById('cfg-bearing-options')?.value || ''),
-    });
-  }
-
-  if (type === 'gyro_storm') {
-    return normalizeGameConfigForType(type, {
-      pattern: document.getElementById('cfg-gyro-sequence')?.value || '',
-      duration: document.getElementById('cfg-duration')?.value || 10,
-    });
-  }
-
-  if (type === 'switchboard') {
-    return normalizeGameConfigForType(type, {
-      switches: normalizeBinaryPattern(document.getElementById('cfg-switch-target')?.value || ''),
-    });
-  }
-
-  if (type === 'compass_blow') {
-    return normalizeGameConfigForType(type, {
-      pattern: document.getElementById('cfg-compass-target')?.value || '',
-      strict: document.getElementById('cfg-compass-strict')?.checked || false,
-    });
-  }
-
-  return {};
+  return normalizeGameConfigForType(type, config);
 }
 
-function renderGameConfig() {
+function renderGameConfig(rawConfig = null) {
   const type = document.getElementById('e-type').value;
-  const s = stages[currentIdx] || {};
-  const cfg = normalizeGameConfigForType(type, s.config || {});
-  let html = '';
+  const params = document.getElementById('game-params');
+  const schema = getMinigameSchema(type);
+  const incoming =
+    rawConfig && typeof rawConfig === 'object' && !Array.isArray(rawConfig)
+      ? rawConfig
+      : getMinigameDefaultConfig(type);
 
-  if (type === 'circuit_hack') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div><label>Start target</label><input id="cfg-target-start" class="config-input" value="${escapeEditorValue(cfg.target_start || 'EAST')}"></div>
-        <div><label>Guard target</label><input id="cfg-target-guard" class="config-input" value="${escapeEditorValue(cfg.target_guard || 'SECOND')}"></div>
-        <div><label>End target</label><input id="cfg-target-end" class="config-input" value="${escapeEditorValue(cfg.target_end || 'SOUTH')}"></div>
+  params.classList.add('editor-game-params');
+
+  if (!schema) {
+    params.innerHTML = `
+      <div class="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-100">
+        Unknown or migration-only minigame type. Editing raw JSON config.
       </div>
+      <textarea id="game-config-json" class="config-input min-h-[180px] font-mono text-xs">${adminConfigEscapeHtml(JSON.stringify(incoming, null, 2))}</textarea>
     `;
-  } else if (type === 'cryptex') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label>Target word</label><input id="cfg-target-word" class="config-input" value="${escapeEditorValue(cfg.target_word || 'SAGA')}"></div>
-        <div><label>Mode</label><input id="cfg-mode" class="config-input" value="${escapeEditorValue(cfg.mode || 'dial_navigation')}"></div>
-      </div>
-    `;
-  } else if (type === 'simon_says') {
-    html = `
-      <label>Sequence (A,B,C,D)</label>
-      <input id="cfg-sequence" class="config-input" value="${escapeEditorValue((cfg.sequence || ['A','B','C','D']).join(','))}">
-    `;
-  } else if (type === 'digital_tuner') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label>Target frequency</label><input id="cfg-target-frequency" class="config-input" value="${escapeEditorValue(cfg.target_frequency || '104.6')}"></div>
-        <div><label>Options</label><input id="cfg-frequency-options" class="config-input" value="${escapeEditorValue((cfg.options || ['87.5','92.3','99.1','104.6','108.0']).join(','))}"></div>
-      </div>
-    `;
-  } else if (type === 'radio_azimuth') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label>Target bearing</label><input id="cfg-target-bearing" class="config-input" value="${escapeEditorValue(cfg.target_bearing || '135°')}"></div>
-        <div><label>Options</label><input id="cfg-bearing-options" class="config-input" value="${escapeEditorValue((cfg.options || ['0°','45°','90°','135°','180°','225°','270°','315°']).join(','))}"></div>
-      </div>
-    `;
-  } else if (type === 'gyro_storm') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label>Pattern (URDL)</label><input id="cfg-gyro-sequence" class="config-input" value="${escapeEditorValue(cfg.pattern || 'URDL')}"></div>
-        <div><label>Duration (s)</label><input id="cfg-duration" type="number" class="config-input" value="${escapeEditorValue(cfg.duration || 10)}"></div>
-      </div>
-    `;
-  } else if (type === 'switchboard') {
-    html = `
-      <label>Target pattern (1,0,1,1)</label>
-      <input id="cfg-switch-target" class="config-input" value="${escapeEditorValue((cfg.switches || [1,0,1,1]).join(','))}">
-    `;
-  } else if (type === 'compass_blow') {
-    html = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label>Target pattern (NES)</label><input id="cfg-compass-target" class="config-input" value="${escapeEditorValue(cfg.pattern || 'NES')}"></div>
-        <label class="flex items-center gap-2 text-xs text-zinc-300 pt-7">
-          <input id="cfg-compass-strict" type="checkbox"${cfg.strict ? ' checked' : ''}>
-          <span>Strict validation</span>
-        </label>
-      </div>
-    `;
-  } else {
-    html = `<div class="text-xs text-zinc-500">Sin parámetros extra</div>`;
+    return;
   }
 
-  document.getElementById('game-params').innerHTML = html;
+  const config = normalizeGameConfigForType(type, incoming);
+  const badge = schema.group === 'family' ? 'FAMILY NATIVE' : 'LEGACY / MIGRATION';
+
+  const fields = schema.fields.map((field) => renderConfigField(field, config)).join('');
+
+  params.innerHTML = `
+    <div class="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-3">
+      <div class="flex items-center justify-between gap-2">
+        <div class="text-sm font-black text-white">${adminConfigEscapeHtml(schema.label)}</div>
+        <div class="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-[.16em] text-cyan-100">${badge}</div>
+      </div>
+      <p class="mt-1 text-xs leading-relaxed text-zinc-400">${adminConfigEscapeHtml(schema.description)}</p>
+    </div>
+    <div class="grid gap-3 md:grid-cols-2">
+      ${fields}
+    </div>
+  `;
 }
 
 function applyChanges() {
