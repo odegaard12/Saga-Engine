@@ -10,6 +10,10 @@ import { bearingHuntDefinition } from '../families/bearingHunt/definition'
 import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
 
+// React player policy: family-native runtimes are the normal path.
+// Legacy adapters remain in code for migration tooling, but are disabled for player resolution.
+const ENABLE_LEGACY_MINIGAME_BRIDGE = false
+
 export type NativeMinigameType = MinigameFamily
 export type MinigameCompatibility = 'native' | 'legacy_bridge'
 
@@ -144,6 +148,10 @@ function resolveNativeMinigame(
 function resolveLegacyBridgedMinigame(
   input: ResolveMinigameInput & { type: string }
 ): ResolvedMinigame | null {
+  if (!ENABLE_LEGACY_MINIGAME_BRIDGE) {
+    return null
+  }
+
   const adapted = adaptLegacyMinigame(input.type, input.config)
   if (!adapted) return null
 
