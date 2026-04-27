@@ -313,7 +313,7 @@ Current runtime foundation includes:
 - legacy type -> family adaptation
 - stage/runtime resolution helpers
 - `FamilyRuntimeHost`
-- `InteractionSheet` integration for resolved family runtime vs legacy bridge
+- `InteractionSheet` integration for resolved family-native runtimes
 - first fullscreen runtime shells for each family
 
 
@@ -365,10 +365,9 @@ Proximity/search games such as:
 
 Current family runtime screens are foundation shells, not final production gameplay yet.
 
-Legacy paths still work through the bridge, so migration can continue without breaking existing stage types.
+Legacy template routes may still exist during migration, but the React player resolver should use family-native runtimes as the normal path.
 
 ---
-
 
 ### Legacy migration boundary
 
@@ -645,7 +644,7 @@ Useful development URLs:
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
-- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry, legacy adapter, runtime bridge
+- `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver, registry, runtime host, migration-only legacy adapter
 - `frontend/src/player/minigames/families/*` -> family definitions and fullscreen runtime screens
 - `frontend/src/shared/api.ts` -> frontend API calls
 - `frontend/src/types/player.ts` -> shared frontend types
