@@ -2051,14 +2051,9 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
     </div>
     <label>Mission type</label>
     <select id="e-type" class="config-input mb-4" onchange="renderGameConfig()">
-      <option value="circuit_hack">🧩 Tuberías</option>
-      <option value="cryptex">🧭 Cryptex</option>
-      <option value="radio_azimuth">📡 Radio Azimuth</option>
-      <option value="gyro_storm">⚖️ Gyro Storm</option>
-      <option value="switchboard">⚡ Switchboard</option>
-      <option value="simon_says">🧠 Simon Says</option>
-      <option value="compass_blow">🎙️ Compass Blow</option>
-      <option value="digital_tuner">📻 Digital Tuner</option>
+      <option value="signal_hunt">📡 Signal Hunt</option>
+      <option value="bearing_hunt">🧭 Bearing Hunt</option>
+      <option value="circuit_matrix">🔌 Circuit Matrix</option>
     </select>
     <div id="game-params" class="bg-black p-4 border border-zinc-800 rounded mb-4"></div>
     <label>Node text</label>
@@ -2127,12 +2122,12 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 map.on('click', function(e) {
   stages.push({
     id: stages.length,
-    title: "NEW NODE",
+    title: "SIGNAL NODE",
     lat: e.latlng.lat,
     lon: e.latlng.lng,
     radius: 50,
-    type: "circuit_hack",
-    content: "PUT NODE TEXT HERE",
+    type: "signal_hunt",
+    content: "Acércate a la fuente hasta bloquear la señal.",
     config: {},
     answer: "",
     rune: "",
@@ -3307,7 +3302,7 @@ function openEditor
   document.getElementById('edit-header').innerText = s.title || 'NODE';
   document.getElementById('e-title').value = s.title || '';
   document.getElementById('e-radius').value = s.radius || 50;
-  document.getElementById('e-type').value = s.type || 'circuit_hack';
+  document.getElementById('e-type').value = s.type || 'signal_hunt';
   document.getElementById('e-content').value = s.content || '';
 
   document.getElementById('e-entry-mode').value = entryMode;
@@ -3378,6 +3373,47 @@ function normalizeBearingLabel(value) {
 }
 
 function getMinigameDefaultConfig(type) {
+  if (type === 'signal_hunt') return {
+    objective: 'proximity_lock',
+    source_radius_m: 75,
+    lock_threshold: 65,
+    hold_ms: 1500,
+    max_signal: 100,
+    noise_floor: 4,
+    jitter: 2,
+    decay_curve: 'smooth',
+    timeout_ms: null,
+    update_rate_ms: 500,
+    use_audio: false,
+    use_vibration: true,
+    use_direction_hint: false,
+    false_peaks: [],
+    dead_zones: []
+  };
+  if (type === 'bearing_hunt') return {
+    objective: 'single_lock',
+    target_bearing_deg: 90,
+    tolerance_deg: 18,
+    hold_ms: 1200,
+    require_stable_orientation: true,
+    feedback_mode: 'mixed',
+    show_numeric_bearing: true,
+    show_compass_ring: true
+  };
+  if (type === 'circuit_matrix') return {
+    objective: 'path_restore',
+    grid_cols: 3,
+    grid_rows: 3,
+    difficulty: 2,
+    max_moves: null,
+    max_time_ms: null,
+    allow_rotate: true,
+    allow_toggle: false,
+    allow_swap: false,
+    hint_mode: 'light',
+    auto_check: true,
+    success_animation: 'restore'
+  };
   if (type === 'circuit_hack') return { target_start: 'EAST', target_guard: 'SECOND', target_end: 'SOUTH' };
   if (type === 'cryptex') return { target_word: 'SAGA', mode: 'dial_navigation' };
   if (type === 'simon_says') return { sequence: ['A', 'B', 'C', 'D'] };
@@ -3634,11 +3670,11 @@ function delPoint() {
 function addNew() {
   stages.push({
     id: stages.length,
-    title: "NEW NODE",
+    title: "SIGNAL NODE",
     lat: {{ config.map_center[0] }},
     lon: {{ config.map_center[1] }},
     radius: 50,
-    type: "circuit_hack",
+    type: "signal_hunt",
     content: "",
     config: {},
     answer: "",
