@@ -16,7 +16,7 @@ interface InteractionSheetProps {
   user: string
   currentStage: PlayerStage | null
   helperText: string
-  legacyPlayerHref: string
+  playerHref: string
   submitting: boolean
   errorMessage: string | null
   onClose: () => void
@@ -45,7 +45,7 @@ export function InteractionSheet({
   user,
   currentStage,
   helperText,
-  legacyPlayerHref,
+  playerHref,
   submitting,
   errorMessage,
   onClose,
@@ -225,7 +225,7 @@ export function InteractionSheet({
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
-                {helperText || 'This node still uses the legacy interaction flow.'}
+                {helperText || 'This node is not available in the current family runtime yet.'}
               </div>
             </section>
           )}
@@ -267,8 +267,8 @@ export function InteractionSheet({
                 {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
               </form>
 
-              <a href={legacyPlayerHref} style={legacyLink}>
-                Open legacy
+              <a href={playerHref} style={fallbackLink}>
+                Open player
               </a>
             </div>
           ) : null}
@@ -486,7 +486,7 @@ const errorText: CSSProperties = {
   lineHeight: 1.4,
 }
 
-const legacyLink: CSSProperties = {
+const fallbackLink: CSSProperties = {
   minHeight: 36,
   display: 'inline-flex',
   alignItems: 'center',

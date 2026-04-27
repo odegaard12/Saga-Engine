@@ -357,7 +357,7 @@ export default function PlayerApp() {
     (member) => String(member.presence || '').toLowerCase() !== 'offline'
   ).length
 
-  const legacyPlayerHref = `/player/${encodeURIComponent(payload.user)}`
+  const playerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
   const adminHref = '/admin'
 
@@ -605,8 +605,8 @@ export default function PlayerApp() {
             debugEnabled={effectiveDebugEnabled}
             followPlayer={followPlayer}
             toolsOpen={toolsOpen}
-            legacyPlayerHref={legacyPlayerHref}
-            legacyLoginHref={shellLoginHref}
+            playerHref={playerHref}
+            loginHref={shellLoginHref}
             adminHref={adminHref}
             primaryLabel={runtime.primaryLabel}
             primaryTone={runtime.primaryTone}
@@ -634,7 +634,7 @@ export default function PlayerApp() {
         user={payload.user}
         currentStage={currentStage}
         helperText={runtime.helperText}
-        legacyPlayerHref={legacyPlayerHref}
+        playerHref={playerHref}
         submitting={submitting}
         errorMessage={submitError}
         onClose={() => {
