@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import json
@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import secrets
 import time
+from pathlib import Path
 
 app = FastAPI()
 
@@ -1205,9 +1206,33 @@ def stage_accepts_code(raw_stage, code):
 
     return False
 
+APP_DIR = Path(__file__).resolve().parent
+REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
+REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
+REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 templates = Jinja2Templates(directory="templates")
+
+def react_index_or_missing():
+    if REACT_INDEX_FILE.exists():
+        return FileResponse(REACT_INDEX_FILE)
+
+    return HTMLResponse(
+        """
+        <!doctype html>
+        <html>
+          <head><title>SAGA React build missing</title></head>
+          <body style="font-family: system-ui; padding: 24px;">
+            <h1>SAGA React build missing</h1>
+            <p>Run <code>cd frontend && npm run build</code> before serving the React player from FastAPI.</p>
+            <p>Temporary legacy routes remain available under <code>/legacy</code>.</p>
+          </body>
+        </html>
+        """,
+        status_code=503,
+    )
 
 @app.middleware("http")
 async def saga_no_cache_html(request, call_next):
@@ -1238,7 +1263,13 @@ async def saga_no_cache_html(request, call_next):
 
     return response
 
+@app.head("/", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/", response_class=HTMLResponse)
+async def react_entry():
+    return react_index_or_missing()
+
+@app.head("/legacy", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/legacy", response_class=HTMLResponse)
 async def login(request: Request):
     cfg = load_config()
     return templates.TemplateResponse(
@@ -1252,7 +1283,15 @@ async def login(request: Request):
         }
     )
 
+@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
+async def react_player(name: str):
+    # Serve the React app directly. The frontend derives the player from /player/{name}.
+    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
+    return react_index_or_missing()
+
+@app.head("/legacy/player/{name}", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/legacy/player/{name}", response_class=HTMLResponse)
 async def game(request: Request, name: str):
     cfg = load_config()
     return templates.TemplateResponse(
@@ -1266,6 +1305,7 @@ async def game(request: Request, name: str):
         }
     )
 
+@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin", response_class=HTMLResponse)
 async def admin(request: Request):
     cfg = load_config()
