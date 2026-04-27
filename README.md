@@ -66,7 +66,7 @@ Current React frontend scope:
 - sanitized player payload consumption via `/api/game/{user}`
 - team presence / live player overlays
 - route-progress top shell
-- interaction-sheet runtime bridge for minigames
+- interaction-sheet family runtime host for minigames
 
 ### Important boundary
 
@@ -369,6 +369,11 @@ Legacy paths still work through the bridge, so migration can continue without br
 
 ---
 
+
+### Legacy migration boundary
+
+Legacy minigame code remains in the repository while the backend/template runtime is still available, but new React gameplay work should target only family-native runtimes. Legacy type adaptation is migration tooling, not the normal React player path.
+
 ## Runtime Model
 
 The public editable schema remains simple, while the backend internally normalizes nodes into a richer runtime structure with sections such as:
@@ -619,7 +624,7 @@ Useful development URLs:
 - no `?user` -> React mission entry / login flow
 - with `?user` -> React player flow
 - `/admin` still goes to backend admin
-- legacy template runtime still exists and remains authoritative for production
+- legacy template runtime still exists for production until the React build is promoted as the primary served player route
 
 ---
 
