@@ -316,6 +316,18 @@ Current runtime foundation includes:
 - `InteractionSheet` integration for resolved family runtime vs legacy bridge
 - first fullscreen runtime shells for each family
 
+
+### React player runtime policy
+
+The React player runtime should use family-native minigame types as the normal path:
+
+- `signal_hunt`
+- `bearing_hunt`
+- `circuit_matrix`
+
+Legacy minigame types may remain in the repository for migration, admin import, or historical compatibility work, but they should not be the default React player resolution path.
+
+
 ### What the families are for
 
 #### `circuit_matrix`
