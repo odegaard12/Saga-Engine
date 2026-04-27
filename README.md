@@ -75,8 +75,8 @@ The production backend can now serve the React player build when `frontend/dist`
 The React frontend is currently:
 
 - a migration workspace
-- not the production frontend yet
-- not at full feature parity with the legacy player flow yet
+- served by the backend when frontend/dist exists
+- still being completed toward full feature parity with the old template flow
 
 ---
 
@@ -214,7 +214,7 @@ The React player iteration is moving toward:
 
 ### Legacy login
 
-The legacy runtime still ships with a template-based player selection/login flow under `/`.
+The legacy runtime still ships with a template-based player selection/login flow under `/legacy` during migration.
 
 ### React mission entry
 
