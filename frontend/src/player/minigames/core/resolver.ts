@@ -26,7 +26,6 @@ export type ResolvedCircuitMatrixMinigame = {
   type: 'circuit_matrix'
   version: 'v1'
   compatibility: MinigameCompatibility
-  legacy_type: string | null
   label: string
   definition: typeof circuitMatrixDefinition
   config: CircuitMatrixConfig
@@ -37,7 +36,6 @@ export type ResolvedBearingHuntMinigame = {
   type: 'bearing_hunt'
   version: 'v1'
   compatibility: MinigameCompatibility
-  legacy_type: string | null
   label: string
   definition: typeof bearingHuntDefinition
   config: BearingHuntConfig
@@ -48,7 +46,6 @@ export type ResolvedSignalHuntMinigame = {
   type: 'signal_hunt'
   version: 'v1'
   compatibility: MinigameCompatibility
-  legacy_type: string | null
   label: string
   definition: typeof signalHuntDefinition
   config: SignalHuntConfig
@@ -83,7 +80,6 @@ function resolveCircuitMatrixNative(
     type: 'circuit_matrix',
     version: normalizeVersion(input.version),
     compatibility: 'native',
-    legacy_type: null,
     label: circuitMatrixDefinition.label,
     definition: circuitMatrixDefinition,
     config: {
@@ -101,7 +97,6 @@ function resolveBearingHuntNative(
     type: 'bearing_hunt',
     version: normalizeVersion(input.version),
     compatibility: 'native',
-    legacy_type: null,
     label: bearingHuntDefinition.label,
     definition: bearingHuntDefinition,
     config: {
@@ -119,7 +114,6 @@ function resolveSignalHuntNative(
     type: 'signal_hunt',
     version: normalizeVersion(input.version),
     compatibility: 'native',
-    legacy_type: null,
     label: signalHuntDefinition.label,
     definition: signalHuntDefinition,
     config: {
