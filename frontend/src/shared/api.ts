@@ -18,6 +18,14 @@ export type AdminReactOverviewStage = {
   require_proximity?: boolean
   has_hint?: boolean
   has_manual_fallback?: boolean
+  content?: string
+  objective?: string
+  config_summary?: string[]
+  messages?: {
+    hint?: string
+    gps_unavailable?: string
+    locked?: string
+  }
 }
 
 export type AdminReactOverviewProfile = {

@@ -1281,10 +1281,15 @@ def _safe_runtime_json_file(global_names, fallback):
 
 def _admin_react_stage_summary(stage, idx):
     stage = stage or {}
+    presentation = stage.get("presentation") if isinstance(stage.get("presentation"), dict) else {}
     location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
     entry = stage.get("entry") if isinstance(stage.get("entry"), dict) else {}
     messages = stage.get("messages") if isinstance(stage.get("messages"), dict) else {}
     minigame = stage.get("minigame") if isinstance(stage.get("minigame"), dict) else {}
+
+    cfg = minigame.get("config") if isinstance(minigame.get("config"), dict) else {}
+    if not cfg and isinstance(stage.get("config"), dict):
+        cfg = stage.get("config") or {}
 
     minigame_type = (
         minigame.get("type")
@@ -1292,19 +1297,50 @@ def _admin_react_stage_summary(stage, idx):
         or "signal_hunt"
     )
 
+    radius = (
+        stage.get("radius")
+        if stage.get("radius") is not None
+        else (
+            location.get("radius")
+            if location.get("radius") is not None
+            else (
+                location.get("radius_m")
+                if location.get("radius_m") is not None
+                else 50
+            )
+        )
+    )
+
+    content = (
+        stage.get("content")
+        or presentation.get("content")
+        or presentation.get("body")
+        or ""
+    )
+
+    safe_messages = {
+        "hint": messages.get("hint") or stage.get("hint") or "",
+        "gps_unavailable": messages.get("gps_unavailable") or stage.get("gps_unavailable_message") or "",
+        "locked": messages.get("locked") or stage.get("locked_message") or "",
+    }
+
     return {
         "id": stage.get("id", idx),
         "index": idx,
-        "title": stage.get("title") or f"Node {idx + 1}",
+        "title": stage.get("title") or presentation.get("title") or f"Node {idx + 1}",
         "type": minigame_type,
         "label": minigame.get("label") or MINIGAME_SPECS.get(minigame_type, {}).get("label") or minigame_type,
         "lat": stage.get("lat", location.get("lat")),
         "lon": stage.get("lon", location.get("lon")),
-        "radius": stage.get("radius") if stage.get("radius") is not None else (location.get("radius") if location.get("radius") is not None else (location.get("radius_m") if location.get("radius_m") is not None else 50)),
+        "radius": radius,
         "entry_mode": entry.get("mode") or stage.get("entry_mode") or "gps",
         "require_proximity": bool(entry.get("require_proximity", stage.get("require_proximity", True))),
-        "has_hint": bool(messages.get("hint") or stage.get("hint")),
+        "has_hint": bool(safe_messages.get("hint")),
         "has_manual_fallback": stage_has_manual_fallback(stage),
+        "content": content,
+        "objective": cfg.get("objective") or "",
+        "config_summary": sorted(str(key) for key in cfg.keys())[:12],
+        "messages": safe_messages,
     }
 
 
