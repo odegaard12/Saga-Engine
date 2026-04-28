@@ -138,7 +138,7 @@ At each node, the engine can combine:
 - `/player/{PLAYER_NAME}` -> backend-served React player route
 - `/admin` -> current admin panel
 - `/admin-react` -> React admin shell for the new Mission Control/editor direction
-- `/api/admin/react-overview` -> password-protected read-only React admin overview
+- `/api/admin/react-overview` -> password-protected read-only React admin overview / Mission Control read model
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
 - `/api/team/{user}` -> team presence / player status payload

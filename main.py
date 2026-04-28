@@ -1300,7 +1300,7 @@ def _admin_react_stage_summary(stage, idx):
         "label": minigame.get("label") or MINIGAME_SPECS.get(minigame_type, {}).get("label") or minigame_type,
         "lat": stage.get("lat", location.get("lat")),
         "lon": stage.get("lon", location.get("lon")),
-        "radius": stage.get("radius", location.get("radius")),
+        "radius": stage.get("radius") if stage.get("radius") is not None else (location.get("radius") if location.get("radius") is not None else (location.get("radius_m") if location.get("radius_m") is not None else 50)),
         "entry_mode": entry.get("mode") or stage.get("entry_mode") or "gps",
         "require_proximity": bool(entry.get("require_proximity", stage.get("require_proximity", True))),
         "has_hint": bool(messages.get("hint") or stage.get("hint")),
@@ -1311,11 +1311,21 @@ def _admin_react_stage_summary(stage, idx):
 def _admin_react_profile_summary(profile, gamestate, positions):
     profile = profile or {}
     profile_id = str(profile.get("id") or profile.get("display_name") or "")
-    state = gamestate.get(profile_id, {}) if isinstance(gamestate, dict) else {}
+    raw_state = gamestate.get(profile_id, {}) if isinstance(gamestate, dict) else {}
     pos = positions.get(profile_id, {}) if isinstance(positions, dict) else {}
 
-    if not isinstance(state, dict):
+    if isinstance(raw_state, dict):
+        state = raw_state
+        level = state.get("level", 0)
+        finished = bool(state.get("finished", False))
+    else:
         state = {}
+        try:
+            level = int(raw_state)
+        except Exception:
+            level = 0
+        finished = False
+
     if not isinstance(pos, dict):
         pos = {}
 
@@ -1324,8 +1334,8 @@ def _admin_react_profile_summary(profile, gamestate, positions):
         "display_name": profile.get("display_name") or profile_id,
         "mode": profile.get("mode") or "solo",
         "status": profile.get("status") or "active",
-        "level": state.get("level"),
-        "finished": bool(state.get("finished", False)),
+        "level": level,
+        "finished": finished,
         "presence": pos.get("presence") or state.get("presence") or "unknown",
         "gps_status": pos.get("gps_status") or state.get("gps_status") or "unknown",
         "last_seen": pos.get("last_seen") or pos.get("ts") or state.get("last_seen"),

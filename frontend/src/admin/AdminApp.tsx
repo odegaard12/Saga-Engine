@@ -85,8 +85,7 @@ export default function AdminApp() {
   const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'React Mission Control shell'
   const familyCounts = overview?.counts?.family_counts || {}
 
-  function handleOverviewSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  function loadOverview() {
     setOverviewState('loading')
     setOverviewError(null)
 
@@ -107,6 +106,11 @@ export default function AdminApp() {
         setOverviewError(err instanceof Error ? err.message : 'Unknown error')
         setOverviewState('error')
       })
+  }
+
+  function handleOverviewSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    loadOverview()
   }
 
   return (
@@ -150,7 +154,7 @@ export default function AdminApp() {
             <div style={sectionKicker}>Read-only admin model</div>
             <h2 style={sectionTitle}>Mission overview</h2>
           </div>
-          <span style={statusPill}>{overviewState === 'ready' ? 'Unlocked' : 'Password required'}</span>
+          <span style={statusPill}>{overviewState === 'ready' ? 'Read-only live view' : 'Password required'}</span>
         </div>
 
         <form onSubmit={handleOverviewSubmit} style={unlockForm}>
@@ -162,9 +166,13 @@ export default function AdminApp() {
             style={passwordInput}
           />
           <button type="submit" style={primaryButton} disabled={overviewState === 'loading'}>
-            {overviewState === 'loading' ? 'Loading…' : 'Load overview'}
+            {overviewState === 'loading' ? 'Loading…' : overviewState === 'ready' ? 'Refresh overview' : 'Load overview'}
           </button>
         </form>
+
+        {overviewState === 'ready' ? (
+          <div style={muted}>Overview loaded. Press refresh after changing data in the current admin.</div>
+        ) : null}
 
         {overviewState === 'error' ? (
           <div style={errorPanel}>
@@ -193,7 +201,7 @@ export default function AdminApp() {
                 {(overview.profiles || []).slice(0, 8).map((profile) => (
                   <div key={profile.id} style={metricRow}>
                     <span>{profile.display_name}</span>
-                    <strong>{profile.finished ? 'Finished' : `Level ${profile.level ?? '—'}`}</strong>
+                    <strong>{profile.finished ? 'Finished' : `Level ${profile.level ?? 0}`}</strong>
                   </div>
                 ))}
                 {(overview.profiles || []).length === 0 ? <div style={muted}>No profiles found.</div> : null}
@@ -263,12 +271,14 @@ export default function AdminApp() {
 }
 
 function NodeRow({ stage }: { stage: AdminReactOverviewStage }) {
+  const radius = stage.radius ?? 50
+
   return (
     <article style={nodeRow}>
       <div>
         <div style={nodeTitle}>{stage.index + 1}. {stage.title}</div>
         <div style={nodeMeta}>
-          {stage.label || stage.type} · {stage.entry_mode || 'gps'} · radius {stage.radius ?? '—'}m
+          {stage.label || stage.type} · {stage.entry_mode || 'gps'} · radius {radius}m
         </div>
       </div>
       <div style={nodeBadges}>
