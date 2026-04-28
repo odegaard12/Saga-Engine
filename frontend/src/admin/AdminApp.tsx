@@ -310,7 +310,7 @@ export default function AdminApp() {
 
         <div style={roadmap}>
           <div style={roadmapItem}>1 · Mission Control read-only cards</div>
-          <div style={roadmapItem}>2 · React node detail drawer</div>
+          <div style={roadmapItem}>2 · React node detail drawer polish and admin-style layout</div>
           <div style={roadmapItem}>3 · Family schema config editor</div>
           <div style={roadmapItem}>4 · Safe save flow through existing admin APIs</div>
         </div>
@@ -406,16 +406,31 @@ function NodeDetailDrawer({
   const configSummary = stage.config_summary || []
   const messages = stage.messages || {}
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   return (
-    <div style={drawerOverlay}>
-      <aside style={drawer}>
+    <div style={drawerOverlay} onClick={onClose} role="presentation">
+      <aside
+        style={drawer}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Node detail: ${stage.title}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div style={drawerHeader}>
           <div>
             <div style={sectionKicker}>Node detail · read-only</div>
             <h2 style={drawerTitle}>{stage.index + 1}. {stage.title}</h2>
             <div style={nodeMeta}>{family?.icon || '◇'} {stage.label || stage.type}</div>
           </div>
-          <button type="button" style={drawerClose} onClick={onClose}>Close</button>
+          <button type="button" style={drawerClose} onClick={onClose} aria-label="Close node detail">Close</button>
         </div>
 
         <div style={drawerBody}>
@@ -1009,12 +1024,12 @@ const drawerOverlay: CSSProperties = {
   zIndex: 50,
   display: 'flex',
   justifyContent: 'flex-end',
-  background: 'rgba(2,6,23,0.58)',
+  background: 'rgba(2,6,23,0.62)',
   backdropFilter: 'blur(10px)',
 }
 
 const drawer: CSSProperties = {
-  width: 'min(560px, 100vw)',
+  width: 'min(620px, 100vw)',
   minHeight: '100vh',
   padding: 22,
   overflowY: 'auto',
@@ -1024,17 +1039,25 @@ const drawer: CSSProperties = {
 }
 
 const drawerHeader: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 2,
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 14,
-  marginBottom: 18,
+  margin: '-22px -22px 18px',
+  padding: 22,
+  borderBottom: '1px solid rgba(148,163,184,0.16)',
+  background: 'rgba(15,23,42,0.94)',
+  backdropFilter: 'blur(14px)',
 }
 
 const drawerTitle: CSSProperties = {
   margin: '6px 0 4px',
   fontSize: 28,
   letterSpacing: '-0.05em',
+  lineHeight: 1.05,
 }
 
 const drawerClose: CSSProperties = {
@@ -1055,7 +1078,7 @@ const drawerBody: CSSProperties = {
 
 const detailGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
   gap: 10,
 }
 
