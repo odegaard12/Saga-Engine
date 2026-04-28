@@ -1260,6 +1260,154 @@ async def heartbeat(request: Request):
         "live_status": project_live_profile_status(profile, current)
     }
 
+
+
+def _safe_runtime_json_file(global_names, fallback):
+    for name in global_names:
+        path = globals().get(name)
+        if not path:
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(fallback, dict) and isinstance(data, dict):
+                return data
+            if isinstance(fallback, list) and isinstance(data, list):
+                return data
+        except Exception:
+            continue
+    return fallback
+
+
+def _admin_react_stage_summary(stage, idx):
+    stage = stage or {}
+    location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
+    entry = stage.get("entry") if isinstance(stage.get("entry"), dict) else {}
+    messages = stage.get("messages") if isinstance(stage.get("messages"), dict) else {}
+    minigame = stage.get("minigame") if isinstance(stage.get("minigame"), dict) else {}
+
+    minigame_type = (
+        minigame.get("type")
+        or stage.get("type")
+        or "signal_hunt"
+    )
+
+    return {
+        "id": stage.get("id", idx),
+        "index": idx,
+        "title": stage.get("title") or f"Node {idx + 1}",
+        "type": minigame_type,
+        "label": minigame.get("label") or MINIGAME_SPECS.get(minigame_type, {}).get("label") or minigame_type,
+        "lat": stage.get("lat", location.get("lat")),
+        "lon": stage.get("lon", location.get("lon")),
+        "radius": stage.get("radius", location.get("radius")),
+        "entry_mode": entry.get("mode") or stage.get("entry_mode") or "gps",
+        "require_proximity": bool(entry.get("require_proximity", stage.get("require_proximity", True))),
+        "has_hint": bool(messages.get("hint") or stage.get("hint")),
+        "has_manual_fallback": stage_has_manual_fallback(stage),
+    }
+
+
+def _admin_react_profile_summary(profile, gamestate, positions):
+    profile = profile or {}
+    profile_id = str(profile.get("id") or profile.get("display_name") or "")
+    state = gamestate.get(profile_id, {}) if isinstance(gamestate, dict) else {}
+    pos = positions.get(profile_id, {}) if isinstance(positions, dict) else {}
+
+    if not isinstance(state, dict):
+        state = {}
+    if not isinstance(pos, dict):
+        pos = {}
+
+    return {
+        "id": profile_id,
+        "display_name": profile.get("display_name") or profile_id,
+        "mode": profile.get("mode") or "solo",
+        "status": profile.get("status") or "active",
+        "level": state.get("level"),
+        "finished": bool(state.get("finished", False)),
+        "presence": pos.get("presence") or state.get("presence") or "unknown",
+        "gps_status": pos.get("gps_status") or state.get("gps_status") or "unknown",
+        "last_seen": pos.get("last_seen") or pos.get("ts") or state.get("last_seen"),
+    }
+
+
+@app.post("/api/admin/react-overview")
+async def admin_react_overview(request: Request):
+    data = await request.json()
+
+    if not verify_admin_password(data.get("password")):
+        return {
+            "status": "fail",
+            "message": "Invalid admin password",
+        }
+
+    if admin_password_change_required():
+        return {
+            "status": "password_change_required",
+            "message": "Admin password change required before using the React admin overview.",
+        }
+
+    cfg = load_config()
+    stages = get_runtime_stages()
+    profiles = get_player_profiles(cfg)
+
+    gamestate = _safe_runtime_json_file(
+        ("GAMESTATE_FILE", "GAMESTATE_PATH", "GAMESTATE_DB"),
+        {},
+    )
+    positions = _safe_runtime_json_file(
+        ("POSITIONS_FILE", "POSITIONS_PATH", "POSITIONS_DB"),
+        {},
+    )
+
+    stage_summaries = [
+        _admin_react_stage_summary(stage, idx)
+        for idx, stage in enumerate(stages)
+    ]
+
+    family_counts = {
+        "signal_hunt": 0,
+        "bearing_hunt": 0,
+        "circuit_matrix": 0,
+    }
+    for stage in stage_summaries:
+        stage_type = stage.get("type")
+        if stage_type in family_counts:
+            family_counts[stage_type] += 1
+
+    profile_summaries = [
+        _admin_react_profile_summary(profile, gamestate, positions)
+        for profile in profiles
+    ]
+
+    return {
+        "status": "ok",
+        "config": {
+            "site_name": cfg.get("site_name"),
+            "admin_title": cfg.get("admin_title"),
+            "admin_subtitle": cfg.get("admin_subtitle"),
+            "player_theme": cfg.get("player_theme"),
+            "map_center": cfg.get("map_center"),
+            "map_zoom": cfg.get("map_zoom"),
+        },
+        "counts": {
+            "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
+            "profiles": len(profiles),
+            "stages": len(stage_summaries),
+            "finished_profiles": sum(1 for item in profile_summaries if item.get("finished")),
+            "family_counts": family_counts,
+        },
+        "families": [
+            {"id": "signal_hunt", "label": "Signal Hunt"},
+            {"id": "bearing_hunt", "label": "Bearing Hunt"},
+            {"id": "circuit_matrix", "label": "Circuit Matrix"},
+        ],
+        "stages": stage_summaries,
+        "profiles": profile_summaries,
+    }
+
+
 @app.post("/api/admin/mission-status")
 async def admin_mission_status(request: Request):
     data = await request.json()
