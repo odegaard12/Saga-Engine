@@ -325,7 +325,7 @@ Logic-heavy games such as:
 - switch logic
 - route repair
 - power balancing
-- cryptex-like board logic
+- lock-style board logic
 - sequence grids
 
 #### `bearing_hunt`
