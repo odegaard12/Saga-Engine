@@ -10,7 +10,7 @@ import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
 
 // React player policy: family-native runtimes are the normal path.
-// Legacy adapters may remain as migration tooling, but the React player resolver does not execute them.
+// Compatibility helpers may normalize older stage shapes, but the React player resolver only executes family-native runtimes.
 
 export type NativeMinigameType = MinigameFamily
 export type MinigameCompatibility = 'native'

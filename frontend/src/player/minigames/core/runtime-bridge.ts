@@ -32,7 +32,7 @@ function normalizeRuntimeSource(runtime?: StageMinigameRuntime | null): StageMin
   }
 }
 
-function normalizeLegacyStageSource(stage: PlayerStage): StageMinigameSource | null {
+function normalizeCompatibleStageSource(stage: PlayerStage): StageMinigameSource | null {
   const type = String(stage.type || '').trim().toLowerCase()
   if (!type) return null
 
@@ -50,7 +50,7 @@ export function getStageMinigameSource(stage: PlayerStage | null | undefined): S
   const runtimeSource = normalizeRuntimeSource(stage.minigame)
   if (runtimeSource) return runtimeSource
 
-  return normalizeLegacyStageSource(stage)
+  return normalizeCompatibleStageSource(stage)
 }
 
 export function buildResolveMinigameInput(
