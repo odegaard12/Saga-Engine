@@ -358,7 +358,7 @@ New gameplay work should use family-native runtimes as the normal path.
 
 ---
 
-### Legacy migration boundary
+### Schema compatibility boundary
 
 New gameplay work should target only family-native runtimes.
 
