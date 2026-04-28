@@ -685,7 +685,7 @@ def _build_success_conditions(raw):
     return conditions
 
 # RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
-# Avoid letting incomplete data silently fall back to old legacy minigames.
+# Avoid letting incomplete data silently fall back to outdated minigame defaults.
 def normalize_stage(raw):
     raw = raw or {}
 

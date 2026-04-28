@@ -888,7 +888,7 @@ label { font-size:10px; color:#a3afc2; text-transform:uppercase; letter-spacing:
 
 /* === NODE EDITOR V2 HARD FIX === */
 
-/* hide legacy editor layout once v2 is active */
+/* hide classic editor layout once v2 is active */
 #editor.node-editor-v2-ready > *{
   display:none !important;
 }
@@ -3103,10 +3103,10 @@ function getStageEntryValue(s, key, fallback) {
   return fallback;
 }
 
-function getStageMessageValue(s, key, legacyKey, fallback="") {
+function getStageMessageValue(s, key, fallbackKey, fallback="") {
   const messages = (s && s.messages && typeof s.messages === "object") ? s.messages : {};
   if (messages[key] !== undefined && messages[key] !== null && String(messages[key]).trim() !== "") return messages[key];
-  if (s && s[legacyKey] !== undefined && s[legacyKey] !== null) return s[legacyKey];
+  if (s && s[fallbackKey] !== undefined && s[fallbackKey] !== null) return s[fallbackKey];
   return fallback;
 }
 
