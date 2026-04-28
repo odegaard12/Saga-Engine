@@ -136,7 +136,8 @@ At each node, the engine can combine:
 
 - `/` -> React mission entry / player app when `frontend/dist` exists
 - `/player/{PLAYER_NAME}` -> backend-served React player route
-- `/admin` -> admin panel
+- `/admin` -> current admin panel
+- `/admin-react` -> React admin shell for the new Mission Control/editor direction
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
 - `/api/team/{user}` -> team presence / player status payload
@@ -609,7 +610,8 @@ Useful development URLs:
 
 - no `?user` -> React mission entry / login flow
 - with `?user` -> React player flow
-- `/admin` still goes to backend admin
+- `/admin` still goes to the current backend admin
+- `/admin-react` opens the new React admin shell
 - React build is the primary player route when served by the backend
 
 ---
@@ -627,6 +629,7 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
+- `frontend/src/admin/AdminApp.tsx` -> React admin shell
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
 - `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host
 - `frontend/src/player/minigames/gameCatalog.ts` and `frontend/src/player/minigames/registry.ts` -> family-native React minigame catalog/registry

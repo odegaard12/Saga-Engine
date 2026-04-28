@@ -1054,6 +1054,16 @@ async def saga_no_cache_html(request, call_next):
 async def react_entry():
     return react_index_or_missing()
 
+@app.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/admin-react", response_class=HTMLResponse)
+async def react_admin_shell():
+    return react_index_or_missing()
+
+@app.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/admin-react/{path:path}", response_class=HTMLResponse)
+async def react_admin_shell_path(path: str):
+    return react_index_or_missing()
+
 @app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
 async def react_player(name: str):
