@@ -70,7 +70,7 @@ Current React frontend scope:
 
 ### Important boundary
 
-The production backend now serves the React player build when `frontend/dist` is available. The legacy player template UI has been removed from the normal app surface.
+The production backend serves the React player build when `frontend/dist` is available.
 
 The React frontend is currently:
 
@@ -480,7 +480,7 @@ Current editable schema supports simple node objects. New stages should prefer f
 }
 ```
 
-Optional legacy-compatible fields already supported by runtime:
+Optional compatibility fields already supported by runtime:
 
 ```json
 {
@@ -518,7 +518,7 @@ The React/frontend runtime now also supports a richer per-stage runtime minigame
 }
 ```
 
-This coexists with legacy `type` + `config` stage data during migration.
+This coexists with the simple `type` + `config` stage shape during schema evolution.
 
 ---
 
