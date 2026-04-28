@@ -49,6 +49,7 @@ export default function AdminApp() {
   const [overview, setOverview] = useState<AdminReactOverviewResponse | null>(null)
   const [overviewState, setOverviewState] = useState<OverviewState>('locked')
   const [overviewError, setOverviewError] = useState<string | null>(null)
+  const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -117,6 +118,7 @@ export default function AdminApp() {
         }
 
         setOverview(payload)
+        setSelectedStage(null)
         setOverviewState('ready')
       })
       .catch((err) => {
@@ -257,11 +259,22 @@ export default function AdminApp() {
 
           <div style={nodeGrid}>
             {stages.map((stage) => (
-              <NodeCard key={`${stage.index}-${stage.id ?? stage.title}`} stage={stage} />
+              <NodeCard
+                key={`${stage.index}-${stage.id ?? stage.title}`}
+                stage={stage}
+                onOpen={() => setSelectedStage(stage)}
+              />
             ))}
             {stages.length === 0 ? <div style={muted}>No nodes found.</div> : null}
           </div>
         </section>
+      ) : null}
+
+      {selectedStage ? (
+        <NodeDetailDrawer
+          stage={selectedStage}
+          onClose={() => setSelectedStage(null)}
+        />
       ) : null}
 
       <section style={section}>
@@ -332,13 +345,19 @@ function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
   )
 }
 
-function NodeCard({ stage }: { stage: AdminReactOverviewStage }) {
+function NodeCard({
+  stage,
+  onOpen,
+}: {
+  stage: AdminReactOverviewStage
+  onOpen: () => void
+}) {
   const radius = stage.radius ?? 50
   const family = familyCards.find((item) => item.id === stage.type)
   const coords = formatCoords(stage.lat, stage.lon)
 
   return (
-    <article style={nodeCard}>
+    <button type="button" style={nodeCardButton} onClick={onOpen}>
       <div style={nodeCardTop}>
         <div style={nodeIndex}>{stage.index + 1}</div>
         <div>
@@ -368,8 +387,87 @@ function NodeCard({ stage }: { stage: AdminReactOverviewStage }) {
         <span style={stage.require_proximity ? badgeOk : badgeNeutral}>
           {stage.require_proximity ? 'GPS gated' : 'Free entry'}
         </span>
+        <span style={miniBadge}>Open details</span>
       </div>
-    </article>
+    </button>
+  )
+}
+
+function NodeDetailDrawer({
+  stage,
+  onClose,
+}: {
+  stage: AdminReactOverviewStage
+  onClose: () => void
+}) {
+  const radius = stage.radius ?? 50
+  const family = familyCards.find((item) => item.id === stage.type)
+  const coords = formatCoords(stage.lat, stage.lon)
+  const configSummary = stage.config_summary || []
+  const messages = stage.messages || {}
+
+  return (
+    <div style={drawerOverlay}>
+      <aside style={drawer}>
+        <div style={drawerHeader}>
+          <div>
+            <div style={sectionKicker}>Node detail · read-only</div>
+            <h2 style={drawerTitle}>{stage.index + 1}. {stage.title}</h2>
+            <div style={nodeMeta}>{family?.icon || '◇'} {stage.label || stage.type}</div>
+          </div>
+          <button type="button" style={drawerClose} onClick={onClose}>Close</button>
+        </div>
+
+        <div style={drawerBody}>
+          <div style={detailGrid}>
+            <DetailItem label="Family" value={stage.type} />
+            <DetailItem label="Entry mode" value={stage.entry_mode || 'gps'} />
+            <DetailItem label="Radius" value={`${radius}m`} />
+            <DetailItem label="Coordinates" value={coords} />
+            <DetailItem label="Objective" value={stage.objective || '—'} />
+            <DetailItem label="Access" value={stage.require_proximity ? 'GPS gated' : 'Free entry'} />
+          </div>
+
+          <section style={detailBlock}>
+            <div style={tinyLabel}>Player-facing content</div>
+            <p style={detailText}>{stage.content || 'No content configured.'}</p>
+          </section>
+
+          <section style={detailBlock}>
+            <div style={tinyLabel}>Messages</div>
+            <div style={messageList}>
+              <DetailItem label="Hint" value={messages.hint || '—'} />
+              <DetailItem label="GPS unavailable" value={messages.gps_unavailable || '—'} />
+              <DetailItem label="Locked" value={messages.locked || '—'} />
+            </div>
+          </section>
+
+          <section style={detailBlock}>
+            <div style={tinyLabel}>Config keys</div>
+            <div style={chipWrap}>
+              {configSummary.length ? (
+                configSummary.map((key) => <code key={key} style={codePill}>{key}</code>)
+              ) : (
+                <span style={muted}>No config keys.</span>
+              )}
+            </div>
+          </section>
+
+          <div style={inlineNotice}>
+            This drawer is read-only. Editing will come later through the React node editor and safe save flow.
+          </div>
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={detailItem}>
+      <div style={detailLabel}>{label}</div>
+      <div style={detailValue}>{value}</div>
+    </div>
   )
 }
 
@@ -718,6 +816,15 @@ const nodeCard: CSSProperties = {
   background: 'rgba(2,6,23,0.34)',
 }
 
+const nodeCardButton: CSSProperties = {
+  ...nodeCard,
+  width: '100%',
+  color: 'inherit',
+  font: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+}
+
 const nodeCardTop: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -894,6 +1001,113 @@ const panel: CSSProperties = {
   background: 'rgba(15,23,42,0.7)',
   border: '1px solid rgba(148,163,184,0.22)',
 }
+
+
+const drawerOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 50,
+  display: 'flex',
+  justifyContent: 'flex-end',
+  background: 'rgba(2,6,23,0.58)',
+  backdropFilter: 'blur(10px)',
+}
+
+const drawer: CSSProperties = {
+  width: 'min(560px, 100vw)',
+  minHeight: '100vh',
+  padding: 22,
+  overflowY: 'auto',
+  borderLeft: '1px solid rgba(148,163,184,0.24)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(2,6,23,0.98))',
+  boxShadow: '-24px 0 70px rgba(0,0,0,0.45)',
+}
+
+const drawerHeader: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 14,
+  marginBottom: 18,
+}
+
+const drawerTitle: CSSProperties = {
+  margin: '6px 0 4px',
+  fontSize: 28,
+  letterSpacing: '-0.05em',
+}
+
+const drawerClose: CSSProperties = {
+  minHeight: 36,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(148,163,184,0.24)',
+  background: 'rgba(15,23,42,0.86)',
+  color: '#dbeafe',
+  fontWeight: 900,
+  cursor: 'pointer',
+}
+
+const drawerBody: CSSProperties = {
+  display: 'grid',
+  gap: 14,
+}
+
+const detailGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 10,
+}
+
+const detailBlock: CSSProperties = {
+  padding: 14,
+  borderRadius: 18,
+  border: '1px solid rgba(148,163,184,0.16)',
+  background: 'rgba(2,6,23,0.36)',
+}
+
+const detailItem: CSSProperties = {
+  padding: 12,
+  borderRadius: 16,
+  border: '1px solid rgba(148,163,184,0.14)',
+  background: 'rgba(15,23,42,0.46)',
+}
+
+const detailLabel: CSSProperties = {
+  marginBottom: 5,
+  color: '#64748b',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.12em',
+  fontWeight: 900,
+}
+
+const detailValue: CSSProperties = {
+  color: '#e5eefc',
+  fontSize: 14,
+  lineHeight: 1.45,
+  wordBreak: 'break-word',
+}
+
+const detailText: CSSProperties = {
+  margin: '8px 0 0',
+  color: '#cbd5e1',
+  lineHeight: 1.55,
+}
+
+const messageList: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  marginTop: 8,
+}
+
+const chipWrap: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 8,
+}
+
 
 const errorPanel: CSSProperties = {
   maxWidth: 1180,
