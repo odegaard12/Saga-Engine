@@ -7,7 +7,7 @@ import {
 
 const samples: PlayerStage[] = [
   {
-    title: 'Legacy circuit',
+    title: 'Compatible circuit stage',
     lat: 0,
     lon: 0,
     radius: 30,

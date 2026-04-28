@@ -3651,7 +3651,7 @@ function renderGameConfig(rawConfig = null) {
   }
 
   const config = normalizeGameConfigForType(type, incoming);
-  const badge = schema.group === 'family' ? 'FAMILY NATIVE' : 'LEGACY / MIGRATION';
+  const badge = schema.group === 'family' ? 'FAMILY NATIVE' : 'SCHEMA COMPAT';
 
   const fields = schema.fields.map((field) => renderConfigField(field, config)).join('');
 
