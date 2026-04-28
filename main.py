@@ -595,7 +595,6 @@ VALID_HEARTBEAT_GPS_STATUS = {
 VALID_HEARTBEAT_SOURCES = {
     "player",
     "device",
-    "legacy",
     "react",
     "pwa",
 }
