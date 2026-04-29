@@ -217,29 +217,37 @@ export default function AdminApp() {
             ))}
           </div>
 
-          <SectionHeader title="Profiles" count={profiles.length} />
+          <details className="admin-disclosure" open>
+            <summary>
+              <SectionHeader title="Profiles" count={profiles.length} />
+            </summary>
 
-          <div className="admin-profile-list">
-            {profiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} />
-            ))}
-            {profiles.length === 0 ? <div className="admin-muted">No profiles found.</div> : null}
-          </div>
+            <div className="admin-profile-list">
+              {profiles.map((profile) => (
+                <ProfileCard key={profile.id} profile={profile} />
+              ))}
+              {profiles.length === 0 ? <div className="admin-muted">No profiles found.</div> : null}
+            </div>
+          </details>
 
-          <SectionHeader title="Families" count={familyCards.length} />
+          <details className="admin-disclosure">
+            <summary>
+              <SectionHeader title="Families" count={familyCards.length} />
+            </summary>
 
-          <div className="admin-family-count-list">
-            {familyCards.map((family) => (
-              <div key={family.id} className="admin-family-row">
-                <span>{family.icon}</span>
-                <div>
-                  <strong>{family.title}</strong>
-                  <small>{family.id}</small>
+            <div className="admin-family-count-list">
+              {familyCards.map((family) => (
+                <div key={family.id} className="admin-family-row">
+                  <span>{family.icon}</span>
+                  <div>
+                    <strong>{family.title}</strong>
+                    <small>{family.id}</small>
+                  </div>
+                  <b>{familyCounts[family.id] || 0}</b>
                 </div>
-                <b>{familyCounts[family.id] || 0}</b>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </details>
         </aside>
 
         <section className="admin-workspace">
@@ -262,25 +270,29 @@ export default function AdminApp() {
             />
 
             <aside className="admin-node-rail">
-              <div className="admin-node-rail-head">
-                <div>
-                  <span className="admin-kicker">Nodes</span>
-                  <h3>Route sequence</h3>
-                </div>
-                <span className="pill neutral">{stages.length}</span>
-              </div>
+              <details className="admin-disclosure admin-disclosure-nodes" open>
+                <summary>
+                  <div className="admin-node-rail-head">
+                    <div>
+                      <span className="admin-kicker">Nodes</span>
+                      <h3>Route sequence</h3>
+                    </div>
+                    <span className="pill neutral">{stages.length}</span>
+                  </div>
+                </summary>
 
-              <div className="admin-node-list">
-                {stages.map((stage) => (
-                  <NodeCard
-                    key={`${stage.index}-${stage.id ?? stage.title}`}
-                    stage={stage}
-                    selected={selectedStage?.index === stage.index}
-                    onOpen={() => setSelectedStage(stage)}
-                  />
-                ))}
-                {stages.length === 0 ? <div className="admin-muted">No nodes found.</div> : null}
-              </div>
+                <div className="admin-node-list">
+                  {stages.map((stage) => (
+                    <NodeCard
+                      key={`${stage.index}-${stage.id ?? stage.title}`}
+                      stage={stage}
+                      selected={selectedStage?.index === stage.index}
+                      onOpen={() => setSelectedStage(stage)}
+                    />
+                  ))}
+                  {stages.length === 0 ? <div className="admin-muted">No nodes found.</div> : null}
+                </div>
+              </details>
             </aside>
           </div>
 
@@ -1269,6 +1281,317 @@ const styles = `
 
   .admin-login-card-minimal h1 {
     font-size: 36px;
+  }
+}
+
+
+/* Unlocked workspace glass pass */
+.admin-root:not(.admin-root-login-only) {
+  height: 100vh;
+  overflow: hidden;
+  padding: 10px;
+  color: #102033;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(56,189,248,0.22), transparent 30%),
+    radial-gradient(circle at 88% 6%, rgba(129,140,248,0.18), transparent 32%),
+    radial-gradient(circle at 55% 96%, rgba(34,197,94,0.10), transparent 34%),
+    linear-gradient(180deg, #eef6ff 0%, #dbeafe 42%, #c4d5e8 100%);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-console-layout {
+  height: calc(100vh - 20px);
+  min-height: 0;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar,
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar,
+.admin-root:not(.admin-root-login-only) .admin-node-rail,
+.admin-root:not(.admin-root-login-only) .admin-operator-strip,
+.admin-root:not(.admin-root-login-only) .admin-stat,
+.admin-root:not(.admin-root-login-only) .admin-profile-card,
+.admin-root:not(.admin-root-login-only) .admin-family-row,
+.admin-root:not(.admin-root-login-only) .admin-node-card,
+.admin-root:not(.admin-root-login-only) .admin-muted {
+  border-color: rgba(255,255,255,0.56);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.34)),
+    rgba(255,255,255,0.30);
+  box-shadow:
+    0 18px 42px rgba(15,23,42,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.58);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar {
+  padding: 14px;
+  border-radius: 30px;
+  gap: 12px;
+  color: #102033;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar h1 {
+  font-size: 23px;
+  color: #0f172a;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar p,
+.admin-root:not(.admin-root-login-only) .admin-stat small,
+.admin-root:not(.admin-root-login-only) .admin-profile-card small,
+.admin-root:not(.admin-root-login-only) .admin-node-card small,
+.admin-root:not(.admin-root-login-only) .admin-family-row small,
+.admin-root:not(.admin-root-login-only) .admin-operator-strip span {
+  color: #516276;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-brand {
+  background: rgba(14,165,233,0.12);
+  border-color: rgba(14,165,233,0.20);
+  color: #0369a1;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a,
+.admin-root:not(.admin-root-login-only) .admin-drawer-head button {
+  min-height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,0.08);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button {
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  color: #07111f;
+  box-shadow: 0 12px 28px rgba(59,130,246,0.22);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a {
+  color: #334155;
+  background: rgba(255,255,255,0.45);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat {
+  padding: 10px;
+  border-radius: 18px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat span,
+.admin-root:not(.admin-root-login-only) .admin-kicker,
+.admin-root:not(.admin-root-login-only) .admin-detail-block > span {
+  color: #0369a1;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar {
+  min-height: 74px;
+  padding: 14px 16px;
+  border-radius: 28px;
+  color: #0f172a;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar h2 {
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area > section {
+  min-height: 0 !important;
+  height: 100% !important;
+  border-radius: 32px !important;
+  border-color: rgba(255,255,255,0.58) !important;
+  box-shadow:
+    0 26px 80px rgba(15,23,42,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.55) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-rail {
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+  border-radius: 28px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-list {
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-card {
+  color: #102033;
+  border-radius: 18px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-card.selected {
+  border-color: rgba(14,165,233,0.46);
+  background:
+    linear-gradient(180deg, rgba(224,242,254,0.80), rgba(255,255,255,0.44)),
+    rgba(186,230,253,0.40);
+  box-shadow:
+    0 16px 36px rgba(14,165,233,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.74);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-top > span {
+  background: rgba(14,165,233,0.14);
+  color: #0369a1;
+}
+
+.admin-root:not(.admin-root-login-only) .pill.ok {
+  color: #166534;
+  border-color: rgba(22,101,52,0.16);
+  background: rgba(187,247,208,0.62);
+}
+
+.admin-root:not(.admin-root-login-only) .pill.warn {
+  color: #92400e;
+  border-color: rgba(146,64,14,0.16);
+  background: rgba(254,243,199,0.70);
+}
+
+.admin-root:not(.admin-root-login-only) .pill.neutral {
+  color: #334155;
+  border-color: rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.46);
+}
+
+.admin-disclosure {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-disclosure summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-disclosure summary .admin-section-head,
+.admin-disclosure summary .admin-node-rail-head {
+  position: relative;
+  padding-right: 22px;
+}
+
+.admin-disclosure summary .admin-section-head::after,
+.admin-disclosure summary .admin-node-rail-head::after {
+  content: "⌄";
+  position: absolute;
+  right: 0;
+  top: 2px;
+  color: #64748b;
+  font-weight: 900;
+  transition: transform .18s ease;
+}
+
+.admin-disclosure[open] summary .admin-section-head::after,
+.admin-disclosure[open] summary .admin-node-rail-head::after {
+  transform: rotate(180deg);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-family-row,
+.admin-root:not(.admin-root-login-only) .admin-profile-card {
+  color: #102033;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay {
+  background: rgba(148,163,184,0.30);
+  backdrop-filter: blur(12px);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58)),
+    rgba(255,255,255,0.54);
+  color: #102033;
+  border-left: 1px solid rgba(255,255,255,0.64);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-head {
+  background: rgba(255,255,255,0.70);
+  border-bottom-color: rgba(15,23,42,0.08);
+  color: #0f172a;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-detail-item,
+.admin-root:not(.admin-root-login-only) .admin-detail-block {
+  background: rgba(255,255,255,0.46);
+  border-color: rgba(15,23,42,0.08);
+  color: #102033;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-detail-block p {
+  color: #102033;
+}
+
+@media (max-width: 1200px) {
+  .admin-root:not(.admin-root-login-only) {
+    height: auto;
+    overflow: auto;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-console-layout {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-map-area {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-map-area > section {
+    min-height: 520px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-root:not(.admin-root-login-only) {
+    padding: 8px;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-workspace-bar {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
