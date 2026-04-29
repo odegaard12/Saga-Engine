@@ -137,33 +137,39 @@ export default function AdminApp() {
 
   if (!overviewReady) {
     return (
-      <main className="admin-root">
+      <main className="admin-root admin-root-login-only">
         <style>{styles}</style>
 
-        <div className="admin-login-layout">
-          <aside className="admin-login-card">
+        <section className="admin-login-minimal" aria-label="Admin login">
+          <div className="admin-login-orb admin-login-orb-a" aria-hidden="true" />
+          <div className="admin-login-orb admin-login-orb-b" aria-hidden="true" />
+
+          <form onSubmit={handleOverviewSubmit} className="admin-login-card admin-login-card-minimal">
             <div className="admin-brand">SAGA ENGINE · ADMIN</div>
-            <div>
+
+            <div className="admin-login-copy">
               <h1>Mission Control</h1>
-              <p>{title} · {subtitle}</p>
+              <p>Protected admin access</p>
             </div>
 
-            <form onSubmit={handleOverviewSubmit} className="admin-login-form">
+            <div className="admin-login-form">
               <label>Admin password</label>
               <input
                 type="password"
                 value={password}
                 placeholder="Enter admin password"
+                autoComplete="current-password"
+                autoFocus
                 onChange={(event) => setPassword(event.target.value)}
               />
               <button type="submit" disabled={overviewState === 'loading'}>
-                {overviewState === 'loading' ? 'Unlocking…' : 'Unlock Mission Control'}
+                {overviewState === 'loading' ? 'Unlocking…' : 'Unlock'}
               </button>
-            </form>
+            </div>
 
             {overviewState === 'error' ? (
               <div className="admin-error">
-                <strong>Unlock failed</strong>
+                <strong>Access denied</strong>
                 <span>{overviewError}</span>
               </div>
             ) : null}
@@ -175,49 +181,15 @@ export default function AdminApp() {
               </div>
             ) : null}
 
-            <div className="admin-link-row">
-              <a href="/admin">Classic admin</a>
-              <a href="/">Player entry</a>
-              <a href="/api/config">Public config</a>
-            </div>
-          </aside>
-
-          <section className="admin-locked-workspace">
-            <div className="admin-workspace-bar">
+            <div className="admin-login-foot">
+              <span>No mission data is shown before unlock.</span>
               <div>
-                <span className="admin-kicker">Protected command surface</span>
-                <h2>Admin console locked</h2>
-              </div>
-              <span className="pill warn">Password required</span>
-            </div>
-
-            <div className="admin-locked-map">
-              <div className="admin-grid-bg" />
-              <div className="admin-locked-message">
-                <strong>Map-first editor is protected.</strong>
-                <span>Unlock to load profiles, live status, route nodes, node map, family counts and operator actions.</span>
+                <a href="/">Player entry</a>
+                <a href="/admin">Classic admin</a>
               </div>
             </div>
-
-            <div className="admin-stat-grid">
-              {stats.map((item) => (
-                <StatCard key={item.label} item={item} />
-              ))}
-            </div>
-
-            <div className="admin-family-compact-grid">
-              {familyCards.map((family) => (
-                <div key={family.id} className="admin-family-compact">
-                  <span>{family.icon}</span>
-                  <div>
-                    <strong>{family.title}</strong>
-                    <small>{family.detail}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+          </form>
+        </section>
       </main>
     )
   }
@@ -1135,4 +1107,169 @@ const styles = `
     font-size: 34px;
   }
 }
+
+/* Minimal protected login pass */
+.admin-root-login-only {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(125,211,252,0.22), transparent 30%),
+    radial-gradient(circle at 78% 12%, rgba(129,140,248,0.18), transparent 30%),
+    radial-gradient(circle at 50% 95%, rgba(34,197,94,0.12), transparent 34%),
+    linear-gradient(180deg, #eef6ff 0%, #dbeafe 38%, #b9c9dc 100%);
+}
+
+.admin-login-minimal {
+  position: relative;
+  width: min(430px, 100%);
+}
+
+.admin-login-card-minimal {
+  position: relative;
+  z-index: 2;
+  min-height: auto;
+  padding: 24px;
+  border-radius: 34px;
+  border: 1px solid rgba(255,255,255,0.62);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.42)),
+    rgba(255,255,255,0.36);
+  box-shadow:
+    0 30px 90px rgba(15,23,42,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.74);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  color: #0f172a;
+}
+
+.admin-login-card-minimal .admin-brand {
+  background: rgba(14,165,233,0.12);
+  border-color: rgba(14,165,233,0.18);
+  color: #0369a1;
+}
+
+.admin-login-copy {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 18px;
+}
+
+.admin-login-card-minimal h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 42px;
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+}
+
+.admin-login-card-minimal p {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.admin-login-card-minimal .admin-login-form label {
+  color: #0369a1;
+}
+
+.admin-login-card-minimal .admin-login-form input {
+  height: 48px;
+  border-color: rgba(15,23,42,0.12);
+  background: rgba(255,255,255,0.62);
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+.admin-login-card-minimal .admin-login-form input::placeholder {
+  color: #64748b;
+}
+
+.admin-login-card-minimal .admin-login-form input:focus {
+  border-color: rgba(14,165,233,0.52);
+  box-shadow:
+    0 0 0 4px rgba(14,165,233,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+.admin-login-card-minimal .admin-login-form button {
+  height: 48px;
+  box-shadow: 0 14px 30px rgba(59,130,246,0.28);
+}
+
+.admin-login-card-minimal .admin-error {
+  border-color: rgba(239,68,68,0.25);
+  background: rgba(254,226,226,0.72);
+  color: #7f1d1d;
+}
+
+.admin-login-foot {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-login-foot > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-login-foot a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.38);
+  color: #334155;
+  text-decoration: none;
+  font-weight: 850;
+}
+
+.admin-login-orb {
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+  filter: blur(2px);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.admin-login-orb-a {
+  width: 180px;
+  height: 180px;
+  left: -64px;
+  top: -62px;
+  background: radial-gradient(circle, rgba(56,189,248,0.60), transparent 68%);
+}
+
+.admin-login-orb-b {
+  width: 220px;
+  height: 220px;
+  right: -86px;
+  bottom: -82px;
+  background: radial-gradient(circle, rgba(129,140,248,0.45), transparent 70%);
+}
+
+@media (max-width: 700px) {
+  .admin-root-login-only {
+    padding: 12px;
+  }
+
+  .admin-login-card-minimal {
+    border-radius: 28px;
+    padding: 20px;
+  }
+
+  .admin-login-card-minimal h1 {
+    font-size: 36px;
+  }
+}
+
 `
