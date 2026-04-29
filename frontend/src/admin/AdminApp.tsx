@@ -9,6 +9,7 @@ import {
   type AdminReactOverviewStage,
 } from '../shared/api'
 import type { PublicConfig } from '../types/player'
+import AdminMissionMap from './AdminMissionMap'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -257,15 +258,23 @@ export default function AdminApp() {
             <span style={statusPillOk}>{stages.length} nodes</span>
           </div>
 
-          <div style={nodeGrid}>
-            {stages.map((stage) => (
-              <NodeCard
-                key={`${stage.index}-${stage.id ?? stage.title}`}
-                stage={stage}
-                onOpen={() => setSelectedStage(stage)}
-              />
-            ))}
-            {stages.length === 0 ? <div style={muted}>No nodes found.</div> : null}
+          <div style={adminMapGrid}>
+            <AdminMissionMap
+              stages={stages}
+              selectedStage={selectedStage}
+              onSelectStage={setSelectedStage}
+            />
+
+            <div style={nodeGrid}>
+              {stages.map((stage) => (
+                <NodeCard
+                  key={`${stage.index}-${stage.id ?? stage.title}`}
+                  stage={stage}
+                  onOpen={() => setSelectedStage(stage)}
+                />
+              ))}
+              {stages.length === 0 ? <div style={muted}>No nodes found.</div> : null}
+            </div>
           </div>
         </section>
       ) : null}
@@ -816,6 +825,13 @@ const familyMiniIcon: CSSProperties = {
 const familyCountNumber: CSSProperties = {
   fontSize: 26,
   letterSpacing: '-0.06em',
+}
+
+const adminMapGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.55fr)',
+  gap: 14,
+  alignItems: 'stretch',
 }
 
 const nodeGrid: CSSProperties = {
