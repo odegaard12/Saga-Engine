@@ -119,7 +119,7 @@ export default function AdminApp() {
         }
 
         setOverview(payload)
-        setSelectedStage(payload.stages?.[0] || null)
+        setSelectedStage(null)
         setOverviewState('ready')
       })
       .catch((err) => {
@@ -256,7 +256,9 @@ export default function AdminApp() {
               <span className="admin-kicker">Route workspace</span>
               <h2>Mission map</h2>
             </div>
-            <div className="admin-topbar-pills">
+            <div className="admin-topbar-pills admin-cms-actions">
+              <button type="button" className="admin-cms-action primary">New node</button>
+              <button type="button" className="admin-cms-action">Manage players</button>
               <span className="pill ok">Live read model</span>
               <span className="pill neutral">{stages.length} nodes</span>
             </div>
@@ -296,12 +298,12 @@ export default function AdminApp() {
             </aside>
           </div>
 
-          <div className="admin-operator-strip">
+          <div className="admin-operator-strip admin-operator-strip-compact">
             <div>
-              <strong>Next capability</strong>
-              <span>Editable node drawer, safe save flow, node create/delete/reorder, then player/profile management.</span>
+              <strong>CMS mode coming next</strong>
+              <span>Select a node to inspect it. Editing, create/delete/reorder and player/team management come through the next save-flow PRs.</span>
             </div>
-            <span className="pill warn">Read-only for now</span>
+            <span className="pill warn">Inspect mode</span>
           </div>
         </section>
       </div>
@@ -1592,6 +1594,186 @@ const styles = `
   .admin-root:not(.admin-root-login-only) .admin-workspace-bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+
+/* Map-first CMS workspace tightening */
+.admin-root:not(.admin-root-login-only) .admin-console-layout {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar {
+  padding: 12px;
+  gap: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar h1 {
+  font-size: 20px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar p {
+  font-size: 12px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-stats {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat {
+  padding: 8px;
+  border-radius: 15px;
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat strong {
+  font-size: 16px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-stat small {
+  font-size: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace {
+  gap: 8px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar {
+  min-height: 58px;
+  padding: 10px 13px;
+  border-radius: 23px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar h2 {
+  font-size: 22px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area {
+  grid-template-columns: minmax(0, 1fr) 245px;
+  gap: 8px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area > section {
+  border-radius: 26px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-rail {
+  padding: 9px;
+  border-radius: 22px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-rail-head h3 {
+  font-size: 15px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-list {
+  max-height: calc(100vh - 168px);
+  gap: 7px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-card {
+  padding: 9px;
+  border-radius: 15px;
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-top {
+  gap: 8px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-top > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-meta {
+  grid-template-columns: 1fr;
+  gap: 3px;
+  margin-top: 7px;
+  font-size: 10px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-profile-card,
+.admin-root:not(.admin-root-login-only) .admin-family-row,
+.admin-root:not(.admin-root-login-only) .admin-muted {
+  border-radius: 15px;
+  padding: 9px;
+  box-shadow:
+    0 10px 24px rgba(15,23,42,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.52);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-profile-list,
+.admin-root:not(.admin-root-login-only) .admin-family-count-list {
+  gap: 7px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-family-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-family-row > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+}
+
+.admin-cms-actions {
+  align-items: center;
+}
+
+.admin-cms-action {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.52);
+  color: #334155;
+  font-weight: 900;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.admin-cms-action.primary {
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  color: #07111f;
+  border-color: transparent;
+  box-shadow: 0 10px 22px rgba(59,130,246,0.18);
+}
+
+.admin-operator-strip-compact {
+  min-height: 50px;
+  padding: 9px 12px !important;
+  border-radius: 18px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-operator-strip-compact span {
+  font-size: 11px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer {
+  width: min(520px, 100%);
+}
+
+@media (min-width: 1500px) {
+  .admin-root:not(.admin-root-login-only) .admin-console-layout {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-map-area {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .admin-root:not(.admin-root-login-only) .admin-map-area > section {
+    min-height: 620px !important;
   }
 }
 
