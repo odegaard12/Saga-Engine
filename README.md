@@ -728,3 +728,5 @@ Longer-term, SAGA can evolve into:
 ## License
 
 MIT recommended.
+
+- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, left CMS rail, map-first workspace and node detail drawer
