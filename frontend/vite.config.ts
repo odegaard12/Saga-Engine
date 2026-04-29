@@ -1,28 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backend = 'http://127.0.0.1:8097'
+
 export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
     port: 5173,
+    strictPort: true,
+    allowedHosts: [
+      'sagaengine.odegaard12.es',
+      '192.168.68.103',
+      'localhost',
+      '127.0.0.1',
+    ],
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8097',
+        target: backend,
+        changeOrigin: true,
+      },
+      '^/admin(?:/|$)': {
+        target: backend,
         changeOrigin: true,
       },
       '/player': {
-        target: 'http://127.0.0.1:8097',
+        target: backend,
         changeOrigin: true,
-      },
-      '/admin': {
-        target: 'http://127.0.0.1:8097',
-        changeOrigin: true,
-      },
-      '/legacy': {
-        target: 'http://127.0.0.1:8097',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/legacy/, ''),
       },
     },
   },
