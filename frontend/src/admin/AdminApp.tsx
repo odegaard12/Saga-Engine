@@ -211,6 +211,68 @@ export default function AdminApp() {
             <a href="/admin">Classic admin</a>
           </div>
 
+        <section className="admin-sidebar-cms">
+          <div className="admin-sidebar-section-head">
+            <span className="admin-kicker">Mission CMS</span>
+            <h3>Control panel</h3>
+          </div>
+
+          <div className="admin-sidebar-cms-actions">
+            <button type="button" className="admin-cms-side-action admin-cms-side-action--primary">
+              New node
+            </button>
+            <button type="button" className="admin-cms-side-action">
+              Manage players
+            </button>
+            <button type="button" className="admin-cms-side-action">
+              Edit labels
+            </button>
+            <button type="button" className="admin-cms-side-action">
+              Mission settings
+            </button>
+          </div>
+
+          <div className="admin-sidebar-cms-note">
+            Structure first: map-first CMS shell, left operator rail, right node drawer on selection.
+          </div>
+        </section>
+
+        <section className="admin-sidebar-cms">
+          <div className="admin-sidebar-section-head">
+            <span className="admin-kicker">Route</span>
+            <h3>Nodes</h3>
+          </div>
+
+          <div className="admin-sidebar-node-list">
+            {stages.map((stage) => {
+              const active = selectedStage?.index === stage.index
+              const key = `${stage.index}-${stage.id ?? stage.title}`
+              const radiusLabel =
+                typeof stage.radius === 'number' && stage.radius > 0 ? `${stage.radius}m` : 'no radius'
+
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  className={`admin-sidebar-node-item${active ? ' active' : ''}`}
+                  onClick={() => setSelectedStage(stage)}
+                >
+                  <span>{stage.index + 1}</span>
+                  <div>
+                    <strong>{stage.title || 'Untitled node'}</strong>
+                    <small>{stage.label || stage.type} · {radiusLabel}</small>
+                  </div>
+                </button>
+              )
+            })}
+
+            {stages.length === 0 ? (
+              <div className="admin-sidebar-empty">No nodes yet.</div>
+            ) : null}
+          </div>
+        </section>
+
+
           <div className="admin-sidebar-stats">
             {stats.map((item) => (
               <StatCard key={item.label} item={item} compact />
@@ -1776,5 +1838,305 @@ const styles = `
     min-height: 620px !important;
   }
 }
+
+
+/* Legacy operator shell pass */
+.admin-root:not(.admin-root-login-only) {
+  height: 100vh;
+  overflow: hidden;
+  padding: 10px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(16,185,129,0.12), transparent 28%),
+    radial-gradient(circle at 84% 10%, rgba(59,130,246,0.10), transparent 30%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 58%, #111827 100%);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-console-layout {
+  height: calc(100vh - 20px) !important;
+  min-height: 0 !important;
+  grid-template-columns: 340px minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  padding: 14px !important;
+  gap: 12px !important;
+  border-radius: 28px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)),
+    rgba(17,24,39,0.74) !important;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar .admin-brand {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  border-radius: 18px !important;
+  font-size: 11px !important;
+  letter-spacing: 0.22em !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: #86efac !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.04 !important;
+  letter-spacing: -0.05em !important;
+  color: #f8fafc !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) p {
+  color: rgba(255,255,255,0.46) !important;
+  font-size: 12px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions a {
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 12px !important;
+  border-radius: 14px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-decoration: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-stats,
+.admin-root:not(.admin-root-login-only) .admin-sidebar .admin-disclosure {
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+    rgba(255,255,255,0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 12px 30px rgba(0,0,0,0.18);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #e5e7eb;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--primary {
+  background: linear-gradient(135deg, rgba(16,185,129,0.28), rgba(14,165,233,0.22));
+  color: #f8fafc;
+  border-color: rgba(110,231,183,0.22);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  color: rgba(255,255,255,0.50);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item.active {
+  background: rgba(59,130,246,0.16);
+  border-color: rgba(96,165,250,0.26);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.10);
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255,255,255,0.54);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-empty {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.50);
+  font-size: 11px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace {
+  height: 100% !important;
+  min-height: 0 !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-workspace-bar,
+.admin-root:not(.admin-root-login-only) .admin-topbar-pills,
+.admin-root:not(.admin-root-login-only) .admin-operator-strip,
+.admin-root:not(.admin-root-login-only) .admin-operator-strip-compact,
+.admin-root:not(.admin-root-login-only) .admin-node-rail {
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-area > section:first-child {
+  height: 100% !important;
+  min-height: 0 !important;
+  border-radius: 28px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03)),
+    rgba(255,255,255,0.03) !important;
+  box-shadow:
+    0 22px 60px rgba(0,0,0,0.24),
+    inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer {
+  width: min(480px, calc(100vw - 28px)) !important;
+  border-left: 1px solid rgba(255,255,255,0.08) !important;
+  background:
+    linear-gradient(180deg, rgba(17,24,39,0.92), rgba(17,24,39,0.96)) !important;
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-head,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body {
+  padding: 16px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-detail-grid {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-detail-item,
+.admin-root:not(.admin-root-login-only) .admin-detail-block {
+  border-radius: 16px !important;
+  padding: 12px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: rgba(255,255,255,0.03) !important;
+}
+
+@media (max-width: 1180px) {
+  .admin-root:not(.admin-root-login-only) {
+    height: auto;
+    overflow: auto;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-console-layout {
+    height: auto !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-sidebar {
+    height: auto !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-map-area > section:first-child {
+    min-height: 72vh !important;
+  }
+}
+
 
 `
