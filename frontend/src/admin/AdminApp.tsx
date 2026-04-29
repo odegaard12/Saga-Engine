@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
 
+import AdminMissionMap from './AdminMissionMap'
 import {
   fetchAdminReactOverview,
   fetchPublicConfig,
@@ -9,7 +9,6 @@ import {
   type AdminReactOverviewStage,
 } from '../shared/api'
 import type { PublicConfig } from '../types/player'
-import AdminMissionMap from './AdminMissionMap'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -25,19 +24,19 @@ const familyCards: Array<{
     id: 'signal_hunt',
     icon: '📡',
     title: 'Signal Hunt',
-    detail: 'Proximity, GPS lock, signal capture, hot/cold search.',
+    detail: 'GPS proximity, signal strength and source capture.',
   },
   {
     id: 'bearing_hunt',
     icon: '🧭',
     title: 'Bearing Hunt',
-    detail: 'Compass, orientation, heading lock, sector scan.',
+    detail: 'Compass heading, sector lock and orientation capture.',
   },
   {
     id: 'circuit_matrix',
     icon: '🧩',
     title: 'Circuit Matrix',
-    detail: 'Logic grids, route repair, power balance, sequence boards.',
+    detail: 'Logic grids, route repair and lock-style board puzzles.',
   },
 ]
 
@@ -77,6 +76,9 @@ export default function AdminApp() {
   const familyCounts = overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
 
+  const title = overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
+  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
+
   const stats = useMemo(() => {
     const counts = overview?.counts
     const cfg = overview?.config || config
@@ -88,20 +90,17 @@ export default function AdminApp() {
     const mapZoom = cfg?.map_zoom ?? '—'
 
     return [
-      { label: 'Players', value: String(players), detail: 'Simple player list' },
+      { label: 'Players', value: String(players), detail: 'Configured entries' },
       { label: 'Profiles', value: String(profileCount), detail: `${finished} finished` },
-      { label: 'Nodes', value: String(stageCount), detail: 'Runtime route model' },
+      { label: 'Nodes', value: String(stageCount), detail: 'Route model' },
       { label: 'Map', value: mapCenter, detail: `Zoom ${mapZoom}` },
-      { label: 'Theme', value: cfg?.player_theme || 'default', detail: 'Player visual theme' },
+      { label: 'Theme', value: cfg?.player_theme || 'classic', detail: 'Player shell' },
     ]
   }, [config, overview])
 
-  const title = overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
-  const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'React Mission Control shell'
-
   function loadOverview() {
     if (!password.trim()) {
-      setOverviewError('Enter the admin password to unlock the read-only Mission Control view.')
+      setOverviewError('Enter the admin password to unlock Mission Control.')
       setOverviewState('error')
       return
     }
@@ -113,17 +112,19 @@ export default function AdminApp() {
       .then((payload) => {
         if (payload.status !== 'ok') {
           setOverview(null)
+          setSelectedStage(null)
           setOverviewError(payload.message || 'Admin overview unavailable')
           setOverviewState('error')
           return
         }
 
         setOverview(payload)
-        setSelectedStage(null)
+        setSelectedStage(payload.stages?.[0] || null)
         setOverviewState('ready')
       })
       .catch((err) => {
         setOverview(null)
+        setSelectedStage(null)
         setOverviewError(err instanceof Error ? err.message : 'Unknown error')
         setOverviewState('error')
       })
@@ -134,150 +135,192 @@ export default function AdminApp() {
     loadOverview()
   }
 
-  return (
-    <main style={page}>
-      <section style={hero}>
-        <div style={heroTopline}>SAGA ENGINE · MISSION CONTROL</div>
-        <h1 style={heroTitle}>{title}</h1>
-        <p style={heroSubtitle}>{subtitle}</p>
+  if (!overviewReady) {
+    return (
+      <main className="admin-root">
+        <style>{styles}</style>
 
-        <div style={actions}>
-          <a href="/admin" style={primaryButton}>Open current admin</a>
-          <a href="/" style={secondaryButton}>Open player entry</a>
-          <a href="/api/config" style={secondaryButton}>View public config</a>
-        </div>
-      </section>
-
-      {state === 'loading' ? <section style={panel}>Loading mission config…</section> : null}
-
-      {state === 'error' ? (
-        <section style={errorPanel}>
-          <strong>Could not load public config.</strong>
-          <span>{error}</span>
-        </section>
-      ) : null}
-
-      <section style={grid}>
-        {stats.map((item) => (
-          <article key={item.label} style={card}>
-            <div style={cardLabel}>{item.label}</div>
-            <div style={cardValue}>{item.value}</div>
-            <div style={cardDetail}>{item.detail}</div>
-          </article>
-        ))}
-      </section>
-
-      <section style={section}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={sectionKicker}>Read-only operator view</div>
-            <h2 style={sectionTitle}>Mission Control</h2>
-          </div>
-          <span style={overviewReady ? statusPillOk : statusPillWarn}>
-            {overviewReady ? 'Read-only live view' : 'Password required'}
-          </span>
-        </div>
-
-        <form onSubmit={handleOverviewSubmit} style={unlockForm}>
-          <input
-            type="password"
-            value={password}
-            placeholder="Admin password"
-            onChange={(event) => setPassword(event.target.value)}
-            style={passwordInput}
-          />
-          <button type="submit" style={primaryButton} disabled={overviewState === 'loading'}>
-            {overviewState === 'loading' ? 'Loading…' : overviewReady ? 'Refresh Mission Control' : 'Load Mission Control'}
-          </button>
-        </form>
-
-        {overviewReady ? (
-          <div style={inlineNotice}>Read-only data loaded. Use the current admin for edits and refresh this view after changes.</div>
-        ) : null}
-
-        {overviewState === 'error' ? (
-          <div style={errorPanel}>
-            <strong>Overview unavailable.</strong>
-            <span>{overviewError}</span>
-          </div>
-        ) : null}
-
-        {overviewReady ? (
-          <div style={controlGrid}>
-            <article style={controlPanel}>
-              <div style={panelTitleRow}>
-                <h3 style={smallTitle}>Profiles</h3>
-                <span style={miniBadge}>{profiles.length}</span>
-              </div>
-
-              <div style={profileGrid}>
-                {profiles.map((profile) => (
-                  <ProfileCard key={profile.id} profile={profile} />
-                ))}
-                {profiles.length === 0 ? <div style={muted}>No profiles found.</div> : null}
-              </div>
-            </article>
-
-            <article style={controlPanel}>
-              <div style={panelTitleRow}>
-                <h3 style={smallTitle}>Family distribution</h3>
-                <span style={miniBadge}>Runtime</span>
-              </div>
-
-              <div style={familyCountList}>
-                {familyCards.map((family) => (
-                  <div key={family.id} style={familyCountRow}>
-                    <div style={familyCountLeft}>
-                      <span style={familyMiniIcon}>{family.icon}</span>
-                      <div>
-                        <strong>{family.title}</strong>
-                        <div style={mutedSmall}>{family.id}</div>
-                      </div>
-                    </div>
-                    <strong style={familyCountNumber}>{familyCounts[family.id] || 0}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </div>
-        ) : (
-          <div style={lockedPanel}>
-            <strong>Mission Control is locked.</strong>
-            <span>Enter the admin password to load profiles, route nodes, family counts, GPS state and progression.</span>
-          </div>
-        )}
-      </section>
-
-      {overviewReady ? (
-        <section style={section}>
-          <div style={sectionHeader}>
+        <div className="admin-login-layout">
+          <aside className="admin-login-card">
+            <div className="admin-brand">SAGA ENGINE · ADMIN</div>
             <div>
-              <div style={sectionKicker}>Route model</div>
-              <h2 style={sectionTitle}>Nodes</h2>
+              <h1>Mission Control</h1>
+              <p>{title} · {subtitle}</p>
             </div>
-            <span style={statusPillOk}>{stages.length} nodes</span>
+
+            <form onSubmit={handleOverviewSubmit} className="admin-login-form">
+              <label>Admin password</label>
+              <input
+                type="password"
+                value={password}
+                placeholder="Enter admin password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button type="submit" disabled={overviewState === 'loading'}>
+                {overviewState === 'loading' ? 'Unlocking…' : 'Unlock Mission Control'}
+              </button>
+            </form>
+
+            {overviewState === 'error' ? (
+              <div className="admin-error">
+                <strong>Unlock failed</strong>
+                <span>{overviewError}</span>
+              </div>
+            ) : null}
+
+            {state === 'error' ? (
+              <div className="admin-error">
+                <strong>Public config unavailable</strong>
+                <span>{error}</span>
+              </div>
+            ) : null}
+
+            <div className="admin-link-row">
+              <a href="/admin">Classic admin</a>
+              <a href="/">Player entry</a>
+              <a href="/api/config">Public config</a>
+            </div>
+          </aside>
+
+          <section className="admin-locked-workspace">
+            <div className="admin-workspace-bar">
+              <div>
+                <span className="admin-kicker">Protected command surface</span>
+                <h2>Admin console locked</h2>
+              </div>
+              <span className="pill warn">Password required</span>
+            </div>
+
+            <div className="admin-locked-map">
+              <div className="admin-grid-bg" />
+              <div className="admin-locked-message">
+                <strong>Map-first editor is protected.</strong>
+                <span>Unlock to load profiles, live status, route nodes, node map, family counts and operator actions.</span>
+              </div>
+            </div>
+
+            <div className="admin-stat-grid">
+              {stats.map((item) => (
+                <StatCard key={item.label} item={item} />
+              ))}
+            </div>
+
+            <div className="admin-family-compact-grid">
+              {familyCards.map((family) => (
+                <div key={family.id} className="admin-family-compact">
+                  <span>{family.icon}</span>
+                  <div>
+                    <strong>{family.title}</strong>
+                    <small>{family.detail}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="admin-root">
+      <style>{styles}</style>
+
+      <div className="admin-console-layout">
+        <aside className="admin-sidebar">
+          <div className="admin-brand">SAGA ENGINE · MISSION CONTROL</div>
+          <div>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
           </div>
 
-          <div style={adminMapGrid}>
+          <div className="admin-sidebar-actions">
+            <button type="button" onClick={loadOverview}>Refresh live view</button>
+            <a href="/admin">Classic admin</a>
+          </div>
+
+          <div className="admin-sidebar-stats">
+            {stats.map((item) => (
+              <StatCard key={item.label} item={item} compact />
+            ))}
+          </div>
+
+          <SectionHeader title="Profiles" count={profiles.length} />
+
+          <div className="admin-profile-list">
+            {profiles.map((profile) => (
+              <ProfileCard key={profile.id} profile={profile} />
+            ))}
+            {profiles.length === 0 ? <div className="admin-muted">No profiles found.</div> : null}
+          </div>
+
+          <SectionHeader title="Families" count={familyCards.length} />
+
+          <div className="admin-family-count-list">
+            {familyCards.map((family) => (
+              <div key={family.id} className="admin-family-row">
+                <span>{family.icon}</span>
+                <div>
+                  <strong>{family.title}</strong>
+                  <small>{family.id}</small>
+                </div>
+                <b>{familyCounts[family.id] || 0}</b>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <section className="admin-workspace">
+          <div className="admin-workspace-bar">
+            <div>
+              <span className="admin-kicker">Route workspace</span>
+              <h2>Mission map</h2>
+            </div>
+            <div className="admin-topbar-pills">
+              <span className="pill ok">Live read model</span>
+              <span className="pill neutral">{stages.length} nodes</span>
+            </div>
+          </div>
+
+          <div className="admin-map-area">
             <AdminMissionMap
               stages={stages}
               selectedStage={selectedStage}
               onSelectStage={setSelectedStage}
             />
 
-            <div style={nodeGrid}>
-              {stages.map((stage) => (
-                <NodeCard
-                  key={`${stage.index}-${stage.id ?? stage.title}`}
-                  stage={stage}
-                  onOpen={() => setSelectedStage(stage)}
-                />
-              ))}
-              {stages.length === 0 ? <div style={muted}>No nodes found.</div> : null}
+            <aside className="admin-node-rail">
+              <div className="admin-node-rail-head">
+                <div>
+                  <span className="admin-kicker">Nodes</span>
+                  <h3>Route sequence</h3>
+                </div>
+                <span className="pill neutral">{stages.length}</span>
+              </div>
+
+              <div className="admin-node-list">
+                {stages.map((stage) => (
+                  <NodeCard
+                    key={`${stage.index}-${stage.id ?? stage.title}`}
+                    stage={stage}
+                    selected={selectedStage?.index === stage.index}
+                    onOpen={() => setSelectedStage(stage)}
+                  />
+                ))}
+                {stages.length === 0 ? <div className="admin-muted">No nodes found.</div> : null}
+              </div>
+            </aside>
+          </div>
+
+          <div className="admin-operator-strip">
+            <div>
+              <strong>Next capability</strong>
+              <span>Editable node drawer, safe save flow, node create/delete/reorder, then player/profile management.</span>
             </div>
+            <span className="pill warn">Read-only for now</span>
           </div>
         </section>
-      ) : null}
+      </div>
 
       {selectedStage ? (
         <NodeDetailDrawer
@@ -285,80 +328,67 @@ export default function AdminApp() {
           onClose={() => setSelectedStage(null)}
         />
       ) : null}
-
-      <section style={section}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={sectionKicker}>Runtime policy</div>
-            <h2 style={sectionTitle}>Family-native minigames</h2>
-          </div>
-          <span style={statusPillOk}>Active path</span>
-        </div>
-
-        <div style={familyGrid}>
-          {familyCards.map((family) => (
-            <article key={family.id} style={familyCard}>
-              <div style={familyIcon}>{family.icon}</div>
-              <div>
-                <h3 style={familyTitle}>{family.title}</h3>
-                <p style={familyDetail}>{family.detail}</p>
-                <code style={codePill}>{family.id}</code>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section style={section}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={sectionKicker}>Next build area</div>
-            <h2 style={sectionTitle}>React admin roadmap</h2>
-          </div>
-        </div>
-
-        <div style={roadmap}>
-          <div style={roadmapItem}>1 · Mission Control read-only cards</div>
-          <div style={roadmapItem}>2 · React node detail drawer polish and admin-style layout</div>
-          <div style={roadmapItem}>3 · Family schema config editor</div>
-          <div style={roadmapItem}>4 · Safe save flow through existing admin APIs</div>
-        </div>
-      </section>
     </main>
+  )
+}
+
+function StatCard({
+  item,
+  compact = false,
+}: {
+  item: { label: string; value: string; detail: string }
+  compact?: boolean
+}) {
+  return (
+    <article className={compact ? 'admin-stat compact' : 'admin-stat'}>
+      <span>{item.label}</span>
+      <strong>{item.value}</strong>
+      <small>{item.detail}</small>
+    </article>
+  )
+}
+
+function SectionHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <div className="admin-section-head">
+      <h2>{title}</h2>
+      <span className="pill neutral">{count}</span>
+    </div>
   )
 }
 
 function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
   const finished = Boolean(profile.finished)
-  const levelLabel = finished ? 'Finished' : `Level ${profile.level ?? 0}`
   const gps = String(profile.gps_status || 'unknown')
   const lastSeen = formatLastSeen(profile.last_seen)
 
   return (
-    <article style={profileCard}>
-      <div style={profileTop}>
-        <div>
-          <div style={profileName}>{profile.display_name || profile.id}</div>
-          <div style={profileMeta}>{profile.mode || 'solo'} · {profile.status || 'active'}</div>
-        </div>
-        <span style={finished ? badgeOk : badgeNeutral}>{levelLabel}</span>
+    <article className="admin-profile-card">
+      <div>
+        <strong>{profile.display_name || profile.id}</strong>
+        <small>{profile.mode || 'solo'} · {profile.status || 'active'}</small>
       </div>
 
-      <div style={profileSignals}>
-        <span style={gpsBadgeStyle(gps)}>GPS {gps}</span>
-        <span style={badgeNeutral}>{profile.presence || 'unknown'}</span>
+      <div className="admin-badge-row">
+        <span className={finished ? 'pill ok' : 'pill neutral'}>
+          {finished ? 'Finished' : `Level ${profile.level ?? 0}`}
+        </span>
+        <span className={gpsClass(gps)}>GPS {gps}</span>
+        <span className="pill neutral">{profile.presence || 'unknown'}</span>
       </div>
 
-      <div style={profileFooter}>{lastSeen}</div>
+      <small>{lastSeen}</small>
     </article>
   )
 }
 
 function NodeCard({
   stage,
+  selected,
   onOpen,
 }: {
   stage: AdminReactOverviewStage
+  selected: boolean
   onOpen: () => void
 }) {
   const radius = stage.radius ?? 50
@@ -366,37 +396,19 @@ function NodeCard({
   const coords = formatCoords(stage.lat, stage.lon)
 
   return (
-    <button type="button" style={nodeCardButton} onClick={onOpen}>
-      <div style={nodeCardTop}>
-        <div style={nodeIndex}>{stage.index + 1}</div>
+    <button type="button" className={selected ? 'admin-node-card selected' : 'admin-node-card'} onClick={onOpen}>
+      <div className="admin-node-top">
+        <span>{stage.index + 1}</span>
         <div>
-          <div style={nodeTitle}>{stage.title}</div>
-          <div style={nodeMeta}>{family?.icon || '◇'} {stage.label || stage.type}</div>
+          <strong>{stage.title || 'Untitled node'}</strong>
+          <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
         </div>
       </div>
 
-      <div style={nodeInfoGrid}>
-        <div>
-          <div style={tinyLabel}>Entry</div>
-          <strong>{stage.entry_mode || 'gps'}</strong>
-        </div>
-        <div>
-          <div style={tinyLabel}>Radius</div>
-          <strong>{radius}m</strong>
-        </div>
-        <div>
-          <div style={tinyLabel}>Coords</div>
-          <strong>{coords}</strong>
-        </div>
-      </div>
-
-      <div style={nodeBadges}>
-        {stage.has_hint ? <span style={miniBadge}>Hint</span> : null}
-        {stage.has_manual_fallback ? <span style={miniBadge}>Fallback</span> : null}
-        <span style={stage.require_proximity ? badgeOk : badgeNeutral}>
-          {stage.require_proximity ? 'GPS gated' : 'Free entry'}
-        </span>
-        <span style={miniBadge}>Open details</span>
+      <div className="admin-node-meta">
+        <span>{stage.entry_mode || 'gps'}</span>
+        <span>{radius}m</span>
+        <span>{coords}</span>
       </div>
     </button>
   )
@@ -412,73 +424,66 @@ function NodeDetailDrawer({
   const radius = stage.radius ?? 50
   const family = familyCards.find((item) => item.id === stage.type)
   const coords = formatCoords(stage.lat, stage.lon)
-  const configSummary = stage.config_summary || []
   const messages = stage.messages || {}
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  const configSummary = stage.config_summary || []
 
   return (
-    <div style={drawerOverlay} onClick={onClose} role="presentation">
+    <div className="admin-drawer-overlay" onClick={onClose} role="presentation">
       <aside
-        style={drawer}
+        className="admin-drawer"
         role="dialog"
         aria-modal="true"
         aria-label={`Node detail: ${stage.title}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={drawerHeader}>
+        <div className="admin-drawer-head">
           <div>
-            <div style={sectionKicker}>Node detail · read-only</div>
-            <h2 style={drawerTitle}>{stage.index + 1}. {stage.title}</h2>
-            <div style={nodeMeta}>{family?.icon || '◇'} {stage.label || stage.type}</div>
+            <span className="admin-kicker">Node detail · read-only</span>
+            <h2>{stage.index + 1}. {stage.title || 'Untitled node'}</h2>
+            <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
           </div>
-          <button type="button" style={drawerClose} onClick={onClose} aria-label="Close node detail">Close</button>
+          <button type="button" onClick={onClose}>Close</button>
         </div>
 
-        <div style={drawerBody}>
-          <div style={detailGrid}>
+        <div className="admin-drawer-body">
+          <div className="admin-detail-grid">
             <DetailItem label="Family" value={stage.type} />
-            <DetailItem label="Entry mode" value={stage.entry_mode || 'gps'} />
+            <DetailItem label="Entry" value={stage.entry_mode || 'gps'} />
             <DetailItem label="Radius" value={`${radius}m`} />
             <DetailItem label="Coordinates" value={coords} />
-            <DetailItem label="Objective" value={stage.objective || '—'} />
             <DetailItem label="Access" value={stage.require_proximity ? 'GPS gated' : 'Free entry'} />
+            <DetailItem label="Objective" value={stage.objective || '—'} />
           </div>
 
-          <section style={detailBlock}>
-            <div style={tinyLabel}>Player-facing content</div>
-            <p style={detailText}>{stage.content || 'No content configured.'}</p>
+          <section className="admin-detail-block">
+            <span>Player content</span>
+            <p>{stage.content || 'No content configured.'}</p>
           </section>
 
-          <section style={detailBlock}>
-            <div style={tinyLabel}>Messages</div>
-            <div style={messageList}>
-              <DetailItem label="Hint" value={messages.hint || '—'} />
-              <DetailItem label="GPS unavailable" value={messages.gps_unavailable || '—'} />
-              <DetailItem label="Locked" value={messages.locked || '—'} />
-            </div>
+          <section className="admin-detail-block">
+            <span>Messages</span>
+            <DetailItem label="Hint" value={messages.hint || '—'} />
+            <DetailItem label="GPS unavailable" value={messages.gps_unavailable || '—'} />
+            <DetailItem label="Locked" value={messages.locked || '—'} />
           </section>
 
-          <section style={detailBlock}>
-            <div style={tinyLabel}>Config keys</div>
-            <div style={chipWrap}>
+          <section className="admin-detail-block">
+            <span>Config keys</span>
+            <div className="admin-chip-wrap">
               {configSummary.length ? (
-                configSummary.map((key) => <code key={key} style={codePill}>{key}</code>)
+                configSummary.map((key) => <code key={key}>{key}</code>)
               ) : (
-                <span style={muted}>No config keys.</span>
+                <small>No config keys.</small>
               )}
             </div>
           </section>
 
-          <div style={inlineNotice}>
-            This drawer is read-only. Editing will come later through the React node editor and safe save flow.
+          <div className="admin-operator-strip">
+            <div>
+              <strong>Editor pending</strong>
+              <span>Next PR should add local editing here before save APIs.</span>
+            </div>
+            <span className="pill warn">Read-only</span>
           </div>
         </div>
       </aside>
@@ -488,9 +493,9 @@ function NodeDetailDrawer({
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div style={detailItem}>
-      <div style={detailLabel}>{label}</div>
-      <div style={detailValue}>{value}</div>
+    <div className="admin-detail-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   )
 }
@@ -529,633 +534,605 @@ function formatLastSeen(value?: number | string | null) {
   return `Seen ${Math.floor(delta / 86400)} d ago`
 }
 
-function gpsBadgeStyle(gps: string): CSSProperties {
+function gpsClass(gps: string) {
   const normalized = gps.toLowerCase()
-  if (normalized === 'ok' || normalized === 'ready') return badgeOk
-  if (normalized === 'searching' || normalized === 'stale') return badgeWarn
-  return badgeNeutral
+  if (normalized === 'ok' || normalized === 'ready') return 'pill ok'
+  if (normalized === 'searching' || normalized === 'stale') return 'pill warn'
+  return 'pill neutral'
 }
 
-const page: CSSProperties = {
-  minHeight: '100vh',
-  padding: '24px',
-  color: '#e5eefc',
+const styles = `
+* {
+  box-sizing: border-box;
+}
+
+.admin-root {
+  min-height: 100vh;
+  padding: 14px;
+  color: #e5eefc;
   background:
-    'radial-gradient(circle at top left, rgba(56,189,248,0.20), transparent 34%), radial-gradient(circle at top right, rgba(168,85,247,0.16), transparent 30%), #05070d',
-  fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-}
-
-const hero: CSSProperties = {
-  maxWidth: 1180,
-  margin: '0 auto 18px',
-  padding: 24,
-  border: '1px solid rgba(148,163,184,0.24)',
-  borderRadius: 28,
-  background: 'linear-gradient(135deg, rgba(15,23,42,0.90), rgba(15,23,42,0.62))',
-  boxShadow: '0 22px 70px rgba(0,0,0,0.42)',
-  backdropFilter: 'blur(18px)',
-}
-
-const heroTopline: CSSProperties = {
-  fontSize: 12,
-  letterSpacing: '0.22em',
-  color: '#7dd3fc',
-  textTransform: 'uppercase',
-  fontWeight: 800,
-}
-
-const heroTitle: CSSProperties = {
-  margin: '10px 0 8px',
-  fontSize: 'clamp(34px, 6vw, 68px)',
-  lineHeight: 0.95,
-  letterSpacing: '-0.06em',
-}
-
-const heroSubtitle: CSSProperties = {
-  margin: 0,
-  color: '#b6c3d8',
-  fontSize: 17,
-  maxWidth: 720,
-  lineHeight: 1.55,
-}
-
-const actions: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 10,
-  marginTop: 22,
-}
-
-const primaryButton: CSSProperties = {
-  minHeight: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 16px',
-  border: 0,
-  borderRadius: 999,
-  background: 'linear-gradient(135deg, #38bdf8, #818cf8)',
-  color: '#020617',
-  fontWeight: 900,
-  textDecoration: 'none',
-  cursor: 'pointer',
-}
-
-const secondaryButton: CSSProperties = {
-  minHeight: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 16px',
-  borderRadius: 999,
-  border: '1px solid rgba(148,163,184,0.28)',
-  color: '#dbeafe',
-  background: 'rgba(15,23,42,0.62)',
-  textDecoration: 'none',
-  fontWeight: 800,
-}
-
-const grid: CSSProperties = {
-  maxWidth: 1180,
-  margin: '0 auto 18px',
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-  gap: 14,
-}
-
-const card: CSSProperties = {
-  padding: 18,
-  borderRadius: 22,
-  border: '1px solid rgba(148,163,184,0.22)',
-  background: 'rgba(15,23,42,0.68)',
-  boxShadow: '0 14px 42px rgba(0,0,0,0.25)',
-}
-
-const cardLabel: CSSProperties = {
-  color: '#94a3b8',
-  fontSize: 12,
-  textTransform: 'uppercase',
-  letterSpacing: '0.14em',
-  fontWeight: 800,
-}
-
-const cardValue: CSSProperties = {
-  marginTop: 8,
-  fontSize: 24,
-  fontWeight: 950,
-  letterSpacing: '-0.04em',
-  wordBreak: 'break-word',
+    radial-gradient(circle at 0% 0%, rgba(56,189,248,0.18), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(34,197,94,0.12), transparent 30%),
+    #020617;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.admin-login-layout,
+.admin-console-layout {
+  min-height: calc(100vh - 28px);
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 14px;
 }
-
-const cardDetail: CSSProperties = {
-  marginTop: 4,
-  color: '#94a3b8',
-  fontSize: 13,
-}
-
-const section: CSSProperties = {
-  maxWidth: 1180,
-  margin: '0 auto 18px',
-  padding: 20,
-  borderRadius: 26,
-  border: '1px solid rgba(148,163,184,0.22)',
-  background: 'rgba(15,23,42,0.62)',
-  boxShadow: '0 18px 52px rgba(0,0,0,0.28)',
-}
-
-const sectionHeader: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 14,
-  marginBottom: 16,
-}
-
-const sectionKicker: CSSProperties = {
-  fontSize: 11,
-  color: '#7dd3fc',
-  textTransform: 'uppercase',
-  letterSpacing: '0.18em',
-  fontWeight: 900,
-}
-
-const sectionTitle: CSSProperties = {
-  margin: '4px 0 0',
-  fontSize: 24,
-  letterSpacing: '-0.04em',
-}
-
-const statusPillOk: CSSProperties = {
-  padding: '8px 10px',
-  borderRadius: 999,
-  background: 'rgba(34,197,94,0.14)',
-  border: '1px solid rgba(34,197,94,0.26)',
-  color: '#bbf7d0',
-  fontSize: 12,
-  fontWeight: 900,
-}
-
-const statusPillWarn: CSSProperties = {
-  ...statusPillOk,
-  background: 'rgba(251,191,36,0.12)',
-  border: '1px solid rgba(251,191,36,0.24)',
-  color: '#fde68a',
-}
-
-const unlockForm: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 10,
-  marginBottom: 14,
-}
-
-const passwordInput: CSSProperties = {
-  minHeight: 42,
-  flex: '1 1 240px',
-  borderRadius: 999,
-  border: '1px solid rgba(148,163,184,0.28)',
-  background: 'rgba(2,6,23,0.62)',
-  color: '#e5eefc',
-  padding: '0 14px',
-  outline: 'none',
-}
-
-const inlineNotice: CSSProperties = {
-  marginBottom: 14,
-  color: '#94a3b8',
-  fontSize: 13,
-}
-
-const controlGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.35fr) minmax(260px, 0.65fr)',
-  gap: 14,
-}
-
-const controlPanel: CSSProperties = {
-  padding: 16,
-  borderRadius: 20,
-  border: '1px solid rgba(148,163,184,0.18)',
-  background: 'rgba(2,6,23,0.36)',
-}
-
-const panelTitleRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  marginBottom: 12,
-}
-
-const profileGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-  gap: 10,
-}
-
-const profileCard: CSSProperties = {
-  padding: 14,
-  borderRadius: 18,
-  border: '1px solid rgba(148,163,184,0.16)',
-  background: 'rgba(15,23,42,0.58)',
-}
-
-const profileTop: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 10,
-}
-
-const profileName: CSSProperties = {
-  fontWeight: 950,
-  letterSpacing: '-0.03em',
-}
-
-const profileMeta: CSSProperties = {
-  marginTop: 3,
-  color: '#94a3b8',
-  fontSize: 12,
-}
-
-const profileSignals: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-  marginTop: 12,
-}
-
-const profileFooter: CSSProperties = {
-  marginTop: 10,
-  color: '#94a3b8',
-  fontSize: 12,
-}
-
-const familyCountList: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
-
-const familyCountRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: 12,
-  borderRadius: 16,
-  border: '1px solid rgba(148,163,184,0.14)',
-  background: 'rgba(15,23,42,0.5)',
-}
-
-const familyCountLeft: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-}
-
-const familyMiniIcon: CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 12,
-  display: 'grid',
-  placeItems: 'center',
-  background: 'rgba(56,189,248,0.12)',
-}
-
-const familyCountNumber: CSSProperties = {
-  fontSize: 26,
-  letterSpacing: '-0.06em',
-}
-
-const adminMapGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.55fr)',
-  gap: 14,
-  alignItems: 'stretch',
-}
-
-const nodeGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-  gap: 12,
-}
-
-const nodeCard: CSSProperties = {
-  padding: 15,
-  borderRadius: 20,
-  border: '1px solid rgba(148,163,184,0.16)',
-  background: 'rgba(2,6,23,0.34)',
-}
-
-const nodeCardButton: CSSProperties = {
-  ...nodeCard,
-  width: '100%',
-  color: 'inherit',
-  font: 'inherit',
-  textAlign: 'left',
-  cursor: 'pointer',
-}
-
-const nodeCardTop: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  marginBottom: 14,
-}
-
-const nodeIndex: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 14,
-  display: 'grid',
-  placeItems: 'center',
-  background: 'rgba(129,140,248,0.16)',
-  border: '1px solid rgba(129,140,248,0.22)',
-  fontWeight: 950,
-}
-
-const nodeTitle: CSSProperties = {
-  fontWeight: 950,
-  letterSpacing: '-0.03em',
-}
-
-const nodeMeta: CSSProperties = {
-  marginTop: 4,
-  color: '#94a3b8',
-  fontSize: 13,
-}
-
-const nodeInfoGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 8,
-  marginBottom: 12,
-  color: '#cbd5e1',
-  fontSize: 13,
-}
-
-const tinyLabel: CSSProperties = {
-  marginBottom: 4,
-  color: '#64748b',
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  fontWeight: 900,
-}
-
-const nodeBadges: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-}
-
-const badgeOk: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '5px 8px',
-  borderRadius: 999,
-  background: 'rgba(34,197,94,0.14)',
-  border: '1px solid rgba(34,197,94,0.24)',
-  color: '#bbf7d0',
-  fontSize: 12,
-  fontWeight: 850,
-}
-
-const badgeWarn: CSSProperties = {
-  ...badgeOk,
-  background: 'rgba(251,191,36,0.12)',
-  border: '1px solid rgba(251,191,36,0.24)',
-  color: '#fde68a',
-}
-
-const badgeNeutral: CSSProperties = {
-  ...badgeOk,
-  background: 'rgba(148,163,184,0.13)',
-  border: '1px solid rgba(148,163,184,0.18)',
-  color: '#cbd5e1',
-}
-
-const miniBadge: CSSProperties = {
-  ...badgeNeutral,
-  fontSize: 12,
-}
-
-const lockedPanel: CSSProperties = {
-  padding: 16,
-  borderRadius: 18,
-  display: 'grid',
-  gap: 6,
-  background: 'rgba(2,6,23,0.34)',
-  border: '1px solid rgba(148,163,184,0.18)',
-  color: '#cbd5e1',
-}
-
-const familyGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-  gap: 14,
-}
-
-const familyCard: CSSProperties = {
-  display: 'flex',
-  gap: 14,
-  padding: 16,
-  borderRadius: 20,
-  border: '1px solid rgba(148,163,184,0.2)',
-  background: 'rgba(2,6,23,0.32)',
-}
-
-const familyIcon: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 16,
-  display: 'grid',
-  placeItems: 'center',
-  background: 'rgba(56,189,248,0.13)',
-  fontSize: 22,
-}
-
-const familyTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 17,
-}
-
-const familyDetail: CSSProperties = {
-  margin: '5px 0 10px',
-  color: '#aab8ce',
-  fontSize: 13,
-  lineHeight: 1.45,
-}
-
-const codePill: CSSProperties = {
-  display: 'inline-flex',
-  padding: '5px 8px',
-  borderRadius: 999,
-  background: 'rgba(15,23,42,0.8)',
-  color: '#bae6fd',
-  fontSize: 12,
-}
-
-const smallTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 16,
-}
-
-const muted: CSSProperties = {
-  color: '#94a3b8',
-}
-
-const mutedSmall: CSSProperties = {
-  color: '#94a3b8',
-  fontSize: 12,
-}
-
-const roadmap: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
-
-const roadmapItem: CSSProperties = {
-  padding: 14,
-  borderRadius: 18,
-  border: '1px solid rgba(148,163,184,0.16)',
-  background: 'rgba(2,6,23,0.32)',
-  color: '#cbd5e1',
-  fontWeight: 750,
-}
-
-const panel: CSSProperties = {
-  maxWidth: 1180,
-  margin: '0 auto 18px',
-  padding: 18,
-  borderRadius: 20,
-  background: 'rgba(15,23,42,0.7)',
-  border: '1px solid rgba(148,163,184,0.22)',
-}
-
-
-const drawerOverlay: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 50,
-  display: 'flex',
-  justifyContent: 'flex-end',
-  background: 'rgba(2,6,23,0.62)',
-  backdropFilter: 'blur(10px)',
-}
-
-const drawer: CSSProperties = {
-  width: 'min(620px, 100vw)',
-  minHeight: '100vh',
-  padding: 22,
-  overflowY: 'auto',
-  borderLeft: '1px solid rgba(148,163,184,0.24)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(2,6,23,0.98))',
-  boxShadow: '-24px 0 70px rgba(0,0,0,0.45)',
-}
-
-const drawerHeader: CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 2,
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 14,
-  margin: '-22px -22px 18px',
-  padding: 22,
-  borderBottom: '1px solid rgba(148,163,184,0.16)',
-  background: 'rgba(15,23,42,0.94)',
-  backdropFilter: 'blur(14px)',
-}
-
-const drawerTitle: CSSProperties = {
-  margin: '6px 0 4px',
-  fontSize: 28,
-  letterSpacing: '-0.05em',
-  lineHeight: 1.05,
-}
-
-const drawerClose: CSSProperties = {
-  minHeight: 36,
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(148,163,184,0.24)',
-  background: 'rgba(15,23,42,0.86)',
-  color: '#dbeafe',
-  fontWeight: 900,
-  cursor: 'pointer',
-}
-
-const drawerBody: CSSProperties = {
-  display: 'grid',
-  gap: 14,
-}
-
-const detailGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: 10,
-}
-
-const detailBlock: CSSProperties = {
-  padding: 14,
-  borderRadius: 18,
-  border: '1px solid rgba(148,163,184,0.16)',
-  background: 'rgba(2,6,23,0.36)',
-}
-
-const detailItem: CSSProperties = {
-  padding: 12,
-  borderRadius: 16,
-  border: '1px solid rgba(148,163,184,0.14)',
-  background: 'rgba(15,23,42,0.46)',
-}
-
-const detailLabel: CSSProperties = {
-  marginBottom: 5,
-  color: '#64748b',
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  fontWeight: 900,
-}
-
-const detailValue: CSSProperties = {
-  color: '#e5eefc',
-  fontSize: 14,
-  lineHeight: 1.45,
-  wordBreak: 'break-word',
-}
-
-const detailText: CSSProperties = {
-  margin: '8px 0 0',
-  color: '#cbd5e1',
-  lineHeight: 1.55,
-}
-
-const messageList: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  marginTop: 8,
-}
-
-const chipWrap: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 8,
-}
-
-
-const errorPanel: CSSProperties = {
-  maxWidth: 1180,
-  margin: '0 auto 18px',
-  padding: 16,
-  borderRadius: 18,
-  display: 'grid',
-  gap: 6,
-  background: 'rgba(127,29,29,0.22)',
-  border: '1px solid rgba(248,113,113,0.35)',
-  color: '#fecaca',
-}
+
+.admin-login-card,
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(148,163,184,0.24);
+  background: rgba(15,23,42,0.76);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.34);
+  backdrop-filter: blur(20px);
+}
+
+.admin-sidebar {
+  overflow: auto;
+}
+
+.admin-brand {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(56,189,248,0.10);
+  border: 1px solid rgba(56,189,248,0.22);
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.admin-login-card h1,
+.admin-sidebar h1 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.admin-sidebar h1 {
+  font-size: 28px;
+}
+
+.admin-login-card p,
+.admin-sidebar p {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-login-form label,
+.admin-detail-block > span,
+.admin-kicker {
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.admin-login-form input {
+  height: 44px;
+  border: 1px solid rgba(148,163,184,0.25);
+  border-radius: 16px;
+  background: rgba(2,6,23,0.62);
+  color: #e5eefc;
+  padding: 0 13px;
+  outline: none;
+}
+
+.admin-login-form button,
+.admin-sidebar-actions button,
+.admin-drawer-head button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  color: #020617;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.admin-link-row,
+.admin-sidebar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-link-row {
+  margin-top: auto;
+}
+
+.admin-link-row a,
+.admin-sidebar-actions a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.24);
+  color: #dbeafe;
+  background: rgba(15,23,42,0.54);
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 12px;
+}
+
+.admin-locked-workspace,
+.admin-workspace {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-locked-workspace {
+  grid-template-rows: auto minmax(360px, 1fr) auto auto;
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid rgba(148,163,184,0.22);
+  background: rgba(15,23,42,0.48);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.26);
+  backdrop-filter: blur(18px);
+}
+
+.admin-workspace {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.admin-workspace-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(18px);
+}
+
+.admin-workspace-bar h2 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.05em;
+}
+
+.admin-locked-map {
+  position: relative;
+  min-height: 420px;
+  border-radius: 30px;
+  overflow: hidden;
+  border: 1px solid rgba(148,163,184,0.18);
+  background:
+    linear-gradient(135deg, rgba(15,23,42,0.92), rgba(2,6,23,0.92)),
+    radial-gradient(circle at 50% 50%, rgba(56,189,248,0.30), transparent 28%);
+}
+
+.admin-grid-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.24;
+  background-image:
+    linear-gradient(rgba(125,211,252,.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125,211,252,.18) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.admin-locked-message {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(420px, calc(100% - 40px));
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(2,6,23,0.76);
+  backdrop-filter: blur(20px);
+  text-align: center;
+  color: #cbd5e1;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-sidebar-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-stat {
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(148,163,184,0.16);
+  background: rgba(2,6,23,0.42);
+}
+
+.admin-stat.compact {
+  padding: 11px;
+}
+
+.admin-stat span {
+  color: #8aa0bd;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-stat strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  word-break: break-word;
+}
+
+.admin-stat small {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.admin-family-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-family-compact,
+.admin-family-row,
+.admin-profile-card,
+.admin-node-card,
+.admin-muted,
+.admin-detail-item,
+.admin-detail-block {
+  border: 1px solid rgba(148,163,184,0.16);
+  background: rgba(2,6,23,0.35);
+  border-radius: 18px;
+}
+
+.admin-family-compact {
+  display: flex;
+  gap: 10px;
+  padding: 13px;
+  color: #cbd5e1;
+}
+
+.admin-family-compact > span,
+.admin-family-row > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: rgba(56,189,248,0.12);
+  flex: 0 0 auto;
+}
+
+.admin-family-compact small,
+.admin-family-row small,
+.admin-profile-card small,
+.admin-node-card small {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+}
+
+.admin-map-area {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+}
+
+.admin-node-rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 28px;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: rgba(15,23,42,0.60);
+  backdrop-filter: blur(18px);
+}
+
+.admin-node-rail-head,
+.admin-section-head,
+.admin-profile-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-node-rail-head h3,
+.admin-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.04em;
+}
+
+.admin-node-list,
+.admin-profile-list,
+.admin-family-count-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-node-list {
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-node-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  padding: 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-node-card.selected {
+  border-color: rgba(56,189,248,0.52);
+  background: rgba(8,47,73,0.44);
+  box-shadow: 0 0 0 1px rgba(56,189,248,0.16) inset;
+}
+
+.admin-node-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-node-top > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(129,140,248,0.18);
+  font-weight: 950;
+}
+
+.admin-node-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.admin-profile-card,
+.admin-muted {
+  padding: 12px;
+}
+
+.admin-badge-row,
+.admin-topbar-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.admin-family-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.pill.ok {
+  border: 1px solid rgba(34,197,94,0.26);
+  background: rgba(34,197,94,0.14);
+  color: #bbf7d0;
+}
+
+.pill.warn {
+  border: 1px solid rgba(251,191,36,0.26);
+  background: rgba(251,191,36,0.12);
+  color: #fde68a;
+}
+
+.pill.neutral {
+  border: 1px solid rgba(148,163,184,0.20);
+  background: rgba(148,163,184,0.10);
+  color: #cbd5e1;
+}
+
+.admin-error {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(248,113,113,0.28);
+  background: rgba(127,29,29,0.22);
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.admin-operator-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border-radius: 20px;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: rgba(15,23,42,0.58);
+  color: #cbd5e1;
+}
+
+.admin-operator-strip span {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.admin-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(2,6,23,0.58);
+  backdrop-filter: blur(8px);
+}
+
+.admin-drawer {
+  width: min(560px, 100%);
+  height: 100%;
+  overflow: auto;
+  border-left: 1px solid rgba(148,163,184,0.22);
+  background: rgba(15,23,42,0.94);
+  box-shadow: -24px 0 80px rgba(0,0,0,0.40);
+}
+
+.admin-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid rgba(148,163,184,0.18);
+  background: rgba(15,23,42,0.92);
+  backdrop-filter: blur(18px);
+}
+
+.admin-drawer-head h2 {
+  margin: 6px 0 0;
+  font-size: 26px;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.admin-drawer-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-detail-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.admin-detail-item span {
+  color: #8aa0bd;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-detail-block {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.admin-detail-block p {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.55;
+}
+
+.admin-chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.admin-chip-wrap code {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #bae6fd;
+  background: rgba(14,165,233,0.12);
+  border: 1px solid rgba(14,165,233,0.20);
+  font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+  .admin-login-layout,
+  .admin-console-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-map-area {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-stat-grid,
+  .admin-family-compact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-root {
+    padding: 8px;
+  }
+
+  .admin-stat-grid,
+  .admin-family-compact-grid,
+  .admin-sidebar-stats,
+  .admin-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-login-card h1 {
+    font-size: 34px;
+  }
+}
+`
