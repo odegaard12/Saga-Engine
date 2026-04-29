@@ -630,7 +630,7 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
-- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, map-first glass CMS workspace, Mission Control overview, node list and node detail drawer
+- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, local CMS actions, map-first workspace and editable-preview node drawer
 - `frontend/src/admin/AdminMissionMap.tsx` -> React admin Leaflet mission map for mapped nodes
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
 - `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host
@@ -728,5 +728,3 @@ Longer-term, SAGA can evolve into:
 ## License
 
 MIT recommended.
-
-- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, left CMS rail, map-first workspace and node detail drawer
