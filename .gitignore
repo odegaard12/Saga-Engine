@@ -66,3 +66,4 @@ _backups/
 **/_backups/
 *.bak
 *.backup
+**/*.bak.*
