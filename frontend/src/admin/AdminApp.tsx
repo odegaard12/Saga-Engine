@@ -12,6 +12,7 @@ import type { PublicConfig } from '../types/player'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
 
 const familyCards: Array<{
@@ -50,6 +51,8 @@ export default function AdminApp() {
   const [overviewState, setOverviewState] = useState<OverviewState>('locked')
   const [overviewError, setOverviewError] = useState<string | null>(null)
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
+  const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
+  const [localNotice, setLocalNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -128,6 +131,72 @@ export default function AdminApp() {
         setOverviewError(err instanceof Error ? err.message : 'Unknown error')
         setOverviewState('error')
       })
+  }
+
+  function syncLocalStage(nextStage: AdminReactOverviewStage) {
+    setOverview((current) => {
+      if (!current) return current
+
+      const currentStages = current.stages || []
+      const exists = currentStages.some((stage) => stage.index === nextStage.index)
+      const nextStages = exists
+        ? currentStages.map((stage) => (stage.index === nextStage.index ? nextStage : stage))
+        : [...currentStages, nextStage]
+
+      const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
+        const family = stage.type || 'signal_hunt'
+        acc[family] = (acc[family] || 0) + 1
+        return acc
+      }, {})
+
+      return {
+        ...current,
+        stages: nextStages,
+        counts: current.counts
+          ? {
+              ...current.counts,
+              stages: nextStages.length,
+              family_counts: familyCounts,
+            }
+          : current.counts,
+      }
+    })
+
+    setSelectedStage(nextStage)
+    setLocalNotice('Local preview updated. Persistent save comes in the next React admin save-flow PR.')
+  }
+
+  function createLocalNode() {
+    const mapCenter =
+      overview?.config?.map_center ||
+      config?.map_center ||
+      ([40.4168, -3.7038] as [number, number])
+
+    const nextIndex = stages.length
+    const nextStage: AdminReactOverviewStage = {
+      id: `local-${Date.now()}`,
+      index: nextIndex,
+      title: `NEW NODE ${nextIndex + 1}`,
+      type: 'signal_hunt',
+      label: 'Signal Hunt',
+      lat: mapCenter[0],
+      lon: mapCenter[1],
+      radius: 50,
+      entry_mode: 'gps',
+      require_proximity: true,
+      has_hint: false,
+      has_manual_fallback: false,
+      content: '',
+      objective: '',
+      config_summary: [],
+      messages: {
+        hint: '',
+        gps_unavailable: 'GPS unavailable.',
+        locked: 'Move closer to unlock this node.',
+      },
+    }
+
+    syncLocalStage(nextStage)
   }
 
   function handleOverviewSubmit(event: FormEvent<HTMLFormElement>) {
@@ -218,23 +287,101 @@ export default function AdminApp() {
           </div>
 
           <div className="admin-sidebar-cms-actions">
-            <button type="button" className="admin-cms-side-action admin-cms-side-action--primary">
+            <button
+              type="button"
+              className="admin-cms-side-action admin-cms-side-action--primary"
+              onClick={createLocalNode}
+            >
               New node
             </button>
-            <button type="button" className="admin-cms-side-action">
+            <button
+              type="button"
+              className={`admin-cms-side-action${cmsPanel === 'players' ? ' active' : ''}`}
+              onClick={() => setCmsPanel(cmsPanel === 'players' ? 'none' : 'players')}
+            >
               Manage players
             </button>
-            <button type="button" className="admin-cms-side-action">
+            <button
+              type="button"
+              className={`admin-cms-side-action${cmsPanel === 'labels' ? ' active' : ''}`}
+              onClick={() => setCmsPanel(cmsPanel === 'labels' ? 'none' : 'labels')}
+            >
               Edit labels
             </button>
-            <button type="button" className="admin-cms-side-action">
+            <button
+              type="button"
+              className={`admin-cms-side-action${cmsPanel === 'mission' ? ' active' : ''}`}
+              onClick={() => setCmsPanel(cmsPanel === 'mission' ? 'none' : 'mission')}
+            >
               Mission settings
             </button>
           </div>
 
           <div className="admin-sidebar-cms-note">
-            Structure first: map-first CMS shell, left operator rail, right node drawer on selection.
+            Select a tool. Changes are local preview until the React save API lands.
           </div>
+
+          {localNotice ? (
+            <div className="admin-local-notice">{localNotice}</div>
+          ) : null}
+
+          {cmsPanel === 'players' ? (
+            <div className="admin-cms-local-panel">
+              <strong>Players</strong>
+              <span>Current mission profiles. Full create/delete/team save flow comes next.</span>
+
+              <div className="admin-local-list">
+                {profiles.map((profile) => (
+                  <button type="button" key={profile.id} className="admin-local-row">
+                    <span>{profile.display_name || profile.id}</span>
+                    <small>{profile.mode || 'solo'} · level {profile.level ?? 0}</small>
+                  </button>
+                ))}
+              </div>
+
+              <button type="button" className="admin-cms-side-action">
+                Add player locally soon
+              </button>
+            </div>
+          ) : null}
+
+          {cmsPanel === 'mission' ? (
+            <div className="admin-cms-local-panel">
+              <strong>Mission settings</strong>
+              <span>Basic text/config surface. Persistent save comes next.</span>
+
+              <label>
+                Admin title
+                <input value={title} readOnly />
+              </label>
+
+              <label>
+                Admin subtitle
+                <input value={subtitle} readOnly />
+              </label>
+
+              <label>
+                Theme
+                <input value={overview?.config?.player_theme || config?.player_theme || 'classic'} readOnly />
+              </label>
+            </div>
+          ) : null}
+
+          {cmsPanel === 'labels' ? (
+            <div className="admin-cms-local-panel">
+              <strong>Families / labels</strong>
+              <span>Available family-native runtime labels.</span>
+
+              <div className="admin-local-list">
+                {familyCards.map((family) => (
+                  <div key={family.id} className="admin-local-row static">
+                    <span>{family.icon} {family.title}</span>
+                    <small>{family.id}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="admin-sidebar-cms">
@@ -374,6 +521,7 @@ export default function AdminApp() {
         <NodeDetailDrawer
           stage={selectedStage}
           onClose={() => setSelectedStage(null)}
+          onApplyLocal={syncLocalStage}
         />
       ) : null}
     </main>
@@ -465,79 +613,241 @@ function NodeCard({
 function NodeDetailDrawer({
   stage,
   onClose,
+  onApplyLocal,
 }: {
   stage: AdminReactOverviewStage
   onClose: () => void
+  onApplyLocal: (stage: AdminReactOverviewStage) => void
 }) {
-  const radius = stage.radius ?? 50
-  const family = familyCards.find((item) => item.id === stage.type)
-  const coords = formatCoords(stage.lat, stage.lon)
-  const messages = stage.messages || {}
-  const configSummary = stage.config_summary || []
+  const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
+
+  useEffect(() => {
+    setDraft(stage)
+  }, [stage])
+
+  const family = familyCards.find((item) => item.id === draft.type)
+  const messages = draft.messages || {}
+  const configSummary = draft.config_summary || []
+  const isLocalNew = typeof draft.id === 'string' && draft.id.startsWith('local-')
+
+  function setDraftField<K extends keyof AdminReactOverviewStage>(
+    key: K,
+    value: AdminReactOverviewStage[K]
+  ) {
+    setDraft((current) => ({
+      ...current,
+      [key]: value,
+    }))
+  }
+
+  function setDraftMessage(
+    key: 'hint' | 'gps_unavailable' | 'locked',
+    value: string
+  ) {
+    setDraft((current) => ({
+      ...current,
+      messages: {
+        ...(current.messages || {}),
+        [key]: value,
+      },
+    }))
+  }
+
+  function numberOrNull(value: string) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
 
   return (
     <div className="admin-drawer-overlay" onClick={onClose} role="presentation">
       <aside
-        className="admin-drawer"
+        className="admin-drawer admin-drawer-editable"
         role="dialog"
         aria-modal="true"
-        aria-label={`Node detail: ${stage.title}`}
+        aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="admin-drawer-head">
           <div>
-            <span className="admin-kicker">Node detail · read-only</span>
-            <h2>{stage.index + 1}. {stage.title || 'Untitled node'}</h2>
-            <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
+            <span className="admin-kicker">{isLocalNew ? 'New node · local preview' : 'Node editor · local preview'}</span>
+            <h2>{draft.index + 1}. {draft.title || 'Untitled node'}</h2>
+            <small>{family?.icon || '◇'} {draft.label || draft.type}</small>
           </div>
+
           <button type="button" onClick={onClose}>Close</button>
         </div>
 
         <div className="admin-drawer-body">
-          <div className="admin-detail-grid">
-            <DetailItem label="Family" value={stage.type} />
-            <DetailItem label="Entry" value={stage.entry_mode || 'gps'} />
-            <DetailItem label="Radius" value={`${radius}m`} />
-            <DetailItem label="Coordinates" value={coords} />
-            <DetailItem label="Access" value={stage.require_proximity ? 'GPS gated' : 'Free entry'} />
-            <DetailItem label="Objective" value={stage.objective || '—'} />
-          </div>
+          <section className="admin-edit-section">
+            <div className="admin-edit-section-head">
+              <strong>Basics</strong>
+              <span>Editable locally</span>
+            </div>
 
-          <section className="admin-detail-block">
-            <span>Player content</span>
-            <p>{stage.content || 'No content configured.'}</p>
+            <label className="admin-edit-field">
+              Title
+              <input
+                value={draft.title || ''}
+                onChange={(event) => setDraftField('title', event.target.value)}
+              />
+            </label>
+
+            <label className="admin-edit-field">
+              Family
+              <select
+                value={draft.type || 'signal_hunt'}
+                onChange={(event) => {
+                  const nextType = event.target.value
+                  const nextFamily = familyCards.find((item) => item.id === nextType)
+                  setDraft((current) => ({
+                    ...current,
+                    type: nextType,
+                    label: nextFamily?.title || nextType,
+                  }))
+                }}
+              >
+                {familyCards.map((item) => (
+                  <option key={item.id} value={item.id}>{item.title}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="admin-edit-field">
+              Player content
+              <textarea
+                rows={5}
+                value={draft.content || ''}
+                onChange={(event) => setDraftField('content', event.target.value)}
+              />
+            </label>
           </section>
 
-          <section className="admin-detail-block">
-            <span>Messages</span>
-            <DetailItem label="Hint" value={messages.hint || '—'} />
-            <DetailItem label="GPS unavailable" value={messages.gps_unavailable || '—'} />
-            <DetailItem label="Locked" value={messages.locked || '—'} />
+          <section className="admin-edit-section">
+            <div className="admin-edit-section-head">
+              <strong>Location</strong>
+              <span>{formatCoords(draft.lat, draft.lon)}</span>
+            </div>
+
+            <div className="admin-edit-grid">
+              <label className="admin-edit-field">
+                Latitude
+                <input
+                  inputMode="decimal"
+                  value={draft.lat ?? ''}
+                  onChange={(event) => setDraftField('lat', numberOrNull(event.target.value))}
+                />
+              </label>
+
+              <label className="admin-edit-field">
+                Longitude
+                <input
+                  inputMode="decimal"
+                  value={draft.lon ?? ''}
+                  onChange={(event) => setDraftField('lon', numberOrNull(event.target.value))}
+                />
+              </label>
+
+              <label className="admin-edit-field">
+                Radius meters
+                <input
+                  inputMode="numeric"
+                  value={draft.radius ?? ''}
+                  onChange={(event) => setDraftField('radius', numberOrNull(event.target.value))}
+                />
+              </label>
+
+              <label className="admin-edit-field">
+                Entry mode
+                <select
+                  value={draft.entry_mode || 'gps'}
+                  onChange={(event) => setDraftField('entry_mode', event.target.value)}
+                >
+                  <option value="gps">GPS</option>
+                  <option value="free">Free</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="admin-edit-check">
+              <input
+                type="checkbox"
+                checked={Boolean(draft.require_proximity)}
+                onChange={(event) => setDraftField('require_proximity', event.target.checked)}
+              />
+              Require proximity
+            </label>
           </section>
 
-          <section className="admin-detail-block">
-            <span>Config keys</span>
+          <section className="admin-edit-section">
+            <div className="admin-edit-section-head">
+              <strong>Messages</strong>
+              <span>Player-facing copy</span>
+            </div>
+
+            <label className="admin-edit-field">
+              Hint
+              <textarea
+                rows={3}
+                value={messages.hint || ''}
+                onChange={(event) => setDraftMessage('hint', event.target.value)}
+              />
+            </label>
+
+            <label className="admin-edit-field">
+              GPS unavailable
+              <input
+                value={messages.gps_unavailable || ''}
+                onChange={(event) => setDraftMessage('gps_unavailable', event.target.value)}
+              />
+            </label>
+
+            <label className="admin-edit-field">
+              Locked / success copy
+              <input
+                value={messages.locked || ''}
+                onChange={(event) => setDraftMessage('locked', event.target.value)}
+              />
+            </label>
+          </section>
+
+          <section className="admin-edit-section">
+            <div className="admin-edit-section-head">
+              <strong>Runtime config</strong>
+              <span>Schema editor next</span>
+            </div>
+
             <div className="admin-chip-wrap">
               {configSummary.length ? (
                 configSummary.map((key) => <code key={key}>{key}</code>)
               ) : (
-                <small>No config keys.</small>
+                <small>No config keys exposed yet.</small>
               )}
             </div>
           </section>
 
-          <div className="admin-operator-strip">
-            <div>
-              <strong>Editor pending</strong>
-              <span>Next PR should add local editing here before save APIs.</span>
-            </div>
-            <span className="pill warn">Read-only</span>
+          <div className="admin-edit-actions">
+            <button
+              type="button"
+              className="admin-cms-side-action admin-cms-side-action--primary"
+              onClick={() => onApplyLocal(draft)}
+            >
+              Apply local preview
+            </button>
+
+            <button type="button" className="admin-cms-side-action" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+
+          <div className="admin-local-notice">
+            Local preview only. Persistent save/update API comes next.
           </div>
         </div>
       </aside>
     </div>
   )
 }
+
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -2135,6 +2445,187 @@ const styles = `
 
   .admin-root:not(.admin-root-login-only) .admin-map-area > section:first-child {
     min-height: 72vh !important;
+  }
+}
+
+
+
+/* Local CMS actions and editable drawer pass */
+.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
+  text-shadow: 0 1px 0 rgba(0,0,0,0.18);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action.active {
+  background: rgba(59,130,246,0.22);
+  border-color: rgba(147,197,253,0.34);
+  color: #f8fafc;
+}
+
+.admin-local-notice {
+  padding: 10px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(110,231,183,0.18);
+  background: rgba(16,185,129,0.12);
+  color: rgba(236,253,245,0.86);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-cms-local-panel {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+}
+
+.admin-cms-local-panel > strong {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.admin-cms-local-panel > span,
+.admin-cms-local-panel label {
+  color: rgba(255,255,255,0.58);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-cms-local-panel label {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-cms-local-panel input {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(15,23,42,0.54);
+  color: #f8fafc;
+}
+
+.admin-local-list {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-local-row {
+  display: grid;
+  gap: 3px;
+  min-height: 40px;
+  padding: 8px 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #f8fafc;
+  text-align: left;
+}
+
+.admin-local-row.static {
+  cursor: default;
+}
+
+.admin-local-row small {
+  color: rgba(255,255,255,0.52);
+}
+
+.admin-drawer-editable .admin-drawer-body {
+  gap: 12px;
+}
+
+.admin-edit-section {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.035);
+}
+
+.admin-edit-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-edit-section-head strong {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.admin-edit-section-head span {
+  color: rgba(255,255,255,0.48);
+  font-size: 11px;
+}
+
+.admin-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.admin-edit-field {
+  display: grid;
+  gap: 6px;
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.admin-edit-field input,
+.admin-edit-field select,
+.admin-edit-field textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 12px;
+  background: rgba(15,23,42,0.56);
+  color: #f8fafc;
+  padding: 10px;
+  font: inherit;
+  outline: none;
+}
+
+.admin-edit-field input,
+.admin-edit-field select {
+  min-height: 39px;
+}
+
+.admin-edit-field textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.admin-edit-field input:focus,
+.admin-edit-field select:focus,
+.admin-edit-field textarea:focus {
+  border-color: rgba(96,165,250,0.48);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.16);
+}
+
+.admin-edit-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+@media (max-width: 620px) {
+  .admin-edit-grid,
+  .admin-edit-actions {
+    grid-template-columns: 1fr;
   }
 }
 

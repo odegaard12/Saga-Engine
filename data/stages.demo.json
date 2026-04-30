@@ -2,8 +2,8 @@
   {
     "id": 0,
     "title": "A CARACOLA",
-    "lat": 42.27092610625838,
-    "lon": -8.861235380172731,
+    "lat": 42.0001,
+    "lon": -8.0001,
     "radius": 50,
     "type": "signal_hunt",
     "content": "RECONECTA O SISTEMA.",
@@ -13,14 +13,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-WIND",
-    "rune": "SAGA-START"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 1,
     "title": "DIAL NODE",
-    "lat": 42.2532155817828,
-    "lon": -8.87326776981354,
+    "lat": 42.0007,
+    "lon": -8.0008,
     "radius": 50,
     "type": "signal_hunt",
     "content": "DIAL NODE · NAVIGATION PUZZLE",
@@ -30,14 +30,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-LIGHT",
-    "rune": "SAGA-HOME"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 2,
     "title": "ROBALEIRA",
-    "lat": 42.25051151999688,
-    "lon": -8.87273669242859,
+    "lat": 42.0013,
+    "lon": -8.0012,
     "radius": 50,
     "type": "signal_hunt",
     "content": "CANLE DE EMERXENCIA.",
@@ -47,14 +47,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-VOICE",
-    "rune": "SAGA-RED"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 3,
     "title": "MELIDE",
-    "lat": 42.25204423297994,
-    "lon": -8.868868947029116,
+    "lat": 42.0019,
+    "lon": -8.0018,
     "radius": 50,
     "type": "signal_hunt",
     "content": "O terreo é inestable e o vento das Cíes forte. Mantén o nivel do sistema firme durante 10 segundos para ancorar a defensa.",
@@ -64,14 +64,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-EARTH",
-    "rune": "SAGA-SAND"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 4,
     "title": "SUBRIDO",
-    "lat": 42.247716009735676,
-    "lon": -8.864121437072756,
+    "lat": 42.0025,
+    "lon": -8.0024,
     "radius": 50,
     "type": "signal_hunt",
     "content": "A Fragua do sistema está fría.\n\nConsulta o Protocolo de Combustión no tríptico: Abre a admisión externa, pecha o centro e purga o sistema.",
@@ -81,14 +81,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-WIND",
-    "rune": "SAGA-FIRE"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 5,
     "title": "ALDEA DE PUXEIRO",
-    "lat": 42.27795573745799,
-    "lon": -8.860795497894289,
+    "lat": 42.0031,
+    "lon": -8.003,
     "radius": 50,
     "type": "signal_hunt",
     "content": "O ARQUIVO (A Memoria).\n\nO Vixía non pode espertar se non recorda como loitar.\nCando restaures os patróns de luz e o Arquivo recupere a súa integridade... liberarás a quinta Runa.",
@@ -98,14 +98,14 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-MEM",
-    "rune": "RUNA DA MEMORIA"
+    "answer": "",
+    "rune": ""
   },
   {
     "id": 6,
     "title": "O FACHO",
-    "lat": 42.27632045563478,
-    "lon": -8.861187100410463,
+    "lat": 42.0037,
+    "lon": -8.0036,
     "radius": 50,
     "type": "signal_hunt",
     "content": "IGNICIÓN FINAL.",
@@ -115,7 +115,7 @@
       "lock_threshold": 65,
       "hold_ms": 1500
     },
-    "answer": "SAGA-WAKE",
-    "rune": "SAGA-END"
+    "answer": "",
+    "rune": ""
   }
 ]

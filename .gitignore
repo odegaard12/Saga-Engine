@@ -58,3 +58,12 @@ frontend/tsconfig.tsbuildinfo
 
 # Vite temporary config loader artifacts
 frontend/vite.config.ts.timestamp-*.mjs
+
+# Local/AI/generated backups
+.backup_chatgpt_*/
+**/.backup_chatgpt_*/
+_backups/
+**/_backups/
+*.bak
+*.backup
+**/*.bak.*
