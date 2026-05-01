@@ -535,25 +535,24 @@ Current production uses:
 
 Typical production setup:
 
-- repo: `~/saga_engine`
-- live data dir: `~/saga_engine_data`
-- container: `saga_engine_app`
+- repo: `/path/to/saga-engine`
+- live data dir: `/path/to/saga-live-data`
+- container: `saga_engine_app_example`
 - port: `8096 -> 5000`
 
 ### Production deployment example
 
 ```bash
-docker build -t saga_engine:latest ~/saga_engine
+docker build -t saga_engine:latest /path/to/saga-engine
 
-docker rm -f saga_engine_app || true
+docker rm -f saga_engine_app_example || true
 
 docker run -d \
-  --name saga_engine_app \
-  -p 8096:5000 \
-  -e ADMIN_PASS='YOUR_PASSWORD' \
-  -e SAGA_DATA_DIR=/app_data \
-  -v ~/saga_engine:/app \
-  -v ~/saga_engine_data:/app_data \
+  --name saga_engine_app_example \
+  -p <HOST_PORT>:5000 \
+    -e SAGA_DATA_DIR=/app_data \
+  -v /path/to/saga-engine:/app \
+  -v /path/to/saga-live-data:/app_data \
   --restart unless-stopped \
   saga_engine:latest
 ```
@@ -561,10 +560,10 @@ docker run -d \
 ### Production smoke check
 
 ```bash
-curl -sS -o /tmp/saga_root.html  -w "GET / => HTTP %{http_code}\n" http://127.0.0.1:8096/
-curl -sS -o /tmp/saga_admin.html -w "GET /admin => HTTP %{http_code}\n" http://127.0.0.1:8096/admin
-curl -sS -o /tmp/saga_cfg.json   -w "GET /api/config => HTTP %{http_code}\n" http://127.0.0.1:8096/api/config
-docker logs --since=2m saga_engine_app 2>&1 | tail -n 40
+curl -sS -o /tmp/saga_root.html  -w "GET / => HTTP %{http_code}\n" http://127.0.0.1:<HOST_PORT>/
+curl -sS -o /tmp/saga_admin.html -w "GET /admin => HTTP %{http_code}\n" http://127.0.0.1:<HOST_PORT>/admin
+curl -sS -o /tmp/saga_cfg.json   -w "GET /api/config => HTTP %{http_code}\n" http://127.0.0.1:<HOST_PORT>/api/config
+docker logs --since=2m saga_engine_app_example 2>&1 | tail -n 40
 ```
 
 ---
@@ -577,7 +576,7 @@ docker logs --since=2m saga_engine_app 2>&1 | tail -n 40
 python3 -m venv .venv
 source .venv/bin/activate
 pip install fastapi uvicorn jinja2
-python -m uvicorn main:app --host 0.0.0.0 --port 8097
+python -m uvicorn main:app --host 127.0.0.1 --port <DEV_BACKEND_PORT>
 ```
 
 Or use the existing Docker-based test container if that is already part of your workflow.
@@ -593,19 +592,19 @@ Install and run:
 ```bash
 cd frontend
 npm install
-npm run dev -- --host 0.0.0.0
+npm run dev -- --host 127.0.0.1
 ```
 
 Default Vite dev behavior:
 
-- backend test target expected at `http://127.0.0.1:8097`
+- backend test target expected at `http://127.0.0.1:<DEV_BACKEND_PORT>`
 - frontend default port is `5173`
 - if `5173` is busy, Vite may move to another port
 
 Useful development URLs:
 
-- React mission entry: `http://127.0.0.1:5173/`
-- React player direct: `http://127.0.0.1:5173/?user=PLAYER%201`
+- React mission entry: `http://127.0.0.1:<DEV_FRONTEND_PORT>/`
+- React player direct: `http://127.0.0.1:<DEV_FRONTEND_PORT>/?user=PLAYER%201`
 
 ### Current frontend dev behavior
 
@@ -728,3 +727,10 @@ Longer-term, SAGA can evolve into:
 ## License
 
 MIT recommended.
+
+
+## Nota de seguridad operativa
+
+Este repositorio público documenta un modelo de despliegue genérico. Los detalles reales de red, puertos internos, rutas locales, credenciales, contraseñas de administración, datos vivos de misión y backups deben mantenerse fuera del repositorio y configurarse únicamente en entornos privados.
+
+Para desarrollo local, los ejemplos usan `127.0.0.1` por defecto. Exponer servicios en `0.0.0.0` solo debe hacerse en redes controladas y con medidas de protección adicionales.

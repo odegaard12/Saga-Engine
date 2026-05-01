@@ -22,3 +22,8 @@ The most security-sensitive areas of this project are:
 - public API payload exposure
 - runtime node normalization / validation
 - deployment and environment configuration
+
+
+## Reporting guidance
+
+No incluyas secretos, contraseñas, tokens, datos reales de misión, coordenadas privadas ni datos personales en issues públicos. Para reportes sensibles, contacta al mantenedor por un canal privado antes de publicar detalles técnicos.
