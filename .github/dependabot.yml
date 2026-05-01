@@ -5,9 +5,34 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      react-major:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      typescript:
+        patterns:
+          - "typescript"
+      frontend-tooling:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "eslint*"
+          - "@typescript-eslint/*"
       frontend-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "typescript"
+          - "vite"
+          - "@vitejs/*"
+          - "eslint*"
+          - "@typescript-eslint/*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
