@@ -3,7 +3,10 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import AdminMissionMap from './AdminMissionMap'
 import {
   fetchAdminReactOverview,
+  fetchAdminStages,
   fetchPublicConfig,
+  saveAdminStages,
+  type AdminRawStage,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
@@ -53,6 +56,8 @@ export default function AdminApp() {
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
   const [localNotice, setLocalNotice] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -133,6 +138,122 @@ export default function AdminApp() {
       })
   }
 
+  function stageSaveIdentity(stage: AdminReactOverviewStage) {
+    if (typeof stage.id === 'number') return String(stage.id)
+    return String(stage.index)
+  }
+
+  function rawStageIdentity(stage: AdminRawStage, fallbackIndex: number) {
+    const rawId = stage.id
+    if (typeof rawId === 'number' || typeof rawId === 'string') return String(rawId)
+    return String(fallbackIndex)
+  }
+
+  function mergeStageForSave(
+    rawStage: AdminRawStage | null,
+    stage: AdminReactOverviewStage
+  ): AdminRawStage {
+    const messages = stage.messages || {}
+
+    return {
+      ...(rawStage || {}),
+      id:
+        typeof stage.id === 'number'
+          ? stage.id
+          : rawStage?.id ?? stage.index,
+      title: stage.title || 'Untitled node',
+      type: stage.type || 'signal_hunt',
+      lat: stage.lat ?? null,
+      lon: stage.lon ?? null,
+      radius: stage.radius ?? 50,
+      content: stage.content || '',
+      entry_mode: stage.entry_mode || 'gps',
+      require_proximity: Boolean(stage.require_proximity),
+      hint: messages.hint || '',
+      gps_unavailable_message: messages.gps_unavailable || '',
+      locked_message: messages.locked || '',
+      config:
+        typeof rawStage?.config === 'object' && rawStage?.config !== null
+          ? rawStage.config
+          : {},
+      answer: rawStage?.answer ?? '',
+      rune: rawStage?.rune ?? '',
+    }
+  }
+
+  function mergeOverviewIntoRawStages(
+    rawStages: AdminRawStage[],
+    overviewStages: AdminReactOverviewStage[]
+  ) {
+    const nextStages = [...rawStages]
+
+    overviewStages.forEach((stage) => {
+      const wantedIdentity = stageSaveIdentity(stage)
+      let rawIndex = nextStages.findIndex(
+        (rawStage, index) => rawStageIdentity(rawStage, index) === wantedIdentity
+      )
+
+      if (rawIndex < 0 && typeof stage.id === 'string' && stage.id.startsWith('local-')) {
+        rawIndex = -1
+      }
+
+      if (rawIndex >= 0) {
+        nextStages[rawIndex] = mergeStageForSave(nextStages[rawIndex], stage)
+      } else {
+        nextStages.push(mergeStageForSave(null, {
+          ...stage,
+          id: nextStages.length,
+          index: nextStages.length,
+        }))
+      }
+    })
+
+    return nextStages
+  }
+
+  async function saveLocalStages() {
+    if (!password.trim()) {
+      setSaveState('error')
+      setSaveError('Admin password is missing. Unlock the admin again.')
+      return
+    }
+
+    if (!overview) {
+      setSaveState('error')
+      setSaveError('No admin overview is loaded.')
+      return
+    }
+
+    setSaveState('saving')
+    setSaveError(null)
+
+    try {
+      const raw = await fetchAdminStages(password)
+      if (raw.status !== 'ok') {
+        throw new Error(raw.message || 'Could not load raw admin stages.')
+      }
+
+      const persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
+      const saved = await saveAdminStages(password, persistedStages)
+
+      if (saved.status !== 'ok') {
+        throw new Error(saved.message || 'Could not save admin stages.')
+      }
+
+      const refreshed = await fetchAdminReactOverview(password)
+      if (refreshed.status === 'ok') {
+        setOverview(refreshed)
+        setSelectedStage(null)
+      }
+
+      setSaveState('saved')
+      setLocalNotice('Saved to backend. Mission data reloaded from the server.')
+    } catch (err) {
+      setSaveState('error')
+      setSaveError(err instanceof Error ? err.message : 'Unknown save error')
+    }
+  }
+
   function syncLocalStage(nextStage: AdminReactOverviewStage) {
     setOverview((current) => {
       if (!current) return current
@@ -163,7 +284,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(nextStage)
-    setLocalNotice('Local preview updated. Persistent save comes in the next React admin save-flow PR.')
+    setLocalNotice('Local preview updated. Use Save node changes to persist it.')
   }
 
   function createLocalNode() {
@@ -296,6 +417,14 @@ export default function AdminApp() {
             </button>
             <button
               type="button"
+              className="admin-cms-side-action admin-cms-side-action--save"
+              onClick={saveLocalStages}
+              disabled={saveState === 'saving'}
+            >
+              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save node changes'}
+            </button>
+            <button
+              type="button"
               className={`admin-cms-side-action${cmsPanel === 'players' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'players' ? 'none' : 'players')}
             >
@@ -306,7 +435,7 @@ export default function AdminApp() {
               className={`admin-cms-side-action${cmsPanel === 'labels' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'labels' ? 'none' : 'labels')}
             >
-              Edit labels
+              Families & labels
             </button>
             <button
               type="button"
@@ -318,17 +447,24 @@ export default function AdminApp() {
           </div>
 
           <div className="admin-sidebar-cms-note">
-            Select a tool. Changes are local preview until the React save API lands.
+            Edit locally, then save node changes to persist them.
           </div>
 
           {localNotice ? (
             <div className="admin-local-notice">{localNotice}</div>
           ) : null}
 
+          {saveState === 'error' && saveError ? (
+            <div className="admin-save-error">
+              <strong>Save failed</strong>
+              <span>{saveError}</span>
+            </div>
+          ) : null}
+
           {cmsPanel === 'players' ? (
             <div className="admin-cms-local-panel">
               <strong>Players</strong>
-              <span>Current mission profiles. Full create/delete/team save flow comes next.</span>
+              <span>Current mission profiles. Profile editing is next; current list is read-only.</span>
 
               <div className="admin-local-list">
                 {profiles.map((profile) => (
@@ -348,7 +484,7 @@ export default function AdminApp() {
           {cmsPanel === 'mission' ? (
             <div className="admin-cms-local-panel">
               <strong>Mission settings</strong>
-              <span>Basic text/config surface. Persistent save comes next.</span>
+              <span>Basic mission text/config surface; persistence comes after node save is stable.</span>
 
               <label>
                 Admin title
@@ -840,7 +976,7 @@ function NodeDetailDrawer({
           </div>
 
           <div className="admin-local-notice">
-            Local preview only. Persistent save/update API comes next.
+            Local preview. Use Save node changes in the left rail to persist to backend.
           </div>
         </div>
       </aside>
@@ -2627,6 +2763,61 @@ const styles = `
   .admin-edit-actions {
     grid-template-columns: 1fr;
   }
+}
+
+
+
+/* Save fix and CMS polish pass */
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save {
+  background: rgba(14,165,233,0.16);
+  border-color: rgba(125,211,252,0.28);
+  color: #e0f2fe;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save:disabled {
+  opacity: 0.68;
+  cursor: wait;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  color: rgba(255,255,255,0.68);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3 {
+  color: #ffffff;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > strong {
+  color: #ffffff;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item small,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > span {
+  color: rgba(226,232,240,0.72);
+}
+
+.admin-save-error {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(248,113,113,0.30);
+  background: rgba(127,29,29,0.26);
+  color: #fecaca;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-save-error strong {
+  color: #fee2e2;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-edit-field input,
+.admin-root:not(.admin-root-login-only) .admin-edit-field select,
+.admin-root:not(.admin-root-login-only) .admin-edit-field textarea {
+  background: rgba(2,6,23,0.64);
+  color: #f8fafc;
 }
 
 
