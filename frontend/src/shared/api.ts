@@ -28,6 +28,19 @@ export type AdminReactOverviewStage = {
   }
 }
 
+export type AdminRawStage = Record<string, unknown>
+
+export type AdminStagesResponse = {
+  status: 'ok' | 'fail'
+  message?: string
+  stages?: AdminRawStage[]
+}
+
+export type AdminSaveResponse = {
+  status: 'ok' | 'fail'
+  message?: string
+}
+
 export type AdminReactOverviewProfile = {
   id: string
   display_name: string
@@ -139,4 +152,13 @@ export function sendHeartbeat(args: {
 
 export function fetchAdminReactOverview(password: string) {
   return postJson<AdminReactOverviewResponse>('/api/admin/react-overview', { password })
+}
+
+
+export function fetchAdminStages(password: string) {
+  return postJson<AdminStagesResponse>('/api/admin/stages', { password })
+}
+
+export function saveAdminStages(password: string, stages: AdminRawStage[]) {
+  return postJson<AdminSaveResponse>('/api/admin/save', { password, stages })
 }
