@@ -181,35 +181,57 @@ export default function AdminApp() {
     }
   }
 
+  function buildRawStageFromOverview(
+    stage: AdminReactOverviewStage,
+    index: number
+  ): AdminRawStage {
+    const messages = stage.messages || {}
+
+    return {
+      id: typeof stage.id === 'number' ? stage.id : index,
+      title: stage.title || `NODE ${index + 1}`,
+      type: stage.type || 'signal_hunt',
+      lat: typeof stage.lat === 'number' ? stage.lat : null,
+      lon: typeof stage.lon === 'number' ? stage.lon : null,
+      radius: typeof stage.radius === 'number' ? stage.radius : 50,
+      content: stage.content || '',
+      entry_mode: stage.entry_mode || 'gps',
+      require_proximity: Boolean(stage.require_proximity),
+      hint: messages.hint || '',
+      gps_unavailable_message: messages.gps_unavailable || '',
+      locked_message: messages.locked || '',
+      config: {},
+      answer: '',
+      rune: '',
+    }
+  }
+
+  function buildRawStagesFromOverview(overviewStages: AdminReactOverviewStage[]) {
+    return overviewStages.map((stage, index) => buildRawStageFromOverview(stage, index))
+  }
+
   function mergeOverviewIntoRawStages(
     rawStages: AdminRawStage[],
     overviewStages: AdminReactOverviewStage[]
   ) {
-    const nextStages = [...rawStages]
-
-    overviewStages.forEach((stage) => {
+    return overviewStages.map((stage, index) => {
       const wantedIdentity = stageSaveIdentity(stage)
-      let rawIndex = nextStages.findIndex(
-        (rawStage, index) => rawStageIdentity(rawStage, index) === wantedIdentity
-      )
+      const rawStage =
+        rawStages.find(
+          (candidate, candidateIndex) =>
+            rawStageIdentity(candidate, candidateIndex) === wantedIdentity
+        ) || null
 
-      if (rawIndex < 0 && typeof stage.id === 'string' && stage.id.startsWith('local-')) {
-        rawIndex = -1
-      }
-
-      if (rawIndex >= 0) {
-        nextStages[rawIndex] = mergeStageForSave(nextStages[rawIndex], stage)
-      } else {
-        nextStages.push(mergeStageForSave(null, {
-          ...stage,
-          id: nextStages.length,
-          index: nextStages.length,
-        }))
-      }
+      return mergeStageForSave(rawStage, {
+        ...stage,
+        index,
+        id: typeof stage.id === 'string' && stage.id.startsWith('local-') ? index : stage.id,
+      })
     })
-
-    return nextStages
   }
+
+
+
 
   async function saveLocalStages() {
     if (!password.trim()) {
@@ -228,12 +250,18 @@ export default function AdminApp() {
     setSaveError(null)
 
     try {
+      let persistedStages: AdminRawStage[] = []
+      let usedFallback = false
+
       const raw = await fetchAdminStages(password)
-      if (raw.status !== 'ok') {
-        throw new Error(raw.message || 'Could not load raw admin stages.')
+
+      if (raw.status === 'ok') {
+        persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
+      } else {
+        usedFallback = true
+        persistedStages = buildRawStagesFromOverview(overview.stages || [])
       }
 
-      const persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
       const saved = await saveAdminStages(password, persistedStages)
 
       if (saved.status !== 'ok') {
@@ -247,12 +275,55 @@ export default function AdminApp() {
       }
 
       setSaveState('saved')
-      setLocalNotice('Saved to backend. Mission data reloaded from the server.')
+      setLocalNotice(
+        usedFallback
+          ? 'Saved using fallback payload. Mission data reloaded.'
+          : 'Saved to backend. Mission data reloaded.'
+      )
     } catch (err) {
       setSaveState('error')
       setSaveError(err instanceof Error ? err.message : 'Unknown save error')
     }
   }
+
+
+  function deleteLocalStage(stageToDelete: AdminReactOverviewStage) {
+    const deleteIdentity = stageSaveIdentity(stageToDelete)
+
+    setOverview((current) => {
+      if (!current) return current
+
+      const nextStages = (current.stages || [])
+        .filter((stage) => stageSaveIdentity(stage) !== deleteIdentity)
+        .map((stage, index) => ({
+          ...stage,
+          index,
+        }))
+
+      const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
+        const family = stage.type || 'signal_hunt'
+        acc[family] = (acc[family] || 0) + 1
+        return acc
+      }, {})
+
+      return {
+        ...current,
+        stages: nextStages,
+        counts: current.counts
+          ? {
+              ...current.counts,
+              stages: nextStages.length,
+              family_counts: familyCounts,
+            }
+          : current.counts,
+      }
+    })
+
+    setSelectedStage(null)
+    setSaveState('idle')
+    setLocalNotice('Node removed locally. Save changes to persist deletion.')
+  }
+
 
   function syncLocalStage(nextStage: AdminReactOverviewStage) {
     setOverview((current) => {
@@ -284,7 +355,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(nextStage)
-    setLocalNotice('Local preview updated. Persistent save comes in the next React admin save-flow PR.')
+    setLocalNotice('Local preview updated. Save changes to persist.')
   }
 
   function createLocalNode() {
@@ -312,7 +383,7 @@ export default function AdminApp() {
       config_summary: [],
       messages: {
         hint: '',
-        gps_unavailable: 'GPS unavailable.',
+        gps_unavailable: 'GPS unavailable message.',
         locked: 'Move closer to unlock this node.',
       },
     }
@@ -375,7 +446,6 @@ export default function AdminApp() {
               <span>No mission data is shown before unlock.</span>
               <div>
                 <a href="/">Player entry</a>
-                <a href="/admin">Classic admin</a>
               </div>
             </div>
           </form>
@@ -390,7 +460,7 @@ export default function AdminApp() {
 
       <div className="admin-console-layout">
         <aside className="admin-sidebar">
-          <div className="admin-brand">SAGA ENGINE · MISSION CONTROL</div>
+          <div className="admin-brand">SAGA ENGINE · ADMIN CMS</div>
           <div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
@@ -398,13 +468,12 @@ export default function AdminApp() {
 
           <div className="admin-sidebar-actions">
             <button type="button" onClick={loadOverview}>Refresh live view</button>
-            <a href="/admin">Classic admin</a>
           </div>
 
         <section className="admin-sidebar-cms">
           <div className="admin-sidebar-section-head">
             <span className="admin-kicker">Mission CMS</span>
-            <h3>Control panel</h3>
+            <h3>Mission tools</h3>
           </div>
 
           <div className="admin-sidebar-cms-actions">
@@ -413,7 +482,7 @@ export default function AdminApp() {
               className="admin-cms-side-action admin-cms-side-action--primary"
               onClick={createLocalNode}
             >
-              New node
+              Add node
             </button>
             <button
               type="button"
@@ -421,33 +490,33 @@ export default function AdminApp() {
               onClick={saveLocalStages}
               disabled={saveState === 'saving'}
             >
-              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save node changes'}
+              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save changes'}
             </button>
             <button
               type="button"
               className={`admin-cms-side-action${cmsPanel === 'players' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'players' ? 'none' : 'players')}
             >
-              Manage players
+              Players
             </button>
             <button
               type="button"
               className={`admin-cms-side-action${cmsPanel === 'labels' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'labels' ? 'none' : 'labels')}
             >
-              Edit labels
+              Families
             </button>
             <button
               type="button"
               className={`admin-cms-side-action${cmsPanel === 'mission' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'mission' ? 'none' : 'mission')}
             >
-              Mission settings
+              Settings
             </button>
           </div>
 
           <div className="admin-sidebar-cms-note">
-            Select a tool. Changes are local preview until the React save API lands.
+            Choose a tool. Edit locally, then save.
           </div>
 
           {localNotice ? (
@@ -483,7 +552,7 @@ export default function AdminApp() {
 
           {cmsPanel === 'mission' ? (
             <div className="admin-cms-local-panel">
-              <strong>Mission settings</strong>
+              <strong>Settings</strong>
               <span>Basic text/config surface. Persistent save comes next.</span>
 
               <label>
@@ -544,6 +613,7 @@ export default function AdminApp() {
                   <div>
                     <strong>{stage.title || 'Untitled node'}</strong>
                     <small>{stage.label || stage.type} · {radiusLabel}</small>
+                    <small className="admin-sidebar-node-coords">{formatCoords(stage.lat, stage.lon)}</small>
                   </div>
                 </button>
               )
@@ -602,8 +672,8 @@ export default function AdminApp() {
               <h2>Mission map</h2>
             </div>
             <div className="admin-topbar-pills admin-cms-actions">
-              <button type="button" className="admin-cms-action primary">New node</button>
-              <button type="button" className="admin-cms-action">Manage players</button>
+              <button type="button" className="admin-cms-action primary">Add node</button>
+              <button type="button" className="admin-cms-action">Players</button>
               <span className="pill ok">Live read model</span>
               <span className="pill neutral">{stages.length} nodes</span>
             </div>
@@ -658,6 +728,7 @@ export default function AdminApp() {
           stage={selectedStage}
           onClose={() => setSelectedStage(null)}
           onApplyLocal={syncLocalStage}
+          onDeleteLocal={deleteLocalStage}
         />
       ) : null}
     </main>
@@ -750,10 +821,12 @@ function NodeDetailDrawer({
   stage,
   onClose,
   onApplyLocal,
+  onDeleteLocal,
 }: {
   stage: AdminReactOverviewStage
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
+  onDeleteLocal: (stage: AdminReactOverviewStage) => void
 }) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
@@ -805,7 +878,7 @@ function NodeDetailDrawer({
       >
         <div className="admin-drawer-head">
           <div>
-            <span className="admin-kicker">{isLocalNew ? 'New node · local preview' : 'Node editor · local preview'}</span>
+            <span className="admin-kicker">{isLocalNew ? 'Add node · local preview' : 'Node editor · local preview'}</span>
             <h2>{draft.index + 1}. {draft.title || 'Untitled node'}</h2>
             <small>{family?.icon || '◇'} {draft.label || draft.type}</small>
           </div>
@@ -849,7 +922,7 @@ function NodeDetailDrawer({
             </label>
 
             <label className="admin-edit-field">
-              Player content
+              Node content
               <textarea
                 rows={5}
                 value={draft.content || ''}
@@ -930,7 +1003,7 @@ function NodeDetailDrawer({
             </label>
 
             <label className="admin-edit-field">
-              GPS unavailable
+              GPS unavailable message
               <input
                 value={messages.gps_unavailable || ''}
                 onChange={(event) => setDraftMessage('gps_unavailable', event.target.value)}
@@ -961,13 +1034,25 @@ function NodeDetailDrawer({
             </div>
           </section>
 
-          <div className="admin-edit-actions">
+          <div className="admin-edit-actions admin-edit-actions-three">
             <button
               type="button"
               className="admin-cms-side-action admin-cms-side-action--primary"
               onClick={() => onApplyLocal(draft)}
             >
-              Apply local preview
+              Apply preview
+            </button>
+
+            <button
+              type="button"
+              className="admin-cms-side-action admin-cms-side-action--danger"
+              onClick={() => {
+                if (window.confirm(`Delete node "${draft.title || 'Untitled node'}"? Save changes afterwards to persist.`)) {
+                  onDeleteLocal(draft)
+                }
+              }}
+            >
+              Delete node
             </button>
 
             <button type="button" className="admin-cms-side-action" onClick={onClose}>
@@ -976,7 +1061,7 @@ function NodeDetailDrawer({
           </div>
 
           <div className="admin-local-notice">
-            Local preview. Use Save node changes in the left rail to persist to backend.
+            Local preview. Use Save changes in the left rail to persist to backend.
           </div>
         </div>
       </aside>
@@ -2793,6 +2878,184 @@ const styles = `
 
 .admin-save-error strong {
   color: #fee2e2;
+}
+
+
+
+/* Delete node and CMS clarity pass */
+.admin-root:not(.admin-root-login-only) .admin-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.45) transparent;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) h1 {
+  color: #ffffff !important;
+  font-size: 19px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar > div:nth-of-type(2) p {
+  color: rgba(226,232,240,0.76) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions {
+  grid-template-columns: 1fr !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button {
+  text-align: left;
+  justify-content: flex-start;
+  background: rgba(14,165,233,0.12) !important;
+  border-color: rgba(125,211,252,0.18) !important;
+  color: #e0f2fe !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms {
+  gap: 12px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3 {
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  color: rgba(226,232,240,0.76);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action::after {
+  content: "›";
+  opacity: .45;
+  font-size: 16px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--primary::after,
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save::after,
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger::after {
+  content: "";
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger {
+  background: rgba(127,29,29,0.30);
+  border-color: rgba(248,113,113,0.30);
+  color: #fecaca;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger:hover {
+  background: rgba(153,27,27,0.42);
+  border-color: rgba(252,165,165,0.38);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-list {
+  max-height: 44vh;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
+  position: relative;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover {
+  transform: translateY(-1px);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item.active {
+  box-shadow: inset 0 0 0 1px rgba(147,197,253,0.20), 0 12px 28px rgba(0,0,0,0.18);
+}
+
+.admin-sidebar-node-coords {
+  color: rgba(186,230,253,0.70) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.admin-edit-actions-three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.admin-drawer-editable .admin-drawer-head h2 {
+  color: #ffffff;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-local-notice {
+  color: #d1fae5;
+}
+
+@media (max-width: 760px) {
+  .admin-edit-actions-three {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* Resilient save and modern CMS polish */
+.admin-root:not(.admin-root-login-only) .admin-sidebar h1,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > strong,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
+  color: #f8fafc !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar p,
+.admin-root:not(.admin-root-login-only) .admin-sidebar small,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > span,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  color: rgba(226,232,240,0.78) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
+  border-radius: 16px;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action:hover,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button:hover,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover {
+  transform: translateY(-1px);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save {
+  background: linear-gradient(180deg, rgba(14,165,233,0.24), rgba(14,165,233,0.14));
+  border-color: rgba(125,211,252,0.32);
+  box-shadow: 0 10px 26px rgba(14,165,233,0.18);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger {
+  background: rgba(127,29,29,0.32);
+  border-color: rgba(248,113,113,0.30);
+  color: #fecaca;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-local-notice {
+  border: 1px solid rgba(74,222,128,0.22);
+  background: rgba(20,83,45,0.24);
+  color: #dcfce7;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-save-error {
+  border-radius: 16px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-edit-field input,
+.admin-root:not(.admin-root-login-only) .admin-edit-field select,
+.admin-root:not(.admin-root-login-only) .admin-edit-field textarea {
+  border-radius: 14px;
+  background: rgba(2,6,23,0.66);
+  color: #f8fafc;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-edit-field input:focus,
+.admin-root:not(.admin-root-login-only) .admin-edit-field select:focus,
+.admin-root:not(.admin-root-login-only) .admin-edit-field textarea:focus {
+  border-color: rgba(125,211,252,0.42);
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
 }
 
 
