@@ -358,21 +358,24 @@ export default function AdminApp() {
     setLocalNotice('Local preview updated. Save changes to persist.')
   }
 
-  function createLocalNode() {
+  function createLocalNodeAt(lat?: number, lon?: number) {
     const mapCenter =
       overview?.config?.map_center ||
       config?.map_center ||
       ([40.4168, -3.7038] as [number, number])
 
     const nextIndex = stages.length
+    const nextLat = typeof lat === 'number' ? lat : mapCenter[0]
+    const nextLon = typeof lon === 'number' ? lon : mapCenter[1]
+
     const nextStage: AdminReactOverviewStage = {
       id: `local-${Date.now()}`,
       index: nextIndex,
       title: `NEW NODE ${nextIndex + 1}`,
       type: 'signal_hunt',
       label: 'Signal Hunt',
-      lat: mapCenter[0],
-      lon: mapCenter[1],
+      lat: nextLat,
+      lon: nextLon,
       radius: 50,
       entry_mode: 'gps',
       require_proximity: true,
@@ -388,8 +391,32 @@ export default function AdminApp() {
       },
     }
 
+    setCmsPanel('none')
+    setSaveState('idle')
     syncLocalStage(nextStage)
+    setLocalNotice(
+      typeof lat === 'number' && typeof lon === 'number'
+        ? 'Node created from map click. Edit details, then save changes.'
+        : 'Node created at mission center. Drag it on the map or edit coordinates.'
+    )
   }
+
+  function moveLocalStage(
+    stageToMove: AdminReactOverviewStage,
+    lat: number,
+    lon: number
+  ) {
+    const movedStage: AdminReactOverviewStage = {
+      ...stageToMove,
+      lat,
+      lon,
+    }
+
+    setSaveState('idle')
+    syncLocalStage(movedStage)
+    setLocalNotice('Node moved on map. Save changes to persist the new position.')
+  }
+
 
   function handleOverviewSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -480,7 +507,7 @@ export default function AdminApp() {
             <button
               type="button"
               className="admin-cms-side-action admin-cms-side-action--primary"
-              onClick={createLocalNode}
+              onClick={() => createLocalNodeAt()}
             >
               Add node
             </button>
@@ -516,7 +543,7 @@ export default function AdminApp() {
           </div>
 
           <div className="admin-sidebar-cms-note">
-            Choose a tool. Edit locally, then save.
+            Click map to add. Drag nodes to move. Save when ready.
           </div>
 
           {localNotice ? (
@@ -620,7 +647,7 @@ export default function AdminApp() {
             })}
 
             {stages.length === 0 ? (
-              <div className="admin-sidebar-empty">No nodes yet.</div>
+              <div className="admin-sidebar-empty">No nodes yet. Click the map to add one.</div>
             ) : null}
           </div>
         </section>
@@ -684,6 +711,8 @@ export default function AdminApp() {
               stages={stages}
               selectedStage={selectedStage}
               onSelectStage={setSelectedStage}
+              onCreateStageAt={createLocalNodeAt}
+              onMoveStage={moveLocalStage}
             />
 
             <aside className="admin-node-rail">
@@ -3056,6 +3085,26 @@ const styles = `
 .admin-root:not(.admin-root-login-only) .admin-edit-field textarea:focus {
   border-color: rgba(125,211,252,0.42);
   box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
+}
+
+
+
+/* Map node interaction polish */
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  border: 1px solid rgba(125,211,252,0.16);
+  background: rgba(14,165,233,0.08);
+  padding: 10px 11px;
+  border-radius: 14px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-empty {
+  color: rgba(226,232,240,0.78);
+  border: 1px dashed rgba(125,211,252,0.20);
+  background: rgba(14,165,233,0.07);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-map-hint {
+  color: rgba(226,232,240,0.76);
 }
 
 

@@ -8,6 +8,8 @@ type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
   selectedStage: AdminReactOverviewStage | null
   onSelectStage: (stage: AdminReactOverviewStage) => void
+  onCreateStageAt?: (lat: number, lon: number) => void
+  onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
 }
 
 function hasCoords(stage: AdminReactOverviewStage) {
@@ -52,6 +54,8 @@ export default function AdminMissionMap({
   stages,
   selectedStage,
   onSelectStage,
+  onCreateStageAt,
+  onMoveStage,
 }: AdminMissionMapProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -68,6 +72,7 @@ export default function AdminMissionMap({
     const map = L.map(mapRootRef.current, {
       zoomControl: false,
       attributionControl: false,
+      doubleClickZoom: false,
     })
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -85,6 +90,21 @@ export default function AdminMissionMap({
       mapRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !onCreateStageAt) return
+
+    const handleMapClick = (event: L.LeafletMouseEvent) => {
+      onCreateStageAt(event.latlng.lat, event.latlng.lng)
+    }
+
+    map.on('click', handleMapClick)
+
+    return () => {
+      map.off('click', handleMapClick)
+    }
+  }, [onCreateStageAt])
 
   useEffect(() => {
     const map = mapRef.current
@@ -113,15 +133,19 @@ export default function AdminMissionMap({
         fillColor: visual.color,
         fillOpacity: visual.ringOpacity,
         className: selected ? 'admin-node-ring admin-node-ring--selected' : 'admin-node-ring',
+        bubblingMouseEvents: false,
       }).addTo(map)
 
-      const marker = L.circleMarker(coords, {
-        radius: visual.radius,
-        color: visual.color,
-        weight: visual.weight,
-        fillColor: visual.fillColor,
-        fillOpacity: visual.fillOpacity,
-        className: selected ? 'admin-node-marker admin-node-marker--selected' : 'admin-node-marker',
+      const markerSize = visual.radius * 2 + 8
+      const marker = L.marker(coords, {
+        draggable: Boolean(onMoveStage),
+        autoPan: true,
+        icon: L.divIcon({
+          className: 'admin-node-marker-icon',
+          html: `<span class="admin-node-dot${selected ? ' admin-node-dot--selected' : ''}" style="--node-color:${visual.color};--node-fill:${visual.fillColor};--node-size:${visual.radius * 2}px;--node-border:${visual.weight}px"></span>`,
+          iconSize: [markerSize, markerSize],
+          iconAnchor: [markerSize / 2, markerSize / 2],
+        }),
       }).addTo(map)
 
       const label = `${stage.index + 1}. ${stage.title || 'Untitled node'}`
@@ -132,8 +156,18 @@ export default function AdminMissionMap({
         opacity: 0.94,
       })
 
-      ring.on('click', () => onSelectStage(stage))
-      marker.on('click', () => onSelectStage(stage))
+      ring.on('click', (event) => {
+        L.DomEvent.stopPropagation(event.originalEvent)
+        onSelectStage(stage)
+      })
+      marker.on('click', (event) => {
+        L.DomEvent.stopPropagation(event.originalEvent)
+        onSelectStage(stage)
+      })
+      marker.on('dragend', () => {
+        const next = marker.getLatLng()
+        onMoveStage?.(stage, next.lat, next.lng)
+      })
 
       layersRef.current.push(ring, marker)
     })
@@ -173,7 +207,7 @@ export default function AdminMissionMap({
       <div style={mapChrome}>
         <div>
           <div style={kicker}>Mission map</div>
-          <div style={title}>{mappedStages.length} mapped nodes</div>
+          <div style={title}>{mappedStages.length} mapped nodes · click map to add</div>
         </div>
         <div style={legend}>
           <span><i style={{ background: '#34d399' }} /> Signal</span>
@@ -187,7 +221,7 @@ export default function AdminMissionMap({
       {mappedStages.length === 0 ? (
         <div style={emptyState}>
           <strong>No mapped nodes yet.</strong>
-          <span>Add latitude and longitude to nodes to show them on the Mission Control map.</span>
+          <span>Click anywhere on the map to create the first node.</span>
         </div>
       ) : null}
     </section>
@@ -295,6 +329,46 @@ const mapCss = `
 .admin-node-marker:hover,
 .admin-node-ring:hover {
   opacity: .92;
+}
+
+.admin-node-marker-icon {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+}
+
+.admin-node-dot {
+  display: block;
+  width: var(--node-size);
+  height: var(--node-size);
+  border-radius: 999px;
+  border: var(--node-border) solid var(--node-color);
+  background: var(--node-fill);
+  box-shadow:
+    0 8px 18px rgba(15,23,42,.30),
+    0 0 0 5px rgba(255,255,255,.18);
+  cursor: grab;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.admin-node-dot:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 10px 24px rgba(15,23,42,.34),
+    0 0 0 7px rgba(255,255,255,.20);
+}
+
+.admin-node-dot--selected {
+  box-shadow:
+    0 0 0 6px rgba(255,255,255,.26),
+    0 0 22px rgba(255,255,255,.58),
+    0 12px 28px rgba(15,23,42,.32);
+}
+
+.leaflet-drag-target .admin-node-dot {
+  cursor: grabbing;
+  transform: scale(1.12);
 }
 
 @keyframes adminNodePulse {
