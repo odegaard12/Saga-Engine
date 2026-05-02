@@ -43,11 +43,41 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
   return {
     color: base,
     fillColor: selected ? '#ffffff' : base,
-    fillOpacity: selected ? 0.98 : 0.82,
-    weight: selected ? 4 : 3,
-    radius: selected ? 10 : 8,
-    ringOpacity: selected ? 0.34 : 0.16,
+    ringOpacity: selected ? 0.28 : 0.14,
+    ringWeight: selected ? 4 : 2,
   }
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function buildPinHtml(stage: AdminReactOverviewStage, selected: boolean, color: string, fill: string) {
+  const title = escapeHtml(stage.title || 'Untitled node')
+  const family = escapeHtml(getFamilyLabel(stage))
+  const label = `${stage.index + 1}`
+
+  return `
+    <div class="admin-node-pin-shell${selected ? ' admin-node-pin-shell--selected' : ''}">
+      <div
+        class="admin-node-pin${selected ? ' admin-node-pin--selected' : ''}"
+        style="--node-color:${color};--node-fill:${fill};"
+        title="${title} · ${family}"
+      >
+        <span class="admin-node-pin__index">${label}</span>
+        <span class="admin-node-pin__grip">⋮⋮</span>
+      </div>
+      <div class="admin-node-label${selected ? ' admin-node-label--selected' : ''}">
+        <strong>${label}. ${title}</strong>
+        <span>${family}</span>
+      </div>
+    </div>
+  `
 }
 
 export default function AdminMissionMap({
@@ -74,6 +104,8 @@ export default function AdminMissionMap({
       attributionControl: false,
       doubleClickZoom: false,
     })
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -128,43 +160,55 @@ export default function AdminMissionMap({
       const ring = L.circle(coords, {
         radius,
         color: visual.color,
-        weight: selected ? 3 : 2,
-        opacity: selected ? 0.88 : 0.54,
+        weight: visual.ringWeight,
+        opacity: selected ? 0.94 : 0.62,
         fillColor: visual.color,
         fillOpacity: visual.ringOpacity,
         className: selected ? 'admin-node-ring admin-node-ring--selected' : 'admin-node-ring',
         bubblingMouseEvents: false,
       }).addTo(map)
 
-      const markerSize = visual.radius * 2 + 8
+      const markerSize = selected ? 74 : 62
       const marker = L.marker(coords, {
         draggable: Boolean(onMoveStage),
         autoPan: true,
         icon: L.divIcon({
           className: 'admin-node-marker-icon',
-          html: `<span class="admin-node-dot${selected ? ' admin-node-dot--selected' : ''}" style="--node-color:${visual.color};--node-fill:${visual.fillColor};--node-size:${visual.radius * 2}px;--node-border:${visual.weight}px"></span>`,
+          html: buildPinHtml(stage, selected, visual.color, visual.fillColor),
           iconSize: [markerSize, markerSize],
           iconAnchor: [markerSize / 2, markerSize / 2],
         }),
       }).addTo(map)
 
-      const label = `${stage.index + 1}. ${stage.title || 'Untitled node'}`
-      const tooltip = `${label} · ${getFamilyLabel(stage)} · ${radius}m`
+      const tooltip = `${stage.index + 1}. ${stage.title || 'Untitled node'} · ${getFamilyLabel(stage)} · ${radius}m`
 
       marker.bindTooltip(tooltip, {
         direction: 'top',
-        opacity: 0.94,
+        opacity: 0.96,
       })
 
-      ring.on('click', (event) => {
+      ring.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
         onSelectStage(stage)
       })
-      marker.on('click', (event) => {
+
+      marker.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
         onSelectStage(stage)
       })
+
+      marker.on('dragstart', () => {
+        onSelectStage(stage)
+        map.getContainer().classList.add('admin-map-dragging-node')
+      })
+
+      marker.on('drag', () => {
+        const next = marker.getLatLng()
+        ring.setLatLng(next)
+      })
+
       marker.on('dragend', () => {
+        map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)
       })
@@ -172,29 +216,31 @@ export default function AdminMissionMap({
       layersRef.current.push(ring, marker)
     })
 
-    if (bounds.length > 1) {
-      map.fitBounds(L.latLngBounds(bounds), {
-        padding: [44, 44],
-        maxZoom: 16,
-        animate: true,
-        duration: 0.35,
-      })
-    } else if (bounds.length === 1) {
-      map.setView(bounds[0], 16, {
-        animate: true,
-        duration: 0.35,
-      })
+    if (!selectedStage) {
+      if (bounds.length > 1) {
+        map.fitBounds(L.latLngBounds(bounds), {
+          padding: [56, 56],
+          maxZoom: 16,
+          animate: true,
+          duration: 0.35,
+        })
+      } else if (bounds.length === 1) {
+        map.setView(bounds[0], 16, {
+          animate: true,
+          duration: 0.35,
+        })
+      }
     }
 
     map.invalidateSize({ pan: false })
-  }, [mappedStages, selectedStage, onSelectStage])
+  }, [mappedStages, selectedStage, onSelectStage, onMoveStage])
 
   useEffect(() => {
     const map = mapRef.current
     const coords = selectedStage ? getStageCoords(selectedStage) : null
     if (!map || !coords) return
 
-    map.flyTo(coords, 16, {
+    map.flyTo(coords, Math.max(map.getZoom(), 16), {
       animate: true,
       duration: 0.35,
     })
@@ -207,7 +253,8 @@ export default function AdminMissionMap({
       <div style={mapChrome}>
         <div>
           <div style={kicker}>Mission map</div>
-          <div style={title}>{mappedStages.length} mapped nodes · click map to add</div>
+          <div style={title}>{mappedStages.length} mapped nodes</div>
+          <div style={helper}>Click map to add · drag numbered pins to move</div>
         </div>
         <div style={legend}>
           <span><i style={{ background: '#34d399' }} /> Signal</span>
@@ -230,7 +277,7 @@ export default function AdminMissionMap({
 
 const shell: React.CSSProperties = {
   position: 'relative',
-  minHeight: 520,
+  minHeight: 580,
   borderRadius: 28,
   overflow: 'hidden',
   border: '1px solid rgba(148,163,184,0.22)',
@@ -257,7 +304,7 @@ const mapChrome: React.CSSProperties = {
   padding: 14,
   borderRadius: 22,
   border: '1px solid rgba(255,255,255,0.16)',
-  background: 'rgba(2,6,23,0.56)',
+  background: 'rgba(2,6,23,0.58)',
   backdropFilter: 'blur(18px)',
   boxShadow: '0 14px 36px rgba(0,0,0,0.24)',
   pointerEvents: 'none',
@@ -277,6 +324,13 @@ const title: React.CSSProperties = {
   fontSize: 18,
   fontWeight: 950,
   letterSpacing: '-0.04em',
+}
+
+const helper: React.CSSProperties = {
+  marginTop: 5,
+  color: '#cbd5e1',
+  fontSize: 11,
+  fontWeight: 750,
 }
 
 const legend: React.CSSProperties = {
@@ -310,25 +364,11 @@ const emptyState: React.CSSProperties = {
 const mapCss = `
 .admin-node-ring {
   cursor: pointer;
-  filter: drop-shadow(0 8px 16px rgba(15,23,42,.18));
+  filter: drop-shadow(0 8px 18px rgba(15,23,42,.24));
 }
 
 .admin-node-ring--selected {
   animation: adminNodePulse 1200ms ease-in-out infinite;
-}
-
-.admin-node-marker {
-  cursor: pointer;
-  filter: drop-shadow(0 6px 14px rgba(15,23,42,.24));
-}
-
-.admin-node-marker--selected {
-  filter: drop-shadow(0 0 16px rgba(255,255,255,.48));
-}
-
-.admin-node-marker:hover,
-.admin-node-ring:hover {
-  opacity: .92;
 }
 
 .admin-node-marker-icon {
@@ -338,37 +378,133 @@ const mapCss = `
   border: 0;
 }
 
-.admin-node-dot {
-  display: block;
-  width: var(--node-size);
-  height: var(--node-size);
+.admin-node-pin-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  transform: translateZ(0);
+}
+
+.admin-node-pin-shell--selected {
+  width: 74px;
+  height: 74px;
+}
+
+.admin-node-pin {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  border: var(--node-border) solid var(--node-color);
-  background: var(--node-fill);
+  border: 4px solid var(--node-color);
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255,255,255,.95), rgba(255,255,255,.68) 28%, var(--node-fill) 72%);
+  color: #020617;
   box-shadow:
-    0 8px 18px rgba(15,23,42,.30),
-    0 0 0 5px rgba(255,255,255,.18);
+    0 0 0 5px rgba(255,255,255,.24),
+    0 0 0 10px rgba(15,23,42,.20),
+    0 12px 28px rgba(2,6,23,.40);
   cursor: grab;
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
-.admin-node-dot:hover {
+.admin-node-pin--selected {
+  width: 42px;
+  height: 42px;
+  border-width: 5px;
+  box-shadow:
+    0 0 0 7px rgba(255,255,255,.30),
+    0 0 0 14px rgba(14,165,233,.18),
+    0 0 28px rgba(255,255,255,.62),
+    0 18px 34px rgba(2,6,23,.46);
+}
+
+.admin-node-pin:hover {
   transform: scale(1.08);
-  box-shadow:
-    0 10px 24px rgba(15,23,42,.34),
-    0 0 0 7px rgba(255,255,255,.20);
 }
 
-.admin-node-dot--selected {
-  box-shadow:
-    0 0 0 6px rgba(255,255,255,.26),
-    0 0 22px rgba(255,255,255,.58),
-    0 12px 28px rgba(15,23,42,.32);
+.admin-node-pin__index {
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1;
 }
 
-.leaflet-drag-target .admin-node-dot {
+.admin-node-pin__grip {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(226,232,240,.92);
+  text-shadow: 0 1px 4px rgba(0,0,0,.7);
+  font-size: 11px;
+  letter-spacing: -4px;
+}
+
+.admin-node-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 5px);
+  transform: translateX(-50%);
+  display: none;
+  min-width: 120px;
+  max-width: 220px;
+  padding: 7px 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(2,6,23,.78);
+  box-shadow: 0 12px 24px rgba(2,6,23,.28);
+  color: #f8fafc;
+  text-align: center;
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.admin-node-label strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.admin-node-label span {
+  display: block;
+  margin-top: 2px;
+  color: #bae6fd;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-node-label--selected {
+  display: block;
+}
+
+.admin-map-dragging-node .admin-node-pin {
   cursor: grabbing;
   transform: scale(1.12);
+}
+
+.admin-node-marker-icon:hover .admin-node-label {
+  display: block;
+}
+
+.admin-node-ring:hover {
+  opacity: .92;
+}
+
+.leaflet-control-zoom {
+  border: 0 !important;
+  box-shadow: 0 12px 28px rgba(2,6,23,.28) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(2,6,23,.74) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  backdrop-filter: blur(14px);
 }
 
 @keyframes adminNodePulse {

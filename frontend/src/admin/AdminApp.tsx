@@ -897,7 +897,7 @@ function NodeDetailDrawer({
   }
 
   return (
-    <div className="admin-drawer-overlay" onClick={onClose} role="presentation">
+    <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="presentation">
       <aside
         className="admin-drawer admin-drawer-editable"
         role="dialog"
@@ -3105,6 +3105,40 @@ const styles = `
 
 .admin-root:not(.admin-root-login-only) .admin-node-map-hint {
   color: rgba(226,232,240,0.76);
+}
+
+
+
+/* Non-blocking map editor drawer */
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+  pointer-events: none !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer {
+  pointer-events: auto !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking::before,
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking::after {
+  pointer-events: none !important;
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer {
+  box-shadow:
+    -22px 0 60px rgba(2,6,23,0.38),
+    inset 1px 0 0 rgba(255,255,255,0.08);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-head {
+  cursor: default;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-map-dragging-node {
+  cursor: grabbing !important;
 }
 
 
