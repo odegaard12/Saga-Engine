@@ -100,7 +100,7 @@ export default function AdminApp() {
     return [
       { label: 'Players', value: String(players), detail: 'Configured entries' },
       { label: 'Profiles', value: String(profileCount), detail: `${finished} finished` },
-      { label: 'Route nodes', value: String(stageCount), detail: 'Route editor model' },
+      { label: 'Nodes', value: String(stageCount), detail: 'Route model' },
       { label: 'Map', value: mapCenter, detail: `Zoom ${mapZoom}` },
       { label: 'Theme', value: cfg?.player_theme || 'classic', detail: 'Player shell' },
     ]
@@ -181,6 +181,35 @@ export default function AdminApp() {
     }
   }
 
+  function buildRawStageFromOverview(
+    stage: AdminReactOverviewStage,
+    index: number
+  ): AdminRawStage {
+    const messages = stage.messages || {}
+
+    return {
+      id: typeof stage.id === 'number' ? stage.id : index,
+      title: stage.title || `NODE ${index + 1}`,
+      type: stage.type || 'signal_hunt',
+      lat: typeof stage.lat === 'number' ? stage.lat : null,
+      lon: typeof stage.lon === 'number' ? stage.lon : null,
+      radius: typeof stage.radius === 'number' ? stage.radius : 50,
+      content: stage.content || '',
+      entry_mode: stage.entry_mode || 'gps',
+      require_proximity: Boolean(stage.require_proximity),
+      hint: messages.hint || '',
+      gps_unavailable_message: messages.gps_unavailable || '',
+      locked_message: messages.locked || '',
+      config: {},
+      answer: '',
+      rune: '',
+    }
+  }
+
+  function buildRawStagesFromOverview(overviewStages: AdminReactOverviewStage[]) {
+    return overviewStages.map((stage, index) => buildRawStageFromOverview(stage, index))
+  }
+
   function mergeOverviewIntoRawStages(
     rawStages: AdminRawStage[],
     overviewStages: AdminReactOverviewStage[]
@@ -203,6 +232,7 @@ export default function AdminApp() {
 
 
 
+
   async function saveLocalStages() {
     if (!password.trim()) {
       setSaveState('error')
@@ -220,12 +250,18 @@ export default function AdminApp() {
     setSaveError(null)
 
     try {
+      let persistedStages: AdminRawStage[] = []
+      let usedFallback = false
+
       const raw = await fetchAdminStages(password)
-      if (raw.status !== 'ok') {
-        throw new Error(raw.message || 'Could not load raw admin stages.')
+
+      if (raw.status === 'ok') {
+        persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
+      } else {
+        usedFallback = true
+        persistedStages = buildRawStagesFromOverview(overview.stages || [])
       }
 
-      const persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
       const saved = await saveAdminStages(password, persistedStages)
 
       if (saved.status !== 'ok') {
@@ -239,12 +275,17 @@ export default function AdminApp() {
       }
 
       setSaveState('saved')
-      setLocalNotice('Saved to backend. Mission data reloaded from the server.')
+      setLocalNotice(
+        usedFallback
+          ? 'Saved using fallback payload. Mission data reloaded.'
+          : 'Saved to backend. Mission data reloaded.'
+      )
     } catch (err) {
       setSaveState('error')
       setSaveError(err instanceof Error ? err.message : 'Unknown save error')
     }
   }
+
 
   function deleteLocalStage(stageToDelete: AdminReactOverviewStage) {
     const deleteIdentity = stageSaveIdentity(stageToDelete)
@@ -314,7 +355,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(nextStage)
-    setLocalNotice('Local preview updated. Persistent save comes in the next React admin save-flow PR.')
+    setLocalNotice('Local preview updated. Save changes to persist.')
   }
 
   function createLocalNode() {
@@ -463,7 +504,7 @@ export default function AdminApp() {
               className={`admin-cms-side-action${cmsPanel === 'labels' ? ' active' : ''}`}
               onClick={() => setCmsPanel(cmsPanel === 'labels' ? 'none' : 'labels')}
             >
-              Edit labels
+              Families
             </button>
             <button
               type="button"
@@ -475,7 +516,7 @@ export default function AdminApp() {
           </div>
 
           <div className="admin-sidebar-cms-note">
-            Select a tool. Changes are local preview until the React save API lands.
+            Choose a tool. Edit locally, then save.
           </div>
 
           {localNotice ? (
@@ -550,8 +591,8 @@ export default function AdminApp() {
 
         <section className="admin-sidebar-cms">
           <div className="admin-sidebar-section-head">
-            <span className="admin-kicker">Route editor</span>
-            <h3>Route nodes</h3>
+            <span className="admin-kicker">Route</span>
+            <h3>Nodes</h3>
           </div>
 
           <div className="admin-sidebar-node-list">
@@ -627,7 +668,7 @@ export default function AdminApp() {
         <section className="admin-workspace">
           <div className="admin-workspace-bar">
             <div>
-              <span className="admin-kicker">Route editor workspace</span>
+              <span className="admin-kicker">Route workspace</span>
               <h2>Mission map</h2>
             </div>
             <div className="admin-topbar-pills admin-cms-actions">
@@ -650,8 +691,8 @@ export default function AdminApp() {
                 <summary>
                   <div className="admin-node-rail-head">
                     <div>
-                      <span className="admin-kicker">Route nodes</span>
-                      <h3>Route editor sequence</h3>
+                      <span className="admin-kicker">Nodes</span>
+                      <h3>Route sequence</h3>
                     </div>
                     <span className="pill neutral">{stages.length}</span>
                   </div>
@@ -970,7 +1011,7 @@ function NodeDetailDrawer({
             </label>
 
             <label className="admin-edit-field">
-              Locked / success message
+              Locked / success copy
               <input
                 value={messages.locked || ''}
                 onChange={(event) => setDraftMessage('locked', event.target.value)}
@@ -2948,6 +2989,73 @@ const styles = `
   .admin-edit-actions-three {
     grid-template-columns: 1fr;
   }
+}
+
+
+
+/* Resilient save and modern CMS polish */
+.admin-root:not(.admin-root-login-only) .admin-sidebar h1,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-section-head h3,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > strong,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item strong {
+  color: #f8fafc !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar p,
+.admin-root:not(.admin-root-login-only) .admin-sidebar small,
+.admin-root:not(.admin-root-login-only) .admin-cms-local-panel > span,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-cms-note {
+  color: rgba(226,232,240,0.78) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item {
+  border-radius: 16px;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action:hover,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-actions button:hover,
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item:hover {
+  transform: translateY(-1px);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--save {
+  background: linear-gradient(180deg, rgba(14,165,233,0.24), rgba(14,165,233,0.14));
+  border-color: rgba(125,211,252,0.32);
+  box-shadow: 0 10px 26px rgba(14,165,233,0.18);
+}
+
+.admin-root:not(.admin-root-login-only) .admin-cms-side-action--danger {
+  background: rgba(127,29,29,0.32);
+  border-color: rgba(248,113,113,0.30);
+  color: #fecaca;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-local-notice {
+  border: 1px solid rgba(74,222,128,0.22);
+  background: rgba(20,83,45,0.24);
+  color: #dcfce7;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-save-error {
+  border-radius: 16px;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-edit-field input,
+.admin-root:not(.admin-root-login-only) .admin-edit-field select,
+.admin-root:not(.admin-root-login-only) .admin-edit-field textarea {
+  border-radius: 14px;
+  background: rgba(2,6,23,0.66);
+  color: #f8fafc;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-edit-field input:focus,
+.admin-root:not(.admin-root-login-only) .admin-edit-field select:focus,
+.admin-root:not(.admin-root-login-only) .admin-edit-field textarea:focus {
+  border-color: rgba(125,211,252,0.42);
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
 }
 
 

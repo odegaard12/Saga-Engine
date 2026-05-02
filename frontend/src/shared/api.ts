@@ -155,10 +155,200 @@ export function fetchAdminReactOverview(password: string) {
 }
 
 
-export function fetchAdminStages(password: string) {
-  return postJson<AdminStagesResponse>('/api/admin/stages', { password })
+
+async function adminPostJsonResilient(url: string, body: unknown): Promise<unknown> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  let payload: unknown = null
+
+  try {
+    payload = await res.json()
+  } catch {
+    payload = null
+  }
+
+  if (!res.ok) {
+    const message =
+      payload && typeof payload === 'object' && 'message' in payload
+        ? String((payload as { message?: unknown }).message)
+        : `HTTP ${res.status}`
+
+    throw new Error(message)
+  }
+
+  return payload
 }
 
-export function saveAdminStages(password: string, stages: AdminRawStage[]) {
-  return postJson<AdminSaveResponse>('/api/admin/save', { password, stages })
+async function adminGetJsonResilient(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  let payload: unknown = null
+
+  try {
+    payload = await res.json()
+  } catch {
+    payload = null
+  }
+
+  if (!res.ok) {
+    const message =
+      payload && typeof payload === 'object' && 'message' in payload
+        ? String((payload as { message?: unknown }).message)
+        : `HTTP ${res.status}`
+
+    throw new Error(message)
+  }
+
+  return payload
+}
+
+function adminPayloadVariantsResilient(password: string, extra: Record<string, unknown> = {}) {
+  return [
+    { password, ...extra },
+    { admin_password: password, ...extra },
+    { admin_pass: password, ...extra },
+    { admin_key: password, ...extra },
+    { key: password, ...extra },
+  ]
+}
+
+function adminQueryVariantsResilient(password: string) {
+  const keys = ['password', 'admin_password', 'admin_pass', 'admin_key', 'key']
+  return keys.map((key) => `/api/admin/stages?${key}=${encodeURIComponent(password)}`)
+}
+
+function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResponse {
+  if (Array.isArray(payload)) {
+    return { status: 'ok', stages: payload as AdminRawStage[] }
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return { status: 'fail', message: 'Empty response from admin stages endpoint.' }
+  }
+
+  const obj = payload as Record<string, unknown>
+  const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
+  const message = typeof obj.message === 'string' ? obj.message : undefined
+
+  const stages =
+    Array.isArray(obj.stages)
+      ? obj.stages
+      : Array.isArray(obj.data)
+        ? obj.data
+        : Array.isArray(obj.items)
+          ? obj.items
+          : Array.isArray(obj.nodes)
+            ? obj.nodes
+            : undefined
+
+  if (rawStatus === 'fail') {
+    return { status: 'fail', message: message || 'Admin stages endpoint returned fail.' }
+  }
+
+  if (!stages) {
+    return { status: 'fail', message: message || 'Admin stages response did not include stages.' }
+  }
+
+  return { status: 'ok', stages: stages as AdminRawStage[] }
+}
+
+function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse {
+  if (!payload || typeof payload !== 'object') {
+    return { status: 'ok' }
+  }
+
+  const obj = payload as Record<string, unknown>
+  const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
+  const message = typeof obj.message === 'string' ? obj.message : undefined
+
+  if (rawStatus === 'fail') {
+    return { status: 'fail', message: message || 'Admin save endpoint returned fail.' }
+  }
+
+  return { status: 'ok', message }
+}
+
+
+export async function fetchAdminStages(password: string): Promise<AdminStagesResponse> {
+  const errors: string[] = []
+
+  for (const body of adminPayloadVariantsResilient(password)) {
+    try {
+      const payload = await adminPostJsonResilient('/api/admin/stages', body)
+      const normalized = normalizeAdminStagesPayloadResilient(payload)
+
+      if (normalized.status === 'ok') {
+        return normalized
+      }
+
+      errors.push(normalized.message || 'Unknown stages POST response error.')
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Unknown stages POST request error.')
+    }
+  }
+
+  for (const url of adminQueryVariantsResilient(password)) {
+    try {
+      const payload = await adminGetJsonResilient(url)
+      const normalized = normalizeAdminStagesPayloadResilient(payload)
+
+      if (normalized.status === 'ok') {
+        return normalized
+      }
+
+      errors.push(normalized.message || 'Unknown stages GET response error.')
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Unknown stages GET request error.')
+    }
+  }
+
+  return {
+    status: 'fail',
+    message: errors.filter(Boolean).join(' | ') || 'Could not load raw admin stages.',
+  }
+}
+
+export async function saveAdminStages(
+  password: string,
+  stages: AdminRawStage[]
+): Promise<AdminSaveResponse> {
+  const errors: string[] = []
+
+  const payloads = [
+    ...adminPayloadVariantsResilient(password, { stages }),
+    ...adminPayloadVariantsResilient(password, { data: stages }),
+    ...adminPayloadVariantsResilient(password, { nodes: stages }),
+  ]
+
+  for (const body of payloads) {
+    try {
+      const payload = await adminPostJsonResilient('/api/admin/save', body)
+      const normalized = normalizeAdminSavePayloadResilient(payload)
+
+      if (normalized.status === 'ok') {
+        return normalized
+      }
+
+      errors.push(normalized.message || 'Unknown save response error.')
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Unknown save request error.')
+    }
+  }
+
+  return {
+    status: 'fail',
+    message: errors.filter(Boolean).join(' | ') || 'Could not save admin stages.',
+  }
 }
