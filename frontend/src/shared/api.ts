@@ -30,6 +30,13 @@ export type AdminReactOverviewStage = {
 
 export type AdminRawStage = Record<string, unknown>
 
+
+export type AdminConfigSaveResponse = {
+  status: 'ok' | 'fail'
+  message?: string
+}
+
+
 export type AdminStagesResponse = {
   status: 'ok' | 'fail'
   message?: string
@@ -350,5 +357,85 @@ export async function saveAdminStages(
   return {
     status: 'fail',
     message: errors.filter(Boolean).join(' | ') || 'Could not save admin stages.',
+  }
+}
+
+
+function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveResponse {
+  if (!payload || typeof payload !== 'object') {
+    return { status: 'ok' }
+  }
+
+  const obj = payload as Record<string, unknown>
+  const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
+  const message = typeof obj.message === 'string' ? obj.message : undefined
+
+  if (rawStatus === 'fail') {
+    return { status: 'fail', message: message || 'Admin config save endpoint returned fail.' }
+  }
+
+  return { status: 'ok', message }
+}
+
+function adminConfigPayloadVariants(password: string, config: Record<string, unknown>) {
+  return [
+    { password, config },
+    { admin_password: password, config },
+    { admin_pass: password, config },
+    { admin_key: password, config },
+    { key: password, config },
+    { password, data: config },
+    { password, ...config },
+  ]
+}
+
+
+export async function saveAdminConfig(password: string, config: Record<string, unknown>): Promise<AdminConfigSaveResponse> {
+  const errors: string[] = []
+
+  for (const body of adminConfigPayloadVariants(password, config)) {
+    try {
+      const res = await fetch('/api/admin/save-config', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      let payload: unknown = null
+
+      try {
+        payload = await res.json()
+      } catch {
+        payload = null
+      }
+
+      if (!res.ok) {
+        const message =
+          payload && typeof payload === 'object' && 'message' in payload
+            ? String((payload as { message?: unknown }).message)
+            : `HTTP ${res.status}`
+
+        errors.push(message)
+        continue
+      }
+
+      const normalized = normalizeAdminConfigSavePayload(payload)
+
+      if (normalized.status === 'ok') {
+        return normalized
+      }
+
+      errors.push(normalized.message || 'Unknown config save response error.')
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : 'Unknown config save request error.')
+    }
+  }
+
+  return {
+    status: 'fail',
+    message: errors.filter(Boolean).join(' | ') || 'Could not save admin config.',
   }
 }
