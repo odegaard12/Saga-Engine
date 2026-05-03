@@ -6,6 +6,7 @@ import {
   fetchAdminStages,
   fetchPublicConfig,
   saveAdminStages,
+  saveAdminConfig,
   type AdminRawStage,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
@@ -58,6 +59,9 @@ export default function AdminApp() {
   const [localNotice, setLocalNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
+  const [missionDraft, setMissionDraft] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -105,6 +109,100 @@ export default function AdminApp() {
       { label: 'Theme', value: cfg?.player_theme || 'classic', detail: 'Player shell' },
     ]
   }, [config, overview])
+
+  function getConfigTextValue(source: Record<string, unknown>, key: string, fallback = '') {
+    const value = source[key]
+    if (typeof value === 'string' || typeof value === 'number') return String(value)
+    return fallback
+  }
+
+  function buildMissionDraft(source: Record<string, unknown>) {
+    const center = Array.isArray(source.map_center) ? source.map_center : config?.map_center
+    const centerLat = Array.isArray(center) ? center[0] : 40.4168
+    const centerLon = Array.isArray(center) ? center[1] : -3.7038
+
+    return {
+      site_name: getConfigTextValue(source, 'site_name', config?.site_name || ''),
+      admin_title: getConfigTextValue(source, 'admin_title', config?.admin_title || ''),
+      admin_subtitle: getConfigTextValue(source, 'admin_subtitle', config?.admin_subtitle || ''),
+      login_subtitle: getConfigTextValue(source, 'login_subtitle', ''),
+      story_title: getConfigTextValue(source, 'story_title', ''),
+      story_text: getConfigTextValue(source, 'story_text', ''),
+      prologue_title: getConfigTextValue(source, 'prologue_title', ''),
+      prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
+      prologue_body: getConfigTextValue(source, 'prologue_body', ''),
+      player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || 'classic'),
+      map_center_lat: String(centerLat ?? 40.4168),
+      map_center_lon: String(centerLon ?? -3.7038),
+      map_zoom: getConfigTextValue(source, 'map_zoom', String(config?.map_zoom || 13)),
+    }
+  }
+
+  function updateMissionDraft(key: string, value: string) {
+    setMissionDraft((current) => ({
+      ...current,
+      [key]: value,
+    }))
+    setSettingsSaveState('idle')
+  }
+
+  function buildMissionConfigPayload() {
+    const base = ((overview?.config || config || {}) as unknown as Record<string, unknown>)
+    const lat = Number(missionDraft.map_center_lat)
+    const lon = Number(missionDraft.map_center_lon)
+    const zoom = Number(missionDraft.map_zoom)
+
+    return {
+      ...base,
+      site_name: missionDraft.site_name || 'SAGA Engine',
+      admin_title: missionDraft.admin_title || 'Mission editor',
+      admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
+      login_subtitle: missionDraft.login_subtitle || '',
+      story_title: missionDraft.story_title || '',
+      story_text: missionDraft.story_text || '',
+      prologue_title: missionDraft.prologue_title || '',
+      prologue_subtitle: missionDraft.prologue_subtitle || '',
+      prologue_body: missionDraft.prologue_body || '',
+      player_theme: missionDraft.player_theme || 'classic',
+      map_center: [
+        Number.isFinite(lat) ? lat : 40.4168,
+        Number.isFinite(lon) ? lon : -3.7038,
+      ],
+      map_zoom: Number.isFinite(zoom) ? zoom : 13,
+    }
+  }
+
+  async function saveMissionSettings() {
+    if (!password.trim()) {
+      setSettingsSaveState('error')
+      setSettingsSaveError('Admin password is missing. Unlock the admin again.')
+      return
+    }
+
+    setSettingsSaveState('saving')
+    setSettingsSaveError(null)
+
+    try {
+      const payload = buildMissionConfigPayload()
+      const saved = await saveAdminConfig(password, payload)
+
+      if (saved.status !== 'ok') {
+        throw new Error(saved.message || 'Could not save mission settings.')
+      }
+
+      const refreshed = await fetchAdminReactOverview(password)
+      if (refreshed.status === 'ok') {
+        setOverview(refreshed)
+        setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
+      }
+
+      setSettingsSaveState('saved')
+      setLocalNotice('Mission settings saved. Admin and player config reloaded.')
+    } catch (err) {
+      setSettingsSaveState('error')
+      setSettingsSaveError(err instanceof Error ? err.message : 'Unknown settings save error')
+    }
+  }
 
   function loadOverview() {
     if (!password.trim()) {
@@ -623,26 +721,135 @@ export default function AdminApp() {
               </button>
             </div>
           ) : null}
-
           {cmsPanel === 'mission' ? (
-            <div className="admin-cms-local-panel">
+            <div className="admin-cms-local-panel admin-settings-panel">
               <strong>Settings</strong>
-              <span>Basic text/config surface. Persistent save comes next.</span>
+              <span>Edit mission/admin text and map defaults. Save settings to persist.</span>
+
+              <label>
+                Site name
+                <input
+                  value={missionDraft.site_name || ''}
+                  onChange={(event) => updateMissionDraft('site_name', event.target.value)}
+                />
+              </label>
 
               <label>
                 Admin title
-                <input value={title} readOnly />
+                <input
+                  value={missionDraft.admin_title || ''}
+                  onChange={(event) => updateMissionDraft('admin_title', event.target.value)}
+                />
               </label>
 
               <label>
                 Admin subtitle
-                <input value={subtitle} readOnly />
+                <input
+                  value={missionDraft.admin_subtitle || ''}
+                  onChange={(event) => updateMissionDraft('admin_subtitle', event.target.value)}
+                />
               </label>
 
               <label>
-                Theme
-                <input value={overview?.config?.player_theme || config?.player_theme || 'classic'} readOnly />
+                Login subtitle
+                <input
+                  value={missionDraft.login_subtitle || ''}
+                  onChange={(event) => updateMissionDraft('login_subtitle', event.target.value)}
+                />
               </label>
+
+              <label>
+                Player theme
+                <select
+                  value={missionDraft.player_theme || 'classic'}
+                  onChange={(event) => updateMissionDraft('player_theme', event.target.value)}
+                >
+                  <option value="classic">classic</option>
+                  <option value="glass">glass</option>
+                </select>
+              </label>
+
+              <div className="admin-settings-grid">
+                <label>
+                  Map latitude
+                  <input
+                    value={missionDraft.map_center_lat || ''}
+                    onChange={(event) => updateMissionDraft('map_center_lat', event.target.value)}
+                  />
+                </label>
+
+                <label>
+                  Map longitude
+                  <input
+                    value={missionDraft.map_center_lon || ''}
+                    onChange={(event) => updateMissionDraft('map_center_lon', event.target.value)}
+                  />
+                </label>
+
+                <label>
+                  Map zoom
+                  <input
+                    value={missionDraft.map_zoom || ''}
+                    onChange={(event) => updateMissionDraft('map_zoom', event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label>
+                Story title
+                <input
+                  value={missionDraft.story_title || ''}
+                  onChange={(event) => updateMissionDraft('story_title', event.target.value)}
+                />
+              </label>
+
+              <label>
+                Story text
+                <textarea
+                  value={missionDraft.story_text || ''}
+                  onChange={(event) => updateMissionDraft('story_text', event.target.value)}
+                />
+              </label>
+
+              <label>
+                Prologue title
+                <input
+                  value={missionDraft.prologue_title || ''}
+                  onChange={(event) => updateMissionDraft('prologue_title', event.target.value)}
+                />
+              </label>
+
+              <label>
+                Prologue subtitle
+                <input
+                  value={missionDraft.prologue_subtitle || ''}
+                  onChange={(event) => updateMissionDraft('prologue_subtitle', event.target.value)}
+                />
+              </label>
+
+              <label>
+                Prologue body
+                <textarea
+                  value={missionDraft.prologue_body || ''}
+                  onChange={(event) => updateMissionDraft('prologue_body', event.target.value)}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="admin-cms-side-action admin-cms-side-action--save"
+                onClick={saveMissionSettings}
+                disabled={settingsSaveState === 'saving'}
+              >
+                {settingsSaveState === 'saving' ? 'Saving settings…' : settingsSaveState === 'saved' ? 'Settings saved' : 'Save settings'}
+              </button>
+
+              {settingsSaveState === 'error' && settingsSaveError ? (
+                <div className="admin-save-error">
+                  <strong>Settings save failed</strong>
+                  <span>{settingsSaveError}</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -3269,6 +3476,64 @@ const styles = `
 
 @media (max-width: 760px) {
   .admin-reorder-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* Persistent mission settings */
+.admin-settings-panel {
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.admin-settings-panel label {
+  display: grid;
+  gap: 5px;
+  color: rgba(226,232,240,0.78);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.admin-settings-panel input,
+.admin-settings-panel select,
+.admin-settings-panel textarea {
+  width: 100%;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 13px;
+  background: rgba(2,6,23,0.62);
+  color: #f8fafc;
+  padding: 10px 11px;
+  font: inherit;
+  outline: none;
+}
+
+.admin-settings-panel textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.admin-settings-panel input:focus,
+.admin-settings-panel select:focus,
+.admin-settings-panel textarea:focus {
+  border-color: rgba(125,211,252,0.42);
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.admin-settings-grid label:last-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+  .admin-settings-grid {
     grid-template-columns: 1fr;
   }
 }
