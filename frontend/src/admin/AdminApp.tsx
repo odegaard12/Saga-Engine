@@ -324,6 +324,53 @@ export default function AdminApp() {
     setLocalNotice('Node removed locally. Save changes to persist deletion.')
   }
 
+  function reorderLocalStage(
+    stageToMove: AdminReactOverviewStage,
+    direction: 'up' | 'down'
+  ) {
+    const moveIdentity = stageSaveIdentity(stageToMove)
+    let movedStage: AdminReactOverviewStage | null = null
+
+    setOverview((current) => {
+      if (!current) return current
+
+      const currentStages = current.stages || []
+      const fromIndex = currentStages.findIndex((stage) => stageSaveIdentity(stage) === moveIdentity)
+      if (fromIndex < 0) return current
+
+      const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
+      if (toIndex < 0 || toIndex >= currentStages.length) return current
+
+      const nextStages = [...currentStages]
+      const [stage] = nextStages.splice(fromIndex, 1)
+      nextStages.splice(toIndex, 0, stage)
+
+      const reindexedStages = nextStages.map((item, index) => ({
+        ...item,
+        index,
+      }))
+
+      movedStage = reindexedStages[toIndex] || null
+
+      return {
+        ...current,
+        stages: reindexedStages,
+        counts: current.counts
+          ? {
+              ...current.counts,
+              stages: reindexedStages.length,
+            }
+          : current.counts,
+      }
+    })
+
+    if (movedStage) {
+      setSelectedStage(movedStage)
+      setSaveState('idle')
+      setLocalNotice('Route order updated locally. Save changes to persist.')
+    }
+  }
+
 
   function syncLocalStage(nextStage: AdminReactOverviewStage) {
     setOverview((current) => {
@@ -744,8 +791,8 @@ export default function AdminApp() {
 
           <div className="admin-operator-strip admin-operator-strip-compact">
             <div>
-              <strong>CMS mode coming next</strong>
-              <span>Select a node to inspect it. Editing, create/delete/reorder and player/team management come through the next save-flow PRs.</span>
+              <strong>Route CMS mode</strong>
+              <span>Select, move, edit, create or delete nodes. Save changes when the route is ready.</span>
             </div>
             <span className="pill warn">Inspect mode</span>
           </div>
@@ -758,6 +805,9 @@ export default function AdminApp() {
           onClose={() => setSelectedStage(null)}
           onApplyLocal={syncLocalStage}
           onDeleteLocal={deleteLocalStage}
+          onMoveLocal={reorderLocalStage}
+          canMoveUp={selectedStage.index > 0}
+          canMoveDown={selectedStage.index < stages.length - 1}
         />
       ) : null}
     </main>
@@ -851,11 +901,17 @@ function NodeDetailDrawer({
   onClose,
   onApplyLocal,
   onDeleteLocal,
+  onMoveLocal,
+  canMoveUp,
+  canMoveDown,
 }: {
   stage: AdminReactOverviewStage
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
+  onMoveLocal: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
+  canMoveUp: boolean
+  canMoveDown: boolean
 }) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
@@ -1061,6 +1117,37 @@ function NodeDetailDrawer({
                 <small>No config keys exposed yet.</small>
               )}
             </div>
+          </section>
+
+          <section className="admin-edit-section admin-reorder-section">
+            <div className="admin-edit-section-head">
+              <strong>Route order</strong>
+              <span>Local reorder</span>
+            </div>
+
+            <div className="admin-reorder-actions">
+              <button
+                type="button"
+                className="admin-cms-side-action"
+                disabled={!canMoveUp}
+                onClick={() => onMoveLocal(draft, 'up')}
+              >
+                Move up
+              </button>
+
+              <button
+                type="button"
+                className="admin-cms-side-action"
+                disabled={!canMoveDown}
+                onClick={() => onMoveLocal(draft, 'down')}
+              >
+                Move down
+              </button>
+            </div>
+
+            <small className="admin-reorder-note">
+              Current route position: {draft.index + 1}. Save changes to persist the new order.
+            </small>
           </section>
 
           <div className="admin-edit-actions admin-edit-actions-three">
@@ -3139,6 +3226,51 @@ const styles = `
 
 .admin-root:not(.admin-root-login-only) .admin-map-dragging-node {
   cursor: grabbing !important;
+}
+
+
+
+/* Node reorder controls */
+.admin-reorder-section {
+  border-color: rgba(125,211,252,0.14);
+  background:
+    radial-gradient(circle at top left, rgba(14,165,233,0.10), transparent 42%),
+    rgba(255,255,255,0.035);
+}
+
+.admin-reorder-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.admin-reorder-actions .admin-cms-side-action {
+  justify-content: center;
+  min-height: 42px;
+  text-align: center;
+}
+
+.admin-reorder-actions .admin-cms-side-action:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.admin-reorder-note {
+  color: rgba(226,232,240,0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-sidebar-node-item span:first-child,
+.admin-root:not(.admin-root-login-only) .admin-node-card .admin-node-top > span {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .admin-reorder-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 
