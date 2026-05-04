@@ -20,6 +20,27 @@ type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
 type EditableAdminStage = AdminReactOverviewStage & { config?: Record<string, unknown> }
 
+function getAdminFamilyLabel(type: string) {
+  if (type === 'bearing_hunt') return 'Bearing Hunt'
+  if (type === 'circuit_matrix') return 'Circuit Matrix'
+  return 'Signal Hunt'
+}
+
+function getAdminFamilyIcon(type: string) {
+  if (type === 'bearing_hunt') return '🧭'
+  if (type === 'circuit_matrix') return '🧩'
+  return '📡'
+}
+
+function buildAdminMinigameBlock(type: string, config: Record<string, unknown>) {
+  return {
+    type,
+    version: 'v1',
+    label: getAdminFamilyLabel(type),
+    config,
+  }
+}
+
 type PlayerDraft = {
   id: string
   display_name: string
@@ -507,6 +528,10 @@ export default function AdminApp() {
         ...rawConfig,
         ...localConfig,
       },
+      minigame: buildAdminMinigameBlock(stage.type || 'signal_hunt', {
+        ...rawConfig,
+        ...localConfig,
+      }),
       answer: rawStage?.answer ?? '',
       rune: rawStage?.rune ?? '',
     }
@@ -535,6 +560,12 @@ export default function AdminApp() {
         typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
           ? ((stage as EditableAdminStage).config as Record<string, unknown>)
           : {},
+      minigame: buildAdminMinigameBlock(
+        stage.type || 'signal_hunt',
+        typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+          ? ((stage as EditableAdminStage).config as Record<string, unknown>)
+          : {}
+      ),
       answer: '',
       rune: '',
     }
@@ -1520,6 +1551,7 @@ function NodeDetailDrawer({
       ...(current as EditableAdminStage),
       type: nextType,
       label: getFamilyLabelForType(nextType),
+      icon: getAdminFamilyIcon(nextType),
       objective: String(nextConfig.objective || ''),
       config: nextConfig,
       config_summary: Object.keys(nextConfig),
