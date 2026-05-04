@@ -1480,6 +1480,52 @@ function NodeDetailDrawer({
     updateDraftConfig('sequence', parts.length > 0 ? parts : value)
   }
 
+  function getDefaultConfigForFamily(type: FamilyId): Record<string, unknown> {
+    if (type === 'bearing_hunt') {
+      return {
+        objective: 'single_lock',
+        target_bearing: 270,
+        tolerance_deg: 12,
+        hold_ms: 1200,
+      }
+    }
+
+    if (type === 'circuit_matrix') {
+      return {
+        objective: 'sequence',
+        sequence: ['alpha', 'beta', 'gamma'],
+        difficulty: 'normal',
+        grid_size: 3,
+      }
+    }
+
+    return {
+      objective: 'proximity_lock',
+      source_radius_m: 75,
+      lock_threshold: 65,
+      hold_ms: 1500,
+    }
+  }
+
+  function getFamilyLabelForType(type: FamilyId) {
+    if (type === 'bearing_hunt') return 'Bearing Hunt'
+    if (type === 'circuit_matrix') return 'Circuit Matrix'
+    return 'Signal Hunt'
+  }
+
+  function handleDraftFamilyChange(nextType: FamilyId) {
+    const nextConfig = getDefaultConfigForFamily(nextType)
+
+    setDraft((current) => ({
+      ...(current as EditableAdminStage),
+      type: nextType,
+      label: getFamilyLabelForType(nextType),
+      objective: String(nextConfig.objective || ''),
+      config: nextConfig,
+      config_summary: Object.keys(nextConfig),
+    }))
+  }
+
   useEffect(() => {
     setDraft(stage)
   }, [stage])
@@ -1555,15 +1601,7 @@ function NodeDetailDrawer({
               Family
               <select
                 value={draft.type || 'signal_hunt'}
-                onChange={(event) => {
-                  const nextType = event.target.value
-                  const nextFamily = familyCards.find((item) => item.id === nextType)
-                  setDraft((current) => ({
-                    ...current,
-                    type: nextType,
-                    label: nextFamily?.title || nextType,
-                  }))
-                }}
+                onChange={(event) => handleDraftFamilyChange(event.target.value as FamilyId)}
               >
                 {familyCards.map((item) => (
                   <option key={item.id} value={item.id}>{item.title}</option>
