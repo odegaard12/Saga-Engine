@@ -1418,7 +1418,15 @@ async def admin_react_overview(request: Request):
         "circuit_matrix": 0,
     }
     for stage in stage_summaries:
-        stage_type = stage.get("type")
+        # react_overview_family_fix_v1
+        raw_minigame = stage.get("minigame") if isinstance(stage.get("minigame"), dict) else {}
+        stage_type = _as_str(raw_minigame.get("type") or stage.get("type")).strip().lower()
+        if stage_type not in SUPPORTED_MINIGAME_TYPES:
+            stage_type = normalize_stage(stage)["interaction"]["type"]
+        stage_config = stage.get("config") if isinstance(stage.get("config"), dict) else raw_minigame.get("config")
+        if not isinstance(stage_config, dict):
+            stage_config = normalize_stage(stage)["interaction"].get("config") or {}
+        stage_label = MINIGAME_SPECS.get(stage_type, {}).get("label") or stage_type.replace("_", " ").title()
         if stage_type in family_counts:
             family_counts[stage_type] += 1
 
@@ -1445,7 +1453,7 @@ async def admin_react_overview(request: Request):
             "family_counts": family_counts,
         },
         "families": [
-            {"id": "signal_hunt", "label": "Signal Hunt"},
+            {"id": "signal_hunt", "label": stage_label},
             {"id": "bearing_hunt", "label": "Bearing Hunt"},
             {"id": "circuit_matrix", "label": "Circuit Matrix"},
         ],
