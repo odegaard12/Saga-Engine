@@ -18,6 +18,8 @@ type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+type EditableAdminStage = AdminReactOverviewStage & { config?: Record<string, unknown> }
+
 type PlayerDraft = {
   id: string
   display_name: string
@@ -475,6 +477,14 @@ export default function AdminApp() {
     stage: AdminReactOverviewStage
   ): AdminRawStage {
     const messages = stage.messages || {}
+    const rawConfig =
+      typeof rawStage?.config === 'object' && rawStage?.config !== null
+        ? (rawStage.config as Record<string, unknown>)
+        : {}
+    const localConfig =
+      typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+        ? ((stage as EditableAdminStage).config as Record<string, unknown>)
+        : {}
 
     return {
       ...(rawStage || {}),
@@ -493,10 +503,10 @@ export default function AdminApp() {
       hint: messages.hint || '',
       gps_unavailable_message: messages.gps_unavailable || '',
       locked_message: messages.locked || '',
-      config:
-        typeof rawStage?.config === 'object' && rawStage?.config !== null
-          ? rawStage.config
-          : {},
+      config: {
+        ...rawConfig,
+        ...localConfig,
+      },
       answer: rawStage?.answer ?? '',
       rune: rawStage?.rune ?? '',
     }
@@ -521,7 +531,10 @@ export default function AdminApp() {
       hint: messages.hint || '',
       gps_unavailable_message: messages.gps_unavailable || '',
       locked_message: messages.locked || '',
-      config: {},
+      config:
+        typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+          ? ((stage as EditableAdminStage).config as Record<string, unknown>)
+          : {},
       answer: '',
       rune: '',
     }
@@ -1426,6 +1439,47 @@ function NodeDetailDrawer({
 }) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
+
+  const draftConfig =
+    typeof (draft as EditableAdminStage).config === 'object' && (draft as EditableAdminStage).config !== null
+      ? (((draft as EditableAdminStage).config || {}) as Record<string, unknown>)
+      : {}
+
+  function getDraftConfigText(key: string, fallback = '') {
+    const value = draftConfig[key]
+    if (Array.isArray(value)) return value.join(', ')
+    if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return String(value)
+    return fallback
+  }
+
+  function updateDraftConfig(key: string, value: unknown) {
+    setDraft((current: AdminReactOverviewStage) => ({
+      ...(current as EditableAdminStage),
+      config: {
+        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
+        [key]: value,
+      },
+    }))
+  }
+
+  function updateDraftConfigText(key: string, value: string) {
+    updateDraftConfig(key, value)
+  }
+
+  function updateDraftConfigNumber(key: string, value: string) {
+    const parsed = Number(value)
+    updateDraftConfig(key, Number.isFinite(parsed) ? parsed : value)
+  }
+
+  function updateDraftConfigSequence(value: string) {
+    const parts = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    updateDraftConfig('sequence', parts.length > 0 ? parts : value)
+  }
+
   useEffect(() => {
     setDraft(stage)
   }, [stage])
@@ -1615,19 +1669,119 @@ function NodeDetailDrawer({
             </label>
           </section>
 
-          <section className="admin-edit-section">
+          <section className="admin-edit-section admin-family-config-section">
             <div className="admin-edit-section-head">
               <strong>Runtime config</strong>
-              <span>Schema editor next</span>
+              <span>{draft.type === 'signal_hunt' ? 'Signal Hunt' : draft.type === 'bearing_hunt' ? 'Bearing Hunt' : 'Circuit Matrix'}</span>
             </div>
 
-            <div className="admin-chip-wrap">
-              {configSummary.length ? (
-                configSummary.map((key) => <code key={key}>{key}</code>)
-              ) : (
-                <small>No config keys exposed yet.</small>
-              )}
+            <div className="admin-family-config-grid">
+              <label>
+                Objective
+                <input
+                  value={getDraftConfigText('objective')}
+                  placeholder="proximity_lock, single_lock, sequence..."
+                  onChange={(event) => updateDraftConfigText('objective', event.target.value)}
+                />
+              </label>
+
+              {draft.type === 'signal_hunt' ? (
+                <>
+                  <label>
+                    Source radius meters
+                    <input
+                      value={getDraftConfigText('source_radius_m')}
+                      placeholder="75"
+                      onChange={(event) => updateDraftConfigNumber('source_radius_m', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Lock threshold
+                    <input
+                      value={getDraftConfigText('lock_threshold')}
+                      placeholder="65"
+                      onChange={(event) => updateDraftConfigNumber('lock_threshold', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Hold milliseconds
+                    <input
+                      value={getDraftConfigText('hold_ms')}
+                      placeholder="1500"
+                      onChange={(event) => updateDraftConfigNumber('hold_ms', event.target.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              {draft.type === 'bearing_hunt' ? (
+                <>
+                  <label>
+                    Target bearing
+                    <input
+                      value={getDraftConfigText('target_bearing')}
+                      placeholder="270"
+                      onChange={(event) => updateDraftConfigNumber('target_bearing', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Tolerance degrees
+                    <input
+                      value={getDraftConfigText('tolerance_deg')}
+                      placeholder="12"
+                      onChange={(event) => updateDraftConfigNumber('tolerance_deg', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Hold milliseconds
+                    <input
+                      value={getDraftConfigText('hold_ms')}
+                      placeholder="1200"
+                      onChange={(event) => updateDraftConfigNumber('hold_ms', event.target.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              {draft.type === 'circuit_matrix' ? (
+                <>
+                  <label>
+                    Sequence
+                    <input
+                      value={getDraftConfigText('sequence')}
+                      placeholder="alpha, beta, gamma"
+                      onChange={(event) => updateDraftConfigSequence(event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Difficulty
+                    <input
+                      value={getDraftConfigText('difficulty')}
+                      placeholder="normal"
+                      onChange={(event) => updateDraftConfigText('difficulty', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Grid size
+                    <input
+                      value={getDraftConfigText('grid_size')}
+                      placeholder="3"
+                      onChange={(event) => updateDraftConfigNumber('grid_size', event.target.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
             </div>
+
+            <small className="admin-family-config-note">
+              Config edits are local until you apply preview and save changes.
+            </small>
           </section>
 
           <section className="admin-edit-section admin-reorder-section">
@@ -3929,6 +4083,51 @@ const styles = `
   .admin-player-actions {
     grid-template-columns: 1fr;
   }
+}
+
+
+
+/* Family config editor */
+.admin-family-config-section {
+  border-color: rgba(168,85,247,0.18);
+  background:
+    radial-gradient(circle at top left, rgba(168,85,247,0.10), transparent 42%),
+    rgba(255,255,255,0.035);
+}
+
+.admin-family-config-grid {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-family-config-grid label {
+  display: grid;
+  gap: 5px;
+  color: rgba(226,232,240,0.78);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.admin-family-config-grid input {
+  width: 100%;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 13px;
+  background: rgba(2,6,23,0.62);
+  color: #f8fafc;
+  padding: 10px 11px;
+  font: inherit;
+  outline: none;
+}
+
+.admin-family-config-grid input:focus {
+  border-color: rgba(168,85,247,0.44);
+  box-shadow: 0 0 0 4px rgba(168,85,247,0.12);
+}
+
+.admin-family-config-note {
+  color: rgba(226,232,240,0.68);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 
