@@ -1072,17 +1072,10 @@ async def react_player(name: str):
     return react_index_or_missing()
 
 @app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin", response_class=HTMLResponse)
-async def admin(request: Request):
-    cfg = load_config()
-    return templates.TemplateResponse(
-        request=request,
-        name="admin.html",
-        context={
-            "request": request,
-            "config": cfg
-        }
-    )
+@app.get("/admin")
+async def admin_redirect_to_react():
+    return Response(status_code=307, headers={"Location": "/admin-react"})
+
 
 @app.get("/api/config")
 async def get_config():
