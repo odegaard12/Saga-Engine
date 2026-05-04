@@ -223,12 +223,12 @@ This is the beginning of the new app flow, not the final product version yet.
 
 ---
 
-
 ### Classic admin UI retirement
 
 The classic server-rendered `/admin` UI has been retired as an operator surface. `/admin` now redirects to `/admin-react`.
 
 The backend admin APIs remain active because the React admin uses them for authentication, mission settings, node persistence, player/profile management, Mission Control status and recovery actions.
+
 
 ## Admin Panel
 
@@ -628,7 +628,6 @@ Useful development URLs:
 ### Backend / runtime
 
 - `main.py` -> FastAPI backend
-- `templates/admin.html` -> admin panel
 - `data/` -> demo / default data files
 
 ### Frontend workspace
