@@ -1279,68 +1279,122 @@ def _safe_runtime_json_file(global_names, fallback):
     return fallback
 
 
-def _admin_react_stage_summary(stage, idx):
-    stage = stage or {}
-    presentation = stage.get("presentation") if isinstance(stage.get("presentation"), dict) else {}
-    location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
-    entry = stage.get("entry") if isinstance(stage.get("entry"), dict) else {}
-    messages = stage.get("messages") if isinstance(stage.get("messages"), dict) else {}
-    minigame = stage.get("minigame") if isinstance(stage.get("minigame"), dict) else {}
+def _admin_react_stage_summary(stage, index):
+    raw = stage if isinstance(stage, dict) else {}
 
-    cfg = minigame.get("config") if isinstance(minigame.get("config"), dict) else {}
-    if not cfg and isinstance(stage.get("config"), dict):
-        cfg = stage.get("config") or {}
+    # get_runtime_stages() returns normalized runtime nodes.
+    # Raw admin stages may still come through in tests, so support both shapes.
+    node = raw if isinstance(raw, dict) and raw.get("version") == 2 else normalize_stage(raw)
 
-    minigame_type = (
-        minigame.get("type")
-        or stage.get("type")
+    presentation = node.get("presentation") if isinstance(node.get("presentation"), dict) else {}
+    location = node.get("location") if isinstance(node.get("location"), dict) else {}
+    entry = node.get("entry") if isinstance(node.get("entry"), dict) else {}
+    interaction = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
+    messages = node.get("messages") if isinstance(node.get("messages"), dict) else {}
+
+    raw_minigame = raw.get("minigame") if isinstance(raw.get("minigame"), dict) else {}
+
+    family_type = _as_str(
+        interaction.get("type")
+        or raw_minigame.get("type")
+        or raw.get("type")
         or "signal_hunt"
+    ).strip().lower() or "signal_hunt"
+
+    if family_type not in SUPPORTED_MINIGAME_TYPES:
+        family_type = "signal_hunt"
+
+    raw_config = (
+        interaction.get("config")
+        if isinstance(interaction.get("config"), dict)
+        else raw_minigame.get("config")
+        if isinstance(raw_minigame.get("config"), dict)
+        else raw.get("config")
+        if isinstance(raw.get("config"), dict)
+        else {}
+    )
+    config = normalize_minigame_config(family_type, raw_config)
+
+    label = (
+        _as_str(raw_minigame.get("label")).strip()
+        or MINIGAME_SPECS.get(family_type, {}).get("label")
+        or family_type.replace("_", " ").title()
     )
 
-    radius = (
-        stage.get("radius")
-        if stage.get("radius") is not None
-        else (
-            location.get("radius")
-            if location.get("radius") is not None
-            else (
-                location.get("radius_m")
-                if location.get("radius_m") is not None
-                else 50
-            )
-        )
-    )
+    title = _as_str(
+        presentation.get("title")
+        or raw.get("title")
+        or f"NODE {index + 1}"
+    ).strip()
 
-    content = (
-        stage.get("content")
-        or presentation.get("content")
-        or presentation.get("body")
+    content = _as_str(
+        presentation.get("content")
+        or raw.get("content")
         or ""
-    )
+    ).strip()
 
-    safe_messages = {
-        "hint": messages.get("hint") or stage.get("hint") or "",
-        "gps_unavailable": messages.get("gps_unavailable") or stage.get("gps_unavailable_message") or "",
-        "locked": messages.get("locked") or stage.get("locked_message") or "",
-    }
+    lat = location.get("lat")
+    if lat is None:
+        lat = raw.get("lat")
+
+    lon = location.get("lon")
+    if lon is None:
+        lon = raw.get("lon")
+
+    radius = location.get("radius_m")
+    if radius is None:
+        radius = raw.get("radius", 50)
+
+    entry_mode = _as_str(
+        entry.get("mode")
+        or raw.get("entry_mode")
+        or "gps"
+    ).strip().lower() or "gps"
+
+    require_proximity = entry.get("require_proximity")
+    if require_proximity is None:
+        require_proximity = raw.get("require_proximity", entry_mode != "free")
+
+    hint = _as_str(
+        messages.get("hint")
+        or raw.get("hint")
+        or ""
+    ).strip()
+
+    gps_unavailable = _as_str(
+        messages.get("gps_unavailable")
+        or raw.get("gps_unavailable_message")
+        or ""
+    ).strip()
+
+    locked = _as_str(
+        messages.get("locked")
+        or raw.get("locked_message")
+        or ""
+    ).strip()
 
     return {
-        "id": stage.get("id", idx),
-        "index": idx,
-        "title": stage.get("title") or presentation.get("title") or f"Node {idx + 1}",
-        "type": minigame_type,
-        "label": minigame.get("label") or MINIGAME_SPECS.get(minigame_type, {}).get("label") or minigame_type,
-        "lat": stage.get("lat", location.get("lat")),
-        "lon": stage.get("lon", location.get("lon")),
+        "id": raw.get("id", index),
+        "index": index,
+        "title": title,
+        "type": family_type,
+        "label": label,
+        "lat": lat,
+        "lon": lon,
         "radius": radius,
-        "entry_mode": entry.get("mode") or stage.get("entry_mode") or "gps",
-        "require_proximity": bool(entry.get("require_proximity", stage.get("require_proximity", True))),
-        "has_hint": bool(safe_messages.get("hint")),
-        "has_manual_fallback": stage_has_manual_fallback(stage),
+        "entry_mode": entry_mode,
+        "require_proximity": bool(require_proximity),
+        "has_hint": bool(hint),
+        "has_manual_fallback": bool(_as_str(raw.get("answer") or raw.get("rune") or "").strip()),
         "content": content,
-        "objective": cfg.get("objective") or "",
-        "config_summary": sorted(str(key) for key in cfg.keys())[:12],
-        "messages": safe_messages,
+        "objective": _as_str(config.get("objective") or "").strip(),
+        "config_summary": sorted(str(key) for key in config.keys())[:12],
+        "config": config,
+        "messages": {
+            "hint": hint,
+            "gps_unavailable": gps_unavailable,
+            "locked": locked,
+        },
     }
 
 
@@ -1418,15 +1472,7 @@ async def admin_react_overview(request: Request):
         "circuit_matrix": 0,
     }
     for stage in stage_summaries:
-        # react_overview_family_fix_v1
-        raw_minigame = stage.get("minigame") if isinstance(stage.get("minigame"), dict) else {}
-        stage_type = _as_str(raw_minigame.get("type") or stage.get("type")).strip().lower()
-        if stage_type not in SUPPORTED_MINIGAME_TYPES:
-            stage_type = normalize_stage(stage)["interaction"]["type"]
-        stage_config = stage.get("config") if isinstance(stage.get("config"), dict) else raw_minigame.get("config")
-        if not isinstance(stage_config, dict):
-            stage_config = normalize_stage(stage)["interaction"].get("config") or {}
-        stage_label = MINIGAME_SPECS.get(stage_type, {}).get("label") or stage_type.replace("_", " ").title()
+        stage_type = stage.get("type")
         if stage_type in family_counts:
             family_counts[stage_type] += 1
 
@@ -1453,7 +1499,7 @@ async def admin_react_overview(request: Request):
             "family_counts": family_counts,
         },
         "families": [
-            {"id": "signal_hunt", "label": stage_label},
+            {"id": "signal_hunt", "label": "Signal Hunt"},
             {"id": "bearing_hunt", "label": "Bearing Hunt"},
             {"id": "circuit_matrix", "label": "Circuit Matrix"},
         ],
