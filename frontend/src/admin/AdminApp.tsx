@@ -102,6 +102,18 @@ export default function AdminApp() {
   const title = overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
   const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
 
+
+  useEffect(() => {
+    if (!overviewReady) return
+
+    const sourceConfig = {
+      ...((config || {}) as unknown as Record<string, unknown>),
+      ...((overview?.config || {}) as unknown as Record<string, unknown>),
+    } as PublicConfig
+
+    setPlayerDrafts(buildPlayerDrafts(overview?.profiles || profiles || [], sourceConfig))
+  }, [overviewReady, overview, profiles, config])
+
   const stats = useMemo(() => {
     const counts = overview?.counts
     const cfg = overview?.config || config
@@ -158,13 +170,35 @@ export default function AdminApp() {
   }
 
   function buildMissionConfigPayload() {
-    const base = ((overview?.config || config || {}) as unknown as Record<string, unknown>)
+    const currentConfig = (config || {}) as unknown as Record<string, unknown>
+    const overviewConfig = (overview?.config || {}) as unknown as Record<string, unknown>
+    const base = {
+      ...currentConfig,
+      ...overviewConfig,
+    }
+
+    const existingPlayers =
+      Array.isArray(currentConfig.players)
+        ? currentConfig.players
+        : Array.isArray(base.players)
+          ? base.players
+          : []
+
+    const existingProfiles =
+      Array.isArray(currentConfig.player_profiles)
+        ? currentConfig.player_profiles
+        : Array.isArray(base.player_profiles)
+          ? base.player_profiles
+          : []
+
     const lat = Number(missionDraft.map_center_lat)
     const lon = Number(missionDraft.map_center_lon)
     const zoom = Number(missionDraft.map_zoom)
 
     return {
       ...base,
+      players: existingPlayers,
+      player_profiles: existingProfiles,
       site_name: missionDraft.site_name || 'SAGA Engine',
       admin_title: missionDraft.admin_title || 'Mission editor',
       admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
@@ -182,6 +216,7 @@ export default function AdminApp() {
       map_zoom: Number.isFinite(zoom) ? zoom : 13,
     }
   }
+
 
   async function saveMissionSettings() {
     if (!password.trim()) {
@@ -201,10 +236,16 @@ export default function AdminApp() {
         throw new Error(saved.message || 'Could not save mission settings.')
       }
 
+      setConfig((current) => ({
+        ...(current || {}),
+        ...(payload as unknown as PublicConfig),
+      }))
+
       const refreshed = await fetchAdminReactOverview(password)
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
+        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
       }
 
       setSettingsSaveState('saved')
@@ -214,6 +255,7 @@ export default function AdminApp() {
       setSettingsSaveError(err instanceof Error ? err.message : 'Unknown settings save error')
     }
   }
+
 
   function normalizePlayerMode(value?: string | null): 'solo' | 'team' {
     return value === 'team' ? 'team' : 'solo'
@@ -365,12 +407,12 @@ export default function AdminApp() {
       const refreshed = await fetchAdminReactOverview(password)
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
-        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as PublicConfig))
+        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
       }
 
       setConfig((current) => ({
         ...(current || {}),
-        ...(payload as PublicConfig),
+        ...(payload as unknown as PublicConfig),
       }))
 
       setPlayerSaveState('saved')
@@ -402,6 +444,10 @@ export default function AdminApp() {
         }
 
         setOverview(payload)
+        setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...((payload.config || {}) as unknown as Record<string, unknown>),
+        } as PublicConfig))
         setSelectedStage(null)
         setOverviewState('ready')
       })
@@ -948,7 +994,7 @@ export default function AdminApp() {
                 ))}
 
                 {playerDrafts.length === 0 ? (
-                  <div className="admin-sidebar-empty">No players yet. Add one to start.</div>
+                  <div className="admin-sidebar-empty">No players found in config. Add one here or restore player_profiles, then save players.</div>
                 ) : null}
               </div>
 
