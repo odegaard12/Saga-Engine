@@ -1484,16 +1484,15 @@ function NodeDetailDrawer({
   }
 
   function updateDraftConfig(key: string, value: unknown) {
-    const nextDraft = {
-      ...(draft as EditableAdminStage),
+    updateDraftLocal((current) => ({
+      ...(current as EditableAdminStage),
       config: {
-        ...(((draft as EditableAdminStage).config || {}) as Record<string, unknown>),
+        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
         [key]: value,
       },
-      config_summary: Array.from(new Set([...(draft.config_summary || []), key])),
-    }
-
-    applyDraftUpdate(nextDraft)
+      config_summary: Array.from(new Set([...(current.config_summary || []), key])),
+      objective: key === 'objective' ? String(value || '') : current.objective,
+    }))
   }
 
   function updateDraftConfigText(key: string, value: string) {
@@ -1549,17 +1548,16 @@ function NodeDetailDrawer({
 
   function handleDraftFamilyChange(nextType: FamilyId) {
     const nextConfig = getDefaultConfigForFamily(nextType)
-    const nextDraft = {
-      ...(draft as EditableAdminStage),
+
+    updateDraftLocal((current) => ({
+      ...(current as EditableAdminStage),
       type: nextType,
       label: getFamilyLabelForType(nextType),
       icon: getAdminFamilyIcon(nextType),
       objective: String(nextConfig.objective || ''),
       config: nextConfig,
       config_summary: Object.keys(nextConfig),
-    }
-
-    applyDraftUpdate(nextDraft)
+    }))
   }
 
   useEffect(() => {
@@ -1571,6 +1569,16 @@ function NodeDetailDrawer({
     onApplyLocal(nextDraft)
   }
 
+  function updateDraftLocal(
+    updater: (current: AdminReactOverviewStage) => AdminReactOverviewStage
+  ) {
+    setDraft((current) => {
+      const nextDraft = updater(current)
+      onApplyLocal(nextDraft)
+      return nextDraft
+    })
+  }
+
   const family = familyCards.find((item) => item.id === draft.type)
   const messages = draft.messages || {}
   const configSummary = draft.config_summary || []
@@ -1580,27 +1588,23 @@ function NodeDetailDrawer({
     key: K,
     value: AdminReactOverviewStage[K]
   ) {
-    const nextDraft = {
-      ...draft,
+    updateDraftLocal((current) => ({
+      ...current,
       [key]: value,
-    }
-
-    applyDraftUpdate(nextDraft)
+    }))
   }
 
   function setDraftMessage(
     key: 'hint' | 'gps_unavailable' | 'locked',
     value: string
   ) {
-    const nextDraft = {
-      ...draft,
+    updateDraftLocal((current) => ({
+      ...current,
       messages: {
-        ...(draft.messages || {}),
+        ...(current.messages || {}),
         [key]: value,
       },
-    }
-
-    applyDraftUpdate(nextDraft)
+    }))
   }
 
   function numberOrNull(value: string) {
@@ -1619,7 +1623,7 @@ function NodeDetailDrawer({
       >
         <div className="admin-drawer-head">
           <div>
-            <span className="admin-kicker">{isLocalNew ? 'Add node · local preview' : 'Node editor · local preview'}</span>
+            <span className="admin-kicker">{isLocalNew ? 'Add node' : 'Node editor'}</span>
             <h2>{draft.index + 1}. {draft.title || 'Untitled node'}</h2>
             <small>{family?.icon || '◇'} {draft.label || draft.type}</small>
           </div>
@@ -1631,7 +1635,7 @@ function NodeDetailDrawer({
           <section className="admin-edit-section">
             <div className="admin-edit-section-head">
               <strong>Basics</strong>
-              <span>Editable locally</span>
+              <span>Auto-updating</span>
             </div>
 
             <label className="admin-edit-field">
@@ -1863,7 +1867,7 @@ function NodeDetailDrawer({
             </div>
 
             <small className="admin-family-config-note">
-              Config edits update the local preview immediately. Use Save changes to persist.
+              Changes update immediately. Use Save changes to persist.
             </small>
           </section>
 
@@ -1899,13 +1903,7 @@ function NodeDetailDrawer({
           </section>
 
           <div className="admin-edit-actions admin-edit-actions-three">
-            <button
-              type="button"
-              className="admin-cms-side-action admin-cms-side-action--primary"
-              onClick={() => onApplyLocal(draft)}
-            >
-              Apply preview
-            </button>
+            
 
             <button
               type="button"
@@ -1925,7 +1923,7 @@ function NodeDetailDrawer({
           </div>
 
           <div className="admin-local-notice">
-            Preview updates automatically. Use Save changes in the left rail to persist to backend.
+            Use Save changes in the left rail to persist to backend.
           </div>
         </div>
       </aside>
