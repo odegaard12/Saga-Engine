@@ -1484,13 +1484,16 @@ function NodeDetailDrawer({
   }
 
   function updateDraftConfig(key: string, value: unknown) {
-    setDraft((current: AdminReactOverviewStage) => ({
-      ...(current as EditableAdminStage),
+    const nextDraft = {
+      ...(draft as EditableAdminStage),
       config: {
-        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
+        ...(((draft as EditableAdminStage).config || {}) as Record<string, unknown>),
         [key]: value,
       },
-    }))
+      config_summary: Array.from(new Set([...(draft.config_summary || []), key])),
+    }
+
+    applyDraftUpdate(nextDraft)
   }
 
   function updateDraftConfigText(key: string, value: string) {
@@ -1546,21 +1549,27 @@ function NodeDetailDrawer({
 
   function handleDraftFamilyChange(nextType: FamilyId) {
     const nextConfig = getDefaultConfigForFamily(nextType)
-
-    setDraft((current) => ({
-      ...(current as EditableAdminStage),
+    const nextDraft = {
+      ...(draft as EditableAdminStage),
       type: nextType,
       label: getFamilyLabelForType(nextType),
       icon: getAdminFamilyIcon(nextType),
       objective: String(nextConfig.objective || ''),
       config: nextConfig,
       config_summary: Object.keys(nextConfig),
-    }))
+    }
+
+    applyDraftUpdate(nextDraft)
   }
 
   useEffect(() => {
     setDraft(stage)
   }, [stage])
+
+  function applyDraftUpdate(nextDraft: AdminReactOverviewStage) {
+    setDraft(nextDraft)
+    onApplyLocal(nextDraft)
+  }
 
   const family = familyCards.find((item) => item.id === draft.type)
   const messages = draft.messages || {}
@@ -1571,23 +1580,27 @@ function NodeDetailDrawer({
     key: K,
     value: AdminReactOverviewStage[K]
   ) {
-    setDraft((current) => ({
-      ...current,
+    const nextDraft = {
+      ...draft,
       [key]: value,
-    }))
+    }
+
+    applyDraftUpdate(nextDraft)
   }
 
   function setDraftMessage(
     key: 'hint' | 'gps_unavailable' | 'locked',
     value: string
   ) {
-    setDraft((current) => ({
-      ...current,
+    const nextDraft = {
+      ...draft,
       messages: {
-        ...(current.messages || {}),
+        ...(draft.messages || {}),
         [key]: value,
       },
-    }))
+    }
+
+    applyDraftUpdate(nextDraft)
   }
 
   function numberOrNull(value: string) {
@@ -1850,7 +1863,7 @@ function NodeDetailDrawer({
             </div>
 
             <small className="admin-family-config-note">
-              Config edits are local until you apply preview and save changes.
+              Config edits update the local preview immediately. Use Save changes to persist.
             </small>
           </section>
 
@@ -1912,7 +1925,7 @@ function NodeDetailDrawer({
           </div>
 
           <div className="admin-local-notice">
-            Local preview. Use Save changes in the left rail to persist to backend.
+            Preview updates automatically. Use Save changes in the left rail to persist to backend.
           </div>
         </div>
       </aside>
