@@ -629,7 +629,7 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
-- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, persistent mission settings, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
+- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, persistent mission settings, persistent player/profile editing, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
 - `frontend/src/admin/AdminMissionMap.tsx` -> React admin Leaflet mission map with visible numbered pins, click-to-create and drag-to-move editing
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
 - `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host

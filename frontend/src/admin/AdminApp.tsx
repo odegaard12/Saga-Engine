@@ -18,6 +18,14 @@ type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+type PlayerDraft = {
+  id: string
+  display_name: string
+  mode: 'solo' | 'team'
+  members: string
+  status: string
+}
+
 
 const familyCards: Array<{
   id: FamilyId
@@ -62,6 +70,9 @@ export default function AdminApp() {
   const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   const [missionDraft, setMissionDraft] = useState<Record<string, string>>({})
+  const [playerDrafts, setPlayerDrafts] = useState<PlayerDraft[]>([])
+  const [playerSaveState, setPlayerSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -90,6 +101,18 @@ export default function AdminApp() {
 
   const title = overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
   const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
+
+
+  useEffect(() => {
+    if (!overviewReady) return
+
+    const sourceConfig = {
+      ...((config || {}) as unknown as Record<string, unknown>),
+      ...((overview?.config || {}) as unknown as Record<string, unknown>),
+    } as PublicConfig
+
+    setPlayerDrafts(buildPlayerDrafts(overview?.profiles || profiles || [], sourceConfig))
+  }, [overviewReady, overview, profiles, config])
 
   const stats = useMemo(() => {
     const counts = overview?.counts
@@ -147,13 +170,35 @@ export default function AdminApp() {
   }
 
   function buildMissionConfigPayload() {
-    const base = ((overview?.config || config || {}) as unknown as Record<string, unknown>)
+    const currentConfig = (config || {}) as unknown as Record<string, unknown>
+    const overviewConfig = (overview?.config || {}) as unknown as Record<string, unknown>
+    const base = {
+      ...currentConfig,
+      ...overviewConfig,
+    }
+
+    const existingPlayers =
+      Array.isArray(currentConfig.players)
+        ? currentConfig.players
+        : Array.isArray(base.players)
+          ? base.players
+          : []
+
+    const existingProfiles =
+      Array.isArray(currentConfig.player_profiles)
+        ? currentConfig.player_profiles
+        : Array.isArray(base.player_profiles)
+          ? base.player_profiles
+          : []
+
     const lat = Number(missionDraft.map_center_lat)
     const lon = Number(missionDraft.map_center_lon)
     const zoom = Number(missionDraft.map_zoom)
 
     return {
       ...base,
+      players: existingPlayers,
+      player_profiles: existingProfiles,
       site_name: missionDraft.site_name || 'SAGA Engine',
       admin_title: missionDraft.admin_title || 'Mission editor',
       admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
@@ -171,6 +216,7 @@ export default function AdminApp() {
       map_zoom: Number.isFinite(zoom) ? zoom : 13,
     }
   }
+
 
   async function saveMissionSettings() {
     if (!password.trim()) {
@@ -190,10 +236,16 @@ export default function AdminApp() {
         throw new Error(saved.message || 'Could not save mission settings.')
       }
 
+      setConfig((current) => ({
+        ...(current || {}),
+        ...(payload as unknown as PublicConfig),
+      }))
+
       const refreshed = await fetchAdminReactOverview(password)
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
+        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
       }
 
       setSettingsSaveState('saved')
@@ -201,6 +253,173 @@ export default function AdminApp() {
     } catch (err) {
       setSettingsSaveState('error')
       setSettingsSaveError(err instanceof Error ? err.message : 'Unknown settings save error')
+    }
+  }
+
+
+  function normalizePlayerMode(value?: string | null): 'solo' | 'team' {
+    return value === 'team' ? 'team' : 'solo'
+  }
+
+  function buildPlayerDrafts(
+    nextProfiles: AdminReactOverviewProfile[],
+    sourceConfig: PublicConfig | null
+  ): PlayerDraft[] {
+    const configProfiles = Array.isArray(sourceConfig?.player_profiles)
+      ? sourceConfig.player_profiles
+      : []
+    const simplePlayers = Array.isArray(sourceConfig?.players)
+      ? sourceConfig.players
+      : []
+
+    const fromOverview = nextProfiles.map((profile) => {
+      const configProfile = configProfiles.find((item) => item.id === profile.id)
+      const members = Array.isArray(configProfile?.members) ? configProfile.members.join(', ') : ''
+
+      return {
+        id: profile.id || profile.display_name || 'PLAYER',
+        display_name: profile.display_name || profile.id || 'Player',
+        mode: normalizePlayerMode(profile.mode || configProfile?.mode),
+        members,
+        status: profile.status || configProfile?.status || 'active',
+      }
+    })
+
+    if (fromOverview.length > 0) return fromOverview
+
+    if (configProfiles.length > 0) {
+      return configProfiles.map((profile) => ({
+        id: profile.id || profile.display_name || 'PLAYER',
+        display_name: profile.display_name || profile.id || 'Player',
+        mode: normalizePlayerMode(profile.mode),
+        members: Array.isArray(profile.members) ? profile.members.join(', ') : '',
+        status: profile.status || 'active',
+      }))
+    }
+
+    return simplePlayers.map((player) => ({
+      id: player,
+      display_name: player,
+      mode: 'solo',
+      members: '',
+      status: 'active',
+    }))
+  }
+
+  function normalizePlayerId(value: string, fallbackIndex: number) {
+    const cleaned = value.trim()
+    if (cleaned) return cleaned
+    return `PLAYER ${fallbackIndex + 1}`
+  }
+
+  function updatePlayerDraft(index: number, key: keyof PlayerDraft, value: string) {
+    setPlayerDrafts((current) =>
+      current.map((draft, draftIndex) =>
+        draftIndex === index
+          ? {
+              ...draft,
+              [key]: key === 'mode' ? normalizePlayerMode(value) : value,
+            }
+          : draft
+      )
+    )
+    setPlayerSaveState('idle')
+  }
+
+  function addPlayerDraft() {
+    setPlayerDrafts((current) => {
+      const nextNumber = current.length + 1
+      return [
+        ...current,
+        {
+          id: `PLAYER ${nextNumber}`,
+          display_name: `PLAYER ${nextNumber}`,
+          mode: 'solo',
+          members: '',
+          status: 'active',
+        },
+      ]
+    })
+    setPlayerSaveState('idle')
+    setLocalNotice('Player added locally. Save players to persist.')
+  }
+
+  function deletePlayerDraft(index: number) {
+    setPlayerDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index))
+    setPlayerSaveState('idle')
+    setLocalNotice('Player removed locally. Save players to persist.')
+  }
+
+  function buildPlayerConfigPayload() {
+    const base = {
+      ...((config || {}) as PublicConfig),
+      ...((overview?.config || {}) as unknown as Record<string, unknown>),
+    }
+
+    const normalizedDrafts = playerDrafts.map((draft, index) => {
+      const id = normalizePlayerId(draft.id, index)
+      const displayName = draft.display_name.trim() || id
+      const members = draft.members
+        .split(',')
+        .map((member) => member.trim())
+        .filter(Boolean)
+
+      return {
+        id,
+        display_name: displayName,
+        mode: normalizePlayerMode(draft.mode),
+        members,
+        status: draft.status.trim() || 'active',
+      }
+    })
+
+    return {
+      ...base,
+      players: normalizedDrafts.map((draft) => draft.id),
+      player_profiles: normalizedDrafts.map((draft) => ({
+        id: draft.id,
+        display_name: draft.display_name,
+        mode: draft.mode,
+        ...(draft.mode === 'team' && draft.members.length > 0 ? { members: draft.members } : {}),
+        status: draft.status,
+      })),
+    }
+  }
+
+  async function savePlayerProfiles() {
+    if (!password.trim()) {
+      setPlayerSaveState('error')
+      setPlayerSaveError('Admin password is missing. Unlock the admin again.')
+      return
+    }
+
+    setPlayerSaveState('saving')
+    setPlayerSaveError(null)
+
+    try {
+      const payload = buildPlayerConfigPayload()
+      const saved = await saveAdminConfig(password, payload)
+
+      if (saved.status !== 'ok') {
+        throw new Error(saved.message || 'Could not save player profiles.')
+      }
+
+      const refreshed = await fetchAdminReactOverview(password)
+      if (refreshed.status === 'ok') {
+        setOverview(refreshed)
+        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
+      }
+
+      setConfig((current) => ({
+        ...(current || {}),
+        ...(payload as unknown as PublicConfig),
+      }))
+
+      setPlayerSaveState('saved')
+      setLocalNotice('Players saved. Admin and player config reloaded.')
+    } catch (err) {
+      setPlayerSaveState('error')
+      setPlayerSaveError(err instanceof Error ? err.message : 'Unknown player save error')
     }
   }
 
@@ -225,6 +444,10 @@ export default function AdminApp() {
         }
 
         setOverview(payload)
+        setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...((payload.config || {}) as unknown as Record<string, unknown>),
+        } as PublicConfig))
         setSelectedStage(null)
         setOverviewState('ready')
       })
@@ -701,24 +924,105 @@ export default function AdminApp() {
               <span>{saveError}</span>
             </div>
           ) : null}
-
           {cmsPanel === 'players' ? (
-            <div className="admin-cms-local-panel">
+            <div className="admin-cms-local-panel admin-players-panel">
               <strong>Players</strong>
-              <span>Current mission profiles. Full create/delete/team save flow comes next.</span>
+              <span>Edit players and teams. Save players to persist.</span>
 
-              <div className="admin-local-list">
-                {profiles.map((profile) => (
-                  <button type="button" key={profile.id} className="admin-local-row">
-                    <span>{profile.display_name || profile.id}</span>
-                    <small>{profile.mode || 'solo'} · level {profile.level ?? 0}</small>
-                  </button>
+              <div className="admin-player-editor-list">
+                {playerDrafts.map((draft, index) => (
+                  <div key={`${draft.id}-${index}`} className="admin-player-editor-card">
+                    <div className="admin-player-editor-head">
+                      <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
+                      <button
+                        type="button"
+                        className="admin-cms-side-action admin-cms-side-action--danger"
+                        onClick={() => deletePlayerDraft(index)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                    <label>
+                      Player ID
+                      <input
+                        value={draft.id}
+                        onChange={(event) => updatePlayerDraft(index, 'id', event.target.value)}
+                      />
+                    </label>
+
+                    <label>
+                      Display name
+                      <input
+                        value={draft.display_name}
+                        onChange={(event) => updatePlayerDraft(index, 'display_name', event.target.value)}
+                      />
+                    </label>
+
+                    <div className="admin-player-editor-grid">
+                      <label>
+                        Mode
+                        <select
+                          value={draft.mode}
+                          onChange={(event) => updatePlayerDraft(index, 'mode', event.target.value)}
+                        >
+                          <option value="solo">solo</option>
+                          <option value="team">team</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        Status
+                        <input
+                          value={draft.status}
+                          onChange={(event) => updatePlayerDraft(index, 'status', event.target.value)}
+                        />
+                      </label>
+                    </div>
+
+                    {draft.mode === 'team' ? (
+                      <label>
+                        Team members
+                        <input
+                          value={draft.members}
+                          placeholder="Name 1, Name 2"
+                          onChange={(event) => updatePlayerDraft(index, 'members', event.target.value)}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
                 ))}
+
+                {playerDrafts.length === 0 ? (
+                  <div className="admin-sidebar-empty">No players found in config. Add one here or restore player_profiles, then save players.</div>
+                ) : null}
               </div>
 
-              <button type="button" className="admin-cms-side-action">
-                Add player locally soon
-              </button>
+              <div className="admin-player-actions">
+                <button
+                  type="button"
+                  className="admin-cms-side-action admin-cms-side-action--primary"
+                  onClick={addPlayerDraft}
+                >
+                  Add player
+                </button>
+
+                <button
+                  type="button"
+                  className="admin-cms-side-action admin-cms-side-action--save"
+                  onClick={savePlayerProfiles}
+                  disabled={playerSaveState === 'saving'}
+                >
+                  {playerSaveState === 'saving' ? 'Saving players…' : playerSaveState === 'saved' ? 'Players saved' : 'Save players'}
+                </button>
+              </div>
+
+              {playerSaveState === 'error' && playerSaveError ? (
+                <div className="admin-save-error">
+                  <strong>Player save failed</strong>
+                  <span>{playerSaveError}</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {cmsPanel === 'mission' ? (
@@ -3534,6 +3838,95 @@ const styles = `
 
 @media (max-width: 760px) {
   .admin-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* Persistent player profile editor */
+.admin-players-panel {
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.admin-player-editor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-player-editor-card {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(148,163,184,0.16);
+  background: rgba(2,6,23,0.34);
+}
+
+.admin-player-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.admin-player-editor-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-player-editor-head .admin-cms-side-action {
+  width: auto;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.admin-player-editor-card label {
+  display: grid;
+  gap: 5px;
+  color: rgba(226,232,240,0.78);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.admin-player-editor-card input,
+.admin-player-editor-card select {
+  width: 100%;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 13px;
+  background: rgba(2,6,23,0.62);
+  color: #f8fafc;
+  padding: 10px 11px;
+  font: inherit;
+  outline: none;
+}
+
+.admin-player-editor-card input:focus,
+.admin-player-editor-card select:focus {
+  border-color: rgba(125,211,252,0.42);
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.10);
+}
+
+.admin-player-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.admin-player-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+@media (max-width: 760px) {
+  .admin-player-editor-grid,
+  .admin-player-actions {
     grid-template-columns: 1fr;
   }
 }
