@@ -136,7 +136,7 @@ At each node, the engine can combine:
 
 - `/` -> React mission entry / player app when `frontend/dist` exists
 - `/player/{PLAYER_NAME}` -> backend-served React player route
-- `/admin` -> current admin panel
+- `/admin` -> React admin CMS
 - `/admin-react` -> React admin shell for the new Mission Control/editor direction
 - `/api/admin/react-overview` -> password-protected read-only React admin overview / Mission Control read model
 - `/api/config` -> public config payload
@@ -222,6 +222,13 @@ The React workspace now includes a first mission entry / login flow that:
 This is the beginning of the new app flow, not the final product version yet.
 
 ---
+
+
+### Classic admin UI retirement
+
+The classic server-rendered `/admin` UI has been retired as an operator surface. `/admin` now redirects to `/admin-react`.
+
+The backend admin APIs remain active because the React admin uses them for authentication, mission settings, node persistence, player/profile management, Mission Control status and recovery actions.
 
 ## Admin Panel
 
