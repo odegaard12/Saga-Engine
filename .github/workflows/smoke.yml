@@ -66,6 +66,11 @@ jobs:
           cat /tmp/saga_smoke.log || true
           exit 1
 
+      - name: Contract checks
+        env:
+          ADMIN_PASS: test_admin_password
+        run: python scripts/contract_check.py
+
       - name: Smoke endpoints
         run: |
           curl -fsS http://127.0.0.1:8097/ >/dev/null
