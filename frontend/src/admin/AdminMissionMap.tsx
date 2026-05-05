@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-import type { AdminReactOverviewStage } from '../shared/api'
+import type { AdminReactOverviewStage } from './lib/adminApi'
 
 type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]

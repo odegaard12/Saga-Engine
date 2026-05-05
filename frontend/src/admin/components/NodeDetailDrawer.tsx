@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AdminReactOverviewStage } from '../../shared/api'
+import type { AdminReactOverviewStage } from '../lib/adminApi'
 import {
   familyCards,
   getAdminFamilyIcon,

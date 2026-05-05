@@ -1,4 +1,4 @@
-import type { AdminRawStage, AdminReactOverviewStage } from '../../shared/api'
+import type { AdminRawStage, AdminReactOverviewStage } from './adminApi'
 import {
   buildAdminMinigameBlock,
   getAdminFamilyLabel,
