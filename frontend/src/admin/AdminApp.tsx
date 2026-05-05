@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import AdminMissionMap from './AdminMissionMap'
 import NodeDetailDrawer from './components/NodeDetailDrawer'
 import PlayersPanel from './components/PlayersPanel'
+import SettingsPanel from './components/SettingsPanel'
 import {
   fetchAdminReactOverview,
   fetchAdminStages,
@@ -783,135 +784,13 @@ export default function AdminApp() {
           ) : null}
 
           {cmsPanel === 'mission' ? (
-            <div className="admin-cms-local-panel admin-settings-panel">
-              <strong>Settings</strong>
-              <span>Edit mission/admin text and map defaults. Save settings to persist.</span>
-
-              <label>
-                Site name
-                <input
-                  value={missionDraft.site_name || ''}
-                  onChange={(event) => updateMissionDraft('site_name', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Admin title
-                <input
-                  value={missionDraft.admin_title || ''}
-                  onChange={(event) => updateMissionDraft('admin_title', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Admin subtitle
-                <input
-                  value={missionDraft.admin_subtitle || ''}
-                  onChange={(event) => updateMissionDraft('admin_subtitle', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Login subtitle
-                <input
-                  value={missionDraft.login_subtitle || ''}
-                  onChange={(event) => updateMissionDraft('login_subtitle', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Player theme
-                <select
-                  value={missionDraft.player_theme || 'classic'}
-                  onChange={(event) => updateMissionDraft('player_theme', event.target.value)}
-                >
-                  <option value="classic">classic</option>
-                  <option value="glass">glass</option>
-                </select>
-              </label>
-
-              <div className="admin-settings-grid">
-                <label>
-                  Map latitude
-                  <input
-                    value={missionDraft.map_center_lat || ''}
-                    onChange={(event) => updateMissionDraft('map_center_lat', event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  Map longitude
-                  <input
-                    value={missionDraft.map_center_lon || ''}
-                    onChange={(event) => updateMissionDraft('map_center_lon', event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  Map zoom
-                  <input
-                    value={missionDraft.map_zoom || ''}
-                    onChange={(event) => updateMissionDraft('map_zoom', event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <label>
-                Story title
-                <input
-                  value={missionDraft.story_title || ''}
-                  onChange={(event) => updateMissionDraft('story_title', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Story text
-                <textarea
-                  value={missionDraft.story_text || ''}
-                  onChange={(event) => updateMissionDraft('story_text', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Prologue title
-                <input
-                  value={missionDraft.prologue_title || ''}
-                  onChange={(event) => updateMissionDraft('prologue_title', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Prologue subtitle
-                <input
-                  value={missionDraft.prologue_subtitle || ''}
-                  onChange={(event) => updateMissionDraft('prologue_subtitle', event.target.value)}
-                />
-              </label>
-
-              <label>
-                Prologue body
-                <textarea
-                  value={missionDraft.prologue_body || ''}
-                  onChange={(event) => updateMissionDraft('prologue_body', event.target.value)}
-                />
-              </label>
-
-              <button
-                type="button"
-                className="admin-cms-side-action admin-cms-side-action--save"
-                onClick={saveMissionSettings}
-                disabled={settingsSaveState === 'saving'}
-              >
-                {settingsSaveState === 'saving' ? 'Saving settings…' : settingsSaveState === 'saved' ? 'Settings saved' : 'Save settings'}
-              </button>
-
-              {settingsSaveState === 'error' && settingsSaveError ? (
-                <div className="admin-save-error">
-                  <strong>Settings save failed</strong>
-                  <span>{settingsSaveError}</span>
-                </div>
-              ) : null}
-            </div>
+            <SettingsPanel
+              missionDraft={missionDraft}
+              settingsSaveState={settingsSaveState}
+              settingsSaveError={settingsSaveError}
+              onUpdateMissionDraft={updateMissionDraft}
+              onSaveSettings={saveMissionSettings}
+            />
           ) : null}
 
           {cmsPanel === 'labels' ? (
