@@ -227,7 +227,7 @@ This is the beginning of the new app flow, not the final product version yet.
 
 ### Retired admin UI boundary
 
-The former server-rendered admin template has been retired. `/admin` now redirects to the React admin CMS. Backend admin APIs remain active as the service layer used by `/admin-react`.
+The retired admin UI has been removed. `/admin` now redirects to the React admin CMS. Backend admin APIs remain active as the service layer used by `/admin-react`.
 
 ### Admin UI
 
