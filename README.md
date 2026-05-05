@@ -748,3 +748,7 @@ MIT recommended.
 Este repositorio público documenta un modelo de despliegue genérico. Los detalles reales de red, puertos internos, rutas locales, credenciales, contraseñas de administración, datos vivos de misión y backups deben mantenerse fuera del repositorio y configurarse únicamente en entornos privados.
 
 Para desarrollo local, los ejemplos usan `127.0.0.1` por defecto. Exponer servicios en `0.0.0.0` solo debe hacerse en redes controladas y con medidas de protección adicionales.
+
+
+Backend modularization note:
+- `backend/app/runtime/minigames.py` contains family-native minigame runtime normalization/helpers.
