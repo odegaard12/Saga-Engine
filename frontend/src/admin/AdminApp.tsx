@@ -4,6 +4,7 @@ import AdminMissionMap from './AdminMissionMap'
 import NodeDetailDrawer from './components/NodeDetailDrawer'
 import PlayersPanel from './components/PlayersPanel'
 import SettingsPanel from './components/SettingsPanel'
+import FamiliesPanel from './components/FamiliesPanel'
 import {
   fetchAdminReactOverview,
   fetchAdminStages,
@@ -794,19 +795,7 @@ export default function AdminApp() {
           ) : null}
 
           {cmsPanel === 'labels' ? (
-            <div className="admin-cms-local-panel">
-              <strong>Families / labels</strong>
-              <span>Available family-native runtime labels.</span>
-
-              <div className="admin-local-list">
-                {familyCards.map((family) => (
-                  <div key={family.id} className="admin-local-row static">
-                    <span>{family.icon} {family.title}</span>
-                    <small>{family.id}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FamiliesPanel />
           ) : null}
         </section>
 
