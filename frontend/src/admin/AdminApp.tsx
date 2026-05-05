@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 import AdminMissionMap from './AdminMissionMap'
 import NodeDetailDrawer from './components/NodeDetailDrawer'
+import PlayersPanel from './components/PlayersPanel'
 import {
   fetchAdminReactOverview,
   fetchAdminStages,
@@ -25,6 +26,13 @@ import {
   type FamilyId,
 } from './lib/familyConfigs'
 import {
+  buildPlayerDrafts,
+  normalizePlayerId,
+  normalizePlayerMode,
+  type PlayerDraft,
+} from './lib/playerDrafts'
+
+import {
   buildRawStagesFromOverview,
   mergeOverviewIntoRawStages,
   stageSaveIdentity,
@@ -35,14 +43,6 @@ import {
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
-type PlayerDraft = {
-  id: string
-  display_name: string
-  mode: 'solo' | 'team'
-  members: string
-  status: string
-}
-
 
 export default function AdminApp() {
   const [config, setConfig] = useState<PublicConfig | null>(null)
@@ -248,60 +248,7 @@ export default function AdminApp() {
   }
 
 
-  function normalizePlayerMode(value?: string | null): 'solo' | 'team' {
-    return value === 'team' ? 'team' : 'solo'
-  }
 
-  function buildPlayerDrafts(
-    nextProfiles: AdminReactOverviewProfile[],
-    sourceConfig: PublicConfig | null
-  ): PlayerDraft[] {
-    const configProfiles = Array.isArray(sourceConfig?.player_profiles)
-      ? sourceConfig.player_profiles
-      : []
-    const simplePlayers = Array.isArray(sourceConfig?.players)
-      ? sourceConfig.players
-      : []
-
-    const fromOverview = nextProfiles.map((profile) => {
-      const configProfile = configProfiles.find((item) => item.id === profile.id)
-      const members = Array.isArray(configProfile?.members) ? configProfile.members.join(', ') : ''
-
-      return {
-        id: profile.id || profile.display_name || 'PLAYER',
-        display_name: profile.display_name || profile.id || 'Player',
-        mode: normalizePlayerMode(profile.mode || configProfile?.mode),
-        members,
-        status: profile.status || configProfile?.status || 'active',
-      }
-    })
-
-    if (fromOverview.length > 0) return fromOverview
-
-    if (configProfiles.length > 0) {
-      return configProfiles.map((profile) => ({
-        id: profile.id || profile.display_name || 'PLAYER',
-        display_name: profile.display_name || profile.id || 'Player',
-        mode: normalizePlayerMode(profile.mode),
-        members: Array.isArray(profile.members) ? profile.members.join(', ') : '',
-        status: profile.status || 'active',
-      }))
-    }
-
-    return simplePlayers.map((player) => ({
-      id: player,
-      display_name: player,
-      mode: 'solo',
-      members: '',
-      status: 'active',
-    }))
-  }
-
-  function normalizePlayerId(value: string, fallbackIndex: number) {
-    const cleaned = value.trim()
-    if (cleaned) return cleaned
-    return `PLAYER ${fallbackIndex + 1}`
-  }
 
   function updatePlayerDraft(index: number, key: keyof PlayerDraft, value: string) {
     setPlayerDrafts((current) =>
@@ -413,6 +360,7 @@ export default function AdminApp() {
       setPlayerSaveError(err instanceof Error ? err.message : 'Unknown player save error')
     }
   }
+
 
   function loadOverview() {
     if (!password.trim()) {
@@ -823,106 +771,17 @@ export default function AdminApp() {
             </div>
           ) : null}
           {cmsPanel === 'players' ? (
-            <div className="admin-cms-local-panel admin-players-panel">
-              <strong>Players</strong>
-              <span>Edit players and teams. Save players to persist.</span>
-
-              <div className="admin-player-editor-list">
-                {playerDrafts.map((draft, index) => (
-                  <div key={`${draft.id}-${index}`} className="admin-player-editor-card">
-                    <div className="admin-player-editor-head">
-                      <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
-                      <button
-                        type="button"
-                        className="admin-cms-side-action admin-cms-side-action--danger"
-                        onClick={() => deletePlayerDraft(index)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-
-                    <label>
-                      Player ID
-                      <input
-                        value={draft.id}
-                        onChange={(event) => updatePlayerDraft(index, 'id', event.target.value)}
-                      />
-                    </label>
-
-                    <label>
-                      Display name
-                      <input
-                        value={draft.display_name}
-                        onChange={(event) => updatePlayerDraft(index, 'display_name', event.target.value)}
-                      />
-                    </label>
-
-                    <div className="admin-player-editor-grid">
-                      <label>
-                        Mode
-                        <select
-                          value={draft.mode}
-                          onChange={(event) => updatePlayerDraft(index, 'mode', event.target.value)}
-                        >
-                          <option value="solo">solo</option>
-                          <option value="team">team</option>
-                        </select>
-                      </label>
-
-                      <label>
-                        Status
-                        <input
-                          value={draft.status}
-                          onChange={(event) => updatePlayerDraft(index, 'status', event.target.value)}
-                        />
-                      </label>
-                    </div>
-
-                    {draft.mode === 'team' ? (
-                      <label>
-                        Team members
-                        <input
-                          value={draft.members}
-                          placeholder="Name 1, Name 2"
-                          onChange={(event) => updatePlayerDraft(index, 'members', event.target.value)}
-                        />
-                      </label>
-                    ) : null}
-                  </div>
-                ))}
-
-                {playerDrafts.length === 0 ? (
-                  <div className="admin-sidebar-empty">No players found in config. Add one here or restore player_profiles, then save players.</div>
-                ) : null}
-              </div>
-
-              <div className="admin-player-actions">
-                <button
-                  type="button"
-                  className="admin-cms-side-action admin-cms-side-action--primary"
-                  onClick={addPlayerDraft}
-                >
-                  Add player
-                </button>
-
-                <button
-                  type="button"
-                  className="admin-cms-side-action admin-cms-side-action--save"
-                  onClick={savePlayerProfiles}
-                  disabled={playerSaveState === 'saving'}
-                >
-                  {playerSaveState === 'saving' ? 'Saving players…' : playerSaveState === 'saved' ? 'Players saved' : 'Save players'}
-                </button>
-              </div>
-
-              {playerSaveState === 'error' && playerSaveError ? (
-                <div className="admin-save-error">
-                  <strong>Player save failed</strong>
-                  <span>{playerSaveError}</span>
-                </div>
-              ) : null}
-            </div>
+            <PlayersPanel
+              playerDrafts={playerDrafts}
+              playerSaveState={playerSaveState}
+              playerSaveError={playerSaveError}
+              onUpdatePlayer={updatePlayerDraft}
+              onDeletePlayer={deletePlayerDraft}
+              onAddPlayer={addPlayerDraft}
+              onSavePlayers={savePlayerProfiles}
+            />
           ) : null}
+
           {cmsPanel === 'mission' ? (
             <div className="admin-cms-local-panel admin-settings-panel">
               <strong>Settings</strong>
