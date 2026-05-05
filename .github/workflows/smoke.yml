@@ -25,7 +25,7 @@ jobs:
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi uvicorn jinja2 python-multipart
+          pip install -r requirements.txt
 
       - name: Create React dist fixture for backend smoke
         run: |
@@ -52,8 +52,19 @@ jobs:
           ADMIN_PASS: test_admin_password
         run: |
           nohup python -m uvicorn main:app --host 127.0.0.1 --port 8097 >/tmp/saga_smoke.log 2>&1 &
-          sleep 4
-          curl -fsS http://127.0.0.1:8097/docs >/dev/null || (cat /tmp/saga_smoke.log && exit 1)
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8097/docs >/dev/null; then
+              echo "App is ready"
+              exit 0
+            fi
+            echo "Waiting for app... attempt ${attempt}/30"
+            sleep 1
+          done
+
+          echo "App did not become ready"
+          cat /tmp/saga_smoke.log || true
+          exit 1
 
       - name: Smoke endpoints
         run: |
