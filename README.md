@@ -223,11 +223,14 @@ This is the beginning of the new app flow, not the final product version yet.
 
 ---
 
-### Classic admin UI retirement
 
-The classic server-rendered `/admin` UI has been retired as an operator surface. `/admin` now redirects to `/admin-react`.
+### Admin UI
 
-The backend admin APIs remain active because the React admin uses them for authentication, mission settings, node persistence, player/profile management, Mission Control status and recovery actions.
+The operator admin surface is the React admin CMS.
+
+- `/admin-react` opens the React admin CMS / Mission Control shell.
+- `/admin` redirects to `/admin-react`.
+- Backend admin APIs remain active because the React admin uses them for authentication, mission settings, node persistence, player/profile management, Mission Control status and recovery actions.
 
 
 ## Admin Panel
@@ -635,7 +638,7 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
-- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, legacy-style operator shell, persistent mission settings, persistent player/profile editing, family config editor, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
+- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, modern operator shell, persistent mission settings, persistent player/profile editing, family config editor, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
 - `frontend/src/admin/AdminMissionMap.tsx` -> React admin Leaflet mission map with visible numbered pins, click-to-create and drag-to-move editing
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
 - `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host
