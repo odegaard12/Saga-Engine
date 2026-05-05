@@ -44,9 +44,9 @@ The FastAPI backend and current runtime already support:
 - English-first visible UI
 - external live data directory via `SAGA_DATA_DIR`
 
-### Frontend migration in progress
+### React frontend and admin active
 
-A new frontend workspace exists under `frontend/`.
+The frontend workspace lives under `frontend/` and is the active direction for player and admin UI.
 
 Current React frontend stack:
 
@@ -74,9 +74,9 @@ The production backend serves the React player build when `frontend/dist` is ava
 
 The React frontend is currently:
 
-- a migration workspace
-- served by the backend when frontend/dist exists
-- still being completed toward full production gameplay polish
+- the active player/admin direction
+- served by the backend when `frontend/dist` exists
+- still being polished toward production-quality gameplay and operator UX
 
 ---
 
@@ -137,7 +137,7 @@ At each node, the engine can combine:
 - `/` -> React mission entry / player app when `frontend/dist` exists
 - `/player/{PLAYER_NAME}` -> backend-served React player route
 - `/admin` -> React admin CMS
-- `/admin-react` -> React admin shell for the new Mission Control/editor direction
+- `/admin-react` -> React admin CMS / Mission Control
 - `/api/admin/react-overview` -> password-protected read-only React admin overview / Mission Control read model
 - `/api/config` -> public config payload
 - `/api/game/{user}` -> sanitized player payload
@@ -157,7 +157,7 @@ When running the frontend workspace locally through Vite:
 
 - `/` -> React mission entry / login flow
 - `/?user=PLAYER 1` -> React player directly
-- `/admin` -> proxied backend admin
+- `/admin` -> redirects/proxies to `/admin-react`
 - `/player/...` -> backend-served React player route
 
 This React flow is the active player direction.
@@ -223,6 +223,11 @@ This is the beginning of the new app flow, not the final product version yet.
 
 ---
 
+
+
+### Retired admin UI boundary
+
+The former server-rendered admin template has been retired. `/admin` now redirects to the React admin CMS. Backend admin APIs remain active as the service layer used by `/admin-react`.
 
 ### Admin UI
 
@@ -620,8 +625,8 @@ Useful development URLs:
 
 - no `?user` -> React mission entry / login flow
 - with `?user` -> React player flow
-- `/admin` still goes to the current backend admin
-- `/admin-react` opens the new React admin shell
+- `/admin` redirects/proxies to `/admin-react`
+- `/admin-react` opens the active React admin CMS
 - React build is the primary player route when served by the backend
 
 ---
@@ -638,7 +643,7 @@ Useful development URLs:
 - `frontend/src/App.tsx` -> React entry router (`LoginApp` vs `PlayerApp`)
 - `frontend/src/login/LoginApp.tsx` -> React mission entry / login flow
 - `frontend/src/player/PlayerApp.tsx` -> React player app
-- `frontend/src/admin/AdminApp.tsx` -> React admin minimal protected login, modern operator shell, persistent mission settings, persistent player/profile editing, family config editor, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
+- `frontend/src/admin/AdminApp.tsx` -> React admin protected login, modern operator shell, persistent mission settings, persistent player/profile editing, family config editor, local CMS actions, resilient node save/delete/reorder flow, map click/drag node editing, map-first workspace and editable-preview node drawer
 - `frontend/src/admin/AdminMissionMap.tsx` -> React admin Leaflet mission map with visible numbered pins, click-to-create and drag-to-move editing
 - `frontend/src/player/components/*` -> player shell / HUD / map surface / interaction sheet
 - `frontend/src/player/minigames/core/*` -> family runtime contracts, resolver and runtime host
