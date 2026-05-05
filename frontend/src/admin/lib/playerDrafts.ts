@@ -1,4 +1,4 @@
-import type { AdminReactOverviewProfile } from '../../shared/api'
+import type { AdminReactOverviewProfile } from './adminApi'
 import type { PublicConfig } from '../../types/player'
 
 export type PlayerDraft = {

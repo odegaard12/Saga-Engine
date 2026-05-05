@@ -1,4 +1,4 @@
-import type { AdminReactOverviewStage } from '../../shared/api'
+import type { AdminReactOverviewStage } from './adminApi'
 
 export type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
 
