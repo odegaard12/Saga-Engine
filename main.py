@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import json
 import os
@@ -999,8 +998,6 @@ REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
 REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
-templates = Jinja2Templates(directory="templates")
-
 def react_index_or_missing():
     if REACT_INDEX_FILE.exists():
         return FileResponse(REACT_INDEX_FILE)

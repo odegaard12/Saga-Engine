@@ -1,17 +1,38 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-*.log
-.env
+*.pyd
 .venv/
+venv/
+env/
+
+# Logs
+*.log
+
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+
+# Runtime data that must not be committed
 data/gamestate.json
 data/positions.json
-templates/*.bak*
-static/*.bak*
-_SYNC_FROM_CONTAINER/
-# --- Local backups / temporary files ---
+data/admin_auth.json
+data/*.bak
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+frontend/vite.config.ts.timestamp-*.mjs
+
+# Local backups / temporary files
 *.bak
-*.bak_*
+*.bak.*
+*.backup
+*.backup.*
 *.broken_now
 *.tmp
 *.temp
@@ -21,49 +42,17 @@ _SYNC_FROM_CONTAINER/
 *.swo
 *~
 
-# --- Python cache / local env ---
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.venv/
-venv/
-env/
-
-# --- Logs ---
-*.log
-
-# --- OS / editor junk ---
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-# --- Keep local secrets out of git ---
-.env
-.env.*
-!.env.example
-
-data/admin_auth.json
-
-# Local Python / backup artifacts
-data/*.bak
-
-# Frontend local artifacts
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/tsconfig.tsbuildinfo
-*.bak.*
-
-# Vite temporary config loader artifacts
-frontend/vite.config.ts.timestamp-*.mjs
-
 # Local/AI/generated backups
 .backup_chatgpt_*/
 **/.backup_chatgpt_*/
 _backups/
 **/_backups/
-*.bak
-*.backup
-**/*.bak.*
+
+# Sync / local import artifacts
+_SYNC_FROM_CONTAINER/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
