@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 import AdminMissionMap from './AdminMissionMap'
+import AdminMissionControlShell from './components/AdminMissionControlShell'
 import FamiliesPanel from './components/FamiliesPanel'
 import NodeDetailDrawer from './components/NodeDetailDrawer'
 import PlayersPanel from './components/PlayersPanel'
@@ -691,256 +692,45 @@ export default function AdminApp() {
   }
 
   return (
-    <main className="admin-root">
+    <>
       <style>{styles}</style>
-
-      <div className="admin-console-layout">
-        <aside className="admin-sidebar">
-          <div className="admin-brand">SAGA ENGINE · ADMIN CMS</div>
-          <div>
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
-          </div>
-
-          <div className="admin-sidebar-actions">
-            <button type="button" onClick={loadOverview}>Refresh live view</button>
-          </div>
-
-        <section className="admin-sidebar-cms">
-          <div className="admin-sidebar-section-head">
-            <span className="admin-kicker">Mission CMS</span>
-            <h3>Mission tools</h3>
-          </div>
-
-          <div className="admin-sidebar-cms-actions">
-            <button
-              type="button"
-              className="admin-cms-side-action admin-cms-side-action--primary"
-              onClick={() => createLocalNodeAt()}
-            >
-              Add node
-            </button>
-            <button
-              type="button"
-              className="admin-cms-side-action admin-cms-side-action--save"
-              onClick={saveLocalStages}
-              disabled={saveState === 'saving'}
-            >
-              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save changes'}
-            </button>
-            <button
-              type="button"
-              className={`admin-cms-side-action${cmsPanel === 'players' ? ' active' : ''}`}
-              onClick={() => setCmsPanel(cmsPanel === 'players' ? 'none' : 'players')}
-            >
-              Players
-            </button>
-            <button
-              type="button"
-              className={`admin-cms-side-action${cmsPanel === 'labels' ? ' active' : ''}`}
-              onClick={() => setCmsPanel(cmsPanel === 'labels' ? 'none' : 'labels')}
-            >
-              Families
-            </button>
-            <button
-              type="button"
-              className={`admin-cms-side-action${cmsPanel === 'mission' ? ' active' : ''}`}
-              onClick={() => setCmsPanel(cmsPanel === 'mission' ? 'none' : 'mission')}
-            >
-              Settings
-            </button>
-          </div>
-
-          <div className="admin-sidebar-cms-note">
-            Click map to add. Drag nodes to move. Save when ready.
-          </div>
-
-          {localNotice ? (
-            <div className="admin-local-notice">{localNotice}</div>
-          ) : null}
-
-          {saveState === 'error' && saveError ? (
-            <div className="admin-save-error">
-              <strong>Save failed</strong>
-              <span>{saveError}</span>
-            </div>
-          ) : null}
-          {cmsPanel === 'players' ? (
-            <PlayersPanel
-              playerDrafts={playerDrafts}
-              playerSaveState={playerSaveState}
-              playerSaveError={playerSaveError}
-              onUpdatePlayer={updatePlayerDraft}
-              onDeletePlayer={deletePlayerDraft}
-              onAddPlayer={addPlayerDraft}
-              onSavePlayers={savePlayerProfiles}
-            />
-          ) : null}
-
-          {cmsPanel === 'mission' ? (
-            <SettingsPanel
-              missionDraft={missionDraft}
-              settingsSaveState={settingsSaveState}
-              settingsSaveError={settingsSaveError}
-              onUpdateMissionDraft={updateMissionDraft}
-              onSaveSettings={saveMissionSettings}
-            />
-          ) : null}
-
-          {cmsPanel === 'labels' ? (
-            <FamiliesPanel />
-          ) : null}
-        </section>
-
-        <section className="admin-sidebar-cms">
-          <div className="admin-sidebar-section-head">
-            <span className="admin-kicker">Route</span>
-            <h3>Nodes</h3>
-          </div>
-
-          <div className="admin-sidebar-node-list">
-            {stages.map((stage) => {
-              const active = selectedStage?.index === stage.index
-              const key = `${stage.index}-${stage.id ?? stage.title}`
-              const radiusLabel =
-                typeof stage.radius === 'number' && stage.radius > 0 ? `${stage.radius}m` : 'no radius'
-
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  className={`admin-sidebar-node-item${active ? ' active' : ''}`}
-                  onClick={() => setSelectedStage(stage)}
-                >
-                  <span>{stage.index + 1}</span>
-                  <div>
-                    <strong>{stage.title || 'Untitled node'}</strong>
-                    <small>{stage.label || stage.type} · {radiusLabel}</small>
-                    <small className="admin-sidebar-node-coords">{formatCoords(stage.lat, stage.lon)}</small>
-                  </div>
-                </button>
-              )
-            })}
-
-            {stages.length === 0 ? (
-              <div className="admin-sidebar-empty">No nodes yet. Click the map to add one.</div>
-            ) : null}
-          </div>
-        </section>
-
-
-          <div className="admin-sidebar-stats">
-            {stats.map((item) => (
-              <StatCard key={item.label} item={item} compact />
-            ))}
-          </div>
-
-          <details className="admin-disclosure" open>
-            <summary>
-              <SectionHeader title="Profiles" count={profiles.length} />
-            </summary>
-
-            <div className="admin-profile-list">
-              {profiles.map((profile) => (
-                <ProfileCard key={profile.id} profile={profile} />
-              ))}
-              {profiles.length === 0 ? <div className="admin-muted">No profiles found.</div> : null}
-            </div>
-          </details>
-
-          <details className="admin-disclosure">
-            <summary>
-              <SectionHeader title="Families" count={familyCards.length} />
-            </summary>
-
-            <div className="admin-family-count-list">
-              {familyCards.map((family) => (
-                <div key={family.id} className="admin-family-row">
-                  <span>{family.icon}</span>
-                  <div>
-                    <strong>{family.title}</strong>
-                    <small>{family.id}</small>
-                  </div>
-                  <b>{familyCounts[family.id] || 0}</b>
-                </div>
-              ))}
-            </div>
-          </details>
-        </aside>
-
-        <section className="admin-workspace">
-          <div className="admin-workspace-bar">
-            <div>
-              <span className="admin-kicker">Route workspace</span>
-              <h2>Mission map</h2>
-            </div>
-            <div className="admin-topbar-pills admin-cms-actions">
-              <button type="button" className="admin-cms-action primary">Add node</button>
-              <button type="button" className="admin-cms-action">Players</button>
-              <span className="pill ok">Live read model</span>
-              <span className="pill neutral">{stages.length} nodes</span>
-            </div>
-          </div>
-
-          <div className="admin-map-area">
-            <AdminMissionMap
-              stages={stages}
-              selectedStage={selectedStage}
-              onSelectStage={setSelectedStage}
-              onCreateStageAt={createLocalNodeAt}
-              onMoveStage={moveLocalStage}
-            />
-
-            <aside className="admin-node-rail">
-              <details className="admin-disclosure admin-disclosure-nodes" open>
-                <summary>
-                  <div className="admin-node-rail-head">
-                    <div>
-                      <span className="admin-kicker">Nodes</span>
-                      <h3>Route sequence</h3>
-                    </div>
-                    <span className="pill neutral">{stages.length}</span>
-                  </div>
-                </summary>
-
-                <div className="admin-node-list">
-                  {stages.map((stage) => (
-                    <NodeCard
-                      key={`${stage.index}-${stage.id ?? stage.title}`}
-                      stage={stage}
-                      selected={selectedStage?.index === stage.index}
-                      onOpen={() => setSelectedStage(stage)}
-                    />
-                  ))}
-                  {stages.length === 0 ? <div className="admin-muted">No nodes found.</div> : null}
-                </div>
-              </details>
-            </aside>
-          </div>
-
-          <div className="admin-operator-strip admin-operator-strip-compact">
-            <div>
-              <strong>Route CMS mode</strong>
-              <span>Select, move, edit, create or delete nodes. Save changes when the route is ready.</span>
-            </div>
-            <span className="pill warn">Inspect mode</span>
-          </div>
-        </section>
-      </div>
-
-      {selectedStage ? (
-        <NodeDetailDrawer
-          stage={selectedStage}
-          onClose={() => setSelectedStage(null)}
-          onApplyLocal={syncLocalStage}
-          onDeleteLocal={deleteLocalStage}
-          onMoveLocal={reorderLocalStage}
-          canMoveUp={selectedStage.index > 0}
-          canMoveDown={selectedStage.index < stages.length - 1}
-        />
-      ) : null}
-    </main>
+      <AdminMissionControlShell
+        title={title}
+        subtitle={subtitle}
+        profiles={profiles}
+        stages={stages}
+        familyCounts={familyCounts}
+        selectedStage={selectedStage}
+        cmsPanel={cmsPanel}
+        localNotice={localNotice}
+        saveState={saveState}
+        saveError={saveError}
+        playerDrafts={playerDrafts}
+        playerSaveState={playerSaveState}
+        playerSaveError={playerSaveError}
+        missionDraft={missionDraft}
+        settingsSaveState={settingsSaveState}
+        settingsSaveError={settingsSaveError}
+        onRefresh={loadOverview}
+        onSelectStage={setSelectedStage}
+        onCreateNode={() => createLocalNodeAt()}
+        onCreateNodeAt={createLocalNodeAt}
+        onMoveStage={moveLocalStage}
+        onApplyStage={syncLocalStage}
+        onDeleteStage={deleteLocalStage}
+        onReorderStage={reorderLocalStage}
+        onSaveStages={saveLocalStages}
+        onSetCmsPanel={setCmsPanel}
+        onUpdatePlayer={updatePlayerDraft}
+        onDeletePlayer={deletePlayerDraft}
+        onAddPlayer={addPlayerDraft}
+        onSavePlayers={savePlayerProfiles}
+        onUpdateMissionDraft={updateMissionDraft}
+        onSaveSettings={saveMissionSettings}
+      />
+    </>
   )
+
 }
 
 function StatCard({

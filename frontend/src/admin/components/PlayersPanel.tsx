@@ -20,42 +20,62 @@ export default function PlayersPanel({
   onSavePlayers,
 }: PlayersPanelProps) {
   return (
-    <div className="admin-cms-local-panel admin-players-panel">
-      <strong>Players</strong>
-      <span>Edit players and teams. Save players to persist.</span>
+    <div className="admin-cms-local-panel admin-players-panel admin-panel-modern">
+      <div className="admin-panel-hero">
+        <div>
+          <span className="admin-kicker">Players</span>
+          <h2>Players & teams</h2>
+          <p>Manage who can play this mission. Save players to persist changes.</p>
+        </div>
+
+        <div className="admin-panel-count">
+          <strong>{playerDrafts.length}</strong>
+          <span>profiles</span>
+        </div>
+      </div>
 
       {playerDrafts.length === 0 ? (
-        <div className="admin-empty-panel">
-          No players yet. Add one to start.
+        <div className="admin-empty-panel admin-empty-panel-modern">
+          <strong>No players yet</strong>
+          <span>Add one player or team to start testing the mission.</span>
         </div>
       ) : (
-        <div className="admin-player-editor-list">
+        <div className="admin-player-editor-list admin-player-editor-list-modern">
           {playerDrafts.map((draft, index) => (
-            <div className="admin-player-editor-card" key={`${draft.id}-${index}`}>
-              <div className="admin-player-editor-head">
-                <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
-                <button type="button" onClick={() => onDeletePlayer(index)}>
+            <section className="admin-player-editor-card admin-player-card-modern" key={`${draft.id}-${index}`}>
+              <div className="admin-player-editor-head admin-player-head-modern">
+                <div className="admin-player-avatar">{index + 1}</div>
+                <div>
+                  <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
+                  <span>{draft.mode === 'team' ? 'Team profile' : 'Solo profile'} · {draft.status || 'active'}</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="admin-inline-danger"
+                  onClick={() => onDeletePlayer(index)}
+                >
                   Delete
                 </button>
               </div>
 
-              <label>
-                Player ID
-                <input
-                  value={draft.id}
-                  onChange={(event) => onUpdatePlayer(index, 'id', event.target.value)}
-                />
-              </label>
+              <div className="admin-player-form-grid">
+                <label>
+                  Player ID
+                  <input
+                    value={draft.id}
+                    onChange={(event) => onUpdatePlayer(index, 'id', event.target.value)}
+                  />
+                </label>
 
-              <label>
-                Display name
-                <input
-                  value={draft.display_name}
-                  onChange={(event) => onUpdatePlayer(index, 'display_name', event.target.value)}
-                />
-              </label>
+                <label>
+                  Display name
+                  <input
+                    value={draft.display_name}
+                    onChange={(event) => onUpdatePlayer(index, 'display_name', event.target.value)}
+                  />
+                </label>
 
-              <div className="admin-player-editor-grid">
                 <label>
                   Mode
                   <select
@@ -77,7 +97,7 @@ export default function PlayersPanel({
               </div>
 
               {draft.mode === 'team' ? (
-                <label>
+                <label className="admin-player-members">
                   Team members
                   <input
                     value={draft.members}
@@ -86,7 +106,7 @@ export default function PlayersPanel({
                   />
                 </label>
               ) : null}
-            </div>
+            </section>
           ))}
         </div>
       )}
@@ -98,12 +118,13 @@ export default function PlayersPanel({
         </div>
       ) : null}
 
-      <div className="admin-local-actions">
+      <div className="admin-local-actions admin-panel-sticky-actions">
         <button type="button" onClick={onAddPlayer}>
           Add player
         </button>
         <button
           type="button"
+          className="admin-cms-side-action--save"
           onClick={onSavePlayers}
           disabled={playerSaveState === 'saving'}
         >
