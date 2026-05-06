@@ -9,6 +9,7 @@ import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { getStoredMissionPack } from './offline/missionPack'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -120,6 +121,13 @@ export default function PlayerApp() {
           setState({ status: 'ready', payload })
         }
       } catch (error) {
+        const offlinePack = await getStoredMissionPack(user).catch(() => null)
+
+        if (!cancelled && offlinePack?.payload) {
+          setState({ status: 'ready', payload: offlinePack.payload })
+          return
+        }
+
         const message = error instanceof Error ? error.message : 'Unknown load error'
 
         if (!cancelled) {
@@ -596,6 +604,8 @@ export default function PlayerApp() {
 
         <div style={getBottomOverlayStyle(isPhone)}>
           <PlayerHud
+            user={payload.user}
+            missionPayload={payload}
             currentStage={currentStage}
             level={payload.level}
             finished={payload.finished}
