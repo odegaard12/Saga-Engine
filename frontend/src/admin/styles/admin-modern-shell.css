@@ -1,0 +1,1673 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+.saga-admin-shell {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #020617;
+  color: #f8fafc;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+/* =========================
+   MAP FIRST BASE
+   ========================= */
+
+.saga-map-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: #020617;
+}
+
+.saga-map-frame {
+  position: absolute;
+  inset: 0;
+  background: #020617;
+}
+
+.saga-map-frame > section {
+  height: 100% !important;
+  min-height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.saga-map-frame > section > div:first-of-type {
+  display: none !important;
+}
+
+/* =========================
+   GLASS SURFACES
+   ========================= */
+
+.saga-left-rail,
+.saga-inspector,
+.saga-floating-panel,
+.saga-command-bar,
+.saga-toast,
+.saga-mobile-actions {
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+
+/* =========================
+   LEFT RAIL DESKTOP
+   ========================= */
+
+.saga-left-rail {
+  position: fixed;
+  z-index: 30;
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  width: 292px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.10), transparent 34%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.82), rgba(2, 6, 23, 0.66));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+}
+
+.saga-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 8px;
+}
+
+.saga-brand-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(168, 85, 247, 0.92));
+  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.24);
+  font-weight: 950;
+}
+
+.saga-rail-brand strong {
+  display: block;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+}
+
+.saga-rail-brand small,
+.saga-mission-card p,
+.saga-node-copy small,
+.saga-empty-mini,
+.saga-save-status span,
+.saga-inspector-empty p {
+  color: #94a3b8;
+}
+
+.saga-mission-card {
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.saga-eyebrow,
+.admin-kicker {
+  display: block;
+  margin-bottom: 7px;
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.saga-mission-card h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.05;
+  letter-spacing: -0.06em;
+}
+
+.saga-mission-card p {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.saga-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.saga-mini-stats span {
+  padding: 8px 6px;
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.46);
+  color: #cbd5e1;
+  font-size: 11px;
+  text-align: center;
+}
+
+.saga-mini-stats b {
+  display: block;
+  color: #f8fafc;
+  font-size: 16px;
+}
+
+.saga-rail-actions {
+  display: grid;
+  grid-template-columns: 1fr 0.75fr 0.75fr;
+  gap: 8px;
+}
+
+.saga-panel-switcher {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.saga-rail-actions button,
+.saga-panel-switcher button,
+.saga-command-bar button,
+.saga-mobile-actions button,
+.saga-floating-head button,
+.admin-local-actions button,
+.admin-cms-side-action,
+.admin-inline-danger,
+.admin-drawer-tab {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.74);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.saga-rail-actions button:hover,
+.saga-panel-switcher button:hover,
+.saga-command-bar button:hover,
+.saga-mobile-actions button:hover,
+.saga-floating-head button:hover,
+.admin-local-actions button:hover,
+.admin-cms-side-action:hover,
+.admin-drawer-tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.44);
+  background: rgba(30, 41, 59, 0.86);
+}
+
+.saga-rail-actions button:disabled,
+.saga-command-bar button:disabled,
+.admin-local-actions button:disabled,
+.admin-cms-side-action:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.saga-primary-action,
+.saga-command-primary {
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd) !important;
+  color: #020617 !important;
+  border-color: transparent !important;
+  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.22);
+}
+
+.saga-save-action[data-state="saved"],
+.admin-cms-side-action--save {
+  color: #bbf7d0 !important;
+  border-color: rgba(34, 197, 94, 0.36) !important;
+  background: rgba(20, 83, 45, 0.22) !important;
+}
+
+.saga-save-action[data-state="error"] {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.42);
+}
+
+.saga-panel-switcher button.active {
+  color: #020617;
+  background: #f8fafc;
+  border-color: transparent;
+}
+
+.saga-route-list {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.saga-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #cbd5e1;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.saga-section-title b {
+  color: #7dd3fc;
+}
+
+.saga-node-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.saga-node-row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.46);
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.saga-node-row.active {
+  background: rgba(14, 165, 233, 0.16);
+  border-color: rgba(125, 211, 252, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.16);
+}
+
+.saga-node-index {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.10);
+  font-weight: 950;
+}
+
+.saga-node-copy {
+  min-width: 0;
+}
+
+.saga-node-copy strong,
+.saga-node-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saga-node-copy strong {
+  font-size: 12px;
+}
+
+.saga-node-copy small {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.saga-empty-mini {
+  padding: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.20);
+  border-radius: 18px;
+  font-size: 12px;
+}
+
+/* =========================
+   COMMAND BAR DESKTOP
+   ========================= */
+
+.saga-command-bar {
+  position: fixed;
+  z-index: 25;
+  top: 18px;
+  left: 334px;
+  right: 18px;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  background: rgba(2, 6, 23, 0.52);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+}
+
+.saga-admin-shell.has-inspector .saga-command-bar {
+  right: 478px;
+}
+
+.saga-command-main,
+.saga-family-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saga-family-chips {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.saga-family-chips span {
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.saga-save-status {
+  display: grid;
+  gap: 2px;
+  min-width: 126px;
+  padding: 7px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 17px;
+  background: rgba(15, 23, 42, 0.74);
+  font-size: 11px;
+}
+
+.saga-save-status b {
+  font-size: 12px;
+}
+
+.saga-save-status.idle b {
+  color: #facc15;
+}
+
+.saga-save-status.saving b {
+  color: #7dd3fc;
+}
+
+.saga-save-status.saved b {
+  color: #86efac;
+}
+
+.saga-save-status.error b {
+  color: #fca5a5;
+}
+
+.saga-toast {
+  position: fixed;
+  z-index: 32;
+  left: 334px;
+  bottom: 18px;
+  max-width: min(560px, calc(100vw - 780px));
+  padding: 12px 14px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.64);
+  color: #dbeafe;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+/* =========================
+   FLOATING CMS PANEL DESKTOP
+   ========================= */
+
+.saga-floating-panel {
+  position: fixed;
+  z-index: 50;
+  top: 28px;
+  bottom: 28px;
+  left: 334px;
+  width: min(860px, calc(100vw - 380px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 30px;
+  background: rgba(2, 6, 23, 0.90);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.44);
+}
+
+.saga-floating-head {
+  flex: 0 0 auto;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.saga-floating-head strong {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+}
+
+.saga-floating-head button {
+  min-width: 82px;
+}
+
+.saga-floating-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 22px 22px;
+  scrollbar-gutter: stable;
+}
+
+.saga-floating-body > * {
+  max-width: none;
+  margin: 0;
+}
+
+/* =========================
+   MODERN PLAYERS / SETTINGS
+   ========================= */
+
+.admin-panel-modern {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-panel-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.10), transparent 34%),
+    rgba(15, 23, 42, 0.52);
+}
+
+.admin-panel-hero h2 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.admin-panel-hero p {
+  margin: 0;
+  max-width: 560px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-panel-count {
+  min-width: 94px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 22px;
+  background: rgba(2, 6, 23, 0.45);
+  text-align: center;
+}
+
+.admin-panel-count strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.admin-panel-count span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-player-editor-list-modern {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.admin-player-card-modern {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 24px !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.70), rgba(15, 23, 42, 0.48)) !important;
+}
+
+.admin-player-head-modern {
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-player-head-modern strong {
+  display: block;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 16px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-player-head-modern span {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.admin-player-avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: rgba(125, 211, 252, 0.14);
+  color: #e0f2fe;
+  font-weight: 950;
+}
+
+.admin-inline-danger {
+  min-height: 34px;
+  padding: 0 12px;
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+}
+
+.admin-player-form-grid,
+.admin-settings-grid-modern,
+.admin-settings-map-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-player-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-player-members {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-settings-section-modern {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.admin-settings-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-settings-section-head strong {
+  font-size: 16px;
+  letter-spacing: -0.03em;
+}
+
+.admin-settings-section-head span {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.admin-settings-grid-modern {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-settings-map-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-wide-field {
+  grid-column: 1 / -1;
+}
+
+.admin-panel-modern label,
+.admin-player-editor-card label,
+.admin-settings-panel label,
+.admin-edit-field,
+.admin-family-config-grid label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-panel-modern input,
+.admin-panel-modern textarea,
+.admin-panel-modern select,
+.saga-admin-shell input,
+.saga-admin-shell textarea,
+.saga-admin-shell select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 16px;
+  outline: none;
+  background: rgba(2, 6, 23, 0.74);
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.admin-panel-modern textarea,
+.saga-admin-shell textarea {
+  min-height: 112px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.admin-panel-sticky-actions,
+.admin-local-actions {
+  display: flex !important;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.admin-panel-sticky-actions button,
+.admin-local-actions button {
+  min-width: 130px;
+}
+
+.admin-empty-panel-modern,
+.admin-empty-panel {
+  display: grid;
+  gap: 6px;
+  min-height: 140px;
+  place-content: center;
+  text-align: center;
+  border: 1px dashed rgba(148, 163, 184, 0.20);
+  border-radius: 22px;
+  color: #94a3b8;
+}
+
+/* =========================
+   NODE INSPECTOR DESKTOP
+   ========================= */
+
+.saga-inspector {
+  position: fixed;
+  z-index: 40;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: 440px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 28px;
+  background: rgba(2, 6, 23, 0.88);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+.saga-inspector .admin-drawer-overlay {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+}
+
+.saga-inspector .admin-drawer {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+.saga-inspector .admin-drawer-head {
+  flex: 0 0 auto;
+  position: relative !important;
+  top: auto !important;
+  z-index: 3;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 22px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(2, 6, 23, 0.90);
+}
+
+.saga-inspector .admin-drawer-head h2 {
+  max-width: 310px;
+  margin: 0;
+  font-size: 24px !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.06em !important;
+}
+
+.saga-inspector .admin-drawer-head button {
+  width: auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: 999px !important;
+  background: rgba(224, 242, 254, 0.94) !important;
+  color: #020617 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.admin-drawer-head-copy {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-drawer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-drawer-meta span {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.52);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-drawer-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px 22px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  scrollbar-width: none;
+}
+
+.admin-drawer-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-drawer-tab {
+  flex: 0 0 auto;
+  min-height: 34px;
+}
+
+.admin-drawer-tab.active {
+  background: #e0f2fe;
+  color: #020617;
+  border-color: transparent;
+}
+
+.admin-drawer-body--modern,
+.saga-inspector .admin-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 22px !important;
+}
+
+.admin-edit-section,
+.admin-edit-section-compact,
+.admin-family-card,
+.admin-player-card,
+.admin-settings-card,
+.admin-sidebar-cms {
+  padding: 18px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 24px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  box-shadow: none !important;
+}
+
+.admin-edit-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-edit-section-head strong {
+  font-size: 15px;
+  letter-spacing: -0.03em;
+}
+
+.admin-edit-section-head span {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.admin-edit-grid,
+.admin-family-config-grid,
+.admin-reorder-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-edit-check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-edit-check input {
+  width: auto !important;
+  min-height: auto !important;
+}
+
+.admin-edit-section-danger {
+  border-color: rgba(248, 113, 113, 0.22) !important;
+}
+
+.admin-cms-side-action--danger {
+  color: #fecaca !important;
+  border-color: rgba(248, 113, 113, 0.30) !important;
+  background: rgba(127, 29, 29, 0.20) !important;
+}
+
+.admin-drawer-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(2, 6, 23, 0.90);
+}
+
+.admin-note-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 270px;
+  min-height: 34px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================
+   MOBILE CLEAN MODE
+   ========================= */
+
+.saga-mobile-actions {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .saga-admin-shell {
+    width: 100vw;
+    height: 100svh;
+  }
+
+  .saga-left-rail {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: auto;
+    width: auto;
+    height: 74px;
+    max-height: 74px;
+    padding: 10px 12px;
+    border-radius: 22px;
+    overflow: hidden;
+  }
+
+  .saga-left-rail .saga-mission-card,
+  .saga-left-rail .saga-rail-actions,
+  .saga-left-rail .saga-panel-switcher,
+  .saga-left-rail .saga-route-list {
+    display: none !important;
+  }
+
+  .saga-rail-brand {
+    padding: 0;
+  }
+
+  .saga-brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .saga-rail-brand strong {
+    font-size: 14px;
+  }
+
+  .saga-rail-brand small {
+    font-size: 12px;
+  }
+
+  .saga-command-bar {
+    display: none !important;
+  }
+
+  .saga-toast {
+    left: 10px;
+    right: 10px;
+    bottom: 74px;
+    max-width: none;
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .saga-mobile-actions {
+    position: fixed;
+    z-index: 70;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+    padding: 7px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 22px;
+    background: rgba(2, 6, 23, 0.82);
+    box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.34);
+  }
+
+  .saga-mobile-actions button {
+    min-height: 42px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .saga-floating-panel {
+    top: 88px;
+    left: 8px;
+    right: 8px;
+    bottom: 66px;
+    width: auto;
+    max-width: none;
+    border-radius: 24px;
+  }
+
+  .saga-floating-head {
+    min-height: 56px;
+    padding: 12px 14px;
+  }
+
+  .saga-floating-head strong {
+    font-size: 17px;
+  }
+
+  .saga-floating-head button {
+    min-width: 64px;
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  .saga-floating-body {
+    padding: 12px;
+  }
+
+  .admin-panel-modern {
+    gap: 12px;
+  }
+
+  .admin-panel-hero {
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .admin-panel-hero h2 {
+    font-size: 18px;
+  }
+
+  .admin-panel-hero p,
+  .admin-panel-count {
+    display: none;
+  }
+
+  .admin-player-editor-list-modern {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .admin-player-card-modern,
+  .admin-settings-section-modern {
+    padding: 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .admin-player-form-grid,
+  .admin-settings-grid-modern,
+  .admin-settings-map-grid,
+  .admin-edit-grid,
+  .admin-family-config-grid,
+  .admin-reorder-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-player-head-modern {
+    grid-template-columns: 36px minmax(0, 1fr) auto !important;
+  }
+
+  .admin-player-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .admin-inline-danger {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .admin-panel-modern input,
+  .admin-panel-modern textarea,
+  .admin-panel-modern select,
+  .saga-admin-shell input,
+  .saga-admin-shell textarea,
+  .saga-admin-shell select {
+    min-height: 40px;
+    border-radius: 14px;
+    font-size: 12px;
+  }
+
+  .admin-panel-sticky-actions,
+  .admin-local-actions {
+    position: sticky;
+    bottom: -12px;
+    z-index: 4;
+    margin: 0 -12px -12px;
+    padding: 10px 12px 12px;
+    background: rgba(2, 6, 23, 0.90);
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .admin-panel-sticky-actions button,
+  .admin-local-actions button {
+    flex: 1;
+    min-width: 0;
+    min-height: 38px;
+  }
+
+  .saga-inspector {
+    top: 88px;
+    left: 8px;
+    right: 8px;
+    bottom: 66px;
+    width: auto;
+    border-radius: 24px;
+  }
+
+  .saga-inspector .admin-drawer-head {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px;
+    padding: 14px !important;
+  }
+
+  .saga-inspector .admin-drawer-head h2 {
+    max-width: none;
+    font-size: 19px !important;
+    line-height: 1.05 !important;
+  }
+
+  .saga-inspector .admin-drawer-head button {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 12px !important;
+    font-size: 11px !important;
+  }
+
+  .admin-drawer-meta {
+    gap: 6px;
+  }
+
+  .admin-drawer-meta span {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .admin-drawer-tabs {
+    padding: 10px 14px;
+  }
+
+  .admin-drawer-tab {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .admin-drawer-body--modern,
+  .saga-inspector .admin-drawer-body {
+    padding: 12px 14px !important;
+  }
+
+  .admin-edit-section,
+  .admin-edit-section-compact {
+    padding: 14px !important;
+    border-radius: 20px !important;
+  }
+
+  .admin-drawer-footer {
+    display: none;
+  }
+}
+
+@media (max-width: 390px) {
+  .saga-floating-panel,
+  .saga-inspector {
+    left: 6px;
+    right: 6px;
+  }
+
+  .saga-mobile-actions {
+    left: 6px;
+    right: 6px;
+    gap: 5px;
+  }
+
+  .saga-mobile-actions button {
+    font-size: 10px;
+    padding: 0 5px;
+  }
+}
+
+/* =========================================================
+   Layout fixes v6: stop oversized panels, remove white scrollbars,
+   improve desktop command bar and mobile bottom-sheet behavior.
+   ========================================================= */
+
+/* Global overflow guard */
+.saga-admin-shell,
+.saga-floating-panel,
+.saga-floating-body,
+.saga-inspector,
+.saga-inspector .admin-drawer,
+.saga-inspector .admin-drawer-body,
+.admin-panel-modern,
+.admin-player-editor-list-modern,
+.admin-player-card-modern,
+.admin-settings-section-modern {
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+/* Dark, subtle scrollbars instead of white Windows bars where supported */
+.saga-floating-body,
+.saga-node-scroll,
+.saga-inspector .admin-drawer-body,
+.admin-drawer-body--modern {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(2, 6, 23, 0.25);
+}
+
+.saga-floating-body::-webkit-scrollbar,
+.saga-node-scroll::-webkit-scrollbar,
+.saga-inspector .admin-drawer-body::-webkit-scrollbar,
+.admin-drawer-body--modern::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.saga-floating-body::-webkit-scrollbar-track,
+.saga-node-scroll::-webkit-scrollbar-track,
+.saga-inspector .admin-drawer-body::-webkit-scrollbar-track,
+.admin-drawer-body--modern::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.22);
+  border-radius: 999px;
+}
+
+.saga-floating-body::-webkit-scrollbar-thumb,
+.saga-node-scroll::-webkit-scrollbar-thumb,
+.saga-inspector .admin-drawer-body::-webkit-scrollbar-thumb,
+.admin-drawer-body--modern::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+/* Desktop CMS panels should size to content, not fill a huge forced rectangle. */
+@media (min-width: 861px) {
+  .saga-floating-panel {
+    top: 36px !important;
+    bottom: auto !important;
+    left: 334px !important;
+    width: min(920px, calc(100vw - 390px)) !important;
+    height: auto !important;
+    max-height: calc(100vh - 72px) !important;
+    transform: none !important;
+  }
+
+  .saga-floating-body {
+    flex: 0 1 auto !important;
+    max-height: calc(100vh - 150px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin-player-editor-list-modern {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start;
+  }
+
+  .admin-player-card-modern {
+    align-self: start;
+  }
+
+  .admin-panel-sticky-actions,
+  .admin-local-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    margin: 0 !important;
+    padding: 14px 0 0 !important;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.92) 38%);
+  }
+
+  .admin-panel-sticky-actions button,
+  .admin-local-actions button {
+    width: auto;
+    min-width: 150px;
+  }
+
+  /* When the node inspector is open, command bar must not fight for width. */
+  .saga-admin-shell.has-inspector .saga-command-bar {
+    right: auto !important;
+    width: min(660px, calc(100vw - 840px)) !important;
+    min-width: 520px;
+    grid-template-columns: auto auto;
+  }
+
+  .saga-admin-shell.has-inspector .saga-family-chips {
+    display: none !important;
+  }
+
+  .saga-admin-shell.has-inspector .saga-save-status {
+    justify-self: end;
+  }
+
+  .saga-inspector {
+    width: min(460px, calc(100vw - 760px)) !important;
+    min-width: 420px;
+  }
+
+  .saga-inspector .admin-drawer-head {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .saga-inspector .admin-drawer-head button {
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .saga-inspector .admin-drawer-tabs {
+    padding-right: 18px !important;
+  }
+}
+
+/* Make Players/Settings cards consume available panel width cleanly. */
+.admin-panel-hero,
+.admin-player-card-modern,
+.admin-settings-section-modern {
+  width: 100%;
+}
+
+.admin-player-form-grid,
+.admin-settings-grid-modern,
+.admin-settings-map-grid,
+.admin-edit-grid,
+.admin-family-config-grid {
+  min-width: 0;
+}
+
+.admin-player-form-grid > *,
+.admin-settings-grid-modern > *,
+.admin-settings-map-grid > *,
+.admin-edit-grid > *,
+.admin-family-config-grid > * {
+  min-width: 0;
+}
+
+/* Stop native-looking buttons inside forms. */
+.admin-local-actions button,
+.admin-panel-sticky-actions button {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  background: rgba(15, 23, 42, 0.82) !important;
+  color: #e2e8f0 !important;
+  font-weight: 900 !important;
+}
+
+.admin-local-actions button:last-child,
+.admin-panel-sticky-actions button:last-child,
+.admin-local-actions .admin-cms-side-action--save,
+.admin-panel-sticky-actions .admin-cms-side-action--save {
+  border-color: rgba(34, 197, 94, 0.34) !important;
+  background: rgba(20, 83, 45, 0.34) !important;
+  color: #bbf7d0 !important;
+}
+
+/* Node editor: less visual dead space and better contained body. */
+.saga-inspector .admin-drawer-body,
+.admin-drawer-body--modern {
+  padding-bottom: 18px !important;
+}
+
+.admin-edit-section,
+.admin-edit-section-compact {
+  margin-bottom: 0 !important;
+}
+
+.admin-edit-section + .admin-edit-section,
+.admin-edit-section-compact + .admin-edit-section-compact {
+  margin-top: 14px !important;
+}
+
+/* Mobile: panels and node editor should be bottom sheets with auto height. */
+@media (max-width: 860px) {
+  .saga-left-rail {
+    height: 68px !important;
+    max-height: 68px !important;
+    border-radius: 20px !important;
+  }
+
+  .saga-brand-mark {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .saga-rail-brand strong {
+    font-size: 13px !important;
+  }
+
+  .saga-rail-brand small {
+    font-size: 11px !important;
+  }
+
+  .saga-floating-panel {
+    top: auto !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 66px !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: calc(100svh - 148px) !important;
+    border-radius: 24px !important;
+    transform: none !important;
+  }
+
+  .saga-floating-head {
+    min-height: 54px !important;
+    padding: 12px 14px !important;
+  }
+
+  .saga-floating-body {
+    flex: 0 1 auto !important;
+    max-height: calc(100svh - 222px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 12px !important;
+  }
+
+  .admin-panel-hero {
+    padding: 12px !important;
+  }
+
+  .admin-panel-hero h2 {
+    margin: 2px 0 0 !important;
+    font-size: 17px !important;
+  }
+
+  .admin-player-editor-list-modern {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-player-card-modern,
+  .admin-settings-section-modern {
+    padding: 12px !important;
+  }
+
+  .admin-player-form-grid,
+  .admin-settings-grid-modern,
+  .admin-settings-map-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-panel-sticky-actions,
+  .admin-local-actions {
+    position: sticky;
+    bottom: -12px;
+    z-index: 5;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 -12px -12px !important;
+    padding: 10px 12px 12px !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    background: rgba(2, 6, 23, 0.92);
+  }
+
+  .admin-panel-sticky-actions button,
+  .admin-local-actions button {
+    min-width: 0 !important;
+    width: 100%;
+    min-height: 38px !important;
+    font-size: 11px !important;
+  }
+
+  /* Node editor mobile: no giant fixed empty block. */
+  .saga-inspector {
+    top: auto !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 66px !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: calc(100svh - 148px) !important;
+    border-radius: 24px !important;
+  }
+
+  .saga-inspector .admin-drawer {
+    height: auto !important;
+    max-height: calc(100svh - 148px) !important;
+  }
+
+  .saga-inspector .admin-drawer-head {
+    padding: 13px 14px !important;
+  }
+
+  .saga-inspector .admin-drawer-head h2 {
+    font-size: 18px !important;
+    line-height: 1.05 !important;
+  }
+
+  .saga-inspector .admin-drawer-head button {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 11px !important;
+    font-size: 11px !important;
+  }
+
+  .admin-drawer-meta {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .admin-drawer-meta::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-drawer-meta span {
+    flex: 0 0 auto;
+  }
+
+  .admin-drawer-tabs {
+    padding: 9px 14px !important;
+  }
+
+  .admin-drawer-tab {
+    min-height: 31px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+
+  .saga-inspector .admin-drawer-body,
+  .admin-drawer-body--modern {
+    flex: 0 1 auto !important;
+    max-height: calc(100svh - 360px) !important;
+    overflow-y: auto !important;
+    padding: 12px 14px !important;
+  }
+
+  .admin-edit-section,
+  .admin-edit-section-compact {
+    padding: 13px !important;
+    border-radius: 19px !important;
+  }
+
+  .admin-edit-section-head {
+    margin-bottom: 12px !important;
+  }
+
+  .admin-edit-section-head strong {
+    font-size: 13px !important;
+  }
+
+  .admin-edit-section-head span {
+    font-size: 10px !important;
+  }
+
+  .admin-panel-modern input,
+  .admin-panel-modern textarea,
+  .admin-panel-modern select,
+  .saga-admin-shell input,
+  .saga-admin-shell textarea,
+  .saga-admin-shell select {
+    min-height: 38px !important;
+    border-radius: 13px !important;
+    font-size: 11px !important;
+  }
+
+  .saga-admin-shell textarea {
+    min-height: 96px !important;
+  }
+
+  .saga-mobile-actions {
+    z-index: 80 !important;
+  }
+}
+
+/* =========================================================
+   Command bar / inspector collision fix v7
+   Keep the desktop command bar fully outside the node editor.
+   ========================================================= */
+
+@media (min-width: 861px) {
+  .saga-inspector {
+    width: clamp(420px, calc(100vw - 760px), 460px) !important;
+  }
+
+  .saga-admin-shell.has-inspector .saga-command-bar {
+    left: 334px !important;
+    right: calc(clamp(420px, calc(100vw - 760px), 460px) + 48px) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    grid-template-columns: auto auto !important;
+    justify-content: start !important;
+  }
+
+  .saga-admin-shell.has-inspector .saga-family-chips {
+    display: none !important;
+  }
+
+  .saga-admin-shell.has-inspector .saga-save-status {
+    justify-self: start !important;
+    min-width: 128px !important;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1240px) {
+  .saga-admin-shell.has-inspector .saga-command-bar {
+    grid-template-columns: auto !important;
+  }
+
+  .saga-admin-shell.has-inspector .saga-save-status {
+    display: none !important;
+  }
+}
