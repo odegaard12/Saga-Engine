@@ -1,8 +1,11 @@
 import type { CSSProperties } from 'react'
-import type { PlayerStage } from '../../types/player'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
+import { MissionPackPanel } from './MissionPackPanel'
 
 interface PlayerHudProps {
+  user: string
+  missionPayload: PlayerGamePayload
   currentStage: PlayerStage | null
   level: number
   finished: boolean
@@ -48,6 +51,8 @@ function getRangeDisplay(
 }
 
 export function PlayerHud({
+  user,
+  missionPayload,
   currentStage,
   finished,
   gpsState,
@@ -180,6 +185,8 @@ export function PlayerHud({
                 ×
               </button>
             </div>
+
+            <MissionPackPanel user={user} payload={missionPayload} />
 
             <button
               type="button"
