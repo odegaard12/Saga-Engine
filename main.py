@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import secrets
 import time
+import tempfile
 from pathlib import Path
 
 app = FastAPI()
@@ -22,17 +23,89 @@ def load_json(file, default):
         print(f"Error cargando {file}: {e}")
         return default
 
-def save_json(file, data):
+def _json_lock_path(file):
+    return f"{file}.lock"
+
+def _acquire_json_lock(file, timeout=10.0):
+    lock_path = _json_lock_path(file)
+    deadline = time.time() + timeout
+
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+            os.write(fd, str(os.getpid()).encode("utf-8"))
+            return fd, lock_path
+        except FileExistsError:
+            try:
+                # Recover stale locks from interrupted writes.
+                if time.time() - os.path.getmtime(lock_path) > 30:
+                    os.unlink(lock_path)
+                    continue
+            except FileNotFoundError:
+                continue
+
+            if time.time() >= deadline:
+                raise TimeoutError(f"Timed out waiting for JSON lock: {lock_path}")
+
+            time.sleep(0.05)
+
+def _release_json_lock(lock):
+    if not lock:
+        return
+
+    fd, lock_path = lock
+
     try:
-        parent = os.path.dirname(file)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        with open(file, "w", encoding="utf-8") as f:
+        os.close(fd)
+    finally:
+        try:
+            os.unlink(lock_path)
+        except FileNotFoundError:
+            pass
+
+def save_json(file, data):
+    lock = None
+    tmp_path = None
+
+    try:
+        parent = os.path.dirname(file) or "."
+        os.makedirs(parent, exist_ok=True)
+
+        lock = _acquire_json_lock(file)
+
+        base = os.path.basename(file) or "data.json"
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f".{base}.",
+            suffix=".tmp",
+            dir=parent,
+        )
+
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
+
+        os.replace(tmp_path, file)
+        tmp_path = None
+
+        try:
+            dir_fd = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
+
     except Exception as e:
         print(f"Error guardando {file}: {e}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        _release_json_lock(lock)
 
 VALID_PLAYER_THEMES = {"classic", "glass"}
 
@@ -1428,28 +1501,21 @@ async def advance(request: Request):
 async def reset(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "bad password"}
-        )
+    # /api/reset mutates player progress. Keep it admin-only.
+    if not verify_admin_password(data.get("password", "")):
+        raise HTTPException(status_code=403, detail="forbidden")
 
-    if admin_password_change_required():
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "password change required"}
-        )
-
-    user = data.get("user")
-    profile = get_player_profile(user)
-    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
+    user = _as_str(data.get("user")).strip()
+    if not user:
+        raise HTTPException(status_code=400, detail="user is required")
 
     state = load_json(GAME_DB, {})
-    state[profile_id] = 0
+    if not isinstance(state, dict):
+        state = {}
+
+    state[user] = 0
     save_json(GAME_DB, state)
-    return {"status": "ok", "user": profile_id}
-
-
+    return {"status": "ok"}
 
 def _clamp_game_level(value, max_level):
     try:
