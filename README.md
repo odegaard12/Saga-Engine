@@ -740,7 +740,7 @@ Longer-term, SAGA can evolve into:
 
 ## License
 
-MIT recommended.
+MIT.
 
 
 ## Nota de seguridad operativa
