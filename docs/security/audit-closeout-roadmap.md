@@ -26,10 +26,9 @@ This document tracks the remaining security/audit work before returning focus to
 Recommended remaining audit PRs:
 
 1. Extract admin auth helpers from `main.py`.
-2. Extract trusted proxy/client IP helpers from `main.py`.
-3. Add route-level SQLite smoke tests for event sync/admin event review.
-4. Add SQLite backup/migration dry-run documentation.
-5. Start splitting `main.py` into route modules after security helpers are isolated.
+2. Add SQLite backup/migration dry-run documentation.
+3. Extract admin auth helpers from `main.py`.
+4. Start splitting `main.py` into route modules after security helpers are isolated.
 
 ## Rule for stage content
 
@@ -38,3 +37,8 @@ Do not modify `data/stages.json` in audit, storage, security, CI or backend refa
 Stage content changes must be explicit mission/content PRs and must use:
 
 `SAGA_ALLOW_PROTECTED_STAGES_CHANGE=1`
+
+## Closed in client IP / event SQLite audit PR
+
+- Trusted proxy/client IP helpers extracted to `backend/app/security/client_ip.py`.
+- Route-level SQLite tests added for player event sync, admin event listing and admin event marking.
