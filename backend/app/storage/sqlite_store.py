@@ -1,0 +1,368 @@
+"""SQLite storage foundation for SAGA Engine.
+
+This module is not the active production storage backend yet.
+
+It creates the first SQLite schema and helper functions for the data that will
+eventually replace high-churn JSON files:
+
+- event log
+- player game state
+- live positions
+
+The current runtime can continue using JSON while this foundation is tested.
+"""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Any
+import json
+import os
+import sqlite3
+
+from backend.app.storage.event_log import normalize_event
+from backend.app.storage.positions import normalize_live_position
+
+
+DEFAULT_SQLITE_FILENAME = "saga.sqlite3"
+SQLITE_SCHEMA_VERSION = 1
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def resolve_sqlite_path(data_dir: str, filename: str = DEFAULT_SQLITE_FILENAME) -> str:
+    base = str(data_dir or ".").strip() or "."
+    if not os.path.isabs(base):
+        base = os.path.abspath(base)
+
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, filename)
+
+
+def connect_sqlite(path: str) -> sqlite3.Connection:
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, exist_ok=True)
+
+    conn = sqlite3.connect(path, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
+
+
+@contextmanager
+def sqlite_connection(path: str):
+    conn = connect_sqlite(path)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def init_sqlite_schema(path: str) -> None:
+    with sqlite_connection(path) as conn:
+        conn.execute("PRAGMA journal_mode = WAL")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            INSERT INTO schema_meta (key, value)
+            VALUES ('schema_version', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (str(SQLITE_SCHEMA_VERSION),),
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS events (
+                id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                user TEXT NOT NULL DEFAULT '',
+                team_id TEXT NOT NULL DEFAULT '',
+                node_id TEXT NOT NULL DEFAULT '',
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                synced_at TEXT,
+                error TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_events_status_created
+            ON events(status, created_at)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_events_user_created
+            ON events(user, created_at)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_events_type_created
+            ON events(type, created_at)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS game_state (
+                user TEXT PRIMARY KEY,
+                level INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS positions (
+                user TEXT PRIMARY KEY,
+                last_seen INTEGER NOT NULL DEFAULT 0,
+                gps_status TEXT NOT NULL DEFAULT 'unknown',
+                lat REAL,
+                lon REAL,
+                source TEXT NOT NULL DEFAULT 'player',
+                debug_enabled INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value if isinstance(value, dict) else {}, ensure_ascii=False)
+
+
+def _json_loads(value: str) -> dict[str, Any]:
+    try:
+        decoded = json.loads(value or "{}")
+        return decoded if isinstance(decoded, dict) else {}
+    except Exception:
+        return {}
+
+
+def append_sqlite_event(path: str, event: dict[str, Any]) -> dict[str, Any]:
+    init_sqlite_schema(path)
+    normalized = normalize_event(event)
+
+    with sqlite_connection(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO events (
+                id,
+                type,
+                status,
+                source,
+                created_at,
+                user,
+                team_id,
+                node_id,
+                payload_json,
+                synced_at,
+                error
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized["id"],
+                normalized["type"],
+                normalized["status"],
+                normalized["source"],
+                normalized["created_at"],
+                normalized.get("user", ""),
+                normalized.get("team_id", ""),
+                normalized.get("node_id", ""),
+                _json_dumps(normalized.get("payload")),
+                normalized.get("synced_at"),
+                normalized.get("error"),
+            ),
+        )
+
+    return normalized
+
+
+def _row_to_event(row: sqlite3.Row) -> dict[str, Any]:
+    event = {
+        "id": row["id"],
+        "type": row["type"],
+        "status": row["status"],
+        "source": row["source"],
+        "created_at": row["created_at"],
+        "user": row["user"],
+        "team_id": row["team_id"],
+        "node_id": row["node_id"],
+        "payload": _json_loads(row["payload_json"]),
+    }
+
+    if row["synced_at"]:
+        event["synced_at"] = row["synced_at"]
+
+    if row["error"]:
+        event["error"] = row["error"]
+
+    return event
+
+
+def list_sqlite_events(
+    path: str,
+    *,
+    status: str | None = None,
+    user: str | None = None,
+    event_type: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    init_sqlite_schema(path)
+
+    clauses = []
+    params: list[Any] = []
+
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+
+    if user:
+        clauses.append("user = ?")
+        params.append(user)
+
+    if event_type:
+        clauses.append("type = ?")
+        params.append(event_type)
+
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    sql = f"SELECT * FROM events{where} ORDER BY created_at ASC, id ASC"
+
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(max(1, min(5000, int(limit))))
+
+    with sqlite_connection(path) as conn:
+        rows = conn.execute(sql, params).fetchall()
+
+    return [_row_to_event(row) for row in rows]
+
+
+def set_sqlite_player_level(path: str, user: str, level: int) -> None:
+    user_key = str(user or "").strip()
+    if not user_key:
+        raise ValueError("user is required")
+
+    next_level = max(0, int(level or 0))
+    now = utc_now_iso()
+
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO game_state (user, level, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user) DO UPDATE SET
+                level = excluded.level,
+                updated_at = excluded.updated_at
+            """,
+            (user_key, next_level, now),
+        )
+
+
+def load_sqlite_game_state(path: str) -> dict[str, int]:
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        rows = conn.execute("SELECT user, level FROM game_state ORDER BY user ASC").fetchall()
+
+    return {row["user"]: int(row["level"] or 0) for row in rows}
+
+
+def upsert_sqlite_position(path: str, user: str, position: dict[str, Any]) -> None:
+    user_key = str(user or "").strip()
+    if not user_key:
+        raise ValueError("user is required")
+
+    normalized = normalize_live_position(position)
+    now = utc_now_iso()
+
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO positions (
+                user,
+                last_seen,
+                gps_status,
+                lat,
+                lon,
+                source,
+                debug_enabled,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user) DO UPDATE SET
+                last_seen = excluded.last_seen,
+                gps_status = excluded.gps_status,
+                lat = excluded.lat,
+                lon = excluded.lon,
+                source = excluded.source,
+                debug_enabled = excluded.debug_enabled,
+                updated_at = excluded.updated_at
+            """,
+            (
+                user_key,
+                normalized["last_seen"],
+                normalized["gps_status"],
+                normalized["lat"],
+                normalized["lon"],
+                normalized["source"],
+                1 if normalized["debug_enabled"] else 0,
+                now,
+            ),
+        )
+
+
+def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        rows = conn.execute(
+            """
+            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled
+            FROM positions
+            ORDER BY user ASC
+            """
+        ).fetchall()
+
+    return {
+        row["user"]: {
+            "last_seen": int(row["last_seen"] or 0),
+            "gps_status": row["gps_status"],
+            "lat": row["lat"],
+            "lon": row["lon"],
+            "source": row["source"],
+            "debug_enabled": bool(row["debug_enabled"]),
+        }
+        for row in rows
+    }
