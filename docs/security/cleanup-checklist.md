@@ -38,3 +38,13 @@ Review before deleting or changing:
 ## Current priority
 
 The next safe cleanup target is splitting `main.py` into route modules after the security helpers have been extracted.
+
+## Cleanup audit report
+
+Run the cleanup audit report before deleting legacy references:
+
+`python scripts/audit_cleanup_candidates.py --write docs/security/cleanup-audit-report.md`
+
+The report lists file paths, categories and line numbers only. It intentionally does not copy matching line contents.
+
+Use the report to plan focused cleanup PRs.
