@@ -1,10 +1,13 @@
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
 os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
 os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-data-"))
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
