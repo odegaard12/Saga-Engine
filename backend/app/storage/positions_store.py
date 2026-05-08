@@ -17,6 +17,7 @@ from backend.app.storage.positions import (
     upsert_live_position as upsert_json_live_position,
 )
 from backend.app.storage.sqlite_store import (
+    get_sqlite_position,
     load_sqlite_positions,
     remove_sqlite_position,
     resolve_sqlite_path,
@@ -43,6 +44,19 @@ def resolve_positions_db_path(json_positions_path: str) -> str:
     data_dir = os.path.dirname(os.path.abspath(json_positions_path)) or "."
     return resolve_sqlite_path(data_dir)
 
+
+
+def get_live_position(path: str, user: str) -> dict[str, Any]:
+    user_key = str(user or "").strip()
+    if not user_key:
+        return {}
+
+    if resolve_positions_storage_backend() == "sqlite":
+        return get_sqlite_position(resolve_positions_db_path(path), user_key)
+
+    state = load_json_live_positions_state(path)
+    raw = state.get(user_key, {})
+    return raw if isinstance(raw, dict) else {}
 
 def load_live_positions_state(path: str) -> dict[str, dict[str, Any]]:
     if resolve_positions_storage_backend() == "sqlite":

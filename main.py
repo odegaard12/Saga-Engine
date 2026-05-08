@@ -12,7 +12,12 @@ from pathlib import Path
 
 from backend.app.storage.json_store import load_json, save_json, update_json
 from backend.app.storage.game_state_store import reset_player_level
-from backend.app.storage.positions_store import load_live_positions_state, save_live_positions_state
+from backend.app.storage.positions_store import (
+    get_live_position as get_live_position_state,
+    load_live_positions_state,
+    save_live_positions_state,
+    upsert_live_position as upsert_live_position_state,
+)
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 
 app = FastAPI()
@@ -570,6 +575,14 @@ def load_live_positions():
 
 def save_live_positions(data):
     save_live_positions_state(POSITIONS_DB, data)
+
+
+def get_live_position(user):
+    return get_live_position_state(POSITIONS_DB, user)
+
+
+def upsert_live_position_for_user(user, position):
+    return upsert_live_position_state(POSITIONS_DB, user, position)
 
 
 def project_live_profile_status(profile, raw=None, now=None):
@@ -1335,8 +1348,7 @@ async def heartbeat(request: Request):
             content={"status": "error", "detail": "lon out of range"}
         )
 
-    positions = load_live_positions()
-    current = positions.get(profile_id, {})
+    current = get_live_position(profile_id)
     if not isinstance(current, dict):
         current = {}
 
@@ -1355,8 +1367,7 @@ async def heartbeat(request: Request):
     # Public heartbeat must not be able to toggle debug state remotely.
     current["debug_enabled"] = False
 
-    positions[profile_id] = current
-    save_live_positions(positions)
+    upsert_live_position_for_user(profile_id, current)
     HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
 
     return {

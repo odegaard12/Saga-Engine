@@ -343,6 +343,35 @@ def upsert_sqlite_position(path: str, user: str, position: dict[str, Any]) -> No
         )
 
 
+
+def get_sqlite_position(path: str, user: str) -> dict[str, Any]:
+    user_key = str(user or "").strip()
+    if not user_key:
+        return {}
+
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        row = conn.execute(
+            """
+            SELECT user, last_seen, gps_status, lat, lon, source, debug_enabled
+            FROM positions
+            WHERE user = ?
+            """,
+            (user_key,),
+        ).fetchone()
+
+    if not row:
+        return {}
+
+    return {
+        "last_seen": int(row["last_seen"] or 0),
+        "gps_status": row["gps_status"],
+        "lat": row["lat"],
+        "lon": row["lon"],
+        "source": row["source"],
+        "debug_enabled": bool(row["debug_enabled"]),
+    }
+
 def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
     init_sqlite_schema(path)
 
