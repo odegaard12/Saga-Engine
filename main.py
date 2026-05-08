@@ -13,7 +13,7 @@ from pathlib import Path
 from backend.app.storage.json_store import load_json, save_json, update_json
 from backend.app.storage.game_state import reset_player_level
 from backend.app.storage.positions import load_live_positions_state, save_live_positions_state
-from backend.app.storage.event_log import append_event, list_events, mark_event_status
+from backend.app.storage.event_store import append_event, list_events, mark_event_status
 
 app = FastAPI()
 

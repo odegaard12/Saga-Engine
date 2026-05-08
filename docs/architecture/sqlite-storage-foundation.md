@@ -84,3 +84,20 @@ Do not store:
 - backups
 - unnecessary private paths
 - sensitive free text
+
+## First optional adapter
+
+The first optional SQLite adapter is the event store.
+
+Default:
+
+    SAGA_STORAGE_BACKEND=json
+
+Optional event storage through SQLite:
+
+    SAGA_STORAGE_BACKEND=sqlite
+    SAGA_SQLITE_DB=/path/to/saga.sqlite3
+
+When enabled, event append/list/mark operations use SQLite. Other runtime state can remain JSON until migrated separately.
+
+This staged approach lets SAGA move high-churn data first while keeping the deployment safe and reversible.
