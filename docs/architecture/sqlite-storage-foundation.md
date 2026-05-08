@@ -141,3 +141,21 @@ The public `/api/heartbeat` route now writes live presence through the positions
 Default behavior remains JSON-backed. When `SAGA_STORAGE_BACKEND=sqlite` is enabled, heartbeat updates use the SQLite positions upsert path instead of rewriting the full live positions document.
 
 This keeps live presence migration opt-in while reducing write amplification for the high-churn heartbeat path.
+
+## Game state route adapter usage
+
+Player progress routes now read and write through the game state adapter.
+
+Covered runtime paths include:
+
+- `/api/state/{user}`
+- `/api/game/{user}`
+- `/api/advance`
+- `/api/admin/mission-status`
+- `/api/admin/react-overview`
+- `/api/admin/profile-action`
+- `/api/reset`
+
+Default behavior remains JSON-backed. When `SAGA_STORAGE_BACKEND=sqlite` is enabled, these routes use the SQLite game state adapter instead of direct `gamestate.json` reads/writes.
+
+This keeps the migration opt-in while making route behavior match the storage adapter contract.
