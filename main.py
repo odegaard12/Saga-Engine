@@ -12,6 +12,7 @@ from pathlib import Path
 
 from backend.app.storage.json_store import load_json, save_json, update_json
 from backend.app.storage.game_state import reset_player_level
+from backend.app.storage.positions import load_live_positions_state, save_live_positions_state
 
 app = FastAPI()
 
@@ -563,11 +564,11 @@ def resolve_known_player_profile(user, cfg=None):
     return None
 
 def load_live_positions():
-    data = load_json(POSITIONS_DB, {})
-    return data if isinstance(data, dict) else {}
+    return load_live_positions_state(POSITIONS_DB)
 
 def save_live_positions(data):
-    save_json(POSITIONS_DB, data)
+    save_live_positions_state(POSITIONS_DB, data)
+
 
 def project_live_profile_status(profile, raw=None, now=None):
     now = int(now or time.time())
