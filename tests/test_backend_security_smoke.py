@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
 os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-data-"))
@@ -138,3 +139,63 @@ def test_json_save_uses_atomic_replace_and_leaves_valid_json():
     assert target.exists()
     assert main.load_json(str(target), {}) == payload
     assert not list(target.parent.glob(".atomic-test.json.*.tmp"))
+
+
+def make_fake_request(headers=None, host="10.0.0.10"):
+    return SimpleNamespace(
+        headers=headers or {},
+        client=SimpleNamespace(host=host),
+    )
+
+
+def test_client_ip_ignores_forwarded_headers_by_default(monkeypatch):
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", False)
+
+    request = make_fake_request(
+        headers={
+            "x-forwarded-for": "203.0.113.10",
+            "cf-connecting-ip": "203.0.113.11",
+        },
+        host="10.0.0.10",
+    )
+
+    assert main.get_client_ip(request) == "10.0.0.10"
+
+
+def test_client_ip_accepts_forwarded_headers_only_from_trusted_proxy(monkeypatch):
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(main, "TRUSTED_PROXY_IPS", {"10.0.0.10"})
+    monkeypatch.setattr(main, "TRUSTED_PROXY_CIDRS", [])
+
+    request = make_fake_request(
+        headers={"x-forwarded-for": "203.0.113.10, 198.51.100.20"},
+        host="10.0.0.10",
+    )
+
+    assert main.get_client_ip(request) == "203.0.113.10"
+
+
+def test_client_ip_rejects_forwarded_headers_from_untrusted_client(monkeypatch):
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(main, "TRUSTED_PROXY_IPS", {"10.0.0.99"})
+    monkeypatch.setattr(main, "TRUSTED_PROXY_CIDRS", [])
+
+    request = make_fake_request(
+        headers={"x-forwarded-for": "203.0.113.10"},
+        host="10.0.0.10",
+    )
+
+    assert main.get_client_ip(request) == "10.0.0.10"
+
+
+def test_client_ip_rejects_invalid_forwarded_header(monkeypatch):
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(main, "TRUSTED_PROXY_IPS", {"10.0.0.10"})
+    monkeypatch.setattr(main, "TRUSTED_PROXY_CIDRS", [])
+
+    request = make_fake_request(
+        headers={"x-forwarded-for": "not-an-ip"},
+        host="10.0.0.10",
+    )
+
+    assert main.get_client_ip(request) == "10.0.0.10"
