@@ -253,12 +253,18 @@ def get_admin_password_from_payload(data):
             return value
     return ""
 
+def legacy_admin_password_payload_enabled():
+    return (os.getenv("SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD") or "0").strip() == "1"
+
+
 def admin_request_authorized(request: Request, data=None):
     cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE)
     if verify_admin_session_token(cookie_token):
         return True
-
+    if not legacy_admin_password_payload_enabled():
+        return False
     return verify_admin_password(get_admin_password_from_payload(data or {}))
+
 
 TRUST_PROXY_HEADERS = (os.getenv("TRUST_PROXY_HEADERS") or "0").strip() == "1"
 
@@ -1892,24 +1898,11 @@ async def admin_login(request: Request):
     if verify_admin_password(data.get("password")):
         clear_admin_login_state(ip)
         response = JSONResponse({"status": "ok", "must_change": admin_password_change_required()})
-    set_admin_session_cookie(response, request, create_admin_session())
-    return response
+        set_admin_session_cookie(response, request, create_admin_session())
+        return response
 
-    state = register_admin_login_failure(ip, now)
-    remaining_after_fail = get_admin_lock_remaining_seconds(ip, now)
-
-    if remaining_after_fail > 0:
-        raise HTTPException(
-            status_code=429,
-            detail=f"too many failed attempts; retry in {remaining_after_fail}s"
-        )
-
-    attempts_left = max(0, ADMIN_LOGIN_MAX_ATTEMPTS - len(state.get("attempts", [])))
-    raise HTTPException(
-        status_code=401,
-        detail=f"invalid password ({attempts_left} attempts left before temporary lock)"
-    )
-
+    register_admin_login_failure(ip, now)
+    raise HTTPException(status_code=401, detail="invalid admin password")
 
 @app.post("/api/admin/logout")
 async def admin_logout(request: Request):

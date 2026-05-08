@@ -159,3 +159,13 @@ Covered runtime paths include:
 Default behavior remains JSON-backed. When `SAGA_STORAGE_BACKEND=sqlite` is enabled, these routes use the SQLite game state adapter instead of direct `gamestate.json` reads/writes.
 
 This keeps the migration opt-in while making route behavior match the storage adapter contract.
+
+## Admin auth compatibility note
+
+SQLite storage migration does not require legacy admin password payload authentication.
+
+The React admin CMS uses the HttpOnly session cookie. Legacy password-in-payload admin authorization is disabled by default and can only be re-enabled temporarily with:
+
+- `SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD=1`
+
+This keeps storage migration and admin authentication changes independent.
