@@ -366,3 +366,46 @@ def load_sqlite_positions(path: str) -> dict[str, dict[str, Any]]:
         }
         for row in rows
     }
+
+def mark_sqlite_event_status(
+    path: str,
+    event_id: str,
+    status: str,
+    *,
+    error: str | None = None,
+) -> dict[str, Any] | None:
+    init_sqlite_schema(path)
+
+    event_key = str(event_id or "").strip()
+    if not event_key:
+        return None
+
+    next_status = str(status or "pending").strip() or "pending"
+    synced_at = utc_now_iso() if next_status == "synced" else None
+
+    with sqlite_connection(path) as conn:
+        existing = conn.execute(
+            "SELECT * FROM events WHERE id = ?",
+            (event_key,),
+        ).fetchone()
+
+        if not existing:
+            return None
+
+        conn.execute(
+            """
+            UPDATE events
+            SET status = ?,
+                synced_at = COALESCE(?, synced_at),
+                error = COALESCE(?, error)
+            WHERE id = ?
+            """,
+            (next_status, synced_at, error, event_key),
+        )
+
+        updated = conn.execute(
+            "SELECT * FROM events WHERE id = ?",
+            (event_key,),
+        ).fetchone()
+
+    return _row_to_event(updated)
