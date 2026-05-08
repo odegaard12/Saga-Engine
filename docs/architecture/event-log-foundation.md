@@ -101,3 +101,17 @@ The future direction is:
 3. Offline player queue sync endpoint.
 4. SQLite event table.
 5. Event-based reconciliation for progress, QR/NFC, team rules and inventory.
+
+## First API foundation
+
+The first API layer exposes:
+
+- `POST /api/events/sync`
+- `POST /api/admin/events`
+- `POST /api/admin/events/mark`
+
+`/api/events/sync` is for player/offline queue events. It only accepts known players and a controlled set of player-safe event types.
+
+`/api/admin/events` and `/api/admin/events/mark` require admin authorization.
+
+The player sync endpoint is intentionally generic but constrained. It should not receive secrets, admin data or large free-text dumps.
