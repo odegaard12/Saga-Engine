@@ -255,6 +255,90 @@ ADMIN_LOGIN_MAX_ATTEMPTS = 5
 ADMIN_LOGIN_LOCK_SECONDS = 600
 ADMIN_LOGIN_ATTEMPTS = {}
 
+ADMIN_SESSION_COOKIE = "saga_admin_session"
+ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS", "3600") or "3600")
+ADMIN_SESSIONS = {}
+
+def _now_ts():
+    return int(time.time())
+
+def prune_admin_sessions(now=None):
+    now = int(now or _now_ts())
+    expired = [
+        token for token, session in ADMIN_SESSIONS.items()
+        if int(session.get("expires_at") or 0) <= now
+    ]
+    for token in expired:
+        ADMIN_SESSIONS.pop(token, None)
+
+def create_admin_session():
+    prune_admin_sessions()
+    token = secrets.token_urlsafe(32)
+    now = _now_ts()
+    ADMIN_SESSIONS[token] = {
+        "created_at": now,
+        "expires_at": now + ADMIN_SESSION_TTL_SECONDS,
+    }
+    return token
+
+def verify_admin_session_token(token):
+    token = str(token or "").strip()
+    if not token:
+        return False
+
+    prune_admin_sessions()
+    session = ADMIN_SESSIONS.get(token)
+    if not session:
+        return False
+
+    if int(session.get("expires_at") or 0) <= _now_ts():
+        ADMIN_SESSIONS.pop(token, None)
+        return False
+
+    return True
+
+def admin_cookie_settings(request: Request):
+    secure = (request.url.scheme or "").lower() == "https"
+    return {
+        "httponly": True,
+        "samesite": "lax",
+        "secure": secure,
+        "path": "/",
+        "max_age": ADMIN_SESSION_TTL_SECONDS,
+    }
+
+def set_admin_session_cookie(response: Response, request: Request, token: str):
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        token,
+        **admin_cookie_settings(request),
+    )
+
+def clear_admin_session_cookie(response: Response, request: Request):
+    response.delete_cookie(
+        ADMIN_SESSION_COOKIE,
+        path="/",
+        secure=(request.url.scheme or "").lower() == "https",
+        httponly=True,
+        samesite="lax",
+    )
+
+def get_admin_password_from_payload(data):
+    if not isinstance(data, dict):
+        return ""
+    for key in ("password", "admin_password", "admin_pass", "admin_key", "key"):
+        value = data.get(key)
+        if value:
+            return value
+    return ""
+
+def admin_request_authorized(request: Request, data=None):
+    cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if verify_admin_session_token(cookie_token):
+        return True
+
+    return verify_admin_password(get_admin_password_from_payload(data or {}))
+
 def get_client_ip(request: Request):
     forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
     if forwarded:
@@ -1502,7 +1586,7 @@ async def reset(request: Request):
     data = await request.json()
 
     # /api/reset mutates player progress. Keep it admin-only.
-    if not verify_admin_password(data.get("password", "")):
+    if not admin_request_authorized(request, data):
         raise HTTPException(status_code=403, detail="forbidden")
 
     user = _as_str(data.get("user")).strip()
@@ -1635,7 +1719,9 @@ async def admin_login(request: Request):
 
     if verify_admin_password(data.get("password")):
         clear_admin_login_state(ip)
-        return {"status": "ok", "must_change": admin_password_change_required()}
+        response = JSONResponse({"status": "ok", "must_change": admin_password_change_required()})
+    set_admin_session_cookie(response, request, create_admin_session())
+    return response
 
     state = register_admin_login_failure(ip, now)
     remaining_after_fail = get_admin_lock_remaining_seconds(ip, now)
@@ -1651,6 +1737,17 @@ async def admin_login(request: Request):
         status_code=401,
         detail=f"invalid password ({attempts_left} attempts left before temporary lock)"
     )
+
+
+@app.post("/api/admin/logout")
+async def admin_logout(request: Request):
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if token:
+        ADMIN_SESSIONS.pop(token, None)
+
+    response = JSONResponse({"status": "ok"})
+    clear_admin_session_cookie(response, request)
+    return response
 
 @app.post("/api/admin/change-password")
 async def admin_change_password(request: Request):
