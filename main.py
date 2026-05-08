@@ -1380,7 +1380,7 @@ def _admin_react_profile_summary(profile, gamestate, positions):
 async def admin_react_overview(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return {
             "status": "fail",
             "message": "Invalid admin password",
@@ -1456,7 +1456,7 @@ async def admin_react_overview(request: Request):
 async def admin_mission_status(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
 
     cfg = load_config()
@@ -1492,7 +1492,7 @@ async def admin_mission_status(request: Request):
 async def get_stages(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return JSONResponse(
             status_code=403,
             content={"status": "error", "detail": "bad password"}
@@ -1510,7 +1510,7 @@ async def get_stages(request: Request):
 async def save_config_endpoint(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
 
     if admin_password_change_required():
@@ -1616,7 +1616,7 @@ def _clamp_game_level(value, max_level):
 async def admin_profile_action(request: Request):
     data = await request.json()
 
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return JSONResponse(
             status_code=403,
             content={"status": "error", "detail": "bad password"}
@@ -1688,7 +1688,7 @@ async def admin_profile_action(request: Request):
 @app.post("/api/admin/save")
 async def save_stages_endpoint(request: Request):
     data = await request.json()
-    if not verify_admin_password(data.get("password")):
+    if not admin_request_authorized(request, data):
         return JSONResponse(status_code=403, content={"status": "error"})
     if admin_password_change_required():
         return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
