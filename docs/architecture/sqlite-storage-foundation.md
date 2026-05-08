@@ -133,3 +133,11 @@ Optional live positions storage through SQLite:
 When enabled, live presence load/save/upsert/remove operations can use SQLite through the adapter layer.
 
 JSON remains the default storage backend. Existing deployments do not change unless SQLite is explicitly enabled.
+
+## Heartbeat write path
+
+The public `/api/heartbeat` route now writes live presence through the positions adapter.
+
+Default behavior remains JSON-backed. When `SAGA_STORAGE_BACKEND=sqlite` is enabled, heartbeat updates use the SQLite positions upsert path instead of rewriting the full live positions document.
+
+This keeps live presence migration opt-in while reducing write amplification for the high-churn heartbeat path.
