@@ -48,3 +48,17 @@ Run the cleanup audit report before deleting legacy references:
 The report lists file paths, categories and line numbers only. It intentionally does not copy matching line contents.
 
 Use the report to plan focused cleanup PRs.
+
+## False-positive policy
+
+Do not delete text just because it says `legacy`, `retired` or `classic`.
+
+Some of those words are intentionally used in security and architecture docs to explain compatibility boundaries.
+
+Actionable cleanup candidates should be specific:
+
+- references to removed routes
+- stale JSON-only wording
+- TODO/FIXME markers
+- confirmed obsolete docs or code
+- wrappers proven unused by tests/search
