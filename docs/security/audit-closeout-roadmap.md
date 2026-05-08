@@ -57,3 +57,10 @@ Stage content changes must be explicit mission/content PRs and must use:
 - Storage model documented as JSON default with optional SQLite adapters.
 - Security posture, repository guards and protected stage policy documented from the public entry point.
 - Cleanup checklist added before major gameplay work resumes.
+
+## Closed in cleanup audit report PR
+
+- Added `scripts/audit_cleanup_candidates.py` to scan tracked text files for legacy/obsolete cleanup candidates.
+- Added `docs/security/cleanup-audit-report.md`.
+- The report avoids copying matched line contents and only records paths, categories and line numbers.
+- Cleanup process now has a repeatable audit step before deleting legacy artifacts.
