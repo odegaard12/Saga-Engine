@@ -10,7 +10,7 @@ import time
 import ipaddress
 from pathlib import Path
 
-from backend.app.storage.json_store import load_json, save_json
+from backend.app.storage.json_store import load_json, save_json, update_json
 
 app = FastAPI()
 
@@ -1567,12 +1567,13 @@ async def reset(request: Request):
     if not user:
         raise HTTPException(status_code=400, detail="user is required")
 
-    state = load_json(GAME_DB, {})
-    if not isinstance(state, dict):
-        state = {}
+    def reset_user_progress(state):
+        if not isinstance(state, dict):
+            state = {}
+        state[user] = 0
+        return state
 
-    state[user] = 0
-    save_json(GAME_DB, state)
+    update_json(GAME_DB, {}, reset_user_progress)
     return {"status": "ok"}
 
 def _clamp_game_level(value, max_level):

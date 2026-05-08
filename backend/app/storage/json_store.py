@@ -8,6 +8,7 @@ It provides:
 - lock-file based write serialization
 - temporary-file writes
 - fsync before atomic replace
+- update_json() for locked read-modify-write flows
 """
 
 from __future__ import annotations
@@ -16,10 +17,10 @@ import json
 import os
 import tempfile
 import time
-from typing import Any
+from typing import Any, Callable
 
 
-def load_json(file: str, default: Any) -> Any:
+def _read_json_unlocked(file: str, default: Any) -> Any:
     try:
         if not os.path.exists(file):
             return default
@@ -30,6 +31,10 @@ def load_json(file: str, default: Any) -> Any:
     except Exception as e:
         print(f"Error cargando {file}: {e}")
         return default
+
+
+def load_json(file: str, default: Any) -> Any:
+    return _read_json_unlocked(file, default)
 
 
 def _json_lock_path(file: str) -> str:
@@ -75,16 +80,12 @@ def _release_json_lock(lock) -> None:
             pass
 
 
-def save_json(file: str, data: Any) -> None:
-    lock = None
+def _write_json_unlocked(file: str, data: Any) -> None:
+    parent = os.path.dirname(file) or "."
+    os.makedirs(parent, exist_ok=True)
+
     tmp_path = None
-
     try:
-        parent = os.path.dirname(file) or "."
-        os.makedirs(parent, exist_ok=True)
-
-        lock = _acquire_json_lock(file)
-
         base = os.path.basename(file) or "data.json"
         fd, tmp_path = tempfile.mkstemp(
             prefix=f".{base}.",
@@ -109,8 +110,6 @@ def save_json(file: str, data: Any) -> None:
         except OSError:
             pass
 
-    except Exception as e:
-        print(f"Error guardando {file}: {e}")
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
@@ -118,4 +117,37 @@ def save_json(file: str, data: Any) -> None:
             except OSError:
                 pass
 
+
+def save_json(file: str, data: Any) -> None:
+    lock = None
+
+    try:
+        lock = _acquire_json_lock(file)
+        _write_json_unlocked(file, data)
+    except Exception as e:
+        print(f"Error guardando {file}: {e}")
+    finally:
+        _release_json_lock(lock)
+
+
+def update_json(file: str, default: Any, updater: Callable[[Any], Any]) -> Any:
+    """Safely update a JSON file with one locked read-modify-write cycle.
+
+    The updater receives the current decoded value and must return the next
+    value to persist. This is safer than calling load_json() and save_json()
+    separately for state mutations.
+    """
+
+    lock = None
+
+    try:
+        lock = _acquire_json_lock(file)
+        current = _read_json_unlocked(file, default)
+        next_value = updater(current)
+        _write_json_unlocked(file, next_value)
+        return next_value
+    except Exception as e:
+        print(f"Error actualizando {file}: {e}")
+        return default
+    finally:
         _release_json_lock(lock)
