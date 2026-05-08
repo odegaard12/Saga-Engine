@@ -35,9 +35,8 @@ Major audit blockers are closed:
 
 Recommended remaining cleanup/refactor PRs:
 
-1. Split `main.py` into route modules.
-2. Remove confirmed obsolete/legacy artifacts after reviewing the cleanup report.
-3. Optionally test SQLite activation on copied runtime data before enabling it on a real deployment.
+1. Remove confirmed obsolete/legacy artifacts after reviewing the cleanup report.
+2. Optionally test SQLite activation on copied runtime data before enabling it on a real deployment.
 
 These are no longer blocking audit issues, but they improve maintainability before larger gameplay work.
 
@@ -61,3 +60,9 @@ It should focus on actionable stale references such as:
 - confirmed obsolete/deprecated text
 
 Intentional security documentation about retired/legacy compatibility boundaries should remain documented.
+
+## Closed in route split PR
+
+- FastAPI route handlers were split into health, player, events, admin and web route modules.
+- The split is mechanical and keeps route paths/behavior stable.
+- `main.py` remains the shared application state/helper entrypoint for now.

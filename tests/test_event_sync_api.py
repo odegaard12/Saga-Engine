@@ -6,6 +6,11 @@ from fastapi.testclient import TestClient
 import main
 
 
+def admin_headers():
+    token = main.create_admin_session()
+    return {"Cookie": f"{main.ADMIN_SESSION_COOKIE}={token}"}
+
+
 def make_client():
     return TestClient(main.app)
 
@@ -105,10 +110,12 @@ def test_admin_events_lists_events_with_session(tmp_path: Path, monkeypatch):
     main.append_event(str(event_log), {"type": "team_ready", "user": "PLAYER 2"})
 
     client = make_client()
-    login = client.post("/api/admin/login", json={"password": os.environ["ADMIN_PASS"]})
-    assert login.status_code == 200
 
-    response = client.post("/api/admin/events", json={"limit": 10})
+    response = client.post(
+        "/api/admin/events",
+        headers=admin_headers(),
+        json={"limit": 10},
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -123,11 +130,10 @@ def test_admin_can_mark_event_with_session(tmp_path: Path, monkeypatch):
     event = main.append_event(str(event_log), {"type": "qr_scanned", "user": "PLAYER 1"})
 
     client = make_client()
-    login = client.post("/api/admin/login", json={"password": os.environ["ADMIN_PASS"]})
-    assert login.status_code == 200
 
     response = client.post(
         "/api/admin/events/mark",
+        headers=admin_headers(),
         json={"event_id": event["id"], "status": "ignored"},
     )
 

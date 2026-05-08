@@ -1,8 +1,25 @@
 # Main route split plan
 
-`main.py` has already been reduced by extracting storage, client IP and admin auth helpers.
+`main.py` has been reduced by extracting storage, client IP, admin auth and now route modules.
 
-The next maintainability step is splitting FastAPI route groups into route modules.
+## Current route modules
+
+FastAPI route handlers are split into:
+
+- `backend/app/routes/player.py`
+- `backend/app/routes/events.py`
+- `backend/app/routes/admin.py`
+- `backend/app/routes/web.py`
+
+No dedicated `health.py` module was created in this split because the current route inventory did not expose a separate health/status route group.
+
+## Current approach
+
+This split is intentionally mechanical.
+
+Route modules still delegate to helpers/state defined in `main.py`. This keeps behavior unchanged while reducing the size and responsibility of the main entrypoint.
+
+This is not the final architecture, but it creates a safe stepping stone.
 
 ## Goals
 
@@ -11,38 +28,38 @@ The next maintainability step is splitting FastAPI route groups into route modul
 - Keep JSON as default storage.
 - Keep SQLite opt-in.
 - Keep audit/privacy guards active.
-- Move in small/medium route-group PRs.
+- Keep existing public paths stable.
 
-## Proposed route modules
+## Next cleanup steps
 
-Suggested target modules:
+Future PRs can gradually move shared runtime helpers out of `main.py` into focused modules:
 
-- `backend/app/routes/health.py`
-- `backend/app/routes/player.py`
-- `backend/app/routes/admin.py`
-- `backend/app/routes/events.py`
-- `backend/app/routes/config.py`
-
-## Recommended order
-
-1. Move health/status routes first.
-2. Move public player read routes.
-3. Move event sync/admin event routes.
-4. Move admin config/stage routes.
-5. Move admin Mission Control/profile recovery routes.
-
-## Compatibility approach
-
-During migration, keep existing route paths unchanged.
-
-Avoid broad rewrites. Prefer importing shared helpers from existing runtime/storage/security modules.
+- player profiles
+- heartbeat/presence
+- stage/runtime normalization
+- admin Mission Control helpers
+- frontend/static web serving helpers
 
 ## Validation
 
-Every route split PR should run:
+Every route split or follow-up cleanup PR should run:
 
 - `python scripts/check_audit_guards.py --base origin/main`
 - contract check
 - full pytest
 - frontend build
 - protected stages check
+
+## Runtime state compatibility
+
+Route modules read runtime database paths from `_main` dynamically for compatibility with existing tests and deployment configuration.
+
+This is important for values such as:
+
+- `EVENT_LOG_DB`
+- `GAME_DB`
+- `POSITIONS_DB`
+- `STAGES_DB`
+- `CONFIG_DB`
+
+Future cleanup PRs can move these settings into a dedicated app settings module.
