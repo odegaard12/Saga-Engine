@@ -116,3 +116,20 @@ Optional game state storage through SQLite:
     SAGA_SQLITE_DB=/path/to/saga.sqlite3
 
 When enabled, player progress operations can use SQLite through the adapter layer. JSON remains the default storage backend.
+
+## Third optional adapter
+
+The third optional SQLite adapter is the live positions store.
+
+Default:
+
+- `SAGA_STORAGE_BACKEND=json`
+
+Optional live positions storage through SQLite:
+
+- `SAGA_STORAGE_BACKEND=sqlite`
+- `SAGA_SQLITE_DB=/path/to/saga.sqlite3`
+
+When enabled, live presence load/save/upsert/remove operations can use SQLite through the adapter layer.
+
+JSON remains the default storage backend. Existing deployments do not change unless SQLite is explicitly enabled.

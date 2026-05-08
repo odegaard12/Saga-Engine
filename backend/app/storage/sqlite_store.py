@@ -476,3 +476,40 @@ def advance_sqlite_player_level(path: str, user: str, step: int = 1) -> dict[str
     set_sqlite_player_level(path, user_key, max(0, current + delta))
     return load_sqlite_game_state(path)
 
+def save_sqlite_positions_state(path: str, state: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for user, position in (state or {}).items():
+        user_key = str(user or "").strip()
+        if not user_key:
+            continue
+        normalized[user_key] = normalize_live_position(position)
+
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        conn.execute("DELETE FROM positions")
+        for user, position in normalized.items():
+            conn.execute(
+                "INSERT INTO positions (user, last_seen, gps_status, lat, lon, source, debug_enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    user,
+                    position["last_seen"],
+                    position["gps_status"],
+                    position["lat"],
+                    position["lon"],
+                    position["source"],
+                    1 if position["debug_enabled"] else 0,
+                    utc_now_iso(),
+                ),
+            )
+    return normalized
+
+
+def remove_sqlite_position(path: str, user: str) -> dict[str, dict[str, Any]]:
+    user_key = str(user or "").strip()
+    if not user_key:
+        raise ValueError("user is required")
+
+    init_sqlite_schema(path)
+    with sqlite_connection(path) as conn:
+        conn.execute("DELETE FROM positions WHERE user = ?", (user_key,))
+    return load_sqlite_positions(path)
