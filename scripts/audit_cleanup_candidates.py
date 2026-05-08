@@ -46,12 +46,20 @@ SKIP_FILES = {
 }
 
 PATTERNS = [
-    ("classic_admin", re.compile(r"\bclassic admin\b|admin clásico|admin clasico", re.IGNORECASE)),
-    ("legacy_admin", re.compile(r"\blegacy admin\b|legacy password|password payload", re.IGNORECASE)),
-    ("json_only_persistence", re.compile(r"json-only|JSON only|solo JSON|only JSON", re.IGNORECASE)),
+    # Narrow old-route patterns: these are more actionable than broad mentions of
+    # "classic admin" in docs that intentionally explain the retired boundary.
     ("old_route_reference", re.compile(r"/admin-classic|admin\.html|classic-admin", re.IGNORECASE)),
+
+    # Stale storage wording. Current docs should say JSON is the default and
+    # SQLite is optional, not that SAGA is JSON-only.
+    ("json_only_persistence", re.compile(r"json-only|JSON only|solo JSON|only JSON", re.IGNORECASE)),
+
+    # Explicit cleanup markers.
     ("cleanup_marker", re.compile(r"\bTODO\b|\bFIXME\b|delete me|remove later|temporary hack", re.IGNORECASE)),
-    ("deprecated_marker", re.compile(r"\bdeprecated\b|obsolete|obsoleto|retired", re.IGNORECASE)),
+
+    # Strong obsolete markers. Avoid broad terms like "retired" because current
+    # docs legitimately state that the classic admin has been retired.
+    ("obsolete_marker", re.compile(r"\bobsolete\b|\bobsoleto\b|\bdeprecated\b", re.IGNORECASE)),
 ]
 
 
