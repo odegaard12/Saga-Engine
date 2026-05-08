@@ -13,6 +13,7 @@ from pathlib import Path
 from backend.app.storage.json_store import load_json, save_json, update_json
 from backend.app.storage.game_state import reset_player_level
 from backend.app.storage.positions import load_live_positions_state, save_live_positions_state
+from backend.app.storage.event_log import append_event, list_events, mark_event_status
 
 app = FastAPI()
 
@@ -57,6 +58,7 @@ GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
+EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 
 BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
 ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
@@ -1084,6 +1086,189 @@ async def get_team_payload(user: str):
         "user": current_profile_id,
         "profiles": profiles
     }
+
+
+PLAYER_EVENT_TYPES = {
+    "node_opened",
+    "node_completed",
+    "qr_scanned",
+    "nfc_url_opened",
+    "team_ready",
+    "team_proof_created",
+    "team_proof_accepted",
+    "inventory_item_collected",
+    "offline_sync_received",
+}
+
+EVENT_PAYLOAD_MAX_KEYS = 32
+EVENT_PAYLOAD_MAX_TEXT_LENGTH = 500
+
+def sanitize_event_text(value, max_length=EVENT_PAYLOAD_MAX_TEXT_LENGTH):
+    text = _as_str(value).strip()
+    if len(text) > max_length:
+        return text[:max_length]
+    return text
+
+def sanitize_event_payload(value):
+    if not isinstance(value, dict):
+        return {}
+
+    clean = {}
+    for index, (key, raw_value) in enumerate(value.items()):
+        if index >= EVENT_PAYLOAD_MAX_KEYS:
+            break
+
+        clean_key = sanitize_event_text(key, 80)
+        if not clean_key:
+            continue
+
+        if isinstance(raw_value, bool) or raw_value is None:
+            clean[clean_key] = raw_value
+        elif isinstance(raw_value, (int, float)):
+            clean[clean_key] = raw_value
+        elif isinstance(raw_value, list):
+            clean[clean_key] = [
+                sanitize_event_text(item)
+                for item in raw_value[:20]
+            ]
+        elif isinstance(raw_value, dict):
+            nested = {}
+            for nested_index, (nested_key, nested_value) in enumerate(raw_value.items()):
+                if nested_index >= 20:
+                    break
+                nested_clean_key = sanitize_event_text(nested_key, 80)
+                if nested_clean_key:
+                    nested[nested_clean_key] = sanitize_event_text(nested_value)
+            clean[clean_key] = nested
+        else:
+            clean[clean_key] = sanitize_event_text(raw_value)
+
+    return clean
+
+def normalize_player_event(raw_event, user, profile):
+    raw_event = raw_event if isinstance(raw_event, dict) else {}
+    event_type = sanitize_event_text(raw_event.get("type"), 80)
+
+    if event_type not in PLAYER_EVENT_TYPES:
+        raise HTTPException(status_code=400, detail=f"unsupported event type: {event_type or 'missing'}")
+
+    node_id = sanitize_event_text(raw_event.get("node_id"), 120)
+    team_id = sanitize_event_text(raw_event.get("team_id") or profile.get("id"), 120)
+
+    return {
+        "type": event_type,
+        "status": "pending",
+        "source": sanitize_event_text(raw_event.get("source") or "offline_queue", 80),
+        "user": user,
+        "team_id": team_id,
+        "node_id": node_id,
+        "payload": sanitize_event_payload(raw_event.get("payload")),
+    }
+
+@app.post("/api/events/sync")
+async def sync_player_events(request: Request):
+    data = await request.json()
+    user = _as_str(data.get("user")).strip()
+
+    profile = resolve_known_player_profile(user)
+    if not profile:
+        raise HTTPException(status_code=403, detail="unknown player")
+
+    events = data.get("events")
+    if not isinstance(events, list):
+        raise HTTPException(status_code=400, detail="events must be a list")
+
+    if len(events) > 100:
+        raise HTTPException(status_code=400, detail="too many events")
+
+    stored = []
+    for raw_event in events:
+        normalized = normalize_player_event(raw_event, user, profile)
+        stored.append(append_event(EVENT_LOG_DB, normalized))
+
+    append_event(
+        EVENT_LOG_DB,
+        {
+            "type": "offline_sync_received",
+            "status": "synced",
+            "source": "server",
+            "user": user,
+            "team_id": _as_str(profile.get("id")),
+            "payload": {
+                "event_count": len(stored),
+            },
+        },
+    )
+
+    return {
+        "status": "ok",
+        "accepted": len(stored),
+        "events": [
+            {
+                "id": event.get("id"),
+                "type": event.get("type"),
+                "status": event.get("status"),
+            }
+            for event in stored
+        ],
+    }
+
+@app.post("/api/admin/events")
+async def admin_events(request: Request):
+    data = await request.json()
+
+    if not admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    limit = data.get("limit", 100)
+    try:
+        limit = max(1, min(500, int(limit)))
+    except (TypeError, ValueError):
+        limit = 100
+
+    status = sanitize_event_text(data.get("status"), 80) or None
+    user = sanitize_event_text(data.get("user"), 120) or None
+    event_type = sanitize_event_text(data.get("type"), 80) or None
+
+    return {
+        "status": "ok",
+        "events": list_events(
+            EVENT_LOG_DB,
+            status=status,
+            user=user,
+            event_type=event_type,
+            limit=limit,
+        ),
+    }
+
+@app.post("/api/admin/events/mark")
+async def admin_mark_event(request: Request):
+    data = await request.json()
+
+    if not admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    event_id = sanitize_event_text(data.get("event_id"), 120)
+    next_status = sanitize_event_text(data.get("status"), 40)
+
+    if not event_id:
+        raise HTTPException(status_code=400, detail="event_id is required")
+
+    updated = mark_event_status(
+        EVENT_LOG_DB,
+        event_id,
+        next_status,
+        error=sanitize_event_text(data.get("error"), 300) or None,
+    )
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="event not found")
+
+    return {
+        "status": "ok",
+        "event": updated,
+    }
+
 
 @app.post("/api/heartbeat")
 async def heartbeat(request: Request):
