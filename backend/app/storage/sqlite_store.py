@@ -409,3 +409,70 @@ def mark_sqlite_event_status(
         ).fetchone()
 
     return _row_to_event(updated)
+
+def save_sqlite_game_state(path: str, state: dict[str, int]) -> dict[str, int]:
+    normalized: dict[str, int] = {}
+
+    for user, level in (state or {}).items():
+        user_key = str(user or "").strip()
+        if not user_key:
+            continue
+        try:
+            normalized[user_key] = max(0, int(level or 0))
+        except (TypeError, ValueError):
+            normalized[user_key] = 0
+
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        conn.execute("DELETE FROM game_state")
+        for user, level in normalized.items():
+            conn.execute(
+                """
+                INSERT INTO game_state (user, level, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (user, level, utc_now_iso()),
+            )
+
+    return normalized
+
+
+def get_sqlite_player_level(path: str, user: str, default: int = 0) -> int:
+    user_key = str(user or "").strip()
+    if not user_key:
+        return int(default or 0)
+
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        row = conn.execute(
+            "SELECT level FROM game_state WHERE user = ?",
+            (user_key,),
+        ).fetchone()
+
+    if not row:
+        return int(default or 0)
+
+    return int(row["level"] or 0)
+
+
+def reset_sqlite_player_level(path: str, user: str) -> dict[str, int]:
+    set_sqlite_player_level(path, user, 0)
+    return load_sqlite_game_state(path)
+
+
+def advance_sqlite_player_level(path: str, user: str, step: int = 1) -> dict[str, int]:
+    user_key = str(user or "").strip()
+    if not user_key:
+        raise ValueError("user is required")
+
+    current = get_sqlite_player_level(path, user_key, default=0)
+    try:
+        delta = int(step or 1)
+    except (TypeError, ValueError):
+        delta = 1
+
+    set_sqlite_player_level(path, user_key, max(0, current + delta))
+    return load_sqlite_game_state(path)
+

@@ -101,3 +101,18 @@ Optional event storage through SQLite:
 When enabled, event append/list/mark operations use SQLite. Other runtime state can remain JSON until migrated separately.
 
 This staged approach lets SAGA move high-churn data first while keeping the deployment safe and reversible.
+
+## Second optional adapter
+
+The second optional SQLite adapter is the game state store.
+
+Default:
+
+    SAGA_STORAGE_BACKEND=json
+
+Optional game state storage through SQLite:
+
+    SAGA_STORAGE_BACKEND=sqlite
+    SAGA_SQLITE_DB=/path/to/saga.sqlite3
+
+When enabled, player progress operations can use SQLite through the adapter layer. JSON remains the default storage backend.
