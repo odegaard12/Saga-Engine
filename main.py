@@ -11,7 +11,12 @@ import ipaddress
 from pathlib import Path
 
 from backend.app.storage.json_store import load_json, save_json, update_json
-from backend.app.storage.game_state_store import reset_player_level
+from backend.app.storage.game_state_store import (
+    get_player_level,
+    load_game_state,
+    reset_player_level,
+    set_player_level,
+)
 from backend.app.storage.positions_store import (
     get_live_position as get_live_position_state,
     load_live_positions_state,
@@ -585,6 +590,18 @@ def upsert_live_position_for_user(user, position):
     return upsert_live_position_state(POSITIONS_DB, user, position)
 
 
+def load_player_progress():
+    return load_game_state(GAME_DB)
+
+
+def get_player_progress_level(user, default=0):
+    return get_player_level(GAME_DB, user, default=default)
+
+
+def set_player_progress_level(user, level):
+    return set_player_level(GAME_DB, user, level)
+
+
 def project_live_profile_status(profile, raw=None, now=None):
     now = int(now or time.time())
     raw = raw if isinstance(raw, dict) else {}
@@ -1042,21 +1059,19 @@ async def get_config():
 @app.get("/api/state/{user}")
 async def get_state(user: str):
     stages = load_json(STAGES_DB, [])
-    state = load_json(GAME_DB, {})
     profile = get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
-    lvl = state.get(profile_id, state.get(user, 0))
+    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
     return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
 
 @app.get("/api/game/{user}")
 async def get_game_payload(user: str):
     runtime_stages = get_runtime_stages()
-    state = load_json(GAME_DB, {})
     profile = get_player_profile(user)
     profile_id = profile.get("id") or user
     live_positions = load_live_positions()
 
-    lvl = state.get(profile_id, state.get(user, 0))
+    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
     finished = lvl >= len(runtime_stages)
 
     current_stage = None
@@ -1568,14 +1583,8 @@ async def admin_react_overview(request: Request):
     stages = get_runtime_stages()
     profiles = get_player_profiles(cfg)
 
-    gamestate = _safe_runtime_json_file(
-        ("GAMESTATE_FILE", "GAMESTATE_PATH", "GAMESTATE_DB"),
-        {},
-    )
-    positions = _safe_runtime_json_file(
-        ("POSITIONS_FILE", "POSITIONS_PATH", "POSITIONS_DB"),
-        {},
-    )
+    gamestate = load_player_progress()
+    positions = load_live_positions()
 
     stage_summaries = [
         _admin_react_stage_summary(stage, idx)
@@ -1633,7 +1642,7 @@ async def admin_mission_status(request: Request):
 
     cfg = load_config()
     runtime_stages = get_runtime_stages()
-    state = load_json(GAME_DB, {})
+    state = load_player_progress()
     positions = load_live_positions()
     now = int(time.time())
 
@@ -1740,15 +1749,13 @@ async def advance(request: Request):
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
 
     stages = get_runtime_stages()
-    state = load_json(GAME_DB, {})
-    lvl = state.get(profile_id, state.get(user, 0))
+    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
 
     if lvl < len(stages):
         current_node = stages[lvl]
 
         if stage_accepts_code(current_node, code):
-            state[profile_id] = lvl + 1
-            save_json(GAME_DB, state)
+            set_player_progress_level(profile_id, lvl + 1)
             return {"status": "ok", "user": profile_id}
 
     return {"status": "fail", "user": profile_id}
@@ -1825,9 +1832,8 @@ async def admin_profile_action(request: Request):
 
     runtime_stages = get_runtime_stages()
     max_level = len(runtime_stages)
-    state = load_json(GAME_DB, {})
 
-    previous_level = _clamp_game_level(state.get(profile_id, 0), max_level)
+    previous_level = _clamp_game_level(get_player_progress_level(profile_id, 0), max_level)
 
     if action == "reset_profile":
         new_level = 0
@@ -1838,8 +1844,7 @@ async def admin_profile_action(request: Request):
     else:  # mark_finished
         new_level = max_level
 
-    state[profile_id] = new_level
-    save_json(GAME_DB, state)
+    set_player_progress_level(profile_id, new_level)
 
     return {
         "status": "ok",
