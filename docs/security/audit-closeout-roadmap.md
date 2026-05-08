@@ -50,3 +50,10 @@ Stage content changes must be explicit mission/content PRs and must use:
 
 - Admin password hashing, persistence helpers, session cookie helpers, legacy payload gate and login lockout helpers were extracted to `backend/app/security/admin_auth.py`.
 - `main.py` keeps compatibility wrappers for existing route code and tests.
+
+## Closed in README refresh PR
+
+- Main README updated to reflect the current engine status.
+- Storage model documented as JSON default with optional SQLite adapters.
+- Security posture, repository guards and protected stage policy documented from the public entry point.
+- Cleanup checklist added before major gameplay work resumes.
