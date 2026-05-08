@@ -3,8 +3,10 @@ import { fetchPublicConfig } from '../../shared/api'
 import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
+  queueOfflineEvent,
   saveLocalProgressSnapshot,
   saveMissionPack,
+  syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from '../offline/missionPack'
 
@@ -61,12 +63,47 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
     try {
       await saveLocalProgressSnapshot(payload)
+      await queueOfflineEvent({
+        user,
+        type: payload.finished ? 'node_completed' : 'node_opened',
+        source: 'offline_queue',
+        node_id: payload.current_stage?.id,
+        payload: {
+          level: payload.level || 0,
+          finished: Boolean(payload.finished),
+          current_stage_id: payload.current_stage?.id,
+          current_stage_title: payload.current_stage?.title,
+        },
+      })
+
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')
-      setMessage('Local progress snapshot saved.')
+      setMessage('Local progress snapshot saved and queued for sync.')
     } catch (error) {
       setState('error')
       setMessage(error instanceof Error ? error.message : 'Could not save local progress.')
+    }
+  }
+
+  async function handleSyncPendingEvents() {
+    setState('saving')
+    setMessage(null)
+
+    try {
+      const result = await syncPendingOfflineEvents(user)
+      setSummary(await getOfflineMissionSummary(user))
+
+      if (result.status === 'ok') {
+        setState('saved')
+        setMessage(result.attempted === 0 ? 'No pending offline events.' : `Synced ${result.synced} offline events.`)
+        return
+      }
+
+      setState('error')
+      setMessage(result.message || `Could not sync ${result.failed} offline events.`)
+    } catch (error) {
+      setState('error')
+      setMessage(error instanceof Error ? error.message : 'Could not sync pending events.')
     }
   }
 
@@ -127,6 +164,15 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
           onClick={handleSaveProgress}
         >
           Save progress
+        </button>
+
+        <button
+          type="button"
+          style={secondaryButton}
+          disabled={state === 'saving' || !summary?.pendingEvents}
+          onClick={handleSyncPendingEvents}
+        >
+          Sync pending
         </button>
       </div>
     </section>
@@ -230,7 +276,7 @@ const meta: CSSProperties = {
 
 const actions: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 8,
 }
 
