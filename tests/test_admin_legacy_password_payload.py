@@ -8,6 +8,7 @@ os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-data-"
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
+from backend.app.security import admin_auth as admin_auth_security  # noqa: E402
 
 
 class DummyRequest:
@@ -33,7 +34,7 @@ def test_admin_cookie_session_still_authorizes_when_legacy_payload_disabled(monk
 def test_legacy_admin_password_payload_is_rejected_by_default(monkeypatch):
     reset_admin_test_state()
     monkeypatch.delenv("SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD", raising=False)
-    monkeypatch.setattr(main, "verify_admin_password", lambda password: password == "pytest_strong_admin_password")
+    monkeypatch.setattr(admin_auth_security, "verify_admin_password", lambda auth_path, password: password == "pytest_strong_admin_password")
 
     request = DummyRequest()
 
@@ -49,7 +50,7 @@ def test_legacy_admin_password_payload_is_rejected_by_default(monkeypatch):
 def test_legacy_admin_password_payload_can_be_enabled_explicitly(monkeypatch):
     reset_admin_test_state()
     monkeypatch.setenv("SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD", "1")
-    monkeypatch.setattr(main, "verify_admin_password", lambda password: password == "pytest_strong_admin_password")
+    monkeypatch.setattr(admin_auth_security, "verify_admin_password", lambda auth_path, password: password == "pytest_strong_admin_password")
 
     request = DummyRequest()
 
@@ -65,7 +66,7 @@ def test_legacy_admin_password_payload_can_be_enabled_explicitly(monkeypatch):
 def test_legacy_admin_password_payload_flag_does_not_accept_wrong_password(monkeypatch):
     reset_admin_test_state()
     monkeypatch.setenv("SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD", "1")
-    monkeypatch.setattr(main, "verify_admin_password", lambda password: password == "pytest_strong_admin_password")
+    monkeypatch.setattr(admin_auth_security, "verify_admin_password", lambda auth_path, password: password == "pytest_strong_admin_password")
 
     request = DummyRequest()
 

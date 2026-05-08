@@ -24,6 +24,7 @@ from backend.app.storage.positions_store import (
     upsert_live_position as upsert_live_position_state,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
+from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
 
 app = FastAPI()
@@ -75,103 +76,6 @@ BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
 ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
 ADMIN_RESET = (os.getenv("ADMIN_RESET") or "0").strip() == "1"
 
-PLAYERS = CONFIG.get("players", ["PLAYER 1", "PLAYER 2"])
-
-def hash_password(password, salt=None, iterations=200000):
-    salt = salt or secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
-    return {
-        "salt": salt,
-        "password_hash": dk.hex(),
-        "iterations": iterations
-    }
-
-def load_admin_auth():
-    return load_json(ADMIN_AUTH_DB, {})
-
-def save_admin_auth(data):
-    save_json(ADMIN_AUTH_DB, data)
-
-def verify_admin_password(password):
-    auth = load_admin_auth()
-    salt = auth.get("salt")
-    expected = auth.get("password_hash")
-    iterations = int(auth.get("iterations") or 200000)
-
-    if not salt or not expected:
-        return False
-
-    dk = hashlib.pbkdf2_hmac(
-        "sha256",
-        (password or "").encode("utf-8"),
-        salt.encode("utf-8"),
-        iterations
-    ).hex()
-
-    return hmac.compare_digest(dk, expected)
-
-def is_weak_admin_password(password):
-    p = (password or "").strip()
-    weak = {
-        "",
-        "CHANGE_ME",
-        "admin",
-        "password",
-        "12345678",
-    }
-    return len(p) < 10 or p in weak
-
-def set_admin_password(password, must_change=False, source="manual"):
-    data = hash_password(password)
-    auth = {
-        "salt": data["salt"],
-        "password_hash": data["password_hash"],
-        "iterations": data["iterations"],
-        "must_change": bool(must_change),
-        "source": source
-    }
-    save_admin_auth(auth)
-    return auth
-
-def admin_password_change_required():
-    auth = load_admin_auth()
-    return bool(auth.get("must_change"))
-
-def ensure_admin_auth():
-    auth = load_admin_auth()
-
-    if ADMIN_RESET:
-        if not BOOTSTRAP_ADMIN_PASS:
-            raise RuntimeError("ADMIN_RESET=1 requires ADMIN_PASS.")
-        set_admin_password(
-            BOOTSTRAP_ADMIN_PASS,
-            must_change=is_weak_admin_password(BOOTSTRAP_ADMIN_PASS),
-            source="reset"
-        )
-        print("[WARN] Admin password reset from environment.")
-        return
-
-    if auth.get("password_hash") and auth.get("salt"):
-        return
-
-    if BOOTSTRAP_ADMIN_PASS:
-        set_admin_password(
-            BOOTSTRAP_ADMIN_PASS,
-            must_change=is_weak_admin_password(BOOTSTRAP_ADMIN_PASS),
-            source="bootstrap"
-        )
-        print("[INFO] Admin password initialized from ADMIN_PASS.")
-        return
-
-    if ALLOW_DEFAULT_ADMIN:
-        set_admin_password("CHANGE_ME", must_change=True, source="fallback")
-        print("[WARN] ADMIN_PASS not set. Using development fallback CHANGE_ME because ALLOW_DEFAULT_ADMIN=1")
-        return
-
-    raise RuntimeError("ADMIN_PASS is required. Set ADMIN_PASS, or enable ALLOW_DEFAULT_ADMIN=1 only for local development.")
-
-ensure_admin_auth()
-
 ADMIN_LOGIN_WINDOW_SECONDS = 600
 ADMIN_LOGIN_MAX_ATTEMPTS = 5
 ADMIN_LOGIN_LOCK_SECONDS = 600
@@ -181,90 +85,103 @@ ADMIN_SESSION_COOKIE = "saga_admin_session"
 ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS", "3600") or "3600")
 ADMIN_SESSIONS = {}
 
+
+def hash_password(password, salt=None, iterations=200000):
+    return admin_auth_security.hash_password(password, salt=salt, iterations=iterations)
+
+
+def load_admin_auth():
+    return admin_auth_security.load_admin_auth(ADMIN_AUTH_DB)
+
+
+def save_admin_auth(data):
+    admin_auth_security.save_admin_auth(ADMIN_AUTH_DB, data)
+
+
+def verify_admin_password(password):
+    return admin_auth_security.verify_admin_password(ADMIN_AUTH_DB, password)
+
+
+def is_weak_admin_password(password):
+    return admin_auth_security.is_weak_admin_password(password)
+
+
+def set_admin_password(password, must_change=False, source="manual"):
+    return admin_auth_security.set_admin_password(
+        ADMIN_AUTH_DB,
+        password,
+        must_change=must_change,
+        source=source,
+    )
+
+
+def admin_password_change_required():
+    return admin_auth_security.admin_password_change_required(ADMIN_AUTH_DB)
+
+
+def ensure_admin_auth():
+    return admin_auth_security.ensure_admin_auth(
+        ADMIN_AUTH_DB,
+        bootstrap_admin_pass=BOOTSTRAP_ADMIN_PASS,
+        allow_default_admin=ALLOW_DEFAULT_ADMIN,
+        admin_reset=ADMIN_RESET,
+    )
+
+
+ensure_admin_auth()
+
+
 def _now_ts():
-    return int(time.time())
+    return admin_auth_security.now_ts()
+
 
 def prune_admin_sessions(now=None):
-    now = int(now or _now_ts())
-    expired = [
-        token for token, session in ADMIN_SESSIONS.items()
-        if int(session.get("expires_at") or 0) <= now
-    ]
-    for token in expired:
-        ADMIN_SESSIONS.pop(token, None)
+    return admin_auth_security.prune_admin_sessions(ADMIN_SESSIONS, now=now)
+
 
 def create_admin_session():
-    prune_admin_sessions()
-    token = secrets.token_urlsafe(32)
-    now = _now_ts()
-    ADMIN_SESSIONS[token] = {
-        "created_at": now,
-        "expires_at": now + ADMIN_SESSION_TTL_SECONDS,
-    }
-    return token
+    return admin_auth_security.create_admin_session(
+        ADMIN_SESSIONS,
+        ADMIN_SESSION_TTL_SECONDS,
+    )
+
 
 def verify_admin_session_token(token):
-    token = str(token or "").strip()
-    if not token:
-        return False
+    return admin_auth_security.verify_admin_session_token(ADMIN_SESSIONS, token)
 
-    prune_admin_sessions()
-    session = ADMIN_SESSIONS.get(token)
-    if not session:
-        return False
-
-    if int(session.get("expires_at") or 0) <= _now_ts():
-        ADMIN_SESSIONS.pop(token, None)
-        return False
-
-    return True
 
 def admin_cookie_settings(request: Request):
-    secure = (request.url.scheme or "").lower() == "https"
-    return {
-        "httponly": True,
-        "samesite": "lax",
-        "secure": secure,
-        "path": "/",
-        "max_age": ADMIN_SESSION_TTL_SECONDS,
-    }
+    return admin_auth_security.admin_cookie_settings(request, ADMIN_SESSION_TTL_SECONDS)
+
 
 def set_admin_session_cookie(response: Response, request: Request, token: str):
-    response.set_cookie(
-        ADMIN_SESSION_COOKIE,
+    return admin_auth_security.set_admin_session_cookie(
+        response,
+        request,
         token,
-        **admin_cookie_settings(request),
+        ADMIN_SESSION_TTL_SECONDS,
     )
+
 
 def clear_admin_session_cookie(response: Response, request: Request):
-    response.delete_cookie(
-        ADMIN_SESSION_COOKIE,
-        path="/",
-        secure=(request.url.scheme or "").lower() == "https",
-        httponly=True,
-        samesite="lax",
-    )
+    return admin_auth_security.clear_admin_session_cookie(response, request)
+
 
 def get_admin_password_from_payload(data):
-    if not isinstance(data, dict):
-        return ""
-    for key in ("password", "admin_password", "admin_pass", "admin_key", "key"):
-        value = data.get(key)
-        if value:
-            return value
-    return ""
+    return admin_auth_security.get_admin_password_from_payload(data)
+
 
 def legacy_admin_password_payload_enabled():
-    return (os.getenv("SAGA_ALLOW_LEGACY_ADMIN_PASSWORD_PAYLOAD") or "0").strip() == "1"
+    return admin_auth_security.legacy_admin_password_payload_enabled()
 
 
 def admin_request_authorized(request: Request, data=None):
-    cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE)
-    if verify_admin_session_token(cookie_token):
-        return True
-    if not legacy_admin_password_payload_enabled():
-        return False
-    return verify_admin_password(get_admin_password_from_payload(data or {}))
+    return admin_auth_security.admin_request_authorized(
+        request,
+        data,
+        auth_path=ADMIN_AUTH_DB,
+        sessions=ADMIN_SESSIONS,
+    )
 
 
 TRUST_PROXY_HEADERS = client_ip_security.TRUST_PROXY_HEADERS
@@ -295,45 +212,44 @@ def get_client_ip(request: Request):
 
 
 def prune_admin_login_attempts(now=None):
-    now = now or time.time()
-    stale_keys = []
-    for ip, state in ADMIN_LOGIN_ATTEMPTS.items():
-        locked_until = float(state.get("locked_until") or 0)
-        attempts = [ts for ts in state.get("attempts", []) if now - ts <= ADMIN_LOGIN_WINDOW_SECONDS]
-        if locked_until <= now and not attempts:
-            stale_keys.append(ip)
-        else:
-            state["attempts"] = attempts
-            if locked_until <= now:
-                state["locked_until"] = 0
-    for ip in stale_keys:
-        ADMIN_LOGIN_ATTEMPTS.pop(ip, None)
+    return admin_auth_security.prune_admin_login_attempts(
+        ADMIN_LOGIN_ATTEMPTS,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        now=now,
+    )
+
 
 def get_admin_login_state(ip, now=None):
-    now = now or time.time()
-    prune_admin_login_attempts(now)
-    state = ADMIN_LOGIN_ATTEMPTS.setdefault(ip, {"attempts": [], "locked_until": 0})
-    state["attempts"] = [ts for ts in state.get("attempts", []) if now - ts <= ADMIN_LOGIN_WINDOW_SECONDS]
-    if float(state.get("locked_until") or 0) <= now:
-        state["locked_until"] = 0
-    return state
+    return admin_auth_security.get_admin_login_state(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        now=now,
+    )
+
 
 def clear_admin_login_state(ip):
-    ADMIN_LOGIN_ATTEMPTS.pop(ip, None)
+    return admin_auth_security.clear_admin_login_state(ADMIN_LOGIN_ATTEMPTS, ip)
+
 
 def register_admin_login_failure(ip, now=None):
-    now = now or time.time()
-    state = get_admin_login_state(ip, now)
-    state["attempts"].append(now)
-    if len(state["attempts"]) >= ADMIN_LOGIN_MAX_ATTEMPTS:
-        state["locked_until"] = now + ADMIN_LOGIN_LOCK_SECONDS
-    return state
+    return admin_auth_security.register_admin_login_failure(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        max_attempts=ADMIN_LOGIN_MAX_ATTEMPTS,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        lock_seconds=ADMIN_LOGIN_LOCK_SECONDS,
+        now=now,
+    )
+
 
 def get_admin_lock_remaining_seconds(ip, now=None):
-    now = now or time.time()
-    state = get_admin_login_state(ip, now)
-    locked_until = float(state.get("locked_until") or 0)
-    return max(0, int(locked_until - now))
+    return admin_auth_security.get_admin_lock_remaining_seconds(
+        ADMIN_LOGIN_ATTEMPTS,
+        ip,
+        window_seconds=ADMIN_LOGIN_WINDOW_SECONDS,
+        now=now,
+    )
 
 
 from backend.app.runtime.minigames import (
