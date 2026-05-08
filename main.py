@@ -8,6 +8,7 @@ import hmac
 import secrets
 import time
 import tempfile
+import ipaddress
 from pathlib import Path
 
 app = FastAPI()
@@ -339,14 +340,83 @@ def admin_request_authorized(request: Request, data=None):
 
     return verify_admin_password(get_admin_password_from_payload(data or {}))
 
-def get_client_ip(request: Request):
-    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
-    if forwarded:
-        return forwarded
+TRUST_PROXY_HEADERS = (os.getenv("TRUST_PROXY_HEADERS") or "0").strip() == "1"
+
+def _split_env_csv(value):
+    return [
+        item.strip()
+        for item in str(value or "").split(",")
+        if item.strip()
+    ]
+
+TRUSTED_PROXY_IPS = set(_split_env_csv(os.getenv("TRUSTED_PROXY_IPS") or ""))
+TRUSTED_PROXY_CIDRS = []
+for _proxy_cidr in _split_env_csv(os.getenv("TRUSTED_PROXY_CIDRS") or ""):
+    try:
+        TRUSTED_PROXY_CIDRS.append(ipaddress.ip_network(_proxy_cidr, strict=False))
+    except ValueError:
+        print(f"[WARN] Ignoring invalid TRUSTED_PROXY_CIDRS entry: {_proxy_cidr}")
+
+def _request_client_host(request: Request):
     client = getattr(request, "client", None)
     if client and getattr(client, "host", None):
-        return client.host
-    return "unknown"
+        return str(client.host).strip()
+    return ""
+
+def _ip_in_trusted_proxy_cidrs(ip_text):
+    try:
+        parsed = ipaddress.ip_address(str(ip_text or "").strip())
+    except ValueError:
+        return False
+
+    return any(parsed in network for network in TRUSTED_PROXY_CIDRS)
+
+def is_trusted_proxy_client(host):
+    host = str(host or "").strip()
+
+    if not host:
+        return False
+
+    if host in TRUSTED_PROXY_IPS:
+        return True
+
+    return _ip_in_trusted_proxy_cidrs(host)
+
+def _first_forwarded_ip(value):
+    first = str(value or "").split(",")[0].strip()
+
+    # Only accept syntactically valid IPs, not arbitrary strings.
+    try:
+        ipaddress.ip_address(first)
+    except ValueError:
+        return ""
+
+    return first
+
+def get_client_ip(request: Request):
+    direct_host = _request_client_host(request) or "unknown"
+
+    if not TRUST_PROXY_HEADERS:
+        return direct_host
+
+    if not is_trusted_proxy_client(direct_host):
+        return direct_host
+
+    # Cloudflare-style real client header, accepted only from trusted proxy.
+    cf_connecting_ip = _first_forwarded_ip(request.headers.get("cf-connecting-ip"))
+    if cf_connecting_ip:
+        return cf_connecting_ip
+
+    forwarded = _first_forwarded_ip(request.headers.get("x-forwarded-for"))
+    if forwarded:
+        return forwarded
+
+    real_ip = _first_forwarded_ip(request.headers.get("x-real-ip"))
+    if real_ip:
+        return real_ip
+
+    return direct_host
+
 
 def prune_admin_login_attempts(now=None):
     now = now or time.time()
@@ -553,10 +623,8 @@ VALID_HEARTBEAT_SOURCES = {
 }
 
 def get_heartbeat_client_ip(request: Request):
-    client = getattr(request, "client", None)
-    if client and getattr(client, "host", None):
-        return client.host
-    return "unknown"
+    return get_client_ip(request)
+
 
 def prune_heartbeat_rate_state(now=None):
     now = now or time.time()
