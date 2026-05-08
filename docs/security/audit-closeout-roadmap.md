@@ -25,8 +25,7 @@ This document tracks the remaining security/audit work before returning focus to
 
 Recommended remaining audit PRs:
 
-1. Extract admin auth helpers from `main.py`.
-2. Start splitting `main.py` into route modules after security helpers are isolated.
+1. Start splitting `main.py` into route modules after security helpers are isolated.
 
 ## Rule for stage content
 
@@ -46,3 +45,8 @@ Stage content changes must be explicit mission/content PRs and must use:
 - Added a non-destructive SQLite migration dry-run script.
 - Added pytest coverage for JSON-to-SQLite dry-run behavior.
 - Documented backup, activation and rollback checklist for optional SQLite storage.
+
+## Closed in admin auth extraction PR
+
+- Admin password hashing, persistence helpers, session cookie helpers, legacy payload gate and login lockout helpers were extracted to `backend/app/security/admin_auth.py`.
+- `main.py` keeps compatibility wrappers for existing route code and tests.
