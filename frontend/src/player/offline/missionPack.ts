@@ -40,6 +40,11 @@ export type OfflineEvent = {
   status: OfflineEventStatus
   retry_count: number
   payload: Record<string, unknown>
+  source?: string
+  team_id?: string
+  node_id?: string | number
+  backend_event_id?: string
+  last_error?: string
 }
 
 export type OfflineMissionSummary = {
@@ -156,6 +161,121 @@ function getAllRecords<T>(storeName: string): Promise<T[]> {
   )
 }
 
+
+function updateOfflineEvent(event: OfflineEvent) {
+  return writeRecord(STORE_EVENT_QUEUE, event)
+}
+
+function eventToSyncPayload(event: OfflineEvent) {
+  return {
+    type: event.type,
+    source: event.source || 'offline_queue',
+    team_id: event.team_id,
+    node_id: event.node_id,
+    payload: {
+      ...event.payload,
+      local_event_id: event.id,
+      local_created_at: event.created_at,
+      retry_count: event.retry_count,
+    },
+  }
+}
+
+export async function getQueuedOfflineEvents(user: string) {
+  const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE)
+  return events.filter((event) => event.user === user && event.status !== 'synced')
+}
+
+export async function syncPendingOfflineEvents(user: string) {
+  const events = await getQueuedOfflineEvents(user)
+  const syncable = events.filter((event) => event.status === 'pending' || event.status === 'failed')
+
+  if (syncable.length === 0) {
+    return {
+      status: 'ok' as const,
+      attempted: 0,
+      synced: 0,
+      failed: 0,
+    }
+  }
+
+  const syncing = await Promise.all(
+    syncable.map((event) =>
+      updateOfflineEvent({
+        ...event,
+        status: 'syncing',
+        last_error: undefined,
+      })
+    )
+  )
+
+  try {
+    const response = await fetch('/api/events/sync', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user,
+        events: syncing.map(eventToSyncPayload),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Sync failed: HTTP ${response.status}`)
+    }
+
+    const payload = await response.json() as {
+      status?: string
+      events?: Array<{ id?: string; type?: string; status?: string }>
+    }
+
+    if (payload.status !== 'ok') {
+      throw new Error('Sync failed: backend rejected the event queue.')
+    }
+
+    await Promise.all(
+      syncing.map((event, index) =>
+        updateOfflineEvent({
+          ...event,
+          status: 'synced',
+          backend_event_id: payload.events?.[index]?.id,
+          last_error: undefined,
+        })
+      )
+    )
+
+    return {
+      status: 'ok' as const,
+      attempted: syncing.length,
+      synced: syncing.length,
+      failed: 0,
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown sync error'
+
+    await Promise.all(
+      syncing.map((event) =>
+        updateOfflineEvent({
+          ...event,
+          status: 'failed',
+          retry_count: event.retry_count + 1,
+          last_error: message,
+        })
+      )
+    )
+
+    return {
+      status: 'error' as const,
+      attempted: syncing.length,
+      synced: 0,
+      failed: syncing.length,
+      message,
+    }
+  }
+}
+
 export function buildMissionPack(args: {
   user: string
   config: PublicConfig
@@ -217,6 +337,9 @@ export function queueOfflineEvent(args: {
   user: string
   type: string
   payload: Record<string, unknown>
+  source?: string
+  team_id?: string
+  node_id?: string | number
 }) {
   const event: OfflineEvent = {
     id: `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
@@ -226,6 +349,9 @@ export function queueOfflineEvent(args: {
     status: 'pending',
     retry_count: 0,
     payload: args.payload,
+    source: args.source,
+    team_id: args.team_id,
+    node_id: args.node_id,
   }
 
   return writeRecord(STORE_EVENT_QUEUE, event)
