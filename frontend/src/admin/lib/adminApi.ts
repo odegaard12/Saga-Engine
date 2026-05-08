@@ -28,6 +28,12 @@ export type AdminConfigSaveResponse = {
   message?: string
 }
 
+export type AdminLoginResponse = {
+  status: 'ok' | 'fail' | 'password_change_required'
+  message?: string
+  must_change?: boolean
+}
+
 export type AdminStagesResponse = {
   status: 'ok' | 'fail'
   message?: string
@@ -77,6 +83,7 @@ export type AdminReactOverviewResponse = {
 async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -91,13 +98,25 @@ async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export function fetchAdminReactOverview(password: string) {
-  return adminPostJson<AdminReactOverviewResponse>('/api/admin/react-overview', { password })
+export function loginAdmin(password: string) {
+  return adminPostJson<AdminLoginResponse>('/api/admin/login', { password })
+}
+
+export function logoutAdmin() {
+  return adminPostJson<AdminLoginResponse>('/api/admin/logout', {})
+}
+
+export function fetchAdminReactOverview(password?: string) {
+  return adminPostJson<AdminReactOverviewResponse>(
+    '/api/admin/react-overview',
+    password ? { password } : {}
+  )
 }
 
 async function adminPostJsonResilient(url: string, body: unknown): Promise<unknown> {
   const res = await fetch(url, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -128,6 +147,7 @@ async function adminPostJsonResilient(url: string, body: unknown): Promise<unkno
 async function adminGetJsonResilient(url: string): Promise<unknown> {
   const res = await fetch(url, {
     method: 'GET',
+    credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
     },
@@ -153,7 +173,11 @@ async function adminGetJsonResilient(url: string): Promise<unknown> {
   return payload
 }
 
-function adminPayloadVariantsResilient(password: string, extra: Record<string, unknown> = {}) {
+function adminPayloadVariantsResilient(password?: string, extra: Record<string, unknown> = {}) {
+  if (!password) {
+    return [{ ...extra }]
+  }
+
   return [
     { password, ...extra },
     { admin_password: password, ...extra },
@@ -163,7 +187,11 @@ function adminPayloadVariantsResilient(password: string, extra: Record<string, u
   ]
 }
 
-function adminQueryVariantsResilient(password: string) {
+function adminQueryVariantsResilient(password?: string) {
+  if (!password) {
+    return ['/api/admin/stages']
+  }
+
   const keys = ['password', 'admin_password', 'admin_pass', 'admin_key', 'key']
   return keys.map((key) => `/api/admin/stages?${key}=${encodeURIComponent(password)}`)
 }
@@ -219,7 +247,7 @@ function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse
   return { status: 'ok', message }
 }
 
-export async function fetchAdminStages(password: string): Promise<AdminStagesResponse> {
+export async function fetchAdminStages(password?: string): Promise<AdminStagesResponse> {
   const errors: string[] = []
 
   for (const body of adminPayloadVariantsResilient(password)) {
@@ -259,7 +287,7 @@ export async function fetchAdminStages(password: string): Promise<AdminStagesRes
 }
 
 export async function saveAdminStages(
-  password: string,
+  password: string | undefined,
   stages: AdminRawStage[]
 ): Promise<AdminSaveResponse> {
   const errors: string[] = []
@@ -307,7 +335,15 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   return { status: 'ok', message }
 }
 
-function adminConfigPayloadVariants(password: string, config: Record<string, unknown>) {
+function adminConfigPayloadVariants(password: string | undefined, config: Record<string, unknown>) {
+  if (!password) {
+    return [
+      { config },
+      { data: config },
+      { ...config },
+    ]
+  }
+
   return [
     { password, config },
     { admin_password: password, config },
@@ -320,7 +356,7 @@ function adminConfigPayloadVariants(password: string, config: Record<string, unk
 }
 
 export async function saveAdminConfig(
-  password: string,
+  password: string | undefined,
   config: Record<string, unknown>
 ): Promise<AdminConfigSaveResponse> {
   const errors: string[] = []
@@ -329,6 +365,7 @@ export async function saveAdminConfig(
     try {
       const res = await fetch('/api/admin/save-config', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',

@@ -11,6 +11,7 @@ import type { PublicConfig } from '../types/player'
 import {
   fetchAdminReactOverview,
   fetchAdminStages,
+  loginAdmin,
   saveAdminConfig,
   saveAdminStages,
   type AdminRawStage,
@@ -206,18 +207,12 @@ export default function AdminApp() {
 
 
   async function saveMissionSettings() {
-    if (!password.trim()) {
-      setSettingsSaveState('error')
-      setSettingsSaveError('Admin password is missing. Unlock the admin again.')
-      return
-    }
-
     setSettingsSaveState('saving')
     setSettingsSaveError(null)
 
     try {
       const payload = buildMissionConfigPayload()
-      const saved = await saveAdminConfig(password, payload)
+      const saved = await saveAdminConfig(undefined, payload)
 
       if (saved.status !== 'ok') {
         throw new Error(saved.message || 'Could not save mission settings.')
@@ -228,7 +223,7 @@ export default function AdminApp() {
         ...(payload as unknown as PublicConfig),
       }))
 
-      const refreshed = await fetchAdminReactOverview(password)
+      const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
@@ -321,24 +316,18 @@ export default function AdminApp() {
   }
 
   async function savePlayerProfiles() {
-    if (!password.trim()) {
-      setPlayerSaveState('error')
-      setPlayerSaveError('Admin password is missing. Unlock the admin again.')
-      return
-    }
-
     setPlayerSaveState('saving')
     setPlayerSaveError(null)
 
     try {
       const payload = buildPlayerConfigPayload()
-      const saved = await saveAdminConfig(password, payload)
+      const saved = await saveAdminConfig(undefined, payload)
 
       if (saved.status !== 'ok') {
         throw new Error(saved.message || 'Could not save player profiles.')
       }
 
-      const refreshed = await fetchAdminReactOverview(password)
+      const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
@@ -358,8 +347,10 @@ export default function AdminApp() {
   }
 
 
-  function loadOverview() {
-    if (!password.trim()) {
+  async function loadOverview() {
+    const typedPassword = password.trim()
+
+    if (!typedPassword && !overviewReady) {
       setOverviewError('Enter the admin password to unlock Mission Control.')
       setOverviewState('error')
       return
@@ -368,40 +359,48 @@ export default function AdminApp() {
     setOverviewState('loading')
     setOverviewError(null)
 
-    fetchAdminReactOverview(password)
-      .then((payload) => {
-        if (payload.status !== 'ok') {
+    try {
+      if (typedPassword) {
+        const login = await loginAdmin(typedPassword)
+
+        if (login.status !== 'ok') {
           setOverview(null)
           setSelectedStage(null)
-          setOverviewError(payload.message || 'Admin overview unavailable')
+          setOverviewError(login.message || 'Admin login failed.')
           setOverviewState('error')
           return
         }
 
-        setOverview(payload)
-        setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], {
-          ...((config || {}) as unknown as Record<string, unknown>),
-          ...((payload.config || {}) as unknown as Record<string, unknown>),
-        } as PublicConfig))
-        setSelectedStage(null)
-        setOverviewState('ready')
-      })
-      .catch((err) => {
+        setPassword('')
+      }
+
+      const payload = await fetchAdminReactOverview()
+
+      if (payload.status !== 'ok') {
         setOverview(null)
         setSelectedStage(null)
-        setOverviewError(err instanceof Error ? err.message : 'Unknown error')
+        setOverviewError(payload.message || 'Admin overview unavailable')
         setOverviewState('error')
-      })
+        return
+      }
+
+      setOverview(payload)
+      setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], {
+        ...((config || {}) as unknown as Record<string, unknown>),
+        ...((payload.config || {}) as unknown as Record<string, unknown>),
+      } as PublicConfig))
+      setSelectedStage(null)
+      setOverviewState('ready')
+    } catch (err) {
+      setOverview(null)
+      setSelectedStage(null)
+      setOverviewError(err instanceof Error ? err.message : 'Unknown error')
+      setOverviewState('error')
+    }
   }
 
 
   async function saveLocalStages() {
-    if (!password.trim()) {
-      setSaveState('error')
-      setSaveError('Admin password is missing. Unlock the admin again.')
-      return
-    }
-
     if (!overview) {
       setSaveState('error')
       setSaveError('No admin overview is loaded.')
@@ -415,7 +414,7 @@ export default function AdminApp() {
       let persistedStages: AdminRawStage[] = []
       let usedFallback = false
 
-      const raw = await fetchAdminStages(password)
+      const raw = await fetchAdminStages()
 
       if (raw.status === 'ok') {
         persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
@@ -424,13 +423,13 @@ export default function AdminApp() {
         persistedStages = buildRawStagesFromOverview(overview.stages || [])
       }
 
-      const saved = await saveAdminStages(password, persistedStages)
+      const saved = await saveAdminStages(undefined, persistedStages)
 
       if (saved.status !== 'ok') {
         throw new Error(saved.message || 'Could not save admin stages.')
       }
 
-      const refreshed = await fetchAdminReactOverview(password)
+      const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setSelectedStage(null)
@@ -655,7 +654,7 @@ export default function AdminApp() {
               <input
                 type="password"
                 value={password}
-                placeholder="Enter admin password"
+                placeholder="Enter admin password once"
                 autoComplete="current-password"
                 autoFocus
                 onChange={(event) => setPassword(event.target.value)}
