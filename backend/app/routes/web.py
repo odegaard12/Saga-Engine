@@ -13,9 +13,6 @@ import main as _main
 router = APIRouter()
 
 
-@router.get("/", response_class=_main.HTMLResponse)
-async def react_entry():
-    return _main.react_index_or_missing()
 
 
 @router.get("/admin-react", response_class=_main.HTMLResponse)
@@ -85,7 +82,6 @@ async def saga_sw_block2():
 
 
 ROUTE_FUNCTIONS = [
-    "react_entry",
     "react_admin_shell",
     "react_admin_shell_path",
     "react_player",

@@ -44,6 +44,11 @@ EVENT_PAYLOAD_MAX_TEXT_LENGTH = 500
 
 app = FastAPI()
 
+
+@app.get("/", response_class=HTMLResponse)
+async def root_smoke_entrypoint():
+    return react_index_or_missing()
+
 VALID_PLAYER_THEMES = {"classic", "glass"}
 
 def normalize_player_theme(value):

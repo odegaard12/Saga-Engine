@@ -45,3 +45,14 @@ def test_route_modules_are_registered_after_split():
         assert hasattr(module, "router")
         assert isinstance(module.ROUTE_FUNCTIONS, list)
         assert module.ROUTE_FUNCTIONS
+
+
+def test_root_smoke_entrypoint_is_registered_early():
+    root_routes = [
+        route
+        for route in main.app.routes
+        if getattr(route, "path", "") == "/"
+    ]
+
+    assert root_routes
+    assert getattr(root_routes[0], "endpoint").__name__ == "root_smoke_entrypoint"
