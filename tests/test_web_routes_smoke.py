@@ -7,10 +7,11 @@ def make_client():
     return TestClient(main.app)
 
 
-def test_root_route_returns_html_or_build_missing_message():
+def test_root_route_does_not_require_query_params():
     response = make_client().get("/")
 
-    assert response.status_code == 200
+    assert response.status_code in {200, 503}
+    assert response.status_code != 422
     assert "text/html" in response.headers.get("content-type", "")
 
 

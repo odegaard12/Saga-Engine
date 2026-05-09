@@ -1,7 +1,7 @@
 """Web/static route module.
 
-This module keeps browser-facing routes explicit instead of relying on the
-mechanical splitter output. Runtime helpers still live in main.py for now.
+Root `/` remains registered directly in main.py as an early smoke-test entrypoint.
+This module owns the remaining browser-facing routes.
 """
 
 from __future__ import annotations
@@ -11,8 +11,6 @@ from fastapi import APIRouter, HTTPException, Request, Response
 import main as _main
 
 router = APIRouter()
-
-
 
 
 @router.get("/admin-react", response_class=_main.HTMLResponse)
@@ -27,8 +25,6 @@ async def react_admin_shell_path(path: str):
 
 @router.get("/player/{name}", response_class=_main.HTMLResponse)
 async def react_player(name: str):
-    # Serve the React app directly. The frontend derives the player from /player/{name}.
-    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
     return _main.react_index_or_missing()
 
 
@@ -41,7 +37,6 @@ async def admin_redirect_to_react():
 async def reset(request: Request):
     data = await request.json()
 
-    # /api/reset mutates player progress. Keep it admin-only.
     if not _main.admin_request_authorized(request, data):
         raise HTTPException(status_code=403, detail="forbidden")
 

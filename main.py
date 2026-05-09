@@ -900,11 +900,6 @@ async def saga_no_cache_html(request, call_next):
 
     return response
 
-@app.head("/", response_class=HTMLResponse, include_in_schema=False)
-@app.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
-@app.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
-@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
-@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
 def sanitize_event_text(value, max_length=EVENT_PAYLOAD_MAX_TEXT_LENGTH):
     text = _as_str(value).strip()
     if len(text) > max_length:
