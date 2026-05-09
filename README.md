@@ -220,7 +220,7 @@ Near-term foundation:
 
 Gameplay roadmap after foundation cleanup:
 
-1. Offline/local-first player core.
+1. Offline/local-first player core foundation added.
 2. Team presence cache and stale/offline map status.
 3. QR/NFC/manual physical events.
 4. Inventory and physical interaction rules.
