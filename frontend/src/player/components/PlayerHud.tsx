@@ -3,6 +3,7 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { OfflineSyncPanel } from './OfflineSyncPanel'
+import { InventoryPanel } from './InventoryPanel'
 
 interface PlayerHudProps {
   user: string
@@ -189,6 +190,7 @@ export function PlayerHud({
 
             <MissionPackPanel user={user} payload={missionPayload} />
           <OfflineSyncPanel user={user} />
+          <InventoryPanel user={user} />
 
             <button
               type="button"
