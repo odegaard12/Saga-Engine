@@ -12,6 +12,7 @@ import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { getStoredMissionPack } from './offline/missionPack'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
+import { queueManualCode } from './offline/physicalEvents'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -563,10 +564,23 @@ export default function PlayerApp() {
         showNotice('Node cleared.', 'success')
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown submit error'
-      setSubmitError(message)
-      showNotice('Mission sync failed. Try again.', 'warn')
+      const message = error instanceof Error ? error.message : 'Unknown submit error'
+      try {
+        const snapshot = queueManualCode({
+          user: payload.user,
+          node_id: currentStage?.id ? String(currentStage.id) : undefined,
+          code,
+          payload: {
+            stage_title: currentStage?.title || '',
+            reason: 'advance_sync_failed',
+          },
+        })
+        setSubmitError(`${message}. Code saved locally and will sync when connection returns.`)
+        showNotice(`Code saved offline (${snapshot.queued_events.length} pending).`, 'warn')
+      } catch {
+        setSubmitError(message)
+        showNotice('Mission sync failed. Try again.', 'warn')
+      }
     } finally {
       setSubmitting(false)
     }
