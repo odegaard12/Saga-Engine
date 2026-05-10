@@ -2,7 +2,7 @@
 
 SAGA Engine should keep team awareness useful under weak coverage.
 
-After the team presence cache foundation, the next step is map-ready teammate markers.
+The player map now receives normalized team map markers from cached/live team presence.
 
 ## Current foundation
 
@@ -21,12 +21,14 @@ It converts `TeamProfileLiveStatus[]` into map marker-friendly objects:
 - source
 - last seen timestamp
 
-## Coverage model
+`PlayerApp` now uses `teamProfilesToMapMarkers()` and passes the result to `MapSurface`.
+
+## Behavior
 
 When the backend returns live team profiles:
 
 - live teammates can be shown as live
-- stale teammates can be shown as stale
+- stale teammates can be shown as recent/stale
 - offline teammates with known position can still be shown as last-known position
 
 When the team endpoint fails and cached profiles are used:
@@ -39,7 +41,7 @@ When the team endpoint fails and cached profiles are used:
 
 This does not provide live location updates without network.
 
-It prepares the map layer for last-known and stale/offline teammate markers. True local real-time presence without the backend would need a separate local transport layer.
+It provides last-known and stale/offline teammate markers on the player map. True local real-time presence without the backend would need a separate local transport layer.
 
 ## Safety
 

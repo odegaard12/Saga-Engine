@@ -11,6 +11,7 @@ import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { getStoredMissionPack } from './offline/missionPack'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
+import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -362,12 +363,13 @@ export default function PlayerApp() {
   const teamOtherProfiles = teamProfiles.filter(
     (member) => !member.is_self && member.user !== payload.user
   )
-  const teamLiveCount = teamOtherProfiles.filter(
-    (member) => String(member.presence || '').toLowerCase() === 'live'
-  ).length
-  const teamVisibleCount = teamOtherProfiles.filter(
-    (member) => String(member.presence || '').toLowerCase() !== 'offline'
-  ).length
+  const teamMapMarkers = teamProfilesToMapMarkers(teamProfiles, {
+    includeSelf: false,
+    includeOfflineWithPosition: true,
+  })
+  const teamMarkerSummary = countVisibleTeamMarkers(teamMapMarkers)
+  const teamLiveCount = teamMarkerSummary.live
+  const teamVisibleCount = teamMarkerSummary.live + teamMarkerSummary.stale
 
   const playerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
@@ -581,7 +583,7 @@ export default function PlayerApp() {
           followPlayer={followPlayer}
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
-          otherPlayers={teamOtherProfiles}
+          otherPlayers={teamMapMarkers}
           selfLabel={'ME'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
