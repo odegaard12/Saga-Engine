@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
+import { OfflineSyncPanel } from './OfflineSyncPanel'
 
 interface PlayerHudProps {
   user: string
@@ -187,6 +188,7 @@ export function PlayerHud({
             </div>
 
             <MissionPackPanel user={user} payload={missionPayload} />
+          <OfflineSyncPanel user={user} />
 
             <button
               type="button"
