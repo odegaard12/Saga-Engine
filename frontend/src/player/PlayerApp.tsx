@@ -10,6 +10,7 @@ import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { getStoredMissionPack } from './offline/missionPack'
+import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -149,12 +150,15 @@ export default function PlayerApp() {
     async function loadTeam() {
       try {
         const team = await fetchTeamStatus(user)
+        const profiles = Array.isArray(team.profiles) ? team.profiles : []
+        cacheTeamProfiles(user, profiles)
         if (!cancelled) {
-          setTeamProfiles(Array.isArray(team.profiles) ? team.profiles : [])
+          setTeamProfiles(profiles)
         }
       } catch {
+        const cachedTeam = getCachedTeamProfiles(user)
         if (!cancelled) {
-          setTeamProfiles([])
+          setTeamProfiles(cachedTeam.profiles)
         }
       }
     }
