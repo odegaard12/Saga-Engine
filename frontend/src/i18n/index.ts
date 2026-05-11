@@ -60,6 +60,15 @@ export const messages = {
       },
       inventory: 'Inventory',
       offlineSync: 'Offline sync',
+      requirements: {
+        title: 'Node requirement',
+        needs: 'Needs',
+        youHave: 'You have it',
+        missing: 'Missing item',
+        quantity: 'Quantity',
+        consume: 'Will be consumed when used',
+        previewOnly: 'Preview only: backend enforcement comes later.',
+      },
     },
   },
   es: {
@@ -118,6 +127,15 @@ export const messages = {
       },
       inventory: 'Inventario',
       offlineSync: 'Sincronización offline',
+      requirements: {
+        title: 'Requisito del nodo',
+        needs: 'Necesitas',
+        youHave: 'Lo tienes',
+        missing: 'Te falta',
+        quantity: 'Cantidad',
+        consume: 'Se consumirá al usarlo',
+        previewOnly: 'Solo vista previa: la validación backend viene después.',
+      },
     },
   },
 } as const
