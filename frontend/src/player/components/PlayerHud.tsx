@@ -1,10 +1,11 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { OfflineSyncPanel } from './OfflineSyncPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
+import { getLocale, setLocale, t, type Locale } from '../../i18n'
 
 interface PlayerHudProps {
   user: string
@@ -78,6 +79,19 @@ export function PlayerHud({
   onCloseTools,
   onToggleDebug,
 }: PlayerHudProps) {
+  const [locale, setLocaleState] = useState(getLocale())
+
+  useEffect(() => {
+    const handleLocaleChange = () => setLocaleState(getLocale())
+    window.addEventListener('saga:locale-change', handleLocaleChange)
+    return () => window.removeEventListener('saga:locale-change', handleLocaleChange)
+  }, [])
+
+  function chooseLocale(nextLocale: Locale) {
+    setLocale(nextLocale)
+    setLocaleState(nextLocale)
+  }
+
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -193,6 +207,24 @@ export function PlayerHud({
             </div>
 
             <MissionPackPanel user={user} payload={missionPayload} />
+          <div className="saga-tools-language-row">
+            <span>{t('common.language', locale)}</span>
+            <button
+              type="button"
+              className={locale === 'en' ? 'active' : ''}
+              onClick={() => chooseLocale('en')}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={locale === 'es' ? 'active' : ''}
+              onClick={() => chooseLocale('es')}
+            >
+              ES
+            </button>
+          </div>
+
           <OfflineSyncPanel user={user} />
           <InventoryPanel user={user} />
           <ManualInventoryCollectPanel user={user} />

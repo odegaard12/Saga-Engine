@@ -33,7 +33,7 @@ function parseItemCode(value: string): ParsedItemCode | null {
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [code, setCode] = useState('')
-  const [message, setMessage] = useState('Use ITEM:id or ITEM:id:Label')
+  const [message, setMessage] = useState('Usa ITEM:id o ITEM:id:Etiqueta')
   const [saved, setSaved] = useState(false)
 
   function submitItemCode() {
@@ -41,7 +41,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Format: ITEM:id or ITEM:id:Label')
+      setMessage('Formato: ITEM:id o ITEM:id:Etiqueta')
       return
     }
 
@@ -60,18 +60,18 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
       setCode('')
       setSaved(true)
-      setMessage(`Collected ${parsed.label} · ${snapshot.items.length} local item type${snapshot.items.length === 1 ? '' : 's'}`)
+      setMessage(`Objeto recogido: ${parsed.label} · ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto local`)
     } catch {
       setSaved(false)
-      setMessage('Could not save item locally')
+      setMessage('No se pudo guardar el objeto en este dispositivo')
     }
   }
 
   return (
     <section style={panel}>
       <div>
-        <div style={eyebrow}>Manual item</div>
-        <div style={title}>Collect local inventory</div>
+        <div style={eyebrow}>Objeto manual</div>
+        <div style={title}>Recoger objeto local</div>
       </div>
 
       <div style={inputRow}>
@@ -99,7 +99,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
             submitItemCode()
           }}
         >
-          Add
+          Añadir
         </button>
       </div>
 
