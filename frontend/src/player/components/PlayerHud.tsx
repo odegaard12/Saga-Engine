@@ -173,7 +173,10 @@ export function PlayerHud({
             onClick={(event) => event.stopPropagation()}
           >
             <div style={toolsHeader}>
-              <div style={toolsTitle}>Tools</div>
+              <div>
+                <div style={toolsTitle}>Player tools</div>
+                <div style={toolsSubtitle}>Offline sync, items and quick links.</div>
+              </div>
 
               <button
                 type="button"
@@ -437,10 +440,9 @@ const toolsOverlay: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: 12,
+  padding: 'calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
-
 const toolsBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
@@ -452,13 +454,17 @@ const toolsBackdrop: CSSProperties = {
 const toolsSheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
+  width: 'min(560px, calc(100vw - 24px))',
+  maxHeight: 'min(82dvh, 760px)',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.14)',
   background:
     'linear-gradient(180deg, rgba(13,23,42,.86), rgba(20,32,58,.78))',
   boxShadow:
     '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
+  padding: '16px 16px calc(18px + env(safe-area-inset-bottom, 0px))',
   display: 'grid',
   gap: 12,
   pointerEvents: 'auto',
@@ -481,7 +487,12 @@ const toolsTitle: CSSProperties = {
   lineHeight: 1,
   letterSpacing: '-0.03em',
 }
-
+const toolsSubtitle: CSSProperties = {
+  color: 'rgba(226,232,240,.68)',
+  fontSize: 12,
+  lineHeight: 1.35,
+  marginTop: 4,
+}
 const closeButton: CSSProperties = {
   width: 38,
   height: 38,
