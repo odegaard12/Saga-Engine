@@ -3,7 +3,7 @@ export type Locale = 'en' | 'es'
 export const DEFAULT_LOCALE: Locale = 'es'
 export const LOCALE_STORAGE_KEY = 'saga_locale'
 
-const messages = {
+export const messages = {
   en: {
     common: {
       language: 'Language',
@@ -21,7 +21,19 @@ const messages = {
     },
     player: {
       mission: 'Mission',
-      tools: 'Tools',
+      missionEntry: 'Mission entry',
+      tools: {
+        button: 'Tools',
+        close: 'Close tools',
+        title: 'Player tools',
+        subtitle: 'Offline sync, items and quick links.',
+        enableDebug: 'Enable local debug',
+        disableDebug: 'Disable local debug',
+      },
+      hud: {
+        details: 'Details',
+        hideDetails: 'Hide details',
+      },
       inventory: 'Inventory',
       offlineSync: 'Offline sync',
     },
@@ -43,28 +55,40 @@ const messages = {
     },
     player: {
       mission: 'Misión',
-      tools: 'Herramientas',
+      missionEntry: 'Entrada de misión',
+      tools: {
+        button: 'Herramientas',
+        close: 'Cerrar herramientas',
+        title: 'Herramientas del jugador',
+        subtitle: 'Sincronización offline, objetos y accesos rápidos.',
+        enableDebug: 'Activar debug local',
+        disableDebug: 'Desactivar debug local',
+      },
+      hud: {
+        details: 'Detalles',
+        hideDetails: 'Ocultar detalles',
+      },
       inventory: 'Inventario',
       offlineSync: 'Sincronización offline',
     },
   },
 } as const
 
-export type TranslationKey =
-  | 'common.language'
-  | 'common.save'
-  | 'common.close'
-  | 'common.loading'
-  | 'common.error'
-  | 'admin.missionControl'
-  | 'admin.nodeEditor'
-  | 'admin.addNode'
-  | 'admin.settings'
-  | 'admin.players'
-  | 'player.mission'
-  | 'player.tools'
-  | 'player.inventory'
-  | 'player.offlineSync'
+type Messages = typeof messages.en
+
+type Join<K, P> = K extends string
+  ? P extends string
+    ? `${K}.${P}`
+    : never
+  : never
+
+type Leaves<T> = T extends string
+  ? never
+  : {
+      [K in keyof T]: T[K] extends string ? K : Join<K, Leaves<T[K]>>
+    }[keyof T]
+
+export type TranslationKey = Leaves<Messages>
 
 function isLocale(value: string | null): value is Locale {
   return value === 'en' || value === 'es'
