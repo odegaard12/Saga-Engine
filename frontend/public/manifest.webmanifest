@@ -1,0 +1,19 @@
+{
+  "name": "SAGA Engine",
+  "short_name": "SAGA",
+  "description": "Mobile-first engine for real-world geolocated missions.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e8efea",
+  "theme_color": "#1f302b",
+  "icons": [
+    {
+      "src": "/saga-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
