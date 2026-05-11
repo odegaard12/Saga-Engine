@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
+import { t } from '../../i18n'
 import {
   familyCards,
   getAdminFamilyIcon,
@@ -416,6 +417,109 @@ export default function NodeDetailDrawer({
                   </>
                 ) : null}
               </div>
+
+              <div className="admin-edit-section-head">
+                <strong>{t('editor.gameAuthoring.title')}</strong>
+                <span>{t('editor.gameAuthoring.subtitle')}</span>
+              </div>
+
+              <div className="admin-edit-section-head">
+                <strong>{t('editor.gameAuthoring.completionTitle')}</strong>
+                <span>{t('editor.gameAuthoring.completionHelp')}</span>
+              </div>
+
+              <label className="admin-edit-field">
+                {t('editor.gameAuthoring.completionMethod')}
+                <select
+                  value={getDraftConfigText('completion_method', 'proximity')}
+                  onChange={(event) => updateDraftConfigText('completion_method', event.target.value)}
+                >
+                  <option value="proximity">{t('editor.gameAuthoring.methodProximity')}</option>
+                  <option value="manual_code">{t('editor.gameAuthoring.methodManualCode')}</option>
+                  <option value="qr">{t('editor.gameAuthoring.methodQr')}</option>
+                  <option value="nfc">{t('editor.gameAuthoring.methodNfc')}</option>
+                  <option value="minigame">{t('editor.gameAuthoring.methodMinigame')}</option>
+                  <option value="item">{t('editor.gameAuthoring.methodItem')}</option>
+                </select>
+              </label>
+
+              <div className="admin-edit-section-head">
+                <strong>{t('editor.gameAuthoring.requiredItemTitle')}</strong>
+                <span>{t('editor.gameAuthoring.completionHelp')}</span>
+              </div>
+
+              <div className="admin-edit-grid">
+                <label className="admin-edit-field">
+                  {t('editor.gameAuthoring.requiredItemId')}
+                  <input
+                    value={getDraftConfigText('required_item_id')}
+                    placeholder="runa_agua"
+                    onChange={(event) => updateDraftConfigText('required_item_id', event.target.value.trim())}
+                  />
+                </label>
+
+                <label className="admin-edit-field">
+                  {t('editor.gameAuthoring.requiredItemLabel')}
+                  <input
+                    value={getDraftConfigText('required_item_label')}
+                    placeholder="Runa de agua"
+                    onChange={(event) => updateDraftConfigText('required_item_label', event.target.value)}
+                  />
+                </label>
+
+                <label className="admin-edit-field">
+                  {t('editor.gameAuthoring.requiredItemQuantity')}
+                  <input
+                    inputMode="numeric"
+                    value={getDraftConfigText('required_item_quantity', '1')}
+                    onChange={(event) => updateDraftConfigNumber('required_item_quantity', event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="admin-edit-check">
+                <input
+                  type="checkbox"
+                  checked={getDraftConfigText('required_item_consume', 'false') === 'true'}
+                  onChange={(event) => updateDraftConfig('required_item_consume', event.target.checked)}
+                />
+                {t('editor.gameAuthoring.consumeItem')}
+              </label>
+
+              <div className="admin-edit-section-head">
+                <strong>{t('editor.gameAuthoring.rewardTitle')}</strong>
+                <span>{t('editor.gameAuthoring.completionHelp')}</span>
+              </div>
+
+              <div className="admin-edit-grid">
+                <label className="admin-edit-field">
+                  {t('editor.gameAuthoring.rewardItemId')}
+                  <input
+                    value={getDraftConfigText('reward_item_id')}
+                    placeholder="llave_torre"
+                    onChange={(event) => updateDraftConfigText('reward_item_id', event.target.value.trim())}
+                  />
+                </label>
+
+                <label className="admin-edit-field">
+                  {t('editor.gameAuthoring.rewardItemLabel')}
+                  <input
+                    value={getDraftConfigText('reward_item_label')}
+                    placeholder="Llave de la torre"
+                    onChange={(event) => updateDraftConfigText('reward_item_label', event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="admin-edit-field">
+                {t('editor.gameAuthoring.rewardMessage')}
+                <textarea
+                  rows={3}
+                  value={getDraftConfigText('reward_message')}
+                  placeholder="Has conseguido la llave de la torre."
+                  onChange={(event) => updateDraftConfigText('reward_message', event.target.value)}
+                />
+              </label>
 
               <small className="admin-family-config-note">
                 This panel updates local draft state immediately. Use Save in Mission Control to persist.
