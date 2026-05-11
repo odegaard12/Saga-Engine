@@ -40,3 +40,19 @@ body {
     background: #e8efea;
   }
 }
+
+:root {
+  --saga-safe-top: env(safe-area-inset-top, 0px);
+  --saga-safe-right: env(safe-area-inset-right, 0px);
+  --saga-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --saga-safe-left: env(safe-area-inset-left, 0px);
+}
+
+body {
+  min-height: 100dvh;
+  padding-top: var(--saga-safe-top);
+  padding-right: var(--saga-safe-right);
+  padding-bottom: var(--saga-safe-bottom);
+  padding-left: var(--saga-safe-left);
+  box-sizing: border-box;
+}
