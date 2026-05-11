@@ -6,6 +6,7 @@ import {
   type InventoryItem,
   type InventorySnapshot,
 } from '../offline/inventory'
+import { queuePhysicalEvent } from '../offline/physicalEvents'
 
 interface InventoryPanelProps {
   user: string
@@ -44,6 +45,20 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
   function useItem(item: InventoryItem) {
     const next = markInventoryItemUsed(user, item.item_id, 1)
     setSnapshot(next)
+
+    queuePhysicalEvent({
+      user,
+      source: item.source === 'nfc' ? 'nfc' : item.source === 'qr' ? 'qr' : 'manual',
+      node_id: item.node_id,
+      physical_id: item.physical_id || item.item_id,
+      payload: {
+        inventory_item_id: item.item_id,
+        inventory_label: item.label,
+        inventory_action: 'used',
+        inventory_quantity_after_use:
+          next.items.find((nextItem) => nextItem.item_id === item.item_id)?.quantity || 0,
+      },
+    })
   }
 
   useEffect(() => {
