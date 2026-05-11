@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import {
   countInventoryItems,
   loadInventorySnapshot,
+  markInventoryItemUsed,
   type InventoryItem,
   type InventorySnapshot,
 } from '../offline/inventory'
@@ -39,6 +40,11 @@ function getUpdatedLabel(value?: string): string {
 
 export function InventoryPanel({ user }: InventoryPanelProps) {
   const [snapshot, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
+
+  function useItem(item: InventoryItem) {
+    const next = markInventoryItemUsed(user, item.item_id, 1)
+    setSnapshot(next)
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -82,7 +88,22 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
                 </div>
                 <div style={itemMeta}>{itemSubtitle(item)}</div>
               </div>
-              <div style={itemState}>{item.state}</div>
+              <div style={itemActions}>
+                <div style={itemState}>{item.state}</div>
+                {item.state !== 'used' && item.quantity > 0 ? (
+                  <button
+                    type="button"
+                    style={useButton}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      useItem(item)
+                    }}
+                  >
+                    Use
+                  </button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -190,6 +211,26 @@ const itemMeta: CSSProperties = {
 const itemState: CSSProperties = {
   flex: '0 0 auto',
   color: '#c4b5fd',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const itemActions: CSSProperties = {
+  flex: '0 0 auto',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 7,
+}
+
+const useButton: CSSProperties = {
+  minHeight: 28,
+  padding: '0 9px',
+  borderRadius: 999,
+  border: '1px solid rgba(34,197,94,.20)',
+  background: 'rgba(34,197,94,.13)',
+  color: '#bbf7d0',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.08em',
