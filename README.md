@@ -230,3 +230,7 @@ Gameplay roadmap after foundation cleanup:
 ## License
 
 MIT.
+
+### Nota de despliegue en producción
+
+Producción debe ejecutarse desde la imagen Docker, con los datos runtime montados por separado. No montes una carpeta o repo del host sobre `/app`, porque eso puede hacer que producción sirva código legacy antiguo aunque la imagen Docker sea nueva. Ver `docs/operations/clean-docker-production-deploy.md`.
