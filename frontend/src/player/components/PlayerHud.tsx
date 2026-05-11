@@ -4,6 +4,7 @@ import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { OfflineSyncPanel } from './OfflineSyncPanel'
 import { InventoryPanel } from './InventoryPanel'
+import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
 
 interface PlayerHudProps {
   user: string
@@ -191,6 +192,7 @@ export function PlayerHud({
             <MissionPackPanel user={user} payload={missionPayload} />
           <OfflineSyncPanel user={user} />
           <InventoryPanel user={user} />
+          <ManualInventoryCollectPanel user={user} />
 
             <button
               type="button"
