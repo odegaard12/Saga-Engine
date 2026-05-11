@@ -34,6 +34,16 @@ npm run build
 cd ..
 docker build -t saga_engine:latest .
 
+## Despliegue limpio de producción
+
+Ver `clean-docker-production-deploy.md` para la regla de producción:
+
+- no montar código del host sobre `/app`
+- ejecutar el código desde la imagen Docker
+- montar solo datos runtime
+- usar `/app_data` como directorio de datos de producción
+- apuntar Cloudflare Tunnel al puerto `8096`, no al puerto dev de Vite `5173`
+
 ## Safety
 
 Do not bake production secrets, local .env files, live SQLite databases, backups or logs into the image.
