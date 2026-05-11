@@ -13,27 +13,27 @@ interface OfflineSyncPanelProps {
 const AUTO_SYNC_INTERVAL_MS = 20_000
 
 function statusLabel(status: SagaSyncStatus): string {
-  if (status === 'syncing') return 'SYNCING'
-  if (status === 'offline') return 'OFFLINE'
-  if (status === 'error') return 'SYNC ERROR'
+  if (status === 'syncing') return 'SINCRONIZANDO'
+  if (status === 'offline') return 'SIN COBERTURA'
+  if (status === 'error') return 'ERROR DE SINCRONIZACIÓN'
   return 'ONLINE'
 }
 
 function getLastSyncLabel(value?: string): string {
-  if (!value) return 'Never synced'
+  if (!value) return 'Nunca sincronizado'
 
   const timestamp = Date.parse(value)
-  if (!Number.isFinite(timestamp)) return 'Last sync unknown'
+  if (!Number.isFinite(timestamp)) return 'Última sincronización desconocida'
 
   const ageSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
-  if (ageSeconds < 10) return 'Synced just now'
-  if (ageSeconds < 60) return `Synced ${ageSeconds}s ago`
+  if (ageSeconds < 10) return 'Sincronizado ahora'
+  if (ageSeconds < 60) return `Sincronizado hace ${ageSeconds}s`
 
   const ageMinutes = Math.round(ageSeconds / 60)
-  if (ageMinutes < 60) return `Synced ${ageMinutes}m ago`
+  if (ageMinutes < 60) return `Sincronizado hace ${ageMinutes}min`
 
   const ageHours = Math.round(ageMinutes / 60)
-  return `Synced ${ageHours}h ago`
+  return `Sincronizado hace ${ageHours}h`
 }
 
 export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
@@ -125,9 +125,9 @@ export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
     <section style={panel}>
       <div style={headerRow}>
         <div>
-          <div style={eyebrow}>Offline sync</div>
+          <div style={eyebrow}>Sincronización offline</div>
           <div style={title}>
-            {pendingCount} pending · {statusLabel(syncing ? 'syncing' : syncStatus)}
+            {pendingCount} pendientes · {statusLabel(syncing ? 'syncing' : syncStatus)}
           </div>
         </div>
         <button
@@ -140,11 +140,11 @@ export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
             void syncNow()
           }}
         >
-          {syncing ? 'Syncing…' : pendingCount > 0 ? 'Sync now' : 'Synced'}
+          {syncing ? 'Sincronizando…' : pendingCount > 0 ? 'Sincronizar ahora' : 'Sincronizado'}
         </button>
       </div>
       <div style={body}>
-        Auto-sync every {AUTO_SYNC_INTERVAL_MS / 1000}s when pending events exist. {lastSyncLabel}.
+        Sincronización automática cada {AUTO_SYNC_INTERVAL_MS / 1000}s si hay acciones pendientes. {lastSyncLabel}.
       </div>
     </section>
   )

@@ -3,9 +3,12 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles/mobile-shell.css'
 import './player/components/map-surface.css'
-import { setupAdminLocaleToggle } from './i18n/adminLocaleToggle'
+import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
+import { setupAdminSettingsLanguageMenu } from './i18n/adminSettingsLanguageMenu'
 
-setupAdminLocaleToggle()
+
+setupLegacySpanishBridge()
+setupAdminSettingsLanguageMenu()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
