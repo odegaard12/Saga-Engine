@@ -160,7 +160,7 @@ export function PlayerHud({
             style={detailsOpen ? ghostButtonActive : ghostButton}
             onClick={onToggleDetails}
           >
-            {detailsOpen ? 'Hide details' : 'Details'}
+            {detailsOpen ? t('player.hud.hideDetails', locale) : t('player.hud.details', locale)}
           </button>
 
           <button
@@ -168,7 +168,7 @@ export function PlayerHud({
             style={toolsOpen ? ghostButtonActive : ghostButton}
             onClick={onOpenTools}
           >
-            {toolsOpen ? 'Close tools' : 'Tools'}
+            {toolsOpen ? t('player.tools.close', locale) : t('player.tools.button', locale)}
           </button>
         </div>
       </section>
@@ -188,8 +188,8 @@ export function PlayerHud({
           >
             <div style={toolsHeader}>
               <div>
-                <div style={toolsTitle}>Player tools</div>
-                <div style={toolsSubtitle}>Offline sync, items and quick links.</div>
+                <div style={toolsTitle}>{t('player.tools.title', locale)}</div>
+                <div style={toolsSubtitle}>{t('player.tools.subtitle', locale)}</div>
               </div>
 
               <button
@@ -237,7 +237,7 @@ export function PlayerHud({
                 onCloseTools()
               }}
             >
-              {debugEnabled ? 'Disable local debug' : 'Enable local debug'}
+              {debugEnabled ? t('player.tools.disableDebug', locale) : t('player.tools.enableDebug', locale)}
             </button>
 
             <a
