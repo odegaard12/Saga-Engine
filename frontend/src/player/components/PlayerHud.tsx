@@ -5,6 +5,7 @@ import { MissionPackPanel } from './MissionPackPanel'
 import { OfflineSyncPanel } from './OfflineSyncPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
+import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 
 interface PlayerHudProps {
@@ -224,6 +225,8 @@ export function PlayerHud({
               ES
             </button>
           </div>
+
+          <RequirementPreviewPanel user={user} stage={currentStage} />
 
           <OfflineSyncPanel user={user} />
           <InventoryPanel user={user} />
