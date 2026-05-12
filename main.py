@@ -853,6 +853,27 @@ REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
 REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
+
+@app.get("/manifest.webmanifest")
+def react_manifest_webmanifest():
+    if REACT_MANIFEST_FILE.exists():
+        return FileResponse(
+            REACT_MANIFEST_FILE,
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        )
+
+    public_manifest_file = Path("frontend/public/manifest.webmanifest")
+    if public_manifest_file.exists():
+        return FileResponse(
+            public_manifest_file,
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        )
+
+    return JSONResponse({"status": "missing_manifest"}, status_code=404)
+
+
 def react_index_or_missing():
     if REACT_INDEX_FILE.exists():
         return FileResponse(REACT_INDEX_FILE)
@@ -2074,19 +2095,36 @@ async def admin_change_password(request: Request):
     return {"status": "ok"}
 
 @app.get("/sw.js")
-async def saga_sw_block():
-    return Response("", media_type="application/javascript", headers={
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Service-Worker-Allowed": "/",
-    })
+def player_service_worker():
+    sw_file = REACT_DIST_DIR / "sw.js"
+    if sw_file.exists():
+        return FileResponse(
+            sw_file,
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Service-Worker-Allowed": "/",
+            },
+        )
+
+    public_sw_file = Path("frontend/public/sw.js")
+    if public_sw_file.exists():
+        return FileResponse(
+            public_sw_file,
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Service-Worker-Allowed": "/",
+            },
+        )
+
+    return JSONResponse({"status": "missing_service_worker"}, status_code=404)
+
 
 @app.get("/service-worker.js")
-async def saga_sw_block2():
-    return Response("", media_type="application/javascript", headers={
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Service-Worker-Allowed": "/",
-    })
+def player_service_worker_alias():
+    return player_service_worker()
+
+    return player_service_worker()
+
+
