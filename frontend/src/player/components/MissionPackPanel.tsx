@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchPlayerGame, fetchPublicConfig } from '../../shared/api'
+import { cachePlayerShell } from '../offline/pwaShell'
 import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
@@ -51,6 +52,8 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
         config,
         payload: offlinePayload,
       })
+
+      await cachePlayerShell(`/player/${encodeURIComponent(user)}`).catch(() => undefined)
 
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')

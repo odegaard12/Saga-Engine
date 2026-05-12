@@ -10,6 +10,7 @@ import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
+import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
@@ -89,6 +90,27 @@ function canShowLiveDistance(gpsState: PlayerGpsStatus): boolean {
   return gpsState === 'ready' || gpsState === 'stale'
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function getStagePosition(stage: PlayerStage | null): { lat: number; lon: number } | null {
+  const lat = toFiniteNumber(stage?.lat)
+  const lon = toFiniteNumber(stage?.lon)
+  if (lat === null || lon === null) return null
+  return { lat, lon }
+}
+
+function getStageRadius(stage: PlayerStage | null): number | null {
+  const radius = toFiniteNumber(stage?.radius)
+  return radius !== null && radius > 0 ? radius : null
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -107,13 +129,24 @@ export default function PlayerApp() {
   const [offlinePrepVisible, setOfflinePrepVisible] = useState(true)
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
+  const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
+  const gpsWatchRef = useRef<number | null>(null)
+  const gpsCenteredRef = useRef(false)
+  const gpsNoticeShownRef = useRef(false)
   const user = useMemo(() => getUserFromUrl(), [])
 
   const isPhone =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  useEffect(() => {
+    const playerUrl = `/player/${encodeURIComponent(user)}`
+    void registerPlayerServiceWorker()
+    void cachePlayerShell(playerUrl)
+  }, [user])
 
   useEffect(() => {
     let cancelled = false
@@ -169,7 +202,7 @@ export default function PlayerApp() {
     }
 
     loadTeam()
-    intervalId = window.setInterval(loadTeam, 1000)
+    intervalId = window.setInterval(loadTeam, 5000)
 
     return () => {
       cancelled = true
@@ -199,25 +232,14 @@ export default function PlayerApp() {
 
   useEffect(() => {
     if (state.status !== 'ready') return
-    const readyPayload: PlayerGamePayload = state.payload
 
     let intervalId: number | null = null
 
     async function publishHeartbeat() {
       try {
-        const secureLiveGpsContext =
-          typeof window !== 'undefined' &&
-          window.isSecureContext &&
-          window.location.protocol === 'https:'
-
-        const rawLivePlayerPosition = getPlayerPosition(readyPayload)
-        const rawGpsState = normalizeGpsStatus(readyPayload.live_status?.gps_status)
-
-        const effectivePosition = localDebugPosition
-          ? localDebugPosition
-          : secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
-          ? rawLivePlayerPosition
-          : null
+        const readyPayload = (state as { status: 'ready'; payload: PlayerGamePayload }).payload
+        const rawLivePosition = getPlayerPosition(readyPayload)
+        const effectivePosition = localDebugPosition || browserGpsPosition || rawLivePosition
 
         await sendHeartbeat({
           user,
@@ -230,7 +252,7 @@ export default function PlayerApp() {
             : {
                 gps_status: 'unavailable',
               }),
-          source: localDebugPosition ? 'react' : 'player',
+          source: localDebugPosition ? 'react' : browserGpsPosition ? 'browser_gps' : 'player',
         })
       } catch {
         // ignore heartbeat errors in the UI loop
@@ -238,7 +260,7 @@ export default function PlayerApp() {
     }
 
     publishHeartbeat()
-    intervalId = window.setInterval(publishHeartbeat, 2000)
+    intervalId = window.setInterval(publishHeartbeat, 5000)
 
     return () => {
       if (intervalId !== null) {
@@ -250,11 +272,11 @@ export default function PlayerApp() {
     state.status,
     state.status === 'ready' ? state.payload.live_status?.lat : null,
     state.status === 'ready' ? state.payload.live_status?.lon : null,
-    state.status === 'ready' ? state.payload.live_status?.gps_status : null,
     localDebugPosition?.lat,
     localDebugPosition?.lon,
+    browserGpsPosition?.lat,
+    browserGpsPosition?.lon,
   ])
-
 
 
   useEffect(() => {
@@ -264,6 +286,10 @@ export default function PlayerApp() {
       }
       if (overlayTimerRef.current !== null) {
         window.clearTimeout(overlayTimerRef.current)
+      }
+      if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+        window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+        gpsWatchRef.current = null
       }
     }
   }, [])
@@ -329,7 +355,7 @@ export default function PlayerApp() {
 
   const rawGpsState = normalizeGpsStatus(payload.live_status?.gps_status)
 
-  const gpsState = localDebugPosition
+  const gpsState: PlayerGpsStatus = localDebugPosition || browserGpsPosition
     ? 'ready'
     : secureLiveGpsContext
     ? rawGpsState
@@ -340,32 +366,25 @@ export default function PlayerApp() {
       ? rawLivePlayerPosition
       : null
 
-  const playerPosition = localDebugPosition || livePlayerPosition
-
-  const rawDistanceMeters =
-    currentStage && playerPosition
-      ? Math.round(
-          getDistanceMeters(playerPosition, {
-            lat: currentStage.lat,
-            lon: currentStage.lon,
-          })
-        )
-      : null
+  const playerPosition = localDebugPosition || browserGpsPosition || livePlayerPosition
+  const stagePosition = getStagePosition(currentStage)
+  const stageRadius = getStageRadius(currentStage)
 
   const distanceMeters =
-    rawDistanceMeters !== null && canShowLiveDistance(gpsState)
-      ? rawDistanceMeters
+    stagePosition && playerPosition
+      ? Math.round(getDistanceMeters(playerPosition, stagePosition))
       : null
 
   const inRange =
-    currentStage && distanceMeters !== null
-      ? distanceMeters <= currentStage.radius
+    stageRadius !== null && distanceMeters !== null
+      ? distanceMeters <= stageRadius
       : false
 
   const effectiveDebugEnabled =
     Boolean(payload.live_status?.debug_enabled) ||
     localDebugEnabled ||
-    Boolean(localDebugPosition)
+    Boolean(localDebugPosition) ||
+    Boolean(browserGpsPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -375,11 +394,17 @@ export default function PlayerApp() {
     debugEnabled: effectiveDebugEnabled,
   })
 
-  const hudHelperText =
+  const gpsActionRequired =
+    !payload.finished &&
+    Boolean(currentStage) &&
     !localDebugPosition &&
-    !secureLiveGpsContext &&
-    runtime.reason === 'gps_unavailable'
-      ? 'Live GPS is unavailable here. Use local debug tap or open the published HTTPS player.'
+    !browserGpsPosition &&
+    gpsState !== 'ready' &&
+    gpsState !== 'stale'
+
+  const hudHelperText =
+    gpsActionRequired
+      ? 'Activa la ubicación del navegador para calcular distancia y entrar en el nodo.'
       : runtime.helperText
 
   const teamOtherProfiles = teamProfiles.filter(
@@ -396,6 +421,10 @@ export default function PlayerApp() {
   const playerHref = `/player/${encodeURIComponent(payload.user)}`
   const shellLoginHref = '/'
   const adminHref = '/admin'
+  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  const hasBrowserGps = Boolean(localDebugPosition || browserGpsPosition) || gpsState === 'ready' || gpsState === 'stale'
+  const primaryLabel = gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
+  const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
@@ -514,6 +543,77 @@ export default function PlayerApp() {
     setInteractionOpen(true)
   }
 
+  async function handleRequestLiveGps() {
+    if (typeof window === 'undefined' || !window.navigator.geolocation) {
+      setBrowserGpsStatus('unavailable')
+      showNotice('GPS no disponible en este dispositivo.', 'warn')
+      return
+    }
+
+    if (!window.isSecureContext) {
+      setBrowserGpsStatus('error')
+      showNotice('El GPS requiere dominio HTTPS o app instalada.', 'warn')
+      return
+    }
+
+    setBrowserGpsStatus('searching')
+    showNotice('Solicitando permiso de ubicación…', 'info')
+
+    const onSuccess = (position: GeolocationPosition) => {
+      const next = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+      }
+
+      setBrowserGpsPosition(next)
+      setBrowserGpsStatus('ready')
+      setFollowPlayer(false)
+
+      if (!gpsCenteredRef.current) {
+        gpsCenteredRef.current = true
+        setFocusRequest({ target: 'player', token: Date.now() })
+      }
+
+      void sendHeartbeat({
+        user,
+        lat: next.lat,
+        lon: next.lon,
+        gps_status: 'ok',
+        source: 'browser_gps',
+      })
+
+      if (!gpsNoticeShownRef.current) {
+        gpsNoticeShownRef.current = true
+        showNotice('GPS activado.', 'success')
+      }
+    }
+
+    const onError = (error: GeolocationPositionError) => {
+      setBrowserGpsStatus('error')
+      const denied = error.code === error.PERMISSION_DENIED
+      showNotice(
+        denied
+          ? 'Permiso de ubicación denegado. Revísalo en ajustes del navegador.'
+          : 'No se pudo obtener ubicación. Prueba otra vez al aire libre.',
+        'warn'
+      )
+    }
+
+    window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 15000,
+    })
+
+    if (gpsWatchRef.current === null) {
+      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 20000,
+      })
+    }
+  }
+
   async function handlePrepareOfflinePack() {
     try {
       setOfflinePrepState('saving')
@@ -531,7 +631,8 @@ export default function PlayerApp() {
       setState({ status: 'ready', payload: offlinePayload })
       setOfflineSummary(await getOfflineMissionSummary(payload.user))
       setOfflinePrepState('saved')
-      setOfflinePrepVisible(false)
+      await cachePlayerShell(playerHref).catch(() => undefined)
+      setOfflinePrepVisible(true)
       showNotice(`Mission downloaded for offline play (${pack.stage_count} nodes).`, 'success')
       vibrate([10, 16, 10])
     } catch (error) {
@@ -542,6 +643,11 @@ export default function PlayerApp() {
   }
 
   function handlePrimaryAction() {
+    if (gpsActionRequired) {
+      void handleRequestLiveGps()
+      return
+    }
+
     if (!runtime.canEnter) return
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
@@ -677,7 +783,7 @@ export default function PlayerApp() {
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-          followPlayer={followPlayer}
+          followPlayer={false}
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
@@ -707,38 +813,54 @@ export default function PlayerApp() {
           <div style={getOfflinePrepOverlayStyle(isPhone)}>
             <section style={offlinePrepCard}>
               <div>
-                <div style={offlinePrepEyebrow}>OFFLINE READY</div>
+                <div style={offlinePrepEyebrow}>MODO CAMPO</div>
                 <div style={offlinePrepTitle}>
-                  {offlineSummary?.hasPack ? 'Update mission before field play' : 'Download mission before field play'}
+                  {hasOfflineMission && hasBrowserGps ? 'Listo para salir' : 'Preparar antes de salir'}
                 </div>
                 <div style={offlinePrepCopy}>
-                  Saves nodes, rules, requirements and local progression so the route keeps working without coverage.
+                  {hasOfflineMission ? '✓ Misión descargada en este teléfono.' : '○ Descarga nodos, códigos, reglas y requisitos.'}
+                  <br />
+                  {hasBrowserGps ? '✓ GPS activo.' : '○ Activa GPS para distancia y entrada en nodos.'}
                 </div>
               </div>
 
-              <button
-                type="button"
-                style={offlinePrepButton}
-                disabled={offlinePrepState === 'saving'}
-                onClick={handlePrepareOfflinePack}
-              >
-                {offlinePrepState === 'saving'
-                  ? 'Downloading…'
-                  : offlineSummary?.hasPack
-                    ? 'Update offline mission'
-                    : 'Download offline mission'}
-              </button>
+              <div style={offlinePrepActions}>
+                <button
+                  type="button"
+                  style={hasOfflineMission ? offlinePrepButtonDone : offlinePrepButton}
+                  disabled={offlinePrepState === 'saving'}
+                  onClick={handlePrepareOfflinePack}
+                >
+                  {offlinePrepState === 'saving'
+                    ? 'Descargando…'
+                    : hasOfflineMission
+                      ? '✓ Misión descargada'
+                      : 'Descargar misión'}
+                </button>
+
+                <button
+                  type="button"
+                  style={hasBrowserGps ? offlinePrepButtonDone : offlinePrepButton}
+                  onClick={handleRequestLiveGps}
+                >
+                  {browserGpsStatus === 'searching'
+                    ? 'Buscando GPS…'
+                    : hasBrowserGps
+                      ? '✓ GPS activo'
+                      : 'Activar GPS'}
+                </button>
+              </div>
 
               <button
                 type="button"
                 style={offlinePrepDismiss}
                 onClick={() => setOfflinePrepVisible(false)}
               >
-                Later
+                {hasOfflineMission && hasBrowserGps ? 'Cerrar' : 'Más tarde'}
               </button>
 
               {offlinePrepState === 'error' ? (
-                <div style={offlinePrepError}>Could not download. Try again from Tools.</div>
+                <div style={offlinePrepError}>No se pudo descargar. Prueba otra vez desde Herramientas.</div>
               ) : null}
             </section>
           </div>
@@ -762,9 +884,9 @@ export default function PlayerApp() {
             playerHref={playerHref}
             loginHref={shellLoginHref}
             adminHref={adminHref}
-            primaryLabel={runtime.primaryLabel}
+            primaryLabel={primaryLabel}
             primaryTone={runtime.primaryTone}
-            primaryDisabled={!runtime.canEnter}
+            primaryDisabled={primaryDisabled}
             helperText={hudHelperText}
             detailsOpen={activePanel === 'details'}
             onPrimaryAction={handlePrimaryAction}
@@ -805,9 +927,10 @@ function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 12 : 24,
     right: mobile ? 12 : 'auto',
-    top: mobile ? 76 : 86,
-    width: mobile ? 'auto' : 360,
-    zIndex: 20,
+    bottom: mobile ? 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 178px)' : 'auto',
+    top: mobile ? 'auto' : 86,
+    width: mobile ? 'auto' : 380,
+    zIndex: 1190,
     pointerEvents: 'auto',
   }
 }
@@ -845,6 +968,12 @@ const offlinePrepCopy: CSSProperties = {
   lineHeight: 1.35,
 }
 
+const offlinePrepActions: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 8,
+}
+
 const offlinePrepButton: CSSProperties = {
   minHeight: 48,
   border: 'none',
@@ -854,6 +983,12 @@ const offlinePrepButton: CSSProperties = {
   fontSize: 14,
   fontWeight: 950,
   cursor: 'pointer',
+}
+
+const offlinePrepButtonDone: CSSProperties = {
+  ...offlinePrepButton,
+  background: '#bbf7d0',
+  color: '#14532d',
 }
 
 const offlinePrepDismiss: CSSProperties = {
@@ -881,6 +1016,9 @@ function ScreenFrame({
   return (
     <main
       style={{
+        position: mobile ? 'fixed' : 'relative',
+        inset: mobile ? 0 : undefined,
+        width: '100vw',
         minHeight: mobile ? '100dvh' : '100svh',
         height: mobile ? '100dvh' : 'auto',
         background:
@@ -889,6 +1027,8 @@ function ScreenFrame({
         fontFamily: 'system-ui, sans-serif',
         color: '#10231a',
         overflow: 'hidden',
+        overscrollBehavior: 'none',
+        touchAction: 'manipulation',
       }}
     >
       {children}
@@ -943,6 +1083,8 @@ function getViewportStyle(mobile: boolean): CSSProperties {
     maxHeight: mobile ? '100dvh' : 980,
     margin: '0 auto',
     overflow: 'hidden',
+    borderRadius: mobile ? 0 : 32,
+    background: '#0f172a',
   }
 }
 
@@ -965,14 +1107,11 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
 function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 12,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 14px)' : 12,
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
     zIndex: 1200,
-    pointerEvents: 'none',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    pointerEvents: 'auto',
   }
 }
 
@@ -995,12 +1134,9 @@ function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 10px)' : 12,
+    bottom: mobile ? 'max(env(safe-area-inset-bottom, 0px), 8px)' : 12,
     zIndex: 1200,
-    pointerEvents: 'none',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    pointerEvents: 'auto',
   }
 }
 

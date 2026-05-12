@@ -139,10 +139,12 @@ export function MapSurface({
   const nodeRadiusRef = useRef<L.Circle | null>(null)
   const playerMarkerRef = useRef<L.Marker | null>(null)
   const otherPlayerLayersRef = useRef<L.Layer[]>([])
+  const lastNodeFrameRef = useRef<string | null>(null)
+  const lastPlayerFrameRef = useRef<string | null>(null)
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
-    [currentStage]
+    [currentStage?.id, currentStage?.lat, currentStage?.lon, currentStage?.radius, currentStage?.title]
   )
 
   useEffect(() => {
@@ -238,17 +240,20 @@ export function MapSurface({
     nodeRadiusRef.current = radiusLayer
     nodeMarkerRef.current = markerLayer
 
-    if (!playerPosition) {
+    const nodeFrameKey = `${stageMapData.lat}:${stageMapData.lon}:${stageMapData.radius}`
+    if (lastNodeFrameRef.current !== nodeFrameKey) {
+      lastNodeFrameRef.current = nodeFrameKey
+      lastPlayerFrameRef.current = null
       map.fitBounds(radiusLayer.getBounds(), {
         padding: [56, 56],
         maxZoom: 16,
         animate: true,
-        duration: 0.45,
+        duration: 0.35,
       })
     }
 
     map.invalidateSize({ pan: false })
-  }, [stageMapData, playerPosition, onNodeTap, nodeState])
+  }, [stageMapData, onNodeTap, nodeState])
 
   useEffect(() => {
     const map = mapRef.current
@@ -275,7 +280,13 @@ export function MapSurface({
       opacity: 0.92,
     })
 
-    if (followPlayer) {
+    const playerFrameKey = stageMapData
+      ? `${stageMapData.lat}:${stageMapData.lon}:player`
+      : `player:${selfLabel}`
+
+    if (followPlayer && lastPlayerFrameRef.current !== playerFrameKey) {
+      lastPlayerFrameRef.current = playerFrameKey
+
       if (stageMapData) {
         const distance = getDistanceMeters(playerPosition, {
           lat: stageMapData.lat,
@@ -290,18 +301,13 @@ export function MapSurface({
           map.fitBounds(bounds.pad(0.30), {
             maxZoom: 16,
             animate: true,
-            duration: 0.55,
-          })
-        } else {
-          map.setView([stageMapData.lat, stageMapData.lon], 15, {
-            animate: true,
-            duration: 0.55,
+            duration: 0.35,
           })
         }
       } else {
         map.setView([playerPosition.lat, playerPosition.lon], 16, {
           animate: true,
-          duration: 0.55,
+          duration: 0.35,
         })
       }
     }
