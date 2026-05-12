@@ -12,22 +12,24 @@ from backend.app.storage.event_store import (
 
 def test_event_store_defaults_to_json_backend(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("SAGA_STORAGE_BACKEND", raising=False)
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "events.json"
 
-    assert resolve_event_storage_backend() == "json"
-    assert resolve_event_db_path(str(target)) == str(target)
+    assert resolve_event_storage_backend() == "sqlite"
+    assert resolve_event_db_path(str(target)) == str(tmp_path / "saga.sqlite3")
 
     event = append_event(str(target), {"type": "qr_scanned", "user": "PLAYER 1"})
 
-    assert target.exists()
+    assert (tmp_path / "saga.sqlite3").exists()
     assert list_events(str(target), user="PLAYER 1")[0]["id"] == event["id"]
 
 
 def test_event_store_unknown_backend_falls_back_to_json(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("SAGA_STORAGE_BACKEND", "unknown")
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "events.json"
 
-    assert resolve_event_storage_backend() == "json"
+    assert resolve_event_storage_backend() == "sqlite"
 
     append_event(str(target), {"type": "team_ready", "user": "PLAYER 1"})
 
@@ -80,7 +82,6 @@ def test_event_store_marks_sqlite_event_status(monkeypatch, tmp_path: Path):
 
 
 def test_event_store_marks_json_event_status(monkeypatch, tmp_path: Path):
-    monkeypatch.setenv("SAGA_STORAGE_BACKEND", "json")
     target = tmp_path / "events.json"
 
     event = append_event(str(target), {"type": "qr_scanned", "user": "PLAYER 1"})

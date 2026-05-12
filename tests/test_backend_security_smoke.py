@@ -54,20 +54,19 @@ def test_admin_react_overview_accepts_session_cookie_without_password():
 def test_admin_reset_rejects_unauthenticated_mutation():
     client = make_client()
 
-    main.save_json(main.GAME_DB, {"PLAYER 1": 4})
+    main.set_player_progress_level("PLAYER 1", 4)
 
     response = client.post("/api/reset", json={"user": "PLAYER 1"})
 
     assert response.status_code == 403
 
-    state = main.load_json(main.GAME_DB, {})
-    assert state.get("PLAYER 1") == 4
+    assert main.get_player_progress_level("PLAYER 1", 0) == 4
 
 
 def test_admin_reset_accepts_session_cookie():
     client = make_client()
 
-    main.save_json(main.GAME_DB, {"PLAYER 1": 4})
+    main.set_player_progress_level("PLAYER 1", 4)
 
     login = client.post(
         "/api/admin/login",
@@ -80,8 +79,7 @@ def test_admin_reset_accepts_session_cookie():
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
-    state = main.load_json(main.GAME_DB, {})
-    assert state.get("PLAYER 1") == 0
+    assert main.get_player_progress_level("PLAYER 1", 0) == 0
 
 
 def test_player_payload_does_not_expose_answer_or_rune_secrets():

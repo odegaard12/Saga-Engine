@@ -11,6 +11,7 @@ import ipaddress
 from pathlib import Path
 
 from backend.app.storage.json_store import load_json, save_json, update_json
+from backend.app.storage.runtime_store import load_document, load_stages, save_document, save_stages
 from backend.app.storage.game_state_store import (
     get_player_level,
     load_game_state,
@@ -35,8 +36,17 @@ def normalize_player_theme(value):
     theme = str(value or "classic").strip().lower()
     return theme if theme in VALID_PLAYER_THEMES else "classic"
 
+def resolve_config_db_path():
+    data_dir = (
+        os.getenv("SAGA_DATA_DIR")
+        or os.getenv("DATA_DIR")
+        or "data"
+    )
+    return os.path.join(str(data_dir or "data"), "config.json")
+
+
 def load_config():
-    cfg = load_json("config.json", {
+    cfg = load_document(resolve_config_db_path(), "config", {
         "site_name": "PUT TITLE HERE",
         "admin_title": "PUT ADMIN TITLE HERE",
         "admin_subtitle": "PUT ADMIN SUBTITLE HERE",
@@ -53,6 +63,10 @@ def load_config():
         cfg = {}
     cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "classic"))
     return cfg
+
+def save_config(cfg):
+    save_document(resolve_config_db_path(), "config", cfg)
+
 
 CONFIG = load_config()
 
@@ -784,7 +798,7 @@ def validate_stages(raw_stages):
     return errors
 
 def get_runtime_stages():
-    raw_stages = load_json(STAGES_DB, [])
+    raw_stages = load_stages(STAGES_DB)
     if not isinstance(raw_stages, list):
         return []
     return [normalize_stage(stage) for stage in raw_stages]
@@ -930,7 +944,7 @@ async def get_config():
 
 @app.get("/api/state/{user}")
 async def get_state(user: str):
-    stages = load_json(STAGES_DB, [])
+    stages = load_stages(STAGES_DB)
     profile = get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
     lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
@@ -1557,7 +1571,7 @@ async def get_stages(request: Request):
             content={"status": "error", "detail": "password change required"}
         )
 
-    return load_json(STAGES_DB, [])
+    return load_stages(STAGES_DB)
 
 @app.post("/api/admin/save-config")
 async def save_config_endpoint(request: Request):
@@ -1608,7 +1622,7 @@ async def save_config_endpoint(request: Request):
 
     cfg["players"] = players
 
-    save_json("config.json", cfg)
+    save_config(cfg)
     return {"status": "ok", "config": cfg}
 
 @app.post("/api/advance")
@@ -1745,7 +1759,7 @@ async def save_stages_endpoint(request: Request):
             content={"status": "error", "detail": "invalid stages", "errors": errors}
         )
 
-    save_json(STAGES_DB, stages)
+    save_stages(STAGES_DB, stages)
     return {"status": "ok"}
 
 @app.post("/api/admin/login")

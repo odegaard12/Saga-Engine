@@ -29,8 +29,8 @@ VALID_POSITIONS_BACKENDS = {"json", "sqlite"}
 
 
 def resolve_positions_storage_backend() -> str:
-    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "json").strip().lower()
-    return backend if backend in VALID_POSITIONS_BACKENDS else "json"
+    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "sqlite").strip().lower()
+    return backend if backend in VALID_POSITIONS_BACKENDS else "sqlite"
 
 
 def resolve_positions_db_path(json_positions_path: str) -> str:

@@ -18,7 +18,7 @@ def test_heartbeat_defaults_to_json_positions_backend(tmp_path: Path, monkeypatc
     positions_json = tmp_path / "positions.json"
 
     monkeypatch.delenv("SAGA_STORAGE_BACKEND", raising=False)
-    monkeypatch.delenv("SAGA_SQLITE_DB", raising=False)
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     monkeypatch.setattr(main, "POSITIONS_DB", str(positions_json))
     reset_heartbeat_rate_state()
 
@@ -37,7 +37,7 @@ def test_heartbeat_defaults_to_json_positions_backend(tmp_path: Path, monkeypatc
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
-    assert positions_json.exists()
+    assert main.get_live_position("PLAYER 1").get("gps_status") == "ok"
     state = main.load_live_positions()
     assert state["PLAYER 1"]["gps_status"] == "ok"
     assert state["PLAYER 1"]["lat"] == 42.2708

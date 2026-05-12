@@ -30,8 +30,8 @@ VALID_EVENT_BACKENDS = {"json", "sqlite"}
 
 
 def resolve_event_storage_backend() -> str:
-    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "json").strip().lower()
-    return backend if backend in VALID_EVENT_BACKENDS else "json"
+    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "sqlite").strip().lower()
+    return backend if backend in VALID_EVENT_BACKENDS else "sqlite"
 
 
 def resolve_event_db_path(json_event_path: str) -> str:
