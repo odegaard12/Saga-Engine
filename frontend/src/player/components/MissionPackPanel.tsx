@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchPublicConfig } from '../../shared/api'
+import { fetchPlayerGame, fetchPublicConfig } from '../../shared/api'
 import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
@@ -41,11 +41,15 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
     setMessage(null)
 
     try {
-      const config = await fetchPublicConfig()
+      const [config, offlinePayload] = await Promise.all([
+        fetchPublicConfig(),
+        fetchPlayerGame(user, { offlinePack: true }),
+      ])
+
       const pack = await saveMissionPack({
         user,
         config,
-        payload,
+        payload: offlinePayload,
       })
 
       setSummary(await getOfflineMissionSummary(user))

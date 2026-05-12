@@ -826,6 +826,8 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "config": node["interaction"]["config"],
             "minigame": build_stage_minigame_runtime(node),
             "entry": node["entry"],
+            "success": node["success"],
+            "requirements": node.get("requirements", {"items": []}),
             "messages": node["messages"],
         })
 
@@ -956,7 +958,7 @@ async def get_state(user: str):
     return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
 
 @app.get("/api/game/{user}")
-async def get_game_payload(user: str):
+async def get_game_payload(user: str, offline_pack: bool = False):
     runtime_stages = get_runtime_stages()
     profile = get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -970,7 +972,7 @@ async def get_game_payload(user: str):
         current_stage = project_stage_for_player(runtime_stages[lvl], include_runtime=True)
 
     stages = [
-        project_stage_for_player(stage, include_runtime=(i == lvl and not finished))
+        project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)))
         for i, stage in enumerate(runtime_stages)
     ]
 
@@ -1085,6 +1087,79 @@ def normalize_player_event(raw_event, user, profile):
         "payload": sanitize_event_payload(raw_event.get("payload")),
     }
 
+
+def _event_payload_code(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    for key in ("code", "manual_code", "answer", "raw_value"):
+        value = _as_str(payload.get(key)).strip()
+        if value:
+            return value
+    return ""
+
+
+def apply_synced_player_event(normalized_event, user, profile):
+    """Apply offline player events that have gameplay side effects.
+
+    node_completed is the key local-first progression event:
+    - validates the submitted code against the current official node
+    - validates required items against server SQLite event history
+    - consumes the required item when configured
+    - advances official server progress
+    """
+    event = normalized_event if isinstance(normalized_event, dict) else {}
+
+    if event.get("type") != "node_completed":
+        return append_event(EVENT_LOG_DB, event)
+
+    profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
+    stages = get_runtime_stages()
+    current_level = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
+
+    if current_level >= len(stages):
+        event["status"] = "ignored"
+        event["error"] = "mission_already_complete"
+        return append_event(EVENT_LOG_DB, event)
+
+    if current_level < 0:
+        current_level = 0
+
+    current_node = stages[current_level]
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    submitted_code = _event_payload_code(payload)
+
+    if not stage_accepts_code(current_node, submitted_code):
+        event["status"] = "failed"
+        event["error"] = "invalid_completion_code"
+        return append_event(EVENT_LOG_DB, event)
+
+    requirement_status = evaluate_stage_item_requirement(current_node, profile_id)
+    if requirement_status.get("required") and not requirement_status.get("ok"):
+        event["status"] = "failed"
+        event["error"] = "missing_required_item"
+        event["payload"] = {
+            **payload,
+            "requirement": requirement_status,
+            "level_before": current_level,
+        }
+        return append_event(EVENT_LOG_DB, event)
+
+    if requirement_status.get("required") and requirement_status.get("consume"):
+        append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+    set_player_progress_level(profile_id, current_level + 1)
+
+    event["status"] = "synced"
+    event["node_id"] = event.get("node_id") or _as_str(current_node.get("id"))
+    event["payload"] = {
+        **payload,
+        "requirement": requirement_status,
+        "level_before": current_level,
+        "level_after": current_level + 1,
+        "server_applied": True,
+    }
+    return append_event(EVENT_LOG_DB, event)
+
+
 @app.post("/api/events/sync")
 async def sync_player_events(request: Request):
     data = await request.json()
@@ -1104,7 +1179,7 @@ async def sync_player_events(request: Request):
     stored = []
     for raw_event in events:
         normalized = normalize_player_event(raw_event, user, profile)
-        stored.append(append_event(EVENT_LOG_DB, normalized))
+        stored.append(apply_synced_player_event(normalized, user, profile))
 
     append_event(
         EVENT_LOG_DB,

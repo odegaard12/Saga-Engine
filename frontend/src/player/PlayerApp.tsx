@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchPlayerGame, fetchTeamStatus, sendHeartbeat } from '../shared/api'
+import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
@@ -9,7 +9,7 @@ import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
-import { getStoredMissionPack } from './offline/missionPack'
+import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
@@ -104,6 +104,9 @@ export default function PlayerApp() {
   const [toolsOpen, setToolsOpen] = useState(false)
   const [teamOpen, setTeamOpen] = useState(false)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
+  const [offlinePrepVisible, setOfflinePrepVisible] = useState(true)
+  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -118,7 +121,7 @@ export default function PlayerApp() {
     async function run() {
       try {
         setState({ status: 'loading' })
-        const payload = await fetchPlayerGame(user)
+        const payload = await fetchPlayerGame(user, { offlinePack: true })
 
         if (!cancelled) {
           setState({ status: 'ready', payload })
@@ -175,6 +178,24 @@ export default function PlayerApp() {
       }
     }
   }, [user])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    let cancelled = false
+
+    getOfflineMissionSummary(user)
+      .then((summary) => {
+        if (!cancelled) setOfflineSummary(summary)
+      })
+      .catch(() => {
+        if (!cancelled) setOfflineSummary(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, state.status, offlinePrepState])
 
   useEffect(() => {
     if (state.status !== 'ready') return
@@ -493,6 +514,33 @@ export default function PlayerApp() {
     setInteractionOpen(true)
   }
 
+  async function handlePrepareOfflinePack() {
+    try {
+      setOfflinePrepState('saving')
+      const [config, offlinePayload] = await Promise.all([
+        fetchPublicConfig(),
+        fetchPlayerGame(payload.user, { offlinePack: true }),
+      ])
+
+      const pack = await saveMissionPack({
+        user: payload.user,
+        config,
+        payload: offlinePayload,
+      })
+
+      setState({ status: 'ready', payload: offlinePayload })
+      setOfflineSummary(await getOfflineMissionSummary(payload.user))
+      setOfflinePrepState('saved')
+      setOfflinePrepVisible(false)
+      showNotice(`Mission downloaded for offline play (${pack.stage_count} nodes).`, 'success')
+      vibrate([10, 16, 10])
+    } catch (error) {
+      setOfflinePrepState('error')
+      showNotice(error instanceof Error ? error.message : 'Could not download offline mission.', 'warn')
+      vibrate(10)
+    }
+  }
+
   function handlePrimaryAction() {
     if (!runtime.canEnter) return
     setFocusRequest({ target: 'node', token: Date.now() })
@@ -548,8 +596,9 @@ export default function PlayerApp() {
 
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
-        setSubmitError('Invalid code for the current stage.')
-        showNotice('The code was not accepted for this stage.', 'warn')
+        const missingItem = result.reason === 'missing_required_item'
+        setSubmitError(missingItem ? 'Missing required item for this node.' : 'Invalid code for the current stage.')
+        showNotice(missingItem ? 'Missing required item for this node.' : 'The code was not accepted for this stage.', 'warn')
         return
       }
 
@@ -565,7 +614,41 @@ export default function PlayerApp() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown submit error'
+
       try {
+        const localResult = await advanceLocalProgress({
+          payload,
+          currentStage,
+          code,
+        })
+
+        if (localResult.ok) {
+          setInteractionOpen(false)
+          setState({ status: 'ready', payload: localResult.payload })
+
+          if (localResult.payload.finished) {
+            showOverlay('finish')
+            showNotice('Mission complete locally. Sync when connection returns.', 'success')
+          } else {
+            showOverlay('node')
+            showNotice('Node cleared locally. Progress queued for sync.', 'success')
+          }
+
+          return
+        }
+
+        if (localResult.reason === 'missing_required_item') {
+          setSubmitError('Missing required item for this node.')
+          showNotice('Missing required item for this node.', 'warn')
+          return
+        }
+
+        if (localResult.reason === 'invalid_code') {
+          setSubmitError('Invalid code for the downloaded offline mission.')
+          showNotice('The offline code was not accepted.', 'warn')
+          return
+        }
+
         const snapshot = queueManualCode({
           user: payload.user,
           node_id: currentStage?.id ? String(currentStage.id) : undefined,
@@ -619,6 +702,47 @@ export default function PlayerApp() {
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
         </div>
+
+        {offlinePrepVisible && !payload.finished ? (
+          <div style={getOfflinePrepOverlayStyle(isPhone)}>
+            <section style={offlinePrepCard}>
+              <div>
+                <div style={offlinePrepEyebrow}>OFFLINE READY</div>
+                <div style={offlinePrepTitle}>
+                  {offlineSummary?.hasPack ? 'Update mission before field play' : 'Download mission before field play'}
+                </div>
+                <div style={offlinePrepCopy}>
+                  Saves nodes, rules, requirements and local progression so the route keeps working without coverage.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                style={offlinePrepButton}
+                disabled={offlinePrepState === 'saving'}
+                onClick={handlePrepareOfflinePack}
+              >
+                {offlinePrepState === 'saving'
+                  ? 'Downloading…'
+                  : offlineSummary?.hasPack
+                    ? 'Update offline mission'
+                    : 'Download offline mission'}
+              </button>
+
+              <button
+                type="button"
+                style={offlinePrepDismiss}
+                onClick={() => setOfflinePrepVisible(false)}
+              >
+                Later
+              </button>
+
+              {offlinePrepState === 'error' ? (
+                <div style={offlinePrepError}>Could not download. Try again from Tools.</div>
+              ) : null}
+            </section>
+          </div>
+        ) : null}
 
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
@@ -674,6 +798,77 @@ export default function PlayerApp() {
       />
     </ScreenFrame>
   )
+}
+
+function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
+  return {
+    position: 'absolute',
+    left: mobile ? 12 : 24,
+    right: mobile ? 12 : 'auto',
+    top: mobile ? 76 : 86,
+    width: mobile ? 'auto' : 360,
+    zIndex: 20,
+    pointerEvents: 'auto',
+  }
+}
+
+const offlinePrepCard: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  padding: 14,
+  borderRadius: 22,
+  background: 'rgba(15, 23, 42, 0.92)',
+  border: '1px solid rgba(255, 255, 255, 0.16)',
+  boxShadow: '0 18px 50px rgba(15, 23, 42, 0.32)',
+  color: '#ffffff',
+}
+
+const offlinePrepEyebrow: CSSProperties = {
+  color: '#93c5fd',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.15em',
+  textTransform: 'uppercase',
+}
+
+const offlinePrepTitle: CSSProperties = {
+  marginTop: 3,
+  fontSize: 18,
+  fontWeight: 950,
+  letterSpacing: '-0.04em',
+}
+
+const offlinePrepCopy: CSSProperties = {
+  marginTop: 4,
+  color: 'rgba(226, 232, 240, 0.82)',
+  fontSize: 13,
+  lineHeight: 1.35,
+}
+
+const offlinePrepButton: CSSProperties = {
+  minHeight: 48,
+  border: 'none',
+  borderRadius: 16,
+  background: '#22c55e',
+  color: '#052e16',
+  fontSize: 14,
+  fontWeight: 950,
+  cursor: 'pointer',
+}
+
+const offlinePrepDismiss: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: 'rgba(226, 232, 240, 0.78)',
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const offlinePrepError: CSSProperties = {
+  color: '#fecaca',
+  fontSize: 12,
+  fontWeight: 800,
 }
 
 function ScreenFrame({
