@@ -26,6 +26,7 @@ VALID_EVENT_TYPES = {
     "team_proof_created",
     "team_proof_accepted",
     "inventory_item_collected",
+    "inventory_item_used",
     "offline_sync_received",
     "admin_action",
 }

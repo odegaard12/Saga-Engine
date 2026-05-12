@@ -587,6 +587,8 @@ def normalize_stage(raw):
         raw_minigame_config if raw_minigame_config is not None else cfg
     )
 
+    item_requirement = read_stage_item_requirement(raw)
+
     return {
         "id": raw.get("id"),
         "version": 2,
@@ -623,6 +625,9 @@ def normalize_stage(raw):
             "mode": "any_of",
             "conditions": _build_success_conditions(raw),
             "case_sensitive": False,
+        },
+        "requirements": {
+            "items": [item_requirement] if item_requirement else [],
         },
         "messages": {
             "locked": _as_str(
@@ -1011,6 +1016,7 @@ PLAYER_EVENT_TYPES = {
     "team_proof_created",
     "team_proof_accepted",
     "inventory_item_collected",
+    "inventory_item_used",
     "offline_sync_received",
 }
 
@@ -1625,6 +1631,165 @@ async def save_config_endpoint(request: Request):
     save_config(cfg)
     return {"status": "ok", "config": cfg}
 
+
+
+def _positive_int(value, default=1):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, parsed)
+
+
+def read_stage_item_requirement(raw_stage):
+    node = raw_stage if isinstance(raw_stage, dict) else {}
+    config = {}
+
+    interaction = node.get("interaction")
+    if isinstance(interaction, dict) and isinstance(interaction.get("config"), dict):
+        config.update(interaction.get("config") or {})
+
+    if isinstance(node.get("config"), dict):
+        config.update(node.get("config") or {})
+
+    requirements = node.get("requirements")
+    if isinstance(requirements, dict):
+        items = requirements.get("items")
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            config.update(items[0])
+
+    item_id = _as_str(
+        config.get("required_item_id")
+        or config.get("item_id")
+        or config.get("id")
+    ).strip()
+
+    if not item_id:
+        return None
+
+    label = _as_str(
+        config.get("required_item_label")
+        or config.get("label")
+        or item_id
+    ).strip() or item_id
+
+    return {
+        "item_id": item_id,
+        "label": label,
+        "quantity": _positive_int(
+            config.get("required_item_quantity")
+            or config.get("quantity")
+            or 1,
+            1,
+        ),
+        "consume": _as_bool(
+            config.get("required_item_consume")
+            or config.get("consume"),
+            False,
+        ),
+    }
+
+
+def _event_payload(event):
+    payload = event.get("payload") if isinstance(event, dict) else {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _event_inventory_item_id(event):
+    payload = _event_payload(event)
+    return _as_str(
+        payload.get("inventory_item_id")
+        or payload.get("item_id")
+        or payload.get("id")
+    ).strip()
+
+
+def _event_inventory_quantity(event, default=1):
+    payload = _event_payload(event)
+    for key in ("inventory_quantity", "quantity", "delta"):
+        if key in payload:
+            return _positive_int(payload.get(key), default)
+    return default
+
+
+def count_player_inventory_item(user, item_id):
+    user_key = _as_str(user).strip()
+    item_key = _as_str(item_id).strip()
+    if not user_key or not item_key:
+        return 0
+
+    total = 0
+    events = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
+
+    for event in events:
+        event_type = _as_str(event.get("type")).strip()
+        payload = _event_payload(event)
+        current_item = _event_inventory_item_id(event)
+
+        if current_item != item_key:
+            continue
+
+        action = _as_str(payload.get("inventory_action")).strip().lower()
+
+        if event_type == "inventory_item_collected" and action != "used":
+            total += _event_inventory_quantity(event, 1)
+        elif event_type == "inventory_item_used" or action in {"used", "spent", "consumed"}:
+            total -= _event_inventory_quantity(event, 1)
+
+    return max(0, total)
+
+
+def evaluate_stage_item_requirement(raw_stage, user):
+    requirement = read_stage_item_requirement(raw_stage)
+    if not requirement:
+        return {
+            "required": False,
+            "ok": True,
+            "owned": 0,
+            "required_quantity": 0,
+            "item_id": "",
+            "label": "",
+            "consume": False,
+        }
+
+    owned = count_player_inventory_item(user, requirement["item_id"])
+    required_quantity = requirement["quantity"]
+
+    return {
+        "required": True,
+        "ok": owned >= required_quantity,
+        "owned": owned,
+        "required_quantity": required_quantity,
+        "item_id": requirement["item_id"],
+        "label": requirement["label"],
+        "consume": requirement["consume"],
+    }
+
+
+def append_inventory_item_used_event(user, profile_id, current_node, requirement_status):
+    node_id = _as_str(current_node.get("id")).strip()
+    quantity = _positive_int(requirement_status.get("required_quantity"), 1)
+
+    return append_event(
+        EVENT_LOG_DB,
+        {
+            "type": "inventory_item_used",
+            "status": "synced",
+            "source": "backend_requirement",
+            "user": profile_id,
+            "team_id": profile_id,
+            "node_id": node_id,
+            "payload": {
+                "inventory_item_id": requirement_status.get("item_id"),
+                "inventory_label": requirement_status.get("label"),
+                "inventory_action": "used_by_backend",
+                "inventory_quantity": quantity,
+                "requested_by": _as_str(user).strip(),
+            },
+        },
+    )
+
+
 @app.post("/api/advance")
 async def advance(request: Request):
     data = await request.json()
@@ -1641,8 +1806,25 @@ async def advance(request: Request):
         current_node = stages[lvl]
 
         if stage_accepts_code(current_node, code):
+            requirement_status = evaluate_stage_item_requirement(current_node, profile_id)
+
+            if not requirement_status["ok"]:
+                return {
+                    "status": "fail",
+                    "user": profile_id,
+                    "reason": "missing_required_item",
+                    "requirement": requirement_status,
+                }
+
+            if requirement_status["required"] and requirement_status["consume"]:
+                append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
             set_player_progress_level(profile_id, lvl + 1)
-            return {"status": "ok", "user": profile_id}
+            return {
+                "status": "ok",
+                "user": profile_id,
+                "requirement": requirement_status,
+            }
 
     return {"status": "fail", "user": profile_id}
 
