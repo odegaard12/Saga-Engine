@@ -34,8 +34,8 @@ VALID_GAME_STATE_BACKENDS = {"json", "sqlite"}
 
 
 def resolve_game_state_backend() -> str:
-    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "json").strip().lower()
-    return backend if backend in VALID_GAME_STATE_BACKENDS else "json"
+    backend = str(os.getenv("SAGA_STORAGE_BACKEND") or "sqlite").strip().lower()
+    return backend if backend in VALID_GAME_STATE_BACKENDS else "sqlite"
 
 
 def resolve_game_state_db_path(json_game_state_path: str) -> str:

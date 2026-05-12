@@ -152,6 +152,26 @@ def init_sqlite_schema(path: str) -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_documents (
+                key TEXT PRIMARY KEY,
+                value_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stages (
+                idx INTEGER PRIMARY KEY,
+                stage_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
 
 def _json_dumps(value: Any) -> str:
     return json.dumps(value if isinstance(value, dict) else {}, ensure_ascii=False)
@@ -542,3 +562,86 @@ def remove_sqlite_position(path: str, user: str) -> dict[str, dict[str, Any]]:
     with sqlite_connection(path) as conn:
         conn.execute("DELETE FROM positions WHERE user = ?", (user_key,))
     return load_sqlite_positions(path)
+
+def _json_dumps_any(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _json_loads_any(value: str, default: Any) -> Any:
+    try:
+        return json.loads(value or "null")
+    except Exception:
+        return default
+
+
+def load_sqlite_document(path: str, key: str, default: Any) -> Any:
+    init_sqlite_schema(path)
+    document_key = str(key or "").strip()
+    if not document_key:
+        return default
+
+    with sqlite_connection(path) as conn:
+        row = conn.execute(
+            "SELECT value_json FROM app_documents WHERE key = ?",
+            (document_key,),
+        ).fetchone()
+
+    if not row:
+        return default
+
+    return _json_loads_any(row["value_json"], default)
+
+
+def save_sqlite_document(path: str, key: str, value: Any) -> None:
+    init_sqlite_schema(path)
+    document_key = str(key or "").strip()
+    if not document_key:
+        raise ValueError("document key is required")
+
+    with sqlite_connection(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO app_documents (key, value_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value_json = excluded.value_json,
+                updated_at = excluded.updated_at
+            """,
+            (document_key, _json_dumps_any(value), utc_now_iso()),
+        )
+
+
+def load_sqlite_stages(path: str) -> list[dict[str, Any]]:
+    init_sqlite_schema(path)
+
+    with sqlite_connection(path) as conn:
+        rows = conn.execute(
+            "SELECT stage_json FROM stages ORDER BY idx ASC"
+        ).fetchall()
+
+    stages: list[dict[str, Any]] = []
+    for row in rows:
+        decoded = _json_loads_any(row["stage_json"], {})
+        if isinstance(decoded, dict):
+            stages.append(decoded)
+
+    return stages
+
+
+def save_sqlite_stages(path: str, stages: list[dict[str, Any]]) -> None:
+    init_sqlite_schema(path)
+    safe_stages = stages if isinstance(stages, list) else []
+
+    with sqlite_connection(path) as conn:
+        conn.execute("DELETE FROM stages")
+        for index, stage in enumerate(safe_stages):
+            if not isinstance(stage, dict):
+                continue
+            conn.execute(
+                """
+                INSERT INTO stages (idx, stage_json, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (index, _json_dumps_any(stage), utc_now_iso()),
+            )
+

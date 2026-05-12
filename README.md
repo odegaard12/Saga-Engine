@@ -234,3 +234,11 @@ MIT.
 ### Nota de despliegue en producción
 
 Producción debe ejecutarse desde la imagen Docker, con los datos runtime montados por separado. No montes una carpeta o repo del host sobre `/app`, porque eso puede hacer que producción sirva código legacy antiguo aunque la imagen Docker sea nueva. Ver `docs/operations/clean-docker-production-deploy.md`.
+
+## Runtime storage
+
+SAGA Engine uses SQLite as the production runtime source of truth.
+
+Runtime state is stored in saga.sqlite3, including mission stages, admin auth, player progress, live positions and event history.
+
+See docs/operations/sqlite-runtime-only.md.

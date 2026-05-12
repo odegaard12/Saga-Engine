@@ -1,4 +1,5 @@
 import json
+from backend.app.storage.sqlite_store import save_sqlite_stages
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -42,6 +43,7 @@ def configure_sqlite_game_state(monkeypatch, tmp_path: Path):
     main.ADMIN_SESSIONS.clear()
 
     write_test_stages(stages_json, count=3)
+    save_sqlite_stages(str(sqlite_db), json.loads(stages_json.read_text(encoding="utf-8")))
     return game_json, sqlite_db, stages_json
 
 

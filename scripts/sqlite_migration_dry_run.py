@@ -25,9 +25,13 @@ from backend.app.storage.sqlite_store import (
     append_sqlite_event,
     init_sqlite_schema,
     list_sqlite_events,
+    load_sqlite_document,
     load_sqlite_game_state,
     load_sqlite_positions,
+    save_sqlite_document,
     save_sqlite_game_state,
+    save_sqlite_stages,
+    load_sqlite_stages,
     save_sqlite_positions_state,
 )
 
@@ -72,14 +76,31 @@ def build_sqlite_from_json(data_dir: Path, sqlite_path: Path) -> dict[str, Any]:
     game_json = data_dir / "gamestate.json"
     positions_json = data_dir / "positions.json"
     events_json = data_dir / "events.json"
+    config_json = data_dir / "config.json"
+    admin_auth_json = data_dir / "admin_auth.json"
+    stages_json = data_dir / "stages.json"
 
     game_state = normalize_game_state(load_json(str(game_json), {}))
     positions = normalize_positions(load_json(str(positions_json), {}))
     events = normalize_event_log(load_json(str(events_json), []))
+    config = load_json(str(config_json), {})
+    admin_auth = load_json(str(admin_auth_json), {})
+    stages = load_json(str(stages_json), [])
+    if not isinstance(config, dict):
+        config = {}
+    if not isinstance(admin_auth, dict):
+        admin_auth = {}
+    if not isinstance(stages, list):
+        stages = []
 
     init_sqlite_schema(str(sqlite_path))
     save_sqlite_game_state(str(sqlite_path), game_state)
     save_sqlite_positions_state(str(sqlite_path), positions)
+    if config:
+        save_sqlite_document(str(sqlite_path), "config", config)
+    if admin_auth:
+        save_sqlite_document(str(sqlite_path), "admin_auth", admin_auth)
+    save_sqlite_stages(str(sqlite_path), [stage for stage in stages if isinstance(stage, dict)])
 
     event_errors: list[str] = []
     for event in events:
@@ -91,6 +112,9 @@ def build_sqlite_from_json(data_dir: Path, sqlite_path: Path) -> dict[str, Any]:
     loaded_game_state = load_sqlite_game_state(str(sqlite_path))
     loaded_positions = load_sqlite_positions(str(sqlite_path))
     loaded_events = list_sqlite_events(str(sqlite_path))
+    loaded_config = load_sqlite_document(str(sqlite_path), "config", {})
+    loaded_admin_auth = load_sqlite_document(str(sqlite_path), "admin_auth", {})
+    loaded_stages = load_sqlite_stages(str(sqlite_path))
 
     return {
         "data_dir": str(data_dir),
@@ -99,11 +123,17 @@ def build_sqlite_from_json(data_dir: Path, sqlite_path: Path) -> dict[str, Any]:
             "game_state": len(game_state),
             "positions": len(positions),
             "events": len(events),
+            "config": 1 if config else 0,
+            "admin_auth": 1 if admin_auth else 0,
+            "stages": len([stage for stage in stages if isinstance(stage, dict)]),
         },
         "sqlite_counts": {
             "game_state": len(loaded_game_state),
             "positions": len(loaded_positions),
             "events": len(loaded_events),
+            "config": 1 if loaded_config else 0,
+            "admin_auth": 1 if loaded_admin_auth else 0,
+            "stages": len(loaded_stages),
         },
         "event_errors": event_errors,
     }

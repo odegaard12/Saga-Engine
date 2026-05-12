@@ -12,10 +12,11 @@ from backend.app.storage.positions_store import (
 
 def test_positions_store_defaults_to_json_backend(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("SAGA_STORAGE_BACKEND", raising=False)
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "positions.json"
 
-    assert resolve_positions_storage_backend() == "json"
-    assert resolve_positions_db_path(str(target)) == str(target)
+    assert resolve_positions_storage_backend() == "sqlite"
+    assert resolve_positions_db_path(str(target)) == str(tmp_path / "saga.sqlite3")
 
     upsert_live_position(
         str(target),
@@ -32,7 +33,7 @@ def test_positions_store_defaults_to_json_backend(monkeypatch, tmp_path: Path):
 
     state = load_live_positions_state(str(target))
 
-    assert target.exists()
+    assert (tmp_path / "saga.sqlite3").exists()
     assert state["PLAYER 1"]["gps_status"] == "ok"
     assert state["PLAYER 1"]["lat"] == 42.1
     assert state["PLAYER 1"]["debug_enabled"] is True
@@ -40,9 +41,10 @@ def test_positions_store_defaults_to_json_backend(monkeypatch, tmp_path: Path):
 
 def test_positions_store_unknown_backend_falls_back_to_json(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("SAGA_STORAGE_BACKEND", "unknown")
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "positions.json"
 
-    assert resolve_positions_storage_backend() == "json"
+    assert resolve_positions_storage_backend() == "sqlite"
 
     save_live_positions_state(
         str(target),
@@ -140,8 +142,8 @@ def test_positions_store_remove_position_in_sqlite_and_json(monkeypatch, tmp_pat
 
     assert list(sqlite_state.keys()) == ["PLAYER 2"]
 
-    json_target = tmp_path / "positions.json"
     monkeypatch.setenv("SAGA_STORAGE_BACKEND", "json")
+    json_target = tmp_path / "positions.json"
 
     upsert_live_position(str(json_target), "PLAYER 1", {"last_seen": 1, "gps_status": "ok"})
     json_state = remove_live_position(str(json_target), "PLAYER 1")

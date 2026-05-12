@@ -13,7 +13,7 @@ import secrets
 import time
 from typing import Any
 
-from backend.app.storage.json_store import load_json, save_json
+from backend.app.storage.runtime_store import load_document, save_document
 
 
 def now_ts() -> int:
@@ -36,12 +36,12 @@ def hash_password(password: str, salt: str | None = None, iterations: int = 2000
 
 
 def load_admin_auth(path: str) -> dict[str, Any]:
-    data = load_json(path, {})
+    data = load_document(path, 'admin_auth', {})
     return data if isinstance(data, dict) else {}
 
 
 def save_admin_auth(path: str, data: dict[str, Any]) -> None:
-    save_json(path, data)
+    save_document(path, 'admin_auth', data)
 
 
 def verify_admin_password(path: str, password: str | None) -> bool:

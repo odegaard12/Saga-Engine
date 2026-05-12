@@ -14,22 +14,24 @@ from backend.app.storage.game_state_store import (
 
 def test_game_state_store_defaults_to_json_backend(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("SAGA_STORAGE_BACKEND", raising=False)
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "gamestate.json"
 
-    assert resolve_game_state_backend() == "json"
-    assert resolve_game_state_db_path(str(target)) == str(target)
+    assert resolve_game_state_backend() == "sqlite"
+    assert resolve_game_state_db_path(str(target)) == str(tmp_path / "saga.sqlite3")
 
     set_player_level(str(target), "PLAYER 1", 3)
 
-    assert target.exists()
+    assert (tmp_path / "saga.sqlite3").exists()
     assert get_player_level(str(target), "PLAYER 1") == 3
 
 
 def test_game_state_store_unknown_backend_falls_back_to_json(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("SAGA_STORAGE_BACKEND", "unknown")
+    monkeypatch.setenv("SAGA_SQLITE_DB", str(tmp_path / "saga.sqlite3"))
     target = tmp_path / "gamestate.json"
 
-    assert resolve_game_state_backend() == "json"
+    assert resolve_game_state_backend() == "sqlite"
 
     set_player_level(str(target), "PLAYER 1", 2)
 
@@ -88,7 +90,6 @@ def test_game_state_store_reset_and_advance_sqlite(monkeypatch, tmp_path: Path):
 
 
 def test_game_state_store_json_reset_and_advance(monkeypatch, tmp_path: Path):
-    monkeypatch.setenv("SAGA_STORAGE_BACKEND", "json")
     target = tmp_path / "gamestate.json"
 
     set_player_level(str(target), "PLAYER 1", 1)
