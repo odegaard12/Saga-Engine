@@ -1,4 +1,5 @@
-import type { PlayerGamePayload, PublicConfig } from '../../types/player'
+import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
+import { loadInventorySnapshot, markInventoryItemUsed } from './inventory'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -235,22 +236,33 @@ export async function syncPendingOfflineEvents(user: string) {
       throw new Error('Sync failed: backend rejected the event queue.')
     }
 
+    let syncedCount = 0
+    let failedCount = 0
+
     await Promise.all(
-      syncing.map((event, index) =>
-        updateOfflineEvent({
+      syncing.map((event, index) => {
+        const backendEvent = payload.events?.[index]
+        const backendStatus = String(backendEvent?.status || '').toLowerCase()
+        const isSynced = !backendStatus || ['pending', 'synced', 'ok', 'applied'].includes(backendStatus)
+
+        if (isSynced) syncedCount += 1
+        else failedCount += 1
+
+        return updateOfflineEvent({
           ...event,
-          status: 'synced',
-          backend_event_id: payload.events?.[index]?.id,
-          last_error: undefined,
+          status: isSynced ? 'synced' : 'failed',
+          backend_event_id: backendEvent?.id,
+          last_error: isSynced ? undefined : backendStatus || 'Backend did not accept this event.',
         })
-      )
+      })
     )
 
     return {
-      status: 'ok' as const,
+      status: failedCount ? 'error' as const : 'ok' as const,
       attempted: syncing.length,
-      synced: syncing.length,
-      failed: 0,
+      synced: syncedCount,
+      failed: failedCount,
+      message: failedCount ? `${failedCount} offline event(s) need review.` : undefined,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown sync error'
@@ -376,5 +388,159 @@ export async function getOfflineMissionSummary(user: string): Promise<OfflineMis
     finished: progress?.finished ?? pack?.finished ?? false,
     pendingEvents,
     lastProgressAt: progress?.updated_at,
+  }
+}
+
+
+function cleanCode(value: unknown) {
+  return String(value || '').trim().toUpperCase()
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function readStageConfig(stage: PlayerStage | null): Record<string, unknown> {
+  const raw = asRecord(stage)
+  return {
+    ...asRecord(raw.config),
+    ...asRecord(asRecord(raw.minigame).config),
+  }
+}
+
+function stageAcceptsLocalCode(stage: PlayerStage | null, code: string) {
+  const submitted = cleanCode(code)
+  if (!stage || !submitted) return false
+
+  const raw = asRecord(stage)
+  const success = asRecord(raw.success)
+  const conditions = Array.isArray(success.conditions) ? success.conditions : []
+
+  for (const condition of conditions) {
+    const expected = cleanCode(asRecord(condition).value)
+    if (expected && expected === submitted) return true
+  }
+
+  const config = readStageConfig(stage)
+  for (const key of ['answer', 'rune', 'code', 'success_code']) {
+    const expected = cleanCode(config[key])
+    if (expected && expected === submitted) return true
+  }
+
+  return submitted === 'OK'
+}
+
+function readLocalRequirement(stage: PlayerStage | null) {
+  if (!stage) return null
+
+  const raw = asRecord(stage)
+  const requirements = asRecord(raw.requirements)
+  const items = Array.isArray(requirements.items) ? requirements.items : []
+  const first = asRecord(items[0])
+  const config = readStageConfig(stage)
+
+  const itemId = String(first.item_id || first.required_item_id || config.required_item_id || '').trim()
+  const label = String(first.label || first.required_item_label || config.required_item_label || itemId).trim()
+  const quantityRaw = first.quantity || first.required_item_quantity || config.required_item_quantity || 1
+  const quantity = Number.isFinite(Number(quantityRaw)) ? Math.max(1, Math.floor(Number(quantityRaw))) : 1
+  const consumeRaw = first.consume ?? first.required_item_consume ?? config.required_item_consume
+  const consume = consumeRaw === true || String(consumeRaw || '').toLowerCase() === 'true'
+
+  if (!itemId) return null
+  return { itemId, label, quantity, consume }
+}
+
+function countOwnedLocalItems(user: string, itemId: string) {
+  return loadInventorySnapshot(user).items
+    .filter((item) => item.item_id === itemId && item.state !== 'used')
+    .reduce((total, item) => total + Math.max(0, item.quantity || 0), 0)
+}
+
+function buildPayloadWithLocalLevel(payload: PlayerGamePayload, nextLevel: number): PlayerGamePayload {
+  const stages = Array.isArray(payload.stages) ? payload.stages : []
+  const finished = nextLevel >= stages.length
+
+  return {
+    ...payload,
+    level: nextLevel,
+    finished,
+    current_stage: finished ? null : stages[nextLevel] || null,
+  }
+}
+
+async function saveMissionPackPayloadProgress(payload: PlayerGamePayload) {
+  const existing = await getStoredMissionPack(payload.user)
+  const pack: MissionPack = existing
+    ? {
+        ...existing,
+        payload,
+        current_level: payload.level || 0,
+        finished: Boolean(payload.finished),
+        stage_count: Array.isArray(payload.stages) ? payload.stages.length : existing.stage_count,
+      }
+    : buildMissionPack({
+        user: payload.user,
+        config: {} as PublicConfig,
+        payload,
+      })
+
+  await writeRecord(STORE_MISSION_PACKS, pack)
+  await saveLocalProgressSnapshot(payload)
+  return pack
+}
+
+export async function advanceLocalProgress(args: {
+  payload: PlayerGamePayload
+  currentStage: PlayerStage | null
+  code: string
+}) {
+  const payload = args.payload
+  const stage = args.currentStage
+  const code = cleanCode(args.code)
+
+  if (!stage) return { ok: false as const, reason: 'missing_stage' }
+  if (!stageAcceptsLocalCode(stage, code)) return { ok: false as const, reason: 'invalid_code' }
+
+  const requirement = readLocalRequirement(stage)
+  const owned = requirement ? countOwnedLocalItems(payload.user, requirement.itemId) : 0
+
+  if (requirement && owned < requirement.quantity) {
+    return {
+      ok: false as const,
+      reason: 'missing_required_item',
+      requirement: { ...requirement, owned, ok: false },
+    }
+  }
+
+  if (requirement?.consume) {
+    markInventoryItemUsed(payload.user, requirement.itemId, requirement.quantity)
+  }
+
+  const currentLevel = Math.max(0, Number(payload.level || 0))
+  const nextPayload = buildPayloadWithLocalLevel(payload, currentLevel + 1)
+
+  await queueOfflineEvent({
+    user: payload.user,
+    type: 'node_completed',
+    source: 'offline_queue',
+    node_id: stage.id,
+    payload: {
+      code,
+      local_progress: true,
+      stage_title: stage.title,
+      level_before: currentLevel,
+      level_after: currentLevel + 1,
+      requirement: requirement ? { ...requirement, owned, ok: true } : { required: false, ok: true },
+    },
+  })
+
+  await saveMissionPackPayloadProgress(nextPayload)
+
+  return {
+    ok: true as const,
+    payload: nextPayload,
+    requirement: requirement ? { ...requirement, owned, ok: true } : null,
   }
 }

@@ -3,6 +3,8 @@ import type { PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../type
 type AdvanceResponse = {
   status: 'ok' | 'fail'
   user: string
+  reason?: string
+  requirement?: Record<string, unknown>
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -22,8 +24,12 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function fetchPlayerGame(user: string): Promise<PlayerGamePayload> {
-  const res = await fetch(`/api/game/${encodeURIComponent(user)}`, {
+export async function fetchPlayerGame(
+  user: string,
+  options: { offlinePack?: boolean } = {},
+): Promise<PlayerGamePayload> {
+  const suffix = options.offlinePack ? '?offline_pack=true' : ''
+  const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
     headers: {
       Accept: 'application/json',
     },
