@@ -15,28 +15,28 @@ interface InventoryPanelProps {
 function itemSubtitle(item: InventoryItem): string {
   const parts = [
     item.source ? String(item.source).toUpperCase() : '',
-    item.node_id ? `NODE ${item.node_id}` : '',
+    item.node_id ? `Nodo ${item.node_id}` : '',
     item.physical_id ? `ID ${item.physical_id}` : '',
   ].filter(Boolean)
 
-  return parts.length ? parts.join(' · ') : 'Local item'
+  return parts.length ? parts.join(' · ') : 'Objeto local'
 }
 
 function getUpdatedLabel(value?: string): string {
-  if (!value) return 'not synced'
+  if (!value) return 'sin sincronizar'
 
   const timestamp = Date.parse(value)
-  if (!Number.isFinite(timestamp)) return 'updated'
+  if (!Number.isFinite(timestamp)) return 'actualizado'
 
   const ageSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
-  if (ageSeconds < 10) return 'updated now'
-  if (ageSeconds < 60) return `updated ${ageSeconds}s ago`
+  if (ageSeconds < 10) return 'actualizado ahora'
+  if (ageSeconds < 60) return `actualizado hace ${ageSeconds}s`
 
   const ageMinutes = Math.round(ageSeconds / 60)
-  if (ageMinutes < 60) return `updated ${ageMinutes}m ago`
+  if (ageMinutes < 60) return `actualizado hace ${ageMinutes}m`
 
   const ageHours = Math.round(ageMinutes / 60)
-  return `updated ${ageHours}h ago`
+  return `actualizado hace ${ageHours}h`
 }
 
 export function InventoryPanel({ user }: InventoryPanelProps) {
@@ -86,47 +86,65 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
     <section style={panel}>
       <div style={headerRow}>
         <div>
-          <div style={eyebrow}>Inventory</div>
-          <div style={title}>{totalItems} item{totalItems === 1 ? '' : 's'}</div>
+          <div style={eyebrow}>Coleccionables</div>
+          <div style={title}>
+            {totalItems} objeto{totalItems === 1 ? '' : 's'}
+          </div>
         </div>
-        <div style={statusPill}>{snapshot.items.length ? 'LOCAL' : 'EMPTY'}</div>
+        <div style={statusPill}>{snapshot.items.length ? 'MOCHILA' : 'VACÍO'}</div>
       </div>
 
       {visibleItems.length ? (
-        <div style={itemList}>
-          {visibleItems.map((item) => (
-            <div key={item.item_id} style={itemRow}>
-              <div style={itemMain}>
-                <div style={itemLabel}>
-                  {item.label}
-                  {item.quantity > 1 ? <span style={quantity}>×{item.quantity}</span> : null}
+        <div style={slotGrid}>
+          {visibleItems.map((item) => {
+            const usable = item.state !== 'used' && item.quantity > 0
+
+            return (
+              <div key={item.item_id} style={usable ? slotCard : slotCardUsed}>
+                <div style={slotIcon}>{usable ? '◆' : '✓'}</div>
+                <div style={slotBody}>
+                  <div style={itemLabel}>
+                    {item.label}
+                    {item.quantity > 1 ? <span style={quantity}>×{item.quantity}</span> : null}
+                  </div>
+                  <div style={itemMeta}>{itemSubtitle(item)}</div>
                 </div>
-                <div style={itemMeta}>{itemSubtitle(item)}</div>
+                <button
+                  type="button"
+                  style={usable ? useButton : useButtonDisabled}
+                  disabled={!usable}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    if (usable) useItem(item)
+                  }}
+                >
+                  {usable ? 'Usar' : 'Usado'}
+                </button>
               </div>
-              <div style={itemActions}>
-                <div style={itemState}>{item.state}</div>
-                {item.state !== 'used' && item.quantity > 0 ? (
-                  <button
-                    type="button"
-                    style={useButton}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      useItem(item)
-                    }}
-                  >
-                    Use
-                  </button>
-                ) : null}
-              </div>
+            )
+          })}
+
+          {Array.from({ length: Math.max(0, 4 - visibleItems.length) }).map((_, index) => (
+            <div key={`empty-${index}`} style={emptySlot}>
+              <div style={emptySlotIcon}>＋</div>
+              <div style={emptySlotText}>Hueco libre</div>
             </div>
           ))}
         </div>
       ) : (
-        <div style={emptyText}>No local items yet. QR/NFC/manual item collection can fill this panel next.</div>
+        <div style={emptyGrid}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} style={emptySlot}>
+              <div style={emptySlotIcon}>＋</div>
+              <div style={emptySlotText}>Hueco libre</div>
+            </div>
+          ))}
+          <div style={emptyText}>Aún no hay coleccionables. Usa QR, NFC o recogida manual para llenar la mochila.</div>
+        </div>
       )}
 
-      <div style={footerText}>{getUpdatedLabel(snapshot.updated_at)} · local-first gameplay state</div>
+      <div style={footerText}>{getUpdatedLabel(snapshot.updated_at)} · estado local del juego</div>
     </section>
   )
 }
@@ -176,25 +194,47 @@ const statusPill: CSSProperties = {
   letterSpacing: '0.10em',
 }
 
-const itemList: CSSProperties = {
+const slotGrid: CSSProperties = {
   display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
 }
 
-const itemRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(15,23,42,.22)',
-  padding: '9px 10px',
+const slotCard: CSSProperties = {
+  minHeight: 112,
+  display: 'grid',
+  gridTemplateRows: 'auto 1fr auto',
+  gap: 7,
+  borderRadius: 16,
+  border: '1px solid rgba(187,247,208,.18)',
+  background: 'linear-gradient(180deg, rgba(34,197,94,.12), rgba(15,23,42,.24))',
+  padding: 10,
 }
 
-const itemMain: CSSProperties = {
+const slotCardUsed: CSSProperties = {
+  ...slotCard,
+  opacity: 0.62,
+  border: '1px solid rgba(148,163,184,.16)',
+  background: 'rgba(15,23,42,.22)',
+}
+
+const slotIcon: CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 12,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(255,255,255,.10)',
+  color: '#bbf7d0',
+  fontSize: 14,
+  fontWeight: 900,
+}
+
+const slotBody: CSSProperties = {
   minWidth: 0,
   display: 'grid',
+  alignContent: 'start',
   gap: 3,
 }
 
@@ -223,28 +263,12 @@ const itemMeta: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-const itemState: CSSProperties = {
-  flex: '0 0 auto',
-  color: '#c4b5fd',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const itemActions: CSSProperties = {
-  flex: '0 0 auto',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 7,
-}
-
 const useButton: CSSProperties = {
-  minHeight: 28,
-  padding: '0 9px',
+  minHeight: 30,
+  padding: '0 10px',
   borderRadius: 999,
-  border: '1px solid rgba(34,197,94,.20)',
-  background: 'rgba(34,197,94,.13)',
+  border: '1px solid rgba(34,197,94,.22)',
+  background: 'rgba(34,197,94,.16)',
   color: '#bbf7d0',
   fontSize: 10,
   fontWeight: 900,
@@ -252,7 +276,46 @@ const useButton: CSSProperties = {
   textTransform: 'uppercase',
 }
 
+const useButtonDisabled: CSSProperties = {
+  ...useButton,
+  border: '1px solid rgba(148,163,184,.14)',
+  background: 'rgba(148,163,184,.10)',
+  color: 'rgba(226,232,240,.54)',
+}
+
+const emptyGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+}
+
+const emptySlot: CSSProperties = {
+  minHeight: 92,
+  display: 'grid',
+  placeItems: 'center',
+  gap: 4,
+  borderRadius: 16,
+  border: '1px dashed rgba(226,232,240,.18)',
+  background: 'rgba(15,23,42,.16)',
+  color: 'rgba(226,232,240,.52)',
+  textAlign: 'center',
+}
+
+const emptySlotIcon: CSSProperties = {
+  fontSize: 18,
+  fontWeight: 900,
+  opacity: 0.72,
+}
+
+const emptySlotText: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
 const emptyText: CSSProperties = {
+  gridColumn: '1 / -1',
   color: 'rgba(226,232,240,.74)',
   fontSize: 12,
   lineHeight: 1.45,

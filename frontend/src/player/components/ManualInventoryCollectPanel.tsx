@@ -10,13 +10,22 @@ type ParsedItemCode = {
   label: string
 }
 
+const QUICK_ITEMS = [
+  { code: 'ITEM:llave:Llave azul', label: 'Llave azul' },
+  { code: 'ITEM:pista:Pista encontrada', label: 'Pista' },
+  { code: 'ITEM:moneda:Moneda antigua', label: 'Moneda' },
+]
+
 function parseItemCode(value: string): ParsedItemCode | null {
   const clean = value.trim()
   if (!clean) return null
 
   const normalized = clean.replace(/^item\s*:/i, 'ITEM:')
   if (!normalized.toUpperCase().startsWith('ITEM:')) {
-    return null
+    return {
+      item_id: clean.slice(0, 80),
+      label: clean.slice(0, 120),
+    }
   }
 
   const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
@@ -33,15 +42,15 @@ function parseItemCode(value: string): ParsedItemCode | null {
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [code, setCode] = useState('')
-  const [message, setMessage] = useState('Usa ITEM:id o ITEM:id:Etiqueta')
+  const [message, setMessage] = useState('Escribe un nombre o pega un código ITEM:id:Etiqueta.')
   const [saved, setSaved] = useState(false)
 
-  function submitItemCode() {
-    const parsed = parseItemCode(code)
+  function submitItemCode(value = code) {
+    const parsed = parseItemCode(value)
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Formato: ITEM:id o ITEM:id:Etiqueta')
+      setMessage('Escribe un objeto o usa formato ITEM:id:Etiqueta.')
       return
     }
 
@@ -60,18 +69,31 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
       setCode('')
       setSaved(true)
-      setMessage(`Objeto recogido: ${parsed.label} · ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto local`)
+      setMessage(`Añadido: ${parsed.label} · ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
     } catch {
       setSaved(false)
-      setMessage('No se pudo guardar el objeto en este dispositivo')
+      setMessage('No se pudo guardar el objeto en este dispositivo.')
     }
   }
 
   return (
     <section style={panel}>
       <div>
-        <div style={eyebrow}>Objeto manual</div>
-        <div style={title}>Recoger objeto local</div>
+        <div style={eyebrow}>Coger objeto</div>
+        <div style={title}>Añadir coleccionable manual</div>
+      </div>
+
+      <div style={quickGrid}>
+        {QUICK_ITEMS.map((item) => (
+          <button
+            key={item.code}
+            type="button"
+            style={quickButton}
+            onClick={() => submitItemCode(item.code)}
+          >
+            + {item.label}
+          </button>
+        ))}
       </div>
 
       <div style={inputRow}>
@@ -87,7 +109,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
               submitItemCode()
             }
           }}
-          placeholder="ITEM:llave:Llave azul"
+          placeholder="Ej: Llave azul"
           style={input}
         />
         <button
@@ -104,11 +126,12 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
       </div>
 
       <div style={saved ? okText : helpText}>{message}</div>
+      <div style={formatHint}>Formato avanzado: ITEM:llave:Llave azul</div>
     </section>
   )
 }
 
-const panel: CSSProperties = {
+const panel: React.CSSProperties = {
   display: 'grid',
   gap: 10,
   borderRadius: 18,
@@ -117,7 +140,7 @@ const panel: CSSProperties = {
   padding: 12,
 }
 
-const eyebrow: CSSProperties = {
+const eyebrow: React.CSSProperties = {
   color: '#fde68a',
   fontSize: 10,
   fontWeight: 900,
@@ -125,20 +148,36 @@ const eyebrow: CSSProperties = {
   textTransform: 'uppercase',
 }
 
-const title: CSSProperties = {
+const title: React.CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
   fontSize: 13,
   fontWeight: 900,
 }
 
-const inputRow: CSSProperties = {
+const quickGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 7,
+}
+
+const quickButton: React.CSSProperties = {
+  minHeight: 34,
+  borderRadius: 14,
+  border: '1px solid rgba(250,204,21,.18)',
+  background: 'rgba(250,204,21,.10)',
+  color: '#fef9c3',
+  fontSize: 10,
+  fontWeight: 900,
+}
+
+const inputRow: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr auto',
   gap: 8,
 }
 
-const input: CSSProperties = {
+const input: React.CSSProperties = {
   width: '100%',
   minWidth: 0,
   borderRadius: 14,
@@ -151,7 +190,7 @@ const input: CSSProperties = {
   outline: 'none',
 }
 
-const button: CSSProperties = {
+const button: React.CSSProperties = {
   minHeight: 38,
   padding: '0 12px',
   borderRadius: 14,
@@ -164,14 +203,20 @@ const button: CSSProperties = {
   textTransform: 'uppercase',
 }
 
-const helpText: CSSProperties = {
+const helpText: React.CSSProperties = {
   color: 'rgba(226,232,240,.66)',
   fontSize: 11,
   lineHeight: 1.4,
 }
 
-const okText: CSSProperties = {
+const okText: React.CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
   fontWeight: 900,
+}
+
+const formatHint: React.CSSProperties = {
+  color: 'rgba(226,232,240,.44)',
+  fontSize: 10,
+  fontWeight: 800,
 }

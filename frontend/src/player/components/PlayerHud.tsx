@@ -8,6 +8,8 @@ import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 
+type BackpackTab = 'requirements' | 'inventory' | 'collect'
+
 interface PlayerHudProps {
   user: string
   missionPayload: PlayerGamePayload
@@ -33,15 +35,16 @@ interface PlayerHudProps {
   onOpenTools: () => void
   onCloseTools: () => void
   onToggleDebug: () => void
+  onRequestGps: () => void
 }
 
 function getGpsDisplay(gpsState: string): string {
   const value = String(gpsState || 'unknown').toLowerCase()
-  if (value === 'ready') return 'GPS LIVE'
-  if (value === 'stale') return 'LAST KNOWN'
-  if (value === 'searching') return 'SEARCHING'
-  if (value === 'error') return 'GPS ERROR'
-  return 'NO GPS'
+  if (value === 'ready') return 'GPS ACTIVO'
+  if (value === 'stale') return 'ÚLTIMA POS.'
+  if (value === 'searching') return 'BUSCANDO GPS'
+  if (value === 'error') return 'ERROR GPS'
+  return 'SIN GPS'
 }
 
 function getRangeDisplay(
@@ -49,10 +52,10 @@ function getRangeDisplay(
   distanceMeters: number | null,
   inRange: boolean
 ): string {
-  if (finished) return 'COMPLETE'
-  if (distanceMeters === null) return 'NO RANGE'
-  if (inRange) return `${distanceMeters}M IN`
-  return `${distanceMeters}M AWAY`
+  if (finished) return 'COMPLETADO'
+  if (distanceMeters === null) return 'SIN DISTANCIA'
+  if (inRange) return `${distanceMeters} M DENTRO`
+  return `${distanceMeters} M`
 }
 
 export function PlayerHud({
@@ -66,9 +69,7 @@ export function PlayerHud({
   debugEnabled,
   followPlayer,
   toolsOpen,
-  playerHref,
   loginHref,
-  adminHref,
   primaryLabel,
   primaryTone,
   primaryDisabled,
@@ -79,8 +80,10 @@ export function PlayerHud({
   onOpenTools,
   onCloseTools,
   onToggleDebug,
+  onRequestGps,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
+  const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
 
   useEffect(() => {
     const handleLocaleChange = () => setLocaleState(getLocale())
@@ -98,6 +101,15 @@ export function PlayerHud({
 
   const gpsDisplay = getGpsDisplay(gpsState)
   const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
+  const distanceLabel = distanceMeters !== null ? `${distanceMeters} m` : null
+  const radiusLabel =
+    typeof currentStage?.radius === 'number' ? `Radio ${currentStage.radius} m.` : ''
+  const helperCopy =
+    finished
+      ? 'Nodo completado.'
+      : inRange
+        ? `${radiusLabel} Ya puedes abrir este nodo.`
+        : `${radiusLabel} Acércate para abrir este nodo.`
 
   return (
     <>
@@ -105,21 +117,9 @@ export function PlayerHud({
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
-          padding: compact ? 14 : 16,
+          padding: compact ? 12 : 14,
         }}
       >
-        <div style={eyebrow}>MISSION</div>
-
-        <div style={{ ...title, fontSize: compact ? 18 : 22 }}>
-          {finished ? 'Mission complete' : currentStage?.title || 'Awaiting node'}
-        </div>
-
-        <div style={chipRow}>
-          <span style={chip}>{rangeDisplay}</span>
-          {followPlayer ? <span style={chipInfo}>FOLLOW</span> : null}
-          {debugEnabled ? <span style={chipDebug}>DEBUG</span> : null}
-          {!debugEnabled ? <span style={chipMuted}>{gpsDisplay}</span> : null}
-        </div>
 
         <button
           type="button"
@@ -127,33 +127,12 @@ export function PlayerHud({
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
         >
-          {primaryLabel}
+          {!finished && !inRange && distanceLabel
+            ? `${primaryLabel} · ${distanceLabel}`
+            : primaryLabel}
         </button>
 
-        <div style={helper}>{helperText}</div>
-
-        {detailsOpen ? (
-          <div style={detailsCard}>
-            <div style={detailRow}>
-              <span style={detailLabel}>Node</span>
-              <span style={detailValue}>{currentStage?.title || '—'}</span>
-            </div>
-            <div style={detailRow}>
-              <span style={detailLabel}>Radius</span>
-              <span style={detailValue}>
-                {typeof currentStage?.radius === 'number' ? `${currentStage.radius} m` : '—'}
-              </span>
-            </div>
-            <div style={detailRow}>
-              <span style={detailLabel}>GPS</span>
-              <span style={detailValue}>{gpsDisplay}</span>
-            </div>
-            <div style={detailRow}>
-              <span style={detailLabel}>Range</span>
-              <span style={detailValue}>{rangeDisplay}</span>
-            </div>
-          </div>
-        ) : null}
+        <div style={helper}>{helperCopy}</div>
 
         <div style={actionRow}>
           <button
@@ -161,7 +140,7 @@ export function PlayerHud({
             style={detailsOpen ? ghostButtonActive : ghostButton}
             onClick={onToggleDetails}
           >
-            {detailsOpen ? t('player.hud.hideDetails', locale) : t('player.hud.details', locale)}
+            {detailsOpen ? 'Cerrar mochila' : 'Mochila'}
           </button>
 
           <button
@@ -169,10 +148,85 @@ export function PlayerHud({
             style={toolsOpen ? ghostButtonActive : ghostButton}
             onClick={onOpenTools}
           >
-            {toolsOpen ? t('player.tools.close', locale) : t('player.tools.button', locale)}
+            {toolsOpen ? t('player.tools.close', locale) : 'Herramientas'}
           </button>
         </div>
       </section>
+
+      {detailsOpen ? (
+        <div style={sheetOverlay}>
+          <div style={sheetBackdrop} onClick={onToggleDetails} />
+
+          <aside
+            style={{
+              ...sheet,
+              width: compact ? '100%' : 'min(100%, 480px)',
+            }}
+            aria-modal="true"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={sheetHeader}>
+              <div>
+                <div style={sheetEyebrow}>MOCHILA</div>
+                <div style={sheetTitle}>Objetos, requisitos y coleccionables</div>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Cerrar mochila"
+                style={closeButton}
+                onClick={onToggleDetails}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={tabs}>
+              <button
+                type="button"
+                style={backpackTab === 'requirements' ? tabActive : tabButton}
+                onClick={() => setBackpackTab('requirements')}
+              >
+                Requisitos
+              </button>
+              <button
+                type="button"
+                style={backpackTab === 'inventory' ? tabActive : tabButton}
+                onClick={() => setBackpackTab('inventory')}
+              >
+                Inventario
+              </button>
+              <button
+                type="button"
+                style={backpackTab === 'collect' ? tabActive : tabButton}
+                onClick={() => setBackpackTab('collect')}
+              >
+                Coger
+              </button>
+            </div>
+
+            <div style={statusRow}>
+              <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
+              <span>{typeof currentStage?.radius === 'number' ? `Radio ${currentStage.radius} m` : 'Sin radio'}</span>
+            </div>
+
+            <div style={tabPanel}>
+              {backpackTab === 'requirements' ? (
+                <RequirementPreviewPanel user={user} stage={currentStage} />
+              ) : null}
+
+              {backpackTab === 'inventory' ? (
+                <InventoryPanel user={user} />
+              ) : null}
+
+              {backpackTab === 'collect' ? (
+                <ManualInventoryCollectPanel user={user} />
+              ) : null}
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       {toolsOpen ? (
         <div style={toolsOverlay}>
@@ -189,13 +243,13 @@ export function PlayerHud({
           >
             <div style={toolsHeader}>
               <div>
-                <div style={toolsTitle}>{t('player.tools.title', locale)}</div>
-                <div style={toolsSubtitle}>{t('player.tools.subtitle', locale)}</div>
+                <div style={toolsTitle}>Herramientas</div>
+                <div style={toolsSubtitle}>Offline, sync, idioma y soporte</div>
               </div>
 
               <button
                 type="button"
-                aria-label="Close tools"
+                aria-label="Cerrar herramientas"
                 style={closeButton}
                 onClick={(event) => {
                   event.preventDefault()
@@ -208,29 +262,36 @@ export function PlayerHud({
             </div>
 
             <MissionPackPanel user={user} payload={missionPayload} />
-          <div className="saga-tools-language-row">
-            <span>{t('common.language', locale)}</span>
+            <OfflineSyncPanel user={user} />
+
+            <div className="saga-tools-language-row">
+              <span>{t('common.language', locale)}</span>
+              <button
+                type="button"
+                className={locale === 'en' ? 'active' : ''}
+                onClick={() => chooseLocale('en')}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                className={locale === 'es' ? 'active' : ''}
+                onClick={() => chooseLocale('es')}
+              >
+                ES
+              </button>
+            </div>
+
             <button
               type="button"
-              className={locale === 'en' ? 'active' : ''}
-              onClick={() => chooseLocale('en')}
+              style={toolsButton}
+              onClick={() => {
+                onRequestGps()
+                onCloseTools()
+              }}
             >
-              EN
+              Reactivar / centrar GPS
             </button>
-            <button
-              type="button"
-              className={locale === 'es' ? 'active' : ''}
-              onClick={() => chooseLocale('es')}
-            >
-              ES
-            </button>
-          </div>
-
-          <RequirementPreviewPanel user={user} stage={currentStage} />
-
-          <OfflineSyncPanel user={user} />
-          <InventoryPanel user={user} />
-          <ManualInventoryCollectPanel user={user} />
 
             <button
               type="button"
@@ -240,31 +301,15 @@ export function PlayerHud({
                 onCloseTools()
               }}
             >
-              {debugEnabled ? t('player.tools.disableDebug', locale) : t('player.tools.enableDebug', locale)}
+              {debugEnabled ? 'Desactivar debug GPS' : 'Activar debug GPS'}
             </button>
-
-            <a
-              href={adminHref}
-              style={toolsLink}
-              onClick={onCloseTools}
-            >
-              Admin
-            </a>
 
             <a
               href={loginHref}
               style={toolsLink}
               onClick={onCloseTools}
             >
-              Mission entry
-            </a>
-
-            <a
-              href={playerHref}
-              style={toolsLinkMuted}
-              onClick={onCloseTools}
-            >
-              Classic runtime
+              Login
             </a>
           </aside>
         </div>
@@ -324,7 +369,7 @@ const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
   display: 'grid',
-  gap: 12,
+  gap: 10,
   borderRadius: 28,
   background:
     'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
@@ -410,38 +455,6 @@ const helper: CSSProperties = {
   fontSize: 13,
   lineHeight: 1.45,
 }
-
-const detailsCard: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  borderRadius: 18,
-  padding: 12,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.08)',
-}
-
-const detailRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-}
-
-const detailLabel: CSSProperties = {
-  color: 'rgba(255,255,255,.68)',
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
-
-const detailValue: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 12,
-  fontWeight: 800,
-  textAlign: 'right',
-}
-
 const actionRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -468,66 +481,139 @@ const ghostButtonActive: CSSProperties = {
   color: '#dbeafe',
 }
 
-const toolsOverlay: CSSProperties = {
+const sheetOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 4000,
+  zIndex: 3900,
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
   padding: 'calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
-const toolsBackdrop: CSSProperties = {
+
+const sheetBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  background: 'rgba(2,6,23,.28)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
 }
 
-const toolsSheet: CSSProperties = {
+const sheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(560px, calc(100vw - 24px))',
-  maxHeight: 'min(82dvh, 760px)',
+  maxHeight: 'min(72dvh, 680px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.14)',
   background:
-    'linear-gradient(180deg, rgba(13,23,42,.86), rgba(20,32,58,.78))',
+    'linear-gradient(180deg, rgba(13,23,42,.92), rgba(20,32,58,.84))',
   boxShadow:
     '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
   padding: '16px 16px calc(18px + env(safe-area-inset-bottom, 0px))',
   display: 'grid',
-  gap: 12,
+  gap: 10,
   pointerEvents: 'auto',
   color: '#f8fafc',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
 }
 
-const toolsHeader: CSSProperties = {
+const sheetHeader: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 12,
 }
 
-const toolsTitle: CSSProperties = {
+const sheetEyebrow: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+}
+
+const sheetTitle: CSSProperties = {
+  marginTop: 4,
   color: '#ffffff',
-  fontSize: 22,
+  fontSize: 20,
   fontWeight: 900,
   lineHeight: 1,
   letterSpacing: '-0.03em',
 }
+
+const tabs: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 6,
+  padding: 4,
+  borderRadius: 18,
+  background: 'rgba(15,23,42,.34)',
+  border: '1px solid rgba(255,255,255,.08)',
+}
+
+const tabButton: CSSProperties = {
+  minHeight: 38,
+  border: 'none',
+  borderRadius: 14,
+  background: 'transparent',
+  color: 'rgba(226,232,240,.70)',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+}
+
+const tabActive: CSSProperties = {
+  ...tabButton,
+  background: 'rgba(187,247,208,.18)',
+  color: '#dcfce7',
+  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.16)',
+}
+
+const statusRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  padding: '8px 10px',
+  borderRadius: 16,
+  background: 'rgba(255,255,255,.07)',
+  color: 'rgba(226,232,240,.82)',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+}
+
+const tabPanel: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const toolsOverlay: CSSProperties = {
+  ...sheetOverlay,
+  zIndex: 4000,
+}
+
+const toolsBackdrop: CSSProperties = sheetBackdrop
+
+const toolsSheet: CSSProperties = sheet
+
+const toolsHeader: CSSProperties = sheetHeader
+
+const toolsTitle: CSSProperties = sheetTitle
+
 const toolsSubtitle: CSSProperties = {
   color: 'rgba(226,232,240,.68)',
   fontSize: 12,
   lineHeight: 1.35,
   marginTop: 4,
 }
+
 const closeButton: CSSProperties = {
   width: 38,
   height: 38,
@@ -572,9 +658,4 @@ const toolsLink: CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   textDecoration: 'none',
-}
-
-const toolsLinkMuted: CSSProperties = {
-  ...toolsLink,
-  color: 'rgba(226,232,240,.82)',
 }

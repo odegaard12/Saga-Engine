@@ -426,6 +426,7 @@ VALID_HEARTBEAT_SOURCES = {
     "device",
     "react",
     "pwa",
+    "browser_gps",
 }
 
 def get_heartbeat_client_ip(request: Request):
@@ -851,6 +852,8 @@ APP_DIR = Path(__file__).resolve().parent
 REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
 REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
 REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
+REACT_MANIFEST_FILE = REACT_DIST_DIR / "manifest.webmanifest"
+REACT_PUBLIC_MANIFEST_FILE = APP_DIR / "frontend" / "public" / "manifest.webmanifest"
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 
@@ -863,10 +866,9 @@ def react_manifest_webmanifest():
             headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
 
-    public_manifest_file = Path("frontend/public/manifest.webmanifest")
-    if public_manifest_file.exists():
+    if REACT_PUBLIC_MANIFEST_FILE.exists():
         return FileResponse(
-            public_manifest_file,
+            REACT_PUBLIC_MANIFEST_FILE,
             media_type="application/manifest+json",
             headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )

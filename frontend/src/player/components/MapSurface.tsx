@@ -5,7 +5,7 @@ import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../
 
 type FocusRequest =
   | {
-      target: 'player' | 'node'
+      target: 'player' | 'node' | 'route' | 'route'
       token: number
     }
   | null
@@ -124,6 +124,7 @@ export function MapSurface({
   currentStage,
   className,
   playerPosition,
+  gpsState,
   debugSimulation,
   followPlayer = true,
   focusRequest,
@@ -138,9 +139,12 @@ export function MapSurface({
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
   const playerMarkerRef = useRef<L.Marker | null>(null)
-  const otherPlayerLayersRef = useRef<L.Layer[]>([])
+  const playerAuraRef = useRef<L.CircleMarker | null>(null)
+  const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
+  const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
+  const lastFocusTokenRef = useRef<number | null>(null)
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -165,16 +169,44 @@ export function MapSurface({
 
     return () => {
       playerMarkerRef.current?.remove()
+      playerAuraRef.current?.remove()
       nodeMarkerRef.current?.remove()
       nodeRadiusRef.current?.remove()
-      otherPlayerLayersRef.current.forEach((layer) => layer.remove())
-      otherPlayerLayersRef.current = []
+      otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
+      otherPlayerMarkersRef.current.clear()
       map.remove()
       mapRef.current = null
       playerMarkerRef.current = null
+      playerAuraRef.current = null
+      playerAuraModeRef.current = null
       nodeMarkerRef.current = null
       nodeRadiusRef.current = null
     }
+  }, [])
+
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (document.getElementById('saga-player-aura-style')) return
+
+    const style = document.createElement('style')
+    style.id = 'saga-player-aura-style'
+    style.textContent = `
+      .saga-player-aura--gps {
+        animation: sagaPlayerAuraPulse 1.35s ease-in-out infinite;
+      }
+
+      .saga-player-aura--debug {
+        animation: sagaPlayerAuraPulse 1.05s ease-in-out infinite;
+      }
+
+      @keyframes sagaPlayerAuraPulse {
+        0% { opacity: 0.95; }
+        50% { opacity: 0.25; }
+        100% { opacity: 0.95; }
+      }
+    `
+    document.head.appendChild(style)
   }, [])
 
   useEffect(() => {
@@ -253,32 +285,72 @@ export function MapSurface({
     }
 
     map.invalidateSize({ pan: false })
-  }, [stageMapData, onNodeTap, nodeState])
+  }, [stageMapData, onNodeTap, nodeState, Boolean(playerPosition)])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    playerMarkerRef.current?.remove()
-    playerMarkerRef.current = null
-
     if (!playerPosition) {
+      playerMarkerRef.current?.remove()
+      playerMarkerRef.current = null
+      playerAuraRef.current?.remove()
+      playerAuraRef.current = null
+      playerAuraModeRef.current = null
       map.invalidateSize({ pan: false })
       return
     }
 
-    playerMarkerRef.current = L.marker(
-      [playerPosition.lat, playerPosition.lon],
-      {
+    const nextLatLng = L.latLng(playerPosition.lat, playerPosition.lon)
+
+    const auraMode =
+      debugSimulation ? 'debug' : gpsState === 'ready' || gpsState === 'stale' ? 'gps' : null
+
+    if (!auraMode) {
+      playerAuraRef.current?.remove()
+      playerAuraRef.current = null
+      playerAuraModeRef.current = null
+    } else {
+      const auraClassName =
+        auraMode === 'debug' ? 'saga-player-aura--debug' : 'saga-player-aura--gps'
+      const auraColor = auraMode === 'debug' ? '#ef4444' : '#22c55e'
+      const auraFill = auraMode === 'debug' ? '#f87171' : '#4ade80'
+
+      if (!playerAuraRef.current || playerAuraModeRef.current !== auraMode) {
+        playerAuraRef.current?.remove()
+        playerAuraRef.current = L.circleMarker(nextLatLng, {
+          radius: 34,
+          color: auraColor,
+          weight: 5,
+          opacity: 0.9,
+          fillColor: auraFill,
+          fillOpacity: 0.30,
+          className: auraClassName,
+          interactive: false,
+        }).addTo(map)
+        playerAuraModeRef.current = auraMode
+      } else {
+        playerAuraRef.current.setLatLng(nextLatLng)
+      }
+
+      playerAuraRef.current.bringToFront()
+    }
+
+    if (!playerMarkerRef.current) {
+      playerMarkerRef.current = L.marker(nextLatLng, {
         icon: createAvatarIcon(selfLabel, 'self'),
         keyboard: false,
-      }
-    ).addTo(map)
+      }).addTo(map)
 
-    playerMarkerRef.current.bindTooltip(selfLabel, {
-      direction: 'top',
-      opacity: 0.92,
-    })
+      playerMarkerRef.current.bindTooltip(selfLabel, {
+        direction: 'top',
+        opacity: 0.92,
+      })
+    } else {
+      playerMarkerRef.current.setLatLng(nextLatLng)
+    }
+
+    playerMarkerRef.current.setZIndexOffset(1000)
 
     const playerFrameKey = stageMapData
       ? `${stageMapData.lat}:${stageMapData.lon}:player`
@@ -311,20 +383,20 @@ export function MapSurface({
         })
       }
     }
-
-    map.invalidateSize({ pan: false })
-  }, [playerPosition, stageMapData, followPlayer, selfLabel])
+  }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, gpsState, debugSimulation])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    otherPlayerLayersRef.current.forEach((layer) => layer.remove())
-    otherPlayerLayersRef.current = []
+    const seen = new Set<string>()
 
     for (const player of otherPlayers) {
       if (player.is_self) continue
       if (typeof player.lat !== 'number' || typeof player.lon !== 'number') continue
+
+      const key = String(player.user || player.display_name || `${player.lat}:${player.lon}`)
+      seen.add(key)
 
       const presence = String(player.presence || 'offline').toLowerCase()
       const kind =
@@ -334,41 +406,124 @@ export function MapSurface({
           ? 'recent'
           : 'live'
 
-      const marker = L.marker([player.lat, player.lon], {
-        icon: createAvatarIcon(player.display_name || player.user, kind),
+      const label = player.display_name || player.user
+      const nextLatLng = L.latLng(player.lat, player.lon)
+      const existing = otherPlayerMarkersRef.current.get(key)
+
+      if (existing) {
+        existing.setLatLng(nextLatLng)
+        existing.setIcon(createAvatarIcon(label, kind))
+        continue
+      }
+
+      const marker = L.marker(nextLatLng, {
+        icon: createAvatarIcon(label, kind),
         keyboard: false,
       }).addTo(map)
 
-      marker.bindTooltip(player.display_name || player.user, {
+      marker.bindTooltip(label, {
         direction: 'top',
         opacity: 0.92,
       })
 
-      otherPlayerLayersRef.current.push(marker)
+      otherPlayerMarkersRef.current.set(key, marker)
+    }
+
+    for (const [key, marker] of otherPlayerMarkersRef.current.entries()) {
+      if (seen.has(key)) continue
+      marker.remove()
+      otherPlayerMarkersRef.current.delete(key)
     }
   }, [otherPlayers])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map || !focusRequest) return
+    if (lastFocusTokenRef.current === focusRequest.token) return
+    lastFocusTokenRef.current = focusRequest.token
+
+    map.invalidateSize({ pan: false })
 
     if (focusRequest.target === 'player' && playerPosition) {
+      map.stop()
       map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
         animate: true,
-        duration: 0.45,
+        duration: 0.85,
+        easeLinearity: 0.22,
       })
-      map.invalidateSize({ pan: false })
       return
     }
 
+    if (focusRequest.target === 'route') {
+      if (stageMapData && playerPosition) {
+        const bounds = L.latLngBounds(
+          [stageMapData.lat, stageMapData.lon],
+          [playerPosition.lat, playerPosition.lon]
+        )
+
+        const routeDistance = getDistanceMeters(playerPosition, {
+          lat: stageMapData.lat,
+          lon: stageMapData.lon,
+        })
+
+        const targetZoom =
+          routeDistance > 100000 ? 6 :
+          routeDistance > 25000 ? 8 :
+          routeDistance > 5000 ? 11 :
+          routeDistance > 1000 ? 13 :
+          routeDistance > 250 ? 15 :
+          17
+
+        map.stop()
+        map.invalidateSize({ pan: false })
+
+        if (routeDistance > 100000) {
+          const center = bounds.getCenter()
+          map.flyTo(center, targetZoom, {
+            animate: true,
+            duration: 0.95,
+            easeLinearity: 0.22,
+          })
+        } else {
+          map.flyToBounds(bounds.pad(0.18), {
+            paddingTopLeft: [44, 132],
+            paddingBottomRight: [44, 190],
+            maxZoom: targetZoom,
+            animate: true,
+            duration: 0.95,
+            easeLinearity: 0.22,
+          })
+        }
+
+        return
+      }
+
+      if (playerPosition) {
+        map.stop()
+        map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
+          animate: true,
+          duration: 0.45,
+        })
+        return
+      }
+    }
+
     if (focusRequest.target === 'node' && stageMapData) {
+      map.stop()
       map.flyTo([stageMapData.lat, stageMapData.lon], 17, {
         animate: true,
-        duration: 0.45,
+        duration: 0.85,
+        easeLinearity: 0.22,
       })
-      map.invalidateSize({ pan: false })
     }
-  }, [focusRequest, playerPosition, stageMapData])
+  }, [
+    focusRequest,
+    playerPosition?.lat,
+    playerPosition?.lon,
+    stageMapData?.lat,
+    stageMapData?.lon,
+    stageMapData?.radius,
+  ])
 
   return (
     <>

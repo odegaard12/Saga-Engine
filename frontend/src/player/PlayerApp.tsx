@@ -24,7 +24,7 @@ type NoticeTone = 'info' | 'warn' | 'success'
 type OverlayState = 'activate' | 'node' | 'finish' | null
 type FocusRequest =
   | {
-      target: 'player' | 'node'
+      target: 'player' | 'node' | 'route'
       token: number
     }
   | null
@@ -111,6 +111,65 @@ function getStageRadius(stage: PlayerStage | null): number | null {
   return radius !== null && radius > 0 ? radius : null
 }
 
+function gpsReadyStorageKey(user: string): string {
+  return `saga:gps-ready:${user}`
+}
+
+function gpsLastPositionStorageKey(user: string): string {
+  return `saga:gps-last-position:${user}`
+}
+
+function readStoredGpsPosition(user: string): { lat: number; lon: number } | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(gpsLastPositionStorageKey(user))
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as { lat?: unknown; lon?: unknown }
+    const lat = toFiniteNumber(parsed.lat)
+    const lon = toFiniteNumber(parsed.lon)
+
+    if (lat === null || lon === null) return null
+    return { lat, lon }
+  } catch {
+    return null
+  }
+}
+
+function rememberGpsReady(user: string): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(gpsReadyStorageKey(user), '1')
+  } catch {
+    // ignore private mode/storage errors
+  }
+}
+
+function rememberGpsPosition(user: string, position: { lat: number; lon: number }): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(
+      gpsLastPositionStorageKey(user),
+      JSON.stringify({ ...position, saved_at: Date.now() })
+    )
+  } catch {
+    // ignore private mode/storage errors
+  }
+}
+
+function hasRememberedGpsReady(user: string): boolean {
+  if (typeof window === 'undefined') return false
+
+  try {
+    return window.localStorage.getItem(gpsReadyStorageKey(user)) === '1'
+  } catch {
+    return false
+  }
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -121,6 +180,7 @@ export default function PlayerApp() {
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
+  const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -137,7 +197,7 @@ export default function PlayerApp() {
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
-  const user = useMemo(() => getUserFromUrl(), [])
+  const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
   const isPhone =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
@@ -146,6 +206,24 @@ export default function PlayerApp() {
     const playerUrl = `/player/${encodeURIComponent(user)}`
     void registerPlayerServiceWorker()
     void cachePlayerShell(playerUrl)
+
+    const storedGps = readStoredGpsPosition(user)
+    if (storedGps) {
+      setBrowserGpsPosition(storedGps)
+      setBrowserGpsStatus('stale')
+      setFollowPlayer(true)
+      gpsCenteredRef.current = false
+      window.setTimeout(() => {
+        setFocusRequest({ target: 'player', token: Date.now() })
+      }, 250)
+    }
+
+    if (hasRememberedGpsReady(user)) {
+      setOfflinePrepVisible(false)
+      window.setTimeout(() => {
+        void handleRequestLiveGps({ silent: true, forceFocus: true })
+      }, 300)
+    }
   }, [user])
 
   useEffect(() => {
@@ -219,7 +297,13 @@ export default function PlayerApp() {
 
     getOfflineMissionSummary(user)
       .then((summary) => {
-        if (!cancelled) setOfflineSummary(summary)
+        if (!cancelled) {
+          setOfflineSummary(summary)
+
+          if (summary?.hasPack && hasRememberedGpsReady(user)) {
+            setOfflinePrepVisible(false)
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setOfflineSummary(null)
@@ -355,18 +439,17 @@ export default function PlayerApp() {
 
   const rawGpsState = normalizeGpsStatus(payload.live_status?.gps_status)
 
-  const gpsState: PlayerGpsStatus = localDebugPosition || browserGpsPosition
+  const gpsState: PlayerGpsStatus = localDebugPosition
     ? 'ready'
-    : secureLiveGpsContext
-    ? rawGpsState
+    : browserGpsPosition
+    ? 'ready'
+    : browserGpsStatus === 'searching'
+    ? 'searching'
+    : browserGpsStatus === 'error'
+    ? 'error'
     : 'unavailable'
 
-  const livePlayerPosition =
-    secureLiveGpsContext && (rawGpsState === 'ready' || rawGpsState === 'stale')
-      ? rawLivePlayerPosition
-      : null
-
-  const playerPosition = localDebugPosition || browserGpsPosition || livePlayerPosition
+  const playerPosition = browserGpsPosition || localDebugPosition
   const stagePosition = getStagePosition(currentStage)
   const stageRadius = getStageRadius(currentStage)
 
@@ -381,10 +464,8 @@ export default function PlayerApp() {
       : false
 
   const effectiveDebugEnabled =
-    Boolean(payload.live_status?.debug_enabled) ||
     localDebugEnabled ||
-    Boolean(localDebugPosition) ||
-    Boolean(browserGpsPosition)
+    Boolean(localDebugPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -397,10 +478,8 @@ export default function PlayerApp() {
   const gpsActionRequired =
     !payload.finished &&
     Boolean(currentStage) &&
-    !localDebugPosition &&
     !browserGpsPosition &&
-    gpsState !== 'ready' &&
-    gpsState !== 'stale'
+    !localDebugPosition
 
   const hudHelperText =
     gpsActionRequired
@@ -422,7 +501,7 @@ export default function PlayerApp() {
   const shellLoginHref = '/'
   const adminHref = '/admin'
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
-  const hasBrowserGps = Boolean(localDebugPosition || browserGpsPosition) || gpsState === 'ready' || gpsState === 'stale'
+  const hasBrowserGps = Boolean(browserGpsPosition)
   const primaryLabel = gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
@@ -470,18 +549,36 @@ export default function PlayerApp() {
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
       setFollowPlayer(true)
-      void sendHeartbeat({
-        user,
-        gps_status: 'unavailable',
-        source: 'react',
-      })
-      showNotice('Debug tap disabled. Live GPS restored.', 'info')
+      setRouteOverviewActive(false)
+
+      const storedGps = readStoredGpsPosition(user)
+      if (storedGps) {
+        setBrowserGpsPosition(storedGps)
+        setBrowserGpsStatus('stale')
+        setFocusRequest({ target: 'player', token: Date.now() })
+      }
+
+      showNotice('Debug desactivado. Recuperando GPS real…', 'info')
+
+      if (hasRememberedGpsReady(user)) {
+        void handleRequestLiveGps({ silent: true, forceFocus: true })
+        window.setTimeout(() => {
+          void handleRequestLiveGps({ silent: true, forceFocus: true })
+        }, 1500)
+      }
+
       vibrate(8)
       return
     }
 
+    if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+      window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+      gpsWatchRef.current = null
+    }
+    setBrowserGpsPosition(null)
+    setBrowserGpsStatus('unavailable')
     setLocalDebugEnabled(true)
-    showNotice('Debug tap enabled. Tap the map to place simulated GPS.', 'success')
+    showNotice('Debug activo. Toca el mapa para colocar tu posición simulada.', 'success')
     vibrate([10, 16, 10])
   }
 
@@ -497,7 +594,7 @@ export default function PlayerApp() {
       gps_status: 'ok',
       source: 'react',
     })
-    showNotice('Simulated GPS updated from map tap.', 'success')
+    showNotice('Posición debug actualizada.', 'success')
     vibrate([10, 12, 10])
   }
 
@@ -535,6 +632,29 @@ export default function PlayerApp() {
     })
   }
 
+  function handleToggleRouteOverview() {
+    if (!playerPosition) {
+      showNotice('Buscando tu ubicación…', 'info')
+      void handleRequestLiveGps({ forceFocus: true })
+      return
+    }
+
+    const nextToken = Date.now()
+
+    if (!currentStage || routeOverviewActive) {
+      setRouteOverviewActive(false)
+      setFollowPlayer(true)
+      setFocusRequest({ target: 'player', token: nextToken })
+      showNotice('Centrado en tu ubicación.', 'info')
+      return
+    }
+
+    setRouteOverviewActive(true)
+    setFollowPlayer(false)
+    setFocusRequest({ target: 'route', token: nextToken })
+    showNotice('Mostrando tu ubicación y el nodo.', 'info')
+  }
+
   function openInteraction() {
     setSubmitError(null)
     setActivePanel(null)
@@ -543,21 +663,23 @@ export default function PlayerApp() {
     setInteractionOpen(true)
   }
 
-  async function handleRequestLiveGps() {
+  async function handleRequestLiveGps(options: { silent?: boolean; forceFocus?: boolean } = {}) {
     if (typeof window === 'undefined' || !window.navigator.geolocation) {
       setBrowserGpsStatus('unavailable')
-      showNotice('GPS no disponible en este dispositivo.', 'warn')
+      if (!options.silent) showNotice('GPS no disponible en este dispositivo.', 'warn')
       return
     }
 
     if (!window.isSecureContext) {
       setBrowserGpsStatus('error')
-      showNotice('El GPS requiere dominio HTTPS o app instalada.', 'warn')
+      if (!options.silent) showNotice('El GPS requiere dominio HTTPS o app instalada.', 'warn')
       return
     }
 
+    setLocalDebugEnabled(false)
+    setLocalDebugPosition(null)
     setBrowserGpsStatus('searching')
-    showNotice('Solicitando permiso de ubicación…', 'info')
+    if (!options.silent) showNotice('Solicitando permiso de ubicación…', 'info')
 
     const onSuccess = (position: GeolocationPosition) => {
       const next = {
@@ -567,9 +689,21 @@ export default function PlayerApp() {
 
       setBrowserGpsPosition(next)
       setBrowserGpsStatus('ready')
-      setFollowPlayer(false)
+      rememberGpsReady(user)
+      rememberGpsPosition(user, next)
+      if (hasOfflineMission) setOfflinePrepVisible(false)
+      setLocalDebugEnabled(false)
+      setLocalDebugPosition(null)
+      setFollowPlayer(true)
 
-      if (!gpsCenteredRef.current) {
+      const storedGps = readStoredGpsPosition(user)
+      if (storedGps) {
+        setBrowserGpsPosition(storedGps)
+        setBrowserGpsStatus('stale')
+        setFocusRequest({ target: 'player', token: Date.now() })
+      }
+
+      if (options.forceFocus || !gpsCenteredRef.current) {
         gpsCenteredRef.current = true
         setFocusRequest({ target: 'player', token: Date.now() })
       }
@@ -582,21 +716,23 @@ export default function PlayerApp() {
         source: 'browser_gps',
       })
 
-      if (!gpsNoticeShownRef.current) {
+      if (!options.silent && !gpsNoticeShownRef.current) {
         gpsNoticeShownRef.current = true
-        showNotice('GPS activado.', 'success')
+        showNotice('GPS real activado.', 'success')
       }
     }
 
     const onError = (error: GeolocationPositionError) => {
       setBrowserGpsStatus('error')
       const denied = error.code === error.PERMISSION_DENIED
-      showNotice(
-        denied
-          ? 'Permiso de ubicación denegado. Revísalo en ajustes del navegador.'
-          : 'No se pudo obtener ubicación. Prueba otra vez al aire libre.',
-        'warn'
-      )
+      if (!options.silent) {
+        showNotice(
+          denied
+            ? 'Permiso de ubicación denegado. Revísalo en ajustes del navegador.'
+            : 'No se pudo obtener ubicación. Prueba otra vez al aire libre.',
+          'warn'
+        )
+      }
     }
 
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
@@ -644,7 +780,7 @@ export default function PlayerApp() {
 
   function handlePrimaryAction() {
     if (gpsActionRequired) {
-      void handleRequestLiveGps()
+      void handleRequestLiveGps({ forceFocus: true })
       return
     }
 
@@ -783,7 +919,7 @@ export default function PlayerApp() {
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-          followPlayer={false}
+          followPlayer={followPlayer}
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
@@ -801,12 +937,26 @@ export default function PlayerApp() {
             teamOpen={teamOpen}
             teamCount={teamVisibleCount}
             teamLiveCount={teamLiveCount}
+            gpsState={gpsState}
             onOpenTeam={openTeam}
           />
         </div>
 
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
+
+          <button
+            type="button"
+            style={mapRouteToggleButton}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              handleToggleRouteOverview()
+            }}
+            aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
+          >
+            {routeOverviewActive ? '◎' : '↔'}
+          </button>
         </div>
 
         {offlinePrepVisible && !payload.finished ? (
@@ -841,7 +991,7 @@ export default function PlayerApp() {
                 <button
                   type="button"
                   style={hasBrowserGps ? offlinePrepButtonDone : offlinePrepButton}
-                  onClick={handleRequestLiveGps}
+                  onClick={() => void handleRequestLiveGps({ forceFocus: true })}
                 >
                   {browserGpsStatus === 'searching'
                     ? 'Buscando GPS…'
@@ -853,10 +1003,10 @@ export default function PlayerApp() {
 
               <button
                 type="button"
-                style={offlinePrepDismiss}
+                style={hasOfflineMission && hasBrowserGps ? offlinePrepDismiss : offlinePrepDismissLater}
                 onClick={() => setOfflinePrepVisible(false)}
               >
-                {hasOfflineMission && hasBrowserGps ? 'Cerrar' : 'Más tarde'}
+                {hasOfflineMission && hasBrowserGps ? '×' : 'Más tarde'}
               </button>
 
               {offlinePrepState === 'error' ? (
@@ -894,6 +1044,7 @@ export default function PlayerApp() {
             onOpenTools={openTools}
             onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
+            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
           />
         </div>
       </div>
@@ -922,13 +1073,33 @@ export default function PlayerApp() {
   )
 }
 
+const mapRouteToggleButton: CSSProperties = {
+  position: 'fixed',
+  right: 18,
+  bottom: 'calc(env(safe-area-inset-bottom, 0px) + 176px)',
+  zIndex: 4600,
+  width: 42,
+  height: 42,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.22)',
+  background: 'rgba(15,23,42,.62)',
+  color: '#f8fafc',
+  fontSize: 20,
+  fontWeight: 900,
+  boxShadow: '0 14px 34px rgba(15,23,42,.22)',
+  backdropFilter: 'blur(14px)',
+  WebkitBackdropFilter: 'blur(14px)',
+  pointerEvents: 'auto',
+  touchAction: 'manipulation',
+}
+
 function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
     left: mobile ? 12 : 24,
     right: mobile ? 12 : 'auto',
-    bottom: mobile ? 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 178px)' : 'auto',
-    top: mobile ? 'auto' : 86,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 230px)' : 86,
+    bottom: 'auto',
     width: mobile ? 'auto' : 380,
     zIndex: 1190,
     pointerEvents: 'auto',
@@ -937,9 +1108,9 @@ function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
 
 const offlinePrepCard: CSSProperties = {
   display: 'grid',
-  gap: 10,
-  padding: 14,
-  borderRadius: 22,
+  gap: 8,
+  padding: '10px 12px',
+  borderRadius: 18,
   background: 'rgba(15, 23, 42, 0.92)',
   border: '1px solid rgba(255, 255, 255, 0.16)',
   boxShadow: '0 18px 50px rgba(15, 23, 42, 0.32)',
@@ -971,11 +1142,11 @@ const offlinePrepCopy: CSSProperties = {
 const offlinePrepActions: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
-  gap: 8,
+  gap: 6,
 }
 
 const offlinePrepButton: CSSProperties = {
-  minHeight: 48,
+  minHeight: 38,
   border: 'none',
   borderRadius: 16,
   background: '#22c55e',
@@ -995,6 +1166,15 @@ const offlinePrepDismiss: CSSProperties = {
   border: 'none',
   background: 'transparent',
   color: 'rgba(226, 232, 240, 0.78)',
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const offlinePrepDismissLater: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: 'rgba(226,232,240,.78)',
   fontSize: 12,
   fontWeight: 800,
   cursor: 'pointer',
@@ -1107,11 +1287,12 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
 function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 14px)' : 12,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 12,
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
+    transform: mobile ? 'translateY(10px)' : undefined,
   }
 }
 
@@ -1134,7 +1315,7 @@ function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 'max(env(safe-area-inset-bottom, 0px), 8px)' : 12,
+    bottom: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }
