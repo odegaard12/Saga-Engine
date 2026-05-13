@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type FocusRequest =
   | {
@@ -104,22 +105,79 @@ function getNodeVisualConfig(nodeState: NodeVisualState) {
   }
 }
 
-function getInitials(label?: string) {
-  const cleaned = String(label || '').trim()
-  if (!cleaned) return '?'
-  const parts = cleaned.split(/\s+/).slice(0, 2)
-  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
+function escapeHtml(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
 
-function createAvatarIcon(label: string, kind: 'self' | 'live' | 'recent' | 'offline') {
-  const initials = getInitials(label)
+function formatSeenAgo(lastSeen?: number): string {
+  if (typeof lastSeen !== 'number' || !Number.isFinite(lastSeen)) return 'sin fecha'
+  const diffSeconds = Math.max(0, Math.round((Date.now() - lastSeen * 1000) / 1000))
+  if (diffSeconds < 60) return `hace ${diffSeconds}s`
+  const diffMinutes = Math.round(diffSeconds / 60)
+  if (diffMinutes < 60) return `hace ${diffMinutes}min`
+  const diffHours = Math.round(diffMinutes / 60)
+  return `hace ${diffHours}h`
+}
+
+function getMarkerIdentity(
+  profile: Partial<TeamProfileLiveStatus> & { display_name?: string; user?: string },
+  fallbackKind: 'self' | 'live' | 'recent' | 'offline'
+) {
+  const color = getPlayerColor(profile)
+  const initials = getPlayerAvatarInitials(profile)
+  const avatarUrl = getPlayerAvatarUrl(profile)
+  const label = profile.display_name || profile.user || initials || 'Player'
+
+  return { color, initials, avatarUrl, label, kind: fallbackKind }
+}
+
+function createAvatarIcon(
+  profile: Partial<TeamProfileLiveStatus> & { display_name?: string; user?: string },
+  kind: 'self' | 'live' | 'recent' | 'offline'
+) {
+  const identity = getMarkerIdentity(profile, kind)
+  const safeInitials = escapeHtml(identity.initials)
+  const safeAvatar = escapeHtml(identity.avatarUrl)
+  const safeColor = escapeHtml(identity.color)
+
+  const avatarHtml = safeAvatar
+    ? `<img src="${safeAvatar}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px;display:block;" />`
+    : safeInitials
 
   return L.divIcon({
     className: 'saga-avatar-icon-wrap',
-    html: `<div class="saga-avatar-pin saga-avatar-pin--${kind}">${initials}</div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    html: `<div class="saga-avatar-pin saga-avatar-pin--${kind}" style="--saga-player-color:${safeColor};">${avatarHtml}</div>`,
+    iconSize: kind === 'self' ? [46, 46] : [42, 42],
+    iconAnchor: kind === 'self' ? [23, 23] : [21, 21],
   })
+}
+
+function buildPlayerPopup(
+  profile: Partial<TeamProfileLiveStatus> & { display_name?: string; user?: string },
+  kind: 'self' | 'live' | 'recent' | 'offline'
+): string {
+  const identity = getMarkerIdentity(profile, kind)
+  const presence = kind === 'self'
+    ? 'TU POSICIÓN'
+    : kind === 'live'
+      ? 'ONLINE'
+      : kind === 'recent'
+        ? 'RECIENTE'
+        : 'OFFLINE'
+
+  return `
+    <div style="min-width:150px;font-family:system-ui,sans-serif;">
+      <strong style="display:block;font-size:13px;color:#0f172a;">${escapeHtml(identity.label)}</strong>
+      <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:900;letter-spacing:.08em;color:${escapeHtml(identity.color)};">${presence}</span>
+      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : ''}
+      ${profile.gps_status ? `<div style="margin-top:4px;font-size:11px;color:#64748b;">GPS ${escapeHtml(String(profile.gps_status).toUpperCase())}</div>` : ''}
+    </div>
+  `
 }
 
 
@@ -480,7 +538,7 @@ export function MapSurface({
 
     if (!playerMarkerRef.current) {
       playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon(selfLabel, 'self'),
+        icon: createAvatarIcon({ display_name: selfLabel, user: selfLabel }, 'self'),
         keyboard: false,
       }).addTo(map)
 
@@ -488,6 +546,7 @@ export function MapSurface({
         direction: 'top',
         opacity: 0.92,
       })
+      playerMarkerRef.current.bindPopup(buildPlayerPopup({ display_name: selfLabel, user: selfLabel }, 'self'))
     } else {
       playerMarkerRef.current.setLatLng(nextLatLng)
     }
@@ -554,12 +613,12 @@ export function MapSurface({
 
       if (existing) {
         existing.setLatLng(nextLatLng)
-        existing.setIcon(createAvatarIcon(label, kind))
+        existing.setIcon(createAvatarIcon(player, kind))
         continue
       }
 
       const marker = L.marker(nextLatLng, {
-        icon: createAvatarIcon(label, kind),
+        icon: createAvatarIcon(player, kind),
         keyboard: false,
       }).addTo(map)
 
@@ -745,44 +804,42 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  border: 2px solid rgba(255,255,255,.92);
-  box-sizing: border-box;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 950;
+          border: 3px solid rgba(255,255,255,.94);
+          box-shadow: 0 12px 30px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.35);
+          color: #ffffff;
+          background: linear-gradient(135deg, var(--saga-player-color, #22c55e), rgba(15,23,42,.72));
+          overflow: hidden;
+        }
 
 .saga-avatar-pin--self {
-  background: rgba(37,99,235,.96);
-  color: #ffffff;
-  box-shadow: 0 0 0 5px rgba(37,99,235,.22), 0 10px 22px rgba(15,23,42,.22);
-}
+          width: 46px;
+          height: 46px;
+          border-color: rgba(255,255,255,.98);
+          box-shadow: 0 14px 34px rgba(15,23,42,.38), 0 0 0 8px color-mix(in srgb, var(--saga-player-color, #22c55e) 20%, transparent);
+        }
 
 .saga-avatar-pin--live {
-  background: rgba(249,115,22,.95);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(249,115,22,.20);
-}
+          border-color: rgba(187,247,208,.92);
+        }
 
 .saga-avatar-pin--recent {
-  background: rgba(249,115,22,.78);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(249,115,22,.14);
-}
+          opacity: .86;
+          border-color: rgba(253,230,138,.88);
+        }
 
 .saga-avatar-pin--offline {
-  background: rgba(148,163,184,.88);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(148,163,184,.14);
-}
+          opacity: .62;
+          filter: grayscale(.35);
+          border-color: rgba(203,213,225,.82);
+        }
 
 @keyframes sagaNodeHaloLocked {
   0% { stroke-opacity: .72; fill-opacity: .06; }

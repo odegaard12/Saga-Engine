@@ -895,6 +895,25 @@ def react_index_or_missing():
         status_code=503,
     )
 
+
+@app.get("/saga-header-mark.svg", include_in_schema=False)
+async def saga_header_mark_svg():
+    dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
+    public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
+
+    if dist_file.exists():
+        return FileResponse(
+            dist_file,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    return FileResponse(
+        public_file,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 @app.middleware("http")
 async def saga_no_cache_html(request, call_next):
     response = await call_next(request)

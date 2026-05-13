@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 interface TeamSheetProps {
   open: boolean

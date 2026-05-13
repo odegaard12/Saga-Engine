@@ -55,6 +55,9 @@ export function teamProfilesToMapMarkers(
       source: profile.source,
       is_self: profile.is_self,
       last_seen: profile.last_seen,
+      color: profile.color,
+      avatar_url: profile.avatar_url,
+      avatar_initials: profile.avatar_initials,
     }));
 }
 
