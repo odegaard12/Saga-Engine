@@ -113,10 +113,10 @@ export function deriveStageRuntime(args: {
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'TOO FAR',
+    primaryLabel: 'DEMASIADO LEJOS',
     primaryTone: 'warn',
     helperText:
       currentStage.messages?.locked ||
-      `Move inside the ${currentStage.radius} m interaction radius.`,
+      `Acércate al radio de ${currentStage.radius} m para abrir este nodo.`,
   }
 }

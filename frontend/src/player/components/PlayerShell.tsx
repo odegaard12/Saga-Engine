@@ -7,7 +7,17 @@ interface PlayerShellProps {
   teamOpen?: boolean
   teamCount?: number
   teamLiveCount?: number
+  gpsState?: string
   onOpenTeam?: () => void
+}
+
+function getGpsShellLabel(gpsState?: string): string {
+  const value = String(gpsState || '').toLowerCase()
+  if (value === 'ready') return 'GPS activo'
+  if (value === 'searching') return 'Buscando GPS'
+  if (value === 'stale') return 'GPS reciente'
+  if (value === 'error') return 'Error GPS'
+  return 'Sin GPS'
 }
 
 function getProgress(payload: PlayerGamePayload) {
@@ -40,6 +50,7 @@ export function PlayerShell({
   teamOpen = false,
   teamCount = 0,
   teamLiveCount = 0,
+  gpsState,
   onOpenTeam,
 }: PlayerShellProps) {
   const compact =
@@ -49,6 +60,7 @@ export function PlayerShell({
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
   const stageName = currentStage?.title || (payload.finished ? 'Mission complete' : 'Awaiting node')
   const progress = getProgress(payload)
+  const gpsLabel = getGpsShellLabel(gpsState)
 
   const nodes = Array.from({ length: progress.total })
 
@@ -58,12 +70,12 @@ export function PlayerShell({
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 16 : 18,
-          borderRadius: compact ? 28 : 30,
+          padding: compact ? 12 : 16,
+          borderRadius: compact ? 22 : 28,
         }}
       >
         <div style={topRow}>
-          <div style={eyebrow}>FIELD SESSION</div>
+          <div style={eyebrow}>{playerName}</div>
 
           <div style={pillRow}>
             <div style={soloPill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
@@ -80,8 +92,7 @@ export function PlayerShell({
           </div>
         </div>
 
-        <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{playerName}</div>
-        <div style={stageTitle}>{stageName}</div>
+        <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{stageName}</div>
 
         <div style={progressRow}>
           <div style={routeWrap}>
@@ -147,7 +158,7 @@ const card: CSSProperties = {
   WebkitBackdropFilter: 'blur(20px) saturate(135%)',
   color: '#ffffff',
   display: 'grid',
-  gap: 10,
+  gap: 8,
 }
 
 const topRow: CSSProperties = {
@@ -155,6 +166,29 @@ const topRow: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 12,
+}
+
+const identityBlock: CSSProperties = {
+  minWidth: 0,
+  display: 'grid',
+  gap: 4,
+}
+
+const gpsMiniPill: CSSProperties = {
+  width: 'fit-content',
+  minHeight: 20,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 8px',
+  borderRadius: 999,
+  background: 'rgba(34,197,94,.16)',
+  border: '1px solid rgba(187,247,208,.20)',
+  color: '#dcfce7',
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
 }
 
 const pillRow: CSSProperties = {
@@ -167,8 +201,12 @@ const eyebrow: CSSProperties = {
   color: '#c8ffe1',
   fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.16em',
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
+  maxWidth: 150,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 }
 
 const soloPill: CSSProperties = {
@@ -183,7 +221,7 @@ const soloPill: CSSProperties = {
   color: '#ffffff',
   fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.10em',
+  letterSpacing: '0.08em',
 }
 
 const teamButton: CSSProperties = {
@@ -234,9 +272,13 @@ const teamLiveDot: CSSProperties = {
 
 const playerTitle: CSSProperties = {
   fontWeight: 900,
-  lineHeight: 1,
+  lineHeight: 1.05,
   letterSpacing: '-0.03em',
   color: '#ffffff',
+  maxWidth: '100%',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 }
 
 const stageTitle: CSSProperties = {

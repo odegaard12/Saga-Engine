@@ -57,10 +57,10 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')
-      setMessage(`Mission saved locally with ${pack.stage_count} nodes.`)
+      setMessage(`Misión guardada con ${pack.stage_count} nodo${pack.stage_count === 1 ? '' : 's'}.`)
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : 'Could not save mission locally.')
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar la misión.')
     }
   }
 
@@ -85,10 +85,10 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')
-      setMessage('Local progress snapshot saved and queued for sync.')
+      setMessage('Progreso guardado para sincronizar.')
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : 'Could not save local progress.')
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar el progreso.')
     }
   }
 
@@ -102,53 +102,47 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       if (result.status === 'ok') {
         setState('saved')
-        setMessage(result.attempted === 0 ? 'No pending offline events.' : `Synced ${result.synced} offline events.`)
+        setMessage(result.attempted === 0 ? 'No hay pendientes.' : `Sincronizados: ${result.synced}.`)
         return
       }
 
       setState('error')
-      setMessage(result.message || `Could not sync ${result.failed} offline events.`)
+      setMessage(result.message || `No se pudieron sincronizar ${result.failed} eventos.`)
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : 'Could not sync pending events.')
+      setMessage(error instanceof Error ? error.message : 'No se pudo sincronizar.')
     }
   }
 
+  const hasPack = Boolean(summary?.hasPack)
+  const downloadedAt = summary?.downloadedAt
+    ? new Date(summary.downloadedAt).toLocaleString()
+    : 'Nunca'
+
   return (
-    <section style={panel} aria-label="Offline mission pack">
+    <section style={panel} aria-label="Misión offline">
       <div style={header}>
         <div>
-          <div style={eyebrow}>OFFLINE MISSION</div>
-          <div style={title}>Download for field play</div>
+          <div style={eyebrow}>MISIÓN OFFLINE</div>
+          <div style={title}>Preparar sin cobertura</div>
         </div>
 
-        <span style={summary?.hasPack ? badgeReady : badgePending}>
-          {summary?.hasPack ? 'READY' : 'NOT SAVED'}
+        <span style={hasPack ? badgeReady : badgePending}>
+          {hasPack ? 'LISTA' : 'SIN GUARDAR'}
         </span>
       </div>
 
       <div style={summaryGrid}>
-        <Stat label="Nodes" value={String(summary?.stageCount || payload.stages?.length || 0)} />
-        <Stat label="Level" value={String(summary?.currentLevel ?? payload.level ?? 0)} />
-        <Stat label="Pending" value={String(summary?.pendingEvents || 0)} />
+        <Stat label="Nodos" value={String(summary?.stageCount || payload.stages?.length || 0)} />
+        <Stat label="Nivel" value={String(summary?.currentLevel ?? payload.level ?? 0)} />
+        <Stat label="Pendientes" value={String(summary?.pendingEvents || 0)} />
       </div>
 
       <p style={copy}>
-        Save this mission to the phone before the route. If coverage drops later,
-        SAGA can open the stored mission and keep local progress ready for sync.
+        Descarga la misión antes de salir. Si pierdes cobertura, podrás seguir jugando y sincronizar después.
       </p>
 
-      {summary?.downloadedAt ? (
-        <div style={meta}>
-          Last local download: {new Date(summary.downloadedAt).toLocaleString()}
-        </div>
-      ) : null}
-
-      {summary?.lastProgressAt ? (
-        <div style={meta}>
-          Last local progress: {new Date(summary.lastProgressAt).toLocaleString()}
-        </div>
-      ) : null}
+      <div style={meta}>Última descarga: {downloadedAt}</div>
 
       {message ? (
         <div style={state === 'error' ? errorBox : okBox}>{message}</div>
@@ -161,7 +155,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
           disabled={state === 'saving'}
           onClick={handleDownloadMission}
         >
-          {state === 'saving' ? 'Saving…' : summary?.hasPack ? 'Update download' : 'Download mission'}
+          {state === 'saving' ? 'Guardando…' : hasPack ? 'Actualizar' : 'Descargar'}
         </button>
 
         <button
@@ -170,7 +164,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
           disabled={state === 'saving'}
           onClick={handleSaveProgress}
         >
-          Save progress
+          Guardar progreso
         </button>
 
         <button
@@ -179,7 +173,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
           disabled={state === 'saving' || !summary?.pendingEvents}
           onClick={handleSyncPendingEvents}
         >
-          Sync pending
+          Sync
         </button>
       </div>
     </section>
@@ -222,7 +216,7 @@ const eyebrow: CSSProperties = {
 const title: CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
-  fontSize: 17,
+  fontSize: 16,
   fontWeight: 900,
   letterSpacing: '-0.03em',
 }

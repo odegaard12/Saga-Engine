@@ -1,12 +1,23 @@
-const CACHE_NAME = 'saga-player-shell-v170-stable-3'
+const CACHE_NAME = 'saga-player-shell-v171-field-polish-28'
 const DEFAULT_PLAYER_URL = '/player/PLAYER%201'
-const CORE_URLS = [DEFAULT_PLAYER_URL, '/manifest.webmanifest']
+const CORE_URLS = [DEFAULT_PLAYER_URL, '/manifest.webmanifest', '/sw.js']
 
 function shouldBypass(url) {
   return (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/admin') ||
     url.pathname.startsWith('/admin-react')
+  )
+}
+
+function isShellAsset(url) {
+  return (
+    url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/player/') ||
+    url.pathname === '/manifest.webmanifest' ||
+    url.pathname === '/sw.js' ||
+    url.pathname === '/service-worker.js' ||
+    url.pathname === '/saga-app-icon.svg'
   )
 }
 
@@ -25,7 +36,7 @@ async function cacheFirst(request) {
   return response
 }
 
-async function navigationResponse(request) {
+async function networkFirst(request) {
   try {
     const response = await fetch(request)
     await putCache(request, response)
@@ -40,6 +51,28 @@ async function navigationResponse(request) {
       })
     )
   }
+}
+
+async function cacheUrls(urls) {
+  const cache = await caches.open(CACHE_NAME)
+
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const request = new Request(url, { method: 'GET', credentials: 'same-origin' })
+        const parsed = new URL(request.url)
+        if (parsed.origin !== self.location.origin) return
+        if (shouldBypass(parsed)) return
+
+        const response = await fetch(request)
+        if (response.ok) {
+          await cache.put(request, response.clone())
+        }
+      } catch {
+        // Best-effort cache warmup.
+      }
+    })
+  )
 }
 
 self.addEventListener('install', (event) => {
@@ -66,6 +99,13 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+self.addEventListener('message', (event) => {
+  const data = event.data || {}
+  if (data.type !== 'SAGA_CACHE_PLAYER_SHELL') return
+  const urls = Array.isArray(data.urls) ? data.urls : []
+  event.waitUntil(cacheUrls(urls))
+})
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
@@ -75,16 +115,11 @@ self.addEventListener('fetch', (event) => {
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(navigationResponse(request))
+    event.respondWith(networkFirst(request))
     return
   }
 
-  if (
-    url.pathname.startsWith('/assets/') ||
-    url.pathname === '/manifest.webmanifest' ||
-    url.pathname === '/sw.js' ||
-    url.pathname === '/service-worker.js'
-  ) {
+  if (isShellAsset(url)) {
     event.respondWith(cacheFirst(request))
   }
 })
