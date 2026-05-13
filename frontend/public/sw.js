@@ -1,6 +1,6 @@
-const CACHE_NAME = 'saga-player-shell-v172-field-refactor-1'
-const DEFAULT_PLAYER_URL = '/player/PLAYER%201'
-const CORE_URLS = [DEFAULT_PLAYER_URL, '/manifest.webmanifest', '/sw.js']
+const CACHE_NAME = 'saga-player-shell-v173-identity-1'
+const DEFAULT_SHELL_URL = '/'
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js']
 
 function shouldBypass(url) {
   return (
@@ -44,7 +44,7 @@ async function networkFirst(request) {
   } catch {
     return (
       (await caches.match(request)) ||
-      (await caches.match(DEFAULT_PLAYER_URL)) ||
+      (await caches.match(DEFAULT_SHELL_URL)) ||
       new Response('SAGA player shell is not cached yet. Open the player online and download the mission first.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },

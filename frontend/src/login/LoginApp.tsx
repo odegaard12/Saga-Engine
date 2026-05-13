@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -36,13 +37,6 @@ function resolveLoginCopy(config: PublicConfig) {
     ? config.story_text!
     : 'Tap an operator to continue.'
   return { title, subtitle, body }
-}
-
-function getInitials(name: string) {
-  const cleaned = String(name || '').trim()
-  if (!cleaned) return '?'
-  const parts = cleaned.split(/\s+/).slice(0, 2)
-  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
 }
 
 function getMeta(profile: PlayerProfile) {
@@ -176,6 +170,9 @@ export default function LoginApp() {
           {profiles.map((profile, index) => {
             const isTeam = profile.mode === 'team'
             const meta = getMeta(profile)
+              const profileColor = getPlayerColor(profile)
+              const avatarUrl = getPlayerAvatarUrl(profile)
+              const avatarInitials = getPlayerAvatarInitials(profile)
 
             return (
               <article
@@ -186,7 +183,30 @@ export default function LoginApp() {
                 }}
               >
                 <div style={playerLeft}>
-                  <div style={avatar}>{getInitials(profile.display_name)}</div>
+                    <div
+                      style={{
+                        ...avatar,
+                        background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.22))`,
+                        borderColor: `${profileColor}66`,
+                        color: '#ffffff',
+                      }}
+                    >
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            borderRadius: 999,
+                            display: 'block',
+                          }}
+                        />
+                      ) : (
+                        avatarInitials
+                      )}
+                    </div>
 
                   <div style={identity}>
                     <div style={playerName}>{profile.display_name}</div>
@@ -202,7 +222,7 @@ export default function LoginApp() {
                     type="button"
                     style={enterButton}
                     onClick={() => {
-                      window.location.href = `/?user=${encodeURIComponent(profile.id)}`
+                      window.location.href = `/player/${encodeURIComponent(profile.id)}`
                     }}
                   >
                     Enter

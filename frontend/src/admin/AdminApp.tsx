@@ -36,6 +36,7 @@ import {
   mergeOverviewIntoRawStages,
   stageSaveIdentity,
 } from './lib/adminStagePersistence'
+import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -258,14 +259,19 @@ export default function AdminApp() {
   function addPlayerDraft() {
     setPlayerDrafts((current) => {
       const nextNumber = current.length + 1
+      const fallbackName = `PLAYER ${nextNumber}`
+
       return [
         ...current,
         {
-          id: `PLAYER ${nextNumber}`,
-          display_name: `PLAYER ${nextNumber}`,
+          id: fallbackName,
+          display_name: fallbackName,
           mode: 'solo',
           members: '',
           status: 'active',
+          color: getStablePlayerColor(fallbackName),
+          avatar_url: '',
+          avatar_initials: getPlayerInitials(fallbackName),
         },
       ]
     })
