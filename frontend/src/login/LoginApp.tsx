@@ -494,3 +494,13 @@ const loginAnimations = `
   }
 }
 `
+
+const heroImage: CSSProperties = {
+  width: 'min(100%, 420px)',
+  maxHeight: 136,
+  objectFit: 'cover',
+  borderRadius: 26,
+  border: '1px solid rgba(255,255,255,.16)',
+  boxShadow: '0 20px 50px rgba(2,6,23,.22)',
+  marginBottom: 14,
+}
