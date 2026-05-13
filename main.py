@@ -898,8 +898,18 @@ def react_index_or_missing():
 
 @app.get("/saga-header-mark.svg", include_in_schema=False)
 async def saga_header_mark_svg():
+    dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
+    public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
+
+    if dist_file.exists():
+        return FileResponse(
+            dist_file,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
     return FileResponse(
-        FRONTEND_DIST_DIR / "saga-header-mark.svg",
+        public_file,
         media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=86400"},
     )
