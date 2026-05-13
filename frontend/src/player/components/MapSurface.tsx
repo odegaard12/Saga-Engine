@@ -5,7 +5,7 @@ import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../
 
 type FocusRequest =
   | {
-      target: 'player' | 'node' | 'route' | 'route'
+      target: 'player' | 'node' | 'route'
       token: number
     }
   | null
@@ -14,6 +14,8 @@ type NodeVisualState = 'locked' | 'ready' | 'engaging'
 
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
+  missionStages?: PlayerStage[]
+  currentLevel?: number
   className?: string
   playerPosition?: { lat: number; lon: number } | null
   gpsState?: PlayerGpsStatus
@@ -120,8 +122,47 @@ function createAvatarIcon(label: string, kind: 'self' | 'live' | 'recent' | 'off
   })
 }
 
+
+function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked') {
+  const label =
+    state === 'completed'
+      ? '✓'
+      : state === 'locked'
+      ? '🔒'
+      : String(index + 1)
+
+  const styles =
+    state === 'completed'
+      ? 'background:rgba(34,197,94,.92);border-color:rgba(255,255,255,.82);color:#052e16;'
+      : state === 'locked'
+      ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
+      : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
+
+  return L.divIcon({
+    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}`,
+    html: `<div style="
+      width:30px;
+      height:30px;
+      border-radius:999px;
+      border:2px solid;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:${state === 'locked' ? '14px' : '13px'};
+      font-weight:900;
+      box-shadow:0 8px 24px rgba(15,23,42,.28);
+      backdrop-filter:blur(10px);
+      ${styles}
+    ">${label}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  })
+}
+
 export function MapSurface({
   currentStage,
+  missionStages = [],
+  currentLevel = 0,
   className,
   playerPosition,
   gpsState,
@@ -142,6 +183,7 @@ export function MapSurface({
   const playerAuraRef = useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
+  const routeNodeLayersRef = useRef<L.Layer[]>([])
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
@@ -172,6 +214,8 @@ export function MapSurface({
       playerAuraRef.current?.remove()
       nodeMarkerRef.current?.remove()
       nodeRadiusRef.current?.remove()
+      routeNodeLayersRef.current.forEach((layer) => layer.remove())
+      routeNodeLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
       map.remove()
@@ -234,58 +278,156 @@ export function MapSurface({
 
     nodeMarkerRef.current?.remove()
     nodeRadiusRef.current?.remove()
+    routeNodeLayersRef.current.forEach((layer) => layer.remove())
+    routeNodeLayersRef.current = []
     nodeMarkerRef.current = null
     nodeRadiusRef.current = null
 
-    if (!stageMapData) {
+    const stages = Array.isArray(missionStages) && missionStages.length > 0
+      ? missionStages
+      : currentStage
+      ? [currentStage]
+      : []
+
+    const stageNodes = stages
+      .map((stage, index) => ({
+        stage,
+        index,
+        data: resolveStageMapData(stage),
+      }))
+      .filter((entry): entry is { stage: PlayerStage; index: number; data: NonNullable<ReturnType<typeof resolveStageMapData>> } => Boolean(entry.data))
+
+    if (stageNodes.length === 0) {
       map.invalidateSize({ pan: false })
       return
     }
 
-    const visual = getNodeVisualConfig(nodeState)
-    const center: L.LatLngExpression = [stageMapData.lat, stageMapData.lon]
+    const activeIndex = Math.max(0, Math.min(currentLevel || 0, stageNodes.length - 1))
+    const routeLatLngs = stageNodes.map((entry) => L.latLng(entry.data.lat, entry.data.lon))
 
-    const radiusLayer = L.circle(center, {
-      radius: stageMapData.radius,
-      color: visual.ringColor,
-      weight: visual.ringWeight,
-      opacity: visual.ringOpacity,
-      fillColor: visual.ringColor,
-      fillOpacity: visual.ringFillOpacity,
-      className: `saga-node-radius saga-node-radius--${nodeState}`,
-    }).addTo(map)
-
-    const markerLayer = L.circleMarker(center, {
-      radius: visual.markerRadius,
-      weight: visual.markerWeight,
-      color: visual.markerStroke,
-      fillColor: visual.markerFill,
-      fillOpacity: 0.98,
-      className: `saga-node-core saga-node-core--${nodeState}`,
-    }).addTo(map)
-
-    if (onNodeTap) {
-      radiusLayer.on('click', () => onNodeTap())
-      markerLayer.on('click', () => onNodeTap())
+    if (routeLatLngs.length > 1) {
+      const routeLine = L.polyline(routeLatLngs, {
+        color: '#64748b',
+        weight: 3,
+        opacity: 0.42,
+        dashArray: '6 8',
+        interactive: false,
+      }).addTo(map)
+      routeNodeLayersRef.current.push(routeLine)
     }
 
-    nodeRadiusRef.current = radiusLayer
-    nodeMarkerRef.current = markerLayer
+    let activeRadiusLayer: L.Circle | null = null
 
-    const nodeFrameKey = `${stageMapData.lat}:${stageMapData.lon}:${stageMapData.radius}`
-    if (lastNodeFrameRef.current !== nodeFrameKey) {
+    for (const entry of stageNodes) {
+      const { data, index } = entry
+      const state =
+        index < activeIndex
+          ? 'completed'
+          : index === activeIndex
+          ? 'current'
+          : 'locked'
+
+      const center: L.LatLngExpression = [data.lat, data.lon]
+
+      if (state === 'current') {
+        const visual = getNodeVisualConfig(nodeState)
+
+        const radiusLayer = L.circle(center, {
+          radius: data.radius,
+          color: visual.ringColor,
+          weight: visual.ringWeight,
+          opacity: visual.ringOpacity,
+          fillColor: visual.ringColor,
+          fillOpacity: visual.ringFillOpacity,
+          className: `saga-node-radius saga-node-radius--${nodeState}`,
+        }).addTo(map)
+
+        const markerLayer = L.marker(center, {
+          icon: createMissionNodeIcon(index, 'current'),
+          keyboard: false,
+          zIndexOffset: 720,
+        }).addTo(map)
+
+        markerLayer.bindTooltip(data.name, {
+          direction: 'top',
+          opacity: 0.92,
+        })
+
+        if (onNodeTap) {
+          radiusLayer.on('click', () => onNodeTap())
+          markerLayer.on('click', () => onNodeTap())
+        }
+
+        nodeRadiusRef.current = radiusLayer
+        nodeMarkerRef.current = markerLayer as unknown as L.CircleMarker
+        activeRadiusLayer = radiusLayer
+        routeNodeLayersRef.current.push(radiusLayer, markerLayer)
+        continue
+      }
+
+      const ringColor = state === 'completed' ? '#22c55e' : '#ef4444'
+      const ringFill = state === 'completed' ? '#bbf7d0' : '#fecaca'
+
+      const ghostRadius = L.circle(center, {
+        radius: Math.max(16, Math.min(data.radius, 40)),
+        color: ringColor,
+        weight: 2,
+        opacity: state === 'completed' ? 0.42 : 0.58,
+        fillColor: ringFill,
+        fillOpacity: state === 'completed' ? 0.10 : 0.14,
+        interactive: false,
+      }).addTo(map)
+
+      const ghostMarker = L.marker(center, {
+        icon: createMissionNodeIcon(index, state),
+        keyboard: false,
+        zIndexOffset: state === 'locked' ? 540 : 560,
+      }).addTo(map)
+
+      ghostMarker.bindTooltip(
+        state === 'locked' ? `Bloqueado · ${data.name}` : `Completado · ${data.name}`,
+        {
+          direction: 'top',
+          opacity: 0.88,
+        }
+      )
+
+      routeNodeLayersRef.current.push(ghostRadius, ghostMarker)
+    }
+
+    const nodeFrameKey = stageNodes
+      .map((entry) => `${entry.index}:${entry.data.lat}:${entry.data.lon}:${entry.data.radius}`)
+      .join('|') + `:active:${activeIndex}`
+
+    if (lastNodeFrameRef.current !== nodeFrameKey && !playerPosition) {
       lastNodeFrameRef.current = nodeFrameKey
       lastPlayerFrameRef.current = null
-      map.fitBounds(radiusLayer.getBounds(), {
-        padding: [56, 56],
-        maxZoom: 16,
-        animate: true,
-        duration: 0.35,
-      })
+
+      if (activeRadiusLayer) {
+        map.fitBounds(activeRadiusLayer.getBounds(), {
+          padding: [56, 56],
+          maxZoom: 16,
+          animate: true,
+          duration: 0.35,
+        })
+      } else {
+        const activeNode = stageNodes[Math.min(activeIndex, stageNodes.length - 1)]
+        map.setView([activeNode.data.lat, activeNode.data.lon], 15, {
+          animate: true,
+          duration: 0.35,
+        })
+      }
     }
 
     map.invalidateSize({ pan: false })
-  }, [stageMapData, onNodeTap, nodeState, Boolean(playerPosition)])
+  }, [
+    currentStage,
+    missionStages,
+    currentLevel,
+    onNodeTap,
+    nodeState,
+    Boolean(playerPosition),
+  ])
 
   useEffect(() => {
     const map = mapRef.current

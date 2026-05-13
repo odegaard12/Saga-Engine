@@ -2,7 +2,7 @@
   "name": "SAGA Engine",
   "short_name": "SAGA",
   "description": "Mobile-first engine for real-world geolocated missions.",
-  "start_url": "/player/PLAYER%201",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

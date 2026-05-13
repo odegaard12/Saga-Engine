@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
@@ -14,6 +15,9 @@ import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShel
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
+import { getDistanceMeters } from './utils/geo'
+import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
+import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -39,135 +43,6 @@ function vibrate(pattern: number | number[]) {
 function getUserFromUrl(): string {
   const params = new URLSearchParams(window.location.search)
   return params.get('user') || 'PLAYER 1'
-}
-
-function getCurrentStage(payload: PlayerGamePayload): PlayerStage | null {
-  if (payload.finished) return null
-  return payload.current_stage || payload.stages?.[payload.level] || null
-}
-
-function normalizeGpsStatus(status?: string): PlayerGpsStatus {
-  if (!status) return 'unavailable'
-  const value = status.toLowerCase()
-
-  if (value === 'ok' || value === 'ready' || value === 'active' || value === 'available') {
-    return 'ready'
-  }
-  if (value === 'stale') return 'stale'
-  if (value === 'searching' || value === 'pending') return 'searching'
-  if (value === 'error' || value === 'denied') return 'error'
-  return 'unavailable'
-}
-
-function getPlayerPosition(payload: PlayerGamePayload) {
-  const lat = payload.live_status?.lat
-  const lon = payload.live_status?.lon
-
-  if (typeof lat !== 'number' || typeof lon !== 'number') return null
-  return { lat, lon }
-}
-
-function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-  const earthRadius = 6371000
-
-  const dLat = toRad(b.lat - a.lat)
-  const dLon = toRad(b.lon - a.lon)
-  const lat1 = toRad(a.lat)
-  const lat2 = toRad(b.lat)
-
-  const sinLat = Math.sin(dLat / 2)
-  const sinLon = Math.sin(dLon / 2)
-
-  const h =
-    sinLat * sinLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
-
-  return 2 * earthRadius * Math.asin(Math.sqrt(h))
-}
-
-function canShowLiveDistance(gpsState: PlayerGpsStatus): boolean {
-  return gpsState === 'ready' || gpsState === 'stale'
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
-}
-
-function getStagePosition(stage: PlayerStage | null): { lat: number; lon: number } | null {
-  const lat = toFiniteNumber(stage?.lat)
-  const lon = toFiniteNumber(stage?.lon)
-  if (lat === null || lon === null) return null
-  return { lat, lon }
-}
-
-function getStageRadius(stage: PlayerStage | null): number | null {
-  const radius = toFiniteNumber(stage?.radius)
-  return radius !== null && radius > 0 ? radius : null
-}
-
-function gpsReadyStorageKey(user: string): string {
-  return `saga:gps-ready:${user}`
-}
-
-function gpsLastPositionStorageKey(user: string): string {
-  return `saga:gps-last-position:${user}`
-}
-
-function readStoredGpsPosition(user: string): { lat: number; lon: number } | null {
-  if (typeof window === 'undefined') return null
-
-  try {
-    const raw = window.localStorage.getItem(gpsLastPositionStorageKey(user))
-    if (!raw) return null
-
-    const parsed = JSON.parse(raw) as { lat?: unknown; lon?: unknown }
-    const lat = toFiniteNumber(parsed.lat)
-    const lon = toFiniteNumber(parsed.lon)
-
-    if (lat === null || lon === null) return null
-    return { lat, lon }
-  } catch {
-    return null
-  }
-}
-
-function rememberGpsReady(user: string): void {
-  if (typeof window === 'undefined') return
-
-  try {
-    window.localStorage.setItem(gpsReadyStorageKey(user), '1')
-  } catch {
-    // ignore private mode/storage errors
-  }
-}
-
-function rememberGpsPosition(user: string, position: { lat: number; lon: number }): void {
-  if (typeof window === 'undefined') return
-
-  try {
-    window.localStorage.setItem(
-      gpsLastPositionStorageKey(user),
-      JSON.stringify({ ...position, saved_at: Date.now() })
-    )
-  } catch {
-    // ignore private mode/storage errors
-  }
-}
-
-function hasRememberedGpsReady(user: string): boolean {
-  if (typeof window === 'undefined') return false
-
-  try {
-    return window.localStorage.getItem(gpsReadyStorageKey(user)) === '1'
-  } catch {
-    return false
-  }
 }
 
 export default function PlayerApp() {
@@ -916,6 +791,8 @@ export default function PlayerApp() {
       <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
+          missionStages={payload.stages || []}
+          currentLevel={payload.level || 0}
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
@@ -959,62 +836,17 @@ export default function PlayerApp() {
           </button>
         </div>
 
-        {offlinePrepVisible && !payload.finished ? (
-          <div style={getOfflinePrepOverlayStyle(isPhone)}>
-            <section style={offlinePrepCard}>
-              <div>
-                <div style={offlinePrepEyebrow}>MODO CAMPO</div>
-                <div style={offlinePrepTitle}>
-                  {hasOfflineMission && hasBrowserGps ? 'Listo para salir' : 'Preparar antes de salir'}
-                </div>
-                <div style={offlinePrepCopy}>
-                  {hasOfflineMission ? '✓ Misión descargada en este teléfono.' : '○ Descarga nodos, códigos, reglas y requisitos.'}
-                  <br />
-                  {hasBrowserGps ? '✓ GPS activo.' : '○ Activa GPS para distancia y entrada en nodos.'}
-                </div>
-              </div>
-
-              <div style={offlinePrepActions}>
-                <button
-                  type="button"
-                  style={hasOfflineMission ? offlinePrepButtonDone : offlinePrepButton}
-                  disabled={offlinePrepState === 'saving'}
-                  onClick={handlePrepareOfflinePack}
-                >
-                  {offlinePrepState === 'saving'
-                    ? 'Descargando…'
-                    : hasOfflineMission
-                      ? '✓ Misión descargada'
-                      : 'Descargar misión'}
-                </button>
-
-                <button
-                  type="button"
-                  style={hasBrowserGps ? offlinePrepButtonDone : offlinePrepButton}
-                  onClick={() => void handleRequestLiveGps({ forceFocus: true })}
-                >
-                  {browserGpsStatus === 'searching'
-                    ? 'Buscando GPS…'
-                    : hasBrowserGps
-                      ? '✓ GPS activo'
-                      : 'Activar GPS'}
-                </button>
-              </div>
-
-              <button
-                type="button"
-                style={hasOfflineMission && hasBrowserGps ? offlinePrepDismiss : offlinePrepDismissLater}
-                onClick={() => setOfflinePrepVisible(false)}
-              >
-                {hasOfflineMission && hasBrowserGps ? '×' : 'Más tarde'}
-              </button>
-
-              {offlinePrepState === 'error' ? (
-                <div style={offlinePrepError}>No se pudo descargar. Prueba otra vez desde Herramientas.</div>
-              ) : null}
-            </section>
-          </div>
-        ) : null}
+          <FieldPrepPanel
+            visible={offlinePrepVisible && !payload.finished}
+            mobile={isPhone}
+            hasOfflineMission={hasOfflineMission}
+            hasBrowserGps={hasBrowserGps}
+            offlinePrepState={offlinePrepState}
+            browserGpsStatus={browserGpsStatus}
+            onPrepareOfflinePack={handlePrepareOfflinePack}
+            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDismiss={() => setOfflinePrepVisible(false)}
+          />
 
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
@@ -1091,99 +923,6 @@ const mapRouteToggleButton: CSSProperties = {
   WebkitBackdropFilter: 'blur(14px)',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
-}
-
-function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    left: mobile ? 12 : 24,
-    right: mobile ? 12 : 'auto',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 230px)' : 86,
-    bottom: 'auto',
-    width: mobile ? 'auto' : 380,
-    zIndex: 1190,
-    pointerEvents: 'auto',
-  }
-}
-
-const offlinePrepCard: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  padding: '10px 12px',
-  borderRadius: 18,
-  background: 'rgba(15, 23, 42, 0.92)',
-  border: '1px solid rgba(255, 255, 255, 0.16)',
-  boxShadow: '0 18px 50px rgba(15, 23, 42, 0.32)',
-  color: '#ffffff',
-}
-
-const offlinePrepEyebrow: CSSProperties = {
-  color: '#93c5fd',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.15em',
-  textTransform: 'uppercase',
-}
-
-const offlinePrepTitle: CSSProperties = {
-  marginTop: 3,
-  fontSize: 18,
-  fontWeight: 950,
-  letterSpacing: '-0.04em',
-}
-
-const offlinePrepCopy: CSSProperties = {
-  marginTop: 4,
-  color: 'rgba(226, 232, 240, 0.82)',
-  fontSize: 13,
-  lineHeight: 1.35,
-}
-
-const offlinePrepActions: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 6,
-}
-
-const offlinePrepButton: CSSProperties = {
-  minHeight: 38,
-  border: 'none',
-  borderRadius: 16,
-  background: '#22c55e',
-  color: '#052e16',
-  fontSize: 14,
-  fontWeight: 950,
-  cursor: 'pointer',
-}
-
-const offlinePrepButtonDone: CSSProperties = {
-  ...offlinePrepButton,
-  background: '#bbf7d0',
-  color: '#14532d',
-}
-
-const offlinePrepDismiss: CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: 'rgba(226, 232, 240, 0.78)',
-  fontSize: 12,
-  fontWeight: 800,
-  cursor: 'pointer',
-}
-
-const offlinePrepDismissLater: CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: 'rgba(226,232,240,.78)',
-  fontSize: 12,
-  fontWeight: 800,
-  cursor: 'pointer',
-}
-
-const offlinePrepError: CSSProperties = {
-  color: '#fecaca',
-  fontSize: 12,
-  fontWeight: 800,
 }
 
 function ScreenFrame({
