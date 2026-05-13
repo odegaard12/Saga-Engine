@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v171-field-polish-28'
+const CACHE_NAME = 'saga-player-shell-v172-field-refactor-1'
 const DEFAULT_PLAYER_URL = '/player/PLAYER%201'
 const CORE_URLS = [DEFAULT_PLAYER_URL, '/manifest.webmanifest', '/sw.js']
 

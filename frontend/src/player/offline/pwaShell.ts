@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v171-field-polish-28'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v172-field-refactor-1'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
