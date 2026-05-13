@@ -791,6 +791,8 @@ export default function PlayerApp() {
       <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
+          missionStages={payload.stages || []}
+          currentLevel={payload.level || 0}
           playerPosition={playerPosition}
           gpsState={gpsState}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
