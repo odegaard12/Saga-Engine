@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v172-field-refactor-1'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v173-identity-1'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
@@ -36,8 +36,7 @@ function sameOriginPath(value: string): string | null {
 
 function collectShellUrls(playerUrl: string): string[] {
   const urls = new Set<string>([
-    sameOriginPath(playerUrl) || '/player/PLAYER%201',
-    '/player/PLAYER%201',
+    sameOriginPath(playerUrl) || '/',
     '/manifest.webmanifest',
     '/sw.js',
     '/service-worker.js',

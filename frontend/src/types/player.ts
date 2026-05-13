@@ -7,6 +7,9 @@ export interface PlayerProfile {
   mode: PlayerMode
   members?: string[]
   status?: string
+  color?: string
+  avatar_url?: string
+  avatar_initials?: string
 }
 
 export interface StageLocation {
@@ -74,6 +77,9 @@ export interface PlayerLiveStatus {
   lon?: number | null
   source?: string
   debug_enabled?: boolean
+  color?: string
+  avatar_url?: string
+  avatar_initials?: string
 }
 
 export interface TeamProfileLiveStatus extends PlayerLiveStatus {

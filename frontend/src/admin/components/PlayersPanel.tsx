@@ -1,4 +1,5 @@
 import type { PlayerDraft } from '../lib/playerDrafts'
+import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
 type PlayersPanelProps = {
   playerDrafts: PlayerDraft[]
@@ -44,7 +45,16 @@ export default function PlayersPanel({
           {playerDrafts.map((draft, index) => (
             <section className="admin-player-editor-card admin-player-card-modern" key={`${draft.id}-${index}`}>
               <div className="admin-player-editor-head admin-player-head-modern">
-                <div className="admin-player-avatar">{index + 1}</div>
+                <div
+                    className="admin-player-avatar"
+                    style={{
+                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                      color: '#ffffff',
+                      boxShadow: '0 10px 26px rgba(15,23,42,0.28)',
+                    }}
+                  >
+                    {draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)}
+                  </div>
                 <div>
                   <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
                   <span>{draft.mode === 'team' ? 'Team profile' : 'Solo profile'} · {draft.status || 'active'}</span>
