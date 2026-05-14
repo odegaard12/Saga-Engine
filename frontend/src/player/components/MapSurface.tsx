@@ -163,18 +163,20 @@ function buildPlayerPopup(
 ): string {
   const identity = getMarkerIdentity(profile, kind)
   const presence = kind === 'self'
-    ? 'TU POSICIÓN'
+    ? 'MI UBICACIÓN'
     : kind === 'live'
       ? 'ONLINE'
       : kind === 'recent'
         ? 'RECIENTE'
         : 'OFFLINE'
 
+  const title = kind === 'self' ? 'Tú' : identity.label
+
   return `
-    <div style="min-width:150px;font-family:system-ui,sans-serif;">
-      <strong style="display:block;font-size:13px;color:#0f172a;">${escapeHtml(identity.label)}</strong>
+    <div style="min-width:156px;font-family:system-ui,sans-serif;">
+      <strong style="display:block;font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
       <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:900;letter-spacing:.08em;color:${escapeHtml(identity.color)};">${presence}</span>
-      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : ''}
+      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : '<div style="margin-top:6px;font-size:11px;color:#475569;">Posición actual del navegador</div>'}
       ${profile.gps_status ? `<div style="margin-top:4px;font-size:11px;color:#64748b;">GPS ${escapeHtml(String(profile.gps_status).toUpperCase())}</div>` : ''}
     </div>
   `
@@ -242,9 +244,14 @@ export function MapSurface({
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const routeNodeLayersRef = useRef<L.Layer[]>([])
+  const onNodeTapRef = useRef(onNodeTap)
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    onNodeTapRef.current = onNodeTap
+  }, [onNodeTap])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -546,6 +553,16 @@ export function MapSurface({
         direction: 'top',
         opacity: 0.92,
       })
+      playerMarkerRef.current.bindPopup(
+        buildPlayerPopup({ display_name: selfLabel, user: selfLabel, gps_status: gpsState }, 'self'),
+        {
+          closeButton: true,
+          autoPan: true,
+          keepInView: true,
+        }
+      )
+      playerMarkerRef.current.off('click')
+      playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
       playerMarkerRef.current.bindPopup(buildPlayerPopup({ display_name: selfLabel, user: selfLabel }, 'self'))
     } else {
       playerMarkerRef.current.setLatLng(nextLatLng)
@@ -614,18 +631,30 @@ export function MapSurface({
       if (existing) {
         existing.setLatLng(nextLatLng)
         existing.setIcon(createAvatarIcon(player, kind))
+        existing.setZIndexOffset(900)
+        existing.bindPopup(buildPlayerPopup(player, kind), {
+          closeButton: true,
+          autoPan: true,
+          keepInView: true,
+        })
+        existing.off('click')
+        existing.on('click', () => existing.openPopup())
         continue
       }
 
       const marker = L.marker(nextLatLng, {
         icon: createAvatarIcon(player, kind),
         keyboard: false,
+        riseOnHover: true,
+        bubblingMouseEvents: false,
+        zIndexOffset: 900,
       }).addTo(map)
 
       marker.bindTooltip(label, {
         direction: 'top',
         opacity: 0.92,
       })
+      marker.on('click', () => marker.openPopup())
 
       otherPlayerMarkersRef.current.set(key, marker)
     }
@@ -817,6 +846,7 @@ const mapAnimations = `
           color: #ffffff;
           background: linear-gradient(135deg, var(--saga-player-color, #22c55e), rgba(15,23,42,.72));
           overflow: hidden;
+          transition: transform 160ms ease, opacity 160ms ease;
         }
 
 .saga-avatar-pin--self {
