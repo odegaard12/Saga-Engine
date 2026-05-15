@@ -800,7 +800,7 @@ export default function PlayerApp() {
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
-          selfLabel={'ME'}
+          selfLabel={'YO'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
         />

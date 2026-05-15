@@ -8,6 +8,45 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; config: PublicConfig }
 
+type LoginLocale = 'es' | 'en'
+
+function getLoginLocale(config?: PublicConfig): LoginLocale {
+  let stored = ''
+  try {
+    stored = String(window.localStorage.getItem('saga_locale') || '').toLowerCase()
+  } catch {
+    stored = ''
+  }
+
+  const raw = stored || String(config?.ui_lang || 'es').toLowerCase()
+  if (raw.startsWith('en')) return 'en'
+  return 'es'
+}
+
+function loginText(locale: LoginLocale) {
+  if (locale === 'en') {
+    return {
+      admin: 'Admin',
+      bodyFallback: 'Choose a player to continue.',
+      enter: 'Enter',
+      solo: 'SOLO',
+      team: 'TEAM',
+      brandKicker: 'FIELD MISSION',
+      configError: 'Configuration error',
+    }
+  }
+
+  return {
+    admin: 'Admin',
+    bodyFallback: 'Elige jugador para continuar.',
+    enter: 'Entrar',
+    solo: 'SOLO',
+    team: 'EQUIPO',
+    brandKicker: 'MISIÓN DE CAMPO',
+    configError: 'Error de configuración',
+  }
+}
+
 function normalizeProfiles(config: PublicConfig): PlayerProfile[] {
   if (Array.isArray(config.player_profiles) && config.player_profiles.length > 0) {
     return config.player_profiles
@@ -28,14 +67,11 @@ function looksPlaceholder(value?: string) {
   return text.toUpperCase().startsWith('PUT ')
 }
 
-function resolveLoginCopy(config: PublicConfig) {
+function resolveLoginCopy(config: PublicConfig, locale: LoginLocale) {
+  const copy = loginText(locale)
   const title = !looksPlaceholder(config.site_name) ? config.site_name! : 'SAGA'
-  const subtitle = !looksPlaceholder(config.story_title)
-    ? config.story_title!
-    : 'Enter mission'
-  const body = !looksPlaceholder(config.story_text)
-    ? config.story_text!
-    : 'Tap an operator to continue.'
+  const subtitle = !looksPlaceholder(config.story_title) ? config.story_title! : ''
+  const body = !looksPlaceholder(config.story_text) ? config.story_text! : copy.bodyFallback
   return { title, subtitle, body }
 }
 
@@ -82,8 +118,7 @@ export default function LoginApp() {
     return normalizeProfiles(state.config)
   }, [state])
 
-  const mobile =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -95,12 +130,10 @@ export default function LoginApp() {
 
         <div style={shellWrap}>
           <section style={heroCard}>
-            <div style={heroTop}>
-              <div style={eyebrow}>MISSION ENTRY</div>
-            </div>
+            <div style={heroTopSpacer} />
             <div style={heroCenter}>
-              <h1 style={heroTitle}>SAGA</h1>
-              <p style={heroSubtitle}>Loading mission</p>
+              <div style={sagaWordmark}>SAGA</div>
+              <div style={sagaWordmarkSub}>MISIÓN DE CAMPO</div>
             </div>
           </section>
         </div>
@@ -118,11 +151,11 @@ export default function LoginApp() {
 
         <div style={shellWrap}>
           <section style={heroCard}>
-            <div style={heroTop}>
-              <div style={eyebrow}>MISSION ENTRY</div>
-            </div>
+            <div style={heroTopSpacer} />
             <div style={heroCenter}>
-              <h1 style={heroTitle}>Config error</h1>
+              <div style={sagaWordmark}>SAGA</div>
+              <div style={sagaWordmarkSub}>MISIÓN DE CAMPO</div>
+              <h1 style={heroTitle}>Error de configuración</h1>
               <p style={heroBody}>{state.message}</p>
             </div>
           </section>
@@ -133,7 +166,9 @@ export default function LoginApp() {
 
   if (state.status !== 'ready') return null
 
-  const { title, subtitle, body } = resolveLoginCopy(state.config)
+  const locale = getLoginLocale(state.config)
+  const copy = loginText(locale)
+  const { title, subtitle, body } = resolveLoginCopy(state.config, locale)
 
   return (
     <main style={pageWrap}>
@@ -152,16 +187,23 @@ export default function LoginApp() {
       >
         <section style={heroCard}>
           <div style={heroTop}>
-            <div style={eyebrow}>MISSION ENTRY</div>
-
+            <div />
             <a href="/admin" style={adminButton}>
-              Admin
+              {copy.admin}
             </a>
           </div>
 
           <div style={heroCenter}>
-            <h1 style={heroTitle}>{title}</h1>
-            <p style={heroSubtitle}>{subtitle}</p>
+            {title && title.toUpperCase() !== 'SAGA' ? (
+              <h1 style={heroTitle}>{title}</h1>
+            ) : (
+              <>
+                <div style={sagaWordmark}>SAGA</div>
+                <div style={sagaWordmarkSub}>{copy.brandKicker}</div>
+              </>
+            )}
+
+            {subtitle ? <p style={heroSubtitle}>{subtitle}</p> : null}
             <p style={heroBody}>{body}</p>
           </div>
         </section>
@@ -170,9 +212,9 @@ export default function LoginApp() {
           {profiles.map((profile, index) => {
             const isTeam = profile.mode === 'team'
             const meta = getMeta(profile)
-              const profileColor = getPlayerColor(profile)
-              const avatarUrl = getPlayerAvatarUrl(profile)
-              const avatarInitials = getPlayerAvatarInitials(profile)
+            const profileColor = getPlayerColor(profile)
+            const avatarUrl = getPlayerAvatarUrl(profile)
+            const avatarInitials = getPlayerAvatarInitials(profile)
 
             return (
               <article
@@ -183,35 +225,35 @@ export default function LoginApp() {
                 }}
               >
                 <div style={playerLeft}>
-                    <div
-                      style={{
-                        ...avatar,
-                        background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.22))`,
-                        borderColor: `${profileColor}66`,
-                        color: '#ffffff',
-                      }}
-                    >
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt=""
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            borderRadius: 999,
-                            display: 'block',
-                          }}
-                        />
-                      ) : (
-                        avatarInitials
-                      )}
-                    </div>
+                  <div
+                    style={{
+                      ...avatar,
+                      background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.20))`,
+                      borderColor: `${profileColor}66`,
+                      color: '#ffffff',
+                    }}
+                  >
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          borderRadius: 999,
+                          display: 'block',
+                        }}
+                      />
+                    ) : (
+                      avatarInitials
+                    )}
+                  </div>
 
                   <div style={identity}>
                     <div style={playerName}>{profile.display_name}</div>
                     <div style={identityBottom}>
-                      <span style={modePill}>{isTeam ? 'TEAM' : 'SOLO'}</span>
+                      <span style={modePill}>{isTeam ? copy.team : copy.solo}</span>
                       {meta ? <span style={playerMetaInline}>{meta}</span> : null}
                     </div>
                   </div>
@@ -225,7 +267,7 @@ export default function LoginApp() {
                       window.location.href = `/player/${encodeURIComponent(profile.id)}`
                     }}
                   >
-                    Enter
+                    {copy.enter}
                   </button>
                 </div>
               </article>
@@ -242,53 +284,65 @@ const pageWrap: CSSProperties = {
   position: 'relative',
   overflowX: 'hidden',
   background:
-    'linear-gradient(180deg, #2f3b36 0%, #394540 28%, #47524e 100%)',
+    'radial-gradient(circle at 50% 0%, rgba(74,222,128,.15), transparent 34%), linear-gradient(180deg, #253530 0%, #34433e 45%, #25322e 100%)',
   color: '#ffffff',
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
 }
 
+const shellWrap: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  width: 'min(100%, 390px)',
+  margin: '0 auto',
+  padding: '32px 20px 40px',
+  display: 'grid',
+  gap: 14,
+}
+
 const backGlowTop: CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  inset: '-180px auto auto 50%',
+  width: 420,
+  height: 420,
+  transform: 'translateX(-50%)',
+  borderRadius: 999,
+  background: 'rgba(74,222,128,.12)',
+  filter: 'blur(34px)',
   pointerEvents: 'none',
-  background:
-    'radial-gradient(circle at 50% 0%, rgba(34,197,94,.18), transparent 28%)',
 }
 
 const backGlowBottom: CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  inset: 'auto auto -240px 50%',
+  width: 520,
+  height: 520,
+  transform: 'translateX(-50%)',
+  borderRadius: 999,
+  background: 'rgba(15,23,42,.24)',
+  filter: 'blur(44px)',
   pointerEvents: 'none',
-  background:
-    'radial-gradient(circle at 84% 18%, rgba(59,130,246,.12), transparent 18%), radial-gradient(circle at 12% 82%, rgba(255,255,255,.06), transparent 18%)',
 }
 
 const backVignette: CSSProperties = {
   position: 'fixed',
   inset: 0,
+  background: 'linear-gradient(90deg, rgba(2,6,23,.12), transparent 22%, transparent 78%, rgba(2,6,23,.12))',
   pointerEvents: 'none',
-  boxShadow: 'inset 0 0 120px rgba(15,23,42,.26)',
-}
-
-const shellWrap: CSSProperties = {
-  position: 'relative',
-  zIndex: 2,
-  width: 'min(760px, 100%)',
-  margin: '0 auto',
-  display: 'grid',
-  gap: 14,
 }
 
 const heroCard: CSSProperties = {
-  padding: '18px 18px 22px',
+  padding: '22px 18px 24px',
   borderRadius: 30,
-  border: '1px solid rgba(255,255,255,.16)',
-  background:
-    'linear-gradient(180deg, rgba(84,91,104,.74) 0%, rgba(110,116,128,.62) 100%)',
-  boxShadow: '0 22px 52px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.10)',
-  backdropFilter: 'blur(20px) saturate(135%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'linear-gradient(180deg, rgba(78,92,90,.86) 0%, rgba(60,74,70,.76) 100%)',
+  boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
+  backdropFilter: 'blur(18px) saturate(135%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(135%)',
   animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const heroTopSpacer: CSSProperties = {
+  minHeight: 30,
 }
 
 const heroTop: CSSProperties = {
@@ -296,28 +350,14 @@ const heroTop: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-}
-
-const eyebrow: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 28,
-  padding: '0 11px',
-  borderRadius: 999,
-  border: '1px solid rgba(74,222,128,.18)',
-  background: 'rgba(220,252,231,.88)',
-  color: '#166534',
-  fontSize: 10,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  fontWeight: 900,
+  minHeight: 30,
 }
 
 const adminButton: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 30,
+  minHeight: 28,
   padding: '0 11px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.16)',
@@ -329,16 +369,36 @@ const adminButton: CSSProperties = {
 }
 
 const heroCenter: CSSProperties = {
-  marginTop: 26,
+  marginTop: 8,
   display: 'grid',
   justifyItems: 'center',
   textAlign: 'center',
-  gap: 10,
+  gap: 8,
+}
+
+const sagaWordmark: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 'clamp(58px, 14vw, 86px)',
+  lineHeight: 0.78,
+  fontWeight: 1000,
+  letterSpacing: '-0.08em',
+  textShadow: '0 16px 34px rgba(2,6,23,.34)',
+}
+
+const sagaWordmarkSub: CSSProperties = {
+  color: '#dcffe9',
+  fontSize: 10,
+  lineHeight: 1,
+  fontWeight: 1000,
+  letterSpacing: '0.36em',
+  textTransform: 'uppercase',
+  marginTop: 3,
+  marginBottom: 8,
 }
 
 const heroTitle: CSSProperties = {
   margin: 0,
-  fontSize: 'clamp(48px, 11vw, 76px)',
+  fontSize: 'clamp(42px, 10vw, 70px)',
   lineHeight: 0.9,
   fontWeight: 900,
   letterSpacing: '-0.06em',
@@ -348,9 +408,9 @@ const heroTitle: CSSProperties = {
 
 const heroSubtitle: CSSProperties = {
   margin: 0,
-  color: '#c8ffe1',
-  fontSize: 13,
-  letterSpacing: '0.22em',
+  color: '#dcffe9',
+  fontSize: 12,
+  letterSpacing: '0.18em',
   textTransform: 'uppercase',
   fontWeight: 900,
 }
@@ -358,9 +418,9 @@ const heroSubtitle: CSSProperties = {
 const heroBody: CSSProperties = {
   margin: 0,
   maxWidth: 420,
-  color: 'rgba(255,255,255,.86)',
-  fontSize: 16,
-  lineHeight: 1.5,
+  color: 'rgba(255,255,255,.88)',
+  fontSize: 14,
+  lineHeight: 1.45,
 }
 
 const listBlock: CSSProperties = {
@@ -376,8 +436,7 @@ const playerCard: CSSProperties = {
   padding: '12px 12px',
   borderRadius: 22,
   border: '1px solid rgba(255,255,255,.14)',
-  background:
-    'linear-gradient(180deg, rgba(84,91,104,.68) 0%, rgba(102,108,120,.58) 100%)',
+  background: 'linear-gradient(180deg, rgba(78,92,90,.76) 0%, rgba(62,78,73,.66) 100%)',
   boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
   backdropFilter: 'blur(18px) saturate(130%)',
   WebkitBackdropFilter: 'blur(18px) saturate(130%)',
@@ -402,91 +461,87 @@ const avatar: CSSProperties = {
   justifyContent: 'center',
   background: 'rgba(219,234,254,.92)',
   border: '1px solid rgba(96,165,250,.28)',
-  color: '#1d4ed8',
+  color: '#ffffff',
   fontSize: 13,
   fontWeight: 900,
-  letterSpacing: '0.04em',
+  overflow: 'hidden',
 }
 
 const identity: CSSProperties = {
-  minWidth: 0,
   display: 'grid',
-  gap: 6,
+  gap: 5,
+  minWidth: 0,
 }
 
 const playerName: CSSProperties = {
-  fontSize: 22,
-  lineHeight: 0.96,
-  fontWeight: 900,
-  color: '#ffffff',
-  letterSpacing: '-0.03em',
-}
-const identityBottom: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  flexWrap: 'wrap',
-}
-
-const playerMetaInline: CSSProperties = {
-  color: 'rgba(255,255,255,.66)',
-  fontSize: 12,
-  lineHeight: 1.2,
-}
-
-
-const playerMeta: CSSProperties = {
-  marginTop: 3,
-  color: 'rgba(255,255,255,.74)',
-  fontSize: 11,
-  lineHeight: 1.3,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+  color: '#ffffff',
+  fontSize: 18,
+  lineHeight: 1,
+  fontWeight: 1000,
+  letterSpacing: '-0.04em',
+  textShadow: '0 8px 18px rgba(2,6,23,.24)',
+}
+
+const identityBottom: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  minWidth: 0,
+}
+
+const modePill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 18,
+  padding: '0 7px',
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.14)',
+  color: 'rgba(255,255,255,.92)',
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const playerMetaInline: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  color: 'rgba(255,255,255,.70)',
+  fontSize: 11,
+  fontWeight: 700,
 }
 
 const playerRight: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-end',
-  minWidth: 132,
-}
-
-const modePill: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 22,
-  padding: '0 8px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.10)',
-  color: '#ffffff',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
 }
 
 const enterButton: CSSProperties = {
-  minWidth: 118,
-  minHeight: 34,
-  padding: '0 14px',
-  borderRadius: 12,
-  border: '1px solid rgba(34,197,94,.24)',
-  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+  minHeight: 32,
+  minWidth: 88,
+  border: 0,
+  borderRadius: 10,
+  background: 'linear-gradient(180deg, #35d86e 0%, #16a34a 100%)',
   color: '#ffffff',
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
+  fontSize: 11,
+  fontWeight: 1000,
+  letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  boxShadow: '0 12px 24px rgba(34,197,94,.18)',
+  boxShadow: '0 12px 24px rgba(22,163,74,.22), inset 0 1px 0 rgba(255,255,255,.20)',
+  cursor: 'pointer',
 }
 
 const loginAnimations = `
 @keyframes sagaLoginRise {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(.992);
+    transform: translateY(8px) scale(.99);
   }
   to {
     opacity: 1;
@@ -494,13 +549,3 @@ const loginAnimations = `
   }
 }
 `
-
-const heroImage: CSSProperties = {
-  width: 'min(100%, 420px)',
-  maxHeight: 136,
-  objectFit: 'cover',
-  borderRadius: 26,
-  border: '1px solid rgba(255,255,255,.16)',
-  boxShadow: '0 20px 50px rgba(2,6,23,.22)',
-  marginBottom: 14,
-}
