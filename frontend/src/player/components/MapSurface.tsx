@@ -115,7 +115,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatSeenAgo(lastSeen?: number): string {
-  if (typeof lastSeen !== 'number' || !Number.isFinite(lastSeen)) return 'sin fecha'
+  if (typeof lastSeen !== 'number' || !Number.isFinite(lastSeen)) return 'sin actualizar'
   const diffSeconds = Math.max(0, Math.round((Date.now() - lastSeen * 1000) / 1000))
   if (diffSeconds < 60) return `hace ${diffSeconds}s`
   const diffMinutes = Math.round(diffSeconds / 60)
@@ -165,10 +165,10 @@ function buildPlayerPopup(
   const presence = kind === 'self'
     ? 'MI UBICACIÓN'
     : kind === 'live'
-      ? 'ONLINE'
+      ? 'EN LÍNEA'
       : kind === 'recent'
         ? 'RECIENTE'
-        : 'OFFLINE'
+        : 'SIN CONEXIÓN'
 
   const title = kind === 'self' ? 'Tú' : identity.label
 
@@ -176,7 +176,7 @@ function buildPlayerPopup(
     <div style="min-width:156px;font-family:system-ui,sans-serif;">
       <strong style="display:block;font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
       <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:900;letter-spacing:.08em;color:${escapeHtml(identity.color)};">${presence}</span>
-      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : '<div style="margin-top:6px;font-size:11px;color:#475569;">Posición actual del navegador</div>'}
+      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : '<div style="margin-top:6px;font-size:11px;color:#475569;">Tu ubicación actual</div>'}
       ${profile.gps_status ? `<div style="margin-top:4px;font-size:11px;color:#64748b;">GPS ${escapeHtml(String(profile.gps_status).toUpperCase())}</div>` : ''}
     </div>
   `
@@ -231,7 +231,7 @@ export function MapSurface({
   focusRequest,
   nodeState = 'locked',
   otherPlayers = [],
-  selfLabel = 'ME',
+  selfLabel = 'YO',
   onDebugSetPosition,
   onNodeTap,
 }: MapSurfaceProps) {
@@ -243,6 +243,7 @@ export function MapSurface({
   const playerAuraRef = useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
+  const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
   const routeNodeLayersRef = useRef<L.Layer[]>([])
   const onNodeTapRef = useRef(onNodeTap)
   const lastNodeFrameRef = useRef<string | null>(null)
@@ -283,6 +284,7 @@ export function MapSurface({
       routeNodeLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
+      otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
       playerMarkerRef.current = null
@@ -418,9 +420,9 @@ export function MapSurface({
           opacity: 0.92,
         })
 
-        if (onNodeTap) {
-          radiusLayer.on('click', () => onNodeTap())
-          markerLayer.on('click', () => onNodeTap())
+        if (onNodeTapRef.current) {
+          radiusLayer.on('click', () => onNodeTapRef.current?.())
+          markerLayer.on('click', () => onNodeTapRef.current?.())
         }
 
         nodeRadiusRef.current = radiusLayer
@@ -473,13 +475,13 @@ export function MapSurface({
           padding: [56, 56],
           maxZoom: 16,
           animate: true,
-          duration: 0.35,
+          duration: 0.25,
         })
       } else {
         const activeNode = stageNodes[Math.min(activeIndex, stageNodes.length - 1)]
         map.setView([activeNode.data.lat, activeNode.data.lon], 15, {
           animate: true,
-          duration: 0.35,
+          duration: 0.25,
         })
       }
     }
@@ -545,16 +547,16 @@ export function MapSurface({
 
     if (!playerMarkerRef.current) {
       playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon({ display_name: selfLabel, user: selfLabel }, 'self'),
+        icon: createAvatarIcon({ display_name: 'YO', user: 'YO', avatar_initials: 'YO' }, 'self'),
         keyboard: false,
       }).addTo(map)
 
-      playerMarkerRef.current.bindTooltip(selfLabel, {
+      playerMarkerRef.current.bindTooltip('YO', {
         direction: 'top',
         opacity: 0.92,
       })
       playerMarkerRef.current.bindPopup(
-        buildPlayerPopup({ display_name: selfLabel, user: selfLabel, gps_status: gpsState }, 'self'),
+        buildPlayerPopup({ display_name: 'YO', user: 'YO', avatar_initials: 'YO', gps_status: gpsState }, 'self'),
         {
           closeButton: true,
           autoPan: true,
@@ -563,7 +565,6 @@ export function MapSurface({
       )
       playerMarkerRef.current.off('click')
       playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
-      playerMarkerRef.current.bindPopup(buildPlayerPopup({ display_name: selfLabel, user: selfLabel }, 'self'))
     } else {
       playerMarkerRef.current.setLatLng(nextLatLng)
     }
@@ -591,13 +592,13 @@ export function MapSurface({
           map.fitBounds(bounds.pad(0.30), {
             maxZoom: 16,
             animate: true,
-            duration: 0.35,
+            duration: 0.25,
           })
         }
       } else {
         map.setView([playerPosition.lat, playerPosition.lon], 16, {
           animate: true,
-          duration: 0.35,
+          duration: 0.25,
         })
       }
     }
@@ -663,6 +664,7 @@ export function MapSurface({
       if (seen.has(key)) continue
       marker.remove()
       otherPlayerMarkersRef.current.delete(key)
+      otherPlayerMarkerStateRef.current.delete(key)
     }
   }, [otherPlayers])
 
@@ -678,7 +680,7 @@ export function MapSurface({
       map.stop()
       map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
         animate: true,
-        duration: 0.85,
+        duration: 0.60,
         easeLinearity: 0.22,
       })
       return
@@ -711,7 +713,7 @@ export function MapSurface({
           const center = bounds.getCenter()
           map.flyTo(center, targetZoom, {
             animate: true,
-            duration: 0.95,
+            duration: 0.65,
             easeLinearity: 0.22,
           })
         } else {
@@ -720,7 +722,7 @@ export function MapSurface({
             paddingBottomRight: [44, 190],
             maxZoom: targetZoom,
             animate: true,
-            duration: 0.95,
+            duration: 0.65,
             easeLinearity: 0.22,
           })
         }
@@ -732,7 +734,7 @@ export function MapSurface({
         map.stop()
         map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
           animate: true,
-          duration: 0.45,
+          duration: 0.25,
         })
         return
       }
@@ -742,7 +744,7 @@ export function MapSurface({
       map.stop()
       map.flyTo([stageMapData.lat, stageMapData.lon], 17, {
         animate: true,
-        duration: 0.85,
+        duration: 0.60,
         easeLinearity: 0.22,
       })
     }
@@ -833,13 +835,15 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin {
+  will-change: transform;
+  transform: translateZ(0);
           width: 42px;
           height: 42px;
           border-radius: 999px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 950;
           border: 3px solid rgba(255,255,255,.94);
           box-shadow: 0 12px 30px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.35);
@@ -850,6 +854,8 @@ const mapAnimations = `
         }
 
 .saga-avatar-pin--self {
+  min-width: 42px;
+  padding: 0 7px;
           width: 46px;
           height: 46px;
           border-color: rgba(255,255,255,.98);

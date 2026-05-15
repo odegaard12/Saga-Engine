@@ -30,9 +30,9 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
 
 function getPresenceLabel(value?: string) {
   const presence = String(value || 'offline').toLowerCase()
-  if (presence === 'live') return 'ONLINE'
-  if (presence === 'stale') return 'RECENT'
-  return 'OFFLINE'
+  if (presence === 'live') return 'EN LÍNEA'
+  if (presence === 'stale') return 'RECIENTE'
+  return 'SIN CONEXIÓN'
 }
 
 function getPresenceStyle(value?: string): CSSProperties {
@@ -99,13 +99,13 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
       >
         <div style={header}>
           <div>
-            <div style={eyebrow}>TEAM</div>
-            <div style={title}>Players</div>
+            <div style={eyebrow}>EQUIPO</div>
+            <div style={title}>Jugadores</div>
           </div>
 
           <button
             type="button"
-            aria-label="Close players"
+            aria-label="Cerrar jugadores"
             style={closeButton}
             onClick={(event) => {
               event.preventDefault()
@@ -118,7 +118,7 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
         </div>
 
         {sorted.length === 0 ? (
-          <div style={emptyState}>No other players are available yet.</div>
+          <div style={emptyState}>Todavía no hay otros jugadores disponibles.</div>
         ) : (
           <div style={list}>
             {sorted.map((player) => {

@@ -55,7 +55,7 @@ def load_config():
         "map_center": [42.26, -8.86],
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
-        "ui_lang": "en",
+        "ui_lang": "es",
         "player_theme": "classic",
         "data_dir": "data"
     })
@@ -857,7 +857,38 @@ REACT_PUBLIC_MANIFEST_FILE = APP_DIR / "frontend" / "public" / "manifest.webmani
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 
-@app.get("/manifest.webmanifest")
+
+def saga_asset_file_response(filename: str, media_type: str):
+    dist_file = REACT_DIST_DIR / filename
+    public_file = APP_DIR / "frontend" / "public" / filename
+
+    if dist_file.exists():
+        return FileResponse(
+            dist_file,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        )
+
+    if public_file.exists():
+        return FileResponse(
+            public_file,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        )
+
+    return JSONResponse({"status": "error", "message": f"{filename} not found"}, status_code=404)
+
+
+@app.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_app_icon_svg():
+    return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
+
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_favicon_ico():
+    return saga_asset_file_response("saga-app-icon-192.png", "image/png")
+
+@app.api_route("/manifest.webmanifest", methods=["GET", "HEAD"])
 def react_manifest_webmanifest():
     if REACT_MANIFEST_FILE.exists():
         return FileResponse(
@@ -896,7 +927,73 @@ def react_index_or_missing():
     )
 
 
-@app.get("/saga-header-mark.svg", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+async def saga_favicon_ico():
+    dist_file = REACT_DIST_DIR / "saga-app-icon-192.png"
+    public_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
+    target = dist_file if dist_file.exists() else public_file
+
+    if not target.exists():
+        return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+    return FileResponse(
+        target,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+
+
+@app.api_route("/saga-app-icon-180.png", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_app_icon_180_png():
+    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+
+@app.api_route("/saga-app-icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_app_icon_192_png():
+    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+
+@app.api_route("/saga-app-icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_app_icon_512_png():
+    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-512.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+
+@app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_apple_touch_icon_png():
+    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+
+@app.api_route("/apple-touch-icon-precomposed.png", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_apple_touch_icon_precomposed_png():
+    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
+
+
+@app.api_route("/saga-brand-final.svg", methods=["GET", "HEAD"], include_in_schema=False)
+async def saga_brand_final_svg():
+    public_file = APP_DIR / "frontend" / "public" / "saga-brand-final.svg"
+    if public_file.exists():
+        return FileResponse(public_file, media_type="image/svg+xml", headers={"Cache-Control": "no-cache, max-age=0"})
+    return JSONResponse({"status": "error", "detail": "brand asset not found"}, status_code=404)
+
+
+@app.api_route("/saga-header-mark.svg", methods=["GET", "HEAD"], include_in_schema=False)
 async def saga_header_mark_svg():
     dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
     public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
@@ -978,7 +1075,7 @@ async def get_config():
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
-        "ui_lang": cfg.get("ui_lang", "en"),
+        "ui_lang": ("en" if str(cfg.get("ui_lang", "es")).strip().lower().startswith("en") else "es"),
         "player_theme": normalize_player_theme(cfg.get("player_theme", "classic")),
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
@@ -1714,9 +1811,9 @@ async def save_config_endpoint(request: Request):
     else:
         players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
 
-    ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "en"))).strip().lower()
-    if ui_lang not in {"en"}:
-        ui_lang = "en"
+    ui_lang = str(incoming.get("ui_lang", cfg.get("ui_lang", "es"))).strip().lower()
+    if ui_lang not in {"es", "en"}:
+        ui_lang = "es"
 
     player_theme = normalize_player_theme(incoming.get("player_theme", cfg.get("player_theme", "classic")))
 
@@ -2115,7 +2212,7 @@ async def admin_change_password(request: Request):
     set_admin_password(new_password, must_change=False, source="web_change")
     return {"status": "ok"}
 
-@app.get("/sw.js")
+@app.api_route("/sw.js", methods=["GET", "HEAD"])
 def player_service_worker():
     sw_file = REACT_DIST_DIR / "sw.js"
     if sw_file.exists():

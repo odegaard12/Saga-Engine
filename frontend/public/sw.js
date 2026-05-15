@@ -1,6 +1,6 @@
-const CACHE_NAME = 'saga-player-shell-v173-identity-1'
+const CACHE_NAME = 'saga-player-shell-v176-login-clean-hard'
 const DEFAULT_SHELL_URL = '/'
-const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js']
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
 function shouldBypass(url) {
   return (
@@ -17,7 +17,14 @@ function isShellAsset(url) {
     url.pathname === '/manifest.webmanifest' ||
     url.pathname === '/sw.js' ||
     url.pathname === '/service-worker.js' ||
-    url.pathname === '/saga-app-icon.svg'
+    url.pathname === '/saga-app-icon.svg' ||
+    url.pathname === '/apple-touch-icon-precomposed.png' ||
+    url.pathname === '/apple-touch-icon.png' ||
+    url.pathname === '/saga-app-icon-180.png' ||
+    url.pathname === '/saga-app-icon-192.png' ||
+    url.pathname === '/saga-app-icon-512.png' ||
+    url.pathname === '/saga-header-mark.svg' ||
+    url.pathname === '/favicon.ico'
   )
 }
 

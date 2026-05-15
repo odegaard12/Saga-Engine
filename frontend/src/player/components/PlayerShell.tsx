@@ -58,7 +58,7 @@ export function PlayerShell({
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
-  const stageName = currentStage?.title || (payload.finished ? 'Mission complete' : 'Awaiting node')
+  const stageName = currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
   const gpsLabel = getGpsShellLabel(gpsState)
 
@@ -78,14 +78,14 @@ export function PlayerShell({
           <div style={eyebrow}>{playerName}</div>
 
           <div style={pillRow}>
-            <div style={soloPill}>{mode === 'team' ? 'TEAM' : 'SOLO'}</div>
+            <div style={soloPill}>{mode === 'team' ? 'EQUIPO' : 'SOLO'}</div>
 
             <button
               type="button"
               style={teamOpen ? teamButtonActive : teamButton}
               onClick={onOpenTeam}
             >
-              <span>PLAYERS</span>
+              <span>JUGADORES</span>
               <span style={teamCountPill}>{teamCount}</span>
               {teamLiveCount > 0 ? <span style={teamLiveDot} /> : null}
             </button>
