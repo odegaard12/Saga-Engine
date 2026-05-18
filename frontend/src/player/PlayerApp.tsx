@@ -802,7 +802,7 @@ export default function PlayerApp() {
       {showIntro && state.status === 'ready' && (
         <IntroGate
           playerName={_playerDisplayName}
-          hasMissionCached={_hasMissionCached}
+          playerHref={playerHref}
           onDone={(coords) => {
             setShowIntro(false)
             if (coords) setIntroFlyTo(coords)
