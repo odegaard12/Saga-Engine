@@ -35,7 +35,6 @@ function resolveCopy(config: PublicConfig) {
 
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
-  const [loadingId, setLoadingId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -50,13 +49,6 @@ export default function LoginApp() {
     if (state.status !== 'ready') return []
     return normalizeProfiles(state.config)
   }, [state])
-
-  function handleEnter(id: string) {
-    setLoadingId(id)
-    setTimeout(() => {
-      window.location.href = `/player/${encodeURIComponent(id)}`
-    }, 320)
-  }
 
   const copy = state.status === 'ready'
     ? resolveCopy(state.config)
@@ -82,13 +74,7 @@ export default function LoginApp() {
             {state.status === 'ready' && (
               <section style={list}>
                 {profiles.map((p, i) => (
-                  <ProfileCard
-                    key={p.id}
-                    profile={p}
-                    index={i}
-                    onEnter={handleEnter}
-                    isLoading={loadingId === p.id}
-                  />
+                  <ProfileCard key={p.id} profile={p} index={i} />
                 ))}
               </section>
             )}
