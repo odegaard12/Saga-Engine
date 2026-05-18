@@ -1,4 +1,5 @@
 import PlayerEntrance from './PlayerEntrance'
+import FirstRunGate from './FirstRunGate'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
@@ -19,6 +20,10 @@ import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
 import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
+
+// FirstRun gate
+const FIRST_RUN_KEY = 'saga_first_run_done'
+const GPS_KEY = 'saga_gps_granted'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -55,6 +60,9 @@ export default function PlayerApp() {
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
+  const [showFirstRun, setShowFirstRun] = useState(
+    () => localStorage.getItem(FIRST_RUN_KEY) !== '1' || localStorage.getItem(GPS_KEY) !== '1'
+  )
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
