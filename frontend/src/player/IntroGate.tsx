@@ -6,22 +6,27 @@ export const FIRST_RUN_KEY = 'saga_first_run_done'
 export function shouldShowIntro(): boolean {
   return localStorage.getItem(FIRST_RUN_KEY) !== '1'
 }
-export function gpsAlreadyGranted(): boolean {
-  return localStorage.getItem(GPS_KEY) === '1'
-}
 export function markIntroDone(): void {
   localStorage.setItem(FIRST_RUN_KEY, '1')
 }
 export function markGpsGranted(): void {
   localStorage.setItem(GPS_KEY, '1')
 }
+export function gpsAlreadyGranted(): boolean {
+  return localStorage.getItem(GPS_KEY) === '1'
+}
 
-type Phase = 'gps' | 'gps_waiting' | 'mission' | 'flying' | 'done'
+// ─── Tipos ───────────────────────────────────────────────────────────────────
+type Phase =
+  | 'gps'         // primera vez — pedir GPS
+  | 'gps_wait'    // esperando respuesta del navegador
+  | 'mission'     // confirmar/descargar misión
+  | 'flying'      // saliendo — mapa va a hacer flyTo
+  | 'done'        // invisible
 
 interface Props {
   playerName: string
   hasMissionCached: boolean
-  // Callback: cuando el intro termina, devuelve coords si se obtuvo GPS
   onDone: (coords: { lat: number; lon: number } | null) => void
 }
 
@@ -30,11 +35,25 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
     gpsAlreadyGranted() ? 'mission' : 'gps'
   )
   const [gpsError, setGpsError] = useState('')
-  const [visible, setVisible]   = useState(true)
+  const [panelOut, setPanelOut] = useState(false)
   const coordsRef               = useRef<{ lat: number; lon: number } | null>(null)
 
+  // Si ya concedió GPS antes, intentar obtener posición en background
+  useEffect(() => {
+    if (gpsAlreadyGranted()) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          coordsRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 8000 }
+      )
+    }
+  }, [])
+
   function requestGPS() {
-    setPhase('gps_waiting')
+    setPhase('gps_wait')
+    setGpsError('')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         coordsRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }
@@ -42,7 +61,7 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
         setPhase('mission')
       },
       () => {
-        setGpsError('GPS denegado — puedes activarlo desde Herramientas.')
+        setGpsError('GPS denegado — actívalo desde Herramientas.')
         setPhase('mission')
       },
       { enableHighAccuracy: true, timeout: 12000 }
@@ -52,50 +71,53 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
   function handleStart() {
     markIntroDone()
     setPhase('flying')
-    // Fade out el panel y dejar el mapa libre para el flyTo
+    setPanelOut(true)
     setTimeout(() => {
-      setVisible(false)
-      setTimeout(() => onDone(coordsRef.current), 100)
-    }, 400)
+      onDone(coordsRef.current)
+    }, 450)
   }
 
-  if (!visible) return null
+  if (phase === 'done') return null
 
   return (
     <>
-      {/* Fondo semitransparente — el mapa es visible debajo */}
+      {/* Backdrop semitransparente — mapa real visible debajo */}
       <div style={{
         ...backdrop,
-        opacity: phase === 'flying' ? 0 : 1,
+        opacity: panelOut ? 0 : 1,
         transition: 'opacity 400ms ease',
+        pointerEvents: panelOut ? 'none' : 'all',
       }} />
 
-      {/* Panel central */}
+      {/* Panel flotante */}
       <div style={{
         ...panelWrap,
-        opacity: phase === 'flying' ? 0 : 1,
-        transform: phase === 'flying' ? 'translateY(12px)' : 'translateY(0)',
-        transition: 'opacity 350ms ease, transform 350ms ease',
+        opacity: panelOut ? 0 : 1,
+        transform: panelOut ? 'translateY(16px) scale(0.97)' : 'translateY(0) scale(1)',
+        transition: 'opacity 380ms ease, transform 380ms cubic-bezier(0.4,0,0.2,1)',
+        pointerEvents: panelOut ? 'none' : 'all',
       }}>
-        {(phase === 'gps' || phase === 'gps_waiting') && (
+
+        {/* ── Panel GPS ── */}
+        {(phase === 'gps' || phase === 'gps_wait') && (
           <div style={panel}>
-            <div style={panelTop}>
-              <div style={saga}>SAGA</div>
-              <div style={operativeLabel}>OPERATIVO: {playerName.toUpperCase()}</div>
+            <div style={brandBlock}>
+              <div style={sagaWord}>SAGA</div>
+              <div style={operativeTag}>OPERATIVO: {playerName.toUpperCase()}</div>
             </div>
-            <div style={divider} />
-            <div style={panelIcon}>📡</div>
-            <div style={panelTitle}>ACCESO A UBICACIÓN</div>
-            <p style={panelBody}>
+            <div style={sep} />
+            <div style={icon}>📡</div>
+            <div style={title}>ACCESO A UBICACIÓN</div>
+            <p style={body}>
               SAGA necesita tu posición GPS para sincronizar zonas de operación y misiones de campo.
             </p>
-            {gpsError && <p style={errorText}>{gpsError}</p>}
+            {gpsError && <p style={errText}>{gpsError}</p>}
             <button
-              style={{ ...btnPrimary, opacity: phase === 'gps_waiting' ? 0.7 : 1 }}
+              style={{ ...btnPrimary, opacity: phase === 'gps_wait' ? 0.65 : 1 }}
               onClick={requestGPS}
-              disabled={phase === 'gps_waiting'}
+              disabled={phase === 'gps_wait'}
             >
-              {phase === 'gps_waiting' ? 'ESPERANDO···' : 'PERMITIR UBICACIÓN'}
+              {phase === 'gps_wait' ? 'ESPERANDO···' : 'PERMITIR UBICACIÓN'}
             </button>
             <button style={btnGhost} onClick={() => setPhase('mission')}>
               Ahora no
@@ -103,19 +125,22 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
           </div>
         )}
 
+        {/* ── Panel Misión ── */}
         {phase === 'mission' && (
           <div style={panel}>
-            <div style={panelTop}>
-              <div style={saga}>SAGA</div>
-              <div style={operativeLabel}>OPERATIVO: {playerName.toUpperCase()}</div>
+            <div style={brandBlock}>
+              <div style={sagaWord}>SAGA</div>
+              <div style={operativeTag}>OPERATIVO: {playerName.toUpperCase()}</div>
             </div>
-            <div style={divider} />
-            <div style={panelIcon}>🎯</div>
-            <div style={panelTitle}>LISTO PARA OPERAR</div>
-            <p style={panelBody}>
+            <div style={sep} />
+            <div style={icon}>{hasMissionCached ? '🎯' : '📦'}</div>
+            <div style={title}>
+              {hasMissionCached ? 'LISTO PARA OPERAR' : 'DESCARGAR MISIÓN'}
+            </div>
+            <p style={body}>
               {hasMissionCached
                 ? 'Misión cargada. El mapa volará hasta tu posición.'
-                : 'Paquete de misión descargado. El mapa volará hasta tu posición.'}
+                : 'Descarga el paquete de misión para operar sin conexión.'}
             </p>
             {coordsRef.current && (
               <div style={coordsBadge}>
@@ -123,7 +148,7 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
               </div>
             )}
             <button style={btnPrimary} onClick={handleStart}>
-              INICIAR OPERACIÓN →
+              {hasMissionCached ? 'INICIAR OPERACIÓN →' : 'DESCARGAR E INICIAR →'}
             </button>
           </div>
         )}
@@ -132,77 +157,75 @@ export default function IntroGate({ playerName, hasMissionCached, onDone }: Prop
   )
 }
 
+// ── Estilos ───────────────────────────────────────────────────────────────────
 const backdrop: CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 1500,
-  background: 'rgba(5,10,13,0.72)',
-  backdropFilter: 'blur(2px)',
-  WebkitBackdropFilter: 'blur(2px)',
-  pointerEvents: 'none',
+  background: 'rgba(5,10,13,0.70)',
+  backdropFilter: 'blur(3px)',
+  WebkitBackdropFilter: 'blur(3px)',
 }
 const panelWrap: CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 1501,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: '0 16px',
-  pointerEvents: 'none',
 }
 const panel: CSSProperties = {
   width: 'min(100%, 360px)',
-  padding: '28px 24px',
-  background: 'rgba(10,16,20,0.90)',
-  backdropFilter: 'blur(28px)',
-  WebkitBackdropFilter: 'blur(28px)',
-  border: '1px solid rgba(0,200,150,.24)',
-  boxShadow: '0 0 0 1px rgba(0,200,150,.06), 0 32px 64px rgba(0,0,0,.8)',
+  padding: '28px 24px 24px',
+  background: 'rgba(8,12,15,0.92)',
+  backdropFilter: 'blur(32px)',
+  WebkitBackdropFilter: 'blur(32px)',
+  border: '1px solid rgba(0,200,150,.22)',
+  boxShadow: '0 0 0 1px rgba(0,200,150,.06), 0 32px 80px rgba(0,0,0,.85)',
   borderRadius: 20,
   display: 'flex', flexDirection: 'column', alignItems: 'center',
   gap: 14, textAlign: 'center',
-  pointerEvents: 'all',
-  animation: 'saga-rise 350ms cubic-bezier(0.16,1,0.3,1) both',
+  animation: 'saga-rise 320ms cubic-bezier(0.16,1,0.3,1) both',
 }
-const panelTop: CSSProperties = {
-  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+const brandBlock: CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
 }
-const saga: CSSProperties = {
+const sagaWord: CSSProperties = {
   fontFamily: 'var(--saga-font-hud)',
-  fontSize: 40, fontWeight: 900, letterSpacing: '-0.04em',
+  fontSize: 44, fontWeight: 900, letterSpacing: '-0.04em',
   color: '#e8f0f4', lineHeight: 1,
-  textShadow: '0 0 30px rgba(0,200,150,.4)',
+  textShadow: '0 0 32px rgba(0,200,150,.45)',
 }
-const operativeLabel: CSSProperties = {
+const operativeTag: CSSProperties = {
   fontFamily: 'var(--saga-font-hud)', fontSize: 9, fontWeight: 700,
-  letterSpacing: '0.28em', color: 'rgba(0,200,150,.8)',
+  letterSpacing: '0.28em', color: 'rgba(0,200,150,.85)',
   textTransform: 'uppercase',
 }
-const divider: CSSProperties = {
+const sep: CSSProperties = {
   width: '100%', height: 1,
-  background: 'linear-gradient(90deg, transparent, rgba(0,200,150,.2), transparent)',
+  background: 'linear-gradient(90deg, transparent, rgba(0,200,150,.18), transparent)',
 }
-const panelIcon: CSSProperties = { fontSize: 38, lineHeight: 1 }
-const panelTitle: CSSProperties = {
+const icon: CSSProperties = { fontSize: 40, lineHeight: 1 }
+const title: CSSProperties = {
   fontFamily: 'var(--saga-font-hud)', fontSize: 17, fontWeight: 700,
   letterSpacing: '0.08em', color: '#e8f0f4',
 }
-const panelBody: CSSProperties = {
+const body: CSSProperties = {
   fontSize: 14, lineHeight: 1.65,
-  color: 'rgba(200,216,224,.72)', maxWidth: '26ch',
-  margin: 0,
+  color: 'rgba(200,216,224,.72)', maxWidth: '26ch', margin: 0,
 }
-const errorText: CSSProperties = { fontSize: 12, color: '#f59e0b', margin: 0 }
+const errText: CSSProperties = { fontSize: 12, color: '#f59e0b', margin: 0 }
 const coordsBadge: CSSProperties = {
-  fontSize: 11, fontFamily: 'monospace',
-  color: 'rgba(0,200,150,.7)', letterSpacing: '0.06em',
+  fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.06em',
+  color: 'rgba(0,200,150,.75)',
   background: 'rgba(0,200,150,.08)', borderRadius: 20,
-  padding: '4px 12px', border: '1px solid rgba(0,200,150,.15)',
+  padding: '4px 14px', border: '1px solid rgba(0,200,150,.15)',
 }
 const btnPrimary: CSSProperties = {
   width: '100%', minHeight: 48, borderRadius: 10,
   background: '#00c896', border: 0, color: '#050a0d',
   fontFamily: 'var(--saga-font-hud)', fontSize: 13, fontWeight: 800,
   letterSpacing: '0.14em', cursor: 'pointer',
-  boxShadow: '0 0 24px rgba(0,200,150,.3)',
-  transition: 'background 150ms, opacity 150ms',
+  boxShadow: '0 0 28px rgba(0,200,150,.32)',
+  transition: 'opacity 150ms, background 150ms',
 }
 const btnGhost: CSSProperties = {
-  background: 'none', border: 0, color: 'rgba(200,216,224,.4)',
-  fontSize: 13, cursor: 'pointer', padding: 8,
+  background: 'none', border: 0,
+  color: 'rgba(200,216,224,.38)', fontSize: 13,
+  cursor: 'pointer', padding: '8px 16px',
 }

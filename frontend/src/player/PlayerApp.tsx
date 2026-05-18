@@ -798,7 +798,7 @@ export default function PlayerApp() {
   const _hasMissionCached   = state.status === 'ready' && (offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack))
 
   return (
-    <PlayerEntrance>
+    <>
       {showIntro && state.status === 'ready' && (
         <IntroGate
           playerName={_playerDisplayName}
@@ -925,7 +925,7 @@ export default function PlayerApp() {
         onSubmitCode={handleSubmitCode}
       />
       </ScreenFrame>
-    </PlayerEntrance>
+    </>
   )
 }
 
