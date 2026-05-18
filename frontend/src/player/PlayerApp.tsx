@@ -809,7 +809,7 @@ export default function PlayerApp() {
           }}
         />
       )}
-    <ScreenFrame mobile={isPhone}>
+      <ScreenFrame mobile={isPhone}>
       <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
@@ -924,7 +924,8 @@ export default function PlayerApp() {
         }}
         onSubmitCode={handleSubmitCode}
       />
-    </ScreenFrame>
+      </ScreenFrame>
+    </PlayerEntrance>
   )
 }
 
