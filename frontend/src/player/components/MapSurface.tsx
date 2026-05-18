@@ -28,6 +28,7 @@ type MapSurfaceProps = {
   selfLabel?: string
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
+  onMapTilesReady?: () => void
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -234,6 +235,7 @@ export function MapSurface({
   selfLabel = 'YO',
   onDebugSetPosition,
   onNodeTap,
+  onMapTilesReady,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -275,6 +277,23 @@ export function MapSurface({
     map.setView([42.4333, -8.65], 13)
     mapRef.current = map
 
+    // Notificar cuando los primeros tiles estén cargados
+    let tilesNotified = false
+    map.on('tileloadend', () => {
+      if (!tilesNotified) {
+        tilesNotified = true
+        onMapTilesReady?.()
+      }
+    })
+    // Fallback: si no hay tiles en 3s, notificar igualmente
+    const tileTimeout = setTimeout(() => {
+      if (!tilesNotified) {
+        tilesNotified = true
+        onMapTilesReady?.()
+      }
+    }, 3000)
+    ;(mapRef as React.MutableRefObject<L.Map & { _tileTimeout?: ReturnType<typeof setTimeout> }>).current._tileTimeout = tileTimeout
+
     return () => {
       playerMarkerRef.current?.remove()
       playerAuraRef.current?.remove()
@@ -286,6 +305,8 @@ export function MapSurface({
       otherPlayerMarkersRef.current.clear()
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      clearTimeout((map as any)._tileTimeout)
       mapRef.current = null
       playerMarkerRef.current = null
       playerAuraRef.current = null

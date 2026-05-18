@@ -60,6 +60,7 @@ export default function PlayerApp() {
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
+  const [mapTilesReady, setMapTilesReady] = useState(false)
   const [showFirstRun, setShowFirstRun] = useState(
     () => shouldShowFirstRun()
   )
@@ -805,6 +806,7 @@ export default function PlayerApp() {
           playerName={_playerDisplayName}
           hasMissionCached={_hasMissionCached}
           isReturning={isReturningPlayer()}
+          mapTilesReady={mapTilesReady}
           onDone={() => setShowFirstRun(false)}
         />
       )}
@@ -824,6 +826,7 @@ export default function PlayerApp() {
           selfLabel={'YO'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
+          onMapTilesReady={() => setMapTilesReady(true)}
         />
 
         <div style={getTopScrimStyle(isPhone)} />
