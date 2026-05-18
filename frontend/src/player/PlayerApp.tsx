@@ -1,5 +1,5 @@
 import PlayerEntrance from './PlayerEntrance'
-import FirstRunGate from './FirstRunGate'
+import FirstRunGate, { shouldShowFirstRun, isReturningPlayer } from './FirstRunGate'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
@@ -61,7 +61,7 @@ export default function PlayerApp() {
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
   const [showFirstRun, setShowFirstRun] = useState(
-    () => localStorage.getItem(FIRST_RUN_KEY) !== '1' || localStorage.getItem(GPS_KEY) !== '1'
+    () => shouldShowFirstRun()
   )
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
@@ -795,7 +795,19 @@ export default function PlayerApp() {
     }
   }
 
+  const _playerDisplayName = (state.status === 'ready' ? state.payload.display_name || state.payload.user : '') || 'OPERATIVO'
+  const _hasMissionCached   = state.status === 'ready' && (offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack))
+
   return (
+    <PlayerEntrance>
+      {showFirstRun && state.status === 'ready' && (
+        <FirstRunGate
+          playerName={_playerDisplayName}
+          hasMissionCached={_hasMissionCached}
+          isReturning={isReturningPlayer()}
+          onDone={() => setShowFirstRun(false)}
+        />
+      )}
     <ScreenFrame mobile={isPhone}>
       <div style={getViewportStyle(isPhone)}>
         <MapSurface

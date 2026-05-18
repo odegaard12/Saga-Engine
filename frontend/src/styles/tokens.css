@@ -86,3 +86,13 @@ body {
     transition-duration:0.01ms !important;
   }
 }
+
+/* ── FirstRunGate keyframes ── */
+@keyframes saga-locator-ring {
+  0%   { transform: scale(0.4); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes saga-bar-fill {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
