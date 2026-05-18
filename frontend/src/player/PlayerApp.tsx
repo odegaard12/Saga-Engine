@@ -1,5 +1,5 @@
 import PlayerEntrance from './PlayerEntrance'
-import FirstRunGate, { shouldShowFirstRun, isReturningPlayer } from './FirstRunGate'
+import IntroGate, { shouldShowIntro } from './IntroGate'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
@@ -60,10 +60,8 @@ export default function PlayerApp() {
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
-  const [mapTilesReady, setMapTilesReady] = useState(false)
-  const [showFirstRun, setShowFirstRun] = useState(
-    () => shouldShowFirstRun()
-  )
+  const [showIntro, setShowIntro] = useState(() => shouldShowIntro())
+  const [introFlyTo, setIntroFlyTo] = useState<{ lat: number; lon: number } | null>(null)
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
@@ -801,13 +799,14 @@ export default function PlayerApp() {
 
   return (
     <PlayerEntrance>
-      {showFirstRun && state.status === 'ready' && (
-        <FirstRunGate
+      {showIntro && state.status === 'ready' && (
+        <IntroGate
           playerName={_playerDisplayName}
           hasMissionCached={_hasMissionCached}
-          isReturning={isReturningPlayer()}
-          mapTilesReady={mapTilesReady}
-          onDone={() => setShowFirstRun(false)}
+          onDone={(coords) => {
+            setShowIntro(false)
+            if (coords) setIntroFlyTo(coords)
+          }}
         />
       )}
     <ScreenFrame mobile={isPhone}>
@@ -826,7 +825,7 @@ export default function PlayerApp() {
           selfLabel={'YO'}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
-          onMapTilesReady={() => setMapTilesReady(true)}
+          introFlyToCoords={introFlyTo}
         />
 
         <div style={getTopScrimStyle(isPhone)} />

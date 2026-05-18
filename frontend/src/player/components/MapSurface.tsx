@@ -29,6 +29,7 @@ type MapSurfaceProps = {
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
   onMapTilesReady?: () => void
+  introFlyToCoords?: { lat: number; lon: number } | null
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -236,6 +237,7 @@ export function MapSurface({
   onDebugSetPosition,
   onNodeTap,
   onMapTilesReady,
+  introFlyToCoords,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -274,7 +276,7 @@ export function MapSurface({
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
-    map.setView([42.4333, -8.65], 13)
+    map.setView([40.0, -4.0], 4)  // arranca en Europa — flyTo llegará al jugador
     mapRef.current = map
 
     // Notificar cuando los primeros tiles estén cargados
