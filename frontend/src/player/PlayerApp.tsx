@@ -1134,29 +1134,16 @@ const overlayFinish: CSSProperties = {
   color: '#7e22ce',
 }
 
-const overlayAnimations = `
-@keyframes sagaPulseRing {
-  from {
-    transform: scale(.42);
-    opacity: .28;
-  }
-  to {
-    transform: scale(1.24);
-    opacity: 0;
-  }
-}
-
-@keyframes sagaOverlayPop {
-  from {
-    transform: scale(.94);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-`
+const overlayAnimations = [
+  '@keyframes sagaPulseRing {',
+  '  from { transform: scale(.42); opacity: .28; }',
+  '  to   { transform: scale(1.24); opacity: 0; }',
+  '}',
+  '@keyframes sagaOverlayPop {',
+  '  from { transform: scale(.94); opacity: 0; }',
+  '  to   { transform: scale(1);   opacity: 1; }',
+  '}',
+].join('\n')
 
 const statusCard: CSSProperties = {
   borderRadius: 20,
