@@ -323,7 +323,7 @@ export default function PlayerApp() {
     ? 'error'
     : 'unavailable'
 
-  const playerPosition = browserGpsPosition || localDebugPosition
+  const playerPosition = localDebugPosition || browserGpsPosition || rawLivePlayerPosition
   const stagePosition = getStagePosition(currentStage)
   const stageRadius = getStageRadius(currentStage)
 
@@ -416,12 +416,45 @@ export default function PlayerApp() {
     window.location.assign(shellLoginHref)
   }
 
+
+  function persistDebugPositionForMinigames(position: { lat: number; lon: number } | null) {
+    if (typeof window === 'undefined') return
+    try {
+      if (!position) {
+        window.localStorage.removeItem('saga_debug_enabled')
+        window.localStorage.removeItem('saga_debug_coords')
+        window.dispatchEvent(new CustomEvent('saga-debug-gps-change', { detail: { enabled: false } }))
+        return
+      }
+
+      window.localStorage.setItem('saga_debug_enabled', '1')
+      window.localStorage.setItem(
+        'saga_debug_coords',
+        JSON.stringify({
+          lat: position.lat,
+          lon: position.lon,
+          accuracy: 3,
+          source: 'debug_ui',
+          at: Date.now(),
+        }),
+      )
+      window.dispatchEvent(
+        new CustomEvent('saga-debug-gps-change', {
+          detail: { enabled: true, coords: position },
+        }),
+      )
+    } catch {
+      // ignore storage/event errors
+    }
+  }
+
   function handleToggleDebug() {
     const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
 
     if (currentlyActive) {
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
+      persistDebugPositionForMinigames(null)
       setFollowPlayer(true)
       setRouteOverviewActive(false)
 
@@ -445,13 +478,27 @@ export default function PlayerApp() {
     setBrowserGpsPosition(null)
     setBrowserGpsStatus('unavailable')
     setLocalDebugEnabled(true)
-    showNotice('Debug activo. Toca el mapa para colocar tu posición simulada.', 'success')
+
+    const nextDebugPosition = stagePosition || localDebugPosition
+    if (nextDebugPosition) {
+      setLocalDebugPosition(nextDebugPosition)
+      persistDebugPositionForMinigames(nextDebugPosition)
+      setFollowPlayer(true)
+      setRouteOverviewActive(false)
+      setFocusRequest({ target: 'player', token: Date.now() })
+      showNotice('Debug activo en el nodo actual.', 'success')
+    } else {
+      persistDebugPositionForMinigames(null)
+      showNotice('Debug activo. Toca el mapa para colocar tu posición simulada.', 'success')
+    }
+
     vibrate([10, 16, 10])
   }
 
   function handleDebugSetPosition(position: { lat: number; lon: number }) {
     setLocalDebugEnabled(true)
     setLocalDebugPosition(position)
+    persistDebugPositionForMinigames(position)
     setFollowPlayer(true)
     setFocusRequest({ target: 'player', token: Date.now() })
     void sendHeartbeat({
@@ -562,6 +609,7 @@ export default function PlayerApp() {
             if (hasOfflineMission) setOfflinePrepVisible(false)
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
+      persistDebugPositionForMinigames(null)
       setFollowPlayer(true)
 
       if (options.forceFocus || !gpsCenteredRef.current) {

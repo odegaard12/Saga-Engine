@@ -171,7 +171,7 @@ export default function FirstRunGate({
           <div style={title}>INICIAR OPERATIVO</div>
           <div style={subtitle}>{playerName}</div>
           <p style={body}>
-            Activaremos GPS, cargaremos la misión y abriremos la ruta de operación.
+            Activaremos GPS, cargaremos la misión y abriremos la mapa de misión.
           </p>
           <button type="button" style={primaryButton} onClick={() => void requestGpsThenLoad()}>
             ACTIVAR GPS E INICIAR →
@@ -422,6 +422,7 @@ const bottomShade: CSSProperties = {
 }
 
 const cinematicBadge: CSSProperties = {
+  display: 'none',
   position: 'fixed',
   left: '50%',
   bottom: 28,
@@ -432,7 +433,6 @@ const cinematicBadge: CSSProperties = {
   border: '1px solid rgba(255,255,255,.10)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
-  display: 'none',
   alignItems: 'center',
   gap: 8,
   color: 'rgba(244,251,255,.86)',
@@ -440,8 +440,7 @@ const cinematicBadge: CSSProperties = {
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '.18em',
-  whiteSpace: 'nowrap',
-}
+  whiteSpace: 'nowrap',}
 
 const badgeDot: CSSProperties = {
   width: 7,
