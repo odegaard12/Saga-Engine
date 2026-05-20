@@ -238,21 +238,10 @@ export default function FirstRunGate({
     )
   }
 
-  const label =
-    phase === 'route_hold'
-      ? 'RUTA DE OPERACIÓN'
-      : phase === 'context_out'
-      ? 'VISTA TÁCTICA GENERAL'
-      : `LOCALIZANDO · ${playerName.toUpperCase()}`
-
   return (
     <div style={cinematicOverlay}>
       <div style={topShade} />
       <div style={bottomShade} />
-      <div style={cinematicBadge}>
-        <span style={badgeDot} />
-        {label}
-      </div>
     </div>
   )
 }

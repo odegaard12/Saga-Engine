@@ -120,17 +120,29 @@ export function prewarmGps(): void {
 // Para iniciar cinemática queremos GPS fresco.
 // No devolvemos cache vieja si el navegador no responde.
 export async function getPrewarmedGps(): Promise<SagaGpsCoords | null> {
-  if (prewarmPromise) {
-    return withTimeout(prewarmPromise, 15000, null)
+  const fresh = prewarmPromise
+    ? await withTimeout(prewarmPromise, 15000, null)
+    : await withTimeout(
+        requestPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        }),
+        15500,
+        null
+      )
+
+  if (fresh) return fresh
+
+  // Si un jugador acaba de obtener GPS bueno, reutilizarlo para otros jugadores
+  // del mismo dispositivo. Evita que Odi vaya bien y Nati/Zaira se queden en error.
+  const recent = readCachedGps(2 * 60 * 1000)
+  if (
+    recent &&
+    (typeof recent.accuracy !== 'number' || recent.accuracy <= 2500)
+  ) {
+    return recent
   }
 
-  return withTimeout(
-    requestPosition({
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
-    }),
-    15500,
-    null
-  )
+  return null
 }
