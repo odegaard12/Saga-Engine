@@ -1,342 +1,463 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { isFirstRunForPlayer, markFirstRunCompleteForPlayer } from './utils/gpsStorage'
+import { getPrewarmedGps, type SagaGpsCoords } from '../shared/gpsPrewarm'
+import { saveInitialOfflinePack } from './autoOfflinePack'
 
+type Coords = { lat: number; lon: number; accuracy?: number }
 type Phase =
-  | 'zoom_in'       // satélite descendiendo, mapa cargando debajo
-  | 'gps'           // pedir GPS (1ª vez)
-  | 'gps_waiting'   // esperando navegador
-  | 'mission'       // confirmar misión
-  | 'zoom_final'    // zoom hacia ubicación jugador
-  | 'dissolve'      // fade-out con mapa ya listo debajo
+  | 'init'
+  | 'first_run_ask'
+  | 'gps_waiting'
+  | 'gps_error'
+  | 'loading'
+  | 'route_hold'
+  | 'context_out'
+  | 'player_fly'
   | 'done'
 
 interface Props {
+  playerUser: string
   playerName: string
-  hasMissionCached: boolean
-  isReturning: boolean
-  mapTilesReady: boolean   // viene de PlayerApp via onMapTilesReady
+  payloadReady: boolean
+  mapTilesReady: boolean
+  onGpsReady: (coords: Coords | null) => void
+  onIntroCameraStart: (coords: Coords | null) => void
   onDone: () => void
 }
 
-export const GPS_KEY       = 'saga_gps_granted'
+export const GPS_KEY = 'saga_gps_granted'
 export const FIRST_RUN_KEY = 'saga_first_run_done'
+export function markFirstRunDone() {}
+export function shouldShowFirstRun() { return true }
+export function isReturningPlayer() { return false }
 
-export function markFirstRunDone() {
-  localStorage.setItem(FIRST_RUN_KEY, '1')
-  localStorage.setItem(GPS_KEY, '1')
-}
-export function shouldShowFirstRun(): boolean {
-  return localStorage.getItem(FIRST_RUN_KEY) !== '1' || localStorage.getItem(GPS_KEY) !== '1'
-}
-export function isReturningPlayer(): boolean {
-  return localStorage.getItem(FIRST_RUN_KEY) === '1' && localStorage.getItem(GPS_KEY) === '1'
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
 
-export default function FirstRunGate({ playerName, hasMissionCached, isReturning, mapTilesReady, onDone }: Props) {
-  const [phase, setPhase]         = useState<Phase>('zoom_in')
-  const [gpsError, setGpsError]   = useState('')
-  const [zoomScale, setZoomScale] = useState(5)
-  const [zoomOp, setZoomOp]       = useState(0)
-  const [dotVisible, setDotVisible] = useState(false)
-  const [overlayOp, setOverlayOp] = useState(1)
-  const tilesReadyRef = useRef(mapTilesReady)
-  const dissolveTriggered = useRef(false)
+function isGoodGps(coords: SagaGpsCoords | null): coords is SagaGpsCoords {
+  if (!coords) return false
 
-  // Sincronizar tiles ready en ref para usarlo en callbacks
-  useEffect(() => { tilesReadyRef.current = mapTilesReady }, [mapTilesReady])
+  // Si el navegador informa precisión enorme, normalmente es IP/WiFi aproximado.
+  // No queremos iniciar cinemática a Madrid con un GPS falso.
+  if (typeof coords.accuracy === 'number' && coords.accuracy > 2500) return false
 
-  // Función para iniciar el dissolve — espera tiles si no están listos
-  function triggerDissolve() {
-    if (dissolveTriggered.current) return
-    dissolveTriggered.current = true
-    setPhase('zoom_final')
+  return true
+}
 
-    function doDissolve() {
-      setPhase('dissolve')
-      setOverlayOp(0)
-      setTimeout(onDone, 700)
-    }
+export default function FirstRunGate({
+  playerUser,
+  playerName,
+  payloadReady,
+  mapTilesReady,
+  onGpsReady,
+  onIntroCameraStart,
+  onDone,
+}: Props) {
+  const [phase, setPhase] = useState<Phase>('init')
+  const [gpsError, setGpsError] = useState('')
+  const [gpsCoords, setGpsCoords] = useState<Coords | null>(null)
+  const firstRunRef = useRef<boolean | null>(null)
+  const startedRef = useRef(false)
+  const doneRef = useRef(false)
 
-    if (tilesReadyRef.current) {
-      setTimeout(doDissolve, 800)
+  useEffect(() => {
+    if (firstRunRef.current !== null) return
+
+    const firstRun = isFirstRunForPlayer(playerUser)
+    firstRunRef.current = firstRun
+
+    if (firstRun) {
+      setPhase('first_run_ask')
     } else {
-      // Esperar tiles con timeout máximo de 3s
-      let waited = 0
-      const interval = setInterval(() => {
-        waited += 100
-        if (tilesReadyRef.current || waited >= 3000) {
-          clearInterval(interval)
-          doDissolve()
-        }
-      }, 100)
+      void requestGpsThenLoad()
     }
+  }, [playerUser])
+
+  async function requestGpsThenLoad() {
+    if (startedRef.current) return
+    startedRef.current = true
+
+    setGpsError('')
+    setPhase('gps_waiting')
+
+    const coords = await getPrewarmedGps()
+    const accuracy =
+      coords && typeof coords.accuracy === 'number'
+        ? coords.accuracy
+        : null
+
+    if (!isGoodGps(coords)) {
+      startedRef.current = false
+      setGpsCoords(null)
+      setGpsError(
+        accuracy !== null
+          ? `GPS impreciso (${Math.round(accuracy)} m). Activa ubicación precisa o prueba desde el móvil.`
+          : 'No se pudo activar GPS. Permite ubicación en el navegador.'
+      )
+      setPhase('gps_error')
+      return
+    }
+
+    const goodCoords = {
+      lat: coords.lat,
+      lon: coords.lon,
+      accuracy: coords.accuracy,
+    }
+
+    setGpsCoords(goodCoords)
+    onGpsReady(goodCoords)
+    setPhase('loading')
   }
 
   useEffect(() => {
-    // Iniciar zoom in
-    const t1 = setTimeout(() => { setZoomOp(1); setZoomScale(1) }, 80)
-    const t2 = setTimeout(() => setDotVisible(true), 1600)
+    if (phase !== 'loading') return
+    if (!payloadReady || !mapTilesReady || !gpsCoords) return
 
-    if (isReturning) {
-      // Jugador que vuelve: zoom 2.5s → dissolve esperando tiles
-      const t3 = setTimeout(triggerDissolve, 2600)
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    let cancelled = false
+
+    async function run() {
+      markFirstRunCompleteForPlayer(playerUser)
+
+      // Preparar misión offline antes de la cinemática:
+      // shell + payload + progreso local quedan listos para cortes de cobertura.
+      await saveInitialOfflinePack(playerUser).catch((error) => {
+        console.warn('SAGA offline preload failed', error)
+      })
+
+      // Ahora sí: la cámara solo arranca con GPS válido y pack offline intentado.
+      onIntroCameraStart(gpsCoords)
+
+      setPhase('route_hold')
+      await sleep(3000)
+      if (cancelled) return
+
+      setPhase('context_out')
+      await sleep(2500)
+      if (cancelled) return
+
+      setPhase('player_fly')
+      await sleep(4300)
+      if (cancelled || doneRef.current) return
+
+      doneRef.current = true
+      setPhase('done')
+      onDone()
     }
 
-    // Primera vez: zoom → mostrar panel
-    const t3 = setTimeout(() => {
-      const gpsGranted = localStorage.getItem(GPS_KEY) === '1'
-      setPhase(gpsGranted ? 'mission' : 'gps')
-    }, 2500)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [])
+    void run()
 
-  function requestGPS() {
-    setPhase('gps_waiting')
-    setGpsError('')
-    navigator.geolocation.getCurrentPosition(
-      () => { localStorage.setItem(GPS_KEY, '1'); setPhase('mission') },
-      () => { setGpsError('GPS denegado. Actívalo desde Herramientas.'); setPhase('mission') },
-      { enableHighAccuracy: true, timeout: 12000 }
+    return () => {
+      cancelled = true
+    }
+  }, [
+    phase,
+    payloadReady,
+    mapTilesReady,
+    gpsCoords,
+    playerUser,
+    onIntroCameraStart,
+    onDone,
+  ])
+
+  if (phase === 'done') return null
+  if (phase === 'init') return <div style={blackout} />
+
+  if (phase === 'first_run_ask') {
+    return (
+      <div style={askOverlay}>
+        <div style={askPanel}>
+          <div style={kicker}>SAGA ENGINE</div>
+          <div style={title}>INICIAR OPERATIVO</div>
+          <div style={subtitle}>{playerName}</div>
+          <p style={body}>
+            Activaremos GPS, cargaremos la misión y abriremos la ruta de operación.
+          </p>
+          <button type="button" style={primaryButton} onClick={() => void requestGpsThenLoad()}>
+            ACTIVAR GPS E INICIAR →
+          </button>
+        </div>
+      </div>
     )
   }
 
-  function handleMissionReady() {
-    markFirstRunDone()
-    triggerDissolve()
+  if (phase === 'gps_waiting') {
+    return (
+      <div style={loadingOverlay}>
+        <div style={loadingPanel}>
+          <div style={scanLine} />
+          <div style={smallKicker}>SAGA ENGINE</div>
+          <div style={loadingTitle}>ACTIVANDO GPS</div>
+          <div style={loadingText}>
+            Esperando ubicación precisa del navegador. La cinemática empezará cuando el GPS esté listo.
+          </div>
+          <div style={pulseRow}>
+            <span style={{ ...pulseDot, animationDelay: '0ms' }} />
+            <span style={{ ...pulseDot, animationDelay: '140ms' }} />
+            <span style={{ ...pulseDot, animationDelay: '280ms' }} />
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const isAnimating = phase === 'zoom_in' || phase === 'zoom_final'
-  const showPanel   = phase === 'gps' || phase === 'gps_waiting' || phase === 'mission'
-  const bgOpacity   = showPanel ? 0.88 : 1  // al mostrar panel, oscurecer menos para ver mapa
-  const overlayBg   = `rgba(5,10,13,${(overlayOp * bgOpacity).toFixed(2)})`
+  if (phase === 'gps_error') {
+    return (
+      <div style={askOverlay}>
+        <div style={askPanel}>
+          <div style={kicker}>SAGA ENGINE</div>
+          <div style={title}>GPS NECESARIO</div>
+          <div style={subtitle}>{playerName}</div>
+          <p style={body}>{gpsError}</p>
+          <button type="button" style={primaryButton} onClick={() => void requestGpsThenLoad()}>
+            REINTENTAR GPS →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'loading') {
+    return (
+      <div style={loadingOverlay}>
+        <div style={loadingPanel}>
+          <div style={scanLine} />
+          <div style={smallKicker}>SAGA ENGINE</div>
+          <div style={loadingTitle}>CARGANDO MISIÓN</div>
+          <div style={loadingText}>
+            GPS activo · {payloadReady ? 'Misión lista' : 'Descargando misión'} ·{' '}
+            {mapTilesReady ? 'Mapa listo' : 'Preparando mapa'}
+          </div>
+          <div style={pulseRow}>
+            <span style={{ ...pulseDot, animationDelay: '0ms' }} />
+            <span style={{ ...pulseDot, animationDelay: '140ms' }} />
+            <span style={{ ...pulseDot, animationDelay: '280ms' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const label =
+    phase === 'route_hold'
+      ? 'RUTA DE OPERACIÓN'
+      : phase === 'context_out'
+      ? 'VISTA TÁCTICA GENERAL'
+      : `LOCALIZANDO · ${playerName.toUpperCase()}`
 
   return (
-    <div style={{
-      ...overlay,
-      background: overlayBg,
-      opacity: overlayOp,
-      transition: phase === 'dissolve'
-        ? 'opacity 700ms cubic-bezier(0.4,0,0.2,1)'
-        : 'background 400ms ease',
-      pointerEvents: phase === 'done' || phase === 'dissolve' ? 'none' : 'all',
-    }}>
-
-      {/* Fondo satelital — se desvanece cuando hay panel */}
-      <div style={{
-        ...satBg,
-        transform: `scale(${zoomScale})`,
-        opacity: zoomOp * (showPanel ? 0.3 : 1),
-        transition: isAnimating
-          ? 'transform 2.4s cubic-bezier(0.16,1,0.3,1), opacity 0.6s ease'
-          : 'opacity 600ms ease, transform 0.8s cubic-bezier(0.4,0,0.2,1)',
-      }}>
-        <div style={gridLayer} />
-        <div style={topoLayer} />
-        <div style={coordLine('h', '28%')} />
-        <div style={coordLine('h', '50%')} />
-        <div style={coordLine('h', '72%')} />
-        <div style={coordLine('v', '22%')} />
-        <div style={coordLine('v', '50%')} />
-        <div style={coordLine('v', '78%')} />
+    <div style={cinematicOverlay}>
+      <div style={topShade} />
+      <div style={bottomShade} />
+      <div style={cinematicBadge}>
+        <span style={badgeDot} />
+        {label}
       </div>
-
-      {/* Localizador pulsante */}
-      {dotVisible && (
-        <div style={locatorWrap}>
-          <div style={locatorRing1} />
-          <div style={locatorRing2} />
-          <div style={locatorDot} />
-        </div>
-      )}
-
-      {/* HUD de zoom */}
-      {isAnimating && (
-        <div style={zoomHUD}>
-          <div style={hudChip}>SAGA ENGINE · OP MODE</div>
-          <div style={hudLabel}>LOCALIZANDO OPERATIVO</div>
-          <div style={hudName}>{playerName.toUpperCase()}</div>
-          <div style={hudCoords}>40°25′N  3°41′O</div>
-          <div style={hudBar}><div style={hudBarFill} /></div>
-        </div>
-      )}
-
-      {/* Panel GPS */}
-      {(phase === 'gps' || phase === 'gps_waiting') && (
-        <div style={panel}>
-          <div style={panelIcon}>📡</div>
-          <div style={panelTitle}>ACCESO A UBICACIÓN</div>
-          <p style={panelBody}>
-            SAGA necesita tu posición GPS para sincronizar zonas de operación y misiones de campo.
-          </p>
-          {gpsError && <p style={errorText}>{gpsError}</p>}
-          <button style={btnPrimary} onClick={requestGPS} disabled={phase === 'gps_waiting'}>
-            {phase === 'gps_waiting' ? 'ESPERANDO···' : 'PERMITIR UBICACIÓN'}
-          </button>
-          <button style={btnGhost} onClick={() => { setGpsError(''); setPhase('mission') }}>
-            Ahora no
-          </button>
-        </div>
-      )}
-
-      {/* Panel Misión */}
-      {phase === 'mission' && (
-        <div style={panel}>
-          <div style={panelIcon}>📦</div>
-          <div style={panelTitle}>PAQUETE DE MISIÓN</div>
-          <p style={panelBody}>
-            {hasMissionCached
-              ? 'Misión almacenada y lista. Opera offline cuando sea necesario.'
-              : 'Descarga el paquete para acceso offline en campo.'}
-          </p>
-          <button style={btnPrimary} onClick={handleMissionReady}>
-            {hasMissionCached ? 'INICIAR OPERACIÓN →' : 'DESCARGAR E INICIAR →'}
-          </button>
-        </div>
-      )}
-
-      {/* Indicador de espera de tiles */}
-      {phase === 'zoom_final' && !mapTilesReady && (
-        <div style={tilesWait}>
-          <div style={tilesSpinner} />
-          <span>Cargando mapa···</span>
-        </div>
-      )}
     </div>
   )
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
+const blackout: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 2000,
+  background: '#050a0d',
+}
 
-const overlay: CSSProperties = {
-  position: 'fixed', inset: 0, zIndex: 2000,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
+const askOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 2000,
+  background:
+    'radial-gradient(circle at 50% 30%, rgba(0,200,150,.18), transparent 34%), #050a0d',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 22,
+}
+
+const askPanel: CSSProperties = {
+  width: 'min(100%, 390px)',
+  borderRadius: 26,
+  padding: '30px 26px',
+  background: 'rgba(9,15,19,.94)',
+  border: '1px solid rgba(0,200,150,.24)',
+  boxShadow: '0 28px 90px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.06)',
+  textAlign: 'center',
+  fontFamily: 'system-ui, sans-serif',
+}
+
+const kicker: CSSProperties = {
+  fontSize: 11,
+  letterSpacing: '.28em',
+  color: 'rgba(0,200,150,.86)',
+  fontWeight: 800,
+  marginBottom: 12,
+}
+
+const title: CSSProperties = {
+  fontSize: 25,
+  lineHeight: 1.05,
+  letterSpacing: '.05em',
+  color: '#f4fbff',
+  fontWeight: 900,
+}
+
+const subtitle: CSSProperties = {
+  marginTop: 8,
+  fontSize: 14,
+  color: 'rgba(230,244,250,.68)',
+  fontWeight: 700,
+}
+
+const body: CSSProperties = {
+  margin: '18px auto 22px',
+  maxWidth: 310,
+  fontSize: 13,
+  lineHeight: 1.65,
+  color: 'rgba(210,225,232,.68)',
+}
+
+const primaryButton: CSSProperties = {
+  width: '100%',
+  minHeight: 50,
+  borderRadius: 15,
+  border: 0,
+  background: 'linear-gradient(135deg, #00e0a4, #6efacc)',
+  color: '#04100d',
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '.12em',
+  cursor: 'pointer',
+  boxShadow: '0 14px 36px rgba(0,200,150,.28)',
+}
+
+const loadingOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 2000,
+  background:
+    'radial-gradient(circle at 50% 42%, rgba(0,200,150,.16), transparent 32%), linear-gradient(180deg, #050a0d, #071216)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 22,
+}
+
+const loadingPanel: CSSProperties = {
+  width: 'min(100%, 360px)',
+  minHeight: 190,
+  position: 'relative',
   overflow: 'hidden',
+  borderRadius: 24,
+  padding: '30px 24px',
+  background: 'rgba(8,14,18,.78)',
+  border: '1px solid rgba(0,200,150,.18)',
+  boxShadow: '0 24px 70px rgba(0,0,0,.48)',
+  textAlign: 'center',
+  fontFamily: 'system-ui, sans-serif',
 }
-const satBg: CSSProperties = {
-  position: 'absolute', inset: '-20%',
-  background: 'radial-gradient(ellipse at 50% 60%, #0a2a18 0%, #050e14 40%, #030608 100%)',
-  transformOrigin: '50% 55%',
+
+const scanLine: CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: 0,
+  height: 2,
+  background: 'linear-gradient(90deg, transparent, rgba(0,224,164,.95), transparent)',
+  animation: 'saga-scan 1.4s linear infinite',
 }
-const gridLayer: CSSProperties = {
-  position: 'absolute', inset: 0,
-  backgroundImage: `linear-gradient(rgba(0,200,150,.07) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0,200,150,.07) 1px, transparent 1px)`,
-  backgroundSize: '48px 48px',
+
+const smallKicker: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: '.30em',
+  color: 'rgba(0,200,150,.72)',
+  fontWeight: 900,
+  marginBottom: 12,
 }
-const topoLayer: CSSProperties = {
-  position: 'absolute', inset: 0,
-  backgroundImage: `radial-gradient(ellipse 60% 30% at 40% 55%, rgba(0,200,150,.04) 0%, transparent 70%),
-                    radial-gradient(ellipse 40% 20% at 65% 45%, rgba(0,180,130,.03) 0%, transparent 70%)`,
+
+const loadingTitle: CSSProperties = {
+  fontSize: 20,
+  color: '#f4fbff',
+  fontWeight: 900,
+  letterSpacing: '.08em',
 }
-function coordLine(dir: 'h' | 'v', pos: string): CSSProperties {
-  return {
-    position: 'absolute',
-    ...(dir === 'h' ? { left: 0, right: 0, top: pos, height: 1 }
-                    : { top: 0, bottom: 0, left: pos, width: 1 }),
-    background: 'rgba(0,200,150,.12)',
-  }
+
+const loadingText: CSSProperties = {
+  marginTop: 14,
+  fontSize: 12,
+  lineHeight: 1.6,
+  color: 'rgba(210,225,232,.62)',
 }
-const locatorWrap: CSSProperties = {
-  position: 'absolute', top: '50%', left: '50%',
-  transform: 'translate(-50%,-50%)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
+
+const pulseRow: CSSProperties = {
+  marginTop: 22,
+  display: 'flex',
+  justifyContent: 'center',
+  gap: 8,
+}
+
+const pulseDot: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: '50%',
+  background: '#00e0a4',
+  boxShadow: '0 0 14px rgba(0,224,164,.85)',
+  animation: 'saga-pulse 900ms ease-in-out infinite',
+}
+
+const cinematicOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 2000,
   pointerEvents: 'none',
+  background: 'transparent',
 }
-const locatorRing1: CSSProperties = {
-  position: 'absolute', width: 80, height: 80, borderRadius: '50%',
-  border: '1.5px solid rgba(0,200,150,.4)',
-  animation: 'saga-locator-ring 2s ease-out infinite',
+
+const topShade: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  top: 0,
+  height: 170,
+  background: 'linear-gradient(180deg, rgba(5,10,13,.92), rgba(5,10,13,.52), transparent)',
 }
-const locatorRing2: CSSProperties = {
-  position: 'absolute', width: 140, height: 140, borderRadius: '50%',
-  border: '1px solid rgba(0,200,150,.2)',
-  animation: 'saga-locator-ring 2s ease-out 0.6s infinite',
+
+const bottomShade: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  height: 220,
+  background: 'linear-gradient(0deg, rgba(5,10,13,.92), rgba(5,10,13,.46), transparent)',
 }
-const locatorDot: CSSProperties = {
-  width: 12, height: 12, borderRadius: '50%',
-  background: '#00c896',
-  boxShadow: '0 0 16px rgba(0,200,150,.9), 0 0 40px rgba(0,200,150,.4)',
-}
-const zoomHUD: CSSProperties = {
-  position: 'absolute', bottom: '13%', left: '50%',
+
+const cinematicBadge: CSSProperties = {
+  position: 'fixed',
+  left: '50%',
+  bottom: 28,
   transform: 'translateX(-50%)',
-  textAlign: 'center', display: 'grid', gap: 6,
-  animation: 'saga-rise 400ms 1.4s both',
-  pointerEvents: 'none',
+  padding: '10px 14px',
+  borderRadius: 999,
+  background: 'rgba(5,10,13,.62)',
+  border: '1px solid rgba(255,255,255,.10)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  display: 'none',
+  alignItems: 'center',
+  gap: 8,
+  color: 'rgba(244,251,255,.86)',
+  fontFamily: 'system-ui, sans-serif',
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: '.18em',
+  whiteSpace: 'nowrap',
 }
-const hudChip: CSSProperties = {
-  display: 'inline-block', margin: '0 auto 4px',
-  background: 'rgba(0,200,150,.12)', border: '1px solid rgba(0,200,150,.25)',
-  borderRadius: 20, padding: '2px 12px',
-  fontFamily: 'var(--saga-font-hud)', fontSize: 9, fontWeight: 700,
-  letterSpacing: '0.22em', color: 'rgba(0,200,150,.8)', textTransform: 'uppercase',
-}
-const hudLabel: CSSProperties = {
-  fontFamily: 'var(--saga-font-hud)', fontSize: 10, fontWeight: 700,
-  letterSpacing: '0.28em', color: 'rgba(0,200,150,.7)', textTransform: 'uppercase',
-}
-const hudName: CSSProperties = {
-  fontFamily: 'var(--saga-font-hud)', fontSize: 28, fontWeight: 700,
-  letterSpacing: '0.04em', color: '#e8f0f4',
-}
-const hudCoords: CSSProperties = {
-  fontFamily: 'monospace', fontSize: 11,
-  color: 'rgba(0,200,150,.55)', letterSpacing: '0.12em',
-}
-const hudBar: CSSProperties = {
-  height: 2, width: 160, background: 'rgba(0,200,150,.15)',
-  borderRadius: 2, margin: '4px auto 0', overflow: 'hidden',
-}
-const hudBarFill: CSSProperties = {
-  height: '100%', width: '100%', background: '#00c896',
-  borderRadius: 2, transformOrigin: 'left',
-  animation: 'saga-bar-fill 2.4s cubic-bezier(0.16,1,0.3,1) forwards',
-}
-const panel: CSSProperties = {
-  position: 'relative', zIndex: 10,
-  width: 'min(calc(100% - 32px), 360px)',
-  padding: '32px 28px',
-  background: 'rgba(10,16,20,0.85)',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
-  border: '1px solid rgba(0,200,150,.22)',
-  boxShadow: '0 0 0 1px rgba(0,200,150,.06), 0 24px 60px rgba(0,0,0,.7)',
-  borderRadius: 20,
-  display: 'flex', flexDirection: 'column', alignItems: 'center',
-  gap: 16, textAlign: 'center',
-  animation: 'saga-rise 350ms cubic-bezier(0.16,1,0.3,1) both',
-}
-const panelIcon: CSSProperties = { fontSize: 44, lineHeight: 1 }
-const panelTitle: CSSProperties = {
-  fontFamily: 'var(--saga-font-hud)', fontSize: 18, fontWeight: 700,
-  letterSpacing: '0.10em', color: '#e8f0f4',
-}
-const panelBody: CSSProperties = {
-  fontSize: 14, lineHeight: 1.65, color: 'rgba(200,216,224,.75)', maxWidth: '26ch',
-}
-const errorText: CSSProperties = { fontSize: 12, color: '#f59e0b' }
-const btnPrimary: CSSProperties = {
-  width: '100%', minHeight: 48, borderRadius: 10,
-  background: '#00c896', border: 0, color: '#050a0d',
-  fontFamily: 'var(--saga-font-hud)', fontSize: 13, fontWeight: 800,
-  letterSpacing: '0.14em', cursor: 'pointer',
-  boxShadow: '0 0 24px rgba(0,200,150,.35)',
-  transition: 'background 150ms',
-}
-const btnGhost: CSSProperties = {
-  background: 'none', border: 0, color: 'rgba(200,216,224,.45)',
-  fontSize: 13, cursor: 'pointer', padding: 8,
-}
-const tilesWait: CSSProperties = {
-  position: 'absolute', bottom: '8%', left: '50%',
-  transform: 'translateX(-50%)',
-  display: 'flex', alignItems: 'center', gap: 8,
-  color: 'rgba(0,200,150,.6)', fontSize: 12,
-  fontFamily: 'var(--saga-font-hud)', letterSpacing: '0.12em',
-}
-const tilesSpinner: CSSProperties = {
-  width: 14, height: 14, borderRadius: '50%',
-  border: '2px solid rgba(0,200,150,.2)',
-  borderTopColor: '#00c896',
-  animation: 'spin 0.8s linear infinite',
+
+const badgeDot: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: '50%',
+  background: '#00e0a4',
+  boxShadow: '0 0 12px rgba(0,224,164,.90)',
 }

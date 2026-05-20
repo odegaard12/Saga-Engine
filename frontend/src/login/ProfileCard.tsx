@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { navigateTo } from '../shared/transitions'
+import { prewarmGps } from '../shared/gpsPrewarm'
 import type { PlayerProfile } from '../types/player'
 
 interface Props {
@@ -20,6 +21,7 @@ export default function ProfileCard({ profile, index }: Props) {
   function handleEnter() {
     if (leaving) return
     setLeaving(true)
+    prewarmGps()
     navigateTo(`/player/${encodeURIComponent(profile.id)}`, 360)
   }
 

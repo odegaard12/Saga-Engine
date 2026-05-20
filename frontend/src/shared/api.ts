@@ -28,7 +28,10 @@ export async function fetchPlayerGame(
   user: string,
   options: { offlinePack?: boolean } = {},
 ): Promise<PlayerGamePayload> {
-  const suffix = options.offlinePack ? '?offline_pack=true' : ''
+  // La fuente canónica de misión es siempre /api/game/{user}.
+  // El modo offline se construye en cliente guardando este payload vivo.
+  // No usamos ?offline_pack=true porque puede leer data/stages.json legacy.
+  const suffix = options.offlinePack ? '' : ''
   const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
     headers: {
       Accept: 'application/json',
