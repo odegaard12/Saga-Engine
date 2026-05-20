@@ -1,0 +1,98 @@
+/* ============================================================
+   SAGA ENGINE — Design Tokens v1
+   ============================================================ */
+:root {
+  --saga-bg:            #080c0f;
+  --saga-surface:       #0d1318;
+  --saga-surface-2:     #111920;
+  --saga-surface-3:     #162028;
+  --saga-border:        rgba(255,255,255,.10);
+  --saga-border-strong: rgba(255,255,255,.18);
+  --saga-text:          #e8f0f4;
+  --saga-text-muted:    #7a9aaa;
+  --saga-text-faint:    #3d5a66;
+  --saga-text-inverse:  #080c0f;
+  --saga-accent:        #00c896;
+  --saga-accent-hover:  #00a87e;
+  --saga-accent-dim:    rgba(0,200,150,.16);
+  --saga-accent-glow:   rgba(0,200,150,.28);
+  --saga-amber:         #f0a030;
+  --saga-amber-dim:     rgba(240,160,48,.16);
+  --saga-danger:        #e03a4a;
+  --saga-danger-dim:    rgba(224,58,74,.16);
+  --saga-blue:          #3a9fd8;
+  --saga-blue-dim:      rgba(58,159,216,.16);
+  --saga-glow-top:      radial-gradient(circle at 50% -10%, rgba(0,200,150,.12) 0%, transparent 60%);
+  --saga-glass:         rgba(13,19,24,.82);
+  --saga-glass-blur:    blur(18px) saturate(140%);
+  --saga-glass-border:  1px solid rgba(255,255,255,.10);
+  --saga-glass-shadow:  0 20px 48px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.08);
+  --saga-font-hud:      'Rajdhani', 'Inter', system-ui, sans-serif;
+  --saga-font-body:     'Inter', system-ui, sans-serif;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px;
+  --s6:24px; --s8:32px; --s10:40px; --s12:48px; --s16:64px;
+  --r-sm:8px; --r-md:14px; --r-lg:22px; --r-xl:32px; --r-full:9999px;
+  --t-fast:   120ms cubic-bezier(0.16,1,0.3,1);
+  --t-base:   220ms cubic-bezier(0.16,1,0.3,1);
+  --t-slow:   380ms cubic-bezier(0.16,1,0.3,1);
+  --t-spring: 420ms cubic-bezier(0.34,1.56,0.64,1);
+  --shadow-sm:     0 2px 8px rgba(0,0,0,.24);
+  --shadow-md:     0 8px 24px rgba(0,0,0,.32);
+  --shadow-lg:     0 20px 48px rgba(0,0,0,.40);
+  --shadow-accent: 0 8px 24px var(--saga-accent-glow);
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+}
+@keyframes saga-rise {
+  from { opacity:0; transform:translateY(10px) scale(.98); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes saga-fade-in {
+  from { opacity:0; } to { opacity:1; }
+}
+@keyframes saga-pulse-glow {
+  0%,100% { box-shadow:0 0 0 0 var(--saga-accent-glow); }
+  50%     { box-shadow:0 0 0 8px transparent; }
+}
+@keyframes saga-scanline {
+  from { transform:translateY(-100%); }
+  to   { transform:translateY(100vh); }
+}
+@keyframes saga-shimmer {
+  0%   { background-position:-200% 0; }
+  100% { background-position: 200% 0; }
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html {
+  -webkit-text-size-adjust:none;
+  text-size-adjust:none;
+  -webkit-font-smoothing:antialiased;
+  scroll-behavior:smooth;
+}
+body {
+  min-height:100dvh;
+  background:var(--saga-bg);
+  color:var(--saga-text);
+  font-family:var(--saga-font-body);
+  font-size:16px;
+  line-height:1.5;
+  overscroll-behavior:none;
+}
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after {
+    animation-duration:0.01ms !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
+/* ── FirstRunGate keyframes ── */
+@keyframes saga-locator-ring {
+  0%   { transform: scale(0.4); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes saga-bar-fill {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}

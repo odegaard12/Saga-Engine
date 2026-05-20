@@ -1,3 +1,5 @@
+import PlayerEntrance from './PlayerEntrance'
+import FirstRunGate from './FirstRunGate'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
@@ -16,9 +18,10 @@ import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
-import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
+import { shouldShowIntro, hasRememberedGpsReady, rememberGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
 
+// FirstRun gate
 type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
@@ -54,6 +57,8 @@ export default function PlayerApp() {
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [followPlayer, setFollowPlayer] = useState(true)
+  const [showIntro, setShowIntro] = useState(() => shouldShowIntro())
+  const [introCameraRequest, setIntroCameraRequest] = useState<{ token: number; playerCoords: { lat: number; lon: number } | null } | null>(null)
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
@@ -66,6 +71,8 @@ export default function PlayerApp() {
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
+  const [startupGpsResolved, setStartupGpsResolved] = useState(false)
+  const [mapTilesReady, setMapTilesReady] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -82,23 +89,18 @@ export default function PlayerApp() {
     void registerPlayerServiceWorker()
     void cachePlayerShell(playerUrl)
 
-    const storedGps = readStoredGpsPosition(user)
-    if (storedGps) {
-      setBrowserGpsPosition(storedGps)
-      setBrowserGpsStatus('stale')
-      setFollowPlayer(true)
-      gpsCenteredRef.current = false
-      window.setTimeout(() => {
-        setFocusRequest({ target: 'player', token: Date.now() })
-      }, 250)
-    }
 
-    if (hasRememberedGpsReady(user)) {
+    if (hasRememberedGpsReady()) {
       setOfflinePrepVisible(false)
       window.setTimeout(() => {
         void handleRequestLiveGps({ silent: true, forceFocus: true })
       }, 300)
     }
+    // Safety: si el GPS no responde en 6s, desbloquear la pantalla igualmente
+    const gpsResolveTimeout = window.setTimeout(() => {
+      setStartupGpsResolved(true)
+    }, 6000)
+    return () => window.clearTimeout(gpsResolveTimeout)
   }, [user])
 
   useEffect(() => {
@@ -107,10 +109,11 @@ export default function PlayerApp() {
     async function run() {
       try {
         setState({ status: 'loading' })
-        const payload = await fetchPlayerGame(user, { offlinePack: true })
+        const payload = await fetchPlayerGame(user)
 
         if (!cancelled) {
-          setState({ status: 'ready', payload })
+          console.info('SAGA_DEBUG_PAYLOAD_STAGES', payload.user, (payload.stages || []).map((s) => [s.title, s.lat, s.lon]))
+        setState({ status: 'ready', payload })
         }
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
@@ -175,7 +178,7 @@ export default function PlayerApp() {
         if (!cancelled) {
           setOfflineSummary(summary)
 
-          if (summary?.hasPack && hasRememberedGpsReady(user)) {
+          if (summary?.hasPack && hasRememberedGpsReady()) {
             setOfflinePrepVisible(false)
           }
         }
@@ -280,11 +283,7 @@ export default function PlayerApp() {
   }
 
   if (state.status === 'idle' || state.status === 'loading') {
-    return (
-      <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Loading player app" body="Fetching player mission payload..." />
-      </ScreenFrame>
-    )
+    return <div style={{ position: 'fixed', inset: 0, background: '#050a0d', zIndex: 1 }} />
   }
 
   if (state.status === 'error') {
@@ -426,16 +425,9 @@ export default function PlayerApp() {
       setFollowPlayer(true)
       setRouteOverviewActive(false)
 
-      const storedGps = readStoredGpsPosition(user)
-      if (storedGps) {
-        setBrowserGpsPosition(storedGps)
-        setBrowserGpsStatus('stale')
-        setFocusRequest({ target: 'player', token: Date.now() })
-      }
-
       showNotice('Debug desactivado. Recuperando GPS real…', 'info')
 
-      if (hasRememberedGpsReady(user)) {
+      if (hasRememberedGpsReady()) {
         void handleRequestLiveGps({ silent: true, forceFocus: true })
         window.setTimeout(() => {
           void handleRequestLiveGps({ silent: true, forceFocus: true })
@@ -547,6 +539,7 @@ export default function PlayerApp() {
 
     if (!window.isSecureContext) {
       setBrowserGpsStatus('error')
+      setStartupGpsResolved(true)
       if (!options.silent) showNotice('El GPS requiere dominio HTTPS o app instalada.', 'warn')
       return
     }
@@ -564,19 +557,12 @@ export default function PlayerApp() {
 
       setBrowserGpsPosition(next)
       setBrowserGpsStatus('ready')
-      rememberGpsReady(user)
-      rememberGpsPosition(user, next)
-      if (hasOfflineMission) setOfflinePrepVisible(false)
+      setStartupGpsResolved(true)
+      rememberGpsReady()
+            if (hasOfflineMission) setOfflinePrepVisible(false)
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
       setFollowPlayer(true)
-
-      const storedGps = readStoredGpsPosition(user)
-      if (storedGps) {
-        setBrowserGpsPosition(storedGps)
-        setBrowserGpsStatus('stale')
-        setFocusRequest({ target: 'player', token: Date.now() })
-      }
 
       if (options.forceFocus || !gpsCenteredRef.current) {
         gpsCenteredRef.current = true
@@ -599,6 +585,7 @@ export default function PlayerApp() {
 
     const onError = (error: GeolocationPositionError) => {
       setBrowserGpsStatus('error')
+      setStartupGpsResolved(true)
       const denied = error.code === error.PERMISSION_DENIED
       if (!options.silent) {
         showNotice(
@@ -786,23 +773,57 @@ export default function PlayerApp() {
     }
   }
 
+  const _playerDisplayName = (state.status === 'ready' ? state.payload.display_name || state.payload.user : '') || 'OPERATIVO'
+  const _hasMissionCached   = state.status === 'ready' && (offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack))
+  const _cameraPlayerPosition =
+    distanceMeters !== null && distanceMeters > 100000 && !localDebugEnabled
+      ? null
+      : playerPosition
+
   return (
-    <ScreenFrame mobile={isPhone}>
+    <>
+      {showIntro && state.status === 'ready' && (
+        <FirstRunGate
+          playerUser={payload.user}
+          playerName={_playerDisplayName}
+          payloadReady={true}
+          mapTilesReady={mapTilesReady}
+          onGpsReady={(coords) => {
+            if (coords) {
+              setBrowserGpsPosition(coords)
+              setBrowserGpsStatus('ready')
+              rememberGpsReady()
+            }
+            setStartupGpsResolved(true)
+          }}
+          onIntroCameraStart={(coords) => {
+            setIntroCameraRequest({ token: Date.now(), playerCoords: coords })
+          }}
+          onDone={() => {
+            setShowIntro(false)
+            setOfflinePrepVisible(false)
+            setStartupGpsResolved(true)
+          }}
+        />
+      )}
+      <ScreenFrame mobile={isPhone}>
       <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
           missionStages={payload.stages || []}
           currentLevel={payload.level || 0}
-          playerPosition={playerPosition}
+          playerPosition={_cameraPlayerPosition}
           gpsState={gpsState}
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-          followPlayer={followPlayer}
+          followPlayer={followPlayer && !showIntro}
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
-          selfLabel={'YO'}
+          selfLabel={_playerDisplayName}
           onDebugSetPosition={handleDebugSetPosition}
+          onMapTilesReady={() => setMapTilesReady(true)}
           onNodeTap={handleMapNodeTap}
+          introCameraRequest={introCameraRequest}
         />
 
         <div style={getTopScrimStyle(isPhone)} />
@@ -835,20 +856,7 @@ export default function PlayerApp() {
             {routeOverviewActive ? '◎' : '↔'}
           </button>
         </div>
-
-          <FieldPrepPanel
-            visible={offlinePrepVisible && !payload.finished}
-            mobile={isPhone}
-            hasOfflineMission={hasOfflineMission}
-            hasBrowserGps={hasBrowserGps}
-            offlinePrepState={offlinePrepState}
-            browserGpsStatus={browserGpsStatus}
-            onPrepareOfflinePack={handlePrepareOfflinePack}
-            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-            onDismiss={() => setOfflinePrepVisible(false)}
-          />
-
-        {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
+{overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
         <div style={getBottomOverlayStyle(isPhone)}>
           <PlayerHud
@@ -861,7 +869,7 @@ export default function PlayerApp() {
             distanceMeters={distanceMeters}
             inRange={inRange}
             debugEnabled={effectiveDebugEnabled}
-            followPlayer={followPlayer}
+            followPlayer={followPlayer && !showIntro}
             toolsOpen={toolsOpen}
             playerHref={playerHref}
             loginHref={shellLoginHref}
@@ -901,7 +909,8 @@ export default function PlayerApp() {
         }}
         onSubmitCode={handleSubmitCode}
       />
-    </ScreenFrame>
+      </ScreenFrame>
+    </>
   )
 }
 
@@ -1111,29 +1120,16 @@ const overlayFinish: CSSProperties = {
   color: '#7e22ce',
 }
 
-const overlayAnimations = `
-@keyframes sagaPulseRing {
-  from {
-    transform: scale(.42);
-    opacity: .28;
-  }
-  to {
-    transform: scale(1.24);
-    opacity: 0;
-  }
-}
-
-@keyframes sagaOverlayPop {
-  from {
-    transform: scale(.94);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-`
+const overlayAnimations = [
+  '@keyframes sagaPulseRing {',
+  '  from { transform: scale(.42); opacity: .28; }',
+  '  to   { transform: scale(1.24); opacity: 0; }',
+  '}',
+  '@keyframes sagaOverlayPop {',
+  '  from { transform: scale(.94); opacity: 0; }',
+  '  to   { transform: scale(1);   opacity: 1; }',
+  '}',
+].join('\n')
 
 const statusCard: CSSProperties = {
   borderRadius: 20,
