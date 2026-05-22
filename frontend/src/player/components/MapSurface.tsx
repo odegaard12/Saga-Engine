@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
@@ -28,8 +28,6 @@ type MapSurfaceProps = {
   selfLabel?: string
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
-  onMapTilesReady?: () => void
-  introCameraRequest?: { token: number; playerCoords: { lat: number; lon: number } | null } | null
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -236,8 +234,6 @@ export function MapSurface({
   selfLabel = 'YO',
   onDebugSetPosition,
   onNodeTap,
-  onMapTilesReady,
-  introCameraRequest,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -253,17 +249,10 @@ export function MapSurface({
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
-  const cinematicLockRef = useRef(false)
-  const lastIntroCameraTokenRef = useRef<number | null>(null)
-  const latestPlayerPositionRef = useRef(playerPosition)
 
   useEffect(() => {
     onNodeTapRef.current = onNodeTap
   }, [onNodeTap])
-
-  useEffect(() => {
-    latestPlayerPositionRef.current = playerPosition
-  }, [playerPosition?.lat, playerPosition?.lon])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -271,7 +260,6 @@ export function MapSurface({
   )
 
   useEffect(() => {
-
     if (!mapRootRef.current || mapRef.current) return
 
     const map = L.map(mapRootRef.current, {
@@ -284,44 +272,8 @@ export function MapSurface({
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
-    const initialRoutePoints = (missionStages || [])
-      .filter((stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number')
-      .map((stage) => [stage.lat as number, stage.lon as number] as [number, number])
-
-    if (initialRoutePoints.length >= 2) {
-      map.fitBounds(L.latLngBounds(initialRoutePoints).pad(0.34), {
-        animate: false,
-        maxZoom: 10,
-      })
-    } else if (initialRoutePoints.length === 1) {
-      map.setView(initialRoutePoints[0], 13)
-    } else if (
-      currentStage &&
-      typeof currentStage.lat === 'number' &&
-      typeof currentStage.lon === 'number'
-    ) {
-      map.setView([currentStage.lat, currentStage.lon], 13)
-    } else {
-      map.setView([40.0, -3.5], 5)
-    }
+    map.setView([42.4333, -8.65], 13)
     mapRef.current = map
-
-    // Notificar cuando los primeros tiles estén cargados
-    let tilesNotified = false
-    map.on('tileloadend', () => {
-      if (!tilesNotified) {
-        tilesNotified = true
-        onMapTilesReady?.()
-      }
-    })
-    // Fallback: si no hay tiles en 3s, notificar igualmente
-    const tileTimeout = setTimeout(() => {
-      if (!tilesNotified) {
-        tilesNotified = true
-        onMapTilesReady?.()
-      }
-    }, 3000)
-    ;(mapRef as React.MutableRefObject<L.Map & { _tileTimeout?: ReturnType<typeof setTimeout> }>).current._tileTimeout = tileTimeout
 
     return () => {
       playerMarkerRef.current?.remove()
@@ -334,8 +286,6 @@ export function MapSurface({
       otherPlayerMarkersRef.current.clear()
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      clearTimeout((map as any)._tileTimeout)
       mapRef.current = null
       playerMarkerRef.current = null
       playerAuraRef.current = null
@@ -516,7 +466,7 @@ export function MapSurface({
       .map((entry) => `${entry.index}:${entry.data.lat}:${entry.data.lon}:${entry.data.radius}`)
       .join('|') + `:active:${activeIndex}`
 
-    if (lastNodeFrameRef.current !== nodeFrameKey && playerPosition && !cinematicLockRef.current) {
+    if (lastNodeFrameRef.current !== nodeFrameKey && !playerPosition) {
       lastNodeFrameRef.current = nodeFrameKey
       lastPlayerFrameRef.current = null
 
@@ -595,26 +545,18 @@ export function MapSurface({
       playerAuraRef.current.bringToFront()
     }
 
-    const selfMarkerLabel = selfLabel || 'Tú'
-    const selfMarkerProfile = {
-      display_name: selfMarkerLabel,
-      user: selfMarkerLabel,
-      avatar_initials: selfMarkerLabel.slice(0, 2).toUpperCase(),
-      gps_status: gpsState,
-    }
-
     if (!playerMarkerRef.current) {
       playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon(selfMarkerProfile, 'self'),
+        icon: createAvatarIcon({ display_name: 'YO', user: 'YO', avatar_initials: 'YO' }, 'self'),
         keyboard: false,
       }).addTo(map)
 
-      playerMarkerRef.current.bindTooltip(selfMarkerLabel, {
+      playerMarkerRef.current.bindTooltip('YO', {
         direction: 'top',
         opacity: 0.92,
       })
       playerMarkerRef.current.bindPopup(
-        buildPlayerPopup(selfMarkerProfile, 'self'),
+        buildPlayerPopup({ display_name: 'YO', user: 'YO', avatar_initials: 'YO', gps_status: gpsState }, 'self'),
         {
           closeButton: true,
           autoPan: true,
@@ -629,11 +571,11 @@ export function MapSurface({
 
     playerMarkerRef.current.setZIndexOffset(1000)
 
-    const playerFrameKey = playerPosition
-      ? `player:${playerPosition.lat.toFixed(4)}:${playerPosition.lon.toFixed(4)}`
+    const playerFrameKey = stageMapData
+      ? `${stageMapData.lat}:${stageMapData.lon}:player`
       : `player:${selfLabel}`
 
-    if (followPlayer && lastPlayerFrameRef.current !== playerFrameKey && !cinematicLockRef.current) {
+    if (followPlayer && lastPlayerFrameRef.current !== playerFrameKey) {
       lastPlayerFrameRef.current = playerFrameKey
 
       if (stageMapData) {
@@ -652,10 +594,6 @@ export function MapSurface({
             animate: true,
             duration: 0.25,
           })
-        } else {
-          // Jugador muy lejos del nodo: NO saltar a esa posición automáticamente.
-          // En escritorio Chrome puede dar ubicación aproximada/IP tipo Madrid.
-          // Mantener la cámara en la ruta/nodo evita romper la misión.
         }
       } else {
         map.setView([playerPosition.lat, playerPosition.lon], 16, {
@@ -733,7 +671,6 @@ export function MapSurface({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !focusRequest) return
-    if (cinematicLockRef.current) return
     if (lastFocusTokenRef.current === focusRequest.token) return
     lastFocusTokenRef.current = focusRequest.token
 
@@ -818,193 +755,6 @@ export function MapSurface({
     stageMapData?.lat,
     stageMapData?.lon,
     stageMapData?.radius,
-  ])
-
-  useEffect(() => {
-    const maybeMap = mapRef.current
-    const maybeRequest = introCameraRequest
-
-    if (!maybeMap || !maybeRequest) return
-    if (lastIntroCameraTokenRef.current === maybeRequest.token) return
-
-    const activeMap: L.Map = maybeMap
-    const activeRequest: { token: number; playerCoords: { lat: number; lon: number } | null } = maybeRequest
-
-    lastIntroCameraTokenRef.current = activeRequest.token
-
-    let cancelled = false
-
-    const surfaceEl = activeMap.getContainer().closest('.map-surface') as HTMLElement | null
-
-    function clearCinematicClasses() {
-      surfaceEl?.classList.remove(
-        'saga-map-cinematic',
-        'saga-map-cinematic-route',
-        'saga-map-cinematic-context',
-        'saga-map-cinematic-player'
-      )
-    }
-
-    function setCinematicClass(phase: 'route' | 'context' | 'player') {
-      clearCinematicClasses()
-      surfaceEl?.classList.add('saga-map-cinematic', `saga-map-cinematic-${phase}`)
-    }
-
-    function sleep(ms: number) {
-      return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-    }
-
-    function getRoutePoints(): [number, number][] {
-      const points = (missionStages || [])
-        .filter((stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number')
-        .map((stage) => [stage.lat as number, stage.lon as number] as [number, number])
-
-      if (
-        points.length === 0 &&
-        currentStage &&
-        typeof currentStage.lat === 'number' &&
-        typeof currentStage.lon === 'number'
-      ) {
-        points.push([currentStage.lat, currentStage.lon])
-      }
-
-      return points
-    }
-
-    function fitRouteInstant(routePoints: [number, number][]) {
-      activeMap.stop()
-      activeMap.invalidateSize({ pan: false })
-
-      if (routePoints.length >= 2) {
-        const bounds = L.latLngBounds(routePoints)
-        activeMap.fitBounds(bounds.pad(0.55), {
-          animate: false,
-          maxZoom: 14,
-          paddingTopLeft: [48, 120],
-          paddingBottomRight: [48, 190],
-        })
-        return
-      }
-
-      if (routePoints.length === 1) {
-        activeMap.setView(routePoints[0], 15, { animate: false })
-        return
-      }
-
-      // Sin routePoints no usamos GPS/cache para encuadrar ruta.
-      // Evita saltos a Madrid por ubicación aproximada o pack offline viejo.
-      activeMap.setView([40.0, -3.5], 5, { animate: false })
-    }
-
-    async function runCamera() {
-      cinematicLockRef.current = true
-      setCinematicClass('route')
-
-      const routePoints = getRoutePoints()
-      let playerCoords = latestPlayerPositionRef.current || activeRequest.playerCoords
-
-      function isPlayerCloseEnoughToRoute(coords: { lat: number; lon: number } | null) {
-        if (!coords) return false
-        if (routePoints.length === 0) return true
-
-        const minDistance = Math.min(
-          ...routePoints.map(([lat, lon]) =>
-            getDistanceMeters(coords, { lat, lon })
-          )
-        )
-
-        // Más de 100 km respecto a la ruta = GPS probablemente aproximado/malo/caché vieja.
-        return minDistance <= 100000
-      }
-
-      if (playerCoords && !isPlayerCloseEnoughToRoute(playerCoords)) {
-        playerCoords = null
-      }
-
-      // 1) Vista nodos/ruta. Quieta 3 segundos.
-      fitRouteInstant(routePoints)
-
-      await sleep(3000)
-      if (cancelled) return
-      setCinematicClass('context')
-
-      // 2) Vista táctica general calculada desde ruta + jugador.
-      // No Galicia fija, no Madrid fijo, no España fija salvo fallback.
-      const playerCloseToRoute = isPlayerCloseEnoughToRoute(playerCoords)
-
-      if (playerCoords && playerCloseToRoute) {
-        const contextPoints = [
-          ...routePoints,
-          [playerCoords.lat, playerCoords.lon] as [number, number],
-        ]
-
-        if (contextPoints.length >= 2) {
-          const contextBounds = L.latLngBounds(contextPoints)
-          activeMap.stop()
-          activeMap.flyToBounds(contextBounds.pad(0.62), {
-            animate: true,
-            duration: 2.35,
-            maxZoom: 7,
-            paddingTopLeft: [40, 96],
-            paddingBottomRight: [40, 160],
-          })
-        } else {
-          activeMap.stop()
-          activeMap.flyTo([playerCoords.lat, playerCoords.lon], 8, {
-            animate: true,
-            duration: 2.20,
-            easeLinearity: 0.20,
-          })
-        }
-      } else if (routePoints.length >= 2) {
-        const routeBounds = L.latLngBounds(routePoints)
-        activeMap.stop()
-        activeMap.flyToBounds(routeBounds.pad(1.10), {
-          animate: true,
-          duration: 2.20,
-          maxZoom: 9,
-          paddingTopLeft: [40, 96],
-          paddingBottomRight: [40, 160],
-        })
-      }
-
-      await sleep(2550)
-      if (cancelled) return
-      setCinematicClass(playerCoords ? 'player' : 'route')
-
-      // 3) Fly final al jugador si hay GPS.
-      if (playerCoords && isPlayerCloseEnoughToRoute(playerCoords)) {
-        activeMap.stop()
-        activeMap.flyTo([playerCoords.lat, playerCoords.lon], 16, {
-          animate: true,
-          duration: 4.00,
-          easeLinearity: 0.18,
-        })
-        await sleep(4200)
-      } else {
-        // GPS lejos o no fiable: quedarse en la ruta, no saltar a Madrid.
-        await sleep(700)
-      }
-
-      if (!cancelled) {
-        clearCinematicClasses()
-        cinematicLockRef.current = false
-      }
-    }
-
-    void runCamera()
-
-    return () => {
-      cancelled = true
-      clearCinematicClasses()
-      cinematicLockRef.current = false
-    }
-  }, [
-    introCameraRequest?.token,
-    missionStages,
-    currentStage?.id,
-    currentStage?.lat,
-    currentStage?.lon,
   ])
 
   return (

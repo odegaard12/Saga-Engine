@@ -559,7 +559,7 @@ function getConfigSource(resolved: ResolvedSignalHuntMinigame, stage: PlayerStag
 
 function getGpsCopy(state: GpsState, hasSource: boolean): string {
   if (!hasSource) return 'Falta source_lat/source_lon en la config o coordenadas del nodo.'
-  if (state === 'requesting') return 'Solicitando posición GPS.'
+  if (state === 'requesting') return 'Solicitando posición GPS real.'
   if (state === 'tracking') return 'GPS real activo. Acércate a la fuente para subir señal.'
   if (state === 'denied') return 'Permiso de ubicación denegado. Revisa permisos del navegador.'
   if (state === 'unsupported') return 'Este navegador no expone geolocalización.'
@@ -578,11 +578,8 @@ export function SignalHuntRuntimeScreen({
   const source = useMemo(() => getConfigSource(resolved, stage), [resolved, stage])
   const hasSource = source !== null
 
-  const stageRadius = toNumber((stage as unknown as Record<string, unknown>).radius)
-
-  const sourceRadius = clamp(Number(cfg.source_radius_m ?? stageRadius ?? 20), 1, 10000)
-  const configuredLockThreshold = clamp(Number(cfg.lock_threshold ?? 85), 1, 100)
-  const lockThreshold = Math.min(configuredLockThreshold, 30)
+  const sourceRadius = clamp(Number(cfg.source_radius_m ?? 20), 1, 10000)
+  const lockThreshold = clamp(Number(cfg.lock_threshold ?? 85), 1, 100)
   const holdMs = clamp(Number(cfg.hold_ms ?? 1500), 100, 10000)
   const maxSignal = clamp(Number(cfg.max_signal ?? 100), 1, 100)
   const noiseFloor = clamp(Number(cfg.noise_floor ?? 4), 0, 35)
