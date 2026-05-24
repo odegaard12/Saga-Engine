@@ -1722,3 +1722,215 @@
     bottom: max(10px, env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* =========================
+   ADMIN POLISH V1
+   Safe admin-only visual layer.
+   Do not use for player fullscreen shell.
+   ========================= */
+
+.saga-admin-shell {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(14, 165, 233, 0.18), transparent 28%),
+    radial-gradient(circle at 78% 18%, rgba(168, 85, 247, 0.14), transparent 32%),
+    radial-gradient(circle at 60% 92%, rgba(34, 197, 94, 0.10), transparent 30%),
+    #020617;
+}
+
+.saga-left-rail,
+.saga-command-bar,
+.saga-inspector,
+.saga-floating-panel {
+  border-color: rgba(226, 232, 240, 0.16);
+}
+
+.saga-left-rail::before,
+.saga-command-bar::before,
+.saga-inspector::before,
+.saga-floating-panel::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.10), transparent 34%),
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.10), transparent 38%);
+  opacity: 0.72;
+}
+
+.saga-rail-brand,
+.saga-mission-card,
+.saga-route-list,
+.saga-command-main,
+.saga-family-chips,
+.saga-save-status {
+  position: relative;
+}
+
+.saga-brand-mark {
+  position: relative;
+  overflow: hidden;
+}
+
+.saga-brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.34), transparent);
+  transform: rotate(25deg) translateX(-120%);
+  animation: saga-admin-brand-sheen 6s ease-in-out infinite;
+}
+
+.saga-mission-card {
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.14), transparent 36%),
+    rgba(15, 23, 42, 0.62);
+}
+
+.saga-mini-stats span {
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+.saga-mini-stats span:hover {
+  transform: translateY(-1px);
+  background: rgba(15, 23, 42, 0.70);
+  border-color: rgba(125, 211, 252, 0.18);
+}
+
+.saga-node-row {
+  position: relative;
+  overflow: hidden;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.saga-node-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0);
+  transition: background 140ms ease;
+}
+
+.saga-node-row:hover {
+  transform: translateX(2px);
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.saga-node-row.active::before {
+  background: rgba(125, 211, 252, 0.95);
+}
+
+.saga-node-row.active .saga-node-index {
+  background: rgba(125, 211, 252, 0.20);
+  color: #e0f2fe;
+}
+
+.saga-family-chips span {
+  border: 1px solid rgba(255,255,255,.07);
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.saga-family-chips span:hover {
+  transform: translateY(-1px);
+  border-color: rgba(196, 181, 253, 0.26);
+  background: rgba(30, 41, 59, 0.78);
+}
+
+.saga-save-status {
+  overflow: hidden;
+}
+
+.saga-save-status.saving {
+  border-color: rgba(125, 211, 252, 0.26);
+}
+
+.saga-save-status.saving::after {
+  content: "";
+  position: absolute;
+  left: -40%;
+  right: auto;
+  bottom: 0;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #7dd3fc, transparent);
+  animation: saga-admin-loading-bar 1.2s ease-in-out infinite;
+}
+
+.saga-save-status.saved {
+  border-color: rgba(134, 239, 172, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 42%),
+    rgba(15, 23, 42, 0.74);
+}
+
+.saga-toast {
+  animation: saga-admin-toast-in 180ms ease-out both;
+}
+
+.saga-floating-panel,
+.saga-inspector {
+  animation: saga-admin-panel-in 180ms ease-out both;
+}
+
+@keyframes saga-admin-brand-sheen {
+  0%, 72% {
+    transform: rotate(25deg) translateX(-120%);
+  }
+  88%, 100% {
+    transform: rotate(25deg) translateX(120%);
+  }
+}
+
+@keyframes saga-admin-loading-bar {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@keyframes saga-admin-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes saga-admin-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saga-brand-mark::after,
+  .saga-save-status.saving::after,
+  .saga-floating-panel,
+  .saga-inspector,
+  .saga-toast {
+    animation: none !important;
+  }
+
+  .saga-node-row,
+  .saga-mini-stats span,
+  .saga-family-chips span {
+    transition: none !important;
+  }
+}
