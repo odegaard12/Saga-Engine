@@ -1,190 +1,243 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { t } from '../../i18n'
-import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
+import type { CSSProperties } from 'react'
+import type { PlayerStage } from '../../types/player'
 
 interface RequirementPreviewPanelProps {
   user: string
-  stage?: unknown
+  stage: PlayerStage | null
 }
 
-type Requirement = {
-  itemId: string
-  label: string
-  quantity: number
-  consume: boolean
+function getValue(stage: PlayerStage | null, keys: string[]): unknown {
+  if (!stage) return undefined
+  const source = stage as unknown as Record<string, unknown>
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+      return source[key]
+    }
+  }
+  return undefined
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
+function getString(stage: PlayerStage | null, keys: string[], fallback = ''): string {
+  const value = getValue(stage, keys)
+  return typeof value === 'string' ? value : fallback
 }
 
-function readString(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  return typeof value === 'string' ? value.trim() : ''
+function getNumber(stage: PlayerStage | null, keys: string[]): number | null {
+  const value = getValue(stage, keys)
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function readBoolean(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') return value.toLowerCase() === 'true'
-  return false
+function getBoolean(stage: PlayerStage | null, keys: string[]): boolean {
+  const value = getValue(stage, keys)
+  return value === true || value === 'true' || value === '1'
 }
 
-function readQuantity(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : 1
-
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1
+function getFamily(stage: PlayerStage | null): string {
+  return getString(stage, ['family', 'minigame_family', 'game_family', 'type'], 'unknown')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
 }
 
-function readRequirement(stage?: unknown): Requirement | null {
-  const stageRecord = asRecord(stage)
-  if (!Object.keys(stageRecord).length) return null
+function getGameTitle(family: string): string {
+  if (family.includes('signal')) return 'Busqueda de senal'
+  if (family.includes('bearing')) return 'Rumbo / brujula'
+  if (family.includes('circuit')) return 'Circuito logico'
+  return 'Nodo de mision'
+}
 
-  const config = asRecord(stageRecord.config)
-  const source = {
-    ...stageRecord,
-    ...config,
+function getGameHowTo(stage: PlayerStage | null): string[] {
+  const family = getFamily(stage)
+
+  if (family.includes('signal')) {
+    return [
+      'Activa GPS y acercate al punto del mapa.',
+      'Cuando estes dentro del radio, mantente estable hasta capturar la senal.',
+      'Si no entra, pulsa Reactivar GPS desde Herramientas y prueba al aire libre.',
+    ]
   }
 
-  const itemId = readString(source, 'required_item_id')
-  const label = readString(source, 'required_item_label') || itemId
-  const quantity = readQuantity(source, 'required_item_quantity')
-  const consume = readBoolean(source, 'required_item_consume')
-
-  if (!itemId && !label) return null
-  if (!itemId) return null
-
-  return {
-    itemId,
-    label,
-    quantity,
-    consume,
+  if (family.includes('bearing')) {
+    return [
+      'Permite orientacion/brujula si el movil lo solicita.',
+      'Gira despacio hasta apuntar al rumbo correcto.',
+      'Si el sensor falla, usa las pistas del nodo o el modo manual cuando este disponible.',
+    ]
   }
-}
 
-function countOwned(snapshot: InventorySnapshot, itemId: string) {
-  return snapshot.items
-    .filter((item) => item.item_id === itemId)
-    .reduce((total, item) => total + Math.max(0, item.quantity || 0), 0)
+  if (family.includes('circuit')) {
+    return [
+      'Lee la pista y resuelve el patron del circuito.',
+      'Prueba combinaciones con calma: este nodo depende mas de logica que de GPS.',
+      'Si hay un objeto fisico asociado, guardalo primero en la mochila.',
+    ]
+  }
+
+  return [
+    'Lee la pista del nodo actual.',
+    'Cumple los requisitos indicados antes de intentar abrirlo.',
+    'Usa Mochila o Coger si el nodo depende de un objeto fisico.',
+  ]
 }
 
 export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanelProps) {
-  const [snapshot, setSnapshot] = useState(() => loadInventorySnapshot(user))
+  if (!stage) {
+    return (
+      <section style={panel}>
+        <div style={eyebrow}>REQUISITOS</div>
+        <div style={title}>Sin nodo seleccionado</div>
+        <p style={copy}>Selecciona un nodo para ver que necesitas y como se juega.</p>
+      </section>
+    )
+  }
 
-  useEffect(() => {
-    const refresh = () => setSnapshot(loadInventorySnapshot(user))
+  const family = getFamily(stage)
+  const gameTitle = getGameTitle(family)
+  const radius = getNumber(stage, ['radius', 'capture_radius_m', 'entry_radius_m'])
+  const requiredItem = getString(stage, ['required_item_id', 'requiredItemId'])
+  const rewardItem = getString(stage, ['reward_item_id', 'rewardItemId'])
+  const manualCode = getString(stage, ['manual_code', 'manualCode'])
+  const interactionMethod = getString(stage, ['interaction_method', 'interactionMethod'])
+  const needsGps = radius !== null || family.includes('signal') || family.includes('bearing')
+  const hasQr = interactionMethod.includes('qr') || getBoolean(stage, ['qr_enabled', 'qrEnabled'])
+  const hasNfc = interactionMethod.includes('nfc') || getBoolean(stage, ['nfc_enabled', 'nfcEnabled'])
+  const hasManual = Boolean(manualCode) || interactionMethod.includes('manual') || rewardItem || requiredItem
 
-    refresh()
-    window.addEventListener('storage', refresh)
-    window.addEventListener('saga:locale-change', refresh)
-
-    const timer = window.setInterval(refresh, 2500)
-
-    return () => {
-      window.removeEventListener('storage', refresh)
-      window.removeEventListener('saga:locale-change', refresh)
-      window.clearInterval(timer)
-    }
-  }, [user])
-
-  const requirement = useMemo(() => readRequirement(stage), [stage])
-
-  if (!requirement) return null
-
-  const owned = countOwned(snapshot, requirement.itemId)
-  const hasEnough = owned >= requirement.quantity
+  const chips = [
+    needsGps ? 'GPS' : null,
+    radius !== null ? `Radio ${radius} m` : null,
+    requiredItem ? 'Necesita objeto' : null,
+    rewardItem ? 'Da objeto' : null,
+    hasQr ? 'QR' : null,
+    hasNfc ? 'NFC' : null,
+    hasManual ? 'Manual' : null,
+  ].filter(Boolean) as string[]
 
   return (
-    <section style={styles.card} aria-label={t('player.requirements.title')}>
-      <div style={styles.header}>
-        <span style={styles.kicker}>{t('player.requirements.title')}</span>
-        <span style={hasEnough ? styles.okBadge : styles.missingBadge}>
-          {hasEnough ? t('player.requirements.youHave') : t('player.requirements.missing')}
-        </span>
+    <section style={panel}>
+      <div style={header}>
+        <div>
+          <div style={eyebrow}>REQUISITOS</div>
+          <div style={title}>{stage.title || 'Nodo actual'}</div>
+        </div>
+        <span style={badge}>{gameTitle}</span>
       </div>
 
-      <div style={styles.row}>
-        <strong>{t('player.requirements.needs')}</strong>
-        <span>{requirement.label}</span>
+      <div style={chipsRow}>
+        {chips.length ? chips.map((chip) => <span key={chip}>{chip}</span>) : <span>Sin requisitos especiales</span>}
       </div>
 
-      <div style={styles.row}>
-        <strong>{t('player.requirements.quantity')}</strong>
-        <span>{owned}/{requirement.quantity}</span>
+      <div style={block}>
+        <strong>Para entrar</strong>
+        <ul style={list}>
+          {needsGps ? <li>Activa GPS y acercate al nodo.</li> : <li>No parece requerir GPS especial.</li>}
+          {radius !== null ? <li>Debes estar dentro del radio de {radius} m.</li> : null}
+          {requiredItem ? <li>Necesitas llevar en mochila: {requiredItem}.</li> : null}
+          {!requiredItem ? <li>No hay objeto obligatorio detectado para abrirlo.</li> : null}
+        </ul>
       </div>
 
-      {requirement.consume ? (
-        <div style={styles.note}>{t('player.requirements.consume')}</div>
-      ) : null}
+      <div style={block}>
+        <strong>Como se juega</strong>
+        <ul style={list}>
+          {getGameHowTo(stage).map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      </div>
 
-      <div style={styles.preview}>{t('player.requirements.previewOnly')}</div>
+      <div style={block}>
+        <strong>Prueba fisica</strong>
+        <p style={copy}>
+          {hasQr || hasNfc
+            ? 'Este nodo puede usar QR/NFC cuando el flujo rapido este activo. Si falla, usa Coger como respaldo manual.'
+            : hasManual
+              ? 'Usa Coger para guardar la palabra, objeto o pista fisica en la mochila local.'
+              : 'No hay prueba fisica especial detectada en este nodo.'}
+        </p>
+      </div>
+
+      <div style={footer}>Perfil local: {user}. Estado calculado en este telefono.</div>
     </section>
   )
 }
 
-const styles: Record<string, CSSProperties> = {
-  card: {
-    display: 'grid',
-    gap: 8,
-    padding: 12,
-    borderRadius: 18,
-    background: 'rgba(15, 23, 42, 0.72)',
-    border: '1px solid rgba(148, 163, 184, 0.24)',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  kicker: {
-    color: 'rgba(226, 232, 240, 0.82)',
-    fontSize: 11,
-    fontWeight: 900,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-  },
-  okBadge: {
-    borderRadius: 999,
-    padding: '4px 8px',
-    background: 'rgba(34, 197, 94, 0.18)',
-    color: '#bbf7d0',
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-  },
-  missingBadge: {
-    borderRadius: 999,
-    padding: '4px 8px',
-    background: 'rgba(248, 113, 113, 0.18)',
-    color: '#fecaca',
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 10,
-    color: 'rgba(226, 232, 240, 0.92)',
-    fontSize: 13,
-  },
-  note: {
-    color: '#fde68a',
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  preview: {
-    color: 'rgba(203, 213, 225, 0.72)',
-    fontSize: 12,
-    lineHeight: 1.35,
-  },
+const panel: CSSProperties = {
+  display: 'grid',
+  gap: 12,
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.055)',
+  padding: 12,
 }
+
+const header: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 10,
+}
+
+const eyebrow: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 10,
+  fontWeight: 950,
+  letterSpacing: '0.14em',
+}
+
+const title: CSSProperties = {
+  marginTop: 4,
+  color: '#ffffff',
+  fontSize: 15,
+  lineHeight: 1.1,
+  fontWeight: 950,
+}
+
+const badge: CSSProperties = {
+  padding: '6px 9px',
+  borderRadius: 999,
+  border: '1px solid rgba(125,211,252,.20)',
+  background: 'rgba(14,165,233,.14)',
+  color: '#dbeafe',
+  fontSize: 9,
+  fontWeight: 950,
+  whiteSpace: 'nowrap',
+}
+
+const chipsRow: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+}
+
+const block: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(15,23,42,.20)',
+  padding: 10,
+}
+
+const list: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  margin: 0,
+  paddingLeft: 18,
+  color: 'rgba(226,232,240,.76)',
+  fontSize: 12,
+  lineHeight: 1.35,
+  fontWeight: 750,
+}
+
+const copy: CSSProperties = {
+  margin: 0,
+  color: 'rgba(226,232,240,.76)',
+  fontSize: 12,
+  lineHeight: 1.4,
+  fontWeight: 750,
+}
+
+const footer: CSSProperties = {
+  color: 'rgba(226,232,240,.46)',
+  fontSize: 10,
+  fontWeight: 800,
+}
+

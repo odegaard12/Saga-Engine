@@ -101,10 +101,10 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>Plan B de campo</div>
-          <div style={title}>Guardar objeto encontrado</div>
+          <div style={eyebrow}>RESPALDO DE CAMPO</div>
+          <div style={title}>Guardar prueba fisica</div>
         </div>
-        <span style={badge}>MOCHILA LOCAL</span>
+        <span style={badge}>LOCAL</span>
       </div>
 
       <div style={steps}>
@@ -118,7 +118,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         </div>
         <div style={step}>
           <b>3</b>
-          <span>Queda guardado aunque no haya cobertura.</span>
+          <span>Se guarda sin cobertura y se sincroniza despues.</span>
         </div>
       </div>
 
@@ -136,14 +136,14 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
               submitManualProof()
             }
           }}
-          placeholder="Ej: Llave de la torre, Runa azul, Pista del faro..."
+          placeholder="Ej: llave torre, runa azul, pista faro..."
           style={input}
         />
       </label>
 
       {preview ? (
         <div style={previewBox}>
-          <span>Se a?adir? a la mochila</span>
+          <span>Se guardara</span>
           <strong>{preview.label}</strong>
           <small>Identificador interno creado autom?ticamente.</small>
         </div>
@@ -163,7 +163,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           submitManualProof()
         }}
       >
-        Guardar objeto
+        Guardar
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>

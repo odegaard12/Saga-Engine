@@ -96,6 +96,17 @@ export function PlayerHud({
     setLocaleState(nextLocale)
   }
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const panelOpen = detailsOpen || toolsOpen
+    document.body.classList.toggle('saga-player-panel-open', panelOpen)
+
+    return () => {
+      document.body.classList.remove('saga-player-panel-open')
+    }
+  }, [detailsOpen, toolsOpen])
+
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -113,6 +124,27 @@ export function PlayerHud({
 
   return (
     <>
+      <style className="saga-player-panel-hide-map-controls">{`
+        body.saga-player-panel-open .leaflet-control-container,
+        body.saga-player-panel-open .saga-map-control,
+        body.saga-player-panel-open .saga-map-controls,
+        body.saga-player-panel-open .saga-map-action,
+        body.saga-player-panel-open .saga-map-actions,
+        body.saga-player-panel-open .saga-map-floating-action,
+        body.saga-player-panel-open .saga-map-floating-actions,
+        body.saga-player-panel-open [data-saga-map-control],
+        body.saga-player-panel-open button[aria-label*="ubicacion" i],
+        body.saga-player-panel-open button[aria-label*="ubicaci?n" i],
+        body.saga-player-panel-open button[aria-label*="centrar" i],
+        body.saga-player-panel-open button[aria-label*="ampliar" i],
+        body.saga-player-panel-open button[aria-label*="expand" i],
+        body.saga-player-panel-open button[aria-label*="mapa" i] {
+          opacity: 0 !important;
+          pointer-events: none !important;
+          transform: scale(.96) !important;
+          transition: opacity 120ms ease, transform 120ms ease !important;
+        }
+      `}</style>
       <section
         style={{
           ...card,
