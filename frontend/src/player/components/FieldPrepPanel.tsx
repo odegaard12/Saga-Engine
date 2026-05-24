@@ -26,18 +26,38 @@ export function FieldPrepPanel({
 }: FieldPrepPanelProps) {
   if (!visible) return null
 
+  const ready = hasOfflineMission && hasBrowserGps
+  const missionCopy = getMissionCopy(hasOfflineMission, offlinePrepState)
+  const gpsCopy = getGpsCopy(hasBrowserGps, browserGpsStatus)
+
   return (
     <div style={getOfflinePrepOverlayStyle(mobile)}>
       <section style={offlinePrepCard}>
         <div>
           <div style={offlinePrepEyebrow}>MODO CAMPO</div>
           <div style={offlinePrepTitle}>
-            {hasOfflineMission && hasBrowserGps ? 'Listo para salir' : 'Preparar antes de salir'}
+            {ready ? 'Listo para salir' : 'Preparar antes de salir'}
           </div>
           <div style={offlinePrepCopy}>
-            {hasOfflineMission ? '✓ Misión descargada en este teléfono.' : '○ Descarga nodos, códigos, reglas y requisitos.'}
-            <br />
-            {hasBrowserGps ? '✓ GPS activo y listo para entrar en nodos cercanos.' : '○ Activa GPS para calcular distancia, centrar el mapa y desbloquear nodos cercanos.'}
+            Deja la misión preparada antes de moverte: datos offline, GPS y entrada en nodos cercanos.
+          </div>
+        </div>
+
+        <div style={statusGrid}>
+          <div style={statusItem}>
+            <span style={hasOfflineMission ? statusDotOk : statusDotPending} />
+            <div>
+              <div style={statusLabel}>Misión offline</div>
+              <div style={statusValue}>{missionCopy}</div>
+            </div>
+          </div>
+
+          <div style={statusItem}>
+            <span style={hasBrowserGps ? statusDotOk : statusDotPending} />
+            <div>
+              <div style={statusLabel}>GPS del teléfono</div>
+              <div style={statusValue}>{gpsCopy}</div>
+            </div>
           </div>
         </div>
 
@@ -70,10 +90,10 @@ export function FieldPrepPanel({
 
         <button
           type="button"
-          style={hasOfflineMission && hasBrowserGps ? offlinePrepDismiss : offlinePrepDismissLater}
+          style={ready ? offlinePrepDismiss : offlinePrepDismissLater}
           onClick={onDismiss}
         >
-          {hasOfflineMission && hasBrowserGps ? '×' : 'Más tarde'}
+          {ready ? '×' : 'Más tarde'}
         </button>
 
         {offlinePrepState === 'error' ? (
@@ -82,6 +102,21 @@ export function FieldPrepPanel({
       </section>
     </div>
   )
+}
+
+function getMissionCopy(hasOfflineMission: boolean, offlinePrepState: FieldPrepPanelProps['offlinePrepState']): string {
+  if (offlinePrepState === 'saving') return 'Guardando nodos, reglas y requisitos…'
+  if (offlinePrepState === 'error') return 'Error al preparar la misión.'
+  if (hasOfflineMission) return 'Lista en este teléfono.'
+  return 'Pendiente de descargar.'
+}
+
+function getGpsCopy(hasBrowserGps: boolean, browserGpsStatus: PlayerGpsStatus): string {
+  if (hasBrowserGps) return 'Activo para distancia y mapa.'
+  if (browserGpsStatus === 'searching') return 'Buscando posición…'
+  if (browserGpsStatus === 'error') return 'Requiere permiso o mejor señal.'
+  if (browserGpsStatus === 'unavailable') return 'No disponible en este navegador.'
+  return 'Pendiente de activar.'
 }
 
 function getOfflinePrepOverlayStyle(mobile: boolean): CSSProperties {
@@ -133,6 +168,51 @@ const offlinePrepCopy: CSSProperties = {
   fontSize: 12,
   lineHeight: 1.45,
   fontWeight: 700,
+}
+
+const statusGrid: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+}
+
+const statusItem: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '10px 1fr',
+  gap: 8,
+  alignItems: 'start',
+  padding: '9px 10px',
+  borderRadius: 16,
+  background: 'rgba(15,23,42,.34)',
+  border: '1px solid rgba(255,255,255,.10)',
+}
+
+const statusDotOk: CSSProperties = {
+  width: 9,
+  height: 9,
+  marginTop: 4,
+  borderRadius: 999,
+  background: '#22c55e',
+  boxShadow: '0 0 0 4px rgba(34,197,94,.14)',
+}
+
+const statusDotPending: CSSProperties = {
+  ...statusDotOk,
+  background: '#60a5fa',
+  boxShadow: '0 0 0 4px rgba(96,165,250,.14)',
+}
+
+const statusLabel: CSSProperties = {
+  color: '#f8fafc',
+  fontSize: 11,
+  fontWeight: 900,
+}
+
+const statusValue: CSSProperties = {
+  marginTop: 2,
+  color: 'rgba(226,232,240,.76)',
+  fontSize: 11,
+  lineHeight: 1.35,
+  fontWeight: 750,
 }
 
 const offlinePrepActions: CSSProperties = {
