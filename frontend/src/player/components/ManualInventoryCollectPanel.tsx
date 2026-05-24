@@ -1,56 +1,73 @@
-import { useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { collectInventoryItem } from '../offline/inventory'
 
 interface ManualInventoryCollectPanelProps {
   user: string
 }
 
-type ParsedItemCode = {
+type ParsedManualInput = {
   item_id: string
   label: string
+  raw: string
+  format: 'field_text' | 'structured_code'
 }
 
-const QUICK_ITEMS = [
-  { code: 'ITEM:llave:Llave azul', label: 'Llave azul' },
-  { code: 'ITEM:pista:Pista encontrada', label: 'Pista' },
-  { code: 'ITEM:moneda:Moneda antigua', label: 'Moneda' },
-]
+function slugifyItemId(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
 
-function parseItemCode(value: string): ParsedItemCode | null {
+function parseManualInput(value: string): ParsedManualInput | null {
   const clean = value.trim()
   if (!clean) return null
 
-  const normalized = clean.replace(/^item\s*:/i, 'ITEM:')
-  if (!normalized.toUpperCase().startsWith('ITEM:')) {
+  const normalized = clean.replace(/^saga\s*:/i, '').replace(/^item\s*:/i, 'ITEM:')
+
+  if (normalized.toUpperCase().startsWith('ITEM:')) {
+    const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
+    const itemId = parts[1]
+    const label = parts.slice(2).join(':') || itemId
+
+    if (!itemId) return null
+
     return {
-      item_id: clean.slice(0, 80),
-      label: clean.slice(0, 120),
+      item_id: slugifyItemId(itemId) || itemId.slice(0, 80),
+      label: label.slice(0, 160),
+      raw: clean.slice(0, 300),
+      format: 'structured_code',
     }
   }
 
-  const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
-  const itemId = parts[1]
-  const label = parts.slice(2).join(':') || itemId
-
+  const itemId = slugifyItemId(clean)
   if (!itemId) return null
 
   return {
-    item_id: itemId.slice(0, 120),
-    label: label.slice(0, 160),
+    item_id: itemId,
+    label: clean.slice(0, 160),
+    raw: clean.slice(0, 300),
+    format: 'field_text',
   }
 }
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
-  const [code, setCode] = useState('')
-  const [message, setMessage] = useState('Escribe un nombre o pega un código ITEM:id:Etiqueta.')
+  const [value, setValue] = useState('')
+  const [message, setMessage] = useState('Esto quedara en Objetos y podra desbloquear otros nodos.')
   const [saved, setSaved] = useState(false)
 
-  function submitItemCode(value = code) {
-    const parsed = parseItemCode(value)
+  const preview = useMemo(() => parseManualInput(value), [value])
+  const canSubmit = Boolean(preview)
+
+  function submitManualProof(input = value) {
+    const parsed = parseManualInput(input)
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Escribe un objeto o usa formato ITEM:id:Etiqueta.')
+      setMessage('Escribe una palabra, nombre de objeto o pista visible.')
       return
     }
 
@@ -64,159 +81,194 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         queue_event: true,
         metadata: {
           manual_entry: true,
+          raw_value: parsed.raw,
+          input_format: parsed.format,
         },
       })
 
-      setCode('')
+      setValue('')
       setSaved(true)
-      setMessage(`Añadido: ${parsed.label} · ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
+      setMessage(`Guardado: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
     } catch {
       setSaved(false)
-      setMessage('No se pudo guardar el objeto en este dispositivo.')
+      setMessage('No se pudo guardar. Prueba otra vez.')
     }
   }
 
   return (
     <section style={panel}>
-      <div>
-        <div style={eyebrow}>Coger objeto</div>
-        <div style={title}>Añadir coleccionable manual</div>
+      <div style={header}>
+        <div>
+          <div style={eyebrow}>PRUEBA</div>
+          <div style={title}>Registrar prueba</div>
+        </div>
+        <span style={badge}>LOCAL</span>
       </div>
 
-      <div style={quickGrid}>
-        {QUICK_ITEMS.map((item) => (
-          <button
-            key={item.code}
-            type="button"
-            style={quickButton}
-            onClick={() => submitItemCode(item.code)}
-          >
-            + {item.label}
-          </button>
-        ))}
+      <div style={hint}>
+        Usa esta pantalla cuando encuentres una tarjeta, sobre, pegatina, palabra, QR, NFC u objeto fisico. Por ahora puedes escribirlo manualmente; despues el QR lo rellenara solo.
       </div>
 
-      <div style={inputRow}>
+      <label style={field}>
+        Palabra, pista u objeto
         <input
-          value={code}
+          value={value}
           onChange={(event) => {
-            setCode(event.target.value)
+            setValue(event.target.value)
             setSaved(false)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
-              submitItemCode()
+              submitManualProof()
             }
           }}
-          placeholder="Ej: Llave azul"
+          placeholder="Ej: llave torre, runa azul, pista faro"
           style={input}
         />
-        <button
-          type="button"
-          style={button}
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            submitItemCode()
-          }}
-        >
-          Añadir
-        </button>
-      </div>
+      </label>
+
+      {preview ? (
+        <div style={previewBox}>
+          <span>Se guardara en Objetos</span>
+          <strong>{preview.label}</strong>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        style={canSubmit ? button : buttonDisabled}
+        disabled={!canSubmit}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          submitManualProof()
+        }}
+      >
+        Guardar en Objetos
+      </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
-      <div style={formatHint}>Formato avanzado: ITEM:llave:Llave azul</div>
     </section>
   )
 }
 
-const panel: React.CSSProperties = {
+const panel: CSSProperties = {
   display: 'grid',
   gap: 10,
-  borderRadius: 18,
+  borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.06)',
+  background:
+    'radial-gradient(circle at top right, rgba(125,211,252,.14), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.34), rgba(51,65,85,.28))',
   padding: 12,
 }
 
-const eyebrow: React.CSSProperties = {
-  color: '#fde68a',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
+const header: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 10,
 }
 
-const title: React.CSSProperties = {
+const eyebrow: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 10,
+  fontWeight: 950,
+  letterSpacing: '0.14em',
+}
+
+const title: CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
-  fontSize: 13,
-  fontWeight: 900,
+  fontSize: 15,
+  fontWeight: 950,
 }
 
-const quickGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 7,
+const badge: CSSProperties = {
+  alignSelf: 'flex-start',
+  minHeight: 24,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 9px',
+  borderRadius: 999,
+  border: '1px solid rgba(125,211,252,.20)',
+  background: 'rgba(14,165,233,.14)',
+  color: '#dbeafe',
+  fontSize: 9,
+  fontWeight: 950,
 }
 
-const quickButton: React.CSSProperties = {
-  minHeight: 34,
-  borderRadius: 14,
-  border: '1px solid rgba(250,204,21,.18)',
-  background: 'rgba(250,204,21,.10)',
-  color: '#fef9c3',
-  fontSize: 10,
-  fontWeight: 900,
-}
-
-const inputRow: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr auto',
-  gap: 8,
-}
-
-const input: React.CSSProperties = {
-  width: '100%',
-  minWidth: 0,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.38)',
-  color: '#ffffff',
+const hint: CSSProperties = {
+  borderRadius: 15,
+  background: 'rgba(15,23,42,.20)',
+  color: 'rgba(226,232,240,.76)',
   fontSize: 12,
-  fontWeight: 800,
-  padding: '10px 11px',
-  outline: 'none',
+  lineHeight: 1.35,
+  fontWeight: 750,
+  padding: 10,
 }
 
-const button: React.CSSProperties = {
-  minHeight: 38,
-  padding: '0 12px',
-  borderRadius: 14,
-  border: '1px solid rgba(250,204,21,.22)',
-  background: 'rgba(250,204,21,.16)',
-  color: '#fef9c3',
-  fontSize: 11,
-  fontWeight: 900,
+const field: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  color: 'rgba(226,232,240,.84)',
+  fontSize: 10,
+  fontWeight: 950,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
 
-const helpText: React.CSSProperties = {
+const input: CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  borderRadius: 15,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(15,23,42,.46)',
+  color: '#ffffff',
+  fontSize: 16,
+  lineHeight: 1.2,
+  fontWeight: 800,
+  padding: '12px 12px',
+  outline: 'none',
+  textTransform: 'none',
+  letterSpacing: 0,
+}
+
+const previewBox: CSSProperties = {
+  display: 'grid',
+  gap: 2,
+  borderRadius: 15,
+  border: '1px solid rgba(187,247,208,.16)',
+  background: 'rgba(34,197,94,.10)',
+  padding: 10,
+}
+
+const button: CSSProperties = {
+  minHeight: 42,
+  padding: '0 12px',
+  borderRadius: 15,
+  border: '1px solid rgba(125,211,252,.24)',
+  background: 'rgba(14,165,233,.20)',
+  color: '#dbeafe',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const buttonDisabled: CSSProperties = {
+  ...button,
+  opacity: 0.48,
+}
+
+const helpText: CSSProperties = {
   color: 'rgba(226,232,240,.66)',
   fontSize: 11,
   lineHeight: 1.4,
 }
 
-const okText: React.CSSProperties = {
+const okText: CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
-  fontWeight: 900,
-}
-
-const formatHint: React.CSSProperties = {
-  color: 'rgba(226,232,240,.44)',
-  fontSize: 10,
-  fontWeight: 800,
+  fontWeight: 950,
 }

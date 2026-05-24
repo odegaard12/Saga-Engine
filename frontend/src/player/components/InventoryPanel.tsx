@@ -86,7 +86,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
     <section style={panel}>
       <div style={headerRow}>
         <div>
-          <div style={eyebrow}>Coleccionables</div>
+          <div style={eyebrow}>Objetos</div>
           <div style={title}>
             {totalItems} objeto{totalItems === 1 ? '' : 's'}
           </div>
@@ -140,7 +140,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               <div style={emptySlotText}>Hueco libre</div>
             </div>
           ))}
-          <div style={emptyText}>Aún no hay coleccionables. Usa QR, NFC o recogida manual para llenar la mochila.</div>
+          <div style={emptyText}>Aún no hay objetos. Usa QR, NFC o recogida manual para llenar la mochila.</div>
         </div>
       )}
 

@@ -1,190 +1,243 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { t } from '../../i18n'
-import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
+import type { CSSProperties } from 'react'
+import type { PlayerStage } from '../../types/player'
 
 interface RequirementPreviewPanelProps {
   user: string
-  stage?: unknown
+  stage: PlayerStage | null
 }
 
-type Requirement = {
-  itemId: string
-  label: string
-  quantity: number
-  consume: boolean
+function read(stage: PlayerStage | null, keys: string[]): unknown {
+  if (!stage) return undefined
+  const source = stage as unknown as Record<string, unknown>
+  for (const key of keys) {
+    const value = source[key]
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+  return undefined
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
+function readString(stage: PlayerStage | null, keys: string[]): string {
+  const value = read(stage, keys)
+  return typeof value === 'string' ? value : ''
 }
 
-function readString(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  return typeof value === 'string' ? value.trim() : ''
+function readNumber(stage: PlayerStage | null, keys: string[]): number | null {
+  const value = read(stage, keys)
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function readBoolean(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') return value.toLowerCase() === 'true'
-  return false
+function familyId(stage: PlayerStage | null): string {
+  return readString(stage, ['family', 'minigame_family', 'game_family', 'type'])
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
 }
 
-function readQuantity(source: Record<string, unknown>, key: string) {
-  const value = source[key]
-  const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : 1
-
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1
+function gameName(family: string): string {
+  if (family.includes('signal')) return 'SENAL'
+  if (family.includes('bearing')) return 'RUMBO'
+  if (family.includes('circuit')) return 'CIRCUITO'
+  return 'NODO'
 }
 
-function readRequirement(stage?: unknown): Requirement | null {
-  const stageRecord = asRecord(stage)
-  if (!Object.keys(stageRecord).length) return null
+function howToPlay(stage: PlayerStage | null): string[] {
+  const family = familyId(stage)
 
-  const config = asRecord(stageRecord.config)
-  const source = {
-    ...stageRecord,
-    ...config,
+  if (family.includes('signal')) {
+    return [
+      'Acercate al punto marcado en el mapa.',
+      'Entra dentro del radio del nodo.',
+      'Mantente estable hasta capturar la senal.',
+    ]
   }
 
-  const itemId = readString(source, 'required_item_id')
-  const label = readString(source, 'required_item_label') || itemId
-  const quantity = readQuantity(source, 'required_item_quantity')
-  const consume = readBoolean(source, 'required_item_consume')
-
-  if (!itemId && !label) return null
-  if (!itemId) return null
-
-  return {
-    itemId,
-    label,
-    quantity,
-    consume,
+  if (family.includes('bearing')) {
+    return [
+      'Permite la brujula si el movil lo pide.',
+      'Gira despacio hasta encontrar el rumbo correcto.',
+      'Si el sensor falla, reintenta al aire libre o usa la prueba manual.',
+    ]
   }
-}
 
-function countOwned(snapshot: InventorySnapshot, itemId: string) {
-  return snapshot.items
-    .filter((item) => item.item_id === itemId)
-    .reduce((total, item) => total + Math.max(0, item.quantity || 0), 0)
+  if (family.includes('circuit')) {
+    return [
+      'Lee la pista y resuelve el patron.',
+      'Prueba la combinacion correcta.',
+      'Si el circuito pide un objeto, primero debe estar en Objetos.',
+    ]
+  }
+
+  return [
+    'Lee la pista del nodo actual.',
+    'Comprueba distancia, objetos y prueba fisica.',
+    'Cuando cumplas todo, podras avanzar.',
+  ]
 }
 
 export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanelProps) {
-  const [snapshot, setSnapshot] = useState(() => loadInventorySnapshot(user))
+  if (!stage) {
+    return (
+      <section style={panel}>
+        <div style={eyebrow}>GUIA</div>
+        <div style={title}>Sin nodo seleccionado</div>
+        <p style={copy}>Selecciona un nodo para ver como se juega y que necesitas.</p>
+      </section>
+    )
+  }
 
-  useEffect(() => {
-    const refresh = () => setSnapshot(loadInventorySnapshot(user))
+  const family = familyId(stage)
+  const radius = readNumber(stage, ['radius', 'capture_radius_m', 'entry_radius_m'])
+  const requiredItem = readString(stage, ['required_item_id', 'requiredItemId'])
+  const rewardItem = readString(stage, ['reward_item_id', 'rewardItemId'])
+  const manualCode = readString(stage, ['manual_code', 'manualCode'])
+  const interaction = readString(stage, ['interaction_method', 'interactionMethod']).toLowerCase()
 
-    refresh()
-    window.addEventListener('storage', refresh)
-    window.addEventListener('saga:locale-change', refresh)
-
-    const timer = window.setInterval(refresh, 2500)
-
-    return () => {
-      window.removeEventListener('storage', refresh)
-      window.removeEventListener('saga:locale-change', refresh)
-      window.clearInterval(timer)
-    }
-  }, [user])
-
-  const requirement = useMemo(() => readRequirement(stage), [stage])
-
-  if (!requirement) return null
-
-  const owned = countOwned(snapshot, requirement.itemId)
-  const hasEnough = owned >= requirement.quantity
+  const needsGps = radius !== null || family.includes('signal') || family.includes('bearing')
+  const needsItem = Boolean(requiredItem)
+  const givesItem = Boolean(rewardItem)
+  const physical = Boolean(manualCode || rewardItem || requiredItem || interaction)
 
   return (
-    <section style={styles.card} aria-label={t('player.requirements.title')}>
-      <div style={styles.header}>
-        <span style={styles.kicker}>{t('player.requirements.title')}</span>
-        <span style={hasEnough ? styles.okBadge : styles.missingBadge}>
-          {hasEnough ? t('player.requirements.youHave') : t('player.requirements.missing')}
-        </span>
+    <section style={panel}>
+      <div style={header}>
+        <div>
+          <div style={eyebrow}>GUIA DEL NODO</div>
+          <div style={title}>{stage.title || 'Nodo actual'}</div>
+        </div>
+        <span style={badge}>{gameName(family)}</span>
       </div>
 
-      <div style={styles.row}>
-        <strong>{t('player.requirements.needs')}</strong>
-        <span>{requirement.label}</span>
+      <div style={statusGrid}>
+        <Mini label="Distancia" value={needsGps ? 'GPS' : 'Libre'} />
+        <Mini label="Radio" value={radius !== null ? `${radius} m` : '-'} />
+        <Mini label="Objeto" value={needsItem ? 'Necesario' : 'No'} />
       </div>
 
-      <div style={styles.row}>
-        <strong>{t('player.requirements.quantity')}</strong>
-        <span>{owned}/{requirement.quantity}</span>
+      <div style={block}>
+        <strong>Que necesitas</strong>
+        <ul style={list}>
+          {needsGps ? <li>Activa GPS y acercate al punto del mapa.</li> : <li>Este nodo no depende de posicion especial.</li>}
+          {radius !== null ? <li>Debes estar dentro del radio de {radius} m.</li> : null}
+          {needsItem ? <li>Necesitas tener este objeto en Objetos: {requiredItem}.</li> : <li>No hay objeto obligatorio detectado.</li>}
+        </ul>
       </div>
 
-      {requirement.consume ? (
-        <div style={styles.note}>{t('player.requirements.consume')}</div>
-      ) : null}
+      <div style={block}>
+        <strong>Como se juega</strong>
+        <ul style={list}>
+          {howToPlay(stage).map((text) => <li key={text}>{text}</li>)}
+        </ul>
+      </div>
 
-      <div style={styles.preview}>{t('player.requirements.previewOnly')}</div>
+      <div style={block}>
+        <strong>Objetos y pruebas</strong>
+        <p style={copy}>
+          Los objetos que guardas en Objetos pueden servir para abrir otros nodos. Si encuentras una tarjeta, palabra, QR, NFC, sobre o prop, registralo desde Prueba.
+        </p>
+        {needsItem ? <p style={copy}>Este nodo comprueba si llevas el objeto requerido antes de avanzar.</p> : null}
+        {givesItem ? <p style={copy}>Este nodo puede darte una recompensa: {rewardItem}.</p> : null}
+        {!physical ? <p style={copy}>No hay prueba fisica especial detectada en este nodo.</p> : null}
+      </div>
+
+      <div style={footer}>Jugador local: {user}</div>
     </section>
   )
 }
 
-const styles: Record<string, CSSProperties> = {
-  card: {
-    display: 'grid',
-    gap: 8,
-    padding: 12,
-    borderRadius: 18,
-    background: 'rgba(15, 23, 42, 0.72)',
-    border: '1px solid rgba(148, 163, 184, 0.24)',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  kicker: {
-    color: 'rgba(226, 232, 240, 0.82)',
-    fontSize: 11,
-    fontWeight: 900,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-  },
-  okBadge: {
-    borderRadius: 999,
-    padding: '4px 8px',
-    background: 'rgba(34, 197, 94, 0.18)',
-    color: '#bbf7d0',
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-  },
-  missingBadge: {
-    borderRadius: 999,
-    padding: '4px 8px',
-    background: 'rgba(248, 113, 113, 0.18)',
-    color: '#fecaca',
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 10,
-    color: 'rgba(226, 232, 240, 0.92)',
-    fontSize: 13,
-  },
-  note: {
-    color: '#fde68a',
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  preview: {
-    color: 'rgba(203, 213, 225, 0.72)',
-    fontSize: 12,
-    lineHeight: 1.35,
-  },
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={mini}>
+      <b>{value}</b>
+      <span>{label}</span>
+    </div>
+  )
+}
+
+const panel: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(15,23,42,.18)',
+  padding: 12,
+}
+
+const header: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 10,
+}
+
+const eyebrow: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 10,
+  fontWeight: 950,
+  letterSpacing: '0.14em',
+}
+
+const title: CSSProperties = {
+  marginTop: 4,
+  color: '#ffffff',
+  fontSize: 15,
+  lineHeight: 1.1,
+  fontWeight: 950,
+}
+
+const badge: CSSProperties = {
+  alignSelf: 'flex-start',
+  borderRadius: 999,
+  border: '1px solid rgba(125,211,252,.22)',
+  background: 'rgba(14,165,233,.14)',
+  color: '#dbeafe',
+  padding: '7px 9px',
+  fontSize: 9,
+  fontWeight: 950,
+}
+
+const statusGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 8,
+}
+
+const mini: CSSProperties = {
+  display: 'grid',
+  gap: 2,
+  borderRadius: 15,
+  background: 'rgba(255,255,255,.075)',
+  padding: 9,
+  textAlign: 'center',
+}
+
+const block: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.055)',
+  padding: 10,
+}
+
+const list: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  margin: 0,
+  paddingLeft: 18,
+  color: 'rgba(226,232,240,.78)',
+  fontSize: 12,
+  lineHeight: 1.35,
+  fontWeight: 750,
+}
+
+const copy: CSSProperties = {
+  margin: 0,
+  color: 'rgba(226,232,240,.78)',
+  fontSize: 12,
+  lineHeight: 1.4,
+  fontWeight: 750,
+}
+
+const footer: CSSProperties = {
+  color: 'rgba(226,232,240,.46)',
+  fontSize: 10,
+  fontWeight: 800,
 }

@@ -96,6 +96,96 @@ export function PlayerHud({
     setLocaleState(nextLocale)
   }
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const panelOpen = detailsOpen || toolsOpen
+    document.body.classList.toggle('saga-player-panel-open', panelOpen)
+
+    return () => {
+      document.body.classList.remove('saga-player-panel-open')
+    }
+  }, [detailsOpen, toolsOpen])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const panelOpen = detailsOpen || toolsOpen
+    document.body.classList.toggle('saga-player-panel-open', panelOpen)
+
+    const hiddenElements: HTMLElement[] = []
+
+    function hideElement(element: HTMLElement) {
+      if (element.dataset.sagaPanelHidden === '1') return
+      element.dataset.sagaPanelHidden = '1'
+      element.dataset.sagaPanelPrevDisplay = element.style.display || ''
+      element.dataset.sagaPanelPrevPointerEvents = element.style.pointerEvents || ''
+      element.dataset.sagaPanelPrevOpacity = element.style.opacity || ''
+      element.style.display = 'none'
+      element.style.pointerEvents = 'none'
+      element.style.opacity = '0'
+      hiddenElements.push(element)
+    }
+
+    function shouldHideButton(button: HTMLButtonElement) {
+      const text = (button.textContent || '').trim().toLowerCase()
+      const label = (button.getAttribute('aria-label') || '').trim().toLowerCase()
+      const title = (button.getAttribute('title') || '').trim().toLowerCase()
+      const combined = `${text} ${label} ${title}`
+
+      if (text === '?' || text === '?' || text === '?' || text === '?') return true
+      if (combined.includes('ampliar')) return true
+      if (combined.includes('expand')) return true
+      if (combined.includes('centrar')) return true
+      if (combined.includes('ubicacion')) return true
+      if (combined.includes('ubicaci?n')) return true
+      if (combined.includes('mi posicion')) return true
+      if (combined.includes('mi posici?n')) return true
+
+      return false
+    }
+
+    function hideMapControls() {
+      if (!panelOpen) return
+
+      document
+        .querySelectorAll<HTMLElement>(
+          '.leaflet-control-container, .saga-map-control, .saga-map-controls, .saga-map-action, .saga-map-actions, .saga-map-floating-action, .saga-map-floating-actions, [data-saga-map-control]'
+        )
+        .forEach(hideElement)
+
+      document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+        if (shouldHideButton(button)) hideElement(button)
+      })
+    }
+
+    function restoreHidden() {
+      hiddenElements.forEach((element) => {
+        element.style.display = element.dataset.sagaPanelPrevDisplay || ''
+        element.style.pointerEvents = element.dataset.sagaPanelPrevPointerEvents || ''
+        element.style.opacity = element.dataset.sagaPanelPrevOpacity || ''
+        delete element.dataset.sagaPanelHidden
+        delete element.dataset.sagaPanelPrevDisplay
+        delete element.dataset.sagaPanelPrevPointerEvents
+        delete element.dataset.sagaPanelPrevOpacity
+      })
+      hiddenElements.length = 0
+    }
+
+    hideMapControls()
+
+    const observer = new MutationObserver(hideMapControls)
+    if (panelOpen) {
+      observer.observe(document.body, { childList: true, subtree: true })
+    }
+
+    return () => {
+      observer.disconnect()
+      restoreHidden()
+      document.body.classList.remove('saga-player-panel-open')
+    }
+  }, [detailsOpen, toolsOpen]) // saga-panel-control-hider-v3
+
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -169,7 +259,7 @@ export function PlayerHud({
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
-                <div style={sheetTitle}>Objetos, requisitos y coleccionables</div>
+                <div style={sheetTitle}>Guia, objetos y pruebas</div>
               </div>
 
               <button
@@ -188,21 +278,21 @@ export function PlayerHud({
                 style={backpackTab === 'requirements' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('requirements')}
               >
-                Requisitos
+                Guia
               </button>
               <button
                 type="button"
                 style={backpackTab === 'inventory' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('inventory')}
               >
-                Inventario
+                Objetos
               </button>
               <button
                 type="button"
                 style={backpackTab === 'collect' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('collect')}
               >
-                Coger
+                Prueba
               </button>
             </div>
 
@@ -484,48 +574,59 @@ const ghostButtonActive: CSSProperties = {
 const sheetOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 3900,
+  zIndex: 3600,
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: 'calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  padding: '0 10px calc(8px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
 
 const sheetBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.28)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  background: 'rgba(2,6,23,.22)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
 }
 
 const sheet: CSSProperties = {
   position: 'relative',
-  zIndex: 2,
-  maxHeight: 'min(72dvh, 680px)',
-  overflowY: 'auto',
-  overscrollBehavior: 'contain',
-  borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.14)',
-  background:
-    'linear-gradient(180deg, rgba(13,23,42,.92), rgba(20,32,58,.84))',
-  boxShadow:
-    '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: '16px 16px calc(18px + env(safe-area-inset-bottom, 0px))',
+  zIndex: 1,
   display: 'grid',
   gap: 10,
-  pointerEvents: 'auto',
+  maxHeight: 'min(66vh, 590px)',
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  overscrollBehavior: 'contain',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.18)',
+  background:
+    'radial-gradient(circle at top left, rgba(187,247,208,.11), transparent 34%), linear-gradient(180deg, rgba(71,85,105,.92), rgba(51,65,85,.86))',
   color: '#f8fafc',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 24px 70px rgba(2,6,23,.42)',
+  backdropFilter: 'blur(24px) saturate(1.08)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.08)',
+  padding: 12,
+  paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
 }
 
 const sheetHeader: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 4,
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
+  margin: '-12px -12px 0',
+  padding: '12px 12px 10px',
+  borderRadius: '30px 30px 18px 18px',
+  background:
+    'linear-gradient(180deg, rgba(71,85,105,.96), rgba(71,85,105,.76))',
+  borderBottom: '1px solid rgba(255,255,255,.10)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
 }
 
 const sheetEyebrow: CSSProperties = {
@@ -556,22 +657,22 @@ const tabs: CSSProperties = {
 }
 
 const tabButton: CSSProperties = {
-  minHeight: 38,
+  minHeight: 40,
   border: 'none',
   borderRadius: 14,
   background: 'transparent',
   color: 'rgba(226,232,240,.70)',
   fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.06em',
+  fontWeight: 950,
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
 }
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'rgba(187,247,208,.18)',
+  background: 'rgba(187,247,208,.16)',
   color: '#dcfce7',
-  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.16)',
+  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.18)',
 }
 
 const statusRow: CSSProperties = {
@@ -579,24 +680,31 @@ const statusRow: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 8,
-  padding: '8px 10px',
-  borderRadius: 16,
-  background: 'rgba(255,255,255,.07)',
-  color: 'rgba(226,232,240,.82)',
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.10)',
+  color: 'rgba(248,250,252,.82)',
+  padding: '8px 12px',
   fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.06em',
+  fontWeight: 950,
+  letterSpacing: '0.02em',
   textTransform: 'uppercase',
 }
 
 const tabPanel: CSSProperties = {
   display: 'grid',
   gap: 10,
+  minHeight: 0,
 }
 
 const toolsOverlay: CSSProperties = {
-  ...sheetOverlay,
-  zIndex: 4000,
+  position: 'fixed',
+  inset: 0,
+  zIndex: 3600,
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  padding: '0 10px calc(8px + env(safe-area-inset-bottom, 0px))',
+  pointerEvents: 'auto',
 }
 
 const toolsBackdrop: CSSProperties = sheetBackdrop
@@ -615,18 +723,21 @@ const toolsSubtitle: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
-  width: 38,
-  height: 38,
+  position: 'relative',
+  zIndex: 10,
+  minWidth: 40,
+  width: 40,
+  height: 40,
+  display: 'grid',
+  placeItems: 'center',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.08)',
+  background: 'rgba(15,23,42,.70)',
   color: '#f8fafc',
   fontSize: 22,
-  fontWeight: 900,
-  lineHeight: 1,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  fontWeight: 950,
+  cursor: 'pointer',
+  boxShadow: '0 12px 28px rgba(2,6,23,.24)',
 }
 
 const toolsButton: CSSProperties = {
