@@ -484,48 +484,58 @@ const ghostButtonActive: CSSProperties = {
 const sheetOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 3900,
+  zIndex: 3200,
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: 'calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  padding: '0 12px calc(10px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
 
 const sheetBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.28)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  background: 'rgba(2,6,23,.32)',
+  backdropFilter: 'blur(3px)',
+  WebkitBackdropFilter: 'blur(3px)',
 }
 
 const sheet: CSSProperties = {
   position: 'relative',
-  zIndex: 2,
-  maxHeight: 'min(72dvh, 680px)',
+  zIndex: 1,
+  display: 'grid',
+  gap: 12,
+  maxHeight: 'min(70vh, 620px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.14)',
+  border: '1px solid rgba(255,255,255,.20)',
   background:
-    'linear-gradient(180deg, rgba(13,23,42,.92), rgba(20,32,58,.84))',
-  boxShadow:
-    '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: '16px 16px calc(18px + env(safe-area-inset-bottom, 0px))',
-  display: 'grid',
-  gap: 10,
-  pointerEvents: 'auto',
+    'linear-gradient(180deg, rgba(100,116,139,.58), rgba(51,65,85,.48))',
   color: '#f8fafc',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 24px 70px rgba(2,6,23,.38)',
+  backdropFilter: 'blur(24px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+  padding: 14,
+  paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
 }
 
 const sheetHeader: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 4,
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
+  margin: '-14px -14px 0',
+  padding: '14px 14px 10px',
+  borderRadius: '28px 28px 18px 18px',
+  background:
+    'linear-gradient(180deg, rgba(71,85,105,.94), rgba(71,85,105,.72))',
+  borderBottom: '1px solid rgba(255,255,255,.10)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
 }
 
 const sheetEyebrow: CSSProperties = {
@@ -548,10 +558,10 @@ const sheetTitle: CSSProperties = {
 const tabs: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 6,
+  gap: 8,
   padding: 4,
   borderRadius: 18,
-  background: 'rgba(15,23,42,.34)',
+  background: 'rgba(15,23,42,.28)',
   border: '1px solid rgba(255,255,255,.08)',
 }
 
@@ -591,12 +601,19 @@ const statusRow: CSSProperties = {
 
 const tabPanel: CSSProperties = {
   display: 'grid',
-  gap: 10,
+  gap: 12,
+  minHeight: 0,
 }
 
 const toolsOverlay: CSSProperties = {
-  ...sheetOverlay,
-  zIndex: 4000,
+  position: 'fixed',
+  inset: 0,
+  zIndex: 3200,
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  padding: '0 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  pointerEvents: 'auto',
 }
 
 const toolsBackdrop: CSSProperties = sheetBackdrop
@@ -615,18 +632,21 @@ const toolsSubtitle: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
+  position: 'relative',
+  zIndex: 10,
+  minWidth: 38,
   width: 38,
   height: 38,
+  display: 'grid',
+  placeItems: 'center',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.08)',
+  background: 'rgba(15,23,42,.56)',
   color: '#f8fafc',
   fontSize: 22,
-  fontWeight: 900,
-  lineHeight: 1,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  fontWeight: 950,
+  cursor: 'pointer',
+  boxShadow: '0 10px 24px rgba(2,6,23,.22)',
 }
 
 const toolsButton: CSSProperties = {

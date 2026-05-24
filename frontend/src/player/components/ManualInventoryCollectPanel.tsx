@@ -177,7 +177,7 @@ const panel: CSSProperties = {
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
   background:
-    'radial-gradient(circle at top right, rgba(250,204,21,.14), transparent 36%), linear-gradient(180deg, rgba(250,204,21,.08), rgba(255,255,255,.045))',
+    'radial-gradient(circle at top right, rgba(125,211,252,.14), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.42), rgba(51,65,85,.34))',
   padding: 12,
 }
 
@@ -189,7 +189,7 @@ const header: CSSProperties = {
 }
 
 const eyebrow: CSSProperties = {
-  color: '#fde68a',
+  color: '#bbf7d0',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.14em',
@@ -210,9 +210,9 @@ const badge: CSSProperties = {
   justifyContent: 'center',
   padding: '0 8px',
   borderRadius: 999,
-  border: '1px solid rgba(250,204,21,.20)',
-  background: 'rgba(250,204,21,.12)',
-  color: '#fef9c3',
+  border: '1px solid rgba(125,211,252,.20)',
+  background: 'rgba(14,165,233,.14)',
+  color: '#dbeafe',
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.10em',
@@ -252,7 +252,8 @@ const input: CSSProperties = {
   border: '1px solid rgba(255,255,255,.16)',
   background: 'rgba(15,23,42,.46)',
   color: '#ffffff',
-  fontSize: 12,
+  fontSize: 16,
+  lineHeight: 1.2,
   fontWeight: 800,
   padding: '12px 12px',
   outline: 'none',
@@ -283,9 +284,9 @@ const button: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
   borderRadius: 15,
-  border: '1px solid rgba(250,204,21,.22)',
-  background: 'rgba(250,204,21,.18)',
-  color: '#fef9c3',
+  border: '1px solid rgba(125,211,252,.24)',
+  background: 'rgba(14,165,233,.20)',
+  color: '#dbeafe',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
