@@ -822,6 +822,7 @@ export default function PlayerApp() {
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
 
+          {activePanel !== 'details' && !toolsOpen ? (
           <button
             type="button"
             style={mapRouteToggleButton}
@@ -834,6 +835,7 @@ export default function PlayerApp() {
           >
             {routeOverviewActive ? '◎' : '↔'}
           </button>
+          ) : null}{/* saga-hide-map-arrow-when-panel-open-v3 */}
         </div>
 
           <FieldPrepPanel
