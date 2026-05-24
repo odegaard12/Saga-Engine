@@ -5,11 +5,11 @@ interface ManualInventoryCollectPanelProps {
   user: string
 }
 
-type ParsedItemCode = {
+type ParsedManualInput = {
   item_id: string
   label: string
   raw: string
-  format: 'item_code' | 'plain_text'
+  format: 'field_text' | 'structured_code'
 }
 
 function slugifyItemId(value: string): string {
@@ -22,7 +22,7 @@ function slugifyItemId(value: string): string {
     .slice(0, 80)
 }
 
-function parseItemCode(value: string): ParsedItemCode | null {
+function parseManualInput(value: string): ParsedManualInput | null {
   const clean = value.trim()
   if (!clean) return null
 
@@ -41,35 +41,35 @@ function parseItemCode(value: string): ParsedItemCode | null {
       item_id: slugifyItemId(itemId) || itemId.slice(0, 80),
       label: label.slice(0, 160),
       raw: clean.slice(0, 300),
-      format: 'item_code',
+      format: 'structured_code',
     }
   }
 
   const itemId = slugifyItemId(clean)
-
   if (!itemId) return null
 
   return {
     item_id: itemId,
     label: clean.slice(0, 160),
     raw: clean.slice(0, 300),
-    format: 'plain_text',
+    format: 'field_text',
   }
 }
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
-  const [code, setCode] = useState('')
-  const [message, setMessage] = useState('Introduce un c?digo f?sico o el nombre del objeto encontrado.')
+  const [value, setValue] = useState('')
+  const [message, setMessage] = useState('Busca una palabra, s?mbolo o nombre en el objeto f?sico y escr?belo aqu?.')
   const [saved, setSaved] = useState(false)
 
-  const preview = useMemo(() => parseItemCode(code), [code])
+  const preview = useMemo(() => parseManualInput(value), [value])
+  const canSubmit = Boolean(preview)
 
-  function submitItemCode(value = code) {
-    const parsed = parseItemCode(value)
+  function submitManualProof(input = value) {
+    const parsed = parseManualInput(input)
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Introduce un objeto o usa formato ITEM:id:Etiqueta.')
+      setMessage('Escribe el nombre del objeto, la palabra del sobre o el c?digo visible del prop.')
       return
     }
 
@@ -88,12 +88,12 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         },
       })
 
-      setCode('')
+      setValue('')
       setSaved(true)
-      setMessage(`Guardado en mochila: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto`)
+      setMessage(`A?adido a la mochila: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto guardado`)
     } catch {
       setSaved(false)
-      setMessage('No se pudo guardar el objeto en este dispositivo.')
+      setMessage('No se pudo guardar en este dispositivo. Prueba otra vez.')
     }
   }
 
@@ -101,70 +101,83 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>Prueba f?sica</div>
-          <div style={title}>Recoger objeto manual</div>
+          <div style={eyebrow}>Plan B de campo</div>
+          <div style={title}>Guardar objeto encontrado</div>
         </div>
-        <span style={badge}>OFFLINE</span>
+        <span style={badge}>MOCHILA LOCAL</span>
       </div>
 
-      <p style={copy}>
-        Usa este fallback cuando el QR/NFC no est? disponible. El objeto queda en la mochila local y se a?ade una prueba a la cola de sincronizaci?n.
-      </p>
+      <div style={steps}>
+        <div style={step}>
+          <b>1</b>
+          <span>Mira el objeto f?sico, tarjeta, sobre o pista.</span>
+        </div>
+        <div style={step}>
+          <b>2</b>
+          <span>Escribe su nombre, palabra clave o c?digo visible.</span>
+        </div>
+        <div style={step}>
+          <b>3</b>
+          <span>Queda guardado aunque no haya cobertura.</span>
+        </div>
+      </div>
 
       <label style={field}>
-        C?digo o nombre del objeto
+        ?Qu? has encontrado?
         <input
-          value={code}
+          value={value}
           onChange={(event) => {
-            setCode(event.target.value)
+            setValue(event.target.value)
             setSaved(false)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
-              submitItemCode()
+              submitManualProof()
             }
           }}
-          placeholder="Ej: ITEM:llave_torre:Llave de la torre"
+          placeholder="Ej: Llave de la torre, Runa azul, Pista del faro..."
           style={input}
         />
       </label>
 
       {preview ? (
         <div style={previewBox}>
-          <span>Se guardar? como</span>
+          <span>Se a?adir? a la mochila</span>
           <strong>{preview.label}</strong>
-          <small>ID: {preview.item_id}</small>
+          <small>Identificador interno creado autom?ticamente.</small>
         </div>
-      ) : null}
+      ) : (
+        <div style={emptyPreview}>
+          El QR/NFC ser? la v?a r?pida m?s adelante. Este campo queda como respaldo manual.
+        </div>
+      )}
 
       <button
         type="button"
-        style={button}
+        style={canSubmit ? button : buttonDisabled}
+        disabled={!canSubmit}
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          submitItemCode()
+          submitManualProof()
         }}
       >
-        Guardar en mochila
+        Guardar objeto
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
-
-      <div style={formatHint}>
-        Formatos v?lidos: <b>ITEM:id:Etiqueta</b> o texto libre. Ejemplo QR futuro: <b>ITEM:runa_agua:Runa de agua</b>.
-      </div>
     </section>
   )
 }
 
 const panel: CSSProperties = {
   display: 'grid',
-  gap: 11,
-  borderRadius: 18,
+  gap: 12,
+  borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(250,204,21,.08), rgba(255,255,255,.045))',
+  background:
+    'radial-gradient(circle at top right, rgba(250,204,21,.14), transparent 36%), linear-gradient(180deg, rgba(250,204,21,.08), rgba(255,255,255,.045))',
   padding: 12,
 }
 
@@ -186,8 +199,8 @@ const eyebrow: CSSProperties = {
 const title: CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
-  fontSize: 13,
-  fontWeight: 900,
+  fontSize: 14,
+  fontWeight: 950,
 }
 
 const badge: CSSProperties = {
@@ -203,20 +216,29 @@ const badge: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.10em',
+  whiteSpace: 'nowrap',
 }
 
-const copy: CSSProperties = {
-  margin: 0,
-  color: 'rgba(226,232,240,.70)',
+const steps: CSSProperties = {
+  display: 'grid',
+  gap: 7,
+}
+
+const step: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '24px 1fr',
+  gap: 8,
+  alignItems: 'center',
+  color: 'rgba(226,232,240,.74)',
   fontSize: 11,
-  lineHeight: 1.45,
+  lineHeight: 1.35,
   fontWeight: 750,
 }
 
 const field: CSSProperties = {
   display: 'grid',
   gap: 6,
-  color: 'rgba(226,232,240,.82)',
+  color: 'rgba(226,232,240,.86)',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.08em',
@@ -226,13 +248,13 @@ const field: CSSProperties = {
 const input: CSSProperties = {
   width: '100%',
   minWidth: 0,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.42)',
+  borderRadius: 15,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(15,23,42,.46)',
   color: '#ffffff',
   fontSize: 12,
   fontWeight: 800,
-  padding: '11px 12px',
+  padding: '12px 12px',
   outline: 'none',
   textTransform: 'none',
   letterSpacing: 0,
@@ -241,23 +263,38 @@ const input: CSSProperties = {
 const previewBox: CSSProperties = {
   display: 'grid',
   gap: 2,
-  borderRadius: 14,
+  borderRadius: 15,
   border: '1px solid rgba(187,247,208,.16)',
   background: 'rgba(34,197,94,.10)',
   padding: 10,
 }
 
+const emptyPreview: CSSProperties = {
+  borderRadius: 15,
+  border: '1px dashed rgba(226,232,240,.14)',
+  color: 'rgba(226,232,240,.54)',
+  fontSize: 10,
+  lineHeight: 1.4,
+  fontWeight: 800,
+  padding: 10,
+}
+
 const button: CSSProperties = {
-  minHeight: 40,
+  minHeight: 42,
   padding: '0 12px',
-  borderRadius: 14,
+  borderRadius: 15,
   border: '1px solid rgba(250,204,21,.22)',
-  background: 'rgba(250,204,21,.16)',
+  background: 'rgba(250,204,21,.18)',
   color: '#fef9c3',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
+}
+
+const buttonDisabled: CSSProperties = {
+  ...button,
+  opacity: 0.48,
 }
 
 const helpText: CSSProperties = {
@@ -270,11 +307,4 @@ const okText: CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
   fontWeight: 900,
-}
-
-const formatHint: CSSProperties = {
-  color: 'rgba(226,232,240,.48)',
-  fontSize: 10,
-  lineHeight: 1.35,
-  fontWeight: 800,
 }
