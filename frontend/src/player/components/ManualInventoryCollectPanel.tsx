@@ -26,9 +26,7 @@ function parseManualInput(value: string): ParsedManualInput | null {
   const clean = value.trim()
   if (!clean) return null
 
-  const normalized = clean
-    .replace(/^saga\s*:/i, '')
-    .replace(/^item\s*:/i, 'ITEM:')
+  const normalized = clean.replace(/^saga\s*:/i, '').replace(/^item\s*:/i, 'ITEM:')
 
   if (normalized.toUpperCase().startsWith('ITEM:')) {
     const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
@@ -58,7 +56,7 @@ function parseManualInput(value: string): ParsedManualInput | null {
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Busca una palabra, s?mbolo o nombre en el objeto f?sico y escr?belo aqu?.')
+  const [message, setMessage] = useState('Escribe la palabra o nombre que ves en la prueba fisica.')
   const [saved, setSaved] = useState(false)
 
   const preview = useMemo(() => parseManualInput(value), [value])
@@ -69,7 +67,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Escribe el nombre del objeto, la palabra del sobre o el c?digo visible del prop.')
+      setMessage('Escribe una palabra, nombre de objeto o codigo visible.')
       return
     }
 
@@ -90,10 +88,10 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
       setValue('')
       setSaved(true)
-      setMessage(`A?adido a la mochila: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto guardado`)
+      setMessage(`Guardado: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
     } catch {
       setSaved(false)
-      setMessage('No se pudo guardar en este dispositivo. Prueba otra vez.')
+      setMessage('No se pudo guardar. Prueba otra vez.')
     }
   }
 
@@ -101,29 +99,18 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>RESPALDO DE CAMPO</div>
-          <div style={title}>Guardar prueba fisica</div>
+          <div style={eyebrow}>COGER</div>
+          <div style={title}>Prueba de campo</div>
         </div>
         <span style={badge}>LOCAL</span>
       </div>
 
-      <div style={steps}>
-        <div style={step}>
-          <b>1</b>
-          <span>Mira el objeto f?sico, tarjeta, sobre o pista.</span>
-        </div>
-        <div style={step}>
-          <b>2</b>
-          <span>Escribe su nombre, palabra clave o c?digo visible.</span>
-        </div>
-        <div style={step}>
-          <b>3</b>
-          <span>Se guarda sin cobertura y se sincroniza despues.</span>
-        </div>
+      <div style={hint}>
+        Busca una palabra, simbolo o nombre en la tarjeta, sobre, QR, NFC o prop. Si el escaneo falla, escribelo aqui.
       </div>
 
       <label style={field}>
-        ?Qu? has encontrado?
+        Palabra o nombre visible
         <input
           value={value}
           onChange={(event) => {
@@ -136,22 +123,17 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
               submitManualProof()
             }
           }}
-          placeholder="Ej: llave torre, runa azul, pista faro..."
+          placeholder="Ej: llave torre, runa azul, pista faro"
           style={input}
         />
       </label>
 
       {preview ? (
         <div style={previewBox}>
-          <span>Se guardara</span>
+          <span>Se guardara en mochila</span>
           <strong>{preview.label}</strong>
-          <small>Identificador interno creado autom?ticamente.</small>
         </div>
-      ) : (
-        <div style={emptyPreview}>
-          El QR/NFC ser? la v?a r?pida m?s adelante. Este campo queda como respaldo manual.
-        </div>
-      )}
+      ) : null}
 
       <button
         type="button"
@@ -163,7 +145,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           submitManualProof()
         }}
       >
-        Guardar
+        Guardar prueba
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
@@ -173,17 +155,16 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
 const panel: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gap: 10,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
   background:
-    'radial-gradient(circle at top right, rgba(125,211,252,.14), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.42), rgba(51,65,85,.34))',
+    'radial-gradient(circle at top right, rgba(125,211,252,.14), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.34), rgba(51,65,85,.28))',
   padding: 12,
 }
 
 const header: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 10,
 }
@@ -191,56 +172,48 @@ const header: CSSProperties = {
 const eyebrow: CSSProperties = {
   color: '#bbf7d0',
   fontSize: 10,
-  fontWeight: 900,
+  fontWeight: 950,
   letterSpacing: '0.14em',
-  textTransform: 'uppercase',
 }
 
 const title: CSSProperties = {
   marginTop: 4,
   color: '#ffffff',
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 950,
 }
 
 const badge: CSSProperties = {
+  alignSelf: 'flex-start',
   minHeight: 24,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '0 8px',
+  padding: '0 9px',
   borderRadius: 999,
   border: '1px solid rgba(125,211,252,.20)',
   background: 'rgba(14,165,233,.14)',
   color: '#dbeafe',
   fontSize: 9,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  whiteSpace: 'nowrap',
+  fontWeight: 950,
 }
 
-const steps: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-}
-
-const step: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '24px 1fr',
-  gap: 8,
-  alignItems: 'center',
-  color: 'rgba(226,232,240,.74)',
-  fontSize: 11,
+const hint: CSSProperties = {
+  borderRadius: 15,
+  background: 'rgba(15,23,42,.20)',
+  color: 'rgba(226,232,240,.76)',
+  fontSize: 12,
   lineHeight: 1.35,
   fontWeight: 750,
+  padding: 10,
 }
 
 const field: CSSProperties = {
   display: 'grid',
   gap: 6,
-  color: 'rgba(226,232,240,.86)',
+  color: 'rgba(226,232,240,.84)',
   fontSize: 10,
-  fontWeight: 900,
+  fontWeight: 950,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
@@ -270,16 +243,6 @@ const previewBox: CSSProperties = {
   padding: 10,
 }
 
-const emptyPreview: CSSProperties = {
-  borderRadius: 15,
-  border: '1px dashed rgba(226,232,240,.14)',
-  color: 'rgba(226,232,240,.54)',
-  fontSize: 10,
-  lineHeight: 1.4,
-  fontWeight: 800,
-  padding: 10,
-}
-
 const button: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
@@ -288,7 +251,7 @@ const button: CSSProperties = {
   background: 'rgba(14,165,233,.20)',
   color: '#dbeafe',
   fontSize: 11,
-  fontWeight: 900,
+  fontWeight: 950,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
@@ -307,5 +270,5 @@ const helpText: CSSProperties = {
 const okText: CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
-  fontWeight: 900,
+  fontWeight: 950,
 }

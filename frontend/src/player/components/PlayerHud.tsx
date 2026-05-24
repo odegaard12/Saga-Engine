@@ -107,6 +107,85 @@ export function PlayerHud({
     }
   }, [detailsOpen, toolsOpen])
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const panelOpen = detailsOpen || toolsOpen
+    document.body.classList.toggle('saga-player-panel-open', panelOpen)
+
+    const hiddenElements: HTMLElement[] = []
+
+    function hideElement(element: HTMLElement) {
+      if (element.dataset.sagaPanelHidden === '1') return
+      element.dataset.sagaPanelHidden = '1'
+      element.dataset.sagaPanelPrevDisplay = element.style.display || ''
+      element.dataset.sagaPanelPrevPointerEvents = element.style.pointerEvents || ''
+      element.dataset.sagaPanelPrevOpacity = element.style.opacity || ''
+      element.style.display = 'none'
+      element.style.pointerEvents = 'none'
+      element.style.opacity = '0'
+      hiddenElements.push(element)
+    }
+
+    function shouldHideButton(button: HTMLButtonElement) {
+      const text = (button.textContent || '').trim().toLowerCase()
+      const label = (button.getAttribute('aria-label') || '').trim().toLowerCase()
+      const title = (button.getAttribute('title') || '').trim().toLowerCase()
+      const combined = `${text} ${label} ${title}`
+
+      if (text === '?' || text === '?' || text === '?' || text === '?') return true
+      if (combined.includes('ampliar')) return true
+      if (combined.includes('expand')) return true
+      if (combined.includes('centrar')) return true
+      if (combined.includes('ubicacion')) return true
+      if (combined.includes('ubicaci?n')) return true
+      if (combined.includes('mi posicion')) return true
+      if (combined.includes('mi posici?n')) return true
+
+      return false
+    }
+
+    function hideMapControls() {
+      if (!panelOpen) return
+
+      document
+        .querySelectorAll<HTMLElement>(
+          '.leaflet-control-container, .saga-map-control, .saga-map-controls, .saga-map-action, .saga-map-actions, .saga-map-floating-action, .saga-map-floating-actions, [data-saga-map-control]'
+        )
+        .forEach(hideElement)
+
+      document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+        if (shouldHideButton(button)) hideElement(button)
+      })
+    }
+
+    function restoreHidden() {
+      hiddenElements.forEach((element) => {
+        element.style.display = element.dataset.sagaPanelPrevDisplay || ''
+        element.style.pointerEvents = element.dataset.sagaPanelPrevPointerEvents || ''
+        element.style.opacity = element.dataset.sagaPanelPrevOpacity || ''
+        delete element.dataset.sagaPanelHidden
+        delete element.dataset.sagaPanelPrevDisplay
+        delete element.dataset.sagaPanelPrevPointerEvents
+        delete element.dataset.sagaPanelPrevOpacity
+      })
+      hiddenElements.length = 0
+    }
+
+    hideMapControls()
+
+    const observer = new MutationObserver(hideMapControls)
+    if (panelOpen) {
+      observer.observe(document.body, { childList: true, subtree: true })
+    }
+
+    return () => {
+      observer.disconnect()
+      restoreHidden()
+      document.body.classList.remove('saga-player-panel-open')
+    }
+  }, [detailsOpen, toolsOpen]) // saga-panel-control-hider-v3
+
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -124,27 +203,6 @@ export function PlayerHud({
 
   return (
     <>
-      <style className="saga-player-panel-hide-map-controls">{`
-        body.saga-player-panel-open .leaflet-control-container,
-        body.saga-player-panel-open .saga-map-control,
-        body.saga-player-panel-open .saga-map-controls,
-        body.saga-player-panel-open .saga-map-action,
-        body.saga-player-panel-open .saga-map-actions,
-        body.saga-player-panel-open .saga-map-floating-action,
-        body.saga-player-panel-open .saga-map-floating-actions,
-        body.saga-player-panel-open [data-saga-map-control],
-        body.saga-player-panel-open button[aria-label*="ubicacion" i],
-        body.saga-player-panel-open button[aria-label*="ubicaci?n" i],
-        body.saga-player-panel-open button[aria-label*="centrar" i],
-        body.saga-player-panel-open button[aria-label*="ampliar" i],
-        body.saga-player-panel-open button[aria-label*="expand" i],
-        body.saga-player-panel-open button[aria-label*="mapa" i] {
-          opacity: 0 !important;
-          pointer-events: none !important;
-          transform: scale(.96) !important;
-          transition: opacity 120ms ease, transform 120ms ease !important;
-        }
-      `}</style>
       <section
         style={{
           ...card,
@@ -516,40 +574,41 @@ const ghostButtonActive: CSSProperties = {
 const sheetOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 3200,
+  zIndex: 3600,
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: '0 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  padding: '0 10px calc(8px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
 
 const sheetBackdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.32)',
-  backdropFilter: 'blur(3px)',
-  WebkitBackdropFilter: 'blur(3px)',
+  background: 'rgba(2,6,23,.22)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
 }
 
 const sheet: CSSProperties = {
   position: 'relative',
   zIndex: 1,
   display: 'grid',
-  gap: 12,
-  maxHeight: 'min(70vh, 620px)',
+  gap: 10,
+  maxHeight: 'min(66vh, 590px)',
   overflowY: 'auto',
+  overflowX: 'hidden',
   overscrollBehavior: 'contain',
-  borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.20)',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.58), rgba(51,65,85,.48))',
+    'radial-gradient(circle at top left, rgba(187,247,208,.11), transparent 34%), linear-gradient(180deg, rgba(71,85,105,.92), rgba(51,65,85,.86))',
   color: '#f8fafc',
-  boxShadow: '0 24px 70px rgba(2,6,23,.38)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
-  padding: 14,
-  paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+  boxShadow: '0 24px 70px rgba(2,6,23,.42)',
+  backdropFilter: 'blur(24px) saturate(1.08)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.08)',
+  padding: 12,
+  paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
 }
 
 const sheetHeader: CSSProperties = {
@@ -560,11 +619,11 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  margin: '-14px -14px 0',
-  padding: '14px 14px 10px',
-  borderRadius: '28px 28px 18px 18px',
+  margin: '-12px -12px 0',
+  padding: '12px 12px 10px',
+  borderRadius: '30px 30px 18px 18px',
   background:
-    'linear-gradient(180deg, rgba(71,85,105,.94), rgba(71,85,105,.72))',
+    'linear-gradient(180deg, rgba(71,85,105,.96), rgba(71,85,105,.76))',
   borderBottom: '1px solid rgba(255,255,255,.10)',
   backdropFilter: 'blur(18px)',
   WebkitBackdropFilter: 'blur(18px)',
@@ -590,30 +649,30 @@ const sheetTitle: CSSProperties = {
 const tabs: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 8,
+  gap: 6,
   padding: 4,
   borderRadius: 18,
-  background: 'rgba(15,23,42,.28)',
+  background: 'rgba(15,23,42,.34)',
   border: '1px solid rgba(255,255,255,.08)',
 }
 
 const tabButton: CSSProperties = {
-  minHeight: 38,
+  minHeight: 40,
   border: 'none',
   borderRadius: 14,
   background: 'transparent',
   color: 'rgba(226,232,240,.70)',
   fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.06em',
+  fontWeight: 950,
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
 }
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'rgba(187,247,208,.18)',
+  background: 'rgba(187,247,208,.16)',
   color: '#dcfce7',
-  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.16)',
+  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.18)',
 }
 
 const statusRow: CSSProperties = {
@@ -621,30 +680,30 @@ const statusRow: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 8,
-  padding: '8px 10px',
-  borderRadius: 16,
-  background: 'rgba(255,255,255,.07)',
-  color: 'rgba(226,232,240,.82)',
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.10)',
+  color: 'rgba(248,250,252,.82)',
+  padding: '8px 12px',
   fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.06em',
+  fontWeight: 950,
+  letterSpacing: '0.02em',
   textTransform: 'uppercase',
 }
 
 const tabPanel: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gap: 10,
   minHeight: 0,
 }
 
 const toolsOverlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 3200,
+  zIndex: 3600,
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: '0 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  padding: '0 10px calc(8px + env(safe-area-inset-bottom, 0px))',
   pointerEvents: 'auto',
 }
 
@@ -666,19 +725,19 @@ const toolsSubtitle: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  minWidth: 38,
-  width: 38,
-  height: 38,
+  minWidth: 40,
+  width: 40,
+  height: 40,
   display: 'grid',
   placeItems: 'center',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.56)',
+  background: 'rgba(15,23,42,.70)',
   color: '#f8fafc',
   fontSize: 22,
   fontWeight: 950,
   cursor: 'pointer',
-  boxShadow: '0 10px 24px rgba(2,6,23,.22)',
+  boxShadow: '0 12px 28px rgba(2,6,23,.24)',
 }
 
 const toolsButton: CSSProperties = {

@@ -6,76 +6,70 @@ interface RequirementPreviewPanelProps {
   stage: PlayerStage | null
 }
 
-function getValue(stage: PlayerStage | null, keys: string[]): unknown {
+function read(stage: PlayerStage | null, keys: string[]): unknown {
   if (!stage) return undefined
   const source = stage as unknown as Record<string, unknown>
   for (const key of keys) {
-    if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
-      return source[key]
-    }
+    const value = source[key]
+    if (value !== undefined && value !== null && value !== '') return value
   }
   return undefined
 }
 
-function getString(stage: PlayerStage | null, keys: string[], fallback = ''): string {
-  const value = getValue(stage, keys)
-  return typeof value === 'string' ? value : fallback
+function readString(stage: PlayerStage | null, keys: string[]): string {
+  const value = read(stage, keys)
+  return typeof value === 'string' ? value : ''
 }
 
-function getNumber(stage: PlayerStage | null, keys: string[]): number | null {
-  const value = getValue(stage, keys)
+function readNumber(stage: PlayerStage | null, keys: string[]): number | null {
+  const value = read(stage, keys)
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function getBoolean(stage: PlayerStage | null, keys: string[]): boolean {
-  const value = getValue(stage, keys)
-  return value === true || value === 'true' || value === '1'
-}
-
-function getFamily(stage: PlayerStage | null): string {
-  return getString(stage, ['family', 'minigame_family', 'game_family', 'type'], 'unknown')
+function familyId(stage: PlayerStage | null): string {
+  return readString(stage, ['family', 'minigame_family', 'game_family', 'type'])
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, '_')
 }
 
-function getGameTitle(family: string): string {
-  if (family.includes('signal')) return 'Busqueda de senal'
-  if (family.includes('bearing')) return 'Rumbo / brujula'
-  if (family.includes('circuit')) return 'Circuito logico'
-  return 'Nodo de mision'
+function gameName(family: string): string {
+  if (family.includes('signal')) return 'BUSQUEDA DE SENAL'
+  if (family.includes('bearing')) return 'RUMBO'
+  if (family.includes('circuit')) return 'CIRCUITO'
+  return 'NODO'
 }
 
-function getGameHowTo(stage: PlayerStage | null): string[] {
-  const family = getFamily(stage)
+function howToPlay(stage: PlayerStage | null): string[] {
+  const family = familyId(stage)
 
   if (family.includes('signal')) {
     return [
-      'Activa GPS y acercate al punto del mapa.',
-      'Cuando estes dentro del radio, mantente estable hasta capturar la senal.',
-      'Si no entra, pulsa Reactivar GPS desde Herramientas y prueba al aire libre.',
+      'Activa GPS y acercate al punto marcado.',
+      'Entra dentro del radio del nodo.',
+      'Mantente estable hasta capturar la senal.',
     ]
   }
 
   if (family.includes('bearing')) {
     return [
-      'Permite orientacion/brujula si el movil lo solicita.',
+      'Activa la brujula si el movil lo pide.',
       'Gira despacio hasta apuntar al rumbo correcto.',
-      'Si el sensor falla, usa las pistas del nodo o el modo manual cuando este disponible.',
+      'Si el sensor falla, usa pista manual o reintenta al aire libre.',
     ]
   }
 
   if (family.includes('circuit')) {
     return [
-      'Lee la pista y resuelve el patron del circuito.',
-      'Prueba combinaciones con calma: este nodo depende mas de logica que de GPS.',
-      'Si hay un objeto fisico asociado, guardalo primero en la mochila.',
+      'Lee la pista del nodo.',
+      'Resuelve el patron o combinacion.',
+      'Si hay objeto fisico, guardalo primero en la mochila.',
     ]
   }
 
   return [
     'Lee la pista del nodo actual.',
-    'Cumple los requisitos indicados antes de intentar abrirlo.',
-    'Usa Mochila o Coger si el nodo depende de un objeto fisico.',
+    'Comprueba distancia, objetos y prueba fisica.',
+    'Cuando todo este listo, abre el nodo.',
   ]
 }
 
@@ -85,92 +79,90 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
       <section style={panel}>
         <div style={eyebrow}>REQUISITOS</div>
         <div style={title}>Sin nodo seleccionado</div>
-        <p style={copy}>Selecciona un nodo para ver que necesitas y como se juega.</p>
+        <p style={copy}>Selecciona un nodo para ver como se juega y que necesitas.</p>
       </section>
     )
   }
 
-  const family = getFamily(stage)
-  const gameTitle = getGameTitle(family)
-  const radius = getNumber(stage, ['radius', 'capture_radius_m', 'entry_radius_m'])
-  const requiredItem = getString(stage, ['required_item_id', 'requiredItemId'])
-  const rewardItem = getString(stage, ['reward_item_id', 'rewardItemId'])
-  const manualCode = getString(stage, ['manual_code', 'manualCode'])
-  const interactionMethod = getString(stage, ['interaction_method', 'interactionMethod'])
-  const needsGps = radius !== null || family.includes('signal') || family.includes('bearing')
-  const hasQr = interactionMethod.includes('qr') || getBoolean(stage, ['qr_enabled', 'qrEnabled'])
-  const hasNfc = interactionMethod.includes('nfc') || getBoolean(stage, ['nfc_enabled', 'nfcEnabled'])
-  const hasManual = Boolean(manualCode) || interactionMethod.includes('manual') || rewardItem || requiredItem
+  const family = familyId(stage)
+  const radius = readNumber(stage, ['radius', 'capture_radius_m', 'entry_radius_m'])
+  const requiredItem = readString(stage, ['required_item_id', 'requiredItemId'])
+  const rewardItem = readString(stage, ['reward_item_id', 'rewardItemId'])
+  const manualCode = readString(stage, ['manual_code', 'manualCode'])
+  const interaction = readString(stage, ['interaction_method', 'interactionMethod']).toLowerCase()
 
-  const chips = [
-    needsGps ? 'GPS' : null,
-    radius !== null ? `Radio ${radius} m` : null,
-    requiredItem ? 'Necesita objeto' : null,
-    rewardItem ? 'Da objeto' : null,
-    hasQr ? 'QR' : null,
-    hasNfc ? 'NFC' : null,
-    hasManual ? 'Manual' : null,
-  ].filter(Boolean) as string[]
+  const needsGps = radius !== null || family.includes('signal') || family.includes('bearing')
+  const needsItem = Boolean(requiredItem)
+  const givesItem = Boolean(rewardItem)
+  const physical = Boolean(manualCode || rewardItem || requiredItem || interaction)
 
   return (
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>REQUISITOS</div>
+          <div style={eyebrow}>COMO ENTRAR</div>
           <div style={title}>{stage.title || 'Nodo actual'}</div>
         </div>
-        <span style={badge}>{gameTitle}</span>
+        <span style={badge}>{gameName(family)}</span>
       </div>
 
-      <div style={chipsRow}>
-        {chips.length ? chips.map((chip) => <span key={chip}>{chip}</span>) : <span>Sin requisitos especiales</span>}
+      <div style={statusGrid}>
+        <Mini label="GPS" value={needsGps ? 'SI' : 'NO'} />
+        <Mini label="Radio" value={radius !== null ? `${radius} m` : '-'} />
+        <Mini label="Objeto" value={needsItem ? 'SI' : 'NO'} />
       </div>
 
       <div style={block}>
-        <strong>Para entrar</strong>
+        <strong>Necesitas</strong>
         <ul style={list}>
-          {needsGps ? <li>Activa GPS y acercate al nodo.</li> : <li>No parece requerir GPS especial.</li>}
-          {radius !== null ? <li>Debes estar dentro del radio de {radius} m.</li> : null}
-          {requiredItem ? <li>Necesitas llevar en mochila: {requiredItem}.</li> : null}
-          {!requiredItem ? <li>No hay objeto obligatorio detectado para abrirlo.</li> : null}
+          {needsGps ? <li>Estar cerca del punto y tener GPS activo.</li> : <li>No requiere posicion especial.</li>}
+          {radius !== null ? <li>Entrar dentro del radio de {radius} m.</li> : null}
+          {needsItem ? <li>Llevar en mochila: {requiredItem}.</li> : <li>No hay objeto obligatorio detectado.</li>}
         </ul>
       </div>
 
       <div style={block}>
         <strong>Como se juega</strong>
         <ul style={list}>
-          {getGameHowTo(stage).map((item) => <li key={item}>{item}</li>)}
+          {howToPlay(stage).map((text) => <li key={text}>{text}</li>)}
         </ul>
       </div>
 
       <div style={block}>
         <strong>Prueba fisica</strong>
         <p style={copy}>
-          {hasQr || hasNfc
-            ? 'Este nodo puede usar QR/NFC cuando el flujo rapido este activo. Si falla, usa Coger como respaldo manual.'
-            : hasManual
-              ? 'Usa Coger para guardar la palabra, objeto o pista fisica en la mochila local.'
-              : 'No hay prueba fisica especial detectada en este nodo.'}
+          {physical
+            ? 'Si encuentras una tarjeta, sobre, QR, NFC o palabra de campo, guardala desde Coger. Queda en la mochila local y se sincroniza despues.'
+            : 'Este nodo no muestra una prueba fisica especial.'}
         </p>
+        {givesItem ? <p style={copy}>Recompensa prevista: {rewardItem}.</p> : null}
       </div>
 
-      <div style={footer}>Perfil local: {user}. Estado calculado en este telefono.</div>
+      <div style={footer}>Jugador local: {user}</div>
     </section>
+  )
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={mini}>
+      <b>{value}</b>
+      <span>{label}</span>
+    </div>
   )
 }
 
 const panel: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gap: 10,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.055)',
+  background: 'rgba(15,23,42,.18)',
   padding: 12,
 }
 
 const header: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 10,
 }
@@ -191,20 +183,29 @@ const title: CSSProperties = {
 }
 
 const badge: CSSProperties = {
-  padding: '6px 9px',
+  alignSelf: 'flex-start',
   borderRadius: 999,
-  border: '1px solid rgba(125,211,252,.20)',
+  border: '1px solid rgba(125,211,252,.22)',
   background: 'rgba(14,165,233,.14)',
   color: '#dbeafe',
+  padding: '7px 9px',
   fontSize: 9,
   fontWeight: 950,
-  whiteSpace: 'nowrap',
 }
 
-const chipsRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
+const statusGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 8,
+}
+
+const mini: CSSProperties = {
+  display: 'grid',
+  gap: 2,
+  borderRadius: 15,
+  background: 'rgba(255,255,255,.075)',
+  padding: 9,
+  textAlign: 'center',
 }
 
 const block: CSSProperties = {
@@ -212,7 +213,7 @@ const block: CSSProperties = {
   gap: 6,
   borderRadius: 16,
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(15,23,42,.20)',
+  background: 'rgba(255,255,255,.055)',
   padding: 10,
 }
 
@@ -221,7 +222,7 @@ const list: CSSProperties = {
   gap: 5,
   margin: 0,
   paddingLeft: 18,
-  color: 'rgba(226,232,240,.76)',
+  color: 'rgba(226,232,240,.78)',
   fontSize: 12,
   lineHeight: 1.35,
   fontWeight: 750,
@@ -229,7 +230,7 @@ const list: CSSProperties = {
 
 const copy: CSSProperties = {
   margin: 0,
-  color: 'rgba(226,232,240,.76)',
+  color: 'rgba(226,232,240,.78)',
   fontSize: 12,
   lineHeight: 1.4,
   fontWeight: 750,
@@ -240,4 +241,3 @@ const footer: CSSProperties = {
   fontSize: 10,
   fontWeight: 800,
 }
-
