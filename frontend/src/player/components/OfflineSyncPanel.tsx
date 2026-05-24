@@ -13,9 +13,9 @@ interface OfflineSyncPanelProps {
 const AUTO_SYNC_INTERVAL_MS = 20_000
 
 function statusLabel(status: SagaSyncStatus): string {
-  if (status === 'syncing') return 'SINCRONIZANDO'
-  if (status === 'offline') return 'SIN COBERTURA'
-  if (status === 'error') return 'ERROR DE SINCRONIZACIÓN'
+  if (status === 'syncing') return 'SYNC EN CURSO'
+  if (status === 'offline') return 'SIN CONEXIÓN'
+  if (status === 'error') return 'ERROR SYNC'
   return 'ONLINE'
 }
 
@@ -39,7 +39,7 @@ function getLastSyncLabel(value?: string): string {
 export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
   const [pendingCount, setPendingCount] = useState(0)
   const [syncStatus, setSyncStatus] = useState<SagaSyncStatus>('online')
-  const [lastSyncLabel, setLastSyncLabel] = useState('Never synced')
+  const [lastSyncLabel, setLastSyncLabel] = useState('Nunca sincronizado')
   const [syncing, setSyncing] = useState(false)
 
   function applySnapshot(snapshot: SagaOfflineSnapshot) {
@@ -125,7 +125,7 @@ export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
     <section style={panel}>
       <div style={headerRow}>
         <div>
-          <div style={eyebrow}>Sincronización offline</div>
+          <div style={eyebrow}>Cola offline</div>
           <div style={title}>
             {pendingCount} pendientes · {statusLabel(syncing ? 'syncing' : syncStatus)}
           </div>
@@ -140,11 +140,11 @@ export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
             void syncNow()
           }}
         >
-          {syncing ? 'Sincronizando…' : pendingCount > 0 ? 'Sincronizar ahora' : 'Sincronizado'}
+          {syncing ? 'Enviando…' : pendingCount > 0 ? 'Enviar ahora' : 'Al día'}
         </button>
       </div>
       <div style={body}>
-        Sincronización automática cada {AUTO_SYNC_INTERVAL_MS / 1000}s si hay acciones pendientes. {lastSyncLabel}.
+        Las acciones pendientes se intentan enviar automáticamente cada {AUTO_SYNC_INTERVAL_MS / 1000}s cuando hay conexión. {lastSyncLabel}.
       </div>
     </section>
   )
