@@ -37,7 +37,7 @@ export function FieldPrepPanel({
           <div style={offlinePrepCopy}>
             {hasOfflineMission ? '✓ Misión descargada en este teléfono.' : '○ Descarga nodos, códigos, reglas y requisitos.'}
             <br />
-            {hasBrowserGps ? '✓ GPS activo.' : '○ Activa GPS para distancia y entrada en nodos.'}
+            {hasBrowserGps ? '✓ GPS activo y listo para entrar en nodos cercanos.' : '○ Activa GPS para calcular distancia, centrar el mapa y desbloquear nodos cercanos.'}
           </div>
         </div>
 

@@ -358,7 +358,7 @@ export default function PlayerApp() {
 
   const hudHelperText =
     gpsActionRequired
-      ? 'Activa la ubicación del navegador para calcular distancia y entrar en el nodo.'
+      ? 'Activa GPS para calcular distancia, centrarte en el mapa y entrar en el nodo cuando estés dentro del radio.'
       : runtime.helperText
 
   const teamOtherProfiles = teamProfiles.filter(
@@ -541,20 +541,20 @@ export default function PlayerApp() {
   async function handleRequestLiveGps(options: { silent?: boolean; forceFocus?: boolean } = {}) {
     if (typeof window === 'undefined' || !window.navigator.geolocation) {
       setBrowserGpsStatus('unavailable')
-      if (!options.silent) showNotice('GPS no disponible en este dispositivo.', 'warn')
+      if (!options.silent) showNotice('GPS no disponible en este dispositivo o navegador.', 'warn')
       return
     }
 
     if (!window.isSecureContext) {
       setBrowserGpsStatus('error')
-      if (!options.silent) showNotice('El GPS requiere dominio HTTPS o app instalada.', 'warn')
+      if (!options.silent) showNotice('El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.', 'warn')
       return
     }
 
     setLocalDebugEnabled(false)
     setLocalDebugPosition(null)
     setBrowserGpsStatus('searching')
-    if (!options.silent) showNotice('Solicitando permiso de ubicación…', 'info')
+    if (!options.silent) showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
     const onSuccess = (position: GeolocationPosition) => {
       const next = {
@@ -603,8 +603,8 @@ export default function PlayerApp() {
       if (!options.silent) {
         showNotice(
           denied
-            ? 'Permiso de ubicación denegado. Revísalo en ajustes del navegador.'
-            : 'No se pudo obtener ubicación. Prueba otra vez al aire libre.',
+            ? 'Permiso de ubicación denegado. En iPhone revisa Ajustes > Safari > Ubicación, o elimina y vuelve a añadir la PWA.'
+            : 'No se pudo obtener ubicación. Prueba al aire libre, activa Ubicación precisa y reintenta.',
           'warn'
         )
       }
