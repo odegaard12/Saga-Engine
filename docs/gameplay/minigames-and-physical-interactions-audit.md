@@ -38,18 +38,15 @@ Relevant family runtime files:
 
 ## Legacy/demo game components
 
-There are also older standalone game components under:
+The old standalone demo game components have been removed from the active frontend tree.
 
-- `frontend/src/player/minigames/games/CircuitHackGame.tsx`
-- `frontend/src/player/minigames/games/CompassBlowGame.tsx`
-- `frontend/src/player/minigames/games/CryptexGame.tsx`
-- `frontend/src/player/minigames/games/DigitalTunerGame.tsx`
-- `frontend/src/player/minigames/games/GyroStormGame.tsx`
-- `frontend/src/player/minigames/games/RadioAzimuthGame.tsx`
-- `frontend/src/player/minigames/games/SimonSaysGame.tsx`
-- `frontend/src/player/minigames/games/SwitchboardGame.tsx`
+The current player path should use family-native runtimes only:
 
-These should be audited before reuse. They may be useful as inspiration for new family presets, but the current player path should prefer family-native runtimes.
+- `signal_hunt`
+- `bearing_hunt`
+- `circuit_matrix`
+
+Future gameplay work should add or port games as family-native definitions and runtimes, not as disconnected standalone components.
 
 ## Family audit priorities
 
