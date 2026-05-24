@@ -259,7 +259,7 @@ export function PlayerHud({
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
-                <div style={sheetTitle}>Objetos, requisitos y coleccionables</div>
+                <div style={sheetTitle}>Guia, objetos y pruebas</div>
               </div>
 
               <button
@@ -278,21 +278,21 @@ export function PlayerHud({
                 style={backpackTab === 'requirements' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('requirements')}
               >
-                Requisitos
+                Guia
               </button>
               <button
                 type="button"
                 style={backpackTab === 'inventory' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('inventory')}
               >
-                Inventario
+                Objetos
               </button>
               <button
                 type="button"
                 style={backpackTab === 'collect' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('collect')}
               >
-                Coger
+                Prueba
               </button>
             </div>
 

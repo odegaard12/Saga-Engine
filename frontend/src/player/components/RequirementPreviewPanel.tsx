@@ -33,7 +33,7 @@ function familyId(stage: PlayerStage | null): string {
 }
 
 function gameName(family: string): string {
-  if (family.includes('signal')) return 'BUSQUEDA DE SENAL'
+  if (family.includes('signal')) return 'SENAL'
   if (family.includes('bearing')) return 'RUMBO'
   if (family.includes('circuit')) return 'CIRCUITO'
   return 'NODO'
@@ -44,7 +44,7 @@ function howToPlay(stage: PlayerStage | null): string[] {
 
   if (family.includes('signal')) {
     return [
-      'Activa GPS y acercate al punto marcado.',
+      'Acercate al punto marcado en el mapa.',
       'Entra dentro del radio del nodo.',
       'Mantente estable hasta capturar la senal.',
     ]
@@ -52,24 +52,24 @@ function howToPlay(stage: PlayerStage | null): string[] {
 
   if (family.includes('bearing')) {
     return [
-      'Activa la brujula si el movil lo pide.',
-      'Gira despacio hasta apuntar al rumbo correcto.',
-      'Si el sensor falla, usa pista manual o reintenta al aire libre.',
+      'Permite la brujula si el movil lo pide.',
+      'Gira despacio hasta encontrar el rumbo correcto.',
+      'Si el sensor falla, reintenta al aire libre o usa la prueba manual.',
     ]
   }
 
   if (family.includes('circuit')) {
     return [
-      'Lee la pista del nodo.',
-      'Resuelve el patron o combinacion.',
-      'Si hay objeto fisico, guardalo primero en la mochila.',
+      'Lee la pista y resuelve el patron.',
+      'Prueba la combinacion correcta.',
+      'Si el circuito pide un objeto, primero debe estar en Objetos.',
     ]
   }
 
   return [
     'Lee la pista del nodo actual.',
     'Comprueba distancia, objetos y prueba fisica.',
-    'Cuando todo este listo, abre el nodo.',
+    'Cuando cumplas todo, podras avanzar.',
   ]
 }
 
@@ -77,7 +77,7 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
   if (!stage) {
     return (
       <section style={panel}>
-        <div style={eyebrow}>REQUISITOS</div>
+        <div style={eyebrow}>GUIA</div>
         <div style={title}>Sin nodo seleccionado</div>
         <p style={copy}>Selecciona un nodo para ver como se juega y que necesitas.</p>
       </section>
@@ -100,24 +100,24 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>COMO ENTRAR</div>
+          <div style={eyebrow}>GUIA DEL NODO</div>
           <div style={title}>{stage.title || 'Nodo actual'}</div>
         </div>
         <span style={badge}>{gameName(family)}</span>
       </div>
 
       <div style={statusGrid}>
-        <Mini label="GPS" value={needsGps ? 'SI' : 'NO'} />
+        <Mini label="Distancia" value={needsGps ? 'GPS' : 'Libre'} />
         <Mini label="Radio" value={radius !== null ? `${radius} m` : '-'} />
-        <Mini label="Objeto" value={needsItem ? 'SI' : 'NO'} />
+        <Mini label="Objeto" value={needsItem ? 'Necesario' : 'No'} />
       </div>
 
       <div style={block}>
-        <strong>Necesitas</strong>
+        <strong>Que necesitas</strong>
         <ul style={list}>
-          {needsGps ? <li>Estar cerca del punto y tener GPS activo.</li> : <li>No requiere posicion especial.</li>}
-          {radius !== null ? <li>Entrar dentro del radio de {radius} m.</li> : null}
-          {needsItem ? <li>Llevar en mochila: {requiredItem}.</li> : <li>No hay objeto obligatorio detectado.</li>}
+          {needsGps ? <li>Activa GPS y acercate al punto del mapa.</li> : <li>Este nodo no depende de posicion especial.</li>}
+          {radius !== null ? <li>Debes estar dentro del radio de {radius} m.</li> : null}
+          {needsItem ? <li>Necesitas tener este objeto en Objetos: {requiredItem}.</li> : <li>No hay objeto obligatorio detectado.</li>}
         </ul>
       </div>
 
@@ -129,13 +129,13 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
       </div>
 
       <div style={block}>
-        <strong>Prueba fisica</strong>
+        <strong>Objetos y pruebas</strong>
         <p style={copy}>
-          {physical
-            ? 'Si encuentras una tarjeta, sobre, QR, NFC o palabra de campo, guardala desde Coger. Queda en la mochila local y se sincroniza despues.'
-            : 'Este nodo no muestra una prueba fisica especial.'}
+          Los objetos que guardas en Objetos pueden servir para abrir otros nodos. Si encuentras una tarjeta, palabra, QR, NFC, sobre o prop, registralo desde Prueba.
         </p>
-        {givesItem ? <p style={copy}>Recompensa prevista: {rewardItem}.</p> : null}
+        {needsItem ? <p style={copy}>Este nodo comprueba si llevas el objeto requerido antes de avanzar.</p> : null}
+        {givesItem ? <p style={copy}>Este nodo puede darte una recompensa: {rewardItem}.</p> : null}
+        {!physical ? <p style={copy}>No hay prueba fisica especial detectada en este nodo.</p> : null}
       </div>
 
       <div style={footer}>Jugador local: {user}</div>

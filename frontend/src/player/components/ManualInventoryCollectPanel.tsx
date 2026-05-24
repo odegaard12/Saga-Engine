@@ -56,7 +56,7 @@ function parseManualInput(value: string): ParsedManualInput | null {
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escribe la palabra o nombre que ves en la prueba fisica.')
+  const [message, setMessage] = useState('Esto quedara en Objetos y podra desbloquear otros nodos.')
   const [saved, setSaved] = useState(false)
 
   const preview = useMemo(() => parseManualInput(value), [value])
@@ -67,7 +67,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Escribe una palabra, nombre de objeto o codigo visible.')
+      setMessage('Escribe una palabra, nombre de objeto o pista visible.')
       return
     }
 
@@ -99,18 +99,18 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
     <section style={panel}>
       <div style={header}>
         <div>
-          <div style={eyebrow}>COGER</div>
-          <div style={title}>Prueba de campo</div>
+          <div style={eyebrow}>PRUEBA</div>
+          <div style={title}>Registrar prueba</div>
         </div>
         <span style={badge}>LOCAL</span>
       </div>
 
       <div style={hint}>
-        Busca una palabra, simbolo o nombre en la tarjeta, sobre, QR, NFC o prop. Si el escaneo falla, escribelo aqui.
+        Usa esta pantalla cuando encuentres una tarjeta, sobre, pegatina, palabra, QR, NFC u objeto fisico. Por ahora puedes escribirlo manualmente; despues el QR lo rellenara solo.
       </div>
 
       <label style={field}>
-        Palabra o nombre visible
+        Palabra, pista u objeto
         <input
           value={value}
           onChange={(event) => {
@@ -130,7 +130,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
       {preview ? (
         <div style={previewBox}>
-          <span>Se guardara en mochila</span>
+          <span>Se guardara en Objetos</span>
           <strong>{preview.label}</strong>
         </div>
       ) : null}
@@ -145,7 +145,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           submitManualProof()
         }}
       >
-        Guardar prueba
+        Guardar en Objetos
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
