@@ -57,7 +57,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')
-      setMessage(`Misión guardada con ${pack.stage_count} nodo${pack.stage_count === 1 ? '' : 's'}.`)
+      setMessage(`Misión preparada en este teléfono: ${pack.stage_count} nodo${pack.stage_count === 1 ? '' : 's'} listo${pack.stage_count === 1 ? '' : 's'}.`)
     } catch (error) {
       setState('error')
       setMessage(error instanceof Error ? error.message : 'No se pudo guardar la misión.')
@@ -85,7 +85,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       setSummary(await getOfflineMissionSummary(user))
       setState('saved')
-      setMessage('Progreso guardado para sincronizar.')
+      setMessage('Avance guardado en la cola offline.')
     } catch (error) {
       setState('error')
       setMessage(error instanceof Error ? error.message : 'No se pudo guardar el progreso.')
@@ -102,7 +102,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
 
       if (result.status === 'ok') {
         setState('saved')
-        setMessage(result.attempted === 0 ? 'No hay pendientes.' : `Sincronizados: ${result.synced}.`)
+        setMessage(result.attempted === 0 ? 'No hay acciones pendientes.' : `Acciones enviadas: ${result.synced}.`)
         return
       }
 
@@ -124,11 +124,11 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
       <div style={header}>
         <div>
           <div style={eyebrow}>MISIÓN OFFLINE</div>
-          <div style={title}>Preparar sin cobertura</div>
+          <div style={title}>Preparar misión</div>
         </div>
 
         <span style={hasPack ? badgeReady : badgePending}>
-          {hasPack ? 'LISTA' : 'SIN GUARDAR'}
+          {hasPack ? 'LISTA' : 'PENDIENTE'}
         </span>
       </div>
 
@@ -139,10 +139,10 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
       </div>
 
       <p style={copy}>
-        Descarga la misión antes de salir. Si pierdes cobertura, podrás seguir jugando y sincronizar después.
+        Guarda nodos, reglas y estado local antes de salir. Si pierdes cobertura, podrás seguir jugando y enviar la cola después.
       </p>
 
-      <div style={meta}>Última descarga: {downloadedAt}</div>
+      <div style={meta}>Última preparación: {downloadedAt}</div>
 
       {message ? (
         <div style={state === 'error' ? errorBox : okBox}>{message}</div>
@@ -164,7 +164,7 @@ export function MissionPackPanel({ user, payload }: MissionPackPanelProps) {
           disabled={state === 'saving'}
           onClick={handleSaveProgress}
         >
-          Guardar progreso
+          Guardar avance
         </button>
 
         <button
