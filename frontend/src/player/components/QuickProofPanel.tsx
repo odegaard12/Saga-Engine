@@ -120,7 +120,7 @@ function decodeNfcText(record: BrowserNDEFRecord): string | null {
 export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
   const [mode, setMode] = useState<ProofMode>('idle')
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Elige QR, NFC o Manual.')
+  const [message, setMessage] = useState('Elige cómo registrar la prueba.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
   const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
@@ -147,7 +147,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
     const parsed = parseProofInput(input, source)
 
     if (!parsed) {
-      setMessage('No se pudo leer. Usa Manual como respaldo.')
+      setMessage('No se pudo leer. Usa el modo Manual como respaldo.')
       setNotice('No se pudo leer la prueba.')
       return false
     }
@@ -192,7 +192,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
     if (!NDEFReader) {
       setNfcState('unsupported')
-      setMessage('NFC no disponible aqui. Usa QR o Manual.')
+      setMessage('NFC no disponible aquí. Usa QR o Manual.')
       return
     }
 
@@ -212,7 +212,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         }
 
         setNfcState('error')
-        setMessage('Etiqueta leida, pero sin prueba valida. Usa Manual.')
+        setMessage('Etiqueta leída, pero sin prueba válida. Usa Manual.')
       }
 
       reader.onreadingerror = () => {
@@ -262,7 +262,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         await video.play()
 
         setScannerState('scanning')
-        setMessage('Apunta al QR. Si no lee, usa Manual.')
+        setMessage('Apunta al QR. Si falla, usa Manual.')
 
         const tick = () => {
           if (stopped) return
@@ -299,7 +299,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
       } catch {
         setScannerState('error')
         setMode('manual')
-        setMessage('No se pudo abrir la camara. Usa Manual.')
+        setMessage('No se pudo abrir la cámara. Usa Manual.')
       }
     }
 
@@ -326,7 +326,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
   if (hidden) return null
 
   return (
-    <div style={getWrapperStyle(mobile)} aria-label="Pruebas rapidas">
+    <div style={getWrapperStyle(mobile)} aria-label="Pruebas rápidas">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
 
       {mode !== 'idle' ? (
@@ -376,7 +376,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
           {mode === 'manual' ? (
             <>
               <label style={field}>
-                Manual, palabra u objeto
+                Palabra, pista u objeto
                 <input
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
@@ -408,7 +408,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
                   saveProof(value, 'manual')
                 }}
               >
-                Guardar
+                Guardar prueba
               </button>
             </>
           ) : null}
@@ -428,7 +428,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
         <button type="button" style={dockButtonWide} onClick={() => {
           setMode('manual')
-          setMessage('Manual: escribe lo que ves si QR/NFC falla.')
+          setMessage('Manual: escribe la palabra, pista u objeto si QR o NFC fallan.')
         }}>
           Manual
         </button>
@@ -444,9 +444,11 @@ function getWrapperStyle(mobile: boolean): CSSProperties {
     justifyItems: 'stretch',
     gap: 8,
     pointerEvents: 'auto',
-    width: mobile ? 'min(calc(100vw - 92px), 300px)' : 300,
-    maxWidth: mobile ? 'min(calc(100vw - 92px), 300px)' : 300,
-    flex: '0 1 auto',
+    width: mobile ? 'min(calc(100vw - 104px), 270px)' : 270,
+    maxWidth: mobile ? 'min(calc(100vw - 104px), 270px)' : 270,
+    justifySelf: 'center',
+    alignSelf: 'center',
+    gridColumn: 2,
   }
 }
 
@@ -469,14 +471,19 @@ const dock: CSSProperties = {
 const dockButton: CSSProperties = {
   minWidth: 0,
   minHeight: 38,
+  padding: '0 10px',
+  display: 'grid',
+  placeItems: 'center',
   borderRadius: 15,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(51,65,85,.42)',
-  color: 'rgba(248,250,252,.88)',
+  color: 'rgba(248,250,252,.90)',
   fontSize: 10,
+  lineHeight: 1,
   fontWeight: 950,
   letterSpacing: '0.05em',
   textTransform: 'uppercase',
+  textAlign: 'center',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
 }
 
@@ -489,20 +496,21 @@ const dockButtonWide: CSSProperties = {
 
 const panel: CSSProperties = {
   position: 'absolute',
-  right: 0,
-  bottom: 'calc(100% + 8px)',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  bottom: 'calc(100% + 10px)',
   width: 'min(88vw, 340px)',
   display: 'grid',
-  gap: 10,
+  gap: 12,
   borderRadius: 24,
   border: '1px solid rgba(255,255,255,.16)',
   background:
-    'linear-gradient(180deg, rgba(148,163,184,.22), rgba(100,116,139,.20))',
+    'linear-gradient(180deg, rgba(100,116,139,.92), rgba(51,65,85,.90))',
   color: '#f8fafc',
   boxShadow: '0 22px 60px rgba(2,6,23,.30)',
-  backdropFilter: 'blur(22px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(22px) saturate(1.12)',
-  padding: 12,
+  backdropFilter: 'blur(24px) saturate(1.10)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.10)',
+  padding: 14,
 }
 
 const panelHead: CSSProperties = {
@@ -510,6 +518,7 @@ const panelHead: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 10,
+  paddingBottom: 2,
 }
 
 const eyebrow: CSSProperties = {
@@ -520,14 +529,21 @@ const eyebrow: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
-  width: 34,
-  height: 34,
+  width: 36,
+  height: 36,
+  minWidth: 36,
+  minHeight: 36,
+  padding: 0,
+  display: 'grid',
+  placeItems: 'center',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(15,23,42,.50)',
+  background: 'rgba(15,23,42,.52)',
   color: '#ffffff',
   fontSize: 18,
+  lineHeight: 1,
   fontWeight: 950,
+  textAlign: 'center',
 }
 
 const scannerBox: CSSProperties = {
@@ -579,7 +595,7 @@ const nfcBox: CSSProperties = {
 const field: CSSProperties = {
   display: 'grid',
   gap: 6,
-  color: 'rgba(226,232,240,.84)',
+  color: 'rgba(241,245,249,.92)',
   fontSize: 10,
   fontWeight: 950,
   letterSpacing: '0.08em',
@@ -591,7 +607,7 @@ const input: CSSProperties = {
   minWidth: 0,
   borderRadius: 15,
   border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.46)',
+  background: 'rgba(15,23,42,.58)',
   color: '#ffffff',
   fontSize: 16,
   lineHeight: 1.2,
@@ -636,16 +652,18 @@ const helpText: CSSProperties = {
 
 const noticeBox: CSSProperties = {
   position: 'absolute',
-  right: 0,
-  bottom: 'calc(100% + 8px)',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  bottom: 'calc(100% + 10px)',
   width: 'min(84vw, 300px)',
   borderRadius: 16,
   border: '1px solid rgba(255,255,255,.14)',
   background:
-    'linear-gradient(180deg, rgba(148,163,184,.20), rgba(100,116,139,.18))',
+    'linear-gradient(180deg, rgba(100,116,139,.94), rgba(51,65,85,.92))',
   color: '#e2e8f0',
   fontSize: 11,
   fontWeight: 900,
+  lineHeight: 1.35,
   padding: '10px 12px',
   textAlign: 'center',
   boxShadow: '0 12px 28px rgba(2,6,23,.18)',
