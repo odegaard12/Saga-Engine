@@ -970,7 +970,7 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     position: 'fixed',
     left: mobile ? 12 : 24,
     right: mobile ? 12 : 24,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 124px)' : 132,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 144px)' : 148,
     zIndex: 4600,
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
