@@ -822,22 +822,30 @@ export default function PlayerApp() {
 
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
-
-          {activePanel !== 'details' && !toolsOpen ? (
-          <button
-            type="button"
-            style={mapRouteToggleButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleToggleRouteOverview()
-            }}
-            aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
-          >
-            {routeOverviewActive ? '◎' : '↔'}
-          </button>
-          ) : null}{/* saga-hide-map-arrow-when-panel-open-v3 */}
         </div>
+
+        {activePanel !== 'details' && !toolsOpen && !overlayState ? (
+          <div style={getMapQuickControlsStyle(isPhone)}>
+            <QuickProofPanel
+              user={user}
+              mobile={isPhone}
+              hidden={false}
+            />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleToggleRouteOverview()
+              }}
+              aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
+            >
+              {routeOverviewActive ? '◎' : '↔'}
+            </button>
+          </div>
+        ) : null}{/* saga-map-quick-controls-row-v1 */}
 
           <FieldPrepPanel
             visible={offlinePrepVisible && !payload.finished}
@@ -854,12 +862,6 @@ export default function PlayerApp() {
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
         <div style={getBottomOverlayStyle(isPhone)}>
-          <QuickProofPanel
-          user={user}
-          mobile={typeof window !== 'undefined' ? window.innerWidth <= 720 : false}
-          hidden={activePanel === 'details' || toolsOpen || Boolean(overlayState)}
-        />
-
         <PlayerHud
             user={payload.user}
             missionPayload={payload}
@@ -933,6 +935,31 @@ const mapRouteToggleButton: CSSProperties = {
   pointerEvents: 'auto',
   touchAction: 'manipulation',
 }
+
+const mapRouteToggleInlineButton: CSSProperties = {
+  ...mapRouteToggleButton,
+  position: 'static',
+  right: 'auto',
+  bottom: 'auto',
+  zIndex: 'auto',
+  flex: '0 0 auto',
+}
+
+function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
+  return {
+    position: 'fixed',
+    right: mobile ? 12 : 24,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 176px)' : 196,
+    zIndex: 4600,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    pointerEvents: 'auto',
+    maxWidth: mobile ? 'calc(100vw - 24px)' : 420,
+  }
+}
+
 
 function ScreenFrame({
   children,

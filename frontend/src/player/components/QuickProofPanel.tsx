@@ -439,16 +439,14 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
 function getWrapperStyle(mobile: boolean): CSSProperties {
   return {
-    position: 'fixed',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : 18,
-    left: mobile ? 12 : 'auto',
-    right: mobile ? 62 : 72,
-    zIndex: 5200,
+    position: 'relative',
     display: 'grid',
-    justifyItems: 'end',
+    justifyItems: 'stretch',
     gap: 8,
     pointerEvents: 'auto',
-    width: mobile ? 'min(calc(100vw - 92px), 240px)' : 280,
+    width: mobile ? 226 : 280,
+    maxWidth: mobile ? 'calc(100vw - 86px)' : 280,
+    flex: '0 1 auto',
   }
 }
 
@@ -462,8 +460,8 @@ const dock: CSSProperties = {
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.14)',
   background:
-    'linear-gradient(180deg, rgba(71,85,105,.82), rgba(51,65,85,.72))',
-  boxShadow: '0 14px 32px rgba(15,23,42,.24)',
+    'linear-gradient(180deg, rgba(71,85,105,.84), rgba(51,65,85,.74))',
+  boxShadow: '0 14px 32px rgba(15,23,42,.26)',
   backdropFilter: 'blur(18px) saturate(1.10)',
   WebkitBackdropFilter: 'blur(18px) saturate(1.10)',
 }
@@ -490,13 +488,16 @@ const dockButtonWide: CSSProperties = {
 }
 
 const panel: CSSProperties = {
-  width: 'min(100%, 320px)',
+  position: 'absolute',
+  right: 0,
+  bottom: 'calc(100% + 8px)',
+  width: 'min(80vw, 320px)',
   display: 'grid',
   gap: 10,
   borderRadius: 24,
   border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.88), rgba(51,65,85,.78))',
+    'linear-gradient(180deg, rgba(100,116,139,.90), rgba(51,65,85,.80))',
   color: '#f8fafc',
   boxShadow: '0 22px 60px rgba(2,6,23,.38)',
   backdropFilter: 'blur(22px) saturate(1.12)',
@@ -634,7 +635,10 @@ const helpText: CSSProperties = {
 }
 
 const noticeBox: CSSProperties = {
-  width: 'min(100%, 320px)',
+  position: 'absolute',
+  right: 0,
+  bottom: 'calc(100% + 8px)',
+  width: 'min(80vw, 280px)',
   borderRadius: 999,
   background: 'rgba(34,197,94,.18)',
   border: '1px solid rgba(187,247,208,.22)',
