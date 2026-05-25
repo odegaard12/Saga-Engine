@@ -510,8 +510,7 @@ export default function PlayerApp() {
 
   function handleToggleRouteOverview() {
     if (!playerPosition) {
-      showNotice('Buscando tu ubicación…', 'info')
-      void handleRequestLiveGps({ forceFocus: true })
+void handleRequestLiveGps({ forceFocus: true })
       return
     }
 
@@ -521,15 +520,13 @@ export default function PlayerApp() {
       setRouteOverviewActive(false)
       setFollowPlayer(true)
       setFocusRequest({ target: 'player', token: nextToken })
-      showNotice('Centrado en tu ubicación.', 'info')
-      return
+return
     }
 
     setRouteOverviewActive(true)
     setFollowPlayer(false)
     setFocusRequest({ target: 'route', token: nextToken })
-    showNotice('Mostrando tu ubicación y el nodo.', 'info')
-  }
+}
 
   function openInteraction() {
     setSubmitError(null)

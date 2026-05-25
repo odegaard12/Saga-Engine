@@ -120,7 +120,7 @@ function decodeNfcText(record: BrowserNDEFRecord): string | null {
 export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
   const [mode, setMode] = useState<ProofMode>('idle')
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escanea QR o NFC. Si falla, usa Mochila > Respaldo.')
+  const [message, setMessage] = useState('Escanea QR o NFC. Si falla, abre Mochila > Respaldo.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
   const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
@@ -262,7 +262,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         await video.play()
 
         setScannerState('scanning')
-        setMessage('Apunta al QR. Si falla, usa Mochila > Respaldo.')
+        setMessage('Apunta la cámara al QR de SAGA. Si falla, usa Mochila > Respaldo.')
 
         const tick = () => {
           if (stopped) return
@@ -488,22 +488,26 @@ const dockButtonWide: CSSProperties = {
 }
 
 const panel: CSSProperties = {
-  position: 'absolute',
+  position: 'fixed',
   left: '50%',
-  transform: 'translateX(-50%)',
-  bottom: 'calc(100% + 10px)',
-  width: 'min(88vw, 340px)',
+  top: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 'min(calc(100vw - 28px), 360px)',
+  maxHeight: 'min(68vh, 560px)',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
   display: 'grid',
-  gap: 12,
-  borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.16)',
+  gap: 13,
+  borderRadius: 26,
+  border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.94), rgba(51,65,85,.92))',
+    'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
   color: '#f8fafc',
-  boxShadow: '0 22px 60px rgba(2,6,23,.30)',
-  backdropFilter: 'blur(24px) saturate(1.10)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.10)',
+  boxShadow: '0 26px 70px rgba(2,6,23,.36)',
+  backdropFilter: 'blur(24px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
   padding: 14,
+  zIndex: 5600,
 }
 
 const panelHead: CSSProperties = {
@@ -511,7 +515,8 @@ const panelHead: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 10,
-  paddingBottom: 2,
+  paddingBottom: 4,
+  borderBottom: '1px solid rgba(255,255,255,.08)',
 }
 
 const eyebrow: CSSProperties = {
@@ -519,6 +524,7 @@ const eyebrow: CSSProperties = {
   fontSize: 9,
   fontWeight: 950,
   letterSpacing: '0.14em',
+  textTransform: 'uppercase',
 }
 
 const closeButton: CSSProperties = {
@@ -530,22 +536,24 @@ const closeButton: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(15,23,42,.52)',
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(15,23,42,.56)',
   color: '#ffffff',
   fontSize: 18,
   lineHeight: 1,
   fontWeight: 950,
   textAlign: 'center',
+  boxShadow: '0 10px 24px rgba(2,6,23,.20)',
 }
 
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 176,
-  borderRadius: 18,
-  border: '1px solid rgba(125,211,252,.20)',
-  background: 'rgba(2,6,23,.54)',
+  minHeight: 190,
+  borderRadius: 20,
+  border: '1px solid rgba(187,247,208,.14)',
+  background: 'rgba(2,6,23,.62)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
 }
 
 const videoStyle: CSSProperties = {
@@ -565,30 +573,33 @@ const scannerText: CSSProperties = {
   right: 10,
   bottom: 10,
   borderRadius: 999,
-  background: 'rgba(2,6,23,.74)',
-  color: '#e0f2fe',
+  background: 'rgba(15,23,42,.80)',
+  border: '1px solid rgba(255,255,255,.10)',
+  color: '#f8fafc',
   padding: '8px 10px',
   fontSize: 11,
   fontWeight: 900,
+  lineHeight: 1.25,
   textAlign: 'center',
 }
 
 const nfcBox: CSSProperties = {
   display: 'grid',
-  gap: 5,
-  borderRadius: 16,
-  border: '1px solid rgba(125,211,252,.16)',
-  background: 'rgba(14,165,233,.10)',
-  color: 'rgba(226,232,240,.82)',
+  gap: 6,
+  borderRadius: 18,
+  border: '1px solid rgba(187,247,208,.16)',
+  background: 'rgba(15,23,42,.32)',
+  color: 'rgba(241,245,249,.90)',
   padding: 12,
   fontSize: 12,
-  lineHeight: 1.35,
+  lineHeight: 1.42,
+  fontWeight: 760,
 }
 
 const field: CSSProperties = {
   display: 'grid',
   gap: 6,
-  color: 'rgba(241,245,249,.92)',
+  color: 'rgba(241,245,249,.94)',
   fontSize: 10,
   fontWeight: 950,
   letterSpacing: '0.08em',
@@ -598,9 +609,9 @@ const field: CSSProperties = {
 const input: CSSProperties = {
   width: '100%',
   minWidth: 0,
-  borderRadius: 15,
+  borderRadius: 16,
   border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.58)',
+  background: 'rgba(15,23,42,.60)',
   color: '#ffffff',
   fontSize: 16,
   lineHeight: 1.2,
@@ -614,9 +625,10 @@ const input: CSSProperties = {
 const previewBox: CSSProperties = {
   display: 'grid',
   gap: 2,
-  borderRadius: 15,
-  border: '1px solid rgba(187,247,208,.16)',
-  background: 'rgba(34,197,94,.10)',
+  borderRadius: 16,
+  border: '1px solid rgba(187,247,208,.18)',
+  background: 'rgba(34,197,94,.12)',
+  color: '#f8fafc',
   padding: 10,
 }
 
@@ -644,22 +656,23 @@ const helpText: CSSProperties = {
 }
 
 const noticeBox: CSSProperties = {
-  position: 'absolute',
+  position: 'fixed',
   left: '50%',
-  transform: 'translateX(-50%)',
-  bottom: 'calc(100% + 10px)',
-  width: 'min(84vw, 300px)',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.14)',
+  top: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 'min(calc(100vw - 28px), 330px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.16)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.94), rgba(51,65,85,.92))',
-  color: '#e2e8f0',
-  fontSize: 11,
+    'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
+  color: '#f8fafc',
+  fontSize: 12,
   fontWeight: 900,
-  lineHeight: 1.35,
-  padding: '10px 12px',
+  lineHeight: 1.38,
+  padding: '11px 13px',
   textAlign: 'center',
-  boxShadow: '0 12px 28px rgba(2,6,23,.18)',
-  backdropFilter: 'blur(18px)',
-  WebkitBackdropFilter: 'blur(18px)',
+  boxShadow: '0 16px 36px rgba(2,6,23,.26)',
+  backdropFilter: 'blur(20px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(20px) saturate(1.12)',
+  zIndex: 5600,
 }
