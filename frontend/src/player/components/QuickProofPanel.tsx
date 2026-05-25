@@ -440,61 +440,67 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 function getWrapperStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    right: mobile ? 12 : 24,
     left: mobile ? 12 : 'auto',
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 222px)' : 236,
+    right: mobile ? 12 : 24,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 112px)' : 132,
     zIndex: 1184,
     display: 'grid',
-    justifyItems: mobile ? 'stretch' : 'end',
+    justifyItems: 'stretch',
     gap: 8,
     pointerEvents: 'auto',
+    width: mobile ? 'auto' : 360,
   }
 }
 
 const dock: CSSProperties = {
-  justifySelf: 'end',
-  display: 'flex',
+  width: '100%',
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   alignItems: 'center',
-  gap: 7,
-  padding: 6,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(51,65,85,.76)',
-  boxShadow: '0 16px 34px rgba(15,23,42,.24)',
-  backdropFilter: 'blur(18px)',
-  WebkitBackdropFilter: 'blur(18px)',
+  gap: 8,
+  padding: 8,
+  borderRadius: 24,
+  border: '1px solid rgba(255,255,255,.20)',
+  background:
+    'linear-gradient(180deg, rgba(100,116,139,.64), rgba(51,65,85,.54))',
+  boxShadow: '0 18px 42px rgba(15,23,42,.24)',
+  backdropFilter: 'blur(22px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(22px) saturate(1.12)',
 }
 
 const dockButton: CSSProperties = {
-  minWidth: 44,
-  minHeight: 38,
-  borderRadius: 999,
-  border: '1px solid rgba(125,211,252,.22)',
-  background: 'rgba(14,165,233,.18)',
-  color: '#dbeafe',
-  fontSize: 11,
+  minWidth: 0,
+  minHeight: 40,
+  borderRadius: 17,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(15,23,42,.34)',
+  color: 'rgba(248,250,252,.84)',
+  fontSize: 10,
   fontWeight: 950,
   letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
 }
 
 const dockButtonWide: CSSProperties = {
   ...dockButton,
-  minWidth: 78,
+  background: 'rgba(34,197,94,.18)',
+  border: '1px solid rgba(187,247,208,.20)',
+  color: '#dcfce7',
 }
 
 const panel: CSSProperties = {
-  justifySelf: 'end',
-  width: 'min(100%, 360px)',
+  width: '100%',
   display: 'grid',
   gap: 10,
   borderRadius: 24,
-  border: '1px solid rgba(255,255,255,.16)',
+  border: '1px solid rgba(255,255,255,.18)',
   background:
     'linear-gradient(180deg, rgba(100,116,139,.82), rgba(51,65,85,.72))',
   color: '#f8fafc',
   boxShadow: '0 22px 60px rgba(2,6,23,.36)',
-  backdropFilter: 'blur(22px)',
-  WebkitBackdropFilter: 'blur(22px)',
+  backdropFilter: 'blur(22px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(22px) saturate(1.12)',
   padding: 12,
 }
 
@@ -628,14 +634,16 @@ const helpText: CSSProperties = {
 }
 
 const noticeBox: CSSProperties = {
-  justifySelf: 'end',
-  maxWidth: 320,
+  width: '100%',
   borderRadius: 999,
   background: 'rgba(34,197,94,.18)',
-  border: '1px solid rgba(187,247,208,.20)',
+  border: '1px solid rgba(187,247,208,.22)',
   color: '#dcfce7',
   fontSize: 11,
   fontWeight: 950,
   padding: '9px 12px',
+  textAlign: 'center',
   boxShadow: '0 12px 28px rgba(2,6,23,.20)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
 }
