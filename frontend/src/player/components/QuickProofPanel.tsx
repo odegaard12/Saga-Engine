@@ -120,7 +120,7 @@ function decodeNfcText(record: BrowserNDEFRecord): string | null {
 export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
   const [mode, setMode] = useState<ProofMode>('idle')
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escanea un QR o NFC del juego. Si falla, abre Mochila > Respaldo.')
+  const [message, setMessage] = useState('Escanea un QR de SAGA. NFC funcionará como etiqueta/enlace o en navegador compatible.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
   const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
@@ -192,7 +192,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
     if (!NDEFReader) {
       setNfcState('unsupported')
-      setMessage('NFC no disponible en este navegador aquí. Usa QR o Mochila > Respaldo.')
+      setMessage('NFC por etiqueta SAGA aquí. Usa QR o Mochila > Respaldo.')
       return
     }
 
@@ -225,7 +225,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
       setMessage('NFC activo. Acerca el móvil a la etiqueta del juego.')
     } catch {
       setNfcState('error')
-      setMessage('No se pudo iniciar NFC. Comprueba que el móvil tenga NFC activo o usa QR.')
+      setMessage('No se pudo iniciar NFC. En Android Chrome comprueba que NFC esté activo. En iPhone usa una etiqueta con enlace SAGA.')
     }
   }
 
@@ -262,7 +262,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         await video.play()
 
         setScannerState('scanning')
-        setMessage('Apunta la cámara al QR de SAGA. Si falla, usa Mochila > Respaldo.')
+        setMessage('Apunta la cámara al QR de SAGA.')
 
         const tick = () => {
           if (stopped) return
@@ -334,7 +334,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
           <div style={panelHead}>
             <div>
               <div style={eyebrow}>ESCANEAR EN CAMPO</div>
-              <strong>{mode === 'qr' ? 'Escanear QR de SAGA de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
+              <strong>{mode === 'qr' ? 'Escanear QR de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
             </div>
 
             <button
@@ -364,7 +364,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
             <div style={nfcBox}>
               <strong>
                 {nfcState === 'unsupported'
-                  ? 'NFC no disponible en este navegador'
+                  ? 'NFC por etiqueta SAGA'
                   : nfcState === 'scanning'
                     ? 'Esperando etiqueta'
                     : 'Acerca la etiqueta NFC'}
@@ -492,21 +492,21 @@ const panel: CSSProperties = {
   left: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 'min(calc(100vw - 28px), 360px)',
-  maxHeight: 'min(68vh, 560px)',
+  width: 'min(calc(100vw - 26px), 380px)',
+  maxHeight: 'min(72vh, 590px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
-  gap: 13,
-  borderRadius: 26,
+  gap: 14,
+  borderRadius: 28,
   border: '1px solid rgba(255,255,255,.18)',
   background:
     'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
   color: '#f8fafc',
-  boxShadow: '0 26px 70px rgba(2,6,23,.36)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
-  padding: 14,
+  boxShadow: '0 28px 76px rgba(2,6,23,.38)',
+  backdropFilter: 'blur(26px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(26px) saturate(1.12)',
+  padding: 15,
   zIndex: 5600,
 }
 
@@ -514,8 +514,8 @@ const panelHead: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 10,
-  paddingBottom: 4,
+  gap: 12,
+  paddingBottom: 6,
   borderBottom: '1px solid rgba(255,255,255,.08)',
 }
 
@@ -549,16 +549,16 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 190,
-  borderRadius: 20,
+  minHeight: 260,
+  borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
-  background: 'rgba(2,6,23,.62)',
+  background: 'rgba(2,6,23,.66)',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
 }
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 210,
+  height: 280,
   objectFit: 'cover',
   display: 'block',
 }
@@ -569,31 +569,31 @@ const canvasStyle: CSSProperties = {
 
 const scannerText: CSSProperties = {
   position: 'absolute',
-  left: 10,
-  right: 10,
-  bottom: 10,
-  borderRadius: 999,
-  background: 'rgba(15,23,42,.80)',
+  left: 12,
+  right: 12,
+  bottom: 12,
+  borderRadius: 18,
+  background: 'rgba(15,23,42,.82)',
   border: '1px solid rgba(255,255,255,.10)',
   color: '#f8fafc',
-  padding: '8px 10px',
+  padding: '9px 11px',
   fontSize: 11,
   fontWeight: 900,
-  lineHeight: 1.25,
+  lineHeight: 1.28,
   textAlign: 'center',
 }
 
 const nfcBox: CSSProperties = {
   display: 'grid',
-  gap: 6,
-  borderRadius: 18,
+  gap: 8,
+  borderRadius: 20,
   border: '1px solid rgba(187,247,208,.16)',
-  background: 'rgba(15,23,42,.32)',
-  color: 'rgba(241,245,249,.90)',
-  padding: 12,
+  background: 'rgba(15,23,42,.34)',
+  color: 'rgba(241,245,249,.92)',
+  padding: 13,
   fontSize: 12,
-  lineHeight: 1.42,
-  fontWeight: 760,
+  lineHeight: 1.45,
+  fontWeight: 780,
 }
 
 const field: CSSProperties = {
@@ -660,16 +660,16 @@ const noticeBox: CSSProperties = {
   left: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 'min(calc(100vw - 28px), 330px)',
-  borderRadius: 18,
+  width: 'min(calc(100vw - 28px), 340px)',
+  borderRadius: 20,
   border: '1px solid rgba(255,255,255,.16)',
   background:
     'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
   color: '#f8fafc',
   fontSize: 12,
   fontWeight: 900,
-  lineHeight: 1.38,
-  padding: '11px 13px',
+  lineHeight: 1.4,
+  padding: '12px 14px',
   textAlign: 'center',
   boxShadow: '0 16px 36px rgba(2,6,23,.26)',
   backdropFilter: 'blur(20px) saturate(1.12)',
