@@ -3,12 +3,13 @@ import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
+import PhysicalQrCardsPanel from './PhysicalQrCardsPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'cards'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AdminMissionControlShellProps = {
@@ -161,6 +162,13 @@ export default function AdminMissionControlShell({
           >
             Settings
           </button>
+          <button
+            type="button"
+            className={cmsPanel === 'cards' ? 'active' : ''}
+            onClick={() => togglePanel('cards')}
+          >
+            QR
+          </button>
         </div>
 
         <section className="saga-route-list" aria-label="Route nodes">
@@ -247,7 +255,7 @@ export default function AdminMissionControlShell({
       {cmsPanel !== 'none' ? (
         <aside className="saga-floating-panel" aria-label="CMS panel">
           <div className="saga-floating-head">
-            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : 'Mission settings'}</strong>
+            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : cmsPanel === 'cards' ? 'Tarjetas QR' : 'Mission settings'}</strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>Close</button>
           </div>
 
@@ -265,6 +273,8 @@ export default function AdminMissionControlShell({
             ) : null}
 
             {cmsPanel === 'labels' ? <FamiliesPanel /> : null}
+
+            {cmsPanel === 'cards' ? <PhysicalQrCardsPanel /> : null}
 
             {cmsPanel === 'mission' ? (
               <SettingsPanel

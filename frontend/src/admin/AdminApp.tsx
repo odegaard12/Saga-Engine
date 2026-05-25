@@ -40,7 +40,7 @@ import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentit
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'cards'
 
 export default function AdminApp() {
   const [config, setConfig] = useState<PublicConfig | null>(null)
