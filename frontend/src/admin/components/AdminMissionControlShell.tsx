@@ -1,6 +1,7 @@
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
+import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
@@ -232,7 +233,16 @@ export default function AdminMissionControlShell({
 
       {selectedStage ? (
         <aside className="saga-inspector is-open" aria-label="Node inspector">
-          <NodeDetailDrawer
+
+          <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-type-v2">
+            <NodePhysicalTypePanel
+              stage={selectedStage}
+              onApplyLocal={onApplyStage}
+            />
+          </div>
+
+{!isPhysicalNode(selectedStage) ? (
+<NodeDetailDrawer
             stage={selectedStage}
             onClose={() => onSelectStage(null)}
             onApplyLocal={onApplyStage}
@@ -241,7 +251,8 @@ export default function AdminMissionControlShell({
             canMoveUp={selectedIndex > 0}
             canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
           />
-        </aside>
+) : null}{/* saga-normal-node-drawer-v1 */}
+</aside>
       ) : null}
 
       {cmsPanel !== 'none' ? (
@@ -287,6 +298,13 @@ export default function AdminMissionControlShell({
       </nav>
     </main>
   )
+}
+
+
+function isPhysicalNode(stage: AdminReactOverviewStage | null) {
+  if (!stage) return false
+  const kind = (stage as AdminReactOverviewStage & { physical_node_kind?: string }).physical_node_kind
+  return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
 }
 
 function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {

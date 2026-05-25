@@ -1934,3 +1934,21 @@
     transition: none !important;
   }
 }
+
+
+.saga-inspector {
+  overflow-y: auto;
+}
+
+
+.saga-node-physical-type {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+
+.saga-inspector {
+  overflow-y: auto;
+}
+
+
