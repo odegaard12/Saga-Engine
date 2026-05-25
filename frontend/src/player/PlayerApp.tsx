@@ -46,6 +46,43 @@ function getUserFromUrl(): string {
   return params.get('user') || 'PLAYER 1'
 }
 
+
+function getSubmitCodeFromProofPayload(value: string): string {
+  const clean = String(value || '').trim()
+  if (!clean) return ''
+
+  try {
+    const maybeUrl = new URL(clean)
+    const nested =
+      maybeUrl.searchParams.get('proof') ||
+      maybeUrl.searchParams.get('c') ||
+      maybeUrl.searchParams.get('saga')
+
+    if (nested) return getSubmitCodeFromProofPayload(nested)
+  } catch {
+    // Plain SAGA code, not a URL.
+  }
+
+  const normalized = clean
+    .replace(/^saga\s*:/i, 'SAGA:')
+    .replace(/^saga1\s*:/i, 'SAGA1:')
+
+  const stripped = normalized.toUpperCase().startsWith('SAGA1:')
+    ? normalized.slice('SAGA1:'.length)
+    : normalized.toUpperCase().startsWith('SAGA:')
+      ? normalized.slice('SAGA:'.length)
+      : normalized
+
+  const parts = stripped.split(':').map((part) => part.trim()).filter(Boolean)
+  const kind = String(parts[0] || '').toUpperCase()
+
+  if (['PROOF', 'STAGE', 'NODE', 'CODE'].includes(kind) && parts[1]) {
+    return parts[1].slice(0, 160)
+  }
+
+  return clean.slice(0, 300)
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -783,6 +820,30 @@ return
       setSubmitting(false)
     }
   }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const rawProof =
+      url.searchParams.get('proof') ||
+      url.searchParams.get('c') ||
+      url.searchParams.get('saga')
+
+    if (!rawProof) return
+
+    const submitCode = getSubmitCodeFromProofPayload(rawProof)
+    if (!submitCode) return
+
+    url.searchParams.delete('proof')
+    url.searchParams.delete('c')
+    url.searchParams.delete('saga')
+    window.history.replaceState({}, '', url.toString())
+
+    void handleSubmitCode(submitCode)
+  }, [currentStage?.id, payload.user]) // saga-proof-url-submit-v1
+
+
 
   return (
     <ScreenFrame mobile={isPhone}>

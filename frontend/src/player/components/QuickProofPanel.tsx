@@ -6,6 +6,7 @@ interface QuickProofPanelProps {
   user: string
   mobile: boolean
   hidden: boolean
+  onSubmitCode?: (code: string) => void | Promise<void>
 }
 
 type ProofMode = 'idle' | 'qr' | 'nfc' | 'manual'
@@ -117,7 +118,30 @@ function decodeNfcText(record: BrowserNDEFRecord): string | null {
   return new TextDecoder().decode(bytes).trim()
 }
 
-export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
+
+function getNodeSubmitCodeFromParsedProof(parsed: ParsedProofInput): string {
+  const clean = String(parsed.raw || '').trim()
+  const normalized = clean
+    .replace(/^saga\s*:/i, 'SAGA:')
+    .replace(/^saga1\s*:/i, 'SAGA1:')
+
+  const stripped = normalized.toUpperCase().startsWith('SAGA1:')
+    ? normalized.slice('SAGA1:'.length)
+    : normalized.toUpperCase().startsWith('SAGA:')
+      ? normalized.slice('SAGA:'.length)
+      : normalized
+
+  const parts = stripped.split(':').map((part) => part.trim()).filter(Boolean)
+  const kind = String(parts[0] || '').toUpperCase()
+
+  if (['PROOF', 'STAGE', 'NODE', 'CODE'].includes(kind) && parts[1]) {
+    return parts[1].slice(0, 160)
+  }
+
+  return parsed.item_id.slice(0, 160)
+}
+
+export function QuickProofPanel({ user, mobile, hidden, onSubmitCode }: QuickProofPanelProps) {
   const [mode, setMode] = useState<ProofMode>('idle')
   const [value, setValue] = useState('')
   const [message, setMessage] = useState('Escanea un QR de SAGA. NFC funcionará como etiqueta/enlace o en navegador compatible.')
@@ -174,6 +198,14 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
       setMode('idle')
       setScannerState('idle')
       setNfcState('idle')
+      
+      if (parsed.kind === 'proof' && onSubmitCode) {
+        const submitCode = getNodeSubmitCodeFromParsedProof(parsed)
+        if (submitCode) {
+          void Promise.resolve(onSubmitCode(submitCode)).catch(() => undefined)
+        }
+      } // saga-submit-proof-to-node-v1
+
       setNotice(`Guardado: ${parsed.label}`)
       setMessage(`Guardado en Objetos. Total: ${snapshot.items.length}.`)
       return true
