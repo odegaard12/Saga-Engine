@@ -120,7 +120,7 @@ function decodeNfcText(record: BrowserNDEFRecord): string | null {
 export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
   const [mode, setMode] = useState<ProofMode>('idle')
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escanea QR o NFC. Si falla, abre Mochila > Respaldo.')
+  const [message, setMessage] = useState('Escanea un QR o NFC del juego. Si falla, abre Mochila > Respaldo.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
   const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
@@ -192,13 +192,13 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
     if (!NDEFReader) {
       setNfcState('unsupported')
-      setMessage('NFC no disponible aquí. Usa QR o Mochila > Respaldo.')
+      setMessage('NFC web no soportado aquí. Usa QR o Mochila > Respaldo.')
       return
     }
 
     try {
       setNfcState('starting')
-      setMessage('Preparando NFC... acerca el movil a la etiqueta.')
+      setMessage('Preparando NFC… acerca el móvil a la etiqueta.')
 
       const reader = new NDEFReader()
 
@@ -212,20 +212,20 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         }
 
         setNfcState('error')
-        setMessage('Etiqueta leída, pero sin prueba válida. Usa Mochila > Respaldo.')
+        setMessage('Etiqueta NFC leída, pero no contiene un código SAGA válido.')
       }
 
       reader.onreadingerror = () => {
         setNfcState('error')
-        setMessage('No se pudo leer NFC. Usa QR o Mochila > Respaldo.')
+        setMessage('No se pudo leer la etiqueta NFC. Acércala de nuevo o usa QR.')
       }
 
       await reader.scan()
       setNfcState('scanning')
-      setMessage('NFC activo. Acerca el movil a la etiqueta.')
+      setMessage('NFC activo. Acerca el móvil a la etiqueta del juego.')
     } catch {
       setNfcState('error')
-      setMessage('No se pudo iniciar NFC. Usa QR o Mochila > Respaldo.')
+      setMessage('No se pudo iniciar NFC. Comprueba que el móvil tenga NFC activo o usa QR.')
     }
   }
 
@@ -238,7 +238,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
     async function startScanner() {
       setScannerState('starting')
-      setMessage('Abriendo camara... acepta el permiso.')
+      setMessage('Abriendo cámara... acepta el permiso.')
 
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -326,15 +326,15 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
   if (hidden) return null
 
   return (
-    <div style={getWrapperStyle(mobile)} aria-label="Pruebas rápidas">
+    <div style={getWrapperStyle(mobile)} aria-label="Acción de campo">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
 
       {mode !== 'idle' ? (
         <section style={panel}>
           <div style={panelHead}>
             <div>
-              <div style={eyebrow}>PRUEBA RAPIDA</div>
-              <strong>{mode === 'qr' ? 'Escanear QR' : mode === 'nfc' ? 'Leer NFC' : 'Manual'}</strong>
+              <div style={eyebrow}>ACCIÓN DE CAMPO</div>
+              <strong>{mode === 'qr' ? 'Escanear QR de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
             </div>
 
             <button
@@ -352,10 +352,10 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
               <canvas ref={canvasRef} style={canvasStyle} />
               <div style={scannerText}>
                 {scannerState === 'starting'
-                  ? 'Abriendo camara...'
+                  ? 'Abriendo cámara...'
                   : scannerState === 'error'
                     ? 'Camara no disponible.'
-                    : 'Apunta al QR.'}
+                    : 'Apunta la cámara al QR de SAGA.'}
               </div>
             </div>
           ) : null}
@@ -364,10 +364,10 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
             <div style={nfcBox}>
               <strong>
                 {nfcState === 'unsupported'
-                  ? 'NFC no disponible'
+                  ? 'NFC web no soportado'
                   : nfcState === 'scanning'
                     ? 'Esperando etiqueta'
-                    : 'Lectura NFC'}
+                    : 'Acerca la etiqueta NFC'}
               </strong>
               <span>{message}</span>
             </div>
