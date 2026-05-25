@@ -88,9 +88,9 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
             style={mode === item.id ? activeButton : modeButton}
             onClick={() => setMode(item.id)}
           >
-            <span>{item.icon}</span>
-            <strong>{item.label}</strong>
-            <small>{item.help}</small>
+            <span style={modeIcon}>{item.icon}</span>
+            <strong style={modeLabel}>{item.label}</strong>
+            <small style={modeHelp}>{item.help}</small>
           </button>
         ))}
       </div>
@@ -164,23 +164,24 @@ const badge: CSSProperties = {
 
 const modeGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-  gap: 7,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))',
+  gap: 8,
 }
 
 const modeButton: CSSProperties = {
-  minHeight: 82,
+  minHeight: 126,
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'center',
-  gap: 3,
-  padding: 8,
-  borderRadius: 17,
+  gap: 6,
+  padding: '12px 10px',
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.34)',
   color: '#e2e8f0',
   textAlign: 'center',
   cursor: 'pointer',
+  overflow: 'hidden',
 }
 
 const activeButton: CSSProperties = {
@@ -188,6 +189,28 @@ const activeButton: CSSProperties = {
   border: '1px solid rgba(187,247,208,.26)',
   background: 'rgba(34,197,94,.15)',
   color: '#dcfce7',
+}
+
+const modeIcon: CSSProperties = {
+  display: 'block',
+  fontSize: 20,
+  lineHeight: 1,
+}
+
+const modeLabel: CSSProperties = {
+  display: 'block',
+  fontSize: 15,
+  lineHeight: 1.08,
+  fontWeight: 950,
+}
+
+const modeHelp: CSSProperties = {
+  display: 'block',
+  maxWidth: 112,
+  color: 'rgba(226,232,240,.82)',
+  fontSize: 12,
+  lineHeight: 1.22,
+  fontWeight: 760,
 }
 
 const emptyBox: CSSProperties = {
