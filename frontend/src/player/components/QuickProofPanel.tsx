@@ -430,7 +430,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
           setMode('manual')
           setMessage('Manual: escribe lo que ves si QR/NFC falla.')
         }}>
-          Codigo
+          Manual
         </button>
       </div>
     </div>
@@ -440,15 +440,15 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 function getWrapperStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 70px)' : 82,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : 18,
     left: mobile ? 12 : 'auto',
-    right: mobile ? 62 : 76,
-    zIndex: 1184,
+    right: mobile ? 62 : 72,
+    zIndex: 1192,
     display: 'grid',
     justifyItems: 'end',
     gap: 8,
     pointerEvents: 'auto',
-    width: mobile ? 'min(100% - 88px, 260px)' : 300,
+    width: mobile ? 'min(calc(100vw - 92px), 240px)' : 280,
   }
 }
 
@@ -457,27 +457,27 @@ const dock: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   alignItems: 'center',
-  gap: 6,
+  gap: 5,
   padding: 5,
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,.16)',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.14)',
   background:
-    'linear-gradient(180deg, rgba(71,85,105,.72), rgba(51,65,85,.60))',
-  boxShadow: '0 14px 34px rgba(15,23,42,.24)',
+    'linear-gradient(180deg, rgba(71,85,105,.82), rgba(51,65,85,.72))',
+  boxShadow: '0 14px 32px rgba(15,23,42,.24)',
   backdropFilter: 'blur(18px) saturate(1.10)',
   WebkitBackdropFilter: 'blur(18px) saturate(1.10)',
 }
 
 const dockButton: CSSProperties = {
   minWidth: 0,
-  minHeight: 34,
-  borderRadius: 16,
+  minHeight: 36,
+  borderRadius: 999,
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.30)',
-  color: 'rgba(248,250,252,.86)',
+  background: 'rgba(15,23,42,.34)',
+  color: 'rgba(248,250,252,.88)',
   fontSize: 10,
   fontWeight: 950,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.05em',
   textTransform: 'uppercase',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
 }
@@ -496,7 +496,7 @@ const panel: CSSProperties = {
   borderRadius: 24,
   border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.84), rgba(51,65,85,.74))',
+    'linear-gradient(180deg, rgba(100,116,139,.86), rgba(51,65,85,.76))',
   color: '#f8fafc',
   boxShadow: '0 22px 60px rgba(2,6,23,.36)',
   backdropFilter: 'blur(22px) saturate(1.12)',
