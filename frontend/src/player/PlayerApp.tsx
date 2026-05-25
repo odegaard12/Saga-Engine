@@ -968,14 +968,14 @@ const mapRouteToggleInlineButton: CSSProperties = {
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
-    left: mobile ? 12 : 24,
-    right: mobile ? 12 : 24,
+    left: mobile ? 4 : 24,
+    right: mobile ? 20 : 24,
     bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 152px)' : 160,
     zIndex: 4600,
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     pointerEvents: 'auto',
   }
 }

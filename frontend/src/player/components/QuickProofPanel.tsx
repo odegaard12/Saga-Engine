@@ -444,11 +444,12 @@ function getWrapperStyle(mobile: boolean): CSSProperties {
     justifyItems: 'stretch',
     gap: 8,
     pointerEvents: 'auto',
-    width: mobile ? 'min(calc(100vw - 104px), 270px)' : 270,
-    maxWidth: mobile ? 'min(calc(100vw - 104px), 270px)' : 270,
+    width: mobile ? 'min(calc(100vw - 112px), 270px)' : 270,
+    maxWidth: mobile ? 'min(calc(100vw - 112px), 270px)' : 270,
     justifySelf: 'center',
     alignSelf: 'center',
     gridColumn: 2,
+    transform: mobile ? 'translateX(-8px)' : undefined,
   }
 }
 
