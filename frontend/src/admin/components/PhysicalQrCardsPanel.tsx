@@ -1,6 +1,12 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 
 type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+
+type PhysicalQrCardsPanelProps = {
+  initialLabel?: string
+  initialKind?: PhysicalQrKind
+  compact?: boolean
+}
 
 const kindLabels: Record<PhysicalQrKind, string> = {
   collectible: 'Coleccionable',
@@ -35,11 +41,21 @@ async function copyToClipboard(value: string): Promise<boolean> {
   }
 }
 
-export default function PhysicalQrCardsPanel() {
-  const [label, setLabel] = useState('Llave de la torre')
+export default function PhysicalQrCardsPanel({
+  initialLabel = 'Buscar a tu enemigo',
+  initialKind = 'collectible',
+  compact = false,
+}: PhysicalQrCardsPanelProps) {
+  const [label, setLabel] = useState(initialLabel)
   const [manualId, setManualId] = useState('')
-  const [kind, setKind] = useState<PhysicalQrKind>('collectible')
+  const [kind, setKind] = useState<PhysicalQrKind>(initialKind)
   const [copied, setCopied] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLabel(initialLabel || 'Buscar a tu enemigo')
+    setManualId('')
+    setKind(initialKind)
+  }, [initialLabel, initialKind])
 
   const itemId = useMemo(() => {
     const chosen = manualId.trim() || label.trim()
@@ -57,16 +73,16 @@ export default function PhysicalQrCardsPanel() {
   }
 
   return (
-    <section style={panel} aria-label="Tarjetas QR">
+    <section style={compact ? compactPanel : panel} aria-label="Tarjeta QR del nodo">
       <div style={header}>
         <div>
-          <div style={eyebrow}>TARJETAS QR</div>
-          <h2 style={title}>Objetos físicos y coleccionables</h2>
+          <div style={eyebrow}>TARJETA QR DEL NODO</div>
+          <h2 style={compact ? compactTitle : title}>Objeto físico / misión secundaria</h2>
           <p style={copy}>
-            Crea tarjetas QR para objetos del juego. El jugador solo ve una tarjeta bonita; SAGA guarda el objeto al escanearla.
+            Genera el contenido interno del QR. El jugador solo escanea la tarjeta y SAGA lo guarda en Objetos.
           </p>
         </div>
-        <span style={badge}>QR MVP</span>
+        <span style={badge}>{kindIcons[kind]} QR</span>
       </div>
 
       <div style={formGrid}>
@@ -75,7 +91,7 @@ export default function PhysicalQrCardsPanel() {
           <input
             value={label}
             onChange={(event) => setLabel(event.target.value)}
-            placeholder="Llave de la torre"
+            placeholder="Buscar a tu enemigo"
             style={input}
           />
         </label>
@@ -91,14 +107,14 @@ export default function PhysicalQrCardsPanel() {
         </label>
 
         <label style={field}>
-          Tipo
+          Uso en juego
           <select
             value={kind}
             onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
             style={input}
           >
-            <option value="collectible">Coleccionable</option>
-            <option value="requirement">Requisito</option>
+            <option value="collectible">Coleccionable / secundaria</option>
+            <option value="requirement">Requisito para otro nodo</option>
             <option value="clue">Pista</option>
             <option value="bonus">Bonus</option>
           </select>
@@ -133,9 +149,9 @@ export default function PhysicalQrCardsPanel() {
       {copied ? <div style={notice}>{copied}</div> : null}
 
       <div style={nextBox}>
-        <b>Siguiente paso</b>
+        <b>Uso recomendado</b>
         <span>
-          Después añadiremos generación/descarga de imagen QR y nodos secundarios con icono especial en el mapa.
+          Para el juego real: genera este payload, conviértelo en QR y colócalo como objeto, pista o requisito físico del nodo.
         </span>
       </div>
     </section>
@@ -145,6 +161,17 @@ export default function PhysicalQrCardsPanel() {
 const panel: CSSProperties = {
   display: 'grid',
   gap: 14,
+}
+
+const compactPanel: CSSProperties = {
+  display: 'grid',
+  gap: 12,
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 22,
+  border: '1px solid rgba(187,247,208,.16)',
+  background:
+    'radial-gradient(circle at top right, rgba(187,247,208,.13), transparent 42%), rgba(15,23,42,.28)',
 }
 
 const header: CSSProperties = {
@@ -169,6 +196,11 @@ const title: CSSProperties = {
   lineHeight: 1.05,
   fontWeight: 950,
   letterSpacing: '-0.04em',
+}
+
+const compactTitle: CSSProperties = {
+  ...title,
+  fontSize: 15,
 }
 
 const copy: CSSProperties = {
@@ -229,7 +261,7 @@ const previewGrid: CSSProperties = {
 }
 
 const cardPreview: CSSProperties = {
-  minHeight: 146,
+  minHeight: 138,
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'center',

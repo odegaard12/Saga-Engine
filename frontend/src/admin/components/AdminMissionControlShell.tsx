@@ -9,7 +9,7 @@ import { familyCards } from '../lib/familyConfigs'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'cards'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AdminMissionControlShellProps = {
@@ -162,13 +162,6 @@ export default function AdminMissionControlShell({
           >
             Settings
           </button>
-          <button
-            type="button"
-            className={cmsPanel === 'cards' ? 'active' : ''}
-            onClick={() => togglePanel('cards')}
-          >
-            QR
-          </button>
         </div>
 
         <section className="saga-route-list" aria-label="Route nodes">
@@ -249,13 +242,21 @@ export default function AdminMissionControlShell({
             canMoveUp={selectedIndex > 0}
             canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
           />
+
+          <div className="saga-node-qr-builder" data-saga-node-qr-builder="saga-node-qr-builder-v1">
+            <PhysicalQrCardsPanel
+              initialLabel={selectedStage.title || 'Buscar a tu enemigo'}
+              initialKind="collectible"
+              compact
+            />
+          </div>
         </aside>
       ) : null}
 
       {cmsPanel !== 'none' ? (
         <aside className="saga-floating-panel" aria-label="CMS panel">
           <div className="saga-floating-head">
-            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : cmsPanel === 'cards' ? 'Tarjetas QR' : 'Mission settings'}</strong>
+            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : 'Mission settings'}</strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>Close</button>
           </div>
 
@@ -273,8 +274,6 @@ export default function AdminMissionControlShell({
             ) : null}
 
             {cmsPanel === 'labels' ? <FamiliesPanel /> : null}
-
-            {cmsPanel === 'cards' ? <PhysicalQrCardsPanel /> : null}
 
             {cmsPanel === 'mission' ? (
               <SettingsPanel
