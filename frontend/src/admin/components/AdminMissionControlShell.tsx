@@ -1,9 +1,9 @@
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
+import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
-import PhysicalQrCardsPanel from './PhysicalQrCardsPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import type { PlayerDraft } from '../lib/playerDrafts'
@@ -233,25 +233,15 @@ export default function AdminMissionControlShell({
 
       {selectedStage ? (
         <aside className="saga-inspector is-open" aria-label="Node inspector">
-          <div className="saga-node-qr-builder" data-saga-node-qr-builder="saga-node-qr-builder-v3">
-            <PhysicalQrCardsPanel
-              initialLabel={selectedStage.title || 'Buscar a tu enemigo'}
-              initialKind="collectible"
-              compact
-              onSaveToNode={(card) => {
-                onApplyStage({
-                  ...selectedStage,
-                  physical_qr: card,
-                  qr_payload: card.payload,
-                  physical_item_id: card.item_id,
-                  physical_item_label: card.label,
-                  physical_item_kind: card.kind,
-                } as AdminReactOverviewStage)
-              }}
+
+          <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-type-v2">
+            <NodePhysicalTypePanel
+              stage={selectedStage}
+              onApplyLocal={onApplyStage}
             />
           </div>
 
-          <NodeDetailDrawer
+<NodeDetailDrawer
             stage={selectedStage}
             onClose={() => onSelectStage(null)}
             onApplyLocal={onApplyStage}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 
-type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+export type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
-type SavedPhysicalQrCard = {
+export type SavedPhysicalQrCard = {
   item_id: string
   label: string
   kind: PhysicalQrKind
@@ -14,9 +14,9 @@ type SavedPhysicalQrCard = {
 
 type PhysicalQrCardsPanelProps = {
   initialLabel?: string
-  initialKind?: PhysicalQrKind
+  initialKind: PhysicalQrKind
   compact?: boolean
-  onSaveToNode?: (card: SavedPhysicalQrCard) => void
+  onSaveToNode: (card: SavedPhysicalQrCard) => void
 }
 
 const kindLabels: Record<PhysicalQrKind, string> = {
@@ -66,7 +66,7 @@ function downloadTextFile(filename: string, content: string, type = 'text/plain'
 
 export default function PhysicalQrCardsPanel({
   initialLabel = 'Buscar a tu enemigo',
-  initialKind = 'collectible',
+  initialKind,
   compact = false,
   onSaveToNode,
 }: PhysicalQrCardsPanelProps) {
@@ -114,7 +114,7 @@ export default function PhysicalQrCardsPanel({
   }
 
   function handleSaveToNode() {
-    onSaveToNode?.({
+    onSaveToNode({
       item_id: itemId,
       label: cleanLabel,
       kind,
@@ -122,17 +122,17 @@ export default function PhysicalQrCardsPanel({
       card_text: cardText,
       updated_at: new Date().toISOString(),
     })
-    showNotice('Tarjeta QR guardada en este nodo')
+    showNotice('QR guardado en este nodo. Pulsa Guardar en Control de misión para persistir.')
   }
 
   return (
-    <section style={compact ? compactPanel : panel} aria-label="Tarjeta QR del nodo">
+    <section style={compact ? compactPanel : panel} aria-label="Generador QR del nodo">
       <div style={header}>
         <div>
           <div style={eyebrow}>QR DEL NODO</div>
-          <h2 style={compact ? compactTitle : title}>Objeto físico / misión secundaria</h2>
+          <h2 style={compact ? compactTitle : title}>Tarjeta física</h2>
           <p style={copy}>
-            Crea una tarjeta QR para este nodo. El jugador la escanea y SAGA la guarda en Objetos.
+            Solo para nodos físicos. El jugador escanea este QR y SAGA guarda el objeto en Objetos.
           </p>
         </div>
         <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
@@ -144,7 +144,7 @@ export default function PhysicalQrCardsPanel({
             <QRCodeSVG value={payload} size={154} level="M" includeMargin />
           </div>
           <strong>{cleanLabel}</strong>
-          <small>{kindLabels[kind]} · {itemId}</small>
+          <small>{itemId}</small>
         </div>
 
         <div style={formGrid}>
@@ -169,7 +169,7 @@ export default function PhysicalQrCardsPanel({
           </label>
 
           <label style={field}>
-            Uso en juego
+            Uso QR
             <select
               value={kind}
               onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
@@ -192,7 +192,7 @@ export default function PhysicalQrCardsPanel({
 
       <div style={actions}>
         <button type="button" style={primaryButton} onClick={handleSaveToNode}>
-          Guardar en nodo
+          Guardar QR en nodo
         </button>
 
         <button type="button" style={button} onClick={() => void handleCopy('Payload QR', payload)}>
@@ -209,15 +209,11 @@ export default function PhysicalQrCardsPanel({
   )
 }
 
-const panel: CSSProperties = {
-  display: 'grid',
-  gap: 14,
-}
+const panel: CSSProperties = { display: 'grid', gap: 14 }
 
 const compactPanel: CSSProperties = {
   display: 'grid',
   gap: 12,
-  margin: '0 0 12px',
   padding: 12,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.16)',
@@ -249,10 +245,7 @@ const title: CSSProperties = {
   letterSpacing: '-0.04em',
 }
 
-const compactTitle: CSSProperties = {
-  ...title,
-  fontSize: 15,
-}
+const compactTitle: CSSProperties = { ...title, fontSize: 15 }
 
 const copy: CSSProperties = {
   margin: '7px 0 0',
@@ -306,10 +299,7 @@ const qrImage: CSSProperties = {
   overflow: 'hidden',
 }
 
-const formGrid: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
+const formGrid: CSSProperties = { display: 'grid', gap: 10 }
 
 const field: CSSProperties = {
   display: 'grid',

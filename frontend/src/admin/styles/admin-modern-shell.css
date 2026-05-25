@@ -156,7 +156,7 @@
 
 .saga-mini-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 7px;
   margin-top: 12px;
 }
@@ -1936,12 +1936,16 @@
 }
 
 
-.saga-node-qr-builder {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 12px;
-  padding-top: 12px;
+.saga-inspector {
+  overflow-y: auto;
 }
 
+
+.saga-node-physical-type {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
 
 .saga-inspector {
   overflow-y: auto;
