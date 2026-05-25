@@ -192,7 +192,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
     if (!NDEFReader) {
       setNfcState('unsupported')
-      setMessage('NFC web no soportado aquí. Usa QR o Mochila > Respaldo.')
+      setMessage('NFC no disponible en este navegador aquí. Usa QR o Mochila > Respaldo.')
       return
     }
 
@@ -326,15 +326,15 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
   if (hidden) return null
 
   return (
-    <div style={getWrapperStyle(mobile)} aria-label="Acción de campo">
+    <div style={getWrapperStyle(mobile)} aria-label="Escanear en campo">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
 
       {mode !== 'idle' ? (
         <section style={panel}>
           <div style={panelHead}>
             <div>
-              <div style={eyebrow}>ACCIÓN DE CAMPO</div>
-              <strong>{mode === 'qr' ? 'Escanear QR de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
+              <div style={eyebrow}>ESCANEAR EN CAMPO</div>
+              <strong>{mode === 'qr' ? 'Escanear QR de SAGA de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
             </div>
 
             <button
@@ -364,7 +364,7 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
             <div style={nfcBox}>
               <strong>
                 {nfcState === 'unsupported'
-                  ? 'NFC web no soportado'
+                  ? 'NFC no disponible en este navegador'
                   : nfcState === 'scanning'
                     ? 'Esperando etiqueta'
                     : 'Acerca la etiqueta NFC'}
