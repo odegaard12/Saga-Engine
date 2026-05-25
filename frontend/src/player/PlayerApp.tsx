@@ -3,6 +3,7 @@ import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sen
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
+import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
@@ -853,7 +854,13 @@ export default function PlayerApp() {
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
         <div style={getBottomOverlayStyle(isPhone)}>
-          <PlayerHud
+          <QuickProofPanel
+          user={user}
+          mobile={typeof window !== 'undefined' ? window.innerWidth <= 720 : false}
+          hidden={activePanel === 'details' || toolsOpen || Boolean(overlayState)}
+        />
+
+        <PlayerHud
             user={payload.user}
             missionPayload={payload}
             currentStage={currentStage}

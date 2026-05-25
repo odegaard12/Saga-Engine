@@ -259,7 +259,7 @@ export function PlayerHud({
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
-                <div style={sheetTitle}>Guia, objetos y pruebas</div>
+                <div style={sheetTitle}>Guia, objetos y respaldo</div>
               </div>
 
               <button
@@ -292,7 +292,7 @@ export function PlayerHud({
                 style={backpackTab === 'collect' ? tabActive : tabButton}
                 onClick={() => setBackpackTab('collect')}
               >
-                Prueba
+                Respaldo
               </button>
             </div>
 
