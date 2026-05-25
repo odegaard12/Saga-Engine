@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 
 type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+
+type SavedPhysicalQrCard = {
+  item_id: string
+  label: string
+  kind: PhysicalQrKind
+  payload: string
+  card_text: string
+  updated_at: string
+}
 
 type PhysicalQrCardsPanelProps = {
   initialLabel?: string
   initialKind?: PhysicalQrKind
   compact?: boolean
+  onSaveToNode?: (card: SavedPhysicalQrCard) => void
 }
 
 const kindLabels: Record<PhysicalQrKind, string> = {
@@ -41,15 +52,29 @@ async function copyToClipboard(value: string): Promise<boolean> {
   }
 }
 
+function downloadTextFile(filename: string, content: string, type = 'text/plain') {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 export default function PhysicalQrCardsPanel({
   initialLabel = 'Buscar a tu enemigo',
   initialKind = 'collectible',
   compact = false,
+  onSaveToNode,
 }: PhysicalQrCardsPanelProps) {
   const [label, setLabel] = useState(initialLabel)
   const [manualId, setManualId] = useState('')
   const [kind, setKind] = useState<PhysicalQrKind>(initialKind)
-  const [copied, setCopied] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const qrWrapRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setLabel(initialLabel || 'Buscar a tu enemigo')
@@ -66,94 +91,120 @@ export default function PhysicalQrCardsPanel({
   const payload = `SAGA1:ITEM:${itemId}:${cleanLabel}`
   const cardText = `${kindIcons[kind]} ${cleanLabel}\n${kindLabels[kind]}\nEscanea esta tarjeta en SAGA.`
 
+  function showNotice(value: string) {
+    setNotice(value)
+    window.setTimeout(() => setNotice(null), 1800)
+  }
+
   async function handleCopy(name: string, value: string) {
     const ok = await copyToClipboard(value)
-    setCopied(ok ? `${name} copiado` : `No se pudo copiar ${name}`)
-    window.setTimeout(() => setCopied(null), 1800)
+    showNotice(ok ? `${name} copiado` : `No se pudo copiar ${name}`)
+  }
+
+  function handleDownloadSvg() {
+    const svg = qrWrapRef.current?.querySelector('svg')
+    if (!svg) {
+      showNotice('No se pudo descargar el QR')
+      return
+    }
+
+    const source = `<?xml version="1.0" encoding="UTF-8"?>\n${svg.outerHTML}`
+    downloadTextFile(`saga-qr-${itemId}.svg`, source, 'image/svg+xml')
+    showNotice('QR descargado')
+  }
+
+  function handleSaveToNode() {
+    onSaveToNode?.({
+      item_id: itemId,
+      label: cleanLabel,
+      kind,
+      payload,
+      card_text: cardText,
+      updated_at: new Date().toISOString(),
+    })
+    showNotice('Tarjeta QR guardada en este nodo')
   }
 
   return (
     <section style={compact ? compactPanel : panel} aria-label="Tarjeta QR del nodo">
       <div style={header}>
         <div>
-          <div style={eyebrow}>TARJETA QR DEL NODO</div>
+          <div style={eyebrow}>QR DEL NODO</div>
           <h2 style={compact ? compactTitle : title}>Objeto físico / misión secundaria</h2>
           <p style={copy}>
-            Genera el contenido interno del QR. El jugador solo escanea la tarjeta y SAGA lo guarda en Objetos.
+            Crea una tarjeta QR para este nodo. El jugador la escanea y SAGA la guarda en Objetos.
           </p>
         </div>
-        <span style={badge}>{kindIcons[kind]} QR</span>
+        <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
       </div>
 
-      <div style={formGrid}>
-        <label style={field}>
-          Nombre visible
-          <input
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-            placeholder="Buscar a tu enemigo"
-            style={input}
-          />
-        </label>
-
-        <label style={field}>
-          ID interno
-          <input
-            value={manualId}
-            onChange={(event) => setManualId(event.target.value)}
-            placeholder={itemId}
-            style={input}
-          />
-        </label>
-
-        <label style={field}>
-          Uso en juego
-          <select
-            value={kind}
-            onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
-            style={input}
-          >
-            <option value="collectible">Coleccionable / secundaria</option>
-            <option value="requirement">Requisito para otro nodo</option>
-            <option value="clue">Pista</option>
-            <option value="bonus">Bonus</option>
-          </select>
-        </label>
-      </div>
-
-      <div style={previewGrid}>
-        <div style={cardPreview}>
-          <div style={cardIcon}>{kindIcons[kind]}</div>
+      <div style={layout}>
+        <div style={qrCard}>
+          <div ref={qrWrapRef} style={qrImage}>
+            <QRCodeSVG value={payload} size={154} level="M" includeMargin />
+          </div>
           <strong>{cleanLabel}</strong>
-          <span>{kindLabels[kind]}</span>
-          <small>Escanea esta tarjeta en SAGA</small>
+          <small>{kindLabels[kind]} · {itemId}</small>
         </div>
 
-        <div style={payloadBox}>
-          <span>Texto interno del QR</span>
-          <code>{payload}</code>
-          <small>Esto va dentro de la imagen QR. El jugador no lo escribe.</small>
+        <div style={formGrid}>
+          <label style={field}>
+            Nombre visible
+            <input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="Buscar a tu enemigo"
+              style={input}
+            />
+          </label>
+
+          <label style={field}>
+            ID interno
+            <input
+              value={manualId}
+              onChange={(event) => setManualId(event.target.value)}
+              placeholder={itemId}
+              style={input}
+            />
+          </label>
+
+          <label style={field}>
+            Uso en juego
+            <select
+              value={kind}
+              onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
+              style={input}
+            >
+              <option value="collectible">Coleccionable / secundaria</option>
+              <option value="requirement">Requisito para otro nodo</option>
+              <option value="clue">Pista</option>
+              <option value="bonus">Bonus</option>
+            </select>
+          </label>
         </div>
+      </div>
+
+      <div style={payloadBox}>
+        <span>Texto interno del QR</span>
+        <code>{payload}</code>
+        <small>El jugador no escribe esto. Va dentro de la imagen QR.</small>
       </div>
 
       <div style={actions}>
+        <button type="button" style={primaryButton} onClick={handleSaveToNode}>
+          Guardar en nodo
+        </button>
+
         <button type="button" style={button} onClick={() => void handleCopy('Payload QR', payload)}>
-          Copiar payload QR
+          Copiar payload
         </button>
 
-        <button type="button" style={button} onClick={() => void handleCopy('Texto tarjeta', cardText)}>
-          Copiar texto tarjeta
+        <button type="button" style={button} onClick={handleDownloadSvg}>
+          Descargar QR
         </button>
       </div>
 
-      {copied ? <div style={notice}>{copied}</div> : null}
-
-      <div style={nextBox}>
-        <b>Uso recomendado</b>
-        <span>
-          Para el juego real: genera este payload, conviértelo en QR y colócalo como objeto, pista o requisito físico del nodo.
-        </span>
-      </div>
+      {notice ? <div style={noticeBox}>{notice}</div> : null}
     </section>
   )
 }
@@ -166,7 +217,7 @@ const panel: CSSProperties = {
 const compactPanel: CSSProperties = {
   display: 'grid',
   gap: 12,
-  marginTop: 12,
+  margin: '0 0 12px',
   padding: 12,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.16)',
@@ -226,6 +277,35 @@ const badge: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+const layout: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '170px minmax(0, 1fr)',
+  gap: 12,
+  alignItems: 'stretch',
+}
+
+const qrCard: CSSProperties = {
+  display: 'grid',
+  justifyItems: 'center',
+  alignContent: 'center',
+  gap: 8,
+  padding: 10,
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,.13)',
+  background: 'rgba(15,23,42,.32)',
+  textAlign: 'center',
+}
+
+const qrImage: CSSProperties = {
+  width: 166,
+  height: 166,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 18,
+  background: '#ffffff',
+  overflow: 'hidden',
+}
+
 const formGrid: CSSProperties = {
   display: 'grid',
   gap: 10,
@@ -254,48 +334,18 @@ const input: CSSProperties = {
   outline: 'none',
 }
 
-const previewGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, .9fr) minmax(0, 1.1fr)',
-  gap: 10,
-}
-
-const cardPreview: CSSProperties = {
-  minHeight: 138,
-  display: 'grid',
-  alignContent: 'center',
-  justifyItems: 'center',
-  gap: 5,
-  padding: 12,
-  borderRadius: 20,
-  border: '1px solid rgba(187,247,208,.16)',
-  background:
-    'radial-gradient(circle at top, rgba(187,247,208,.18), transparent 48%), rgba(15,23,42,.34)',
-  textAlign: 'center',
-}
-
-const cardIcon: CSSProperties = {
-  width: 42,
-  height: 42,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 16,
-  background: 'rgba(248,250,252,.10)',
-  fontSize: 22,
-}
-
 const payloadBox: CSSProperties = {
   display: 'grid',
   gap: 7,
   padding: 12,
-  borderRadius: 20,
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.11)',
   background: 'rgba(15,23,42,.30)',
 }
 
 const actions: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: '1.15fr .9fr .9fr',
   gap: 8,
 }
 
@@ -311,7 +361,12 @@ const button: CSSProperties = {
   textTransform: 'uppercase',
 }
 
-const notice: CSSProperties = {
+const primaryButton: CSSProperties = {
+  ...button,
+  background: 'linear-gradient(180deg, rgba(187,247,208,.28), rgba(34,197,94,.18))',
+}
+
+const noticeBox: CSSProperties = {
   padding: 10,
   borderRadius: 14,
   background: 'rgba(34,197,94,.12)',
@@ -319,15 +374,4 @@ const notice: CSSProperties = {
   color: '#dcfce7',
   fontSize: 12,
   fontWeight: 900,
-}
-
-const nextBox: CSSProperties = {
-  display: 'grid',
-  gap: 3,
-  padding: 11,
-  borderRadius: 16,
-  border: '1px dashed rgba(226,232,240,.16)',
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 11,
-  lineHeight: 1.35,
 }

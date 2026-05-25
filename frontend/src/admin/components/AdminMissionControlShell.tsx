@@ -233,6 +233,24 @@ export default function AdminMissionControlShell({
 
       {selectedStage ? (
         <aside className="saga-inspector is-open" aria-label="Node inspector">
+          <div className="saga-node-qr-builder" data-saga-node-qr-builder="saga-node-qr-builder-v3">
+            <PhysicalQrCardsPanel
+              initialLabel={selectedStage.title || 'Buscar a tu enemigo'}
+              initialKind="collectible"
+              compact
+              onSaveToNode={(card) => {
+                onApplyStage({
+                  ...selectedStage,
+                  physical_qr: card,
+                  qr_payload: card.payload,
+                  physical_item_id: card.item_id,
+                  physical_item_label: card.label,
+                  physical_item_kind: card.kind,
+                } as AdminReactOverviewStage)
+              }}
+            />
+          </div>
+
           <NodeDetailDrawer
             stage={selectedStage}
             onClose={() => onSelectStage(null)}
@@ -242,15 +260,7 @@ export default function AdminMissionControlShell({
             canMoveUp={selectedIndex > 0}
             canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
           />
-
-          <div className="saga-node-qr-builder" data-saga-node-qr-builder="saga-node-qr-builder-v1">
-            <PhysicalQrCardsPanel
-              initialLabel={selectedStage.title || 'Buscar a tu enemigo'}
-              initialKind="collectible"
-              compact
-            />
-          </div>
-        </aside>
+</aside>
       ) : null}
 
       {cmsPanel !== 'none' ? (
