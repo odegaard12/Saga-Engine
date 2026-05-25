@@ -439,11 +439,11 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
 function getWrapperStyle(mobile: boolean): CSSProperties {
   return {
-    position: 'absolute',
+    position: 'fixed',
     top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : 18,
     left: mobile ? 12 : 'auto',
     right: mobile ? 62 : 72,
-    zIndex: 1192,
+    zIndex: 5200,
     display: 'grid',
     justifyItems: 'end',
     gap: 8,
@@ -496,9 +496,9 @@ const panel: CSSProperties = {
   borderRadius: 24,
   border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.86), rgba(51,65,85,.76))',
+    'linear-gradient(180deg, rgba(100,116,139,.88), rgba(51,65,85,.78))',
   color: '#f8fafc',
-  boxShadow: '0 22px 60px rgba(2,6,23,.36)',
+  boxShadow: '0 22px 60px rgba(2,6,23,.38)',
   backdropFilter: 'blur(22px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(22px) saturate(1.12)',
   padding: 12,
