@@ -9,7 +9,6 @@ type ParsedManualInput = {
   item_id: string
   label: string
   raw: string
-  format: 'field_text' | 'structured_code'
 }
 
 function slugifyItemId(value: string): string {
@@ -26,9 +25,19 @@ function parseManualInput(value: string): ParsedManualInput | null {
   const clean = value.trim()
   if (!clean) return null
 
-  const normalized = clean.replace(/^saga\s*:/i, '').replace(/^item\s*:/i, 'ITEM:')
+  let normalized = clean.replace(/^saga\s*:/i, 'SAGA:')
 
-  if (normalized.toUpperCase().startsWith('ITEM:')) {
+  if (normalized.toUpperCase().startsWith('SAGA1:')) {
+    normalized = normalized.slice('SAGA1:'.length)
+  } else if (normalized.toUpperCase().startsWith('SAGA:')) {
+    normalized = normalized.slice('SAGA:'.length)
+  }
+
+  normalized = normalized
+    .replace(/^item\s*:/i, 'ITEM:')
+    .replace(/^proof\s*:/i, 'PROOF:')
+
+  if (normalized.toUpperCase().startsWith('ITEM:') || normalized.toUpperCase().startsWith('PROOF:')) {
     const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
     const itemId = parts[1]
     const label = parts.slice(2).join(':') || itemId
@@ -39,7 +48,6 @@ function parseManualInput(value: string): ParsedManualInput | null {
       item_id: slugifyItemId(itemId) || itemId.slice(0, 80),
       label: label.slice(0, 160),
       raw: clean.slice(0, 300),
-      format: 'structured_code',
     }
   }
 
@@ -50,24 +58,23 @@ function parseManualInput(value: string): ParsedManualInput | null {
     item_id: itemId,
     label: clean.slice(0, 160),
     raw: clean.slice(0, 300),
-    format: 'field_text',
   }
 }
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Esto quedara en Objetos y podra desbloquear otros nodos.')
+  const [message, setMessage] = useState('Usa esto solo como respaldo si QR/NFC falla o si os perdeis en un nodo.')
   const [saved, setSaved] = useState(false)
 
   const preview = useMemo(() => parseManualInput(value), [value])
   const canSubmit = Boolean(preview)
 
-  function submitManualProof(input = value) {
-    const parsed = parseManualInput(input)
+  function submitManualFallback() {
+    const parsed = parseManualInput(value)
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Escribe una palabra, nombre de objeto o pista visible.')
+      setMessage('Escribe una palabra, codigo o nombre visible de la prueba.')
       return
     }
 
@@ -82,13 +89,13 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         metadata: {
           manual_entry: true,
           raw_value: parsed.raw,
-          input_format: parsed.format,
+          input_format: 'manual_fallback',
         },
       })
 
       setValue('')
       setSaved(true)
-      setMessage(`Guardado: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
+      setMessage(`Guardado en Objetos: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
     } catch {
       setSaved(false)
       setMessage('No se pudo guardar. Prueba otra vez.')
@@ -97,20 +104,17 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
   return (
     <section style={panel}>
-      <div style={header}>
-        <div>
-          <div style={eyebrow}>PRUEBA</div>
-          <div style={title}>Registrar prueba</div>
-        </div>
-        <span style={badge}>LOCAL</span>
+      <div>
+        <div style={eyebrow}>RESPALDO</div>
+        <div style={title}>Codigo o texto manual</div>
       </div>
 
-      <div style={hint}>
-        Usa esta pantalla cuando encuentres una tarjeta, sobre, pegatina, palabra, QR, NFC u objeto fisico. Por ahora puedes escribirlo manualmente; despues el QR lo rellenara solo.
+      <div style={copy}>
+        Normalmente usa los botones rapidos del mapa: QR o NFC. Esta pantalla es el plan B para escribir una palabra, codigo o nombre si algo falla.
       </div>
 
       <label style={field}>
-        Palabra, pista u objeto
+        Texto de respaldo
         <input
           value={value}
           onChange={(event) => {
@@ -120,7 +124,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
-              submitManualProof()
+              submitManualFallback()
             }
           }}
           placeholder="Ej: llave torre, runa azul, pista faro"
@@ -132,6 +136,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         <div style={previewBox}>
           <span>Se guardara en Objetos</span>
           <strong>{preview.label}</strong>
+          <small>El identificador interno se crea automaticamente.</small>
         </div>
       ) : null}
 
@@ -142,10 +147,10 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          submitManualProof()
+          submitManualFallback()
         }}
       >
-        Guardar en Objetos
+        Guardar respaldo
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
@@ -155,18 +160,12 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
 const panel: CSSProperties = {
   display: 'grid',
-  gap: 10,
+  gap: 12,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.12)',
   background:
-    'radial-gradient(circle at top right, rgba(125,211,252,.14), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.34), rgba(51,65,85,.28))',
+    'radial-gradient(circle at top right, rgba(125,211,252,.12), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.34), rgba(51,65,85,.28))',
   padding: 12,
-}
-
-const header: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 10,
 }
 
 const eyebrow: CSSProperties = {
@@ -183,22 +182,7 @@ const title: CSSProperties = {
   fontWeight: 950,
 }
 
-const badge: CSSProperties = {
-  alignSelf: 'flex-start',
-  minHeight: 24,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 9px',
-  borderRadius: 999,
-  border: '1px solid rgba(125,211,252,.20)',
-  background: 'rgba(14,165,233,.14)',
-  color: '#dbeafe',
-  fontSize: 9,
-  fontWeight: 950,
-}
-
-const hint: CSSProperties = {
+const copy: CSSProperties = {
   borderRadius: 15,
   background: 'rgba(15,23,42,.20)',
   color: 'rgba(226,232,240,.76)',

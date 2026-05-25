@@ -3,6 +3,7 @@ import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sen
 import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
+import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
@@ -509,8 +510,7 @@ export default function PlayerApp() {
 
   function handleToggleRouteOverview() {
     if (!playerPosition) {
-      showNotice('Buscando tu ubicación…', 'info')
-      void handleRequestLiveGps({ forceFocus: true })
+void handleRequestLiveGps({ forceFocus: true })
       return
     }
 
@@ -520,15 +520,13 @@ export default function PlayerApp() {
       setRouteOverviewActive(false)
       setFollowPlayer(true)
       setFocusRequest({ target: 'player', token: nextToken })
-      showNotice('Centrado en tu ubicación.', 'info')
-      return
+return
     }
 
     setRouteOverviewActive(true)
     setFollowPlayer(false)
     setFocusRequest({ target: 'route', token: nextToken })
-    showNotice('Mostrando tu ubicación y el nodo.', 'info')
-  }
+}
 
   function openInteraction() {
     setSubmitError(null)
@@ -821,22 +819,30 @@ export default function PlayerApp() {
 
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
-
-          {activePanel !== 'details' && !toolsOpen ? (
-          <button
-            type="button"
-            style={mapRouteToggleButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleToggleRouteOverview()
-            }}
-            aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
-          >
-            {routeOverviewActive ? '◎' : '↔'}
-          </button>
-          ) : null}{/* saga-hide-map-arrow-when-panel-open-v3 */}
         </div>
+
+        {activePanel !== 'details' && !toolsOpen && !overlayState ? (
+          <div style={getMapQuickControlsStyle(isPhone)}>
+            <QuickProofPanel
+              user={user}
+              mobile={isPhone}
+              hidden={false}
+            />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleToggleRouteOverview()
+              }}
+              aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
+            >
+              {routeOverviewActive ? '◎' : '↔'}
+            </button>
+          </div>
+        ) : null}{/* saga-map-quick-controls-row-v1 */}
 
           <FieldPrepPanel
             visible={offlinePrepVisible && !payload.finished}
@@ -853,7 +859,7 @@ export default function PlayerApp() {
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
         <div style={getBottomOverlayStyle(isPhone)}>
-          <PlayerHud
+        <PlayerHud
             user={payload.user}
             missionPayload={payload}
             currentStage={currentStage}
@@ -926,6 +932,52 @@ const mapRouteToggleButton: CSSProperties = {
   pointerEvents: 'auto',
   touchAction: 'manipulation',
 }
+
+const mapRouteToggleInlineButton: CSSProperties = {
+  ...mapRouteToggleButton,
+  position: 'static',
+  right: 'auto',
+  bottom: 'auto',
+  zIndex: 'auto',
+  gridColumn: 3,
+  justifySelf: 'start',
+  alignSelf: 'center',
+  width: 42,
+  height: 42,
+  minWidth: 42,
+  minHeight: 42,
+  padding: 0,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 17,
+  border: '1px solid rgba(255,255,255,.12)',
+  background:
+    'linear-gradient(180deg, rgba(148,163,184,.20), rgba(100,116,139,.17))',
+  color: '#f8fafc',
+  boxShadow: '0 12px 26px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.06)',
+  backdropFilter: 'blur(20px) saturate(1.10)',
+  WebkitBackdropFilter: 'blur(20px) saturate(1.10)',
+  fontSize: 17,
+  lineHeight: 1,
+  fontWeight: 950,
+  textAlign: 'center',
+}
+
+function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
+  return {
+    position: 'fixed',
+    left: mobile ? 12 : 24,
+    right: mobile ? 12 : 24,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 138px)' : 148,
+    zIndex: 4600,
+    display: 'grid',
+    gridTemplateColumns: '1fr auto auto 1fr',
+    alignItems: 'center',
+    gap: 8,
+    pointerEvents: 'auto',
+  }
+}
+
 
 function ScreenFrame({
   children,
