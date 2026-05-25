@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import jsQR from 'jsqr'
 import { collectInventoryItem } from '../offline/inventory'
 
@@ -8,35 +8,12 @@ interface QuickProofPanelProps {
   hidden: boolean
 }
 
-type ProofMode = 'idle' | 'qr' | 'nfc' | 'manual'
-
-type ParsedProofInput = {
+type ParsedQrItem = {
   item_id: string
   label: string
   raw: string
-  kind: 'item' | 'proof'
-  format: 'manual' | 'qr' | 'nfc' | 'structured_code'
-}
-
-type BrowserNDEFRecord = {
-  recordType?: string
-  data?: DataView
-}
-
-type BrowserNDEFReadingEvent = {
-  message?: {
-    records?: BrowserNDEFRecord[]
-  }
-}
-
-type BrowserNDEFReader = {
-  scan: () => Promise<void>
-  onreading: ((event: BrowserNDEFReadingEvent) => void) | null
-  onreadingerror: (() => void) | null
-}
-
-type WindowWithNFC = Window & {
-  NDEFReader?: new () => BrowserNDEFReader
+  kind: 'item' | 'proof' | 'text'
+  format: 'saga_item' | 'saga_proof' | 'plain_text' | 'url'
 }
 
 function slugifyItemId(value: string): string {
@@ -49,39 +26,67 @@ function slugifyItemId(value: string): string {
     .slice(0, 80)
 }
 
-function parseProofInput(value: string, format: ParsedProofInput['format'] = 'manual'): ParsedProofInput | null {
-  const clean = value.trim()
-  if (!clean) return null
+function getPayloadFromQr(value: string): { payload: string; format: ParsedQrItem['format'] } {
+  const clean = String(value || '').trim()
 
-  let normalized = clean.replace(/^saga\s*:/i, 'SAGA:')
-  let detectedFormat = format
+  try {
+    const url = new URL(clean)
+    const nested =
+      url.searchParams.get('item') ||
+      url.searchParams.get('proof') ||
+      url.searchParams.get('c') ||
+      url.searchParams.get('saga')
 
-  if (normalized.toUpperCase().startsWith('SAGA1:')) {
-    normalized = normalized.slice('SAGA1:'.length)
-    detectedFormat = format === 'nfc' ? 'nfc' : 'qr'
-  } else if (normalized.toUpperCase().startsWith('SAGA:')) {
-    normalized = normalized.slice('SAGA:'.length)
-    detectedFormat = format === 'nfc' ? 'nfc' : 'qr'
+    if (nested) return { payload: nested.trim(), format: 'url' }
+  } catch {
+    // Not a URL; use the raw QR payload.
   }
 
-  normalized = normalized
-    .replace(/^item\s*:/i, 'ITEM:')
-    .replace(/^proof\s*:/i, 'PROOF:')
+  return { payload: clean, format: 'plain_text' }
+}
 
-  if (normalized.toUpperCase().startsWith('ITEM:') || normalized.toUpperCase().startsWith('PROOF:')) {
-    const kind = normalized.toUpperCase().startsWith('ITEM:') ? 'item' : 'proof'
-    const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
-    const itemId = parts[1]
-    const label = parts.slice(2).join(':') || itemId
+function parseQrItem(value: string): ParsedQrItem | null {
+  const { payload, format } = getPayloadFromQr(value)
+  const clean = payload.trim()
 
-    if (!itemId) return null
+  if (!clean) return null
+
+  const normalized = clean
+    .replace(/^saga\s*:/i, 'SAGA:')
+    .replace(/^saga1\s*:/i, 'SAGA1:')
+
+  const stripped = normalized.toUpperCase().startsWith('SAGA1:')
+    ? normalized.slice('SAGA1:'.length)
+    : normalized.toUpperCase().startsWith('SAGA:')
+      ? normalized.slice('SAGA:'.length)
+      : normalized
+
+  const parts = stripped.split(':').map((part) => part.trim()).filter(Boolean)
+  const kind = String(parts[0] || '').toUpperCase()
+
+  if (kind === 'ITEM' && parts[1]) {
+    const itemId = slugifyItemId(parts[1]) || parts[1].slice(0, 80)
+    const label = parts.slice(2).join(':') || parts[1]
 
     return {
-      item_id: slugifyItemId(itemId) || itemId.slice(0, 80),
+      item_id: itemId,
       label: label.slice(0, 160),
       raw: clean.slice(0, 300),
-      kind,
-      format: detectedFormat === 'manual' ? 'structured_code' : detectedFormat,
+      kind: 'item',
+      format: 'saga_item',
+    }
+  }
+
+  if (['PROOF', 'STAGE', 'NODE', 'CODE'].includes(kind) && parts[1]) {
+    const itemId = slugifyItemId(parts[1]) || parts[1].slice(0, 80)
+    const label = parts.slice(2).join(':') || `Tarjeta QR ${parts[1]}`
+
+    return {
+      item_id: `qr_${itemId}`.slice(0, 90),
+      label: label.slice(0, 160),
+      raw: clean.slice(0, 300),
+      kind: 'proof',
+      format: format === 'url' ? 'url' : 'saga_proof',
     }
   }
 
@@ -92,64 +97,58 @@ function parseProofInput(value: string, format: ParsedProofInput['format'] = 'ma
     item_id: itemId,
     label: clean.slice(0, 160),
     raw: clean.slice(0, 300),
-    kind: 'proof',
+    kind: 'text',
     format,
   }
 }
 
-function decodeNfcText(record: BrowserNDEFRecord): string | null {
-  if (!record.data) return null
-
-  const bytes = new Uint8Array(
-    record.data.buffer,
-    record.data.byteOffset,
-    record.data.byteLength
-  )
-
-  if (bytes.length === 0) return null
-
-  if (record.recordType === 'text' && bytes.length > 1) {
-    const languageLength = bytes[0] & 0x3f
-    const payload = bytes.slice(1 + languageLength)
-    return new TextDecoder().decode(payload).trim()
-  }
-
-  return new TextDecoder().decode(bytes).trim()
-}
-
 export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
-  const [mode, setMode] = useState<ProofMode>('idle')
-  const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escanea un QR de SAGA. NFC funcionará como etiqueta/enlace o en navegador compatible.')
+  const [mode, setMode] = useState<'idle' | 'qr'>('idle')
+  const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
-  const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
-  const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
+  const [scanning, setScanning] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const frameRef = useRef<number | null>(null)
 
-  const preview = useMemo(() => parseProofInput(value, 'manual'), [value])
-  const canSubmit = Boolean(preview)
+  function stopCamera() {
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
 
-  useEffect(() => {
-    if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), 3600)
-    return () => window.clearTimeout(timer)
-  }, [notice])
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    setScanning(false)
+  }
 
   useEffect(() => {
     if (hidden) {
+      stopCamera()
       setMode('idle')
+      setNotice(null)
     }
   }, [hidden])
 
-  function saveProof(input: string, source: ParsedProofInput['format']) {
-    const parsed = parseProofInput(input, source)
+  useEffect(() => {
+    return () => stopCamera()
+  }, [])
+
+  useEffect(() => {
+    if (!notice) return
+
+    const timer = window.setTimeout(() => setNotice(null), 2200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
+  function saveQrItem(value: string) {
+    const parsed = parseQrItem(value)
 
     if (!parsed) {
-      setMessage('No se pudo leer. Usa Mochila > Respaldo.')
-      setNotice('No se pudo leer la prueba.')
-      return false
+      setMessage('QR no leído. Prueba otra vez o usa Mochila > Respaldo.')
+      return
     }
 
     try {
@@ -157,273 +156,138 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         user,
         item_id: parsed.item_id,
         label: parsed.label,
-        source: parsed.format === 'qr' ? 'qr' : parsed.format === 'nfc' ? 'nfc' : 'manual',
+        source: 'qr',
         physical_id: parsed.item_id,
         queue_event: true,
         metadata: {
-          manual_entry: parsed.format !== 'qr' && parsed.format !== 'nfc',
-          qr_entry: parsed.format === 'qr',
-          nfc_entry: parsed.format === 'nfc',
-          proof_kind: parsed.kind,
+          qr_entry: true,
           raw_value: parsed.raw,
           input_format: parsed.format,
+          qr_kind: parsed.kind,
         },
       })
 
-      setValue('')
+      setNotice(`Guardado en Objetos: ${parsed.label}`)
+      setMessage(`Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
       setMode('idle')
-      setScannerState('idle')
-      setNfcState('idle')
-      setNotice(`Guardado: ${parsed.label}`)
-      setMessage(`Guardado en Objetos. Total: ${snapshot.items.length}.`)
-      return true
+      stopCamera()
     } catch {
-      setMessage('No se pudo guardar. Prueba otra vez.')
-      setNotice('No se pudo guardar.')
-      return false
+      setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
     }
   }
 
-  async function startNfcScan() {
-    setMode('nfc')
-    setNotice(null)
+  async function startQrScan() {
+    if (typeof window === 'undefined') return
 
-    const NDEFReader = (window as WindowWithNFC).NDEFReader
-
-    if (!NDEFReader) {
-      setNfcState('unsupported')
-      setMessage('NFC por etiqueta SAGA aquí. Usa QR o Mochila > Respaldo.')
+    if (!window.navigator.mediaDevices?.getUserMedia) {
+      setMode('qr')
+      setMessage('La cámara no está disponible. Usa Mochila > Respaldo.')
       return
     }
 
+    stopCamera()
+    setMode('qr')
+    setNotice(null)
+    setMessage('Apunta la cámara a la tarjeta QR de SAGA.')
+    setScanning(true)
+
     try {
-      setNfcState('starting')
-      setMessage('Preparando NFC… acerca el móvil a la etiqueta.')
+      const stream = await window.navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+        },
+        audio: false,
+      })
 
-      const reader = new NDEFReader()
+      streamRef.current = stream
 
-      reader.onreading = (event) => {
-        const records = event.message?.records || []
-        const text = records.map(decodeNfcText).find(Boolean)
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
 
-        if (text) {
-          saveProof(text, 'nfc')
+      const scan = () => {
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        const context = canvas?.getContext('2d', { willReadFrequently: true })
+
+        if (!video || !canvas || !context || !streamRef.current) {
+          frameRef.current = window.requestAnimationFrame(scan)
           return
         }
 
-        setNfcState('error')
-        setMessage('Etiqueta NFC leída, pero no contiene un código SAGA válido.')
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          canvas.width = video.videoWidth || 640
+          canvas.height = video.videoHeight || 480
+
+          context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+          const image = context.getImageData(0, 0, canvas.width, canvas.height)
+          const result = jsQR(image.data, image.width, image.height, {
+            inversionAttempts: 'attemptBoth',
+          })
+
+          if (result?.data) {
+            saveQrItem(result.data)
+            return
+          }
+        }
+
+        frameRef.current = window.requestAnimationFrame(scan)
       }
 
-      reader.onreadingerror = () => {
-        setNfcState('error')
-        setMessage('No se pudo leer la etiqueta NFC. Acércala de nuevo o usa QR.')
-      }
-
-      await reader.scan()
-      setNfcState('scanning')
-      setMessage('NFC activo. Acerca el móvil a la etiqueta del juego.')
+      frameRef.current = window.requestAnimationFrame(scan)
     } catch {
-      setNfcState('error')
-      setMessage('No se pudo iniciar NFC. En Android Chrome comprueba que NFC esté activo. En iPhone usa una etiqueta con enlace SAGA.')
+      stopCamera()
+      setMode('qr')
+      setMessage('No se pudo abrir la cámara. Usa Mochila > Respaldo.')
     }
   }
-
-  useEffect(() => {
-    if (mode !== 'qr') return
-
-    let stopped = false
-    let timeoutId: number | null = null
-    let stream: MediaStream | null = null
-
-    async function startScanner() {
-      setScannerState('starting')
-      setMessage('Abriendo cámara... acepta el permiso.')
-
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error('camera_unavailable')
-        }
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-          },
-          audio: false,
-        })
-
-        if (stopped) return
-
-        const video = videoRef.current
-        if (!video) throw new Error('video_unavailable')
-
-        video.srcObject = stream
-        video.setAttribute('playsinline', 'true')
-        await video.play()
-
-        setScannerState('scanning')
-        setMessage('Apunta la cámara al QR de SAGA.')
-
-        const tick = () => {
-          if (stopped) return
-
-          const currentVideo = videoRef.current
-          const canvas = canvasRef.current
-          const context = canvas?.getContext('2d', { willReadFrequently: true })
-
-          if (currentVideo && canvas && context && currentVideo.readyState >= 2) {
-            const width = currentVideo.videoWidth
-            const height = currentVideo.videoHeight
-
-            if (width > 0 && height > 0) {
-              canvas.width = width
-              canvas.height = height
-              context.drawImage(currentVideo, 0, 0, width, height)
-
-              const image = context.getImageData(0, 0, width, height)
-              const result = jsQR(image.data, image.width, image.height, {
-                inversionAttempts: 'attemptBoth',
-              })
-
-              if (result?.data) {
-                saveProof(result.data, 'qr')
-                return
-              }
-            }
-          }
-
-          timeoutId = window.setTimeout(tick, 220)
-        }
-
-        tick()
-      } catch {
-        setScannerState('error')
-        setMode('manual')
-        setMessage('No se pudo abrir la cámara. Usa Mochila > Respaldo.')
-      }
-    }
-
-    void startScanner()
-
-    return () => {
-      stopped = true
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
-
-      const video = videoRef.current
-      if (video) {
-        video.srcObject = null
-      }
-    }
-  }, [mode, user])
 
   if (hidden) return null
 
   return (
-    <div style={getWrapperStyle(mobile)} aria-label="Escanear en campo">
+    <div style={getWrapperStyle(mobile)} aria-label="Escaneo QR de campo">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
 
-      {mode !== 'idle' ? (
+      {mode === 'qr' ? (
         <section style={panel}>
           <div style={panelHead}>
             <div>
-              <div style={eyebrow}>ESCANEAR EN CAMPO</div>
-              <strong>{mode === 'qr' ? 'Escanear QR de SAGA' : mode === 'nfc' ? 'Acercar etiqueta NFC' : 'Manual'}</strong>
+              <div style={eyebrow}>ESCANEAR QR</div>
+              <strong>Escanear tarjeta QR</strong>
             </div>
 
             <button
               type="button"
               style={closeButton}
-              onClick={() => setMode('idle')}
+              aria-label="Cerrar escáner QR"
+              onClick={() => {
+                stopCamera()
+                setMode('idle')
+              }}
             >
-              x
+              ×
             </button>
           </div>
 
-          {mode === 'qr' ? (
-            <div style={scannerBox}>
-              <video ref={videoRef} style={videoStyle} muted playsInline />
-              <canvas ref={canvasRef} style={canvasStyle} />
-              <div style={scannerText}>
-                {scannerState === 'starting'
-                  ? 'Abriendo cámara...'
-                  : scannerState === 'error'
-                    ? 'Camara no disponible.'
-                    : 'Apunta la cámara al QR de SAGA.'}
-              </div>
+          <div style={scannerBox}>
+            <video ref={videoRef} style={videoStyle} playsInline muted />
+            <canvas ref={canvasRef} style={canvasStyle} />
+            <div style={scannerText}>
+              {scanning
+                ? 'Apunta la cámara a la tarjeta QR de SAGA.'
+                : 'Pulsa QR para activar la cámara.'}
             </div>
-          ) : null}
-
-          {mode === 'nfc' ? (
-            <div style={nfcBox}>
-              <strong>
-                {nfcState === 'unsupported'
-                  ? 'NFC por etiqueta SAGA'
-                  : nfcState === 'scanning'
-                    ? 'Esperando etiqueta'
-                    : 'Acerca la etiqueta NFC'}
-              </strong>
-              <span>{message}</span>
-            </div>
-          ) : null}
-
-          {mode === 'manual' ? (
-            <>
-              <label style={field}>
-                Palabra, pista u objeto
-                <input
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      saveProof(value, 'manual')
-                    }
-                  }}
-                  placeholder="Ej: llave torre, runa azul"
-                  style={input}
-                />
-              </label>
-
-              {preview ? (
-                <div style={previewBox}>
-                  <span>Se guardara como</span>
-                  <strong>{preview.label}</strong>
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                style={canSubmit ? saveButton : saveButtonDisabled}
-                disabled={!canSubmit}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  saveProof(value, 'manual')
-                }}
-              >
-                Guardar prueba
-              </button>
-            </>
-          ) : null}
+          </div>
 
           <div style={helpText}>{message}</div>
         </section>
       ) : null}
 
       <div style={dock}>
-        <button type="button" style={dockButton} onClick={() => setMode('qr')}>
+        <button type="button" style={dockButtonWide} onClick={() => void startQrScan()}>
           QR
-        </button>
-
-        <button type="button" style={dockButtonWide} onClick={() => void startNfcScan()}>
-          NFC
         </button>
       </div>
     </div>
@@ -437,8 +301,8 @@ function getWrapperStyle(mobile: boolean): CSSProperties {
     justifyItems: 'stretch',
     gap: 8,
     pointerEvents: 'auto',
-    width: mobile ? 'min(calc(100vw - 112px), 190px)' : 204,
-    maxWidth: mobile ? 'min(calc(100vw - 112px), 190px)' : 204,
+    width: mobile ? 'min(calc(100vw - 112px), 128px)' : 136,
+    maxWidth: mobile ? 'min(calc(100vw - 112px), 128px)' : 136,
     justifySelf: 'end',
     alignSelf: 'center',
     gridColumn: 2,
@@ -448,7 +312,7 @@ function getWrapperStyle(mobile: boolean): CSSProperties {
 const dock: CSSProperties = {
   width: '100%',
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: '1fr',
   alignItems: 'center',
   gap: 6,
   padding: 6,
@@ -492,8 +356,8 @@ const panel: CSSProperties = {
   left: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 'min(calc(100vw - 26px), 380px)',
-  maxHeight: 'min(72vh, 590px)',
+  width: 'min(calc(100vw - 26px), 390px)',
+  maxHeight: 'min(74vh, 610px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
@@ -549,7 +413,7 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 260,
+  minHeight: 280,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
   background: 'rgba(2,6,23,.66)',
@@ -558,7 +422,7 @@ const scannerBox: CSSProperties = {
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 280,
+  height: 300,
   objectFit: 'cover',
   display: 'block',
 }
@@ -583,76 +447,11 @@ const scannerText: CSSProperties = {
   textAlign: 'center',
 }
 
-const nfcBox: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  borderRadius: 20,
-  border: '1px solid rgba(187,247,208,.16)',
-  background: 'rgba(15,23,42,.34)',
-  color: 'rgba(241,245,249,.92)',
-  padding: 13,
-  fontSize: 12,
-  lineHeight: 1.45,
-  fontWeight: 780,
-}
-
-const field: CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  color: 'rgba(241,245,249,.94)',
-  fontSize: 10,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const input: CSSProperties = {
-  width: '100%',
-  minWidth: 0,
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.60)',
-  color: '#ffffff',
-  fontSize: 16,
-  lineHeight: 1.2,
-  fontWeight: 800,
-  padding: '12px 12px',
-  outline: 'none',
-  textTransform: 'none',
-  letterSpacing: 0,
-}
-
-const previewBox: CSSProperties = {
-  display: 'grid',
-  gap: 2,
-  borderRadius: 16,
-  border: '1px solid rgba(187,247,208,.18)',
-  background: 'rgba(34,197,94,.12)',
-  color: '#f8fafc',
-  padding: 10,
-}
-
-const saveButton: CSSProperties = {
-  minHeight: 40,
-  borderRadius: 14,
-  border: '1px solid rgba(125,211,252,.24)',
-  background: 'rgba(14,165,233,.20)',
-  color: '#dbeafe',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const saveButtonDisabled: CSSProperties = {
-  ...saveButton,
-  opacity: 0.48,
-}
-
 const helpText: CSSProperties = {
-  color: 'rgba(226,232,240,.70)',
-  fontSize: 11,
-  lineHeight: 1.35,
+  color: 'rgba(241,245,249,.78)',
+  fontSize: 12,
+  lineHeight: 1.42,
+  fontWeight: 820,
 }
 
 const noticeBox: CSSProperties = {
