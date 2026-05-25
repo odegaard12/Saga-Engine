@@ -943,20 +943,33 @@ const mapRouteToggleInlineButton: CSSProperties = {
   bottom: 'auto',
   zIndex: 'auto',
   flex: '0 0 auto',
+  width: 46,
+  height: 46,
+  minWidth: 46,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.14)',
+  background:
+    'linear-gradient(180deg, rgba(100,116,139,.32), rgba(71,85,105,.24))',
+  color: '#f8fafc',
+  boxShadow: '0 14px 30px rgba(15,23,42,.22), inset 0 1px 0 rgba(255,255,255,.06)',
+  backdropFilter: 'blur(18px) saturate(1.10)',
+  WebkitBackdropFilter: 'blur(18px) saturate(1.10)',
+  fontSize: 18,
+  fontWeight: 950,
 }
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
+    left: mobile ? 12 : 24,
     right: mobile ? 12 : 24,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 176px)' : 196,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 188px)' : 196,
     zIndex: 4600,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     gap: 10,
     pointerEvents: 'auto',
-    maxWidth: mobile ? 'calc(100vw - 24px)' : 420,
   }
 }
 
