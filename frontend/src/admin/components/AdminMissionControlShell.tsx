@@ -241,6 +241,7 @@ export default function AdminMissionControlShell({
             />
           </div>
 
+{!isPhysicalNode(selectedStage) ? (
 <NodeDetailDrawer
             stage={selectedStage}
             onClose={() => onSelectStage(null)}
@@ -250,6 +251,7 @@ export default function AdminMissionControlShell({
             canMoveUp={selectedIndex > 0}
             canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
           />
+) : null}{/* saga-normal-node-drawer-v1 */}
 </aside>
       ) : null}
 
@@ -296,6 +298,13 @@ export default function AdminMissionControlShell({
       </nav>
     </main>
   )
+}
+
+
+function isPhysicalNode(stage: AdminReactOverviewStage | null) {
+  if (!stage) return false
+  const kind = (stage as AdminReactOverviewStage & { physical_node_kind?: string }).physical_node_kind
+  return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
 }
 
 function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {
