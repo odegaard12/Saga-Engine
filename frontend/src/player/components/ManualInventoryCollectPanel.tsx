@@ -1,15 +1,17 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import jsQR from 'jsqr'
 import { collectInventoryItem } from '../offline/inventory'
 
 interface ManualInventoryCollectPanelProps {
   user: string
 }
 
-type ParsedManualInput = {
+type ParsedProofInput = {
   item_id: string
   label: string
   raw: string
-  format: 'field_text' | 'structured_code'
+  kind: 'item' | 'proof'
+  format: 'field_text' | 'structured_code' | 'qr'
 }
 
 function slugifyItemId(value: string): string {
@@ -22,13 +24,27 @@ function slugifyItemId(value: string): string {
     .slice(0, 80)
 }
 
-function parseManualInput(value: string): ParsedManualInput | null {
+function parseProofInput(value: string, format: ParsedProofInput['format'] = 'field_text'): ParsedProofInput | null {
   const clean = value.trim()
   if (!clean) return null
 
-  const normalized = clean.replace(/^saga\s*:/i, '').replace(/^item\s*:/i, 'ITEM:')
+  let normalized = clean.replace(/^saga\s*:/i, 'SAGA:')
+  let qrFormat = format
 
-  if (normalized.toUpperCase().startsWith('ITEM:')) {
+  if (normalized.toUpperCase().startsWith('SAGA1:')) {
+    normalized = normalized.slice('SAGA1:'.length)
+    qrFormat = 'qr'
+  } else if (normalized.toUpperCase().startsWith('SAGA:')) {
+    normalized = normalized.slice('SAGA:'.length)
+    qrFormat = 'qr'
+  }
+
+  normalized = normalized
+    .replace(/^item\s*:/i, 'ITEM:')
+    .replace(/^proof\s*:/i, 'PROOF:')
+
+  if (normalized.toUpperCase().startsWith('ITEM:') || normalized.toUpperCase().startsWith('PROOF:')) {
+    const kind = normalized.toUpperCase().startsWith('PROOF:') ? 'proof' : 'item'
     const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
     const itemId = parts[1]
     const label = parts.slice(2).join(':') || itemId
@@ -39,7 +55,8 @@ function parseManualInput(value: string): ParsedManualInput | null {
       item_id: slugifyItemId(itemId) || itemId.slice(0, 80),
       label: label.slice(0, 160),
       raw: clean.slice(0, 300),
-      format: 'structured_code',
+      kind,
+      format: qrFormat === 'qr' ? 'qr' : 'structured_code',
     }
   }
 
@@ -50,25 +67,31 @@ function parseManualInput(value: string): ParsedManualInput | null {
     item_id: itemId,
     label: clean.slice(0, 160),
     raw: clean.slice(0, 300),
-    format: 'field_text',
+    kind: 'proof',
+    format,
   }
 }
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Esto quedara en Objetos y podra desbloquear otros nodos.')
+  const [message, setMessage] = useState('Escanea un QR o escribe la palabra que ves en la prueba fisica.')
   const [saved, setSaved] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
 
-  const preview = useMemo(() => parseManualInput(value), [value])
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  const preview = useMemo(() => parseProofInput(value), [value])
   const canSubmit = Boolean(preview)
 
-  function submitManualProof(input = value) {
-    const parsed = parseManualInput(input)
+  function saveProof(input = value, source: ParsedProofInput['format'] = 'field_text') {
+    const parsed = parseProofInput(input, source)
 
     if (!parsed) {
       setSaved(false)
       setMessage('Escribe una palabra, nombre de objeto o pista visible.')
-      return
+      return false
     }
 
     try {
@@ -76,38 +99,179 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         user,
         item_id: parsed.item_id,
         label: parsed.label,
-        source: 'manual',
+        source: parsed.format === 'qr' ? 'qr' : 'manual',
         physical_id: parsed.item_id,
         queue_event: true,
         metadata: {
-          manual_entry: true,
+          manual_entry: parsed.format !== 'qr',
+          qr_entry: parsed.format === 'qr',
+          proof_kind: parsed.kind,
           raw_value: parsed.raw,
           input_format: parsed.format,
         },
       })
 
       setValue('')
+      setScannerOpen(false)
+      setScannerState('idle')
       setSaved(true)
-      setMessage(`Guardado: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
+      setMessage(`Guardado en Objetos: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
+      return true
     } catch {
       setSaved(false)
       setMessage('No se pudo guardar. Prueba otra vez.')
+      return false
     }
   }
+
+  useEffect(() => {
+    if (!scannerOpen) return
+
+    let stopped = false
+    let timeoutId: number | null = null
+    let stream: MediaStream | null = null
+
+    async function startScanner() {
+      setScannerState('starting')
+      setMessage('Abriendo camara... acepta el permiso del navegador.')
+
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error('camera_unavailable')
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+          },
+          audio: false,
+        })
+
+        if (stopped) return
+
+        const video = videoRef.current
+        if (!video) throw new Error('video_unavailable')
+
+        video.srcObject = stream
+        video.setAttribute('playsinline', 'true')
+        await video.play()
+
+        setScannerState('scanning')
+        setMessage('Apunta al QR de la tarjeta, sobre, pegatina o prop.')
+
+        const tick = () => {
+          if (stopped) return
+
+          const currentVideo = videoRef.current
+          const canvas = canvasRef.current
+          const context = canvas?.getContext('2d', { willReadFrequently: true })
+
+          if (currentVideo && canvas && context && currentVideo.readyState >= 2) {
+            const width = currentVideo.videoWidth
+            const height = currentVideo.videoHeight
+
+            if (width > 0 && height > 0) {
+              canvas.width = width
+              canvas.height = height
+              context.drawImage(currentVideo, 0, 0, width, height)
+
+              const image = context.getImageData(0, 0, width, height)
+              const result = jsQR(image.data, image.width, image.height, {
+                inversionAttempts: 'dontInvert',
+              })
+
+              if (result?.data) {
+                saveProof(result.data, 'qr')
+                return
+              }
+            }
+          }
+
+          timeoutId = window.setTimeout(tick, 220)
+        }
+
+        tick()
+      } catch {
+        setScannerState('error')
+        setScannerOpen(false)
+        setMessage('No se pudo abrir la camara. Usa la entrada manual.')
+      }
+    }
+
+    void startScanner()
+
+    return () => {
+      stopped = true
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+      }
+
+      const video = videoRef.current
+      if (video) {
+        video.srcObject = null
+      }
+    }
+  }, [scannerOpen, user])
 
   return (
     <section style={panel}>
       <div style={header}>
         <div>
           <div style={eyebrow}>PRUEBA</div>
-          <div style={title}>Registrar prueba</div>
+          <div style={title}>Registrar prueba fisica</div>
         </div>
-        <span style={badge}>LOCAL</span>
+        <span style={badge}>QR + MANUAL</span>
       </div>
 
       <div style={hint}>
-        Usa esta pantalla cuando encuentres una tarjeta, sobre, pegatina, palabra, QR, NFC u objeto fisico. Por ahora puedes escribirlo manualmente; despues el QR lo rellenara solo.
+        Escanea un QR de SAGA o escribe la palabra visible. La prueba se guarda en Objetos y puede desbloquear otros nodos.
       </div>
+
+      <div style={modeRow}>
+        <button
+          type="button"
+          style={scannerOpen ? modeButtonActive : modeButton}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setSaved(false)
+            setScannerOpen((current) => !current)
+          }}
+        >
+          {scannerOpen ? 'Cerrar QR' : 'Escanear QR'}
+        </button>
+
+        <button
+          type="button"
+          style={modeButton}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setScannerOpen(false)
+          }}
+        >
+          Escribir manualmente
+        </button>
+      </div>
+
+      {scannerOpen ? (
+        <div style={scannerBox}>
+          <video ref={videoRef} style={videoStyle} muted playsInline />
+          <canvas ref={canvasRef} style={canvasStyle} />
+          <div style={scannerText}>
+            {scannerState === 'starting'
+              ? 'Abriendo camara...'
+              : scannerState === 'error'
+                ? 'Camara no disponible.'
+                : 'Apunta al QR.'}
+          </div>
+        </div>
+      ) : null}
 
       <label style={field}>
         Palabra, pista u objeto
@@ -120,7 +284,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
-              submitManualProof()
+              saveProof()
             }
           }}
           placeholder="Ej: llave torre, runa azul, pista faro"
@@ -142,13 +306,17 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          submitManualProof()
+          saveProof()
         }}
       >
         Guardar en Objetos
       </button>
 
       <div style={saved ? okText : helpText}>{message}</div>
+
+      <div style={formatHint}>
+        QR recomendado: SAGA1:ITEM:llave_torre:Llave de la torre
+      </div>
     </section>
   )
 }
@@ -196,6 +364,7 @@ const badge: CSSProperties = {
   color: '#dbeafe',
   fontSize: 9,
   fontWeight: 950,
+  whiteSpace: 'nowrap',
 }
 
 const hint: CSSProperties = {
@@ -206,6 +375,65 @@ const hint: CSSProperties = {
   lineHeight: 1.35,
   fontWeight: 750,
   padding: 10,
+}
+
+const modeRow: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+}
+
+const modeButton: CSSProperties = {
+  minHeight: 40,
+  borderRadius: 15,
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(15,23,42,.30)',
+  color: 'rgba(226,232,240,.82)',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+}
+
+const modeButtonActive: CSSProperties = {
+  ...modeButton,
+  border: '1px solid rgba(187,247,208,.20)',
+  background: 'rgba(34,197,94,.14)',
+  color: '#dcfce7',
+}
+
+const scannerBox: CSSProperties = {
+  position: 'relative',
+  overflow: 'hidden',
+  minHeight: 180,
+  borderRadius: 18,
+  border: '1px solid rgba(125,211,252,.20)',
+  background: 'rgba(2,6,23,.54)',
+}
+
+const videoStyle: CSSProperties = {
+  width: '100%',
+  height: 220,
+  objectFit: 'cover',
+  display: 'block',
+}
+
+const canvasStyle: CSSProperties = {
+  display: 'none',
+}
+
+const scannerText: CSSProperties = {
+  position: 'absolute',
+  left: 10,
+  right: 10,
+  bottom: 10,
+  borderRadius: 999,
+  background: 'rgba(2,6,23,.72)',
+  color: '#e0f2fe',
+  padding: '8px 10px',
+  fontSize: 11,
+  fontWeight: 900,
+  textAlign: 'center',
 }
 
 const field: CSSProperties = {
@@ -271,4 +499,11 @@ const okText: CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
   fontWeight: 950,
+}
+
+const formatHint: CSSProperties = {
+  color: 'rgba(226,232,240,.42)',
+  fontSize: 10,
+  lineHeight: 1.35,
+  fontWeight: 800,
 }
