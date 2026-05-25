@@ -251,28 +251,29 @@ const activeBadge: CSSProperties = {
 
 const modeLayout: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(118px, .8fr) minmax(0, 2.2fr)',
+  gridTemplateColumns: '1fr',
   gap: 8,
 }
 
 const physicalGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(92px, 1fr))',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
 }
 
 const normalButton: CSSProperties = {
-  minHeight: 120,
+  minHeight: 84,
   display: 'grid',
-  alignContent: 'center',
-  justifyItems: 'center',
-  gap: 6,
-  padding: '12px 10px',
+  gridTemplateColumns: '34px 1fr',
+  alignItems: 'center',
+  justifyItems: 'start',
+  gap: 10,
+  padding: '12px 14px',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.34)',
   color: '#e2e8f0',
-  textAlign: 'center',
+  textAlign: 'left',
   cursor: 'pointer',
 }
 
@@ -284,13 +285,13 @@ const normalActiveButton: CSSProperties = {
 }
 
 const modeButton: CSSProperties = {
-  minHeight: 120,
+  minHeight: 104,
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'center',
-  gap: 6,
-  padding: '12px 9px',
-  borderRadius: 20,
+  gap: 5,
+  padding: '10px 10px',
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.34)',
   color: '#e2e8f0',
@@ -321,10 +322,10 @@ const modeLabel: CSSProperties = {
 
 const modeHelp: CSSProperties = {
   display: 'block',
-  maxWidth: 112,
+  maxWidth: 150,
   color: 'rgba(226,232,240,.82)',
   fontSize: 11,
-  lineHeight: 1.22,
+  lineHeight: 1.2,
   fontWeight: 760,
 }
 
