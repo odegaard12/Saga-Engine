@@ -6,12 +6,35 @@ interface ManualInventoryCollectPanelProps {
   user: string
 }
 
+type ProofMode = 'qr' | 'nfc' | 'manual'
+
 type ParsedProofInput = {
   item_id: string
   label: string
   raw: string
   kind: 'item' | 'proof'
-  format: 'field_text' | 'structured_code' | 'qr'
+  format: 'manual' | 'qr' | 'nfc' | 'structured_code'
+}
+
+type BrowserNDEFRecord = {
+  recordType?: string
+  data?: DataView
+}
+
+type BrowserNDEFReadingEvent = {
+  message?: {
+    records?: BrowserNDEFRecord[]
+  }
+}
+
+type BrowserNDEFReader = {
+  scan: () => Promise<void>
+  onreading: ((event: BrowserNDEFReadingEvent) => void) | null
+  onreadingerror: (() => void) | null
+}
+
+type WindowWithNFC = Window & {
+  NDEFReader?: new () => BrowserNDEFReader
 }
 
 function slugifyItemId(value: string): string {
@@ -24,19 +47,19 @@ function slugifyItemId(value: string): string {
     .slice(0, 80)
 }
 
-function parseProofInput(value: string, format: ParsedProofInput['format'] = 'field_text'): ParsedProofInput | null {
+function parseProofInput(value: string, format: ParsedProofInput['format'] = 'manual'): ParsedProofInput | null {
   const clean = value.trim()
   if (!clean) return null
 
   let normalized = clean.replace(/^saga\s*:/i, 'SAGA:')
-  let qrFormat = format
+  let detectedFormat = format
 
   if (normalized.toUpperCase().startsWith('SAGA1:')) {
     normalized = normalized.slice('SAGA1:'.length)
-    qrFormat = 'qr'
+    detectedFormat = format === 'nfc' ? 'nfc' : 'qr'
   } else if (normalized.toUpperCase().startsWith('SAGA:')) {
     normalized = normalized.slice('SAGA:'.length)
-    qrFormat = 'qr'
+    detectedFormat = format === 'nfc' ? 'nfc' : 'qr'
   }
 
   normalized = normalized
@@ -44,7 +67,7 @@ function parseProofInput(value: string, format: ParsedProofInput['format'] = 'fi
     .replace(/^proof\s*:/i, 'PROOF:')
 
   if (normalized.toUpperCase().startsWith('ITEM:') || normalized.toUpperCase().startsWith('PROOF:')) {
-    const kind = normalized.toUpperCase().startsWith('PROOF:') ? 'proof' : 'item'
+    const kind = normalized.toUpperCase().startsWith('ITEM:') ? 'item' : 'proof'
     const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
     const itemId = parts[1]
     const label = parts.slice(2).join(':') || itemId
@@ -56,7 +79,7 @@ function parseProofInput(value: string, format: ParsedProofInput['format'] = 'fi
       label: label.slice(0, 160),
       raw: clean.slice(0, 300),
       kind,
-      format: qrFormat === 'qr' ? 'qr' : 'structured_code',
+      format: detectedFormat === 'manual' ? 'structured_code' : detectedFormat,
     }
   }
 
@@ -72,25 +95,58 @@ function parseProofInput(value: string, format: ParsedProofInput['format'] = 'fi
   }
 }
 
+function decodeNfcText(record: BrowserNDEFRecord): string | null {
+  if (!record.data) return null
+
+  const bytes = new Uint8Array(
+    record.data.buffer,
+    record.data.byteOffset,
+    record.data.byteLength
+  )
+
+  if (bytes.length === 0) return null
+
+  if (record.recordType === 'text' && bytes.length > 1) {
+    const languageLength = bytes[0] & 0x3f
+    const payload = bytes.slice(1 + languageLength)
+    return new TextDecoder().decode(payload).trim()
+  }
+
+  return new TextDecoder().decode(bytes).trim()
+}
+
+function getModeHelp(mode: ProofMode): string {
+  if (mode === 'qr') {
+    return 'Escanea el QR de una tarjeta, pegatina, sobre o prop. Si no funciona, usa Codigo manual.'
+  }
+
+  if (mode === 'nfc') {
+    return 'Acerca el movil a una etiqueta NFC. Si tu navegador no lo permite, usa QR o Codigo manual.'
+  }
+
+  return 'Fallback permanente: escribe la palabra, codigo o nombre visible cuando QR/NFC no funcione.'
+}
+
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
+  const [mode, setMode] = useState<ProofMode>('qr')
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Escanea un QR o escribe la palabra que ves en la prueba fisica.')
+  const [message, setMessage] = useState('Escanea QR, lee NFC o introduce el codigo manual.')
   const [saved, setSaved] = useState(false)
-  const [scannerOpen, setScannerOpen] = useState(false)
   const [scannerState, setScannerState] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle')
+  const [nfcState, setNfcState] = useState<'idle' | 'starting' | 'scanning' | 'unsupported' | 'error'>('idle')
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  const preview = useMemo(() => parseProofInput(value), [value])
+  const preview = useMemo(() => parseProofInput(value, 'manual'), [value])
   const canSubmit = Boolean(preview)
 
-  function saveProof(input = value, source: ParsedProofInput['format'] = 'field_text') {
+  function saveProof(input: string, source: ParsedProofInput['format']) {
     const parsed = parseProofInput(input, source)
 
     if (!parsed) {
       setSaved(false)
-      setMessage('Escribe una palabra, nombre de objeto o pista visible.')
+      setMessage('No se pudo leer la prueba. Usa Codigo manual.')
       return false
     }
 
@@ -99,12 +155,13 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         user,
         item_id: parsed.item_id,
         label: parsed.label,
-        source: parsed.format === 'qr' ? 'qr' : 'manual',
+        source: parsed.format === 'qr' ? 'qr' : parsed.format === 'nfc' ? 'nfc' : 'manual',
         physical_id: parsed.item_id,
         queue_event: true,
         metadata: {
-          manual_entry: parsed.format !== 'qr',
+          manual_entry: parsed.format !== 'qr' && parsed.format !== 'nfc',
           qr_entry: parsed.format === 'qr',
+          nfc_entry: parsed.format === 'nfc',
           proof_kind: parsed.kind,
           raw_value: parsed.raw,
           input_format: parsed.format,
@@ -112,8 +169,8 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
       })
 
       setValue('')
-      setScannerOpen(false)
       setScannerState('idle')
+      setNfcState('idle')
       setSaved(true)
       setMessage(`Guardado en Objetos: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
       return true
@@ -124,8 +181,63 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
     }
   }
 
+  function submitManualCode() {
+    if (!value.trim()) {
+      setSaved(false)
+      setMessage('Introduce la palabra, codigo o nombre visible.')
+      return
+    }
+
+    saveProof(value, 'manual')
+  }
+
+  async function startNfcScan() {
+    setMode('nfc')
+    setSaved(false)
+
+    const NDEFReader = (window as WindowWithNFC).NDEFReader
+
+    if (!NDEFReader) {
+      setNfcState('unsupported')
+      setMessage('NFC no esta disponible en este dispositivo o navegador. Usa QR o Codigo manual.')
+      return
+    }
+
+    try {
+      setNfcState('starting')
+      setMessage('Preparando NFC... acerca el movil a la etiqueta.')
+
+      const reader = new NDEFReader()
+
+      reader.onreading = (event) => {
+        const records = event.message?.records || []
+        const text = records.map(decodeNfcText).find(Boolean)
+
+        if (text) {
+          saveProof(text, 'nfc')
+          return
+        }
+
+        setNfcState('error')
+        setMessage('NFC leido, pero no contenia una prueba valida. Usa Codigo manual.')
+      }
+
+      reader.onreadingerror = () => {
+        setNfcState('error')
+        setMessage('No se pudo leer NFC. Usa QR o Codigo manual.')
+      }
+
+      await reader.scan()
+      setNfcState('scanning')
+      setMessage('NFC activo. Acerca el movil a la etiqueta.')
+    } catch {
+      setNfcState('error')
+      setMessage('No se pudo iniciar NFC. Usa QR o Codigo manual.')
+    }
+  }
+
   useEffect(() => {
-    if (!scannerOpen) return
+    if (mode !== 'qr') return
 
     let stopped = false
     let timeoutId: number | null = null
@@ -157,7 +269,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         await video.play()
 
         setScannerState('scanning')
-        setMessage('Apunta al QR de la tarjeta, sobre, pegatina o prop.')
+        setMessage('Apunta al QR. Si no lo lee, cambia a Codigo manual.')
 
         const tick = () => {
           if (stopped) return
@@ -177,11 +289,12 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
               const image = context.getImageData(0, 0, width, height)
               const result = jsQR(image.data, image.width, image.height, {
-                inversionAttempts: 'dontInvert',
+                inversionAttempts: 'attemptBoth',
               })
 
               if (result?.data) {
                 saveProof(result.data, 'qr')
+                setMode('manual')
                 return
               }
             }
@@ -193,8 +306,8 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         tick()
       } catch {
         setScannerState('error')
-        setScannerOpen(false)
-        setMessage('No se pudo abrir la camara. Usa la entrada manual.')
+        setMode('manual')
+        setMessage('No se pudo abrir la camara. Usa Codigo manual.')
       }
     }
 
@@ -216,7 +329,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
         video.srcObject = null
       }
     }
-  }, [scannerOpen, user])
+  }, [mode, user])
 
   return (
     <section style={panel}>
@@ -225,41 +338,53 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
           <div style={eyebrow}>PRUEBA</div>
           <div style={title}>Registrar prueba fisica</div>
         </div>
-        <span style={badge}>QR + MANUAL</span>
+        <span style={badge}>CAMPO</span>
       </div>
 
-      <div style={hint}>
-        Escanea un QR de SAGA o escribe la palabra visible. La prueba se guarda en Objetos y puede desbloquear otros nodos.
-      </div>
+      <div style={hint}>{getModeHelp(mode)}</div>
 
-      <div style={modeRow}>
+      <div style={methodGrid}>
         <button
           type="button"
-          style={scannerOpen ? modeButtonActive : modeButton}
+          style={mode === 'qr' ? methodButtonActive : methodButton}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
+            setMode('qr')
             setSaved(false)
-            setScannerOpen((current) => !current)
           }}
         >
-          {scannerOpen ? 'Cerrar QR' : 'Escanear QR'}
+          Escanear QR
         </button>
 
         <button
           type="button"
-          style={modeButton}
+          style={mode === 'nfc' ? methodButtonActive : methodButton}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            setScannerOpen(false)
+            void startNfcScan()
           }}
         >
-          Escribir manualmente
+          Leer NFC
+        </button>
+
+        <button
+          type="button"
+          style={mode === 'manual' ? methodButtonActive : methodButton}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setMode('manual')
+            setSaved(false)
+            setMessage('Codigo manual: escribe lo que ves si QR/NFC falla.')
+          }}
+        >
+          Codigo manual
         </button>
       </div>
 
-      {scannerOpen ? (
+      {mode === 'qr' ? (
         <div style={scannerBox}>
           <video ref={videoRef} style={videoStyle} muted playsInline />
           <canvas ref={canvasRef} style={canvasStyle} />
@@ -267,56 +392,67 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
             {scannerState === 'starting'
               ? 'Abriendo camara...'
               : scannerState === 'error'
-                ? 'Camara no disponible.'
+                ? 'Camara no disponible. Usa Codigo manual.'
                 : 'Apunta al QR.'}
           </div>
         </div>
       ) : null}
 
-      <label style={field}>
-        Palabra, pista u objeto
-        <input
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value)
-            setSaved(false)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              saveProof()
-            }
-          }}
-          placeholder="Ej: llave torre, runa azul, pista faro"
-          style={input}
-        />
-      </label>
-
-      {preview ? (
-        <div style={previewBox}>
-          <span>Se guardara en Objetos</span>
-          <strong>{preview.label}</strong>
+      {mode === 'nfc' ? (
+        <div style={nfcBox}>
+          <strong>{nfcState === 'unsupported' ? 'NFC no disponible' : nfcState === 'scanning' ? 'Esperando etiqueta NFC' : 'Lectura NFC'}</strong>
+          <span>
+            {nfcState === 'unsupported'
+              ? 'No pasa nada: QR y Codigo manual siguen funcionando.'
+              : 'Acerca el movil a la etiqueta. Si no responde, usa Codigo manual.'}
+          </span>
         </div>
       ) : null}
 
-      <button
-        type="button"
-        style={canSubmit ? button : buttonDisabled}
-        disabled={!canSubmit}
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          saveProof()
-        }}
-      >
-        Guardar en Objetos
-      </button>
+      {mode === 'manual' ? (
+        <>
+          <label style={field}>
+            Palabra, pista u objeto
+            <input
+              value={value}
+              onChange={(event) => {
+                setValue(event.target.value)
+                setSaved(false)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  submitManualCode()
+                }
+              }}
+              placeholder="Ej: llave torre, runa azul, pista faro"
+              style={input}
+            />
+          </label>
+
+          {preview ? (
+            <div style={previewBox}>
+              <span>Se guardara en Objetos</span>
+              <strong>{preview.label}</strong>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            style={canSubmit ? button : buttonDisabled}
+            disabled={!canSubmit}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              submitManualCode()
+            }}
+          >
+            Guardar codigo
+          </button>
+        </>
+      ) : null}
 
       <div style={saved ? okText : helpText}>{message}</div>
-
-      <div style={formatHint}>
-        QR recomendado: SAGA1:ITEM:llave_torre:Llave de la torre
-      </div>
     </section>
   )
 }
@@ -370,33 +506,33 @@ const badge: CSSProperties = {
 const hint: CSSProperties = {
   borderRadius: 15,
   background: 'rgba(15,23,42,.20)',
-  color: 'rgba(226,232,240,.76)',
+  color: 'rgba(226,232,240,.78)',
   fontSize: 12,
   lineHeight: 1.35,
   fontWeight: 750,
   padding: 10,
 }
 
-const modeRow: CSSProperties = {
+const methodGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 7,
 }
 
-const modeButton: CSSProperties = {
-  minHeight: 40,
+const methodButton: CSSProperties = {
+  minHeight: 42,
   borderRadius: 15,
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(15,23,42,.30)',
-  color: 'rgba(226,232,240,.82)',
-  fontSize: 11,
+  color: 'rgba(226,232,240,.80)',
+  fontSize: 10,
   fontWeight: 950,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
 }
 
-const modeButtonActive: CSSProperties = {
-  ...modeButton,
+const methodButtonActive: CSSProperties = {
+  ...methodButton,
   border: '1px solid rgba(187,247,208,.20)',
   background: 'rgba(34,197,94,.14)',
   color: '#dcfce7',
@@ -405,7 +541,7 @@ const modeButtonActive: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 180,
+  minHeight: 190,
   borderRadius: 18,
   border: '1px solid rgba(125,211,252,.20)',
   background: 'rgba(2,6,23,.54)',
@@ -428,12 +564,24 @@ const scannerText: CSSProperties = {
   right: 10,
   bottom: 10,
   borderRadius: 999,
-  background: 'rgba(2,6,23,.72)',
+  background: 'rgba(2,6,23,.74)',
   color: '#e0f2fe',
   padding: '8px 10px',
   fontSize: 11,
   fontWeight: 900,
   textAlign: 'center',
+}
+
+const nfcBox: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  borderRadius: 16,
+  border: '1px solid rgba(125,211,252,.16)',
+  background: 'rgba(14,165,233,.10)',
+  color: 'rgba(226,232,240,.82)',
+  padding: 12,
+  fontSize: 12,
+  lineHeight: 1.35,
 }
 
 const field: CSSProperties = {
@@ -499,11 +647,4 @@ const okText: CSSProperties = {
   ...helpText,
   color: '#bbf7d0',
   fontWeight: 950,
-}
-
-const formatHint: CSSProperties = {
-  color: 'rgba(226,232,240,.42)',
-  fontSize: 10,
-  lineHeight: 1.35,
-  fontWeight: 800,
 }
