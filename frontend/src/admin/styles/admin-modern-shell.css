@@ -2142,3 +2142,28 @@
   opacity: 0.32;
   cursor: not-allowed;
 }
+
+
+/* saga-node-editor-type-button-v2 */
+.admin-node-mode-toolbar--type-only {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-node-mode-toolbar--type-only button {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(125, 211, 252, 0.22) !important;
+  background: rgba(14, 165, 233, 0.14) !important;
+  color: #e0f2fe !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+.admin-node-mode-toolbar--type-only button:hover {
+  background: rgba(14, 165, 233, 0.24) !important;
+  border-color: rgba(125, 211, 252, 0.40) !important;
+}

@@ -170,16 +170,9 @@ export default function NodeDetailDrawer({
               <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
             </div>
 
-            <div className="admin-node-mode-toolbar">
+            <div className="admin-node-mode-toolbar admin-node-mode-toolbar--type-only">
               <button type="button" onClick={onRequestChangeType}>
                 Cambiar tipo de nodo
-              </button>
-              <button type="button" disabled={!canMoveUp} onClick={() => onMoveLocal(draft, 'up')}>
-                ↑ Anterior
-              </button>
-              <span>Ruta {draft.index + 1}</span>
-              <button type="button" disabled={!canMoveDown} onClick={() => onMoveLocal(draft, 'down')}>
-                ↓ Siguiente
               </button>
             </div>
           </div>
