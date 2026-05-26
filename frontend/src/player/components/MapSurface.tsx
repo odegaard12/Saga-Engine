@@ -12,6 +12,39 @@ type FocusRequest =
   | null
 
 type NodeVisualState = 'locked' | 'ready' | 'engaging'
+type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+
+const physicalNodeVisuals: Record<PhysicalNodeKind, { icon: string; label: string }> = {
+  collectible: { icon: '⭐', label: 'Coleccionable QR' },
+  requirement: { icon: '🔒', label: 'Requisito QR' },
+  clue: { icon: '🧩', label: 'Pista QR' },
+  bonus: { icon: '🎁', label: 'Bonus QR' },
+}
+
+function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
+  if (value === 'collectible' || value === 'requirement' || value === 'clue' || value === 'bonus') {
+    return value
+  }
+
+  return null
+}
+
+function getPhysicalNodeVisual(stage: unknown): { icon: string; label: string } | null {
+  if (!stage || typeof stage !== 'object') return null
+
+  const record = stage as Record<string, unknown>
+  const flatKind = normalizePhysicalKind(record.physical_node_kind || record.physical_item_kind)
+  if (flatKind) return physicalNodeVisuals[flatKind]
+
+  const physicalQr = record.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    const qrKind = normalizePhysicalKind((physicalQr as Record<string, unknown>).kind)
+    if (qrKind) return physicalNodeVisuals[qrKind]
+  }
+
+  return null
+}
+
 
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
@@ -183,13 +216,14 @@ function buildPlayerPopup(
 }
 
 
-function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked') {
+function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', physicalIcon?: string) {
   const label =
-    state === 'completed'
+    physicalIcon ||
+    (state === 'completed'
       ? '✓'
       : state === 'locked'
       ? '🔒'
-      : String(index + 1)
+      : String(index + 1))
 
   const styles =
     state === 'completed'
@@ -395,6 +429,8 @@ export function MapSurface({
           : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
+      const physicalVisual = getPhysicalNodeVisual(entry.stage)
+      const physicalPrefix = physicalVisual ? `${physicalVisual.icon} ${physicalVisual.label} · ` : ''
 
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
@@ -410,12 +446,12 @@ export function MapSurface({
         }).addTo(map)
 
         const markerLayer = L.marker(center, {
-          icon: createMissionNodeIcon(index, 'current'),
+          icon: createMissionNodeIcon(index, 'current', physicalVisual?.icon),
           keyboard: false,
           zIndexOffset: 720,
         }).addTo(map)
 
-        markerLayer.bindTooltip(data.name, {
+        markerLayer.bindTooltip(`${physicalPrefix}${data.name}`, {
           direction: 'top',
           opacity: 0.92,
         })
@@ -446,13 +482,13 @@ export function MapSurface({
       }).addTo(map)
 
       const ghostMarker = L.marker(center, {
-        icon: createMissionNodeIcon(index, state),
+        icon: createMissionNodeIcon(index, state, physicalVisual?.icon),
         keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
       }).addTo(map)
 
       ghostMarker.bindTooltip(
-        state === 'locked' ? `Bloqueado · ${data.name}` : `Completado · ${data.name}`,
+        state === 'locked' ? `Bloqueado · ${physicalPrefix}${data.name}` : `Completado · ${physicalPrefix}${data.name}`,
         {
           direction: 'top',
           opacity: 0.88,

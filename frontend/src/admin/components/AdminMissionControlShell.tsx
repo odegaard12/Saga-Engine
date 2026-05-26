@@ -181,24 +181,31 @@ export default function AdminMissionControlShell({
               >
                 <span className="saga-node-index">{stage.index + 1}</span>
                 <span className="saga-node-copy">
-                  <strong>
-                    {getPhysicalNodeVisual(stage) ? (
-                      <span
-                        className={`saga-physical-node-badge saga-physical-node-badge--${getPhysicalNodeVisual(stage)?.tone}`}
-                        title={getPhysicalNodeVisual(stage)?.label}
-                      >
-                        {getPhysicalNodeVisual(stage)?.icon}
-                      </span>
-                    ) : null}
-                    {stage.title || 'Untitled node'}
-                  </strong>
-                  <small>
-                    {getPhysicalNodeVisual(stage)
-                      ? `${getPhysicalNodeVisual(stage)?.label} QR`
-                      : (stage.label || stage.type)}
-                    {' · '}
-                    {formatCoords(stage.lat, stage.lon)}
-                  </small>
+                  {(() => {
+                    const physicalVisual = getPhysicalNodeVisual(stage)
+
+                    return (
+                      <>
+                        <strong className="saga-node-title-line">
+                          {physicalVisual ? (
+                            <span
+                              className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
+                              title={`${physicalVisual.label} QR`}
+                              aria-label={`${physicalVisual.label} QR`}
+                            >
+                              {physicalVisual.icon}
+                            </span>
+                          ) : null}
+                          <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
+                        </strong>
+                        <small>
+                          {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
+                          {' · '}
+                          {formatCoords(stage.lat, stage.lon)}
+                        </small>
+                      </>
+                    )
+                  })()}
                 </span>
               </button>
             ))}

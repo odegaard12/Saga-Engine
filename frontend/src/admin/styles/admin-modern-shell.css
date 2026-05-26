@@ -1988,3 +1988,24 @@
   background: rgba(244, 114, 182, 0.14);
   border-color: rgba(251, 207, 232, 0.24);
 }
+
+
+/* saga-physical-node-route-badge-v2 */
+.saga-node-title-line {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.saga-node-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saga-node-title-line .saga-physical-node-badge {
+  flex: 0 0 auto;
+  margin-right: 0;
+}

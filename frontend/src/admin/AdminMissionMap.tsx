@@ -3,7 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import type { AdminReactOverviewStage } from './lib/adminApi'
-import { getPhysicalNodeMapLabel } from './lib/physicalNodeVisuals'
+import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
@@ -62,20 +62,25 @@ function buildPinHtml(stage: AdminReactOverviewStage, selected: boolean, color: 
   const title = escapeHtml(stage.title || 'Untitled node')
   const family = escapeHtml(getFamilyLabel(stage))
   const label = `${stage.index + 1}`
+  const physicalVisual = getPhysicalNodeVisual(stage)
+  const physicalTitle = physicalVisual ? escapeHtml(`${physicalVisual.label} QR`) : ''
+  const physicalIcon = physicalVisual ? escapeHtml(physicalVisual.icon) : ''
+  const physicalTone = physicalVisual ? escapeHtml(physicalVisual.tone) : ''
 
   return `
     <div class="admin-node-pin-shell${selected ? ' admin-node-pin-shell--selected' : ''}">
       <div
         class="admin-node-pin${selected ? ' admin-node-pin--selected' : ''}"
         style="--node-color:${color};--node-fill:${fill};"
-        title="${title} · ${family}"
+        title="${title} · ${physicalTitle || family}"
       >
+        ${physicalVisual ? `<span class="admin-node-pin__physical admin-node-pin__physical--${physicalTone}" title="${physicalTitle}">${physicalIcon}</span>` : ''}
         <span class="admin-node-pin__index">${label}</span>
         <span class="admin-node-pin__grip">⋮⋮</span>
       </div>
       <div class="admin-node-label${selected ? ' admin-node-label--selected' : ''}">
-        <strong>${label}. ${title}</strong>
-        <span>${family}</span>
+        <strong>${label}. ${physicalVisual ? `<span class="admin-node-label__physical">${physicalIcon}</span>` : ''}${title}</strong>
+        <span>${physicalVisual ? `${physicalTitle} · ${family}` : family}</span>
       </div>
     </div>
   `
