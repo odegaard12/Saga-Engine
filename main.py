@@ -533,6 +533,27 @@ def _build_success_conditions(raw):
 
 # RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
 # Avoid letting incomplete data silently fall back to outdated minigame defaults.
+SAGA_PHYSICAL_STAGE_FIELDS = (
+    "physical_node_kind",
+    "physical_item_kind",
+    "physical_item_id",
+    "physical_item_label",
+    "qr_payload",
+    "physical_qr",
+)
+
+
+def preserve_physical_stage_fields(raw_stage, node):
+    if not isinstance(raw_stage, dict) or not isinstance(node, dict):
+        return node
+
+    for key in SAGA_PHYSICAL_STAGE_FIELDS:
+        if key in raw_stage:
+            node[key] = raw_stage[key]
+
+    return node
+
+
 def normalize_stage(raw):
     raw = raw or {}
 

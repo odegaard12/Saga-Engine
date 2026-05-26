@@ -196,10 +196,7 @@ export default function PhysicalQrCardsPanel({
   )
 }
 
-const panel: CSSProperties = {
-  display: 'grid',
-  gap: 14,
-}
+const panel: CSSProperties = { display: 'grid', gap: 14 }
 
 const compactPanel: CSSProperties = {
   display: 'grid',
@@ -235,10 +232,7 @@ const title: CSSProperties = {
   letterSpacing: '-0.04em',
 }
 
-const compactTitle: CSSProperties = {
-  ...title,
-  fontSize: 15,
-}
+const compactTitle: CSSProperties = { ...title, fontSize: 15 }
 
 const copy: CSSProperties = {
   margin: '7px 0 0',
@@ -292,10 +286,7 @@ const qrImage: CSSProperties = {
   overflow: 'hidden',
 }
 
-const formGrid: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
+const formGrid: CSSProperties = { display: 'grid', gap: 10 }
 
 const field: CSSProperties = {
   display: 'grid',
