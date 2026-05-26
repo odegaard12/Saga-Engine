@@ -231,15 +231,16 @@ function createMissionNodeIcon(index: number, state: 'completed' | 'current' | '
       ? '🔒'
       : String(index + 1))
 
-  const styles =
-    state === 'completed'
+  const styles = physicalVisual
+    ? 'background:rgba(255,255,255,.96);border-color:rgba(15,23,42,.72);color:#020617;'
+    : state === 'completed'
       ? 'background:rgba(34,197,94,.92);border-color:rgba(255,255,255,.82);color:#052e16;'
       : state === 'locked'
       ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
       : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
 
-  const physicalStyles = physicalVisual
-    ? 'box-shadow:0 8px 24px rgba(15,23,42,.28),0 0 0 5px rgba(255,255,255,.38),0 0 0 10px rgba(34,197,94,.16);'
+  const shadow = physicalVisual
+    ? 'box-shadow:0 8px 18px rgba(15,23,42,.26);'
     : 'box-shadow:0 8px 24px rgba(15,23,42,.28);'
 
   return L.divIcon({
@@ -252,11 +253,11 @@ function createMissionNodeIcon(index: number, state: 'completed' | 'current' | '
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:${physicalVisual ? '16px' : state === 'locked' ? '14px' : '13px'};
+      font-size:${physicalVisual ? '17px' : state === 'locked' ? '14px' : '13px'};
       font-weight:900;
       backdrop-filter:blur(10px);
       ${styles}
-      ${physicalStyles}
+      ${shadow}
     " title="${physicalVisual ? physicalVisual.label : ''}">${label}</div>`,
     iconSize: physicalVisual ? [34, 34] : [30, 30],
     iconAnchor: physicalVisual ? [17, 17] : [15, 15],
@@ -439,20 +440,18 @@ export function MapSurface({
           : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
-      const physicalVisual = getPhysicalNodeVisual(entry.stage)
-      const physicalPrefix = physicalVisual ? `${physicalVisual.icon} ${physicalVisual.label} · ` : ''
-
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
+        const physicalVisual = getPhysicalNodeVisual(entry.stage)
 
         const radiusLayer = L.circle(center, {
           radius: data.radius,
-          color: visual.ringColor,
-          weight: visual.ringWeight,
-          opacity: visual.ringOpacity,
-          fillColor: visual.ringColor,
-          fillOpacity: visual.ringFillOpacity,
-          className: `saga-node-radius saga-node-radius--${nodeState}`,
+          color: physicalVisual ? '#0f172a' : visual.ringColor,
+          weight: physicalVisual ? 1 : visual.ringWeight,
+          opacity: physicalVisual ? 0.26 : visual.ringOpacity,
+          fillColor: physicalVisual ? '#ffffff' : visual.ringColor,
+          fillOpacity: physicalVisual ? 0.02 : visual.ringFillOpacity,
+          className: physicalVisual ? 'saga-node-radius saga-node-radius--physical' : `saga-node-radius saga-node-radius--${nodeState}`,
         }).addTo(map)
 
         const markerLayer = L.marker(center, {
