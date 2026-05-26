@@ -1634,7 +1634,7 @@ def _admin_react_stage_summary(stage, index):
         or ""
     ).strip()
 
-    return {
+    summary = {
         "id": raw.get("id", index),
         "index": index,
         "title": title,
@@ -1657,6 +1657,8 @@ def _admin_react_stage_summary(stage, index):
             "locked": locked,
         },
     }
+
+    return preserve_physical_stage_fields(stage, summary)
 
 
 def _admin_react_profile_summary(profile, gamestate, positions):
