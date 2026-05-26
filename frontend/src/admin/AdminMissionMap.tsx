@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import type { AdminReactOverviewStage } from './lib/adminApi'
+import { getPhysicalNodeMapLabel } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
@@ -180,7 +181,9 @@ export default function AdminMissionMap({
         }),
       }).addTo(map)
 
-      const tooltip = `${stage.index + 1}. ${stage.title || 'Untitled node'} · ${getFamilyLabel(stage)} · ${radius}m`
+      const physicalLabel = getPhysicalNodeMapLabel(stage)
+      const stageTitle = physicalLabel ? `${physicalLabel} · ${stage.title || 'Nodo'}` : (stage.title || 'Untitled node')
+      const tooltip = `${stage.index + 1}. ${stageTitle} · ${getFamilyLabel(stage)} · ${radius}m`
 
       marker.bindTooltip(tooltip, {
         direction: 'top',

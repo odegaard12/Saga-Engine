@@ -7,6 +7,7 @@ import SettingsPanel from './SettingsPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import type { PlayerDraft } from '../lib/playerDrafts'
+import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import '../styles/admin-modern-shell.css'
 
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
@@ -180,8 +181,24 @@ export default function AdminMissionControlShell({
               >
                 <span className="saga-node-index">{stage.index + 1}</span>
                 <span className="saga-node-copy">
-                  <strong>{stage.title || 'Untitled node'}</strong>
-                  <small>{stage.label || stage.type} · {formatCoords(stage.lat, stage.lon)}</small>
+                  <strong>
+                    {getPhysicalNodeVisual(stage) ? (
+                      <span
+                        className={`saga-physical-node-badge saga-physical-node-badge--${getPhysicalNodeVisual(stage)?.tone}`}
+                        title={getPhysicalNodeVisual(stage)?.label}
+                      >
+                        {getPhysicalNodeVisual(stage)?.icon}
+                      </span>
+                    ) : null}
+                    {stage.title || 'Untitled node'}
+                  </strong>
+                  <small>
+                    {getPhysicalNodeVisual(stage)
+                      ? `${getPhysicalNodeVisual(stage)?.label} QR`
+                      : (stage.label || stage.type)}
+                    {' · '}
+                    {formatCoords(stage.lat, stage.lon)}
+                  </small>
                 </span>
               </button>
             ))}
