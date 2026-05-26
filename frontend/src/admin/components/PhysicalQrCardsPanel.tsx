@@ -72,14 +72,14 @@ export default function PhysicalQrCardsPanel({
 }: PhysicalQrCardsPanelProps) {
   const [label, setLabel] = useState(initialLabel)
   const [manualId, setManualId] = useState('')
-  const [kind, setKind] = useState<PhysicalQrKind>(initialKind)
   const [notice, setNotice] = useState<string | null>(null)
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
+
+  const kind = initialKind
 
   useEffect(() => {
     setLabel(initialLabel || 'Buscar a tu enemigo')
     setManualId('')
-    setKind(initialKind)
   }, [initialLabel, initialKind])
 
   const itemId = useMemo(() => {
@@ -122,6 +122,7 @@ export default function PhysicalQrCardsPanel({
       card_text: cardText,
       updated_at: new Date().toISOString(),
     })
+
     showNotice('QR guardado en este nodo. Pulsa Guardar en Control de misión para persistir.')
   }
 
@@ -132,7 +133,7 @@ export default function PhysicalQrCardsPanel({
           <div style={eyebrow}>QR DEL NODO</div>
           <h2 style={compact ? compactTitle : title}>Tarjeta física</h2>
           <p style={copy}>
-            Solo para nodos físicos. El jugador escanea este QR y SAGA guarda el objeto en Objetos.
+            Hereda el tipo elegido arriba: {kindLabels[kind]}. El jugador escanea este QR y SAGA lo guarda en Objetos.
           </p>
         </div>
         <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
@@ -167,20 +168,6 @@ export default function PhysicalQrCardsPanel({
               style={input}
             />
           </label>
-
-          <label style={field}>
-            Uso QR
-            <select
-              value={kind}
-              onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
-              style={input}
-            >
-              <option value="collectible">Coleccionable / secundaria</option>
-              <option value="requirement">Requisito para otro nodo</option>
-              <option value="clue">Pista</option>
-              <option value="bonus">Bonus</option>
-            </select>
-          </label>
         </div>
       </div>
 
@@ -209,7 +196,10 @@ export default function PhysicalQrCardsPanel({
   )
 }
 
-const panel: CSSProperties = { display: 'grid', gap: 14 }
+const panel: CSSProperties = {
+  display: 'grid',
+  gap: 14,
+}
 
 const compactPanel: CSSProperties = {
   display: 'grid',
@@ -245,7 +235,10 @@ const title: CSSProperties = {
   letterSpacing: '-0.04em',
 }
 
-const compactTitle: CSSProperties = { ...title, fontSize: 15 }
+const compactTitle: CSSProperties = {
+  ...title,
+  fontSize: 15,
+}
 
 const copy: CSSProperties = {
   margin: '7px 0 0',
@@ -299,7 +292,10 @@ const qrImage: CSSProperties = {
   overflow: 'hidden',
 }
 
-const formGrid: CSSProperties = { display: 'grid', gap: 10 }
+const formGrid: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
 
 const field: CSSProperties = {
   display: 'grid',
