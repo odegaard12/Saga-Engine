@@ -10,6 +10,9 @@ type NodePhysicalMode = 'none' | PhysicalQrKind
 type NodePhysicalTypePanelProps = {
   stage: AdminReactOverviewStage
   onApplyLocal: (stage: AdminReactOverviewStage) => void
+  chooserOnly?: boolean
+  onFinishChoice?: () => void
+  onRequestChangeType?: () => void
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
@@ -58,7 +61,13 @@ function formatCoord(value: unknown): string {
   return typeof value === 'number' ? value.toFixed(5) : 'Sin GPS'
 }
 
-export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysicalTypePanelProps) {
+export default function NodePhysicalTypePanel({
+  stage,
+  onApplyLocal,
+  chooserOnly = false,
+  onFinishChoice,
+  onRequestChangeType,
+}: NodePhysicalTypePanelProps) {
   const mode = getPhysicalMode(stage)
   const isPhysical = mode !== 'none'
 
@@ -72,6 +81,7 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
   function setMode(nextMode: NodePhysicalMode) {
     if (nextMode === 'none') {
       onApplyLocal(clearPhysicalFields(stage))
+      onFinishChoice?.()
       return
     }
 
@@ -79,6 +89,7 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
       physical_node_kind: nextMode,
       physical_item_kind: nextMode,
     })
+    onFinishChoice?.()
   }
 
   function saveQrCard(card: SavedPhysicalQrCard) {
@@ -107,36 +118,45 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
         <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
       </div>
 
-      <div style={modeLayout}>
-        <button
-          type="button"
-          style={mode === 'none' ? normalActiveButton : normalButton}
-          onClick={() => setMode('none')}
-        >
-          <span style={modeIcon}>●</span>
-          <span>
-            <strong style={modeLabel}>Normal</strong>
-            <small style={modeHelp}>Ruta, GPS o minijuego</small>
-          </span>
-        </button>
+      {chooserOnly ? (
+        <div style={modeLayout}>
+          <button
+            type="button"
+            style={mode === 'none' ? normalActiveButton : normalButton}
+            onClick={() => setMode('none')}
+          >
+            <span style={modeIcon}>●</span>
+            <span>
+              <strong style={modeLabel}>Normal</strong>
+              <small style={modeHelp}>Ruta, GPS o minijuego</small>
+            </span>
+          </button>
 
-        <div style={physicalGrid}>
-          {physicalModes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              style={mode === item.id ? activeButton : modeButton}
-              onClick={() => setMode(item.id)}
-            >
-              <span style={modeIcon}>{item.icon}</span>
-              <strong style={modeLabel}>{item.label}</strong>
-              <small style={modeHelp}>{item.help}</small>
-            </button>
-          ))}
+          <div style={physicalGrid}>
+            {physicalModes.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                style={mode === item.id ? activeButton : modeButton}
+                onClick={() => setMode(item.id)}
+              >
+                <span style={modeIcon}>{item.icon}</span>
+                <strong style={modeLabel}>{item.label}</strong>
+                <small style={modeHelp}>{item.help}</small>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={changeTypeBar}>
+          <span>{isPhysical ? 'Editor de nodo físico QR' : 'Editor de nodo normal'}</span>
+          <button type="button" style={changeTypeButton} onClick={onRequestChangeType}>
+            Cambiar tipo de nodo
+          </button>
+        </div>
+      )}
 
-      {isPhysical ? (
+      {!chooserOnly && isPhysical ? (
         <div style={physicalEditor}>
           <div style={sectionTitle}>
             <span>Datos físicos</span>
@@ -189,11 +209,11 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
             onSaveToNode={saveQrCard}
           />
         </div>
-      ) : (
+      ) : !chooserOnly ? (
         <div style={emptyBox}>
-          Nodo normal. El editor inferior gestiona ubicación, familia de juego, mensajes y reglas.
+          Nodo normal. El editor de juego, ubicación, mensajes y reglas está debajo.
         </div>
-      )}
+      ) : null}
     </section>
   )
 }
@@ -409,4 +429,30 @@ const emptyBox: CSSProperties = {
   color: 'rgba(226,232,240,.72)',
   fontSize: 12,
   lineHeight: 1.35,
+}
+
+
+const changeTypeBar: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  padding: 10,
+  borderRadius: 18,
+  border: '1px solid rgba(125,211,252,.18)',
+  background: 'rgba(14,165,233,.10)',
+  color: '#dbeafe',
+  fontSize: 12,
+  fontWeight: 850,
+}
+
+const changeTypeButton: CSSProperties = {
+  minHeight: 34,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(15,23,42,.56)',
+  color: '#f8fafc',
+  fontSize: 11,
+  fontWeight: 950,
 }

@@ -17,6 +17,7 @@ type NodeDetailDrawerProps = {
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
   onMoveLocal: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
+  onRequestChangeType?: () => void
   canMoveUp: boolean
   canMoveDown: boolean
 }
@@ -37,6 +38,7 @@ export default function NodeDetailDrawer({
   onApplyLocal,
   onDeleteLocal,
   onMoveLocal,
+  onRequestChangeType,
   canMoveUp,
   canMoveDown,
 }: NodeDetailDrawerProps) {
@@ -166,6 +168,19 @@ export default function NodeDetailDrawer({
               <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
               <span>{formatCoords(draft.lat, draft.lon)}</span>
               <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
+            </div>
+
+            <div className="admin-node-mode-toolbar">
+              <button type="button" onClick={onRequestChangeType}>
+                Cambiar tipo de nodo
+              </button>
+              <button type="button" disabled={!canMoveUp} onClick={() => onMoveLocal(draft, 'up')}>
+                ↑ Anterior
+              </button>
+              <span>Ruta {draft.index + 1}</span>
+              <button type="button" disabled={!canMoveDown} onClick={() => onMoveLocal(draft, 'down')}>
+                ↓ Siguiente
+              </button>
             </div>
           </div>
 

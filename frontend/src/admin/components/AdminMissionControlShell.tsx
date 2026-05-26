@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
@@ -48,6 +49,16 @@ type AdminMissionControlShellProps = {
   onSaveSettings: () => void
 }
 
+function selectedStageKey(stage: AdminReactOverviewStage | null) {
+  if (!stage) return ''
+  return String(stage.id ?? stage.index)
+}
+
+function getUiBoolean(stage: AdminReactOverviewStage | null, key: string) {
+  if (!stage) return false
+  return Boolean((stage as unknown as Record<string, unknown>)[key])
+}
+
 export default function AdminMissionControlShell({
   title,
   subtitle,
@@ -82,9 +93,39 @@ export default function AdminMissionControlShell({
   onUpdateMissionDraft,
   onSaveSettings,
 }: AdminMissionControlShellProps) {
+  const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
+
   const selectedIndex = selectedStage
     ? stages.findIndex((stage) => stage.index === selectedStage.index)
     : -1
+
+  const selectedKey = selectedStageKey(selectedStage)
+  const shouldShowTypeChooser = Boolean(
+    selectedStage &&
+    (
+      typeChooserStageKey === selectedKey ||
+      (
+        typeof selectedStage.id === 'string' &&
+        selectedStage.id.startsWith('local-') &&
+        !getUiBoolean(selectedStage, '_type_choice_done')
+      )
+    )
+  )
+
+  useEffect(() => {
+    if (!selectedStage) {
+      setTypeChooserStageKey(null)
+      return
+    }
+
+    if (
+      typeof selectedStage.id === 'string' &&
+      selectedStage.id.startsWith('local-') &&
+      !getUiBoolean(selectedStage, '_type_choice_done')
+    ) {
+      setTypeChooserStageKey(selectedStageKey(selectedStage))
+    }
+  }, [selectedKey])
 
   const mappedCount = stages.filter(
     (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
@@ -167,48 +208,68 @@ export default function AdminMissionControlShell({
 
         <section className="saga-route-list" aria-label="Route nodes">
           <div className="saga-section-title">
-            <span>Route</span>
+            <span>Ruta</span>
             <b>{stages.length}</b>
           </div>
 
           <div className="saga-node-scroll">
-            {stages.map((stage) => (
-              <button
-                key={`${stage.index}-${stage.id ?? stage.title}`}
-                type="button"
-                className={selectedStage?.index === stage.index ? 'saga-node-row active' : 'saga-node-row'}
-                onClick={() => onSelectStage(stage)}
-              >
-                <span className="saga-node-index">{stage.index + 1}</span>
-                <span className="saga-node-copy">
-                  {(() => {
-                    const physicalVisual = getPhysicalNodeVisual(stage)
+            {stages.map((stage, routeIndex) => {
+              const physicalVisual = getPhysicalNodeVisual(stage)
+              const selected = selectedStage?.index === stage.index
 
-                    return (
-                      <>
-                        <strong className="saga-node-title-line">
-                          {physicalVisual ? (
-                            <span
-                              className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
-                              title={`${physicalVisual.label} QR`}
-                              aria-label={`${physicalVisual.label} QR`}
-                            >
-                              {physicalVisual.icon}
-                            </span>
-                          ) : null}
-                          <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
-                        </strong>
-                        <small>
-                          {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
-                          {' · '}
-                          {formatCoords(stage.lat, stage.lon)}
-                        </small>
-                      </>
-                    )
-                  })()}
-                </span>
-              </button>
-            ))}
+              return (
+                <div
+                  key={`${stage.index}-${stage.id ?? stage.title}`}
+                  className={selected ? 'saga-node-row active' : 'saga-node-row'}
+                >
+                  <button
+                    type="button"
+                    className="saga-node-main"
+                    onClick={() => onSelectStage(stage)}
+                  >
+                    <span className="saga-node-index">{routeIndex + 1}</span>
+                    <span className="saga-node-copy">
+                      <strong className="saga-node-title-line">
+                        {physicalVisual ? (
+                          <span
+                            className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
+                            title={`${physicalVisual.label} QR`}
+                            aria-label={`${physicalVisual.label} QR`}
+                          >
+                            {physicalVisual.icon}
+                          </span>
+                        ) : null}
+                        <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
+                      </strong>
+                      <small>
+                        {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
+                        {' · '}
+                        {formatCoords(stage.lat, stage.lon)}
+                      </small>
+                    </span>
+                  </button>
+
+                  <span className="saga-node-order-actions">
+                    <button
+                      type="button"
+                      title="Subir nodo"
+                      disabled={routeIndex === 0}
+                      onClick={() => onReorderStage(stage, 'up')}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      title="Bajar nodo"
+                      disabled={routeIndex >= stages.length - 1}
+                      onClick={() => onReorderStage(stage, 'down')}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
 
             {stages.length === 0 ? (
               <div className="saga-empty-mini">Click the map to create the first node.</div>
@@ -257,26 +318,41 @@ export default function AdminMissionControlShell({
 
       {selectedStage ? (
         <aside className="saga-inspector is-open" aria-label="Node inspector">
-
-          <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-type-v2">
-            <NodePhysicalTypePanel
+          {shouldShowTypeChooser ? (
+            <div className="saga-node-type-choice-screen">
+              <NodePhysicalTypePanel
+                stage={selectedStage}
+                chooserOnly
+                onApplyLocal={(nextStage) => {
+                  onApplyStage({
+                    ...(nextStage as unknown as Record<string, unknown>),
+                    _type_choice_done: true,
+                  } as unknown as AdminReactOverviewStage)
+                }}
+                onFinishChoice={() => setTypeChooserStageKey(null)}
+              />
+            </div>
+          ) : isPhysicalNode(selectedStage) ? (
+            <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
+              <NodePhysicalTypePanel
+                stage={selectedStage}
+                onApplyLocal={onApplyStage}
+                onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
+              />
+            </div>
+          ) : (
+            <NodeDetailDrawer
               stage={selectedStage}
+              onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
+              onDeleteLocal={onDeleteStage}
+              onMoveLocal={onReorderStage}
+              onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
+              canMoveUp={selectedIndex > 0}
+              canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
             />
-          </div>
-
-{!isPhysicalNode(selectedStage) ? (
-<NodeDetailDrawer
-            stage={selectedStage}
-            onClose={() => onSelectStage(null)}
-            onApplyLocal={onApplyStage}
-            onDeleteLocal={onDeleteStage}
-            onMoveLocal={onReorderStage}
-            canMoveUp={selectedIndex > 0}
-            canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
-          />
-) : null}{/* saga-normal-node-drawer-v1 */}
-</aside>
+          )}
+        </aside>
       ) : null}
 
       {cmsPanel !== 'none' ? (
