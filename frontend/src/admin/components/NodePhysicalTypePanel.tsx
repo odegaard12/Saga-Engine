@@ -111,7 +111,7 @@ export default function NodePhysicalTypePanel({
           <strong style={title}>{isPhysical ? 'Nodo QR físico' : 'Nodo normal jugable'}</strong>
           <p style={intro}>
             {isPhysical
-              ? 'Usa este modo para objetos físicos, pistas, bonus o requisitos. No muestra el editor de minijuego normal.'
+              ? 'Usa este modo para objetos físicos, llaves, pistas o bonus. No muestra el editor de minijuego normal.'
               : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
           </p>
         </div>

@@ -2306,3 +2306,44 @@
   border-color: rgba(248,113,113,.46) !important;
   color: #fee2e2 !important;
 }
+
+
+/* saga-node-delete-visible-v2 */
+.admin-node-mode-toolbar--type-only {
+  flex-wrap: wrap;
+}
+
+.admin-node-delete-visible {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(127,29,29,.18) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-delete-visible:hover {
+  background: rgba(185,28,28,.30) !important;
+  border-color: rgba(248,113,113,.46) !important;
+  color: #fee2e2 !important;
+}
+
+.saga-physical-node-actions {
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.saga-danger-action {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 16px;
+  border: 1px solid rgba(248,113,113,.30);
+  background: rgba(127,29,29,.22);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.saga-danger-action:hover {
+  background: rgba(185,28,28,.30);
+  border-color: rgba(248,113,113,.46);
+  color: #fee2e2;
+}
