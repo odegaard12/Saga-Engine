@@ -2167,3 +2167,124 @@
   background: rgba(14, 165, 233, 0.24) !important;
   border-color: rgba(125, 211, 252, 0.40) !important;
 }
+
+
+/* saga-requirement-simple-v1 */
+.admin-node-requirement-panel {
+  border-color: rgba(125, 211, 252, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(14,165,233,.08), rgba(15,23,42,.18)) !important;
+}
+
+.admin-required-item-select select {
+  min-height: 46px;
+  border-color: rgba(125, 211, 252, 0.24) !important;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,.94), rgba(30,41,59,.90)) !important;
+}
+
+.admin-requirement-summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(187,247,208,.22);
+  background: rgba(34,197,94,.10);
+}
+
+.admin-requirement-summary > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(15,23,42,.44);
+  font-size: 17px;
+}
+
+.admin-requirement-summary strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.admin-requirement-summary small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(226,232,240,.72);
+  font-size: 11px;
+  line-height: 1.32;
+  font-weight: 760;
+}
+
+.admin-requirement-summary--off {
+  border-color: rgba(148,163,184,.18);
+  background: rgba(148,163,184,.08);
+}
+
+.admin-rule-empty-state {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(251,191,36,.32);
+  background: rgba(251,191,36,.08);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 820;
+  line-height: 1.4;
+}
+
+.admin-rule-empty-state strong {
+  color: #fef3c7;
+  font-size: 13px;
+}
+
+.admin-rule-empty-state span {
+  color: rgba(254,243,199,.82);
+}
+
+.admin-requirement-advanced {
+  margin-top: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(15,23,42,.22);
+  padding: 10px 12px;
+}
+
+.admin-requirement-advanced summary {
+  cursor: pointer;
+  color: rgba(226,232,240,.82);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-requirement-advanced .admin-edit-grid {
+  margin-top: 12px;
+}
+
+.saga-physical-node-actions {
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.saga-danger-action {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 16px;
+  border: 1px solid rgba(248,113,113,.30);
+  background: rgba(127,29,29,.22);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.saga-danger-action:hover {
+  background: rgba(185,28,28,.30);
+  border-color: rgba(248,113,113,.46);
+  color: #fee2e2;
+}

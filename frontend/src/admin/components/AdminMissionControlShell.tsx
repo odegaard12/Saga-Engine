@@ -333,13 +333,29 @@ export default function AdminMissionControlShell({
               />
             </div>
           ) : isPhysicalNode(selectedStage) ? (
-            <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
-              <NodePhysicalTypePanel
-                stage={selectedStage}
-                onApplyLocal={onApplyStage}
-                onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
-              />
-            </div>
+            <>
+              <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
+                <NodePhysicalTypePanel
+                  stage={selectedStage}
+                  onApplyLocal={onApplyStage}
+                  onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
+                />
+              </div>
+
+              <div className="saga-physical-node-actions">
+                <button
+                  type="button"
+                  className="saga-danger-action"
+                  onClick={() => {
+                    if (window.confirm(`Eliminar nodo QR "${selectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                      onDeleteStage(selectedStage)
+                    }
+                  }}
+                >
+                  Eliminar nodo QR
+                </button>
+              </div>
+            </>
           ) : (
             <NodeDetailDrawer
               stage={selectedStage}
