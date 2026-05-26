@@ -515,6 +515,54 @@ const mapCss = `
   backdrop-filter: blur(14px);
 }
 
+
+.admin-node-pin__physical {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.92);
+  background: rgba(2,6,23,.86);
+  box-shadow:
+    0 7px 18px rgba(2,6,23,.42),
+    inset 0 1px 0 rgba(255,255,255,.16);
+  font-size: 13px;
+  line-height: 1;
+  z-index: 2;
+}
+
+.admin-node-pin__physical--collectible {
+  background: rgba(113,63,18,.92);
+}
+
+.admin-node-pin__physical--requirement {
+  background: rgba(30,64,175,.92);
+}
+
+.admin-node-pin__physical--clue {
+  background: rgba(20,83,45,.92);
+}
+
+.admin-node-pin__physical--bonus {
+  background: rgba(157,23,77,.92);
+}
+
+.admin-node-label__physical {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  font-size: 11px;
+  vertical-align: -3px;
+}
+
 @keyframes adminNodePulse {
   0% { stroke-opacity: .92; fill-opacity: .24; }
   50% { stroke-opacity: .36; fill-opacity: .08; }

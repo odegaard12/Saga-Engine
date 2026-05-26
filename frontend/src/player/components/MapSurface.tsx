@@ -63,6 +63,11 @@ type MapSurfaceProps = {
   onNodeTap?: () => void
 }
 
+function getPhysicalNodeTooltipPrefix(stage: unknown): string {
+  const visual = getPhysicalNodeVisual(stage)
+  return visual ? `${visual.icon} ${visual.label} · ` : ''
+}
+
 function resolveStageMapData(stage: PlayerStage | null) {
   if (!stage) return null
 
@@ -216,9 +221,10 @@ function buildPlayerPopup(
 }
 
 
-function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', physicalIcon?: string) {
+function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
+  const physicalVisual = getPhysicalNodeVisual(stage)
   const label =
-    physicalIcon ||
+    physicalVisual?.icon ||
     (state === 'completed'
       ? '✓'
       : state === 'locked'
@@ -232,24 +238,28 @@ function createMissionNodeIcon(index: number, state: 'completed' | 'current' | '
       ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
       : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
 
+  const physicalStyles = physicalVisual
+    ? 'box-shadow:0 8px 24px rgba(15,23,42,.28),0 0 0 5px rgba(255,255,255,.38),0 0 0 10px rgba(34,197,94,.16);'
+    : 'box-shadow:0 8px 24px rgba(15,23,42,.28);'
+
   return L.divIcon({
-    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}`,
+    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
     html: `<div style="
-      width:30px;
-      height:30px;
+      width:${physicalVisual ? '34px' : '30px'};
+      height:${physicalVisual ? '34px' : '30px'};
       border-radius:999px;
       border:2px solid;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:${state === 'locked' ? '14px' : '13px'};
+      font-size:${physicalVisual ? '16px' : state === 'locked' ? '14px' : '13px'};
       font-weight:900;
-      box-shadow:0 8px 24px rgba(15,23,42,.28);
       backdrop-filter:blur(10px);
       ${styles}
-    ">${label}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+      ${physicalStyles}
+    " title="${physicalVisual ? physicalVisual.label : ''}">${label}</div>`,
+    iconSize: physicalVisual ? [34, 34] : [30, 30],
+    iconAnchor: physicalVisual ? [17, 17] : [15, 15],
   })
 }
 
@@ -446,12 +456,12 @@ export function MapSurface({
         }).addTo(map)
 
         const markerLayer = L.marker(center, {
-          icon: createMissionNodeIcon(index, 'current', physicalVisual?.icon),
+          icon: createMissionNodeIcon(index, 'current', entry.stage),
           keyboard: false,
           zIndexOffset: 720,
         }).addTo(map)
 
-        markerLayer.bindTooltip(`${physicalPrefix}${data.name}`, {
+        markerLayer.bindTooltip(`${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, {
           direction: 'top',
           opacity: 0.92,
         })
@@ -482,13 +492,13 @@ export function MapSurface({
       }).addTo(map)
 
       const ghostMarker = L.marker(center, {
-        icon: createMissionNodeIcon(index, state, physicalVisual?.icon),
+        icon: createMissionNodeIcon(index, state, entry.stage),
         keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
       }).addTo(map)
 
       ghostMarker.bindTooltip(
-        state === 'locked' ? `Bloqueado · ${physicalPrefix}${data.name}` : `Completado · ${physicalPrefix}${data.name}`,
+        state === 'locked' ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}` : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`,
         {
           direction: 'top',
           opacity: 0.88,
