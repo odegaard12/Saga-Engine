@@ -611,7 +611,7 @@ def normalize_stage(raw):
 
     item_requirement = read_stage_item_requirement(raw)
 
-    return {
+    node = {
         "id": raw.get("id"),
         "version": 2,
         "enabled": _as_bool(raw.get("enabled", True), True),
@@ -671,6 +671,8 @@ def normalize_stage(raw):
             "interaction_type_fallback_reason": interaction_type_fallback_reason,
         },
     }
+
+    return preserve_physical_stage_fields(raw, node)
 
 def stage_has_manual_fallback(node):
     for condition in node["success"]["conditions"]:
@@ -853,6 +855,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "messages": node["messages"],
         })
 
+    out = preserve_physical_stage_fields(node, out)
     return out
 
 def stage_accepts_code(raw_stage, code):
