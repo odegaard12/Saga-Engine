@@ -167,6 +167,24 @@ export default function NodeDetailDrawer({
               <span>{formatCoords(draft.lat, draft.lon)}</span>
               <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
             </div>
+
+            <div className="admin-route-order-inline" aria-label="Orden en ruta">
+              <button
+                type="button"
+                disabled={!canMoveUp}
+                onClick={() => onMoveLocal(draft, 'up')}
+              >
+                ↑ Anterior
+              </button>
+              <span>Ruta {draft.index + 1}</span>
+              <button
+                type="button"
+                disabled={!canMoveDown}
+                onClick={() => onMoveLocal(draft, 'down')}
+              >
+                ↓ Siguiente
+              </button>
+            </div>
           </div>
 
           <button type="button" onClick={onClose}>Close</button>

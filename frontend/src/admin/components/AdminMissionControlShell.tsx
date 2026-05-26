@@ -167,48 +167,70 @@ export default function AdminMissionControlShell({
 
         <section className="saga-route-list" aria-label="Route nodes">
           <div className="saga-section-title">
-            <span>Route</span>
+            <span>Ruta</span>
             <b>{stages.length}</b>
           </div>
 
           <div className="saga-node-scroll">
-            {stages.map((stage) => (
-              <button
-                key={`${stage.index}-${stage.id ?? stage.title}`}
-                type="button"
-                className={selectedStage?.index === stage.index ? 'saga-node-row active' : 'saga-node-row'}
-                onClick={() => onSelectStage(stage)}
-              >
-                <span className="saga-node-index">{stage.index + 1}</span>
-                <span className="saga-node-copy">
-                  {(() => {
-                    const physicalVisual = getPhysicalNodeVisual(stage)
+            {stages.map((stage, routeIndex) => {
+              const physicalVisual = getPhysicalNodeVisual(stage)
+              const selected = selectedStage?.index === stage.index
 
-                    return (
-                      <>
-                        <strong className="saga-node-title-line">
-                          {physicalVisual ? (
-                            <span
-                              className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
-                              title={`${physicalVisual.label} QR`}
-                              aria-label={`${physicalVisual.label} QR`}
-                            >
-                              {physicalVisual.icon}
-                            </span>
-                          ) : null}
-                          <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
-                        </strong>
-                        <small>
-                          {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
-                          {' · '}
-                          {formatCoords(stage.lat, stage.lon)}
-                        </small>
-                      </>
-                    )
-                  })()}
-                </span>
-              </button>
-            ))}
+              return (
+                <div
+                  key={`${stage.index}-${stage.id ?? stage.title}`}
+                  className={selected ? 'saga-node-row active' : 'saga-node-row'}
+                  role="group"
+                  aria-label={`Nodo ${routeIndex + 1}: ${stage.title || 'Untitled node'}`}
+                >
+                  <button
+                    type="button"
+                    className="saga-node-main"
+                    onClick={() => onSelectStage(stage)}
+                  >
+                    <span className="saga-node-index">{routeIndex + 1}</span>
+                    <span className="saga-node-copy">
+                      <strong className="saga-node-title-line">
+                        {physicalVisual ? (
+                          <span
+                            className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
+                            title={`${physicalVisual.label} QR`}
+                            aria-label={`${physicalVisual.label} QR`}
+                          >
+                            {physicalVisual.icon}
+                          </span>
+                        ) : null}
+                        <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
+                      </strong>
+                      <small>
+                        {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
+                        {' · '}
+                        {formatCoords(stage.lat, stage.lon)}
+                      </small>
+                    </span>
+                  </button>
+
+                  <span className="saga-node-order-actions" aria-label="Cambiar orden del nodo">
+                    <button
+                      type="button"
+                      title="Subir nodo"
+                      disabled={routeIndex === 0}
+                      onClick={() => onReorderStage(stage, 'up')}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      title="Bajar nodo"
+                      disabled={routeIndex >= stages.length - 1}
+                      onClick={() => onReorderStage(stage, 'down')}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
 
             {stages.length === 0 ? (
               <div className="saga-empty-mini">Click the map to create the first node.</div>
