@@ -16,8 +16,8 @@ type NodePhysicalTypePanelProps = {
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
-  { id: 'collectible', label: 'Coleccionable', help: 'Objeto opcional o secundaria', icon: '⭐' },
-  { id: 'requirement', label: 'Requisito', help: 'Objeto necesario', icon: '🔒' },
+  { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico opcional o usable como requisito', icon: '⭐' },
+  { id: 'requirement', label: 'Llave QR', help: 'Objeto que puede desbloquear otro nodo', icon: '🔑' },
   { id: 'clue', label: 'Pista', help: 'Tarjeta con pista', icon: '🧩' },
   { id: 'bonus', label: 'Bonus', help: 'Extra o recompensa', icon: '🎁' },
 ]
@@ -108,7 +108,7 @@ export default function NodePhysicalTypePanel({
       <div style={head}>
         <div>
           <div style={eyebrow}>TIPO DE NODO</div>
-          <strong style={title}>{isPhysical ? 'Nodo físico con QR' : 'Nodo normal jugable'}</strong>
+          <strong style={title}>{isPhysical ? 'Nodo QR físico' : 'Nodo normal jugable'}</strong>
           <p style={intro}>
             {isPhysical
               ? 'Usa este modo para objetos físicos, pistas, bonus o requisitos. No muestra el editor de minijuego normal.'

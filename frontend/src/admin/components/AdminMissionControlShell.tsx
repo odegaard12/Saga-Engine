@@ -347,12 +347,12 @@ export default function AdminMissionControlShell({
                   type="button"
                   className="saga-danger-action"
                   onClick={() => {
-                    if (window.confirm(`Eliminar nodo QR "${selectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                    if (window.confirm(`Eliminar nodo "${selectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
                       onDeleteStage(selectedStage)
                     }
                   }}
                 >
-                  Eliminar nodo QR
+                  Eliminar nodo
                 </button>
               </div>
             </>

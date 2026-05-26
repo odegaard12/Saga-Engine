@@ -224,6 +224,17 @@ export default function NodeDetailDrawer({
               <button type="button" onClick={onRequestChangeType}>
                 Cambiar tipo de nodo
               </button>
+              <button
+                type="button"
+                className="admin-node-delete-visible"
+                onClick={() => {
+                  if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                    onDeleteLocal(draft)
+                  }
+                }}
+              >
+                Eliminar nodo
+              </button>
             </div>
           </div>
 
@@ -552,14 +563,14 @@ export default function NodeDetailDrawer({
           {activeTab === 'requirement' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-node-requirement-panel">
               <div className="admin-edit-section-head">
-                <strong>Requisito físico</strong>
-                <span>Opcional. El orden de ruta ya se respeta; activa esto solo si este nodo necesita un QR físico.</span>
+                <strong>Requisito de entrada</strong>
+                <span>Opcional. El orden de ruta ya se respeta; activa esto solo si este nodo necesita que el jugador haya escaneado un QR físico.</span>
               </div>
 
               {physicalRequirementOptions.length > 0 ? (
                 <>
                   <label className="admin-edit-field admin-required-item-select">
-                    Este nodo requiere
+                    Para abrir este nodo se necesita
                     <select
                       value={getDraftConfigText('required_item_id')}
                       onChange={(event) => {
@@ -592,7 +603,7 @@ export default function NodeDetailDrawer({
                       <span>{selectedRequirement.icon}</span>
                       <div>
                         <strong>{selectedRequirement.label}</strong>
-                        <small>Este nodo queda bloqueado hasta que el jugador escanee ese QR físico.</small>
+                        <small>Este nodo queda bloqueado hasta que el jugador escanee ese objeto QR.</small>
                       </div>
                     </div>
                   ) : (
@@ -650,8 +661,8 @@ export default function NodeDetailDrawer({
                 </>
               ) : (
                 <div className="admin-rule-empty-state">
-                  <strong>No hay QR físicos disponibles.</strong>
-                  <span>Crea primero un nodo Coleccionable, Requisito, Pista o Bonus y guarda su tarjeta QR. Después podrás pedirlo aquí.</span>
+                  <strong>No hay objetos QR disponibles.</strong>
+                  <span>Crea primero un nodo Objeto QR, Llave QR, Pista o Bonus y guarda su tarjeta QR. Después podrás pedirlo aquí.</span>
                 </div>
               )}
             </section>
