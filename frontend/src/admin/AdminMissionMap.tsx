@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import type { AdminReactOverviewStage } from './lib/adminApi'
+import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
@@ -61,20 +62,25 @@ function buildPinHtml(stage: AdminReactOverviewStage, selected: boolean, color: 
   const title = escapeHtml(stage.title || 'Untitled node')
   const family = escapeHtml(getFamilyLabel(stage))
   const label = `${stage.index + 1}`
+  const physicalVisual = getPhysicalNodeVisual(stage)
+  const physicalTitle = physicalVisual ? escapeHtml(`${physicalVisual.label} QR`) : ''
+  const physicalIcon = physicalVisual ? escapeHtml(physicalVisual.icon) : ''
+  const physicalTone = physicalVisual ? escapeHtml(physicalVisual.tone) : ''
 
   return `
     <div class="admin-node-pin-shell${selected ? ' admin-node-pin-shell--selected' : ''}">
       <div
         class="admin-node-pin${selected ? ' admin-node-pin--selected' : ''}"
         style="--node-color:${color};--node-fill:${fill};"
-        title="${title} · ${family}"
+        title="${title} · ${physicalTitle || family}"
       >
+        ${physicalVisual ? `<span class="admin-node-pin__physical admin-node-pin__physical--${physicalTone}" title="${physicalTitle}">${physicalIcon}</span>` : ''}
         <span class="admin-node-pin__index">${label}</span>
         <span class="admin-node-pin__grip">⋮⋮</span>
       </div>
       <div class="admin-node-label${selected ? ' admin-node-label--selected' : ''}">
-        <strong>${label}. ${title}</strong>
-        <span>${family}</span>
+        <strong>${label}. ${physicalVisual ? `<span class="admin-node-label__physical">${physicalIcon}</span>` : ''}${title}</strong>
+        <span>${physicalVisual ? `${physicalTitle} · ${family}` : family}</span>
       </div>
     </div>
   `
@@ -180,7 +186,9 @@ export default function AdminMissionMap({
         }),
       }).addTo(map)
 
-      const tooltip = `${stage.index + 1}. ${stage.title || 'Untitled node'} · ${getFamilyLabel(stage)} · ${radius}m`
+      const physicalLabel = getPhysicalNodeMapLabel(stage)
+      const stageTitle = physicalLabel ? `${physicalLabel} · ${stage.title || 'Nodo'}` : (stage.title || 'Untitled node')
+      const tooltip = `${stage.index + 1}. ${stageTitle} · ${getFamilyLabel(stage)} · ${radius}m`
 
       marker.bindTooltip(tooltip, {
         direction: 'top',
@@ -505,6 +513,54 @@ const mapCss = `
   color: #f8fafc !important;
   border: 1px solid rgba(255,255,255,.14) !important;
   backdrop-filter: blur(14px);
+}
+
+
+.admin-node-pin__physical {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.92);
+  background: rgba(2,6,23,.86);
+  box-shadow:
+    0 7px 18px rgba(2,6,23,.42),
+    inset 0 1px 0 rgba(255,255,255,.16);
+  font-size: 13px;
+  line-height: 1;
+  z-index: 2;
+}
+
+.admin-node-pin__physical--collectible {
+  background: rgba(113,63,18,.92);
+}
+
+.admin-node-pin__physical--requirement {
+  background: rgba(30,64,175,.92);
+}
+
+.admin-node-pin__physical--clue {
+  background: rgba(20,83,45,.92);
+}
+
+.admin-node-pin__physical--bonus {
+  background: rgba(157,23,77,.92);
+}
+
+.admin-node-label__physical {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  font-size: 11px;
+  vertical-align: -3px;
 }
 
 @keyframes adminNodePulse {

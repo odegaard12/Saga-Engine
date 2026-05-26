@@ -533,6 +533,27 @@ def _build_success_conditions(raw):
 
 # RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
 # Avoid letting incomplete data silently fall back to outdated minigame defaults.
+SAGA_PHYSICAL_STAGE_FIELDS = (
+    "physical_node_kind",
+    "physical_item_kind",
+    "physical_item_id",
+    "physical_item_label",
+    "qr_payload",
+    "physical_qr",
+)
+
+
+def preserve_physical_stage_fields(raw_stage, node):
+    if not isinstance(raw_stage, dict) or not isinstance(node, dict):
+        return node
+
+    for key in SAGA_PHYSICAL_STAGE_FIELDS:
+        if key in raw_stage:
+            node[key] = raw_stage[key]
+
+    return node
+
+
 def normalize_stage(raw):
     raw = raw or {}
 
@@ -590,7 +611,7 @@ def normalize_stage(raw):
 
     item_requirement = read_stage_item_requirement(raw)
 
-    return {
+    node = {
         "id": raw.get("id"),
         "version": 2,
         "enabled": _as_bool(raw.get("enabled", True), True),
@@ -650,6 +671,8 @@ def normalize_stage(raw):
             "interaction_type_fallback_reason": interaction_type_fallback_reason,
         },
     }
+
+    return preserve_physical_stage_fields(raw, node)
 
 def stage_has_manual_fallback(node):
     for condition in node["success"]["conditions"]:
@@ -832,6 +855,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "messages": node["messages"],
         })
 
+    out = preserve_physical_stage_fields(node, out)
     return out
 
 def stage_accepts_code(raw_stage, code):
@@ -1610,7 +1634,7 @@ def _admin_react_stage_summary(stage, index):
         or ""
     ).strip()
 
-    return {
+    summary = {
         "id": raw.get("id", index),
         "index": index,
         "title": title,
@@ -1633,6 +1657,8 @@ def _admin_react_stage_summary(stage, index):
             "locked": locked,
         },
     }
+
+    return preserve_physical_stage_fields(stage, summary)
 
 
 def _admin_react_profile_summary(profile, gamestate, positions):

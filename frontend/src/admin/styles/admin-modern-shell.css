@@ -1952,3 +1952,60 @@
 }
 
 
+
+/* saga-physical-node-route-badge-v1 */
+.saga-physical-node-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.42);
+  font-size: 12px;
+  line-height: 1;
+  vertical-align: middle;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.saga-physical-node-badge--collectible {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: rgba(250, 204, 21, 0.24);
+}
+
+.saga-physical-node-badge--requirement {
+  background: rgba(96, 165, 250, 0.14);
+  border-color: rgba(147, 197, 253, 0.24);
+}
+
+.saga-physical-node-badge--clue {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(187, 247, 208, 0.24);
+}
+
+.saga-physical-node-badge--bonus {
+  background: rgba(244, 114, 182, 0.14);
+  border-color: rgba(251, 207, 232, 0.24);
+}
+
+
+/* saga-physical-node-route-badge-v2 */
+.saga-node-title-line {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.saga-node-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saga-node-title-line .saga-physical-node-badge {
+  flex: 0 0 auto;
+  margin-right: 0;
+}

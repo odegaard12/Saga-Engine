@@ -7,6 +7,7 @@ import SettingsPanel from './SettingsPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import type { PlayerDraft } from '../lib/playerDrafts'
+import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import '../styles/admin-modern-shell.css'
 
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
@@ -180,8 +181,31 @@ export default function AdminMissionControlShell({
               >
                 <span className="saga-node-index">{stage.index + 1}</span>
                 <span className="saga-node-copy">
-                  <strong>{stage.title || 'Untitled node'}</strong>
-                  <small>{stage.label || stage.type} · {formatCoords(stage.lat, stage.lon)}</small>
+                  {(() => {
+                    const physicalVisual = getPhysicalNodeVisual(stage)
+
+                    return (
+                      <>
+                        <strong className="saga-node-title-line">
+                          {physicalVisual ? (
+                            <span
+                              className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
+                              title={`${physicalVisual.label} QR`}
+                              aria-label={`${physicalVisual.label} QR`}
+                            >
+                              {physicalVisual.icon}
+                            </span>
+                          ) : null}
+                          <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
+                        </strong>
+                        <small>
+                          {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
+                          {' · '}
+                          {formatCoords(stage.lat, stage.lon)}
+                        </small>
+                      </>
+                    )
+                  })()}
                 </span>
               </button>
             ))}
@@ -303,7 +327,15 @@ export default function AdminMissionControlShell({
 
 function isPhysicalNode(stage: AdminReactOverviewStage | null) {
   if (!stage) return false
-  const kind = (stage as AdminReactOverviewStage & { physical_node_kind?: string }).physical_node_kind
+
+  const record = stage as AdminReactOverviewStage & {
+    physical_node_kind?: string
+    physical_item_kind?: string
+    physical_qr?: { kind?: string }
+  }
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+
   return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
 }
 

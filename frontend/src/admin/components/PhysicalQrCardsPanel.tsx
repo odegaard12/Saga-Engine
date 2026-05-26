@@ -72,14 +72,14 @@ export default function PhysicalQrCardsPanel({
 }: PhysicalQrCardsPanelProps) {
   const [label, setLabel] = useState(initialLabel)
   const [manualId, setManualId] = useState('')
-  const [kind, setKind] = useState<PhysicalQrKind>(initialKind)
   const [notice, setNotice] = useState<string | null>(null)
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
+
+  const kind = initialKind
 
   useEffect(() => {
     setLabel(initialLabel || 'Buscar a tu enemigo')
     setManualId('')
-    setKind(initialKind)
   }, [initialLabel, initialKind])
 
   const itemId = useMemo(() => {
@@ -122,6 +122,7 @@ export default function PhysicalQrCardsPanel({
       card_text: cardText,
       updated_at: new Date().toISOString(),
     })
+
     showNotice('QR guardado en este nodo. Pulsa Guardar en Control de misión para persistir.')
   }
 
@@ -132,7 +133,7 @@ export default function PhysicalQrCardsPanel({
           <div style={eyebrow}>QR DEL NODO</div>
           <h2 style={compact ? compactTitle : title}>Tarjeta física</h2>
           <p style={copy}>
-            Solo para nodos físicos. El jugador escanea este QR y SAGA guarda el objeto en Objetos.
+            Hereda el tipo elegido arriba: {kindLabels[kind]}. El jugador escanea este QR y SAGA lo guarda en Objetos.
           </p>
         </div>
         <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
@@ -166,20 +167,6 @@ export default function PhysicalQrCardsPanel({
               placeholder={itemId}
               style={input}
             />
-          </label>
-
-          <label style={field}>
-            Uso QR
-            <select
-              value={kind}
-              onChange={(event) => setKind(event.target.value as PhysicalQrKind)}
-              style={input}
-            >
-              <option value="collectible">Coleccionable / secundaria</option>
-              <option value="requirement">Requisito para otro nodo</option>
-              <option value="clue">Pista</option>
-              <option value="bonus">Bonus</option>
-            </select>
           </label>
         </div>
       </div>
@@ -272,7 +259,7 @@ const badge: CSSProperties = {
 
 const layout: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '170px minmax(0, 1fr)',
+  gridTemplateColumns: '1fr',
   gap: 12,
   alignItems: 'stretch',
 }
@@ -282,7 +269,7 @@ const qrCard: CSSProperties = {
   justifyItems: 'center',
   alignContent: 'center',
   gap: 8,
-  padding: 10,
+  padding: 12,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.13)',
   background: 'rgba(15,23,42,.32)',
@@ -335,7 +322,7 @@ const payloadBox: CSSProperties = {
 
 const actions: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1.15fr .9fr .9fr',
+  gridTemplateColumns: '1fr',
   gap: 8,
 }
 

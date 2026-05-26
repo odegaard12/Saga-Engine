@@ -12,6 +12,39 @@ type FocusRequest =
   | null
 
 type NodeVisualState = 'locked' | 'ready' | 'engaging'
+type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+
+const physicalNodeVisuals: Record<PhysicalNodeKind, { icon: string; label: string }> = {
+  collectible: { icon: '⭐', label: 'Coleccionable QR' },
+  requirement: { icon: '🔒', label: 'Requisito QR' },
+  clue: { icon: '🧩', label: 'Pista QR' },
+  bonus: { icon: '🎁', label: 'Bonus QR' },
+}
+
+function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
+  if (value === 'collectible' || value === 'requirement' || value === 'clue' || value === 'bonus') {
+    return value
+  }
+
+  return null
+}
+
+function getPhysicalNodeVisual(stage: unknown): { icon: string; label: string } | null {
+  if (!stage || typeof stage !== 'object') return null
+
+  const record = stage as Record<string, unknown>
+  const flatKind = normalizePhysicalKind(record.physical_node_kind || record.physical_item_kind)
+  if (flatKind) return physicalNodeVisuals[flatKind]
+
+  const physicalQr = record.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    const qrKind = normalizePhysicalKind((physicalQr as Record<string, unknown>).kind)
+    if (qrKind) return physicalNodeVisuals[qrKind]
+  }
+
+  return null
+}
+
 
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
@@ -28,6 +61,11 @@ type MapSurfaceProps = {
   selfLabel?: string
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
+}
+
+function getPhysicalNodeTooltipPrefix(stage: unknown): string {
+  const visual = getPhysicalNodeVisual(stage)
+  return visual ? `${visual.icon} ${visual.label} · ` : ''
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -183,39 +221,46 @@ function buildPlayerPopup(
 }
 
 
-function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked') {
+function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
+  const physicalVisual = getPhysicalNodeVisual(stage)
   const label =
-    state === 'completed'
+    physicalVisual?.icon ||
+    (state === 'completed'
       ? '✓'
       : state === 'locked'
       ? '🔒'
-      : String(index + 1)
+      : String(index + 1))
 
-  const styles =
-    state === 'completed'
+  const styles = physicalVisual
+    ? 'background:rgba(255,255,255,.96);border-color:rgba(15,23,42,.72);color:#020617;'
+    : state === 'completed'
       ? 'background:rgba(34,197,94,.92);border-color:rgba(255,255,255,.82);color:#052e16;'
       : state === 'locked'
       ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
       : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
 
+  const shadow = physicalVisual
+    ? 'box-shadow:0 8px 18px rgba(15,23,42,.26);'
+    : 'box-shadow:0 8px 24px rgba(15,23,42,.28);'
+
   return L.divIcon({
-    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}`,
+    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
     html: `<div style="
-      width:30px;
-      height:30px;
+      width:${physicalVisual ? '34px' : '30px'};
+      height:${physicalVisual ? '34px' : '30px'};
       border-radius:999px;
       border:2px solid;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:${state === 'locked' ? '14px' : '13px'};
+      font-size:${physicalVisual ? '17px' : state === 'locked' ? '14px' : '13px'};
       font-weight:900;
-      box-shadow:0 8px 24px rgba(15,23,42,.28);
       backdrop-filter:blur(10px);
       ${styles}
-    ">${label}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+      ${shadow}
+    " title="${physicalVisual ? physicalVisual.label : ''}">${label}</div>`,
+    iconSize: physicalVisual ? [34, 34] : [30, 30],
+    iconAnchor: physicalVisual ? [17, 17] : [15, 15],
   })
 }
 
@@ -395,27 +440,27 @@ export function MapSurface({
           : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
-
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
+        const physicalVisual = getPhysicalNodeVisual(entry.stage)
 
         const radiusLayer = L.circle(center, {
           radius: data.radius,
-          color: visual.ringColor,
-          weight: visual.ringWeight,
-          opacity: visual.ringOpacity,
-          fillColor: visual.ringColor,
-          fillOpacity: visual.ringFillOpacity,
-          className: `saga-node-radius saga-node-radius--${nodeState}`,
+          color: physicalVisual ? '#0f172a' : visual.ringColor,
+          weight: physicalVisual ? 1 : visual.ringWeight,
+          opacity: physicalVisual ? 0.26 : visual.ringOpacity,
+          fillColor: physicalVisual ? '#ffffff' : visual.ringColor,
+          fillOpacity: physicalVisual ? 0.02 : visual.ringFillOpacity,
+          className: physicalVisual ? 'saga-node-radius saga-node-radius--physical' : `saga-node-radius saga-node-radius--${nodeState}`,
         }).addTo(map)
 
         const markerLayer = L.marker(center, {
-          icon: createMissionNodeIcon(index, 'current'),
+          icon: createMissionNodeIcon(index, 'current', entry.stage),
           keyboard: false,
           zIndexOffset: 720,
         }).addTo(map)
 
-        markerLayer.bindTooltip(data.name, {
+        markerLayer.bindTooltip(`${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, {
           direction: 'top',
           opacity: 0.92,
         })
@@ -446,13 +491,13 @@ export function MapSurface({
       }).addTo(map)
 
       const ghostMarker = L.marker(center, {
-        icon: createMissionNodeIcon(index, state),
+        icon: createMissionNodeIcon(index, state, entry.stage),
         keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
       }).addTo(map)
 
       ghostMarker.bindTooltip(
-        state === 'locked' ? `Bloqueado · ${data.name}` : `Completado · ${data.name}`,
+        state === 'locked' ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}` : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`,
         {
           direction: 'top',
           opacity: 0.88,
