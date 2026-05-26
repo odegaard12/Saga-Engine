@@ -171,6 +171,14 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
       setMessage(`Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
       setMode('idle')
       stopCamera()
+      window.dispatchEvent(new CustomEvent('saga:inventory-updated', {
+        detail: {
+          user,
+          item_id: parsed.item_id,
+          label: parsed.label,
+          source: 'qr',
+        },
+      }))
     } catch {
       setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
     }

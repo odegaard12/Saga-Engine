@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
+import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -16,6 +16,7 @@ import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShel
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
+import { loadInventorySnapshot } from './offline/inventory'
 import { getDistanceMeters } from './utils/geo'
 import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
@@ -46,6 +47,48 @@ function getUserFromUrl(): string {
   return params.get('user') || 'PLAYER 1'
 }
 
+type ActiveItemRequirement = {
+  itemId: string
+  label: string
+  quantity: number
+  consume: boolean
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function readActiveItemRequirement(stage: PlayerStage | null): ActiveItemRequirement | null {
+  if (!stage) return null
+
+  const raw = asRecord(stage)
+  const requirements = asRecord(raw.requirements)
+  const items = Array.isArray(requirements.items) ? requirements.items : []
+  const first = asRecord(items[0])
+  const config = {
+    ...asRecord(raw.config),
+    ...asRecord(asRecord(raw.minigame).config),
+  }
+
+  const itemId = String(first.item_id || first.required_item_id || config.required_item_id || '').trim()
+  const label = String(first.label || first.required_item_label || config.required_item_label || itemId).trim()
+  const quantityRaw = first.quantity || first.required_item_quantity || config.required_item_quantity || 1
+  const quantity = Number.isFinite(Number(quantityRaw)) ? Math.max(1, Math.floor(Number(quantityRaw))) : 1
+  const consumeRaw = first.consume ?? first.required_item_consume ?? config.required_item_consume
+  const consume = consumeRaw === true || String(consumeRaw || '').toLowerCase() === 'true'
+
+  if (!itemId) return null
+  return { itemId, label: label || itemId, quantity, consume }
+}
+
+function countOwnedItems(user: string, itemId: string): number {
+  return loadInventorySnapshot(user).items
+    .filter((item) => item.item_id === itemId && item.state !== 'used')
+    .reduce((total, item) => total + Math.max(0, item.quantity || 0), 0)
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -67,6 +110,7 @@ export default function PlayerApp() {
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
+  const [inventoryRevision, setInventoryRevision] = useState(0)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -77,6 +121,20 @@ export default function PlayerApp() {
 
   const isPhone =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  useEffect(() => {
+    const handleInventoryUpdated = () => {
+      setInventoryRevision((current) => current + 1)
+    }
+
+    window.addEventListener('saga:inventory-updated', handleInventoryUpdated)
+    window.addEventListener('storage', handleInventoryUpdated)
+
+    return () => {
+      window.removeEventListener('saga:inventory-updated', handleInventoryUpdated)
+      window.removeEventListener('storage', handleInventoryUpdated)
+    }
+  }, [])
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -357,8 +415,19 @@ export default function PlayerApp() {
     !browserGpsPosition &&
     !localDebugPosition
 
+  const activeRequirement = readActiveItemRequirement(currentStage)
+  const ownedRequirementQuantity = activeRequirement
+    ? countOwnedItems(payload.user, activeRequirement.itemId)
+    : 0
+  const missingRequiredItem = Boolean(
+    activeRequirement && ownedRequirementQuantity < activeRequirement.quantity
+  )
+  void inventoryRevision
+
   const hudHelperText =
-    gpsActionRequired
+    missingRequiredItem && activeRequirement
+      ? `Necesitas ${activeRequirement.quantity > 1 ? `${activeRequirement.quantity}× ` : ''}${activeRequirement.label}. Escanea su QR físico para guardarlo en Objetos.`
+      : gpsActionRequired
       ? 'Activa GPS para calcular distancia, centrarte en el mapa y entrar en el nodo cuando estés dentro del radio.'
       : runtime.helperText
 
@@ -379,7 +448,7 @@ export default function PlayerApp() {
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(browserGpsPosition)
   const primaryLabel = gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
-  const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
+  const primaryDisabled = gpsActionRequired ? false : missingRequiredItem || !runtime.canEnter
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
@@ -657,6 +726,12 @@ return
       return
     }
 
+    if (missingRequiredItem && activeRequirement) {
+      showNotice(`Necesitas ${activeRequirement.label}. Escanea su QR físico primero.`, 'warn')
+      vibrate([10, 16, 10])
+      return
+    }
+
     if (!runtime.canEnter) return
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
@@ -675,6 +750,11 @@ return
     }
 
     setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (missingRequiredItem && activeRequirement) {
+      showNotice(`Necesitas ${activeRequirement.label}. Escanea su QR físico primero.`, 'warn')
+      return
+    }
 
     if (runtime.canEnter) {
       showNotice('Target in range. Use Open Interaction.', 'info')

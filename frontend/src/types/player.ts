@@ -32,6 +32,21 @@ export interface StageMessages {
   [key: string]: string | undefined
 }
 
+export interface StageItemRequirement {
+  item_id?: string
+  required_item_id?: string
+  label?: string
+  required_item_label?: string
+  quantity?: number
+  required_item_quantity?: number
+  consume?: boolean
+  required_item_consume?: boolean
+}
+
+export interface StageRequirements {
+  items?: StageItemRequirement[]
+}
+
 export interface StageConfig {
   [key: string]: unknown
 }
@@ -61,6 +76,7 @@ export interface PlayerStage {
   config?: StageConfig
   minigame?: StageMinigameRuntime
   entry?: StageEntryRules
+  requirements?: StageRequirements
   messages?: StageMessages
 }
 

@@ -13,6 +13,7 @@ type DrawerTab = 'basics' | 'location' | 'game' | 'messages' | 'advanced'
 
 type NodeDetailDrawerProps = {
   stage: AdminReactOverviewStage
+  stages?: AdminReactOverviewStage[]
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
@@ -31,8 +32,33 @@ function numberOrNull(value: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function getPhysicalRequirementOption(stage: AdminReactOverviewStage) {
+  const record = stage as AdminReactOverviewStage & {
+    physical_node_kind?: string
+    physical_item_kind?: string
+    physical_item_id?: string
+    physical_item_label?: string
+    physical_qr?: { item_id?: string; label?: string; kind?: string }
+  }
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+  const itemId = record.physical_item_id || record.physical_qr?.item_id
+  const label = record.physical_item_label || record.physical_qr?.label || stage.title || itemId
+
+  if (!itemId) return null
+  if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
+
+  return {
+    itemId,
+    label: label || itemId,
+    title: stage.title || label || itemId,
+    kind,
+  }
+}
+
 export default function NodeDetailDrawer({
   stage,
+  stages = [],
   onClose,
   onApplyLocal,
   onDeleteLocal,
@@ -59,6 +85,10 @@ export default function NodeDetailDrawer({
     typeof (draft as EditableAdminStage).config === 'object' && (draft as EditableAdminStage).config !== null
       ? (((draft as EditableAdminStage).config || {}) as Record<string, unknown>)
       : {}
+
+  const physicalRequirementOptions = stages
+    .map(getPhysicalRequirementOption)
+    .filter((item): item is NonNullable<ReturnType<typeof getPhysicalRequirementOption>> => Boolean(item))
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -447,6 +477,32 @@ export default function NodeDetailDrawer({
                 <strong>{t('editor.gameAuthoring.requiredItemTitle')}</strong>
                 <span>{t('editor.gameAuthoring.completionHelp')}</span>
               </div>
+
+              <label className="admin-edit-field">
+                Physical QR item
+                <select
+                  value={getDraftConfigText('required_item_id')}
+                  onChange={(event) => {
+                    const selected = physicalRequirementOptions.find((item) => item.itemId === event.target.value)
+
+                    if (!selected) {
+                      updateDraftConfigText('required_item_id', '')
+                      updateDraftConfigText('required_item_label', '')
+                      return
+                    }
+
+                    updateDraftConfigText('required_item_id', selected.itemId)
+                    updateDraftConfigText('required_item_label', selected.label)
+                  }}
+                >
+                  <option value="">No physical item required</option>
+                  {physicalRequirementOptions.map((item) => (
+                    <option key={item.itemId} value={item.itemId}>
+                      {item.kind === 'collectible' ? '⭐' : item.kind === 'requirement' ? '🔒' : item.kind === 'clue' ? '🧩' : '🎁'} {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="admin-edit-grid">
                 <label className="admin-edit-field">
