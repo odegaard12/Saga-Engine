@@ -233,8 +233,8 @@ export default function AdminMissionControlShell({
                         {physicalVisual ? (
                           <span
                             className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
-                            title={`${physicalVisual.label} QR`}
-                            aria-label={`${physicalVisual.label} QR`}
+                            title={physicalVisual.label}
+                            aria-label={physicalVisual.label}
                           >
                             {physicalVisual.icon}
                           </span>
@@ -242,7 +242,7 @@ export default function AdminMissionControlShell({
                         <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
                       </strong>
                       <small>
-                        {physicalVisual ? `${physicalVisual.label} QR` : (stage.label || stage.type)}
+                        {physicalVisual ? physicalVisual.label : (stage.label || stage.type)}
                         {' · '}
                         {formatCoords(stage.lat, stage.lon)}
                       </small>

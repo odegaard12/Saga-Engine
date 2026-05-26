@@ -2347,3 +2347,21 @@
   border-color: rgba(248,113,113,.46);
   color: #fee2e2;
 }
+
+
+/* saga-node-delete-and-requirement-fix-v1 */
+.admin-node-mode-toolbar--type-only {
+  flex-wrap: wrap;
+}
+
+.admin-node-delete-visible {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(127,29,29,.18) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-delete-visible:hover {
+  background: rgba(185,28,28,.30) !important;
+  border-color: rgba(248,113,113,.46) !important;
+  color: #fee2e2 !important;
+}

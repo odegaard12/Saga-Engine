@@ -16,10 +16,10 @@ type NodePhysicalTypePanelProps = {
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
-  { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico opcional o usable como requisito', icon: '⭐' },
+  { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico que se recoge', icon: '⭐' },
   { id: 'requirement', label: 'Llave QR', help: 'Objeto que puede desbloquear otro nodo', icon: '🔑' },
-  { id: 'clue', label: 'Pista', help: 'Tarjeta con pista', icon: '🧩' },
-  { id: 'bonus', label: 'Bonus', help: 'Extra o recompensa', icon: '🎁' },
+  { id: 'clue', label: 'Pista QR', help: 'Tarjeta física con pista', icon: '🧩' },
+  { id: 'bonus', label: 'Bonus QR', help: 'Extra o recompensa física', icon: '🎁' },
 ]
 
 function getPhysicalMode(stage: AdminReactOverviewStage): NodePhysicalMode {
@@ -61,6 +61,53 @@ function formatCoord(value: unknown): string {
   return typeof value === 'number' ? value.toFixed(5) : 'Sin GPS'
 }
 
+function slugifyPhysicalValue(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
+function buildDefaultPhysicalQrCard(
+  stage: AdminReactOverviewStage,
+  kind: PhysicalQrKind,
+): SavedPhysicalQrCard {
+  const record = stage as unknown as Record<string, unknown>
+  const physicalQr =
+    record.physical_qr && typeof record.physical_qr === 'object'
+      ? record.physical_qr as Partial<SavedPhysicalQrCard>
+      : {}
+
+  const mode = physicalModes.find((item) => item.id === kind)
+  const label = String(
+    record.physical_item_label ||
+    physicalQr.label ||
+    stage.title ||
+    'Objeto SAGA'
+  ).trim()
+
+  const itemId = String(
+    record.physical_item_id ||
+    physicalQr.item_id ||
+    slugifyPhysicalValue(label) ||
+    'objeto_saga'
+  ).trim()
+
+  const payload = physicalQr.payload || `SAGA1:ITEM:${itemId}:${label}`
+
+  return {
+    item_id: itemId,
+    label,
+    kind,
+    payload,
+    card_text: physicalQr.card_text || `${mode?.icon || '⭐'} ${label}\n${mode?.label || 'Objeto QR'}\nEscanea esta tarjeta en SAGA.`,
+    updated_at: physicalQr.updated_at || new Date().toISOString(),
+  }
+}
+
 export default function NodePhysicalTypePanel({
   stage,
   onApplyLocal,
@@ -85,9 +132,15 @@ export default function NodePhysicalTypePanel({
       return
     }
 
+    const card = buildDefaultPhysicalQrCard(stage, nextMode)
+
     patchStage({
       physical_node_kind: nextMode,
       physical_item_kind: nextMode,
+      physical_qr: card,
+      qr_payload: card.payload,
+      physical_item_id: card.item_id,
+      physical_item_label: card.label,
     })
     onFinishChoice?.()
   }

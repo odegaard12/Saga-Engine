@@ -63,7 +63,7 @@ function buildPinHtml(stage: AdminReactOverviewStage, selected: boolean, color: 
   const family = escapeHtml(getFamilyLabel(stage))
   const label = `${stage.index + 1}`
   const physicalVisual = getPhysicalNodeVisual(stage)
-  const physicalTitle = physicalVisual ? escapeHtml(`${physicalVisual.label} QR`) : ''
+  const physicalTitle = physicalVisual ? escapeHtml(physicalVisual.label) : ''
   const physicalIcon = physicalVisual ? escapeHtml(physicalVisual.icon) : ''
   const physicalTone = physicalVisual ? escapeHtml(physicalVisual.tone) : ''
 

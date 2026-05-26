@@ -41,6 +41,16 @@ type PhysicalRequirementOption = {
   icon: string
 }
 
+function slugifyRequirementItemId(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
 function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalRequirementOption | null {
   const record = stage as AdminReactOverviewStage & {
     physical_node_kind?: string
@@ -51,11 +61,21 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
   }
 
   const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
-  const itemId = record.physical_item_id || record.physical_qr?.item_id
-  const label = record.physical_item_label || record.physical_qr?.label || stage.title || itemId
-
-  if (!itemId) return null
   if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
+
+  const label = String(
+    record.physical_item_label ||
+    record.physical_qr?.label ||
+    stage.title ||
+    `Nodo ${stage.index + 1}`
+  ).trim()
+
+  const itemId = String(
+    record.physical_item_id ||
+    record.physical_qr?.item_id ||
+    slugifyRequirementItemId(label) ||
+    `node_${stage.index + 1}`
+  ).trim()
 
   return {
     itemId,
@@ -66,7 +86,7 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
       kind === 'collectible'
         ? '⭐'
         : kind === 'requirement'
-          ? '🔒'
+          ? '🔑'
           : kind === 'clue'
             ? '🧩'
             : '🎁',
@@ -662,7 +682,7 @@ export default function NodeDetailDrawer({
               ) : (
                 <div className="admin-rule-empty-state">
                   <strong>No hay objetos QR disponibles.</strong>
-                  <span>Crea primero un nodo Objeto QR, Llave QR, Pista o Bonus y guarda su tarjeta QR. Después podrás pedirlo aquí.</span>
+                  <span>Crea primero un nodo Objeto QR, Llave QR, Pista QR o Bonus QR. Después podrás pedirlo aquí.</span>
                 </div>
               )}
             </section>
