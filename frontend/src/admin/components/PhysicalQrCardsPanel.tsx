@@ -272,7 +272,7 @@ const badge: CSSProperties = {
 
 const layout: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '170px minmax(0, 1fr)',
+  gridTemplateColumns: '1fr',
   gap: 12,
   alignItems: 'stretch',
 }
@@ -282,7 +282,7 @@ const qrCard: CSSProperties = {
   justifyItems: 'center',
   alignContent: 'center',
   gap: 8,
-  padding: 10,
+  padding: 12,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.13)',
   background: 'rgba(15,23,42,.32)',
@@ -335,7 +335,7 @@ const payloadBox: CSSProperties = {
 
 const actions: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1.15fr .9fr .9fr',
+  gridTemplateColumns: '1fr',
   gap: 8,
 }
 

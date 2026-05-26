@@ -13,20 +13,31 @@ type NodePhysicalTypePanelProps = {
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
-  { id: 'collectible', label: 'Coleccionable', help: 'Objeto opcional o misión secundaria', icon: '⭐' },
-  { id: 'requirement', label: 'Requisito', help: 'Objeto necesario para otro nodo', icon: '🔒' },
-  { id: 'clue', label: 'Pista', help: 'Tarjeta con pista física', icon: '🧩' },
+  { id: 'collectible', label: 'Coleccionable', help: 'Objeto opcional o secundaria', icon: '⭐' },
+  { id: 'requirement', label: 'Requisito', help: 'Objeto necesario', icon: '🔒' },
+  { id: 'clue', label: 'Pista', help: 'Tarjeta con pista', icon: '🧩' },
   { id: 'bonus', label: 'Bonus', help: 'Extra o recompensa', icon: '🎁' },
 ]
 
 function getPhysicalMode(stage: AdminReactOverviewStage): NodePhysicalMode {
-  const raw = (stage as AdminReactOverviewStage & { physical_node_kind?: string }).physical_node_kind
+  const record = stage as unknown as Record<string, unknown>
+  const raw = record.physical_node_kind || record.physical_item_kind
+
   if (raw === 'collectible' || raw === 'requirement' || raw === 'clue' || raw === 'bonus') return raw
+
+  const physicalQr = record.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    const qrKind = (physicalQr as Record<string, unknown>).kind
+    if (qrKind === 'collectible' || qrKind === 'requirement' || qrKind === 'clue' || qrKind === 'bonus') {
+      return qrKind
+    }
+  }
+
   return 'none'
 }
 
 function clearPhysicalFields(stage: AdminReactOverviewStage): AdminReactOverviewStage {
-  const next = { ...(stage as Record<string, unknown>) }
+  const next = { ...(stage as unknown as Record<string, unknown>) }
 
   delete next.physical_node_kind
   delete next.physical_qr
@@ -89,8 +100,8 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
           <strong style={title}>{isPhysical ? 'Nodo físico con QR' : 'Nodo normal jugable'}</strong>
           <p style={intro}>
             {isPhysical
-              ? 'Este nodo no usa minijuego normal. Funciona como tarjeta física, coleccionable, pista, bonus o requisito.'
-              : 'Este nodo usa el flujo normal: ubicación, juego, mensajes y reglas del editor.'}
+              ? 'Usa este modo para objetos físicos, pistas, bonus o requisitos. No muestra el editor de minijuego normal.'
+              : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
           </p>
         </div>
         <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
@@ -103,8 +114,10 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
           onClick={() => setMode('none')}
         >
           <span style={modeIcon}>●</span>
-          <strong style={modeLabel}>Normal</strong>
-          <small style={modeHelp}>Nodo de ruta, GPS o minijuego</small>
+          <span>
+            <strong style={modeLabel}>Normal</strong>
+            <small style={modeHelp}>Ruta, GPS o minijuego</small>
+          </span>
         </button>
 
         <div style={physicalGrid}>
@@ -126,12 +139,12 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
       {isPhysical ? (
         <div style={physicalEditor}>
           <div style={sectionTitle}>
-            <span>Datos del nodo físico</span>
-            <small>No se muestran opciones de minijuego normal</small>
+            <span>Datos físicos</span>
+            <small>Sin opciones de minijuego</small>
           </div>
 
           <label style={field}>
-            Nombre visible del punto
+            Nombre visible
             <input
               value={stage.title || ''}
               onChange={(event) => patchStage({ title: event.target.value })}
@@ -160,8 +173,8 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
               <b>{formatCoord((stage as AdminReactOverviewStage & { lon?: unknown }).lon)}</b>
             </div>
             <div style={infoPill}>
-              <span>Ubicación</span>
-              <b>Mover en mapa</b>
+              <span>Mapa</span>
+              <b>Mover punto</b>
             </div>
           </div>
 
@@ -178,7 +191,7 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
         </div>
       ) : (
         <div style={emptyBox}>
-          Nodo normal. Usa el editor inferior para configurar ubicación, familia de juego, mensajes, reglas y opciones avanzadas.
+          Nodo normal. El editor inferior gestiona ubicación, familia de juego, mensajes y reglas.
         </div>
       )}
     </section>
@@ -191,8 +204,7 @@ const panel: CSSProperties = {
   padding: 14,
   borderRadius: 24,
   border: '1px solid rgba(255,255,255,.12)',
-  background:
-    'linear-gradient(180deg, rgba(15,23,42,.60), rgba(15,23,42,.38))',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.60), rgba(15,23,42,.38))',
 }
 
 const head: CSSProperties = {
@@ -251,7 +263,6 @@ const activeBadge: CSSProperties = {
 
 const modeLayout: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr',
   gap: 8,
 }
 
@@ -262,14 +273,14 @@ const physicalGrid: CSSProperties = {
 }
 
 const normalButton: CSSProperties = {
-  minHeight: 84,
+  minHeight: 74,
   display: 'grid',
   gridTemplateColumns: '34px 1fr',
   alignItems: 'center',
   justifyItems: 'start',
   gap: 10,
-  padding: '12px 14px',
-  borderRadius: 20,
+  padding: '10px 14px',
+  borderRadius: 18,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.34)',
   color: '#e2e8f0',
@@ -285,12 +296,12 @@ const normalActiveButton: CSSProperties = {
 }
 
 const modeButton: CSSProperties = {
-  minHeight: 104,
+  minHeight: 88,
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'center',
-  gap: 5,
-  padding: '10px 10px',
+  gap: 4,
+  padding: '9px 10px',
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.34)',
@@ -309,13 +320,13 @@ const activeButton: CSSProperties = {
 
 const modeIcon: CSSProperties = {
   display: 'block',
-  fontSize: 20,
+  fontSize: 19,
   lineHeight: 1,
 }
 
 const modeLabel: CSSProperties = {
   display: 'block',
-  fontSize: 14,
+  fontSize: 13,
   lineHeight: 1.08,
   fontWeight: 950,
 }
@@ -324,8 +335,8 @@ const modeHelp: CSSProperties = {
   display: 'block',
   maxWidth: 150,
   color: 'rgba(226,232,240,.82)',
-  fontSize: 11,
-  lineHeight: 1.2,
+  fontSize: 10,
+  lineHeight: 1.18,
   fontWeight: 760,
 }
 
