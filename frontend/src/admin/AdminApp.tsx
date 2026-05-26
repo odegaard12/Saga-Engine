@@ -42,6 +42,28 @@ type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
 
+
+function preservePhysicalStageFields<T extends Record<string, unknown>>(previous: T, next: T): T {
+  const keys = [
+    'physical_node_kind',
+    'physical_item_kind',
+    'physical_item_id',
+    'physical_item_label',
+    'physical_qr',
+    'qr_payload',
+  ] as const
+
+  const merged = { ...next } as Record<string, unknown>
+
+  for (const key of keys) {
+    if (!(key in merged) && key in previous) {
+      merged[key] = previous[key]
+    }
+  }
+
+  return merged as T
+}
+
 export default function AdminApp() {
   const [config, setConfig] = useState<PublicConfig | null>(null)
   const [state, setState] = useState<LoadState>('loading')
@@ -546,7 +568,7 @@ export default function AdminApp() {
       const currentStages = current.stages || []
       const exists = currentStages.some((stage) => stage.index === nextStage.index)
       const nextStages = exists
-        ? currentStages.map((stage) => (stage.index === nextStage.index ? nextStage : stage))
+        ? currentStages.map((stage) => (stage.index === nextStage.index ? preservePhysicalStageFields(stage as unknown as Record<string, unknown>, nextStage as unknown as Record<string, unknown>) as typeof stage : stage))
         : [...currentStages, nextStage]
 
       const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {

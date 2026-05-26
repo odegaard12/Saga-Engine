@@ -1873,7 +1873,7 @@ def read_stage_item_requirement(raw_stage):
             config.update(items[0])
 
     item_id = _as_str(
-        config.get("required_item_id")
+        config.get("required_item_id", "physical_node_kind")
         or config.get("item_id")
         or config.get("id")
     ).strip()

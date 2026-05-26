@@ -1,3 +1,5 @@
+export type AdminPhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+
 export type AdminReactOverviewStage = {
   id?: number | string
   index: number
@@ -19,6 +21,20 @@ export type AdminReactOverviewStage = {
     gps_unavailable?: string
     locked?: string
   }
+  physical_node_kind?: AdminPhysicalNodeKind
+  physical_item_kind?: AdminPhysicalNodeKind
+  physical_item_id?: string
+  physical_item_label?: string
+  qr_payload?: string
+  physical_qr?: {
+    item_id: string
+    label: string
+    kind: AdminPhysicalNodeKind
+    payload: string
+    card_text?: string
+    updated_at?: string
+  }
+
 }
 
 export type AdminRawStage = Record<string, unknown>
