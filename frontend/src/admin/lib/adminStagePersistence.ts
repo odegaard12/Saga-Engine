@@ -1,4 +1,5 @@
 import type { AdminRawStage, AdminReactOverviewStage } from './adminApi'
+import { withPhysicalStageFields } from './physicalStageFields'
 import {
   buildAdminMinigameBlock,
   getAdminFamilyLabel,
@@ -51,6 +52,7 @@ export function mergeStageForSave(
   })
 
   return {
+    ...withPhysicalStageFields(stage, {}),
     ...(rawStage || {}),
     id:
       typeof stage.id === 'number'
@@ -90,6 +92,7 @@ export function buildRawStageFromOverview(
   )
 
   return {
+    ...withPhysicalStageFields(stage, {}),
     id: typeof stage.id === 'number' ? stage.id : index,
     title: stage.title || `NODE ${index + 1}`,
     type: saveType,
@@ -111,7 +114,7 @@ export function buildRawStageFromOverview(
 }
 
 export function buildRawStagesFromOverview(overviewStages: AdminReactOverviewStage[]) {
-  return overviewStages.map((stage, index) => buildRawStageFromOverview(stage, index))
+  return overviewStages.map((stage, index) => withPhysicalStageFields(stage, buildRawStageFromOverview(stage, index)))
 }
 
 export function mergeOverviewIntoRawStages(

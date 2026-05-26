@@ -320,7 +320,15 @@ export default function AdminMissionControlShell({
 
 function isPhysicalNode(stage: AdminReactOverviewStage | null) {
   if (!stage) return false
-  const kind = (stage as AdminReactOverviewStage & { physical_node_kind?: string }).physical_node_kind
+
+  const record = stage as AdminReactOverviewStage & {
+    physical_node_kind?: string
+    physical_item_kind?: string
+    physical_qr?: { kind?: string }
+  }
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+
   return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
 }
 
