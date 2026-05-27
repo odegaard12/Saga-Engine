@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
@@ -388,6 +388,7 @@ export function MapSurface({
   onNodeTap,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
+  const [mapReadyToken, setMapReadyToken] = useState(0)
   const mapRef = useRef<L.Map | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
@@ -886,9 +887,12 @@ export function MapSurface({
           })
         })
       })
+
       fieldProofLayersRef.current.push(marker)
     }
-  }, [fieldProofs, viewerUser, onDeleteFieldProof])
+  }, [fieldProofs, viewerUser, mapReadyToken])
+
+
 
   useEffect(() => {
     const map = mapRef.current
@@ -1055,6 +1059,8 @@ const mapAnimations = `
   background: transparent;
   border: none;
 }
+
+
 
 
 .saga-field-proof-photo-wrap {
