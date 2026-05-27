@@ -2760,3 +2760,220 @@
     max-height: calc(100vh - 250px) !important;
   }
 }
+
+
+/* admin-node-editor-layout-fix-v4 */
+
+/* ===== Cabecera del editor: ordenada, compacta y sin solapes ===== */
+.admin-drawer-head--modern.admin-node-editor-topbar {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+  padding: 14px 16px 10px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.admin-node-editor-kicker-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  position: static !important;
+}
+
+.admin-node-editor-kicker-row .admin-kicker {
+  position: static !important;
+  display: block !important;
+  margin: 0 !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.20em !important;
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-close {
+  position: static !important;
+  margin: 0 !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  flex: 0 0 auto !important;
+}
+
+.admin-node-editor-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: start !important;
+  position: static !important;
+}
+
+.admin-node-editor-title-copy {
+  min-width: 0 !important;
+}
+
+.admin-node-editor-title-copy h2 {
+  margin: 0 0 8px 0 !important;
+  font-size: clamp(22px, 4vw, 32px) !important;
+  line-height: 1 !important;
+  letter-spacing: -0.045em !important;
+}
+
+.admin-node-editor-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+}
+
+.admin-node-editor-meta span {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+.admin-node-editor-actions button {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-actions .admin-node-delete-visible {
+  background: rgba(127, 29, 29, 0.20) !important;
+  border: 1px solid rgba(248, 113, 113, 0.28) !important;
+  color: #fecaca !important;
+}
+
+/* En pantallas medianas/grandes: título a la izquierda y acciones a la derecha */
+@media (min-width: 760px) {
+  .admin-node-editor-title-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: end !important;
+  }
+
+  .admin-node-editor-actions {
+    justify-content: flex-end !important;
+  }
+}
+
+/* ===== Tabs: siempre visibles, sin scroll horizontal ===== */
+.admin-drawer-tabs.admin-node-editor-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 10px 16px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(2, 6, 23, 0.32) !important;
+}
+
+.admin-node-editor-tabs .admin-drawer-tab {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (min-width: 760px) {
+  .admin-drawer-tabs.admin-node-editor-tabs {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  .admin-node-editor-tabs .admin-drawer-tab {
+    font-size: 12px !important;
+    padding: 0 10px !important;
+  }
+}
+
+/* ===== Más espacio útil para el cuerpo ===== */
+.admin-drawer-body--modern {
+  max-height: calc(100vh - 250px) !important;
+  overflow: auto !important;
+}
+
+@media (min-width: 760px) {
+  .admin-drawer-body--modern {
+    max-height: calc(100vh - 230px) !important;
+  }
+}
+
+/* ===== Cabecera de la pestaña Juego: que no aplaste y no se corte ===== */
+.admin-family-config-section .admin-edit-section-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  align-items: start !important;
+}
+
+.admin-family-config-section .admin-edit-section-head > strong {
+  grid-column: 1 !important;
+  align-self: center !important;
+}
+
+.admin-family-config-section .admin-edit-section-head > span {
+  grid-column: 2 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  font-size: 12px !important;
+  text-align: right !important;
+  max-width: 120px !important;
+}
+
+.admin-family-config-section .admin-game-editor-help {
+  grid-column: 1 / -1 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+.admin-game-catalog-grid {
+  margin-top: 10px !important;
+}
+
+/* ===== Evitar solapes raros heredados ===== */
+.admin-drawer-head-copy,
+.admin-drawer-head--modern > *,
+.admin-node-editor-kicker-row > *,
+.admin-node-editor-title-row > * {
+  position: static !important;
+}
+
+.admin-drawer-head--modern button,
+.admin-drawer-tabs button {
+  transform: none !important;
+}
