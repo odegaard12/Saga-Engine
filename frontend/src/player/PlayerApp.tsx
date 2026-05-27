@@ -1020,14 +1020,14 @@ const mapRouteToggleButton: CSSProperties = {
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 46,
-  height: 42,
-  minWidth: 46,
-  minHeight: 42,
+  width: 44,
+  height: 38,
+  minWidth: 44,
+  minHeight: 38,
   padding: 0,
-  borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.06)',
-  background: 'rgba(255,255,255,.035)',
+  borderRadius: 18,
+  border: '1px solid transparent',
+  background: 'rgba(255,255,255,.03)',
   color: '#f8fafc',
   display: 'inline-flex',
   alignItems: 'center',
@@ -1035,61 +1035,55 @@ const mapRouteToggleInlineButton: CSSProperties = {
   gap: 4,
   fontSize: 16,
   lineHeight: 1,
-  fontWeight: 950,
+  fontWeight: 900,
   textAlign: 'center',
   whiteSpace: 'nowrap',
-  textShadow: '0 1px 8px rgba(15,23,42,.28)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
+  textShadow: '0 1px 6px rgba(15,23,42,.24)',
+  boxShadow: 'none',
+  position: 'relative',
+  overflow: 'hidden',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
   cursor: 'pointer',
   userSelect: 'none',
 }
 
-
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(255,255,255,.11)',
-  border: '1px solid rgba(224,242,254,.28)',
+  background: 'rgba(255,255,255,.10)',
+  border: '1px solid rgba(224,242,254,.24)',
   color: '#e0f2fe',
-  boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,.10), 0 0 0 1px rgba(125,211,252,.08)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
 }
-
-
-const mapQuickCountPill: CSSProperties = {
-  minWidth: 16,
-  height: 16,
-  padding: '0 4px',
-  marginLeft: -5,
-  marginTop: -17,
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(15,23,42,.48)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 9,
-  fontWeight: 950,
-  lineHeight: 1,
-  boxShadow: '0 4px 10px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.10)',
-}
-
 
 const mapQuickIcon: CSSProperties = {
-  width: 30,
-  height: 30,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 17,
+  lineHeight: 1,
+  filter: 'drop-shadow(0 1px 3px rgba(15,23,42,.24))',
+  transform: 'translateY(-0.5px)',
+}
+
+const mapQuickCountPill: CSSProperties = {
+  position: 'absolute',
+  top: 5,
+  right: 5,
+  minWidth: 14,
+  height: 14,
+  padding: '0 3px',
   borderRadius: 999,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background:
-    'radial-gradient(circle at 35% 25%, rgba(255,255,255,.34), rgba(255,255,255,.11) 46%, rgba(15,23,42,.12) 100%)',
-  boxShadow:
-    '0 0 0 1px rgba(255,255,255,.10), 0 6px 14px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.18)',
-  transform: 'translateY(-0.5px)',
-  filter: 'drop-shadow(0 1px 4px rgba(15,23,42,.26))',
+  background: 'rgba(15,23,42,.56)',
+  border: '1px solid rgba(255,255,255,.16)',
+  color: '#ffffff',
+  fontSize: 8,
+  fontWeight: 950,
+  lineHeight: 1,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
@@ -1104,21 +1098,19 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    gap: 6,
-    padding: 6,
-    borderRadius: 26,
-    border: '1px solid rgba(255,255,255,.22)',
+    gap: 2,
+    padding: 4,
+    borderRadius: 24,
+    border: '1px solid rgba(255,255,255,.20)',
     background:
       'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
     boxShadow:
-      '0 18px 42px rgba(15,23,42,.22), inset 0 1px 0 rgba(255,255,255,.12)',
-    backdropFilter: 'blur(20px) saturate(135%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+      '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
+    backdropFilter: 'blur(18px) saturate(130%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(130%)',
     pointerEvents: 'auto',
   }
 }
-
-
 
 function ScreenFrame({
   children,
