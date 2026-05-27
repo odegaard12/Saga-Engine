@@ -66,6 +66,9 @@ export type AdminReactOverviewProfile = {
   display_name: string
   mode?: string
   status?: string
+  color?: string
+  avatar_url?: string
+  avatar_initials?: string
   level?: number | null
   finished?: boolean
   presence?: string

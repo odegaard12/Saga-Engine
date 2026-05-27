@@ -344,12 +344,19 @@ def normalize_player_profile(raw, index=0):
         if mode == "solo" and not members and display_name:
             members = [display_name]
 
+        color = _as_str(raw.get("color") or "").strip()
+        avatar_url = _as_str(raw.get("avatar_url") or "").strip()
+        avatar_initials = _as_str(raw.get("avatar_initials") or "").strip()[:3].upper()
+
         return {
             "id": profile_id,
             "display_name": display_name,
             "mode": mode,
             "members": members,
             "status": status,
+            "color": color,
+            "avatar_url": avatar_url,
+            "avatar_initials": avatar_initials,
         }
 
     display_name = _as_str(raw, f"PLAYER {index + 1}").strip() or f"PLAYER {index + 1}"
@@ -359,10 +366,18 @@ def normalize_player_profile(raw, index=0):
         "mode": "solo",
         "members": [display_name],
         "status": "active",
+        "color": "",
+        "avatar_url": "",
+        "avatar_initials": "",
     }
 
 def get_player_profiles(cfg=None):
     cfg = cfg or load_config()
+
+    raw_profiles = cfg.get("player_profiles")
+    if isinstance(raw_profiles, list) and raw_profiles:
+        return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_profiles)]
+
     raw_players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
     return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_players)]
 
@@ -509,6 +524,9 @@ def project_live_profile_status(profile, raw=None, now=None):
         "session_mode": profile.get("mode", "solo"),
         "members": profile.get("members", []),
         "status": profile.get("status", "active"),
+        "color": profile.get("color", ""),
+        "avatar_url": profile.get("avatar_url", ""),
+        "avatar_initials": profile.get("avatar_initials", ""),
         "presence": presence,
         "last_seen": last_seen,
         "gps_status": gps_status,
@@ -1866,7 +1884,24 @@ async def save_config_endpoint(request: Request):
     except Exception:
         pass
 
-    cfg["players"] = players
+    incoming_profiles = incoming.get("player_profiles")
+    if isinstance(incoming_profiles, list) and incoming_profiles:
+        normalized_profiles = [
+            normalize_player_profile(profile, index=i)
+            for i, profile in enumerate(incoming_profiles)
+        ]
+        cfg["player_profiles"] = normalized_profiles
+        cfg["players"] = [
+            profile.get("id") or profile.get("display_name") or f"PLAYER {i + 1}"
+            for i, profile in enumerate(normalized_profiles)
+        ]
+    else:
+        cfg["players"] = players
+        if "player_profiles" in incoming:
+            cfg["player_profiles"] = [
+                normalize_player_profile(player, index=i)
+                for i, player in enumerate(players)
+            ]
 
     save_config(cfg)
     return {"status": "ok", "config": cfg}

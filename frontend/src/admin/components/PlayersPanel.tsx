@@ -1,5 +1,54 @@
+import type { ChangeEvent } from 'react'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
+
+
+const AVATAR_CANVAS_SIZE = 160
+
+function fileToAvatarDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('El archivo debe ser una imagen.'))
+      return
+    }
+
+    const reader = new FileReader()
+
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'))
+    reader.onload = () => {
+      const image = new Image()
+
+      image.onerror = () => reject(new Error('No se pudo procesar la imagen.'))
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = AVATAR_CANVAS_SIZE
+        canvas.height = AVATAR_CANVAS_SIZE
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Canvas no disponible.'))
+          return
+        }
+
+        ctx.fillStyle = '#0f172a'
+        ctx.fillRect(0, 0, AVATAR_CANVAS_SIZE, AVATAR_CANVAS_SIZE)
+
+        const scale = Math.max(AVATAR_CANVAS_SIZE / image.width, AVATAR_CANVAS_SIZE / image.height)
+        const width = image.width * scale
+        const height = image.height * scale
+        const x = (AVATAR_CANVAS_SIZE - width) / 2
+        const y = (AVATAR_CANVAS_SIZE - height) / 2
+
+        ctx.drawImage(image, x, y, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+
+      image.src = String(reader.result || '')
+    }
+
+    reader.readAsDataURL(file)
+  })
+}
 
 type PlayersPanelProps = {
   playerDrafts: PlayerDraft[]
@@ -20,6 +69,21 @@ export default function PlayersPanel({
   onAddPlayer,
   onSavePlayers,
 }: PlayersPanelProps) {
+  async function handleAvatarFile(event: ChangeEvent<HTMLInputElement>, index: number) {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file)
+      onUpdatePlayer(index, 'avatar_url', dataUrl)
+      onUpdatePlayer(index, 'avatar_initials', '')
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No se pudo cargar el avatar.')
+    } finally {
+      event.currentTarget.value = ''
+    }
+  }
+
   return (
     <div className="admin-cms-local-panel admin-players-panel admin-panel-modern">
       <div className="admin-panel-hero">
@@ -46,15 +110,24 @@ export default function PlayersPanel({
             <section className="admin-player-editor-card admin-player-card-modern" key={`${draft.id}-${index}`}>
               <div className="admin-player-editor-head admin-player-head-modern">
                 <div
-                    className="admin-player-avatar"
-                    style={{
-                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
-                      color: '#ffffff',
-                      boxShadow: '0 10px 26px rgba(15,23,42,0.28)',
-                    }}
-                  >
-                    {draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)}
-                  </div>
+                  className="admin-player-avatar"
+                  style={{
+                    background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                    color: '#ffffff',
+                    boxShadow: '0 10px 26px rgba(15,23,42,0.28)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {draft.avatar_url ? (
+                    <img
+                      src={draft.avatar_url}
+                      alt=""
+                      className="admin-player-avatar-image"
+                    />
+                  ) : (
+                    draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
+                  )}
+                </div>
                 <div>
                   <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
                   <span>{draft.mode === 'team' ? 'Team profile' : 'Solo profile'} · {draft.status || 'active'}</span>
@@ -104,6 +177,58 @@ export default function PlayersPanel({
                     onChange={(event) => onUpdatePlayer(index, 'status', event.target.value)}
                   />
                 </label>
+              </div>
+
+              <div className="admin-player-avatar-tools">
+                <div className="admin-player-avatar-preview-row">
+                  <label>
+                    Color
+                    <input
+                      type="color"
+                      value={/^#[0-9a-fA-F]{6}$/.test(draft.color) ? draft.color : getStablePlayerColor(draft.id || draft.display_name)}
+                      onChange={(event) => onUpdatePlayer(index, 'color', event.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Iniciales
+                    <input
+                      value={draft.avatar_initials}
+                      maxLength={3}
+                      placeholder={getPlayerInitials(draft.display_name || draft.id)}
+                      onChange={(event) => onUpdatePlayer(index, 'avatar_initials', event.target.value.toUpperCase().slice(0, 3))}
+                    />
+                  </label>
+                </div>
+
+                <label className="admin-player-avatar-upload">
+                  Foto/avatar
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => void handleAvatarFile(event, index)}
+                  />
+                  <span>Se comprime en el navegador y se guarda en la configuración runtime, no en el repo.</span>
+                </label>
+
+                <label>
+                  URL/data URL avatar
+                  <input
+                    value={draft.avatar_url}
+                    placeholder="Al subir imagen aparecerá aquí un data:image/..."
+                    onChange={(event) => onUpdatePlayer(index, 'avatar_url', event.target.value)}
+                  />
+                </label>
+
+                {draft.avatar_url ? (
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    onClick={() => onUpdatePlayer(index, 'avatar_url', '')}
+                  >
+                    Quitar foto
+                  </button>
+                ) : null}
               </div>
 
               {draft.mode === 'team' ? (

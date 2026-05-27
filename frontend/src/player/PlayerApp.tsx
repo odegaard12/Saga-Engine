@@ -854,7 +854,13 @@ return
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
-          selfLabel={'YO'}
+          selfLabel={payload.display_name || payload.user || 'YO'}
+          selfProfile={{
+            ...(payload.profile || {}),
+            user: payload.user,
+            display_name: payload.display_name || payload.user,
+            gps_status: gpsState,
+          }}
           onDebugSetPosition={handleDebugSetPosition}
           onNodeTap={handleMapNodeTap}
         />
