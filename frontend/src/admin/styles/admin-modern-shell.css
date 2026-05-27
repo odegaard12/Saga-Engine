@@ -2365,3 +2365,68 @@
   border-color: rgba(248,113,113,.46) !important;
   color: #fee2e2 !important;
 }
+
+
+/* saga-player-avatars-v1 */
+.admin-player-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-player-avatar-tools {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(15,23,42,.22);
+}
+
+.admin-player-avatar-preview-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-player-avatar-tools label {
+  display: grid;
+  gap: 6px;
+  color: rgba(226,232,240,.86);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admin-player-avatar-tools input[type="color"] {
+  width: 100%;
+  height: 40px;
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(15,23,42,.40);
+}
+
+.admin-player-avatar-tools input[type="file"] {
+  width: 100%;
+  color: rgba(226,232,240,.78);
+  font-size: 11px;
+}
+
+.admin-player-avatar-upload span {
+  color: rgba(226,232,240,.56);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.admin-inline-soft {
+  min-height: 34px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.08);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}

@@ -58,13 +58,6 @@ function getPresenceStyle(value?: string): CSSProperties {
   }
 }
 
-function getInitials(name: string) {
-  const cleaned = String(name || '').trim()
-  if (!cleaned) return '?'
-  const parts = cleaned.split(/\s+/).slice(0, 2)
-  return parts.map((part) => part[0]?.toUpperCase() || '').join('') || '?'
-}
-
 function formatDistance(
   currentPosition: { lat: number; lon: number } | null | undefined,
   player: TeamProfileLiveStatus
@@ -127,7 +120,20 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
 
               return (
                 <article key={player.user} style={card}>
-                  <div style={avatar}>{getInitials(player.display_name || player.user)}</div>
+                  <div
+                    style={{
+                      ...avatar,
+                      background: getPlayerColor(player),
+                      border: '1px solid rgba(255,255,255,.20)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {getPlayerAvatarUrl(player) ? (
+                      <img src={getPlayerAvatarUrl(player)} alt="" style={avatarImage} />
+                    ) : (
+                      getPlayerAvatarInitials(player)
+                    )}
+                  </div>
 
                   <div style={content}>
                     <div style={rowTop}>
@@ -267,6 +273,13 @@ const avatar: CSSProperties = {
   fontSize: 13,
   fontWeight: 900,
   letterSpacing: '0.06em',
+}
+
+const avatarImage: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  display: 'block',
 }
 
 const content: CSSProperties = {

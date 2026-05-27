@@ -341,6 +341,9 @@ export default function AdminApp() {
         mode: normalizePlayerMode(draft.mode),
         members,
         status: draft.status.trim() || 'active',
+        color: draft.color || getStablePlayerColor(id || displayName),
+        avatar_url: draft.avatar_url.trim(),
+        avatar_initials: (draft.avatar_initials.trim() || getPlayerInitials(displayName)).slice(0, 3).toUpperCase(),
       }
     })
 
@@ -353,6 +356,9 @@ export default function AdminApp() {
         mode: draft.mode,
         ...(draft.mode === 'team' && draft.members.length > 0 ? { members: draft.members } : {}),
         status: draft.status,
+        color: draft.color,
+        avatar_url: draft.avatar_url,
+        avatar_initials: draft.avatar_initials,
       })),
     }
   }

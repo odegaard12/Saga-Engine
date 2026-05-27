@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import type { PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type FocusRequest =
@@ -59,6 +59,7 @@ type MapSurfaceProps = {
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
   selfLabel?: string
+  selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
 }
@@ -277,6 +278,7 @@ export function MapSurface({
   nodeState = 'locked',
   otherPlayers = [],
   selfLabel = 'YO',
+  selfProfile,
   onDebugSetPosition,
   onNodeTap,
 }: MapSurfaceProps) {
@@ -590,18 +592,26 @@ export function MapSurface({
       playerAuraRef.current.bringToFront()
     }
 
+    const selfMarkerProfile = {
+      ...(selfProfile || {}),
+      user: selfProfile?.user || selfProfile?.id || selfLabel || 'YO',
+      display_name: selfProfile?.display_name || selfLabel || 'YO',
+      avatar_initials: selfProfile?.avatar_initials || getPlayerAvatarInitials(selfProfile) || 'YO',
+      gps_status: gpsState,
+    }
+
     if (!playerMarkerRef.current) {
       playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon({ display_name: 'YO', user: 'YO', avatar_initials: 'YO' }, 'self'),
+        icon: createAvatarIcon(selfMarkerProfile, 'self'),
         keyboard: false,
       }).addTo(map)
 
-      playerMarkerRef.current.bindTooltip('YO', {
+      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
         direction: 'top',
         opacity: 0.92,
       })
       playerMarkerRef.current.bindPopup(
-        buildPlayerPopup({ display_name: 'YO', user: 'YO', avatar_initials: 'YO', gps_status: gpsState }, 'self'),
+        buildPlayerPopup(selfMarkerProfile, 'self'),
         {
           closeButton: true,
           autoPan: true,
@@ -612,6 +622,16 @@ export function MapSurface({
       playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
     } else {
       playerMarkerRef.current.setLatLng(nextLatLng)
+      playerMarkerRef.current.setIcon(createAvatarIcon(selfMarkerProfile, 'self'))
+      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
+        direction: 'top',
+        opacity: 0.92,
+      })
+      playerMarkerRef.current.bindPopup(buildPlayerPopup(selfMarkerProfile, 'self'), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+      })
     }
 
     playerMarkerRef.current.setZIndexOffset(1000)
@@ -647,7 +667,7 @@ export function MapSurface({
         })
       }
     }
-  }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, gpsState, debugSimulation])
+  }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, selfProfile, gpsState, debugSimulation])
 
   useEffect(() => {
     const map = mapRef.current
