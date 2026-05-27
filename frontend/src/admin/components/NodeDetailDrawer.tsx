@@ -9,14 +9,16 @@ import {
   type FamilyId,
 } from '../lib/familyConfigs'
 
-type DrawerTab = 'basics' | 'location' | 'game' | 'messages' | 'advanced'
+type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
 
 type NodeDetailDrawerProps = {
   stage: AdminReactOverviewStage
+  stages?: AdminReactOverviewStage[]
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
   onMoveLocal: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
+  onRequestChangeType?: () => void
   canMoveUp: boolean
   canMoveDown: boolean
 }
@@ -31,12 +33,74 @@ function numberOrNull(value: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+type PhysicalRequirementOption = {
+  itemId: string
+  label: string
+  title: string
+  kind: string
+  icon: string
+}
+
+function slugifyRequirementItemId(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
+function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalRequirementOption | null {
+  const record = stage as AdminReactOverviewStage & {
+    physical_node_kind?: string
+    physical_item_kind?: string
+    physical_item_id?: string
+    physical_item_label?: string
+    physical_qr?: { item_id?: string; label?: string; kind?: string }
+  }
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+  if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
+
+  const label = String(
+    record.physical_item_label ||
+    record.physical_qr?.label ||
+    stage.title ||
+    `Nodo ${stage.index + 1}`
+  ).trim()
+
+  const itemId = String(
+    record.physical_item_id ||
+    record.physical_qr?.item_id ||
+    slugifyRequirementItemId(label) ||
+    `node_${stage.index + 1}`
+  ).trim()
+
+  return {
+    itemId,
+    label: label || itemId,
+    title: stage.title || label || itemId,
+    kind,
+    icon:
+      kind === 'collectible'
+        ? '⭐'
+        : kind === 'requirement'
+          ? '🔑'
+          : kind === 'clue'
+            ? '🧩'
+            : '🎁',
+  }
+}
+
 export default function NodeDetailDrawer({
   stage,
+  stages = [],
   onClose,
   onApplyLocal,
   onDeleteLocal,
   onMoveLocal,
+  onRequestChangeType,
   canMoveUp,
   canMoveDown,
 }: NodeDetailDrawerProps) {
@@ -59,6 +123,15 @@ export default function NodeDetailDrawer({
     typeof (draft as EditableAdminStage).config === 'object' && (draft as EditableAdminStage).config !== null
       ? (((draft as EditableAdminStage).config || {}) as Record<string, unknown>)
       : {}
+
+  const physicalRequirementOptions = stages
+    .filter((candidate) => candidate.index !== draft.index)
+    .map(getPhysicalRequirementOption)
+    .filter((item): item is PhysicalRequirementOption => Boolean(item))
+
+  const selectedRequirement = physicalRequirementOptions.find(
+    (item) => item.itemId === getDraftConfigText('required_item_id')
+  )
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -167,6 +240,23 @@ export default function NodeDetailDrawer({
               <span>{formatCoords(draft.lat, draft.lon)}</span>
               <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
             </div>
+
+            <div className="admin-node-mode-toolbar admin-node-mode-toolbar--type-only">
+              <button type="button" onClick={onRequestChangeType}>
+                Cambiar tipo de nodo
+              </button>
+              <button
+                type="button"
+                className="admin-node-delete-visible"
+                onClick={() => {
+                  if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                    onDeleteLocal(draft)
+                  }
+                }}
+              >
+                Eliminar nodo
+              </button>
+            </div>
           </div>
 
           <button type="button" onClick={onClose}>Close</button>
@@ -192,7 +282,14 @@ export default function NodeDetailDrawer({
             className={activeTab === 'game' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('game')}
           >
-            Game
+            Juego
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'requirement' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
+            onClick={() => setActiveTab('requirement')}
+          >
+            Requisito
           </button>
           <button
             type="button"
@@ -444,49 +541,6 @@ export default function NodeDetailDrawer({
               </label>
 
               <div className="admin-edit-section-head">
-                <strong>{t('editor.gameAuthoring.requiredItemTitle')}</strong>
-                <span>{t('editor.gameAuthoring.completionHelp')}</span>
-              </div>
-
-              <div className="admin-edit-grid">
-                <label className="admin-edit-field">
-                  {t('editor.gameAuthoring.requiredItemId')}
-                  <input
-                    value={getDraftConfigText('required_item_id')}
-                    placeholder="runa_agua"
-                    onChange={(event) => updateDraftConfigText('required_item_id', event.target.value.trim())}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  {t('editor.gameAuthoring.requiredItemLabel')}
-                  <input
-                    value={getDraftConfigText('required_item_label')}
-                    placeholder="Runa de agua"
-                    onChange={(event) => updateDraftConfigText('required_item_label', event.target.value)}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  {t('editor.gameAuthoring.requiredItemQuantity')}
-                  <input
-                    inputMode="numeric"
-                    value={getDraftConfigText('required_item_quantity', '1')}
-                    onChange={(event) => updateDraftConfigNumber('required_item_quantity', event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <label className="admin-edit-check">
-                <input
-                  type="checkbox"
-                  checked={getDraftConfigText('required_item_consume', 'false') === 'true'}
-                  onChange={(event) => updateDraftConfig('required_item_consume', event.target.checked)}
-                />
-                {t('editor.gameAuthoring.consumeItem')}
-              </label>
-
-              <div className="admin-edit-section-head">
                 <strong>{t('editor.gameAuthoring.rewardTitle')}</strong>
                 <span>{t('editor.gameAuthoring.completionHelp')}</span>
               </div>
@@ -524,6 +578,114 @@ export default function NodeDetailDrawer({
               <small className="admin-family-config-note">
                 This panel updates local draft state immediately. Use Save in Mission Control to persist.
               </small>
+            </section>
+          ) : null}
+
+          {activeTab === 'requirement' ? (
+            <section className="admin-edit-section admin-edit-section-compact admin-node-requirement-panel">
+              <div className="admin-edit-section-head">
+                <strong>Requisito de entrada</strong>
+                <span>Opcional. El orden de ruta ya se respeta; activa esto solo si este nodo necesita que el jugador haya escaneado un QR físico.</span>
+              </div>
+
+              {physicalRequirementOptions.length > 0 ? (
+                <>
+                  <label className="admin-edit-field admin-required-item-select">
+                    Para abrir este nodo se necesita
+                    <select
+                      value={getDraftConfigText('required_item_id')}
+                      onChange={(event) => {
+                        const selected = physicalRequirementOptions.find((item) => item.itemId === event.target.value)
+
+                        if (!selected) {
+                          updateDraftConfigText('required_item_id', '')
+                          updateDraftConfigText('required_item_label', '')
+                          updateDraftConfigNumber('required_item_quantity', '1')
+                          updateDraftConfig('required_item_consume', false)
+                          return
+                        }
+
+                        updateDraftConfigText('required_item_id', selected.itemId)
+                        updateDraftConfigText('required_item_label', selected.label)
+                        updateDraftConfigNumber('required_item_quantity', '1')
+                      }}
+                    >
+                      <option value="">Nada: solo seguir el orden de ruta</option>
+                      {physicalRequirementOptions.map((item) => (
+                        <option key={item.itemId} value={item.itemId}>
+                          {item.icon} {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {selectedRequirement ? (
+                    <div className="admin-requirement-summary">
+                      <span>{selectedRequirement.icon}</span>
+                      <div>
+                        <strong>{selectedRequirement.label}</strong>
+                        <small>Este nodo queda bloqueado hasta que el jugador escanee ese objeto QR.</small>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="admin-requirement-summary admin-requirement-summary--off">
+                      <span>✓</span>
+                      <div>
+                        <strong>Sin requisito físico</strong>
+                        <small>Este nodo solo depende del orden de ruta, GPS y reglas normales.</small>
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="admin-edit-check">
+                    <input
+                      type="checkbox"
+                      checked={getDraftConfigText('required_item_consume', 'false') === 'true'}
+                      disabled={!getDraftConfigText('required_item_id')}
+                      onChange={(event) => updateDraftConfig('required_item_consume', event.target.checked)}
+                    />
+                    Consumir objeto al superar el nodo
+                  </label>
+
+                  <details className="admin-requirement-advanced">
+                    <summary>Avanzado: editar ID manualmente</summary>
+
+                    <div className="admin-edit-grid">
+                      <label className="admin-edit-field">
+                        ID requerido
+                        <input
+                          value={getDraftConfigText('required_item_id')}
+                          placeholder="el_miedo"
+                          onChange={(event) => updateDraftConfigText('required_item_id', event.target.value.trim())}
+                        />
+                      </label>
+
+                      <label className="admin-edit-field">
+                        Nombre visible
+                        <input
+                          value={getDraftConfigText('required_item_label')}
+                          placeholder="El MIEDO"
+                          onChange={(event) => updateDraftConfigText('required_item_label', event.target.value)}
+                        />
+                      </label>
+
+                      <label className="admin-edit-field">
+                        Cantidad
+                        <input
+                          inputMode="numeric"
+                          value={getDraftConfigText('required_item_quantity', '1')}
+                          onChange={(event) => updateDraftConfigNumber('required_item_quantity', event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <div className="admin-rule-empty-state">
+                  <strong>No hay objetos QR disponibles.</strong>
+                  <span>Crea primero un nodo Objeto QR, Llave QR, Pista QR o Bonus QR. Después podrás pedirlo aquí.</span>
+                </div>
+              )}
             </section>
           ) : null}
 

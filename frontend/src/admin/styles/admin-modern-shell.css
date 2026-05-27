@@ -2009,3 +2009,359 @@
   flex: 0 0 auto;
   margin-right: 0;
 }
+
+
+/* saga-node-flow-polish-v1 */
+.saga-node-type-choice-screen {
+  height: 100%;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.saga-node-row {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 62px;
+  padding: 7px;
+  border-radius: 20px;
+}
+
+.saga-node-main {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.saga-node-main:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.72);
+  outline-offset: 3px;
+  border-radius: 16px;
+}
+
+.saga-node-title-line {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.saga-node-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saga-node-title-line .saga-physical-node-badge {
+  flex: 0 0 auto;
+  margin-right: 0;
+}
+
+.saga-node-order-actions {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  align-self: stretch;
+  min-width: 34px;
+}
+
+.saga-node-order-actions button {
+  width: 34px;
+  min-width: 34px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(15, 23, 42, 0.46);
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.saga-node-order-actions button:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(125, 211, 252, 0.36);
+  color: #f8fafc;
+}
+
+.saga-node-order-actions button:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.admin-node-mode-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.admin-node-mode-toolbar span {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.admin-node-mode-toolbar button {
+  min-height: 32px !important;
+  padding: 0 11px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(15, 23, 42, 0.54) !important;
+  color: #f8fafc !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.admin-node-mode-toolbar button:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.24) !important;
+  border-color: rgba(125, 211, 252, 0.34) !important;
+}
+
+.admin-node-mode-toolbar button:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+
+/* saga-node-editor-type-button-v2 */
+.admin-node-mode-toolbar--type-only {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-node-mode-toolbar--type-only button {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(125, 211, 252, 0.22) !important;
+  background: rgba(14, 165, 233, 0.14) !important;
+  color: #e0f2fe !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+.admin-node-mode-toolbar--type-only button:hover {
+  background: rgba(14, 165, 233, 0.24) !important;
+  border-color: rgba(125, 211, 252, 0.40) !important;
+}
+
+
+/* saga-requirement-simple-v1 */
+.admin-node-requirement-panel {
+  border-color: rgba(125, 211, 252, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(14,165,233,.08), rgba(15,23,42,.18)) !important;
+}
+
+.admin-required-item-select select {
+  min-height: 46px;
+  border-color: rgba(125, 211, 252, 0.24) !important;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,.94), rgba(30,41,59,.90)) !important;
+}
+
+.admin-requirement-summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(187,247,208,.22);
+  background: rgba(34,197,94,.10);
+}
+
+.admin-requirement-summary > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(15,23,42,.44);
+  font-size: 17px;
+}
+
+.admin-requirement-summary strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.admin-requirement-summary small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(226,232,240,.72);
+  font-size: 11px;
+  line-height: 1.32;
+  font-weight: 760;
+}
+
+.admin-requirement-summary--off {
+  border-color: rgba(148,163,184,.18);
+  background: rgba(148,163,184,.08);
+}
+
+.admin-rule-empty-state {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(251,191,36,.32);
+  background: rgba(251,191,36,.08);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 820;
+  line-height: 1.4;
+}
+
+.admin-rule-empty-state strong {
+  color: #fef3c7;
+  font-size: 13px;
+}
+
+.admin-rule-empty-state span {
+  color: rgba(254,243,199,.82);
+}
+
+.admin-requirement-advanced {
+  margin-top: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(15,23,42,.22);
+  padding: 10px 12px;
+}
+
+.admin-requirement-advanced summary {
+  cursor: pointer;
+  color: rgba(226,232,240,.82);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-requirement-advanced .admin-edit-grid {
+  margin-top: 12px;
+}
+
+.saga-physical-node-actions {
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.saga-danger-action {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 16px;
+  border: 1px solid rgba(248,113,113,.30);
+  background: rgba(127,29,29,.22);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.saga-danger-action:hover {
+  background: rgba(185,28,28,.30);
+  border-color: rgba(248,113,113,.46);
+  color: #fee2e2;
+}
+
+
+/* saga-node-delete-visible-v1 */
+.admin-node-mode-toolbar--type-only {
+  flex-wrap: wrap;
+}
+
+.admin-node-delete-visible {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(127,29,29,.18) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-delete-visible:hover {
+  background: rgba(185,28,28,.30) !important;
+  border-color: rgba(248,113,113,.46) !important;
+  color: #fee2e2 !important;
+}
+
+
+/* saga-node-delete-visible-v2 */
+.admin-node-mode-toolbar--type-only {
+  flex-wrap: wrap;
+}
+
+.admin-node-delete-visible {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(127,29,29,.18) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-delete-visible:hover {
+  background: rgba(185,28,28,.30) !important;
+  border-color: rgba(248,113,113,.46) !important;
+  color: #fee2e2 !important;
+}
+
+.saga-physical-node-actions {
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.saga-danger-action {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 16px;
+  border: 1px solid rgba(248,113,113,.30);
+  background: rgba(127,29,29,.22);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.saga-danger-action:hover {
+  background: rgba(185,28,28,.30);
+  border-color: rgba(248,113,113,.46);
+  color: #fee2e2;
+}
+
+
+/* saga-node-delete-and-requirement-fix-v1 */
+.admin-node-mode-toolbar--type-only {
+  flex-wrap: wrap;
+}
+
+.admin-node-delete-visible {
+  border-color: rgba(248,113,113,.28) !important;
+  background: rgba(127,29,29,.18) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-delete-visible:hover {
+  background: rgba(185,28,28,.30) !important;
+  border-color: rgba(248,113,113,.46) !important;
+  color: #fee2e2 !important;
+}

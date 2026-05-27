@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, TeamProfileLiveStatus } from '../types/player'
+import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -46,6 +46,25 @@ function getUserFromUrl(): string {
   return params.get('user') || 'PLAYER 1'
 }
 
+function isPhysicalQrStage(stage: PlayerStage | null): boolean {
+  if (!stage || typeof stage !== 'object') return false
+
+  const record = stage as unknown as Record<string, unknown>
+  const flatKind = record.physical_node_kind || record.physical_item_kind
+
+  if (flatKind === 'collectible' || flatKind === 'requirement' || flatKind === 'clue' || flatKind === 'bonus') {
+    return true
+  }
+
+  const physicalQr = record.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    const kind = (physicalQr as Record<string, unknown>).kind
+    return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
+  }
+
+  return false
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -67,6 +86,7 @@ export default function PlayerApp() {
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
+  const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -306,6 +326,7 @@ export default function PlayerApp() {
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
+  const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
 
   const rawLivePlayerPosition = getPlayerPosition(payload)
   const secureLiveGpsContext =
@@ -378,7 +399,7 @@ export default function PlayerApp() {
   const adminHref = '/admin'
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(browserGpsPosition)
-  const primaryLabel = gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
+  const primaryLabel = currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   async function refreshPayload() {
@@ -657,6 +678,25 @@ return
       return
     }
 
+    if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        vibrate(8)
+        return
+      }
+
+      setFocusRequest({ target: 'node', token: Date.now() })
+      setQuickQrOpenSignal(Date.now())
+      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      vibrate([10, 16, 10])
+      return
+    }
+
     if (!runtime.canEnter) return
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
@@ -675,6 +715,22 @@ return
     }
 
     setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        return
+      }
+
+      setQuickQrOpenSignal(Date.now())
+      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      return
+    }
 
     if (runtime.canEnter) {
       showNotice('Target in range. Use Open Interaction.', 'info')
@@ -821,13 +877,43 @@ return
           <ToastNotice notice={uiNotice} />
         </div>
 
-        {activePanel !== 'details' && !toolsOpen && !overlayState ? (
+        {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
               user={user}
               mobile={isPhone}
               hidden={false}
+              openSignal={quickQrOpenSignal}
+              showLauncher={false}
             />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                showNotice('📸 Prueba rápida: fotos de mapa y carrusel llegarán en el siguiente PR.', 'info')
+                vibrate(8)
+              }}
+              aria-label="Prueba rápida"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>📷</span>
+            </button>
+
+            <button
+              type="button"
+              style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                openTeam()
+              }}
+              aria-label="Jugadores"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>👥</span>
+              <span style={mapQuickCountPill}>{teamVisibleCount}</span>
+            </button>
 
             <button
               type="button"
@@ -839,7 +925,7 @@ return
               }}
               aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
             >
-              {routeOverviewActive ? '◎' : '↔'}
+              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '📍' : '🧭'}</span>
             </button>
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
@@ -934,50 +1020,97 @@ const mapRouteToggleButton: CSSProperties = {
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
-  ...mapRouteToggleButton,
-  position: 'static',
-  right: 'auto',
-  bottom: 'auto',
-  zIndex: 'auto',
-  gridColumn: 3,
-  justifySelf: 'start',
-  alignSelf: 'center',
-  width: 42,
-  height: 42,
-  minWidth: 42,
-  minHeight: 42,
+  width: 44,
+  height: 38,
+  minWidth: 44,
+  minHeight: 38,
   padding: 0,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 17,
-  border: '1px solid rgba(255,255,255,.12)',
-  background:
-    'linear-gradient(180deg, rgba(148,163,184,.20), rgba(100,116,139,.17))',
+  borderRadius: 18,
+  border: '1px solid transparent',
+  background: 'rgba(255,255,255,.03)',
   color: '#f8fafc',
-  boxShadow: '0 12px 26px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.06)',
-  backdropFilter: 'blur(20px) saturate(1.10)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.10)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  fontSize: 16,
+  lineHeight: 1,
+  fontWeight: 900,
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  textShadow: '0 1px 6px rgba(15,23,42,.24)',
+  boxShadow: 'none',
+  position: 'relative',
+  overflow: 'hidden',
+  pointerEvents: 'auto',
+  touchAction: 'manipulation',
+  cursor: 'pointer',
+  userSelect: 'none',
+}
+
+const mapQuickButtonActive: CSSProperties = {
+  ...mapRouteToggleInlineButton,
+  background: 'rgba(255,255,255,.10)',
+  border: '1px solid rgba(224,242,254,.24)',
+  color: '#e0f2fe',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+}
+
+const mapQuickIcon: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   fontSize: 17,
   lineHeight: 1,
+  filter: 'drop-shadow(0 1px 3px rgba(15,23,42,.24))',
+  transform: 'translateY(-0.5px)',
+}
+
+const mapQuickCountPill: CSSProperties = {
+  position: 'absolute',
+  top: 5,
+  right: 5,
+  minWidth: 14,
+  height: 14,
+  padding: '0 3px',
+  borderRadius: 999,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(15,23,42,.56)',
+  border: '1px solid rgba(255,255,255,.16)',
+  color: '#ffffff',
+  fontSize: 8,
   fontWeight: 950,
-  textAlign: 'center',
+  lineHeight: 1,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
-    left: mobile ? 12 : 24,
-    right: mobile ? 12 : 24,
+    left: '50%',
     bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 138px)' : 148,
+    transform: 'translateX(-50%)',
     zIndex: 4600,
-    display: 'grid',
-    gridTemplateColumns: '1fr auto auto 1fr',
+    display: 'inline-flex',
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
+    gap: 2,
+    padding: 4,
+    borderRadius: 24,
+    border: '1px solid rgba(255,255,255,.20)',
+    background:
+      'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
+    boxShadow:
+      '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
+    backdropFilter: 'blur(18px) saturate(130%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(130%)',
     pointerEvents: 'auto',
   }
 }
-
 
 function ScreenFrame({
   children,

@@ -20,15 +20,15 @@ type PhysicalQrCardsPanelProps = {
 }
 
 const kindLabels: Record<PhysicalQrKind, string> = {
-  collectible: 'Coleccionable',
-  requirement: 'Requisito',
-  clue: 'Pista',
-  bonus: 'Bonus',
+  collectible: 'Objeto QR',
+  requirement: 'Llave QR',
+  clue: 'Pista QR',
+  bonus: 'Bonus QR',
 }
 
 const kindIcons: Record<PhysicalQrKind, string> = {
   collectible: '⭐',
-  requirement: '🔒',
+  requirement: '🔑',
   clue: '🧩',
   bonus: '🎁',
 }

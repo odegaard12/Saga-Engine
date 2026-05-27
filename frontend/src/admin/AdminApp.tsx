@@ -54,6 +54,20 @@ function preservePhysicalStageFields<T extends Record<string, unknown>>(previous
   ] as const
 
   const merged = { ...next } as Record<string, unknown>
+  const clearPhysical =
+    merged._clear_physical_fields === true ||
+    merged._physical_node_mode === 'normal' ||
+    merged.physical_node_kind === null ||
+    merged.physical_item_kind === null
+
+  if (clearPhysical) {
+    for (const key of keys) {
+      delete merged[key]
+    }
+    delete merged._clear_physical_fields
+    delete merged._physical_node_mode
+    return merged as T
+  }
 
   for (const key of keys) {
     if (!(key in merged) && key in previous) {

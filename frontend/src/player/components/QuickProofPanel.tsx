@@ -6,6 +6,8 @@ interface QuickProofPanelProps {
   user: string
   mobile: boolean
   hidden: boolean
+  openSignal?: number
+  showLauncher?: boolean
 }
 
 type ParsedQrItem = {
@@ -102,7 +104,13 @@ function parseQrItem(value: string): ParsedQrItem | null {
   }
 }
 
-export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) {
+export function QuickProofPanel({
+  user,
+  mobile,
+  hidden,
+  openSignal = 0,
+  showLauncher = true,
+}: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
@@ -171,10 +179,23 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
       setMessage(`Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
       setMode('idle')
       stopCamera()
+      window.dispatchEvent(new CustomEvent('saga:inventory-updated', {
+        detail: {
+          user,
+          item_id: parsed.item_id,
+          label: parsed.label,
+          source: 'qr',
+        },
+      }))
     } catch {
       setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
     }
   }
+
+  useEffect(() => {
+    if (!openSignal || hidden) return
+    void startQrScan()
+  }, [openSignal, hidden])
 
   async function startQrScan() {
     if (typeof window === 'undefined') return
@@ -246,6 +267,8 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
 
   if (hidden) return null
 
+  if (!showLauncher && mode === 'idle' && !notice) return null
+
   return (
     <div style={getWrapperStyle(mobile)} aria-label="Escaneo QR de campo">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
@@ -285,11 +308,13 @@ export function QuickProofPanel({ user, mobile, hidden }: QuickProofPanelProps) 
         </section>
       ) : null}
 
-      <div style={dock}>
-        <button type="button" style={dockButtonWide} onClick={() => void startQrScan()}>
-          QR
-        </button>
-      </div>
+      {showLauncher ? (
+        <div style={dock}>
+          <button type="button" style={dockButtonWide} onClick={() => void startQrScan()}>
+            QR
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

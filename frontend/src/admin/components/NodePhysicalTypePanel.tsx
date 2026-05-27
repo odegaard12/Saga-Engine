@@ -10,13 +10,16 @@ type NodePhysicalMode = 'none' | PhysicalQrKind
 type NodePhysicalTypePanelProps = {
   stage: AdminReactOverviewStage
   onApplyLocal: (stage: AdminReactOverviewStage) => void
+  chooserOnly?: boolean
+  onFinishChoice?: () => void
+  onRequestChangeType?: () => void
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
-  { id: 'collectible', label: 'Coleccionable', help: 'Objeto opcional o secundaria', icon: '⭐' },
-  { id: 'requirement', label: 'Requisito', help: 'Objeto necesario', icon: '🔒' },
-  { id: 'clue', label: 'Pista', help: 'Tarjeta con pista', icon: '🧩' },
-  { id: 'bonus', label: 'Bonus', help: 'Extra o recompensa', icon: '🎁' },
+  { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico que se recoge', icon: '⭐' },
+  { id: 'requirement', label: 'Llave QR', help: 'Objeto que puede desbloquear otro nodo', icon: '🔑' },
+  { id: 'clue', label: 'Pista QR', help: 'Tarjeta física con pista', icon: '🧩' },
+  { id: 'bonus', label: 'Bonus QR', help: 'Extra o recompensa física', icon: '🎁' },
 ]
 
 function getPhysicalMode(stage: AdminReactOverviewStage): NodePhysicalMode {
@@ -58,7 +61,60 @@ function formatCoord(value: unknown): string {
   return typeof value === 'number' ? value.toFixed(5) : 'Sin GPS'
 }
 
-export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysicalTypePanelProps) {
+function slugifyPhysicalValue(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
+function buildDefaultPhysicalQrCard(
+  stage: AdminReactOverviewStage,
+  kind: PhysicalQrKind,
+): SavedPhysicalQrCard {
+  const record = stage as unknown as Record<string, unknown>
+  const physicalQr =
+    record.physical_qr && typeof record.physical_qr === 'object'
+      ? record.physical_qr as Partial<SavedPhysicalQrCard>
+      : {}
+
+  const mode = physicalModes.find((item) => item.id === kind)
+  const label = String(
+    record.physical_item_label ||
+    physicalQr.label ||
+    stage.title ||
+    'Objeto SAGA'
+  ).trim()
+
+  const itemId = String(
+    record.physical_item_id ||
+    physicalQr.item_id ||
+    slugifyPhysicalValue(label) ||
+    'objeto_saga'
+  ).trim()
+
+  const payload = physicalQr.payload || `SAGA1:ITEM:${itemId}:${label}`
+
+  return {
+    item_id: itemId,
+    label,
+    kind,
+    payload,
+    card_text: physicalQr.card_text || `${mode?.icon || '⭐'} ${label}\n${mode?.label || 'Objeto QR'}\nEscanea esta tarjeta en SAGA.`,
+    updated_at: physicalQr.updated_at || new Date().toISOString(),
+  }
+}
+
+export default function NodePhysicalTypePanel({
+  stage,
+  onApplyLocal,
+  chooserOnly = false,
+  onFinishChoice,
+  onRequestChangeType,
+}: NodePhysicalTypePanelProps) {
   const mode = getPhysicalMode(stage)
   const isPhysical = mode !== 'none'
 
@@ -72,13 +128,21 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
   function setMode(nextMode: NodePhysicalMode) {
     if (nextMode === 'none') {
       onApplyLocal(clearPhysicalFields(stage))
+      onFinishChoice?.()
       return
     }
+
+    const card = buildDefaultPhysicalQrCard(stage, nextMode)
 
     patchStage({
       physical_node_kind: nextMode,
       physical_item_kind: nextMode,
+      physical_qr: card,
+      qr_payload: card.payload,
+      physical_item_id: card.item_id,
+      physical_item_label: card.label,
     })
+    onFinishChoice?.()
   }
 
   function saveQrCard(card: SavedPhysicalQrCard) {
@@ -97,46 +161,55 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
       <div style={head}>
         <div>
           <div style={eyebrow}>TIPO DE NODO</div>
-          <strong style={title}>{isPhysical ? 'Nodo físico con QR' : 'Nodo normal jugable'}</strong>
+          <strong style={title}>{isPhysical ? 'Nodo QR físico' : 'Nodo normal jugable'}</strong>
           <p style={intro}>
             {isPhysical
-              ? 'Usa este modo para objetos físicos, pistas, bonus o requisitos. No muestra el editor de minijuego normal.'
+              ? 'Usa este modo para objetos físicos, llaves, pistas o bonus. No muestra el editor de minijuego normal.'
               : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
           </p>
         </div>
         <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
       </div>
 
-      <div style={modeLayout}>
-        <button
-          type="button"
-          style={mode === 'none' ? normalActiveButton : normalButton}
-          onClick={() => setMode('none')}
-        >
-          <span style={modeIcon}>●</span>
-          <span>
-            <strong style={modeLabel}>Normal</strong>
-            <small style={modeHelp}>Ruta, GPS o minijuego</small>
-          </span>
-        </button>
+      {chooserOnly ? (
+        <div style={modeLayout}>
+          <button
+            type="button"
+            style={mode === 'none' ? normalActiveButton : normalButton}
+            onClick={() => setMode('none')}
+          >
+            <span style={modeIcon}>●</span>
+            <span>
+              <strong style={modeLabel}>Normal</strong>
+              <small style={modeHelp}>Ruta, GPS o minijuego</small>
+            </span>
+          </button>
 
-        <div style={physicalGrid}>
-          {physicalModes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              style={mode === item.id ? activeButton : modeButton}
-              onClick={() => setMode(item.id)}
-            >
-              <span style={modeIcon}>{item.icon}</span>
-              <strong style={modeLabel}>{item.label}</strong>
-              <small style={modeHelp}>{item.help}</small>
-            </button>
-          ))}
+          <div style={physicalGrid}>
+            {physicalModes.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                style={mode === item.id ? activeButton : modeButton}
+                onClick={() => setMode(item.id)}
+              >
+                <span style={modeIcon}>{item.icon}</span>
+                <strong style={modeLabel}>{item.label}</strong>
+                <small style={modeHelp}>{item.help}</small>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={changeTypeBar}>
+          <span>{isPhysical ? 'Editor de nodo físico QR' : 'Editor de nodo normal'}</span>
+          <button type="button" style={changeTypeButton} onClick={onRequestChangeType}>
+            Cambiar tipo de nodo
+          </button>
+        </div>
+      )}
 
-      {isPhysical ? (
+      {!chooserOnly && isPhysical ? (
         <div style={physicalEditor}>
           <div style={sectionTitle}>
             <span>Datos físicos</span>
@@ -189,11 +262,11 @@ export default function NodePhysicalTypePanel({ stage, onApplyLocal }: NodePhysi
             onSaveToNode={saveQrCard}
           />
         </div>
-      ) : (
+      ) : !chooserOnly ? (
         <div style={emptyBox}>
-          Nodo normal. El editor inferior gestiona ubicación, familia de juego, mensajes y reglas.
+          Nodo normal. El editor de juego, ubicación, mensajes y reglas está debajo.
         </div>
-      )}
+      ) : null}
     </section>
   )
 }
@@ -409,4 +482,30 @@ const emptyBox: CSSProperties = {
   color: 'rgba(226,232,240,.72)',
   fontSize: 12,
   lineHeight: 1.35,
+}
+
+
+const changeTypeBar: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  padding: 10,
+  borderRadius: 18,
+  border: '1px solid rgba(125,211,252,.18)',
+  background: 'rgba(14,165,233,.10)',
+  color: '#dbeafe',
+  fontSize: 12,
+  fontWeight: 850,
+}
+
+const changeTypeButton: CSSProperties = {
+  minHeight: 34,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'rgba(15,23,42,.56)',
+  color: '#f8fafc',
+  fontSize: 11,
+  fontWeight: 950,
 }
