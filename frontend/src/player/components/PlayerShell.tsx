@@ -77,19 +77,11 @@ export function PlayerShell({
         <div style={topRow}>
           <div style={eyebrow}>{playerName}</div>
 
-          <div style={pillRow}>
-            <div style={soloPill}>{mode === 'team' ? 'EQUIPO' : 'SOLO'}</div>
-
-            <button
-              type="button"
-              style={teamOpen ? teamButtonActive : teamButton}
-              onClick={onOpenTeam}
-            >
-              <span>JUGADORES</span>
-              <span style={teamCountPill}>{teamCount}</span>
-              {teamLiveCount > 0 ? <span style={teamLiveDot} /> : null}
-            </button>
-          </div>
+          {mode === 'team' ? (
+            <div style={pillRow}>
+              <div style={soloPill}>EQUIPO</div>
+            </div>
+          ) : null}
         </div>
 
         <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{stageName}</div>

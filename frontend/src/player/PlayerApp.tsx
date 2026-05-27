@@ -903,6 +903,19 @@ return
 
             <button
               type="button"
+              style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                openTeam()
+              }}
+              aria-label="Jugadores"
+            >
+              👥 {teamVisibleCount}
+            </button>
+
+            <button
+              type="button"
               style={mapRouteToggleInlineButton}
               onClick={(event) => {
                 event.preventDefault()
@@ -1033,6 +1046,13 @@ const mapRouteToggleInlineButton: CSSProperties = {
   lineHeight: 1,
   fontWeight: 950,
   textAlign: 'center',
+}
+
+const mapQuickButtonActive: CSSProperties = {
+  ...mapRouteToggleInlineButton,
+  background: 'rgba(59,130,246,.24)',
+  border: '1px solid rgba(147,197,253,.42)',
+  color: '#dbeafe',
 }
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
