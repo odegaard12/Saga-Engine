@@ -1275,6 +1275,7 @@ const mapAnimations = `
 
 
 
+
 .saga-player-cluster-wrap,
 .saga-field-proof-photo-wrap {
   background: transparent;
