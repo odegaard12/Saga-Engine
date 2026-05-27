@@ -925,7 +925,7 @@ return
               }}
               aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
             >
-              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '◎' : '⌖'}</span>
+              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '◎' : '🧭'}</span>
             </button>
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
@@ -1020,14 +1020,14 @@ const mapRouteToggleButton: CSSProperties = {
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 44,
-  height: 40,
-  minWidth: 44,
-  minHeight: 40,
+  width: 46,
+  height: 42,
+  minWidth: 46,
+  minHeight: 42,
   padding: 0,
-  borderRadius: 18,
-  border: '1px solid transparent',
-  background: 'transparent',
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,.06)',
+  background: 'rgba(255,255,255,.035)',
   color: '#f8fafc',
   display: 'inline-flex',
   alignItems: 'center',
@@ -1039,44 +1039,57 @@ const mapRouteToggleInlineButton: CSSProperties = {
   textAlign: 'center',
   whiteSpace: 'nowrap',
   textShadow: '0 1px 8px rgba(15,23,42,.28)',
-  boxShadow: 'none',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
   cursor: 'pointer',
   userSelect: 'none',
 }
 
+
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(125,211,252,.16)',
-  border: '1px solid rgba(125,211,252,.26)',
+  background: 'rgba(255,255,255,.11)',
+  border: '1px solid rgba(224,242,254,.28)',
   color: '#e0f2fe',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+  boxShadow:
+    'inset 0 1px 0 rgba(255,255,255,.10), 0 0 0 1px rgba(125,211,252,.08)',
 }
+
 
 const mapQuickCountPill: CSSProperties = {
   minWidth: 16,
   height: 16,
   padding: '0 4px',
-  marginLeft: -1,
+  marginLeft: -5,
+  marginTop: -17,
   borderRadius: 999,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(255,255,255,.16)',
+  background: 'rgba(15,23,42,.48)',
+  border: '1px solid rgba(255,255,255,.16)',
   color: '#ffffff',
   fontSize: 9,
   fontWeight: 950,
   lineHeight: 1,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+  boxShadow: '0 4px 10px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
+
 const mapQuickIcon: CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 999,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  background:
+    'radial-gradient(circle at 35% 25%, rgba(255,255,255,.34), rgba(255,255,255,.11) 46%, rgba(15,23,42,.12) 100%)',
+  boxShadow:
+    '0 0 0 1px rgba(255,255,255,.10), 0 6px 14px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.18)',
   transform: 'translateY(-0.5px)',
-  filter: 'drop-shadow(0 1px 4px rgba(15,23,42,.32))',
+  filter: 'drop-shadow(0 1px 4px rgba(15,23,42,.26))',
 }
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
@@ -1091,16 +1104,16 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    gap: 4,
-    padding: 4,
-    borderRadius: 22,
-    border: '1px solid rgba(255,255,255,.18)',
+    gap: 6,
+    padding: 6,
+    borderRadius: 26,
+    border: '1px solid rgba(255,255,255,.22)',
     background:
-      'linear-gradient(180deg, rgba(15,23,42,.54), rgba(15,23,42,.34))',
+      'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
     boxShadow:
-      '0 16px 38px rgba(15,23,42,.24), inset 0 1px 0 rgba(255,255,255,.08)',
-    backdropFilter: 'blur(20px) saturate(1.18)',
-    WebkitBackdropFilter: 'blur(20px) saturate(1.18)',
+      '0 18px 42px rgba(15,23,42,.22), inset 0 1px 0 rgba(255,255,255,.12)',
+    backdropFilter: 'blur(20px) saturate(135%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(135%)',
     pointerEvents: 'auto',
   }
 }
