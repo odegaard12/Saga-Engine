@@ -248,20 +248,21 @@ function groupFieldProofs(proofs: FieldProof[], radiusMeters = 100): FieldProofG
 }
 
 function createFieldProofIcon(proofs: FieldProof[]) {
-  const latest = proofs[0]
-  const image = escapeHtml(getFieldProofImage(latest))
-  const count = proofs.length
+  const first = proofs[0]
+  const image = escapeHtml(getFieldProofImage(first))
+  const count = proofs.length > 1 ? `<span>${proofs.length}</span>` : ''
 
   return L.divIcon({
     className: 'saga-field-proof-photo-wrap',
     html: `
       <div class="saga-field-proof-photo-pin">
-        <img src="${image}" alt="" />
-        ${count > 1 ? `<span>${count}</span>` : ''}
+        <img src="${image}" alt="" loading="lazy" />
+        ${count}
       </div>
     `,
-    iconSize: [58, 58],
-    iconAnchor: [29, 29],
+    iconSize: [56, 56],
+    iconAnchor: [28, 28],
+    popupAnchor: [0, -24],
   })
 }
 
@@ -279,7 +280,9 @@ function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string 
 
       return `
         <article class="saga-field-proof-card">
-          <img src="${image}" alt="" loading="lazy" />
+          <div class="saga-field-proof-image-wrap">
+            <img src="${image}" alt="" loading="lazy" />
+          </div>
           <div class="saga-field-proof-meta">
             <strong>${author}</strong>
             ${stage ? `<small>${stage}</small>` : ''}
@@ -301,6 +304,7 @@ function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string 
     </div>
   `
 }
+
 
 function getFieldProofTooltip(proofs: FieldProof[]) {
   return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
@@ -1076,6 +1080,8 @@ export function MapSurface({
         autoPan: true,
         keepInView: true,
         maxWidth: 292,
+        autoPanPaddingTopLeft: L.point(24, 170),
+        autoPanPaddingBottomRight: L.point(24, 110),
       })
 
       marker.bindTooltip(getFieldProofTooltip(group.proofs), {
@@ -1270,6 +1276,7 @@ const mapAnimations = `
 
 
 
+
 .saga-player-cluster-wrap,
 .saga-field-proof-photo-wrap {
   background: transparent;
@@ -1285,7 +1292,7 @@ const mapAnimations = `
   position: relative;
   background: linear-gradient(135deg, rgba(15,23,42,.88), rgba(51,65,85,.78));
   border: 3px solid rgba(255,255,255,.94);
-  box-shadow: 0 16px 34px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow: 0 14px 28px rgba(15,23,42,.28), inset 0 1px 0 rgba(255,255,255,.18);
   color: #fff;
 }
 
@@ -1345,13 +1352,13 @@ const mapAnimations = `
 }
 
 .saga-field-proof-photo-pin {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
   overflow: hidden;
   border: 3px solid rgba(255,255,255,.96);
-  box-shadow: 0 16px 34px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.24);
-  background: rgba(15,23,42,.18);
+  box-shadow: 0 14px 28px rgba(15,23,42,.26), inset 0 1px 0 rgba(255,255,255,.24);
+  background: rgba(15,23,42,.16);
   position: relative;
   transform: translateZ(0);
 }
@@ -1360,6 +1367,7 @@ const mapAnimations = `
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center;
   display: block;
 }
 
@@ -1367,8 +1375,8 @@ const mapAnimations = `
   position: absolute;
   right: -3px;
   top: -3px;
-  min-width: 21px;
-  height: 21px;
+  min-width: 20px;
+  height: 20px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -1381,9 +1389,9 @@ const mapAnimations = `
 }
 
 .saga-field-proof-popup {
-  width: min(76vw, 286px);
-  max-width: 286px;
-  max-height: min(70vh, 430px);
+  width: min(74vw, 280px);
+  max-width: 280px;
+  max-height: min(68vh, 420px);
   overflow: hidden;
   font-family: system-ui, sans-serif;
 }
@@ -1395,6 +1403,11 @@ const mapAnimations = `
   gap: 8px;
   margin-bottom: 8px;
   color: #0f172a;
+}
+
+.saga-field-proof-popup-head strong {
+  font-size: 15px;
+  font-weight: 950;
 }
 
 .saga-field-proof-popup-head span {
@@ -1421,21 +1434,29 @@ const mapAnimations = `
 }
 
 .saga-field-proof-card {
-  min-width: 238px;
-  max-width: 238px;
+  min-width: 228px;
+  max-width: 228px;
   scroll-snap-align: start;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   align-content: start;
 }
 
-.saga-field-proof-card img {
-  width: 238px;
-  height: 148px;
-  object-fit: cover;
-  border-radius: 14px;
-  display: block;
+.saga-field-proof-image-wrap {
+  width: 228px;
+  height: 138px;
+  border-radius: 16px;
+  overflow: hidden;
   background: #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.30);
+}
+
+.saga-field-proof-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
 }
 
 .saga-field-proof-meta {
@@ -1453,11 +1474,13 @@ const mapAnimations = `
   color: #64748b;
   font-size: 10px;
   line-height: 1.15;
+  text-transform: uppercase;
+  letter-spacing: .04em;
 }
 
 .saga-field-proof-card p {
   margin: 0;
-  max-height: 52px;
+  max-height: 50px;
   overflow-y: auto;
   color: #334155;
   font-size: 11px;
@@ -1469,7 +1492,7 @@ const mapAnimations = `
   min-height: 30px;
   border-radius: 12px;
   border: 1px solid rgba(220,38,38,.18);
-  background: rgba(254,226,226,.82);
+  background: rgba(254,226,226,.78);
   color: #991b1b;
   font-size: 11px;
   font-weight: 900;

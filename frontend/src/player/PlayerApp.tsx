@@ -1136,7 +1136,7 @@ const mapRouteToggleButton: CSSProperties = {
   fontSize: 20,
   fontWeight: 900,
   boxShadow: '0 14px 34px rgba(15,23,42,.22)',
-  backdropFilter: 'blur(14px)',
+  backdropFilter: 'blur(5px)',
   WebkitBackdropFilter: 'blur(14px)',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
