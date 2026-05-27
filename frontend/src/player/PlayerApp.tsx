@@ -925,7 +925,7 @@ return
               }}
               aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
             >
-              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '◎' : '🧭'}</span>
+              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '📍' : '🧭'}</span>
             </button>
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
