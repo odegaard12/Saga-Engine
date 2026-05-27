@@ -8,6 +8,12 @@ import {
   type EditableAdminStage,
   type FamilyId,
 } from '../lib/familyConfigs'
+import {
+  adminGameCatalog,
+  getAdminGameForStage,
+  getDefaultAdminStagePatchForGame,
+  type AdminGameId,
+} from '../lib/gameCatalog'
 
 type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
 
@@ -58,29 +64,78 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
     physical_item_id?: string
     physical_item_label?: string
     physical_qr?: { item_id?: string; label?: string; kind?: string }
+    qr_payload?: string
+    label?: string
+    icon?: string
   }
 
-  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+  const config =
+    typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+      ? (((stage as EditableAdminStage).config || {}) as Record<string, unknown>)
+      : {}
+
+  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  const labelText = String(record.label || stage.title || '').toLowerCase()
+  const titleText = String(stage.title || '').toLowerCase()
+  const payloadText = String(record.qr_payload || record.physical_qr?.item_id || record.physical_qr?.label || '').toLowerCase()
+  const gameText = String(gameId || config.game_title || config.objective || '').toLowerCase()
+  const allText = `${labelText} ${titleText} ${payloadText} ${gameText}`
+
+  const catalogKind =
+    gameId === 'qr_collectible'
+      ? 'collectible'
+      : gameId === 'qr_key_gate'
+        ? 'requirement'
+        : gameId === 'clue_card'
+          ? 'clue'
+          : gameId === 'bonus_cache'
+            ? 'bonus'
+            : ''
+
+  const inferredKind =
+    /llave|key|qr_key|requirement/.test(allText)
+      ? 'requirement'
+      : /pista|clue/.test(allText)
+        ? 'clue'
+        : /bonus|regalo|cache/.test(allText)
+          ? 'bonus'
+          : /objeto|coleccionable|collectible|qr/.test(allText)
+            ? 'collectible'
+            : ''
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind || catalogKind || inferredKind
   if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
 
-  const label = String(
+  const title = String(stage.title || `Nodo ${stage.index + 1}`).trim()
+  const typeLabel = String(
     record.physical_item_label ||
     record.physical_qr?.label ||
-    stage.title ||
-    `Nodo ${stage.index + 1}`
+    config.physical_item_label ||
+    config.game_title ||
+    record.label ||
+    (
+      kind === 'requirement'
+        ? 'Llave QR'
+        : kind === 'clue'
+          ? 'Pista QR'
+          : kind === 'bonus'
+            ? 'Bonus QR'
+            : 'Objeto QR'
+    )
   ).trim()
 
   const itemId = String(
     record.physical_item_id ||
     record.physical_qr?.item_id ||
-    slugifyRequirementItemId(label) ||
+    config.physical_item_id ||
+    slugifyRequirementItemId(typeLabel || title) ||
     `node_${stage.index + 1}`
   ).trim()
 
   return {
     itemId,
-    label: label || itemId,
-    title: stage.title || label || itemId,
+    label: title || typeLabel || itemId,
+    title: typeLabel && typeLabel !== title ? `${title} · ${typeLabel}` : title,
     kind,
     icon:
       kind === 'collectible'
@@ -132,6 +187,7 @@ export default function NodeDetailDrawer({
   const selectedRequirement = physicalRequirementOptions.find(
     (item) => item.itemId === getDraftConfigText('required_item_id')
   )
+  const selectedGame = getAdminGameForStage(draft.type, draftConfig)
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -203,6 +259,30 @@ export default function NodeDetailDrawer({
     updateDraftConfig('sequence', parts.length > 0 ? parts : value)
   }
 
+  function handleDraftGameChange(nextGameId: AdminGameId) {
+    const patch = getDefaultAdminStagePatchForGame(nextGameId)
+
+    updateDraftLocal((current) => ({
+      ...(current as EditableAdminStage),
+      type: patch.type,
+      label: patch.label,
+      icon: patch.icon,
+      objective: patch.objective,
+      config: {
+        ...patch.config,
+        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
+        game_id: nextGameId,
+        game_title: patch.label,
+      },
+      config_summary: Object.keys(patch.config),
+      content: current.content || patch.content,
+      messages: {
+        ...(patch.messages || {}),
+        ...(current.messages || {}),
+      },
+    }))
+  }
+
   function handleDraftFamilyChange(nextType: FamilyId) {
     const nextConfig = getDefaultAdminConfigForFamily(nextType)
 
@@ -231,19 +311,33 @@ export default function NodeDetailDrawer({
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="admin-drawer-head admin-drawer-head--modern">
-          <div className="admin-drawer-head-copy">
-            <span className="admin-kicker">{isLocalNew ? 'Add node' : 'Node editor'}</span>
-            <h2>{draft.index + 1}. {draft.title || 'Untitled node'}</h2>
-            <div className="admin-drawer-meta">
-              <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
-              <span>{formatCoords(draft.lat, draft.lon)}</span>
-              <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
+        <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
+          <div className="admin-node-editor-kicker-row">
+            <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor de nodo'}</span>
+
+            <button
+              type="button"
+              className="admin-node-editor-close"
+              onClick={onClose}
+            >
+              Cerrar
+            </button>
+          </div>
+
+          <div className="admin-node-editor-title-row">
+            <div className="admin-node-editor-title-copy">
+              <h2>{draft.index + 1}. {draft.title || 'Nodo sin título'}</h2>
+
+              <div className="admin-drawer-meta admin-node-editor-meta">
+                <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
+                <span>{formatCoords(draft.lat, draft.lon)}</span>
+                <span>{typeof draft.radius === 'number' ? `${draft.radius} m` : 'Sin radio'}</span>
+              </div>
             </div>
 
-            <div className="admin-node-mode-toolbar admin-node-mode-toolbar--type-only">
+            <div className="admin-node-editor-actions">
               <button type="button" onClick={onRequestChangeType}>
-                Cambiar tipo de nodo
+                Cambiar tipo
               </button>
               <button
                 type="button"
@@ -254,28 +348,26 @@ export default function NodeDetailDrawer({
                   }
                 }}
               >
-                Eliminar nodo
+                Eliminar
               </button>
             </div>
           </div>
-
-          <button type="button" onClick={onClose}>Close</button>
         </div>
 
-        <div className="admin-drawer-tabs" role="tablist" aria-label="Node editor tabs">
+        <div className="admin-drawer-tabs admin-node-editor-tabs" role="tablist" aria-label="Node editor tabs">
           <button
             type="button"
             className={activeTab === 'basics' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('basics')}
           >
-            Basics
+            Básico
           </button>
           <button
             type="button"
             className={activeTab === 'location' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('location')}
           >
-            Location
+            Ubicación
           </button>
           <button
             type="button"
@@ -296,14 +388,14 @@ export default function NodeDetailDrawer({
             className={activeTab === 'messages' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('messages')}
           >
-            Messages
+            Mensajes
           </button>
           <button
             type="button"
             className={activeTab === 'advanced' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('advanced')}
           >
-            Advanced
+            Avanzado
           </button>
         </div>
 
@@ -324,16 +416,27 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                Family
+                Juego
                 <select
-                  value={draft.type || 'signal_hunt'}
-                  onChange={(event) => handleDraftFamilyChange(event.target.value as FamilyId)}
+                  value={selectedGame.id}
+                  onChange={(event) => handleDraftGameChange(event.target.value as AdminGameId)}
                 >
-                  {familyCards.map((item) => (
-                    <option key={item.id} value={item.id}>{item.title}</option>
+                  {adminGameCatalog.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.icon} {item.title} · {item.difficulty}
+                    </option>
                   ))}
                 </select>
               </label>
+
+              <div className="admin-game-choice-summary">
+                <span>{selectedGame.icon}</span>
+                <div>
+                  <strong>{selectedGame.title}</strong>
+                  <p>{selectedGame.summary}</p>
+                  <small>{selectedGame.playerGoal}</small>
+                </div>
+              </div>
 
               <label className="admin-edit-field">
                 Node content
@@ -407,8 +510,31 @@ export default function NodeDetailDrawer({
           {activeTab === 'game' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
               <div className="admin-edit-section-head">
-                <strong>Game config</strong>
-                <span>{draft.type === 'signal_hunt' ? 'Signal Hunt' : draft.type === 'bearing_hunt' ? 'Bearing Hunt' : 'Circuit Matrix'}</span>
+                <strong>Juego</strong>
+                <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
+                <small className="admin-game-editor-help admin-game-editor-help-v1">
+                  Elige la prueba; luego ajusta texto, mapa y requisitos.
+                </small>
+              </div>
+
+              <div className="admin-game-catalog-grid">
+                {adminGameCatalog.map((game) => (
+                  <button
+                    key={game.id}
+                    type="button"
+                    className={selectedGame.id === game.id ? 'admin-game-card active' : 'admin-game-card'}
+                    onClick={() => handleDraftGameChange(game.id)}
+                  >
+                    <span>{game.icon}</span>
+                    <strong>{game.title}</strong>
+                    <small>{game.summary}</small>
+                  </button>
+                ))}
+              </div>
+
+              <div className="admin-game-explain-box">
+                <strong>{selectedGame.playerGoal}</strong>
+                <span>{selectedGame.editorHint}</span>
               </div>
 
               <div className="admin-family-config-grid">
