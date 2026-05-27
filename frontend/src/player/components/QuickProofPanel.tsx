@@ -7,6 +7,7 @@ interface QuickProofPanelProps {
   mobile: boolean
   hidden: boolean
   openSignal?: number
+  showLauncher?: boolean
 }
 
 type ParsedQrItem = {
@@ -103,7 +104,13 @@ function parseQrItem(value: string): ParsedQrItem | null {
   }
 }
 
-export function QuickProofPanel({ user, mobile, hidden, openSignal = 0 }: QuickProofPanelProps) {
+export function QuickProofPanel({
+  user,
+  mobile,
+  hidden,
+  openSignal = 0,
+  showLauncher = true,
+}: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
@@ -260,6 +267,8 @@ export function QuickProofPanel({ user, mobile, hidden, openSignal = 0 }: QuickP
 
   if (hidden) return null
 
+  if (!showLauncher && mode === 'idle' && !notice) return null
+
   return (
     <div style={getWrapperStyle(mobile)} aria-label="Escaneo QR de campo">
       {notice ? <div style={noticeBox}>{notice}</div> : null}
@@ -299,11 +308,13 @@ export function QuickProofPanel({ user, mobile, hidden, openSignal = 0 }: QuickP
         </section>
       ) : null}
 
-      <div style={dock}>
-        <button type="button" style={dockButtonWide} onClick={() => void startQrScan()}>
-          QR
-        </button>
-      </div>
+      {showLauncher ? (
+        <div style={dock}>
+          <button type="button" style={dockButtonWide} onClick={() => void startQrScan()}>
+            QR
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

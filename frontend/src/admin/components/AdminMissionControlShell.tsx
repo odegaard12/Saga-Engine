@@ -95,35 +95,41 @@ export default function AdminMissionControlShell({
 }: AdminMissionControlShellProps) {
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
 
-  const selectedIndex = selectedStage
-    ? stages.findIndex((stage) => stage.index === selectedStage.index)
+  const liveSelectedStage = selectedStage
+    ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
+      stages.find((stage) => stage.index === selectedStage.index) ||
+      selectedStage
+    : null
+
+  const selectedIndex = liveSelectedStage
+    ? stages.findIndex((stage) => stage.index === liveSelectedStage.index)
     : -1
 
-  const selectedKey = selectedStageKey(selectedStage)
+  const selectedKey = selectedStageKey(liveSelectedStage)
   const shouldShowTypeChooser = Boolean(
-    selectedStage &&
+    liveSelectedStage &&
     (
       typeChooserStageKey === selectedKey ||
       (
-        typeof selectedStage.id === 'string' &&
-        selectedStage.id.startsWith('local-') &&
-        !getUiBoolean(selectedStage, '_type_choice_done')
+        typeof liveSelectedStage.id === 'string' &&
+        liveSelectedStage.id.startsWith('local-') &&
+        !getUiBoolean(liveSelectedStage, '_type_choice_done')
       )
     )
   )
 
   useEffect(() => {
-    if (!selectedStage) {
+    if (!liveSelectedStage) {
       setTypeChooserStageKey(null)
       return
     }
 
     if (
-      typeof selectedStage.id === 'string' &&
-      selectedStage.id.startsWith('local-') &&
-      !getUiBoolean(selectedStage, '_type_choice_done')
+      typeof liveSelectedStage.id === 'string' &&
+      liveSelectedStage.id.startsWith('local-') &&
+      !getUiBoolean(liveSelectedStage, '_type_choice_done')
     ) {
-      setTypeChooserStageKey(selectedStageKey(selectedStage))
+      setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
     }
   }, [selectedKey])
 
@@ -254,7 +260,7 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Subir nodo"
                       disabled={routeIndex === 0}
-                      onClick={() => onReorderStage(stage, 'up')}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'up') }}
                     >
                       ↑
                     </button>
@@ -262,7 +268,7 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Bajar nodo"
                       disabled={routeIndex >= stages.length - 1}
-                      onClick={() => onReorderStage(stage, 'down')}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'down') }}
                     >
                       ↓
                     </button>
@@ -316,12 +322,12 @@ export default function AdminMissionControlShell({
         ) : null}
       </section>
 
-      {selectedStage ? (
+      {liveSelectedStage ? (
         <aside className="saga-inspector is-open" aria-label="Node inspector">
           {shouldShowTypeChooser ? (
             <div className="saga-node-type-choice-screen">
               <NodePhysicalTypePanel
-                stage={selectedStage}
+                stage={liveSelectedStage}
                 chooserOnly
                 onApplyLocal={(nextStage) => {
                   onApplyStage({
@@ -332,13 +338,13 @@ export default function AdminMissionControlShell({
                 onFinishChoice={() => setTypeChooserStageKey(null)}
               />
             </div>
-          ) : isPhysicalNode(selectedStage) ? (
+          ) : isPhysicalNode(liveSelectedStage) ? (
             <>
               <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
                 <NodePhysicalTypePanel
-                  stage={selectedStage}
+                  stage={liveSelectedStage}
                   onApplyLocal={onApplyStage}
-                  onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
+                  onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
                 />
               </div>
 
@@ -347,8 +353,8 @@ export default function AdminMissionControlShell({
                   type="button"
                   className="saga-danger-action"
                   onClick={() => {
-                    if (window.confirm(`Eliminar nodo "${selectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
-                      onDeleteStage(selectedStage)
+                    if (window.confirm(`Eliminar nodo "${liveSelectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                      onDeleteStage(liveSelectedStage)
                     }
                   }}
                 >
@@ -358,12 +364,12 @@ export default function AdminMissionControlShell({
             </>
           ) : (
             <NodeDetailDrawer
-              stage={selectedStage}
+              stage={liveSelectedStage}
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
               onMoveLocal={onReorderStage}
-              onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(selectedStage))}
+              onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
               canMoveUp={selectedIndex > 0}
               canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
             />

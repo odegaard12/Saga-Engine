@@ -18,6 +18,33 @@ export function rawStageIdentity(stage: AdminRawStage, fallbackIndex: number) {
   return String(fallbackIndex)
 }
 
+function shouldClearPhysicalStageFields(stage: AdminReactOverviewStage) {
+  const record = stage as unknown as Record<string, unknown>
+  return (
+    record._clear_physical_fields === true ||
+    record._physical_node_mode === 'normal' ||
+    record.physical_node_kind === null ||
+    record.physical_item_kind === null
+  )
+}
+
+function stripPhysicalStageFields<T extends Record<string, unknown>>(stage: T): T {
+  const next = { ...stage }
+  for (const key of [
+    'physical_node_kind',
+    'physical_item_kind',
+    'physical_item_id',
+    'physical_item_label',
+    'physical_qr',
+    'qr_payload',
+  ]) {
+    delete next[key]
+  }
+  delete next._clear_physical_fields
+  delete next._physical_node_mode
+  return next
+}
+
 export function mergeStageForSave(
   rawStage: AdminRawStage | null,
   stage: AdminReactOverviewStage
@@ -51,9 +78,17 @@ export function mergeStageForSave(
     ...localConfig,
   })
 
+  const rawBase = shouldClearPhysicalStageFields(stage)
+    ? stripPhysicalStageFields(((rawStage || {}) as unknown as Record<string, unknown>)) as AdminRawStage
+    : (rawStage || {})
+
+  const physicalFields = shouldClearPhysicalStageFields(stage)
+    ? {}
+    : withPhysicalStageFields(stage, {})
+
   return {
-    ...withPhysicalStageFields(stage, {}),
-    ...(rawStage || {}),
+    ...rawBase,
+    ...physicalFields,
     id:
       typeof stage.id === 'number'
         ? stage.id
@@ -91,8 +126,12 @@ export function buildRawStageFromOverview(
       : {}
   )
 
+  const physicalFields = shouldClearPhysicalStageFields(stage)
+    ? {}
+    : withPhysicalStageFields(stage, {})
+
   return {
-    ...withPhysicalStageFields(stage, {}),
+    ...physicalFields,
     id: typeof stage.id === 'number' ? stage.id : index,
     title: stage.title || `NODE ${index + 1}`,
     type: saveType,

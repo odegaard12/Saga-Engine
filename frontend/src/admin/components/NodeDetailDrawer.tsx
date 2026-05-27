@@ -125,6 +125,7 @@ export default function NodeDetailDrawer({
       : {}
 
   const physicalRequirementOptions = stages
+    .filter((candidate) => candidate.index !== draft.index)
     .map(getPhysicalRequirementOption)
     .filter((item): item is PhysicalRequirementOption => Boolean(item))
 

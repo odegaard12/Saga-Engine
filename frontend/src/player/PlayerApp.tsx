@@ -673,16 +673,27 @@ return
   }
 
   function handlePrimaryAction() {
+    if (gpsActionRequired) {
+      void handleRequestLiveGps({ forceFocus: true })
+      return
+    }
+
     if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        vibrate(8)
+        return
+      }
+
       setFocusRequest({ target: 'node', token: Date.now() })
       setQuickQrOpenSignal(Date.now())
       showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
       vibrate([10, 16, 10])
-      return
-    }
-
-    if (gpsActionRequired) {
-      void handleRequestLiveGps({ forceFocus: true })
       return
     }
 
@@ -706,6 +717,16 @@ return
     setFocusRequest({ target: 'node', token: Date.now() })
 
     if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        return
+      }
+
       setQuickQrOpenSignal(Date.now())
       showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
       return
@@ -863,7 +884,22 @@ return
               mobile={isPhone}
               hidden={false}
               openSignal={quickQrOpenSignal}
+              showLauncher={false}
             />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                showNotice('📸 Prueba rápida: fotos de mapa y carrusel llegarán en el siguiente PR.', 'info')
+                vibrate(8)
+              }}
+              aria-label="Prueba rápida"
+            >
+              📸
+            </button>
 
             <button
               type="button"
