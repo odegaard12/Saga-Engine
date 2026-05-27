@@ -3029,3 +3029,32 @@
 .admin-game-catalog-grid {
   margin-top: 8px !important;
 }
+
+
+/* admin-final-game-help-compact-v1 */
+.admin-family-config-section .admin-game-editor-help {
+  grid-column: 1 / -1 !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 7px 10px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  background: rgba(14, 165, 233, 0.07) !important;
+  border: 1px solid rgba(56, 189, 248, 0.14) !important;
+  color: #bae6fd !important;
+}
+
+.admin-family-config-section .admin-edit-section-head {
+  gap: 8px !important;
+}
+
+.admin-game-selected-pill,
+.admin-family-config-section .admin-edit-section-head > span {
+  max-width: 190px !important;
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+}

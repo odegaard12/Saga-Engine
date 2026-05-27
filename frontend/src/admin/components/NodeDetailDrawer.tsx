@@ -64,6 +64,9 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
     physical_item_id?: string
     physical_item_label?: string
     physical_qr?: { item_id?: string; label?: string; kind?: string }
+    qr_payload?: string
+    label?: string
+    icon?: string
   }
 
   const config =
@@ -72,6 +75,12 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
       : {}
 
   const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  const labelText = String(record.label || stage.title || '').toLowerCase()
+  const titleText = String(stage.title || '').toLowerCase()
+  const payloadText = String(record.qr_payload || record.physical_qr?.item_id || record.physical_qr?.label || '').toLowerCase()
+  const gameText = String(gameId || config.game_title || config.objective || '').toLowerCase()
+  const allText = `${labelText} ${titleText} ${payloadText} ${gameText}`
+
   const catalogKind =
     gameId === 'qr_collectible'
       ? 'collectible'
@@ -83,30 +92,50 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
             ? 'bonus'
             : ''
 
-  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind || catalogKind
+  const inferredKind =
+    /llave|key|qr_key|requirement/.test(allText)
+      ? 'requirement'
+      : /pista|clue/.test(allText)
+        ? 'clue'
+        : /bonus|regalo|cache/.test(allText)
+          ? 'bonus'
+          : /objeto|coleccionable|collectible|qr/.test(allText)
+            ? 'collectible'
+            : ''
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind || catalogKind || inferredKind
   if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
 
-  const label = String(
+  const title = String(stage.title || `Nodo ${stage.index + 1}`).trim()
+  const typeLabel = String(
     record.physical_item_label ||
     record.physical_qr?.label ||
     config.physical_item_label ||
     config.game_title ||
-    stage.title ||
-    `Nodo ${stage.index + 1}`
+    record.label ||
+    (
+      kind === 'requirement'
+        ? 'Llave QR'
+        : kind === 'clue'
+          ? 'Pista QR'
+          : kind === 'bonus'
+            ? 'Bonus QR'
+            : 'Objeto QR'
+    )
   ).trim()
 
   const itemId = String(
     record.physical_item_id ||
     record.physical_qr?.item_id ||
     config.physical_item_id ||
-    slugifyRequirementItemId(label) ||
+    slugifyRequirementItemId(typeLabel || title) ||
     `node_${stage.index + 1}`
   ).trim()
 
   return {
     itemId,
-    label: label || itemId,
-    title: stage.title || label || itemId,
+    label: title || typeLabel || itemId,
+    title: typeLabel && typeLabel !== title ? `${title} · ${typeLabel}` : title,
     kind,
     icon:
       kind === 'collectible'
