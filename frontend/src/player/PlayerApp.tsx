@@ -911,7 +911,8 @@ return
               }}
               aria-label="Jugadores"
             >
-              👥 {teamVisibleCount}
+              <span aria-hidden="true">👥</span>
+              <span style={mapQuickCountPill}>{teamVisibleCount}</span>
             </button>
 
             <button
@@ -1019,38 +1020,60 @@ const mapRouteToggleButton: CSSProperties = {
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 44,
-  height: 44,
-  minWidth: 44,
-  minHeight: 44,
+  width: 46,
+  height: 46,
+  minWidth: 46,
+  minHeight: 46,
   padding: 0,
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.16)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.18)',
   background:
-    'linear-gradient(180deg, rgba(148,163,184,.24), rgba(100,116,139,.20))',
+    'linear-gradient(180deg, rgba(248,250,252,.34), rgba(100,116,139,.26))',
   color: '#f8fafc',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 5,
-  fontSize: 16,
+  fontSize: 17,
   lineHeight: 1,
   fontWeight: 950,
   textAlign: 'center',
   whiteSpace: 'nowrap',
-  boxShadow: '0 12px 26px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.06)',
-  backdropFilter: 'blur(20px) saturate(1.10)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.10)',
+  textShadow: '0 1px 8px rgba(15,23,42,.34)',
+  boxShadow:
+    '0 12px 28px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.16)',
+  backdropFilter: 'blur(20px) saturate(1.18)',
+  WebkitBackdropFilter: 'blur(20px) saturate(1.18)',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
+  cursor: 'pointer',
+  userSelect: 'none',
 }
 
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(59,130,246,.24)',
-  border: '1px solid rgba(147,197,253,.42)',
-  color: '#dbeafe',
+  background:
+    'linear-gradient(180deg, rgba(96,165,250,.38), rgba(37,99,235,.24))',
+  border: '1px solid rgba(147,197,253,.46)',
+  color: '#eff6ff',
 }
+
+const mapQuickCountPill: CSSProperties = {
+  minWidth: 18,
+  height: 18,
+  padding: '0 5px',
+  borderRadius: 999,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(255,255,255,.18)',
+  color: '#ffffff',
+  fontSize: 10,
+  fontWeight: 950,
+  lineHeight: 1,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+}
+
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
@@ -1059,12 +1082,19 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 138px)' : 148,
     transform: 'translateX(-50%)',
     zIndex: 4600,
-    display: 'flex',
+    display: 'inline-flex',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
     gap: 8,
+    padding: 5,
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,.16)',
+    background: 'rgba(15,23,42,.18)',
+    boxShadow: '0 14px 34px rgba(15,23,42,.16)',
+    backdropFilter: 'blur(18px) saturate(1.16)',
+    WebkitBackdropFilter: 'blur(18px) saturate(1.16)',
     pointerEvents: 'auto',
   }
 }
