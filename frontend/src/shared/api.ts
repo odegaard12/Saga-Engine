@@ -110,3 +110,19 @@ export function uploadFieldProof(args: {
 }) {
   return postJson<FieldProofUploadResponse>('/api/field-proofs', args)
 }
+
+
+export async function deleteFieldProof(user: string, proofId: string): Promise<{ status: 'ok'; id: string }> {
+  const res = await fetch(`/api/field-proofs/${encodeURIComponent(proofId)}?user=${encodeURIComponent(user)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to delete field proof: HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<{ status: 'ok'; id: string }>
+}

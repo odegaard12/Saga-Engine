@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat, uploadFieldProof } from '../shared/api'
 import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
@@ -458,6 +458,24 @@ export default function PlayerApp() {
 
     setFieldCameraOpen(true)
     vibrate(8)
+  }
+
+  async function handleDeleteFieldProof(proofId: string) {
+    if (!proofId) return
+
+    const confirmed = window.confirm('¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.')
+    if (!confirmed) return
+
+    try {
+      await deleteFieldProof(payload.user, proofId)
+      setFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      void refreshFieldProofs().catch(() => {})
+      showNotice('Foto eliminada.', 'success')
+      vibrate(8)
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo eliminar la foto.', 'warn')
+      vibrate(8)
+    }
   }
 
   async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
@@ -943,6 +961,8 @@ return
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
           fieldProofs={fieldProofs}
+          viewerUser={payload.user}
+          onDeleteFieldProof={handleDeleteFieldProof}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),

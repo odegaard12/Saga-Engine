@@ -59,6 +59,8 @@ type MapSurfaceProps = {
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
   fieldProofs?: FieldProof[]
+  viewerUser?: string
+  onDeleteFieldProof?: (proofId: string) => void
   selfLabel?: string
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
@@ -164,19 +166,27 @@ function createFieldProofIcon(proofs: FieldProof[]) {
   })
 }
 
-function buildFieldProofPopup(proofs: FieldProof[]): string {
+function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string {
+  const safeViewer = String(viewerUser || '').trim()
+
   const items = proofs
     .map((proof) => {
       const image = escapeHtml(getFieldProofImage(proof))
       const author = escapeHtml(proof.display_name || proof.user || 'Jugador')
       const note = escapeHtml(proof.note || '')
       const stage = escapeHtml(proof.stage_title || '')
+      const proofId = escapeHtml(proof.id)
+      const canDelete = safeViewer && proof.user === safeViewer
+
       return `
         <article class="saga-field-proof-card">
-          <img src="${image}" alt="" />
-          <strong>${author}</strong>
-          ${stage ? `<small>${stage}</small>` : ''}
+          <img src="${image}" alt="" loading="lazy" />
+          <div class="saga-field-proof-meta">
+            <strong>${author}</strong>
+            ${stage ? `<small>${stage}</small>` : ''}
+          </div>
           ${note ? `<p>${note}</p>` : ''}
+          ${canDelete ? `<button type="button" class="saga-field-proof-delete" data-proof-delete-id="${proofId}">Eliminar foto</button>` : ''}
         </article>
       `
     })
@@ -370,6 +380,8 @@ export function MapSurface({
   nodeState = 'locked',
   otherPlayers = [],
   fieldProofs = [],
+  viewerUser = '',
+  onDeleteFieldProof,
   selfLabel = 'YO',
   selfProfile,
   onDebugSetPosition,
@@ -847,7 +859,7 @@ export function MapSurface({
         zIndexOffset: 760,
       }).addTo(map)
 
-      marker.bindPopup(buildFieldProofPopup(group.proofs), {
+      marker.bindPopup(buildFieldProofPopup(group.proofs, viewerUser), {
         closeButton: true,
         autoPan: true,
         keepInView: true,
@@ -860,9 +872,23 @@ export function MapSurface({
       })
 
       marker.on('click', () => marker.openPopup())
+      marker.on('popupopen', () => {
+        const popupElement = marker.getPopup()?.getElement()
+        if (!popupElement || !onDeleteFieldProof) return
+
+        popupElement.querySelectorAll<HTMLButtonElement>('[data-proof-delete-id]').forEach((button) => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+
+            const proofId = button.getAttribute('data-proof-delete-id')
+            if (proofId) onDeleteFieldProof(proofId)
+          })
+        })
+      })
       fieldProofLayersRef.current.push(marker)
     }
-  }, [fieldProofs])
+  }, [fieldProofs, viewerUser, onDeleteFieldProof])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1028,6 +1054,144 @@ const mapAnimations = `
 .saga-avatar-icon-wrap {
   background: transparent;
   border: none;
+}
+
+
+.saga-field-proof-photo-wrap {
+  background: transparent;
+  border: none;
+}
+
+.saga-field-proof-photo-pin {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 3px solid rgba(255,255,255,.96);
+  box-shadow: 0 16px 34px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.24);
+  background: rgba(15,23,42,.18);
+  position: relative;
+  transform: translateZ(0);
+}
+
+.saga-field-proof-photo-pin img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.saga-field-proof-photo-pin span {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  min-width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15,23,42,.88);
+  border: 1px solid rgba(255,255,255,.70);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.saga-field-proof-popup {
+  width: min(76vw, 286px);
+  max-width: 286px;
+  max-height: min(70vh, 430px);
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+}
+
+.saga-field-proof-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.saga-field-proof-popup-head span {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.saga-field-proof-carousel {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  max-width: 100%;
+}
+
+.saga-field-proof-card {
+  min-width: 238px;
+  max-width: 238px;
+  scroll-snap-align: start;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.saga-field-proof-card img {
+  width: 238px;
+  height: 148px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+  background: #e2e8f0;
+}
+
+.saga-field-proof-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.saga-field-proof-card strong {
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.saga-field-proof-card small {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.saga-field-proof-card p {
+  margin: 0;
+  max-height: 52px;
+  overflow-y: auto;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.35;
+  padding-right: 4px;
+}
+
+.saga-field-proof-delete {
+  min-height: 30px;
+  border-radius: 12px;
+  border: 1px solid rgba(220,38,38,.18);
+  background: rgba(254,226,226,.82);
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .saga-avatar-pin {

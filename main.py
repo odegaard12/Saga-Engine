@@ -265,24 +265,106 @@ async def get_field_proof_image(proof_id: str):
     if not safe_id:
         raise HTTPException(status_code=404, detail="proof not found")
 
-    proof = get_field_proof_record(safe_id)
-    if not proof:
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        row = conn.execute(
+            """
+            SELECT image_filename, media_type
+            FROM field_proofs
+            WHERE id = ? AND status = 'active'
+            """,
+            (safe_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
         raise HTTPException(status_code=404, detail="proof not found")
 
-    filename = _as_str(proof.get("image_filename")).strip()
+    filename = _as_str(row["image_filename"]).strip()
+    media_type = _as_str(row["media_type"] or "image/jpeg").strip() or "image/jpeg"
+
     base_dir = resolve_field_proofs_dir().resolve()
     target = (base_dir / filename).resolve()
 
     if not str(target).startswith(str(base_dir)):
         raise HTTPException(status_code=400, detail="invalid proof path")
-    if not target.exists():
+    if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="proof image not found")
 
     return FileResponse(
         target,
-        media_type=proof.get("media_type") or "image/jpeg",
+        media_type=media_type,
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+
+
+
+@app.delete("/api/field-proofs/{proof_id}")
+async def delete_field_proof(proof_id: str, user: str = ""):
+    safe_id = _as_str(proof_id).strip()
+    user_text = _as_str(user).strip()
+
+    if not safe_id:
+        raise HTTPException(status_code=404, detail="proof not found")
+    if not user_text:
+        raise HTTPException(status_code=400, detail="user required")
+
+    profile = resolve_known_player_profile(user_text)
+    if not profile:
+        raise HTTPException(status_code=403, detail="unknown player")
+
+    profile_id = _as_str(profile.get("id") or user_text).strip()
+
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        row = conn.execute(
+            """
+            SELECT id, user, image_filename
+            FROM field_proofs
+            WHERE id = ? AND status = 'active'
+            """,
+            (safe_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="proof not found")
+
+        if _as_str(row["user"]).strip() != profile_id:
+            raise HTTPException(status_code=403, detail="only the creator can delete this photo")
+
+        conn.execute(
+            """
+            UPDATE field_proofs
+            SET status = 'deleted'
+            WHERE id = ?
+            """,
+            (safe_id,),
+        )
+        conn.commit()
+
+        filename = _as_str(row["image_filename"]).strip()
+    finally:
+        conn.close()
+
+    if filename:
+        base_dir = resolve_field_proofs_dir().resolve()
+        target = (base_dir / filename).resolve()
+
+        if str(target).startswith(str(base_dir)) and target.exists() and target.is_file():
+            try:
+                target.unlink()
+            except OSError:
+                pass
+
+    return {
+        "status": "ok",
+        "id": safe_id,
+    }
 
 
 @app.post("/api/field-proofs")
