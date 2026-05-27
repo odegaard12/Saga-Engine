@@ -450,6 +450,9 @@ export default function NodeDetailDrawer({
             <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
               <div className="admin-edit-section-head">
                 <strong>Juego</strong>
+              <div className="admin-game-editor-help admin-game-editor-help-v1">
+                Elige qué hace el jugador en este nodo. Los juegos son plantillas editables: puedes cambiar título, texto, radio, requisitos y mensajes después.
+              </div>
                 <span>{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
               </div>
 

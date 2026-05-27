@@ -2597,3 +2597,17 @@
   color: #bae6fd;
   line-height: 1.35;
 }
+
+
+/* admin-game-editor-help-v1 */
+.admin-game-editor-help {
+  margin-top: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.20);
+  background: rgba(14, 165, 233, 0.10);
+  color: #bae6fd;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 750;
+}
