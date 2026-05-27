@@ -37,6 +37,7 @@ interface PlayerHudProps {
   onToggleDebug: () => void
   onRequestGps: () => void
   onDownloadFieldProofs?: () => void
+  fieldPhotoCount?: number
 }
 
 function getGpsDisplay(gpsState: string): string {
@@ -83,6 +84,7 @@ export function PlayerHud({
   onToggleDebug,
   onRequestGps,
   onDownloadFieldProofs,
+  fieldPhotoCount = 0,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
@@ -373,15 +375,14 @@ export function PlayerHud({
                 ES
               </button>
             </div>
-
-
             {onDownloadFieldProofs ? (
               <button
                 type="button"
-                style={toolsButton}
-                onClick={onDownloadFieldProofs}
+                style={fieldPhotoCount > 0 ? toolsButton : { ...toolsButton, opacity: 0.55, cursor: 'not-allowed' }}
+                disabled={fieldPhotoCount <= 0}
+                onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
               >
-                Descargar todas las fotos
+                {fieldPhotoCount > 0 ? `Descargar fotos (${fieldPhotoCount})` : 'Sin fotos'}
               </button>
             ) : null}
 

@@ -334,6 +334,9 @@ async def download_field_proofs(user: str = ""):
             ),
         )
 
+    if not manifest:
+        raise HTTPException(status_code=404, detail="no field photos")
+
     buffer.seek(0)
     stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
 

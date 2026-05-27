@@ -447,6 +447,10 @@ export default function PlayerApp() {
   }
 
   function handleDownloadFieldProofs() {
+    if (fieldProofs.length <= 0) {
+      return
+    }
+
     const link = document.createElement('a')
     link.href = getFieldProofsDownloadUrl(payload.user)
     link.download = ''
@@ -456,7 +460,7 @@ export default function PlayerApp() {
     closeTools()
   }
 
-  function handleOpenFieldCamera() {
+function handleOpenFieldCamera() {
     if (fieldPhotoUploading) {
       showNotice('Subiendo foto…', 'info')
       return
@@ -1115,6 +1119,7 @@ return
             onToggleDebug={handleToggleDebug}
             onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
             onDownloadFieldProofs={handleDownloadFieldProofs}
+            fieldPhotoCount={fieldProofs.length}
           />
         </div>
       </div>
