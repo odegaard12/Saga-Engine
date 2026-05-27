@@ -369,6 +369,7 @@ export default function AdminMissionControlShell({
           ) : (
             <NodeDetailDrawer
               stage={liveSelectedStage}
+              stages={stages}
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
