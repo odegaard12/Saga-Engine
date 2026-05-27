@@ -1,4 +1,4 @@
-import type { PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../types/player'
+import type { FieldProofsPayload, FieldProofUploadResponse, PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../types/player'
 
 type AdvanceResponse = {
   status: 'ok' | 'fail'
@@ -82,4 +82,52 @@ export function sendHeartbeat(args: {
   source?: string
 }) {
   return postJson('/api/heartbeat', args)
+}
+
+
+export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {
+  const res = await fetch(`/api/field-proofs?user=${encodeURIComponent(user)}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<FieldProofsPayload>
+}
+
+export function uploadFieldProof(args: {
+  user: string
+  image_data_url: string
+  lat: number
+  lon: number
+  note?: string
+  stage_id?: string
+  stage_title?: string
+}) {
+  return postJson<FieldProofUploadResponse>('/api/field-proofs', args)
+}
+
+
+export async function deleteFieldProof(user: string, proofId: string): Promise<{ status: 'ok'; id: string }> {
+  const res = await fetch(`/api/field-proofs/${encodeURIComponent(proofId)}?user=${encodeURIComponent(user)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to delete field proof: HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<{ status: 'ok'; id: string }>
+}
+
+
+export function getFieldProofsDownloadUrl(user: string): string {
+  return `/api/field-proofs/download?user=${encodeURIComponent(user)}`
 }

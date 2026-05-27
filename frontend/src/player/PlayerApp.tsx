@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -9,6 +9,8 @@ import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { FieldPhotoViewer } from './components/FieldPhotoViewer'
+import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
@@ -87,6 +89,10 @@ export default function PlayerApp() {
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
+  const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
+  const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
+  const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
+  const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -177,6 +183,32 @@ export default function PlayerApp() {
 
     loadTeam()
     intervalId = window.setInterval(loadTeam, 5000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadFieldProofs() {
+      try {
+        const payload = await fetchFieldProofs(user)
+        if (!cancelled) {
+          setFieldProofs(Array.isArray(payload.proofs) ? payload.proofs : [])
+        }
+      } catch {
+        // Fotos online-only por ahora: si falla, el mapa sigue funcionando.
+      }
+    }
+
+    void loadFieldProofs()
+    intervalId = window.setInterval(loadFieldProofs, 15000)
 
     return () => {
       cancelled = true
@@ -407,6 +439,95 @@ export default function PlayerApp() {
     setState({ status: 'ready', payload: nextPayload })
     return nextPayload
   }
+
+  async function refreshFieldProofs() {
+    const nextProofs = await fetchFieldProofs(user)
+    setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
+    return nextProofs
+  }
+
+  function handleDownloadFieldProofs() {
+    if (fieldProofs.length <= 0) {
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = getFieldProofsDownloadUrl(payload.user)
+    link.download = ''
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    closeTools()
+  }
+
+function handleOpenFieldCamera() {
+    if (fieldPhotoUploading) {
+      showNotice('Subiendo foto…', 'info')
+      return
+    }
+
+    if (!playerPosition) {
+      showNotice('Activa GPS o usa modo debug para guardar la foto en el mapa.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFieldCameraOpen(true)
+    vibrate(8)
+  }
+
+  async function handleDeleteFieldProof(proofId: string) {
+    if (!proofId) return
+
+    const confirmed = window.confirm('¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.')
+    if (!confirmed) return
+
+    try {
+      await deleteFieldProof(payload.user, proofId)
+      setFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      void refreshFieldProofs().catch(() => {})
+      vibrate(8)
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo eliminar la foto.', 'warn')
+      vibrate(8)
+    }
+  }
+
+  async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
+    if (!playerPosition) {
+      showNotice('No hay posición para guardar la foto.', 'warn')
+      return
+    }
+
+    try {
+      setFieldPhotoUploading(true)
+
+      const saved = await uploadFieldProof({
+        user: payload.user,
+        image_data_url: imageDataUrl,
+        lat: playerPosition.lat,
+        lon: playerPosition.lon,
+        note,
+        stage_id: currentStage?.id ? String(currentStage.id) : undefined,
+        stage_title: currentStage?.title || undefined,
+      })
+
+      setFieldProofs((current) => [
+        saved.proof,
+        ...current.filter((item) => item.id !== saved.proof.id),
+      ])
+
+      void refreshFieldProofs().catch(() => {})
+      vibrate([10, 16, 10])
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo subir la foto.', 'warn')
+      vibrate(8)
+    } finally {
+      setFieldPhotoUploading(false)
+    }
+  }
+
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
@@ -854,6 +975,10 @@ return
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
+          fieldProofs={fieldProofs}
+          viewerUser={payload.user}
+          onDeleteFieldProof={handleDeleteFieldProof}
+          onOpenFieldProofs={(proofs) => setSelectedFieldProofs(proofs)}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),
@@ -883,6 +1008,21 @@ return
           <ToastNotice notice={uiNotice} />
         </div>
 
+        <FieldPhotoViewer
+          open={selectedFieldProofs.length > 0}
+          proofs={selectedFieldProofs}
+          viewerUser={payload.user}
+          onClose={() => setSelectedFieldProofs([])}
+          onDelete={handleDeleteFieldProof}
+        />
+
+        <FieldCameraCapture
+          open={fieldCameraOpen}
+          busy={fieldPhotoUploading}
+          onClose={() => setFieldCameraOpen(false)}
+          onCapture={handleFieldCameraCapture}
+        />
+
         {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
@@ -896,15 +1036,16 @@ return
             <button
               type="button"
               style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                showNotice('📸 Prueba rápida: fotos de mapa y carrusel llegarán en el siguiente PR.', 'info')
-                vibrate(8)
+                handleOpenFieldCamera()
               }}
-              aria-label="Prueba rápida"
+              aria-label="Hacer foto de campo"
+              title="Hacer foto de campo"
             >
-              <span aria-hidden="true" style={mapQuickIcon}>📷</span>
+              <span aria-hidden="true" style={mapQuickIcon}>{fieldPhotoUploading ? '⏳' : '📷'}</span>
             </button>
 
             <button
@@ -977,6 +1118,8 @@ return
             onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
             onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDownloadFieldProofs={handleDownloadFieldProofs}
+            fieldPhotoCount={fieldProofs.length}
           />
         </div>
       </div>
@@ -1019,7 +1162,7 @@ const mapRouteToggleButton: CSSProperties = {
   fontSize: 20,
   fontWeight: 900,
   boxShadow: '0 14px 34px rgba(15,23,42,.22)',
-  backdropFilter: 'blur(14px)',
+  backdropFilter: 'blur(5px)',
   WebkitBackdropFilter: 'blur(14px)',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
@@ -1112,11 +1255,39 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
       'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
     boxShadow:
       '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
-    backdropFilter: 'blur(18px) saturate(130%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+    backdropFilter: 'blur(8px) saturate(120%)',
+    WebkitBackdropFilter: 'blur(8px) saturate(120%)',
     pointerEvents: 'auto',
   }
 }
+
+
+const globalPlayerEdgeFix = `
+html,
+body,
+#root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  background: #020617 !important;
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+.leaflet-container {
+  background: #020617 !important;
+  outline: none !important;
+}
+
+.saga-player-edge-fix {
+  background: #020617 !important;
+}
+`
 
 function ScreenFrame({
   children,
@@ -1126,15 +1297,16 @@ function ScreenFrame({
   mobile: boolean
 }) {
   return (
-    <main
+    <>
+      <style>{globalPlayerEdgeFix}</style>
+      <main
       style={{
         position: mobile ? 'fixed' : 'relative',
-        inset: mobile ? 0 : undefined,
-        width: '100vw',
+        inset: mobile ? '-1px -1px 0 -1px' : undefined,
+        width: mobile ? 'calc(100vw + 2px)' : '100vw',
         minHeight: mobile ? '100dvh' : '100svh',
         height: mobile ? '100dvh' : 'auto',
-        background:
-          'linear-gradient(180deg, #eef3ed 0%, #e8efea 48%, #e2ebe3 100%)',
+        background: '#020617',
         padding: mobile ? 0 : 12,
         fontFamily: 'system-ui, sans-serif',
         color: '#10231a',
@@ -1144,7 +1316,8 @@ function ScreenFrame({
       }}
     >
       {children}
-    </main>
+      </main>
+    </>
   )
 }
 
@@ -1203,16 +1376,11 @@ function getViewportStyle(mobile: boolean): CSSProperties {
 function getTopScrimStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: mobile ? 132 : 144,
+    inset: '0 0 auto 0',
+    height: 0,
     zIndex: 1100,
     pointerEvents: 'none',
-    borderTopLeftRadius: mobile ? 0 : 28,
-    borderTopRightRadius: mobile ? 0 : 28,
-    background:
-      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+    background: 'transparent',
   }
 }
 

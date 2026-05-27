@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type FocusRequest =
@@ -58,6 +58,10 @@ type MapSurfaceProps = {
   focusRequest?: FocusRequest
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
+  fieldProofs?: FieldProof[]
+  viewerUser?: string
+  onDeleteFieldProof?: (proofId: string) => void
+  onOpenFieldProofs?: (proofs: FieldProof[]) => void
   selfLabel?: string
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
@@ -103,6 +107,208 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
     Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
 
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
+}
+
+
+function offsetLatLon(point: { lat: number; lon: number }, distanceMeters: number, angleDeg: number) {
+  const angle = (angleDeg * Math.PI) / 180
+  const dx = Math.cos(angle) * distanceMeters
+  const dy = Math.sin(angle) * distanceMeters
+  const lat = point.lat + dy / 111_111
+  const lon = point.lon + dx / (111_111 * Math.max(0.18, Math.cos((point.lat * Math.PI) / 180)))
+
+  return { lat, lon }
+}
+
+function spreadAround(
+  center: { lat: number; lon: number },
+  index: number,
+  total: number,
+  radiusMeters: number,
+  startAngle = -45
+) {
+  if (total <= 1) return center
+  const angle = startAngle + (360 / total) * index
+  return offsetLatLon(center, radiusMeters, angle)
+}
+
+function getClusterRadiusForZoom(zoom: number) {
+  if (zoom >= 19) return 4
+  if (zoom >= 18) return 8
+  if (zoom >= 17) return 24
+  if (zoom >= 16) return 60
+  return 120
+}
+
+function getPhotoClusterRadiusForZoom(zoom: number) {
+  if (zoom >= 19) return 12
+  if (zoom >= 18) return 28
+  if (zoom >= 17) return 60
+  return 100
+}
+
+type PlayerMarkerGroup = {
+  lat: number
+  lon: number
+  players: TeamProfileLiveStatus[]
+}
+
+function groupPlayerMarkers(players: TeamProfileLiveStatus[], radiusMeters: number): PlayerMarkerGroup[] {
+  const groups: PlayerMarkerGroup[] = []
+
+  for (const player of players) {
+    if (typeof player.lat !== 'number' || typeof player.lon !== 'number') continue
+
+    const point = { lat: player.lat, lon: player.lon }
+    const group = groups.find((candidate) =>
+      getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
+    )
+
+    if (group) {
+      group.players.push(player)
+      const count = group.players.length
+      group.lat = ((group.lat * (count - 1)) + player.lat) / count
+      group.lon = ((group.lon * (count - 1)) + player.lon) / count
+    } else {
+      groups.push({
+        lat: player.lat,
+        lon: player.lon,
+        players: [player],
+      })
+    }
+  }
+
+  return groups
+}
+
+function createPlayerClusterIcon(count: number) {
+  return L.divIcon({
+    className: 'saga-player-cluster-wrap',
+    html: `<div class="saga-player-cluster-pin"><span>👥</span><b>${count}</b></div>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  })
+}
+
+function buildPlayerClusterPopup(players: TeamProfileLiveStatus[]): string {
+  const items = players
+    .map((player) => {
+      const name = escapeHtml(player.display_name || player.user || 'Jugador')
+      const status = escapeHtml(String(player.presence || 'online').toUpperCase())
+      return `<li><strong>${name}</strong><span>${status}</span></li>`
+    })
+    .join('')
+
+  return `
+    <div class="saga-player-cluster-popup">
+      <strong>Jugadores cerca</strong>
+      <ul>${items}</ul>
+    </div>
+  `
+}
+
+
+type FieldProofGroup = {
+  lat: number
+  lon: number
+  proofs: FieldProof[]
+}
+
+function getFieldProofImage(proof: FieldProof): string {
+  return proof.thumbnail_url || proof.image_url || ''
+}
+
+function groupFieldProofs(proofs: FieldProof[], radiusMeters = 100): FieldProofGroup[] {
+  const sorted = [...proofs]
+    .filter((proof) => typeof proof.lat === 'number' && typeof proof.lon === 'number')
+    .sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0))
+
+  const groups: FieldProofGroup[] = []
+
+  for (const proof of sorted) {
+    const point = { lat: proof.lat, lon: proof.lon }
+    const group = groups.find((candidate) =>
+      getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
+    )
+
+    if (group) {
+      group.proofs.push(proof)
+      const count = group.proofs.length
+      group.lat = ((group.lat * (count - 1)) + proof.lat) / count
+      group.lon = ((group.lon * (count - 1)) + proof.lon) / count
+    } else {
+      groups.push({
+        lat: proof.lat,
+        lon: proof.lon,
+        proofs: [proof],
+      })
+    }
+  }
+
+  return groups
+}
+
+function createFieldProofIcon(proofs: FieldProof[]) {
+  const first = proofs[0]
+  const image = escapeHtml(getFieldProofImage(first))
+  const count = proofs.length > 1 ? `<span>${proofs.length}</span>` : ''
+
+  return L.divIcon({
+    className: 'saga-field-proof-photo-wrap',
+    html: `
+      <div class="saga-field-proof-photo-pin">
+        <div class="saga-field-proof-photo-thumb" style="background-image:url('${image}')"></div>
+        ${count}
+      </div>
+    `,
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
+  })
+}
+
+
+function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string {
+  const safeViewer = String(viewerUser || '').trim()
+
+  const items = proofs
+    .map((proof) => {
+      const image = escapeHtml(getFieldProofImage(proof))
+      const author = escapeHtml(proof.display_name || proof.user || 'Jugador')
+      const note = escapeHtml(proof.note || '')
+      const stage = escapeHtml(proof.stage_title || '')
+      const proofId = escapeHtml(proof.id)
+      const canDelete = safeViewer && proof.user === safeViewer
+
+      return `
+        <article class="saga-field-proof-card">
+          <div class="saga-field-proof-image-wrap">
+            <img src="${image}" alt="" loading="lazy" />
+          </div>
+          <div class="saga-field-proof-meta">
+            <strong>${author}</strong>
+            ${stage ? `<small>${stage}</small>` : ''}
+          </div>
+          ${note ? `<p>${note}</p>` : ''}
+          ${canDelete ? `<button type="button" class="saga-field-proof-delete" data-proof-delete-id="${proofId}">Eliminar foto</button>` : ''}
+        </article>
+      `
+    })
+    .join('')
+
+  return `
+    <div class="saga-field-proof-popup">
+      <div class="saga-field-proof-popup-head">
+        <strong>Fotos de campo</strong>
+        <span>${proofs.length}</span>
+      </div>
+      <div class="saga-field-proof-carousel">${items}</div>
+    </div>
+  `
+}
+
+
+function getFieldProofTooltip(proofs: FieldProof[]) {
+  return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
 }
 
 function getNodeVisualConfig(nodeState: NodeVisualState) {
@@ -277,12 +483,18 @@ export function MapSurface({
   focusRequest,
   nodeState = 'locked',
   otherPlayers = [],
+  fieldProofs = [],
+  viewerUser = '',
+  onDeleteFieldProof,
+  onOpenFieldProofs,
   selfLabel = 'YO',
   selfProfile,
   onDebugSetPosition,
   onNodeTap,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
+  const [mapReadyToken, setMapReadyToken] = useState(0)
+  const [mapZoom, setMapZoom] = useState(16)
   const mapRef = useRef<L.Map | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
@@ -291,6 +503,7 @@ export function MapSurface({
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
+  const fieldProofLayersRef = useRef<L.Layer[]>([])
   const routeNodeLayersRef = useRef<L.Layer[]>([])
   const onNodeTapRef = useRef(onNodeTap)
   const lastNodeFrameRef = useRef<string | null>(null)
@@ -314,15 +527,22 @@ export function MapSurface({
       attributionControl: false,
     })
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20,
+      maxNativeZoom: 19,
+      attribution: 'Tiles © Esri',
     }).addTo(map)
 
-    map.setView([42.4333, -8.65], 13)
+    map.setView([42.4333, -8.65], 16)
     mapRef.current = map
 
+    const updateZoom = () => setMapZoom(map.getZoom())
+    map.on('zoomend', updateZoom)
+    updateZoom()
+    setMapReadyToken((value) => value + 1)
+
     return () => {
+      map.off('zoomend', updateZoom)
       playerMarkerRef.current?.remove()
       playerAuraRef.current?.remove()
       nodeMarkerRef.current?.remove()
@@ -331,6 +551,8 @@ export function MapSurface({
       routeNodeLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
+      fieldProofLayersRef.current.forEach((layer) => layer.remove())
+      fieldProofLayersRef.current = []
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
@@ -385,6 +607,31 @@ export function MapSurface({
       map.off('click', handleMapClick)
     }
   }, [debugSimulation, onDebugSetPosition])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !onDeleteFieldProof) return
+
+    const container = map.getContainer()
+
+    const handleProofDeleteClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const button = target?.closest?.('[data-proof-delete-id]') as HTMLElement | null
+      if (!button) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const proofId = button.getAttribute('data-proof-delete-id')
+      if (proofId) onDeleteFieldProof(proofId)
+    }
+
+    container.addEventListener('click', handleProofDeleteClick, true)
+
+    return () => {
+      container.removeEventListener('click', handleProofDeleteClick, true)
+    }
+  }, [mapReadyToken, onDeleteFieldProof])
 
   useEffect(() => {
     const map = mapRef.current
@@ -520,13 +767,13 @@ export function MapSurface({
       if (activeRadiusLayer) {
         map.fitBounds(activeRadiusLayer.getBounds(), {
           padding: [56, 56],
-          maxZoom: 16,
+          maxZoom: 18,
           animate: true,
           duration: 0.25,
         })
       } else {
         const activeNode = stageNodes[Math.min(activeIndex, stageNodes.length - 1)]
-        map.setView([activeNode.data.lat, activeNode.data.lon], 15, {
+        map.setView([activeNode.data.lat, activeNode.data.lon], 17, {
           animate: true,
           duration: 0.25,
         })
@@ -655,13 +902,13 @@ export function MapSurface({
             [playerPosition.lat, playerPosition.lon]
           )
           map.fitBounds(bounds.pad(0.30), {
-            maxZoom: 16,
+            maxZoom: 18,
             animate: true,
             duration: 0.25,
           })
         }
       } else {
-        map.setView([playerPosition.lat, playerPosition.lon], 16, {
+        map.setView([playerPosition.lat, playerPosition.lon], 18, {
           animate: true,
           duration: 0.25,
         })
@@ -674,55 +921,120 @@ export function MapSurface({
     if (!map) return
 
     const seen = new Set<string>()
+    const radius = getClusterRadiusForZoom(mapZoom)
+    const visiblePlayers = otherPlayers.filter(
+      (player) => !player.is_self && typeof player.lat === 'number' && typeof player.lon === 'number'
+    )
+    const groups = groupPlayerMarkers(visiblePlayers, radius)
 
-    for (const player of otherPlayers) {
-      if (player.is_self) continue
-      if (typeof player.lat !== 'number' || typeof player.lon !== 'number') continue
+    for (const group of groups) {
+      const center = { lat: group.lat, lon: group.lon }
+      const clusterMode = group.players.length > 1 && mapZoom < 17
 
-      const key = String(player.user || player.display_name || `${player.lat}:${player.lon}`)
-      seen.add(key)
+      if (clusterMode) {
+        const key = `cluster:${group.players.map((player) => player.user || player.display_name).join('|')}`
+        seen.add(key)
 
-      const presence = String(player.presence || 'offline').toLowerCase()
-      const kind =
-        presence === 'offline'
-          ? 'offline'
-          : presence === 'stale'
-          ? 'recent'
-          : 'live'
+        const nearSelf = playerPosition && getDistanceMeters(center, playerPosition) <= 18
+        const visualCenter = nearSelf ? offsetLatLon(center, 18, 35) : center
+        const nextLatLng = L.latLng(visualCenter.lat, visualCenter.lon)
+        const existing = otherPlayerMarkersRef.current.get(key)
 
-      const label = player.display_name || player.user
-      const nextLatLng = L.latLng(player.lat, player.lon)
-      const existing = otherPlayerMarkersRef.current.get(key)
+        if (existing) {
+          existing.setLatLng(nextLatLng)
+          existing.setIcon(createPlayerClusterIcon(group.players.length))
+          existing.setZIndexOffset(930)
+          existing.bindPopup(buildPlayerClusterPopup(group.players), {
+            closeButton: true,
+            autoPan: true,
+            keepInView: true,
+          })
+          continue
+        }
 
-      if (existing) {
-        existing.setLatLng(nextLatLng)
-        existing.setIcon(createAvatarIcon(player, kind))
-        existing.setZIndexOffset(900)
-        existing.bindPopup(buildPlayerPopup(player, kind), {
+        const marker = L.marker(nextLatLng, {
+          icon: createPlayerClusterIcon(group.players.length),
+          keyboard: false,
+          riseOnHover: true,
+          bubblingMouseEvents: false,
+          zIndexOffset: 930,
+        }).addTo(map)
+
+        marker.bindTooltip(`${group.players.length} jugadores cerca`, {
+          direction: 'top',
+          opacity: 0.92,
+        })
+        marker.bindPopup(buildPlayerClusterPopup(group.players), {
           closeButton: true,
           autoPan: true,
           keepInView: true,
         })
-        existing.off('click')
-        existing.on('click', () => existing.openPopup())
+        marker.on('click', () => marker.openPopup())
+        otherPlayerMarkersRef.current.set(key, marker)
         continue
       }
 
-      const marker = L.marker(nextLatLng, {
-        icon: createAvatarIcon(player, kind),
-        keyboard: false,
-        riseOnHover: true,
-        bubblingMouseEvents: false,
-        zIndexOffset: 900,
-      }).addTo(map)
+      group.players.forEach((player, playerIndex) => {
+        const key = String(player.user || player.display_name || `${player.lat}:${player.lon}`)
+        seen.add(key)
 
-      marker.bindTooltip(label, {
-        direction: 'top',
-        opacity: 0.92,
+        const presence = String(player.presence || 'offline').toLowerCase()
+        const kind =
+          presence === 'offline'
+            ? 'offline'
+            : presence === 'stale'
+            ? 'recent'
+            : 'live'
+
+        const basePoint =
+          group.players.length > 1
+            ? spreadAround(center, playerIndex, group.players.length, mapZoom >= 18 ? 11 : 18, 20)
+            : { lat: Number(player.lat), lon: Number(player.lon) }
+
+        const nearSelf = playerPosition && getDistanceMeters(basePoint, playerPosition) <= 12
+        const visualPoint = nearSelf
+          ? offsetLatLon(basePoint, 16 + playerIndex * 4, 28 + playerIndex * 46)
+          : basePoint
+
+        const label = player.display_name || player.user
+        const nextLatLng = L.latLng(visualPoint.lat, visualPoint.lon)
+        const existing = otherPlayerMarkersRef.current.get(key)
+
+        if (existing) {
+          existing.setLatLng(nextLatLng)
+          existing.setIcon(createAvatarIcon(player, kind))
+          existing.setZIndexOffset(930)
+          existing.bindPopup(buildPlayerPopup(player, kind), {
+            closeButton: true,
+            autoPan: true,
+            keepInView: true,
+          })
+          existing.off('click')
+          existing.on('click', () => existing.openPopup())
+          return
+        }
+
+        const marker = L.marker(nextLatLng, {
+          icon: createAvatarIcon(player, kind),
+          keyboard: false,
+          riseOnHover: true,
+          bubblingMouseEvents: false,
+          zIndexOffset: 930,
+        }).addTo(map)
+
+        marker.bindTooltip(label, {
+          direction: 'top',
+          opacity: 0.92,
+        })
+        marker.bindPopup(buildPlayerPopup(player, kind), {
+          closeButton: true,
+          autoPan: true,
+          keepInView: true,
+        })
+        marker.on('click', () => marker.openPopup())
+
+        otherPlayerMarkersRef.current.set(key, marker)
       })
-      marker.on('click', () => marker.openPopup())
-
-      otherPlayerMarkersRef.current.set(key, marker)
     }
 
     for (const [key, marker] of otherPlayerMarkersRef.current.entries()) {
@@ -731,7 +1043,63 @@ export function MapSurface({
       otherPlayerMarkersRef.current.delete(key)
       otherPlayerMarkerStateRef.current.delete(key)
     }
-  }, [otherPlayers])
+  }, [otherPlayers, mapZoom, playerPosition?.lat, playerPosition?.lon])
+
+
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    fieldProofLayersRef.current.forEach((layer) => layer.remove())
+    fieldProofLayersRef.current = []
+
+    const groups = groupFieldProofs(fieldProofs, getPhotoClusterRadiusForZoom(mapZoom))
+
+    for (const group of groups) {
+      const center = { lat: group.lat, lon: group.lon }
+      const nearSelf = playerPosition && getDistanceMeters(center, playerPosition) <= 16
+      const nearOtherPlayer = otherPlayers.some((player) =>
+        typeof player.lat === 'number' &&
+        typeof player.lon === 'number' &&
+        getDistanceMeters(center, { lat: player.lat, lon: player.lon }) <= 16
+      )
+      const visualCenter =
+        nearSelf || nearOtherPlayer
+          ? offsetLatLon(center, mapZoom >= 18 ? 14 : 22, -35)
+          : center
+
+      const marker = L.marker([visualCenter.lat, visualCenter.lon], {
+        icon: createFieldProofIcon(group.proofs),
+        keyboard: false,
+        riseOnHover: true,
+        bubblingMouseEvents: false,
+        zIndexOffset: 980,
+      }).addTo(map)
+
+      marker.bindTooltip(getFieldProofTooltip(group.proofs), {
+        direction: 'top',
+        opacity: 0.92,
+      })
+
+      marker.on('click', () => {
+        onOpenFieldProofs?.(group.proofs)
+      })
+
+      fieldProofLayersRef.current.push(marker)
+    }
+  }, [
+    fieldProofs,
+    mapReadyToken,
+    mapZoom,
+    playerPosition?.lat,
+    playerPosition?.lon,
+    otherPlayers,
+    onOpenFieldProofs,
+  ])
+
+
+
 
   useEffect(() => {
     const map = mapRef.current
@@ -743,7 +1111,7 @@ export function MapSurface({
 
     if (focusRequest.target === 'player' && playerPosition) {
       map.stop()
-      map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
+      map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
         animate: true,
         duration: 0.60,
         easeLinearity: 0.22,
@@ -797,7 +1165,7 @@ export function MapSurface({
 
       if (playerPosition) {
         map.stop()
-        map.flyTo([playerPosition.lat, playerPosition.lon], 17, {
+        map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
           animate: true,
           duration: 0.25,
         })
@@ -807,7 +1175,7 @@ export function MapSurface({
 
     if (focusRequest.target === 'node' && stageMapData) {
       map.stop()
-      map.flyTo([stageMapData.lat, stageMapData.lon], 17, {
+      map.flyTo([stageMapData.lat, stageMapData.lon], 18, {
         animate: true,
         duration: 0.60,
         easeLinearity: 0.22,
@@ -897,6 +1265,135 @@ const mapAnimations = `
 .saga-avatar-icon-wrap {
   background: transparent;
   border: none;
+}
+
+
+
+
+
+
+
+
+
+
+.saga-player-cluster-wrap,
+.saga-field-proof-photo-wrap {
+  background: transparent;
+  border: none;
+}
+
+.saga-player-cluster-pin {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: linear-gradient(135deg, rgba(15,23,42,.88), rgba(51,65,85,.78));
+  border: 3px solid rgba(255,255,255,.94);
+  box-shadow: 0 14px 28px rgba(15,23,42,.28), inset 0 1px 0 rgba(255,255,255,.18);
+  color: #fff;
+}
+
+.saga-player-cluster-pin span {
+  font-size: 17px;
+  transform: translateY(-1px);
+}
+
+.saga-player-cluster-pin b {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14,165,233,.96);
+  border: 1px solid rgba(255,255,255,.76);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.saga-player-cluster-popup {
+  min-width: 180px;
+  font-family: system-ui, sans-serif;
+}
+
+.saga-player-cluster-popup strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.saga-player-cluster-popup ul {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  list-style: none;
+}
+
+.saga-player-cluster-popup li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #334155;
+  font-size: 11px;
+}
+
+.saga-player-cluster-popup li span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.saga-field-proof-photo-pin {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,.96);
+  box-shadow: 0 10px 22px rgba(15,23,42,.24);
+  background: rgba(15,23,42,.18);
+  position: relative;
+  transform: translateZ(0);
+}
+
+.saga-field-proof-photo-thumb {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.saga-field-proof-photo-pin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(15,23,42,.10);
+  pointer-events: none;
+}
+
+.saga-field-proof-photo-pin span {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15,23,42,.90);
+  border: 1px solid rgba(255,255,255,.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 950;
+  z-index: 2;
 }
 
 .saga-avatar-pin {
