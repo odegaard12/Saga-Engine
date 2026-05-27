@@ -61,6 +61,7 @@ type MapSurfaceProps = {
   fieldProofs?: FieldProof[]
   viewerUser?: string
   onDeleteFieldProof?: (proofId: string) => void
+  onOpenFieldProofs?: (proofs: FieldProof[]) => void
   selfLabel?: string
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
@@ -256,15 +257,15 @@ function createFieldProofIcon(proofs: FieldProof[]) {
     className: 'saga-field-proof-photo-wrap',
     html: `
       <div class="saga-field-proof-photo-pin">
-        <img src="${image}" alt="" loading="lazy" />
+        <div class="saga-field-proof-photo-thumb" style="background-image:url('${image}')"></div>
         ${count}
       </div>
     `,
-    iconSize: [56, 56],
-    iconAnchor: [28, 28],
-    popupAnchor: [0, -24],
+    iconSize: [54, 54],
+    iconAnchor: [27, 27],
   })
 }
+
 
 function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string {
   const safeViewer = String(viewerUser || '').trim()
@@ -485,6 +486,7 @@ export function MapSurface({
   fieldProofs = [],
   viewerUser = '',
   onDeleteFieldProof,
+  onOpenFieldProofs,
   selfLabel = 'YO',
   selfProfile,
   onDebugSetPosition,
@@ -1075,21 +1077,18 @@ export function MapSurface({
         zIndexOffset: 980,
       }).addTo(map)
 
-      marker.bindPopup(buildFieldProofPopup(group.proofs, viewerUser), {
-        closeButton: true,
-        autoPan: true,
-        keepInView: true,
-        maxWidth: 292,
-        autoPanPaddingTopLeft: L.point(24, 170),
-        autoPanPaddingBottomRight: L.point(24, 110),
-      })
-
       marker.bindTooltip(getFieldProofTooltip(group.proofs), {
         direction: 'top',
         opacity: 0.92,
       })
 
-      marker.on('click', () => marker.openPopup())
+      marker.on('click', () => {
+        if (onOpenFieldProofs) {
+          onOpenFieldProofs(group.proofs)
+          return
+        }
+      })
+
       fieldProofLayersRef.current.push(marker)
     }
   }, [
@@ -1100,6 +1099,7 @@ export function MapSurface({
     playerPosition?.lat,
     playerPosition?.lon,
     otherPlayers,
+    onOpenFieldProofs,
   ])
 
 
@@ -1277,6 +1277,7 @@ const mapAnimations = `
 
 
 
+
 .saga-player-cluster-wrap,
 .saga-field-proof-photo-wrap {
   background: transparent;
@@ -1352,23 +1353,32 @@ const mapAnimations = `
 }
 
 .saga-field-proof-photo-pin {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
   overflow: hidden;
   border: 3px solid rgba(255,255,255,.96);
-  box-shadow: 0 14px 28px rgba(15,23,42,.26), inset 0 1px 0 rgba(255,255,255,.24);
-  background: rgba(15,23,42,.16);
+  box-shadow: 0 12px 24px rgba(15,23,42,.26), inset 0 1px 0 rgba(255,255,255,.24);
+  background: rgba(15,23,42,.18);
   position: relative;
   transform: translateZ(0);
 }
 
-.saga-field-proof-photo-pin img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center center;
-  display: block;
+.saga-field-proof-photo-thumb {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  transform: scale(1.01);
+}
+
+.saga-field-proof-photo-pin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(15,23,42,.10);
+  pointer-events: none;
 }
 
 .saga-field-proof-photo-pin span {
@@ -1381,123 +1391,12 @@ const mapAnimations = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15,23,42,.88);
-  border: 1px solid rgba(255,255,255,.70);
+  background: rgba(15,23,42,.90);
+  border: 1px solid rgba(255,255,255,.72);
   color: #fff;
   font-size: 10px;
   font-weight: 950;
-}
-
-.saga-field-proof-popup {
-  width: min(74vw, 280px);
-  max-width: 280px;
-  max-height: min(68vh, 420px);
-  overflow: hidden;
-  font-family: system-ui, sans-serif;
-}
-
-.saga-field-proof-popup-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: #0f172a;
-}
-
-.saga-field-proof-popup-head strong {
-  font-size: 15px;
-  font-weight: 950;
-}
-
-.saga-field-proof-popup-head span {
-  min-width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #0f172a;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 950;
-}
-
-.saga-field-proof-carousel {
-  display: flex;
-  gap: 9px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 4px;
-  max-width: 100%;
-}
-
-.saga-field-proof-card {
-  min-width: 228px;
-  max-width: 228px;
-  scroll-snap-align: start;
-  display: grid;
-  gap: 8px;
-  align-content: start;
-}
-
-.saga-field-proof-image-wrap {
-  width: 228px;
-  height: 138px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #e2e8f0;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.30);
-}
-
-.saga-field-proof-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center center;
-  display: block;
-}
-
-.saga-field-proof-meta {
-  display: grid;
-  gap: 2px;
-}
-
-.saga-field-proof-card strong {
-  color: #0f172a;
-  font-size: 12px;
-  line-height: 1.15;
-}
-
-.saga-field-proof-card small {
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1.15;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.saga-field-proof-card p {
-  margin: 0;
-  max-height: 50px;
-  overflow-y: auto;
-  color: #334155;
-  font-size: 11px;
-  line-height: 1.35;
-  padding-right: 4px;
-}
-
-.saga-field-proof-delete {
-  min-height: 30px;
-  border-radius: 12px;
-  border: 1px solid rgba(220,38,38,.18);
-  background: rgba(254,226,226,.78);
-  color: #991b1b;
-  font-size: 11px;
-  font-weight: 900;
-  cursor: pointer;
-  pointer-events: auto;
+  z-index: 2;
 }
 
 .saga-avatar-pin {

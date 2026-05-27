@@ -9,6 +9,7 @@ import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
@@ -90,6 +91,7 @@ export default function PlayerApp() {
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
   const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
+  const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
@@ -469,6 +471,7 @@ export default function PlayerApp() {
     try {
       await deleteFieldProof(payload.user, proofId)
       setFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
       void refreshFieldProofs().catch(() => {})
       showNotice('Foto eliminada.', 'success')
       vibrate(8)
@@ -963,6 +966,7 @@ return
           fieldProofs={fieldProofs}
           viewerUser={payload.user}
           onDeleteFieldProof={handleDeleteFieldProof}
+          onOpenFieldProofs={(proofs) => setSelectedFieldProofs(proofs)}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),
@@ -991,6 +995,14 @@ return
         <div style={getToastOverlayStyle(isPhone)}>
           <ToastNotice notice={uiNotice} />
         </div>
+
+        <FieldPhotoViewer
+          open={selectedFieldProofs.length > 0}
+          proofs={selectedFieldProofs}
+          viewerUser={payload.user}
+          onClose={() => setSelectedFieldProofs([])}
+          onDelete={handleDeleteFieldProof}
+        />
 
         <FieldCameraCapture
           open={fieldCameraOpen}
@@ -1323,15 +1335,16 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 132 : 144,
+    height: mobile ? 82 : 96,
     zIndex: 1100,
     pointerEvents: 'none',
     borderTopLeftRadius: mobile ? 0 : 28,
     borderTopRightRadius: mobile ? 0 : 28,
     background:
-      'linear-gradient(180deg, rgba(238,243,237,.96) 0%, rgba(238,243,237,.86) 42%, rgba(238,243,237,.52) 72%, rgba(238,243,237,0) 100%)',
+      'linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(15,23,42,.04) 44%, rgba(15,23,42,0) 100%)',
   }
 }
+
 
 function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {
