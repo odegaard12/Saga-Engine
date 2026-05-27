@@ -373,6 +373,11 @@ def normalize_player_profile(raw, index=0):
 
 def get_player_profiles(cfg=None):
     cfg = cfg or load_config()
+
+    raw_profiles = cfg.get("player_profiles")
+    if isinstance(raw_profiles, list) and raw_profiles:
+        return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_profiles)]
+
     raw_players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
     return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_players)]
 
@@ -1879,7 +1884,24 @@ async def save_config_endpoint(request: Request):
     except Exception:
         pass
 
-    cfg["players"] = players
+    incoming_profiles = incoming.get("player_profiles")
+    if isinstance(incoming_profiles, list) and incoming_profiles:
+        normalized_profiles = [
+            normalize_player_profile(profile, index=i)
+            for i, profile in enumerate(incoming_profiles)
+        ]
+        cfg["player_profiles"] = normalized_profiles
+        cfg["players"] = [
+            profile.get("id") or profile.get("display_name") or f"PLAYER {i + 1}"
+            for i, profile in enumerate(normalized_profiles)
+        ]
+    else:
+        cfg["players"] = players
+        if "player_profiles" in incoming:
+            cfg["player_profiles"] = [
+                normalize_player_profile(player, index=i)
+                for i, player in enumerate(players)
+            ]
 
     save_config(cfg)
     return {"status": "ok", "config": cfg}

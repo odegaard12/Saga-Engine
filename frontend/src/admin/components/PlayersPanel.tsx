@@ -76,6 +76,7 @@ export default function PlayersPanel({
     try {
       const dataUrl = await fileToAvatarDataUrl(file)
       onUpdatePlayer(index, 'avatar_url', dataUrl)
+      onUpdatePlayer(index, 'avatar_initials', '')
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No se pudo cargar el avatar.')
     } finally {
@@ -214,7 +215,7 @@ export default function PlayersPanel({
                   URL/data URL avatar
                   <input
                     value={draft.avatar_url}
-                    placeholder="https://... o sube una imagen"
+                    placeholder="Al subir imagen aparecerá aquí un data:image/..."
                     onChange={(event) => onUpdatePlayer(index, 'avatar_url', event.target.value)}
                   />
                 </label>
