@@ -473,7 +473,6 @@ export default function PlayerApp() {
       setFieldProofs((current) => current.filter((item) => item.id !== proofId))
       setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
       void refreshFieldProofs().catch(() => {})
-      showNotice('Foto eliminada.', 'success')
       vibrate(8)
     } catch (error) {
       showNotice(error instanceof Error ? error.message : 'No se pudo eliminar la foto.', 'warn')
@@ -506,7 +505,6 @@ export default function PlayerApp() {
       ])
 
       void refreshFieldProofs().catch(() => {})
-      showNotice('Foto compartida en el mapa.', 'success')
       vibrate([10, 16, 10])
     } catch (error) {
       showNotice(error instanceof Error ? error.message : 'No se pudo subir la foto.', 'warn')
@@ -1241,8 +1239,8 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
       'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
     boxShadow:
       '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
-    backdropFilter: 'blur(18px) saturate(130%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+    backdropFilter: 'blur(8px) saturate(120%)',
+    WebkitBackdropFilter: 'blur(8px) saturate(120%)',
     pointerEvents: 'auto',
   }
 }
@@ -1262,8 +1260,7 @@ function ScreenFrame({
         width: '100vw',
         minHeight: mobile ? '100dvh' : '100svh',
         height: mobile ? '100dvh' : 'auto',
-        background:
-          'linear-gradient(180deg, #eef3ed 0%, #e8efea 48%, #e2ebe3 100%)',
+        background: '#020617',
         padding: mobile ? 0 : 12,
         fontFamily: 'system-ui, sans-serif',
         color: '#10231a',
@@ -1335,16 +1332,12 @@ function getTopScrimStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    height: mobile ? 82 : 96,
+    height: 0,
     zIndex: 1100,
     pointerEvents: 'none',
-    borderTopLeftRadius: mobile ? 0 : 28,
-    borderTopRightRadius: mobile ? 0 : 28,
-    background:
-      'linear-gradient(180deg, rgba(15,23,42,.10) 0%, rgba(15,23,42,.04) 44%, rgba(15,23,42,0) 100%)',
+    background: 'transparent',
   }
 }
-
 
 function getTopOverlayStyle(mobile: boolean): CSSProperties {
   return {

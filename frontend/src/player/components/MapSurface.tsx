@@ -261,8 +261,8 @@ function createFieldProofIcon(proofs: FieldProof[]) {
         ${count}
       </div>
     `,
-    iconSize: [54, 54],
-    iconAnchor: [27, 27],
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
   })
 }
 
@@ -1083,17 +1083,13 @@ export function MapSurface({
       })
 
       marker.on('click', () => {
-        if (onOpenFieldProofs) {
-          onOpenFieldProofs(group.proofs)
-          return
-        }
+        onOpenFieldProofs?.(group.proofs)
       })
 
       fieldProofLayersRef.current.push(marker)
     }
   }, [
     fieldProofs,
-    viewerUser,
     mapReadyToken,
     mapZoom,
     playerPosition?.lat,
@@ -1278,6 +1274,7 @@ const mapAnimations = `
 
 
 
+
 .saga-player-cluster-wrap,
 .saga-field-proof-photo-wrap {
   background: transparent;
@@ -1353,12 +1350,12 @@ const mapAnimations = `
 }
 
 .saga-field-proof-photo-pin {
-  width: 54px;
-  height: 54px;
-  border-radius: 17px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 3px solid rgba(255,255,255,.96);
-  box-shadow: 0 12px 24px rgba(15,23,42,.26), inset 0 1px 0 rgba(255,255,255,.24);
+  border: 2px solid rgba(255,255,255,.96);
+  box-shadow: 0 10px 22px rgba(15,23,42,.24);
   background: rgba(15,23,42,.18);
   position: relative;
   transform: translateZ(0);
@@ -1370,7 +1367,6 @@ const mapAnimations = `
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  transform: scale(1.01);
 }
 
 .saga-field-proof-photo-pin::after {

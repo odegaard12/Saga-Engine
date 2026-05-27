@@ -29,16 +29,18 @@ export function FieldPhotoViewer({
   const canDelete = proof.user === viewerUser
   const imageUrl = proof.image_url || proof.thumbnail_url || ''
 
-  function previous() {
-    setIndex((current) => Math.max(0, current - 1))
+  function close() {
+    setIndex(0)
+    onClose()
   }
 
-  function next() {
-    setIndex((current) => Math.min(proofs.length - 1, current + 1))
+  function deleteCurrent() {
+    onDelete(proof.id)
+    if (proofs.length <= 1) close()
   }
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={overlay} onClick={close}>
       <section style={sheet} onClick={(event) => event.stopPropagation()} aria-label="Fotos de campo">
         <div style={header}>
           <div>
@@ -46,7 +48,7 @@ export function FieldPhotoViewer({
             <span style={counter}>{safeIndex + 1}/{proofs.length}</span>
           </div>
 
-          <button type="button" style={closeButton} onClick={onClose} aria-label="Cerrar">
+          <button type="button" style={closeButton} onClick={close} aria-label="Cerrar">
             ×
           </button>
         </div>
@@ -63,26 +65,20 @@ export function FieldPhotoViewer({
 
         {proofs.length > 1 ? (
           <div style={nav}>
-            <button type="button" style={navButton} disabled={safeIndex === 0} onClick={previous}>
+            <button type="button" style={navButton} disabled={safeIndex === 0} onClick={() => setIndex((v) => Math.max(0, v - 1))}>
               ← Anterior
             </button>
-            <button type="button" style={navButton} disabled={safeIndex >= proofs.length - 1} onClick={next}>
+            <button type="button" style={navButton} disabled={safeIndex >= proofs.length - 1} onClick={() => setIndex((v) => Math.min(proofs.length - 1, v + 1))}>
               Siguiente →
             </button>
           </div>
         ) : null}
 
-        <div style={actions}>
-          {canDelete ? (
-            <button
-              type="button"
-              style={deleteButton}
-              onClick={() => onDelete(proof.id)}
-            >
-              Eliminar foto
-            </button>
-          ) : null}
-        </div>
+        {canDelete ? (
+          <button type="button" style={deleteButton} onClick={deleteCurrent}>
+            Eliminar foto
+          </button>
+        ) : null}
       </section>
     </div>
   )
@@ -94,9 +90,9 @@ const overlay: CSSProperties = {
   zIndex: 7600,
   display: 'grid',
   alignItems: 'end',
-  background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(3px)',
-  WebkitBackdropFilter: 'blur(3px)',
+  background: 'rgba(2,6,23,.22)',
+  backdropFilter: 'blur(2px)',
+  WebkitBackdropFilter: 'blur(2px)',
 }
 
 const sheet: CSSProperties = {
@@ -104,10 +100,10 @@ const sheet: CSSProperties = {
   margin: '0 auto',
   padding: 14,
   paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
-  borderRadius: '26px 26px 0 0',
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'linear-gradient(180deg, rgba(248,250,252,.98), rgba(241,245,249,.98))',
-  boxShadow: '0 -20px 56px rgba(15,23,42,.28)',
+  borderRadius: '24px 24px 0 0',
+  border: '1px solid rgba(15,23,42,.08)',
+  background: 'rgba(248,250,252,.98)',
+  boxShadow: '0 -18px 48px rgba(15,23,42,.22)',
   color: '#0f172a',
   display: 'grid',
   gap: 12,
@@ -122,7 +118,7 @@ const header: CSSProperties = {
 
 const title: CSSProperties = {
   display: 'block',
-  fontSize: 20,
+  fontSize: 19,
   fontWeight: 950,
   letterSpacing: '-0.03em',
 }
@@ -130,7 +126,7 @@ const title: CSSProperties = {
 const counter: CSSProperties = {
   display: 'inline-flex',
   marginTop: 4,
-  minHeight: 22,
+  minHeight: 21,
   padding: '0 8px',
   alignItems: 'center',
   borderRadius: 999,
@@ -141,27 +137,26 @@ const counter: CSSProperties = {
 }
 
 const closeButton: CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 38,
+  height: 38,
   borderRadius: 999,
   border: '1px solid rgba(15,23,42,.10)',
   background: 'rgba(15,23,42,.06)',
   color: '#334155',
-  fontSize: 26,
+  fontSize: 24,
   lineHeight: 1,
   fontWeight: 700,
 }
 
 const imageFrame: CSSProperties = {
   width: '100%',
-  height: 'min(48vh, 360px)',
+  height: 'min(46vh, 340px)',
   minHeight: 220,
-  borderRadius: 22,
+  borderRadius: 20,
   overflow: 'hidden',
-  background: '#0f172a',
+  background: '#020617',
   display: 'grid',
   placeItems: 'center',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.18)',
 }
 
 const image: CSSProperties = {
@@ -191,11 +186,6 @@ const navButton: CSSProperties = {
   color: '#0f172a',
   fontSize: 12,
   fontWeight: 900,
-}
-
-const actions: CSSProperties = {
-  display: 'grid',
-  gap: 8,
 }
 
 const deleteButton: CSSProperties = {
