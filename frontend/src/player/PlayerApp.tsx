@@ -877,7 +877,7 @@ return
           <ToastNotice notice={uiNotice} />
         </div>
 
-        {activePanel !== 'details' && !toolsOpen && !overlayState ? (
+        {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
               user={user}
