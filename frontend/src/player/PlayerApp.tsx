@@ -898,7 +898,7 @@ return
               }}
               aria-label="Prueba rápida"
             >
-              📸
+              <span aria-hidden="true" style={mapQuickIcon}>📷</span>
             </button>
 
             <button
@@ -911,7 +911,7 @@ return
               }}
               aria-label="Jugadores"
             >
-              <span aria-hidden="true">👥</span>
+              <span aria-hidden="true" style={mapQuickIcon}>👥</span>
               <span style={mapQuickCountPill}>{teamVisibleCount}</span>
             </button>
 
@@ -925,7 +925,7 @@ return
               }}
               aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
             >
-              {routeOverviewActive ? '◎' : '↔'}
+              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '◎' : '⌖'}</span>
             </button>
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
@@ -1020,30 +1020,26 @@ const mapRouteToggleButton: CSSProperties = {
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 46,
-  height: 46,
-  minWidth: 46,
-  minHeight: 46,
+  width: 44,
+  height: 40,
+  minWidth: 44,
+  minHeight: 40,
   padding: 0,
   borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.18)',
-  background:
-    'linear-gradient(180deg, rgba(248,250,252,.34), rgba(100,116,139,.26))',
+  border: '1px solid transparent',
+  background: 'transparent',
   color: '#f8fafc',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 5,
-  fontSize: 17,
+  gap: 4,
+  fontSize: 16,
   lineHeight: 1,
   fontWeight: 950,
   textAlign: 'center',
   whiteSpace: 'nowrap',
-  textShadow: '0 1px 8px rgba(15,23,42,.34)',
-  boxShadow:
-    '0 12px 28px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.16)',
-  backdropFilter: 'blur(20px) saturate(1.18)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.18)',
+  textShadow: '0 1px 8px rgba(15,23,42,.28)',
+  boxShadow: 'none',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
   cursor: 'pointer',
@@ -1052,28 +1048,36 @@ const mapRouteToggleInlineButton: CSSProperties = {
 
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background:
-    'linear-gradient(180deg, rgba(96,165,250,.38), rgba(37,99,235,.24))',
-  border: '1px solid rgba(147,197,253,.46)',
-  color: '#eff6ff',
+  background: 'rgba(125,211,252,.16)',
+  border: '1px solid rgba(125,211,252,.26)',
+  color: '#e0f2fe',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
 }
 
 const mapQuickCountPill: CSSProperties = {
-  minWidth: 18,
-  height: 18,
-  padding: '0 5px',
+  minWidth: 16,
+  height: 16,
+  padding: '0 4px',
+  marginLeft: -1,
   borderRadius: 999,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(255,255,255,.18)',
+  background: 'rgba(255,255,255,.16)',
   color: '#ffffff',
-  fontSize: 10,
+  fontSize: 9,
   fontWeight: 950,
   lineHeight: 1,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
+const mapQuickIcon: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transform: 'translateY(-0.5px)',
+  filter: 'drop-shadow(0 1px 4px rgba(15,23,42,.32))',
+}
 
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
@@ -1087,17 +1091,20 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    gap: 8,
-    padding: 5,
-    borderRadius: 999,
-    border: '1px solid rgba(255,255,255,.16)',
-    background: 'rgba(15,23,42,.18)',
-    boxShadow: '0 14px 34px rgba(15,23,42,.16)',
-    backdropFilter: 'blur(18px) saturate(1.16)',
-    WebkitBackdropFilter: 'blur(18px) saturate(1.16)',
+    gap: 4,
+    padding: 4,
+    borderRadius: 22,
+    border: '1px solid rgba(255,255,255,.18)',
+    background:
+      'linear-gradient(180deg, rgba(15,23,42,.54), rgba(15,23,42,.34))',
+    boxShadow:
+      '0 16px 38px rgba(15,23,42,.24), inset 0 1px 0 rgba(255,255,255,.08)',
+    backdropFilter: 'blur(20px) saturate(1.18)',
+    WebkitBackdropFilter: 'blur(20px) saturate(1.18)',
     pointerEvents: 'auto',
   }
 }
+
 
 
 function ScreenFrame({
