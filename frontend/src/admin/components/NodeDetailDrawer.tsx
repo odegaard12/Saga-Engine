@@ -262,19 +262,33 @@ export default function NodeDetailDrawer({
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="admin-drawer-head admin-drawer-head--modern">
-          <div className="admin-drawer-head-copy">
-            <span className="admin-kicker">{isLocalNew ? 'Add node' : 'Node editor'}</span>
-            <h2>{draft.index + 1}. {draft.title || 'Untitled node'}</h2>
-            <div className="admin-drawer-meta">
-              <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
-              <span>{formatCoords(draft.lat, draft.lon)}</span>
-              <span>{typeof draft.radius === 'number' ? `${draft.radius}m radius` : 'No radius'}</span>
+        <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
+          <div className="admin-node-editor-kicker-row">
+            <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor de nodo'}</span>
+
+            <button
+              type="button"
+              className="admin-node-editor-close"
+              onClick={onClose}
+            >
+              Cerrar
+            </button>
+          </div>
+
+          <div className="admin-node-editor-title-row">
+            <div className="admin-node-editor-title-copy">
+              <h2>{draft.index + 1}. {draft.title || 'Nodo sin título'}</h2>
+
+              <div className="admin-drawer-meta admin-node-editor-meta">
+                <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
+                <span>{formatCoords(draft.lat, draft.lon)}</span>
+                <span>{typeof draft.radius === 'number' ? `${draft.radius} m` : 'Sin radio'}</span>
+              </div>
             </div>
 
-            <div className="admin-node-mode-toolbar admin-node-mode-toolbar--type-only">
+            <div className="admin-node-editor-actions">
               <button type="button" onClick={onRequestChangeType}>
-                Cambiar tipo de nodo
+                Cambiar tipo
               </button>
               <button
                 type="button"
@@ -285,28 +299,26 @@ export default function NodeDetailDrawer({
                   }
                 }}
               >
-                Eliminar nodo
+                Eliminar
               </button>
             </div>
           </div>
-
-          <button type="button" onClick={onClose}>Close</button>
         </div>
 
-        <div className="admin-drawer-tabs" role="tablist" aria-label="Node editor tabs">
+        <div className="admin-drawer-tabs admin-node-editor-tabs" role="tablist" aria-label="Node editor tabs">
           <button
             type="button"
             className={activeTab === 'basics' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('basics')}
           >
-            Basics
+            Básico
           </button>
           <button
             type="button"
             className={activeTab === 'location' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('location')}
           >
-            Location
+            Ubicación
           </button>
           <button
             type="button"
@@ -327,14 +339,14 @@ export default function NodeDetailDrawer({
             className={activeTab === 'messages' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('messages')}
           >
-            Messages
+            Mensajes
           </button>
           <button
             type="button"
             className={activeTab === 'advanced' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('advanced')}
           >
-            Advanced
+            Avanzado
           </button>
         </div>
 

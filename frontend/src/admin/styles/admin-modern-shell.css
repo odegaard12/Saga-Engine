@@ -2611,3 +2611,152 @@
   line-height: 1.35;
   font-weight: 750;
 }
+
+/* admin-node-editor-organized-topbar-v1 */
+.admin-drawer-editable {
+  overflow: hidden !important;
+}
+
+.admin-node-editor-topbar {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 18px 20px 12px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+}
+
+.admin-node-editor-kicker-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.admin-node-editor-kicker-row .admin-kicker {
+  font-size: 11px !important;
+  letter-spacing: 0.22em !important;
+  line-height: 1 !important;
+}
+
+.admin-node-editor-close {
+  min-height: 34px !important;
+  padding: 0 16px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(226, 232, 240, 0.18) !important;
+  background: rgba(226, 232, 240, 0.92) !important;
+  color: #020617 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.admin-node-editor-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+  gap: 14px !important;
+}
+
+.admin-node-editor-title-copy {
+  min-width: 0 !important;
+}
+
+.admin-node-editor-title-copy h2 {
+  margin: 0 0 8px !important;
+  font-size: clamp(24px, 3.2vw, 34px) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.055em !important;
+}
+
+.admin-node-editor-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+.admin-node-editor-meta span {
+  min-height: 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  max-width: 100% !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  max-width: 260px !important;
+}
+
+.admin-node-editor-actions button {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.admin-node-editor-actions .admin-node-delete-visible {
+  border-color: rgba(248, 113, 113, 0.28) !important;
+  background: rgba(127, 29, 29, 0.22) !important;
+  color: #fecaca !important;
+}
+
+.admin-node-editor-tabs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  padding: 10px 20px !important;
+  margin: 0 !important;
+  overflow-x: auto !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(2, 6, 23, 0.36) !important;
+}
+
+.admin-node-editor-tabs .admin-drawer-tab {
+  flex: 0 0 auto !important;
+  min-height: 34px !important;
+  padding: 0 13px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.admin-drawer-body--modern {
+  max-height: calc(100vh - 235px) !important;
+  overflow: auto !important;
+}
+
+@media (max-width: 860px) {
+  .admin-node-editor-topbar {
+    padding: 14px 14px 10px !important;
+  }
+
+  .admin-node-editor-title-row {
+    grid-template-columns: 1fr !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .admin-node-editor-title-copy h2 {
+    font-size: 25px !important;
+  }
+
+  .admin-node-editor-actions {
+    justify-content: flex-start !important;
+    max-width: none !important;
+  }
+
+  .admin-node-editor-tabs {
+    padding: 9px 14px !important;
+  }
+
+  .admin-drawer-body--modern {
+    max-height: calc(100vh - 250px) !important;
+  }
+}
