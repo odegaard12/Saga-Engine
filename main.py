@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
+import io
+import zipfile
 import base64
 import os
 import hashlib
@@ -257,6 +259,92 @@ async def get_field_proofs(user: str = "", limit: int = 180):
         "status": "ok",
         "proofs": list_field_proof_records(limit=limit),
     }
+
+
+
+
+@app.get("/api/field-proofs/download")
+async def download_field_proofs(user: str = ""):
+    user_text = _as_str(user).strip()
+
+    if user_text and not resolve_known_player_profile(user_text):
+        raise HTTPException(status_code=403, detail="unknown player")
+
+    init_field_proof_schema()
+
+    conn = connect_runtime_sqlite()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM field_proofs
+            WHERE status = 'active' AND visibility = 'team'
+            ORDER BY created_at ASC, id ASC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    base_dir = resolve_field_proofs_dir().resolve()
+    buffer = io.BytesIO()
+    manifest = []
+
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for row in rows:
+            proof_id = _as_str(row["id"]).strip()
+            filename = _as_str(row["image_filename"]).strip()
+            media_type = _as_str(row["media_type"] or "image/jpeg").strip() or "image/jpeg"
+            created_at = int(row["created_at"] or 0)
+            target = (base_dir / filename).resolve()
+
+            if not str(target).startswith(str(base_dir)):
+                continue
+            if not target.exists() or not target.is_file():
+                continue
+
+            suffix = target.suffix or ".jpg"
+            arcname = f"photos/{created_at}_{proof_id}{suffix}"
+            archive.write(target, arcname)
+
+            manifest.append({
+                "id": proof_id,
+                "file": arcname,
+                "user": row["user"],
+                "display_name": row["display_name"],
+                "stage_id": row["stage_id"],
+                "stage_title": row["stage_title"],
+                "lat": row["lat"],
+                "lon": row["lon"],
+                "note": row["note"],
+                "media_type": media_type,
+                "created_at": created_at,
+            })
+
+        archive.writestr(
+            "manifest.json",
+            json.dumps(
+                {
+                    "status": "ok",
+                    "generated_at": int(time.time()),
+                    "count": len(manifest),
+                    "photos": manifest,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+        )
+
+    buffer.seek(0)
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="saga-field-photos-{stamp}.zip"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.get("/api/field-proofs/{proof_id}/image")

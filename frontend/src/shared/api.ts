@@ -126,3 +126,8 @@ export async function deleteFieldProof(user: string, proofId: string): Promise<{
 
   return res.json() as Promise<{ status: 'ok'; id: string }>
 }
+
+
+export function getFieldProofsDownloadUrl(user: string): string {
+  return `/api/field-proofs/download?user=${encodeURIComponent(user)}`
+}

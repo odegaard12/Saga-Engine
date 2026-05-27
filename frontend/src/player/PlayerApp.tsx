@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
 import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
@@ -444,6 +444,16 @@ export default function PlayerApp() {
     const nextProofs = await fetchFieldProofs(user)
     setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
     return nextProofs
+  }
+
+  function handleDownloadFieldProofs() {
+    const link = document.createElement('a')
+    link.href = getFieldProofsDownloadUrl(payload.user)
+    link.download = ''
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    closeTools()
   }
 
   function handleOpenFieldCamera() {
@@ -1104,6 +1114,7 @@ return
             onCloseTools={closeTools}
             onToggleDebug={handleToggleDebug}
             onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDownloadFieldProofs={handleDownloadFieldProofs}
           />
         </div>
       </div>
@@ -1245,6 +1256,34 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   }
 }
 
+
+const globalPlayerEdgeFix = `
+html,
+body,
+#root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  background: #020617 !important;
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+.leaflet-container {
+  background: #020617 !important;
+  outline: none !important;
+}
+
+.saga-player-edge-fix {
+  background: #020617 !important;
+}
+`
+
 function ScreenFrame({
   children,
   mobile,
@@ -1253,11 +1292,13 @@ function ScreenFrame({
   mobile: boolean
 }) {
   return (
-    <main
+    <>
+      <style>{globalPlayerEdgeFix}</style>
+      <main
       style={{
         position: mobile ? 'fixed' : 'relative',
-        inset: mobile ? 0 : undefined,
-        width: '100vw',
+        inset: mobile ? '-1px -1px 0 -1px' : undefined,
+        width: mobile ? 'calc(100vw + 2px)' : '100vw',
         minHeight: mobile ? '100dvh' : '100svh',
         height: mobile ? '100dvh' : 'auto',
         background: '#020617',
@@ -1270,7 +1311,8 @@ function ScreenFrame({
       }}
     >
       {children}
-    </main>
+      </main>
+    </>
   )
 }
 
@@ -1329,9 +1371,7 @@ function getViewportStyle(mobile: boolean): CSSProperties {
 function getTopScrimStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    inset: '0 0 auto 0',
     height: 0,
     zIndex: 1100,
     pointerEvents: 'none',

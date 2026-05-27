@@ -36,6 +36,7 @@ interface PlayerHudProps {
   onCloseTools: () => void
   onToggleDebug: () => void
   onRequestGps: () => void
+  onDownloadFieldProofs?: () => void
 }
 
 function getGpsDisplay(gpsState: string): string {
@@ -81,6 +82,7 @@ export function PlayerHud({
   onCloseTools,
   onToggleDebug,
   onRequestGps,
+  onDownloadFieldProofs,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
@@ -371,6 +373,17 @@ export function PlayerHud({
                 ES
               </button>
             </div>
+
+
+            {onDownloadFieldProofs ? (
+              <button
+                type="button"
+                style={toolsButton}
+                onClick={onDownloadFieldProofs}
+              >
+                Descargar todas las fotos
+              </button>
+            ) : null}
 
             <button
               type="button"
