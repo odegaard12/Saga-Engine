@@ -45,7 +45,7 @@ import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentit
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'builder'
 
 
 function slugifyMissionItemId(value: string): string {

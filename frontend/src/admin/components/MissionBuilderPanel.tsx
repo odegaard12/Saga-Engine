@@ -3,21 +3,34 @@ import type { AdminReactOverviewStage } from '../lib/adminApi'
 
 type MissionBuilderPanelProps = {
   stages: AdminReactOverviewStage[]
+  onCreateNode: () => void
   onApplyTemplate: (templateId: MissionTemplateId) => void
 }
 
 export default function MissionBuilderPanel({
   stages,
+  onCreateNode,
   onApplyTemplate,
 }: MissionBuilderPanelProps) {
   return (
     <div className="admin-cms-local-panel saga-mission-builder-panel">
-      <strong>Mission Builder</strong>
-      <span>Elige una plantilla clara. Se crea una ruta editable en local; después revisa nodos y pulsa Guardar.</span>
+      <strong>Crear contenido</strong>
+      <span>
+        Crea un nodo suelto para editarlo a mano, o arranca una plantilla completa de misión.
+        Nada se guarda hasta pulsar Guardar.
+      </span>
+
+      <button type="button" className="saga-builder-single-node" onClick={onCreateNode}>
+        <span>＋</span>
+        <div>
+          <strong>Crear nodo suelto</strong>
+          <small>Empieza con un nodo normal y elige después si será QR, pista, bonus o minijuego.</small>
+        </div>
+      </button>
 
       {stages.length > 0 ? (
         <div className="saga-builder-warning">
-          Esta acción reemplaza la ruta local actual. No toca datos persistidos hasta que pulses Guardar.
+          Las plantillas reemplazan la ruta local visible. No se persiste nada hasta pulsar Guardar.
         </div>
       ) : null}
 
@@ -36,9 +49,7 @@ export default function MissionBuilderPanel({
 
             <ol>
               {template.stages.map((stage) => (
-                <li key={`${template.id}-${stage.title}`}>
-                  {stage.title}
-                </li>
+                <li key={`${template.id}-${stage.title}`}>{stage.title}</li>
               ))}
             </ol>
 
