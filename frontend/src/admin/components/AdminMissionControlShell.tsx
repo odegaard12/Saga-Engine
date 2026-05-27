@@ -5,13 +5,15 @@ import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
+import MissionBuilderPanel from './MissionBuilderPanel'
 import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
+import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AdminMissionControlShellProps = {
@@ -47,6 +49,7 @@ type AdminMissionControlShellProps = {
   onSavePlayers: () => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
+  onApplyMissionTemplate: (templateId: MissionTemplateId) => void
 }
 
 function selectedStageKey(stage: AdminReactOverviewStage | null) {
@@ -92,6 +95,7 @@ export default function AdminMissionControlShell({
   onSavePlayers,
   onUpdateMissionDraft,
   onSaveSettings,
+  onApplyMissionTemplate,
 }: AdminMissionControlShellProps) {
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
 
@@ -189,6 +193,14 @@ export default function AdminMissionControlShell({
         </nav>
 
         <div className="saga-panel-switcher">
+          <button
+            type="button"
+            className={cmsPanel === 'builder' ? 'active' : ''}
+            onClick={() => togglePanel('builder')}
+          >
+            Builder
+          </button>
+
           <button
             type="button"
             className={cmsPanel === 'players' ? 'active' : ''}
@@ -380,7 +392,7 @@ export default function AdminMissionControlShell({
       {cmsPanel !== 'none' ? (
         <aside className="saga-floating-panel" aria-label="CMS panel">
           <div className="saga-floating-head">
-            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : 'Mission settings'}</strong>
+            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Games' : cmsPanel === 'builder' ? 'Mission Builder' : 'Mission settings'}</strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>Close</button>
           </div>
 
@@ -415,6 +427,7 @@ export default function AdminMissionControlShell({
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
         <button type="button" onClick={onCreateNode}>+ Node</button>
         <button type="button" onClick={onSaveStages}>Save</button>
+        <button type="button" onClick={() => togglePanel('builder')}>Builder</button>
         <button type="button" onClick={() => togglePanel('players')}>Players</button>
         <button type="button" onClick={() => togglePanel('mission')}>Settings</button>
       </nav>

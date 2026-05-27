@@ -26,6 +26,11 @@ import {
   type FamilyId,
 } from './lib/familyConfigs'
 import {
+  getDefaultAdminStagePatchForGame,
+  getMissionTemplateById,
+  type MissionTemplateId,
+} from './lib/gameCatalog'
+import {
   buildPlayerDrafts,
   normalizePlayerId,
   normalizePlayerMode,
@@ -40,8 +45,37 @@ import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentit
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
 
+
+function slugifyMissionItemId(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
+function buildTemplatePhysicalFields(kind: 'collectible' | 'requirement' | 'clue' | 'bonus', label: string) {
+  const itemId = slugifyMissionItemId(label) || 'objeto_qr'
+  const payload = `saga:item:${itemId}`
+
+  return {
+    physical_node_kind: kind,
+    physical_item_kind: kind,
+    physical_item_id: itemId,
+    physical_item_label: label,
+    physical_qr: {
+      kind,
+      item_id: itemId,
+      label,
+      payload,
+    },
+    qr_payload: payload,
+  }
+}
 
 function preservePhysicalStageFields<T extends Record<string, unknown>>(previous: T, next: T): T {
   const keys = [
@@ -614,6 +648,104 @@ export default function AdminApp() {
     setLocalNotice('Local preview updated. Save changes to persist.')
   }
 
+  function applyMissionTemplate(templateId: MissionTemplateId) {
+    if (!overview) return
+
+    const template = getMissionTemplateById(templateId)
+    const shouldReplace =
+      stages.length === 0 ||
+      window.confirm(`Reemplazar la ruta local actual por la plantilla "${template.title}"? Guarda después para persistir.`)
+
+    if (!shouldReplace) return
+
+    const mapCenter =
+      overview?.config?.map_center ||
+      config?.map_center ||
+      ([40.4168, -3.7038] as [number, number])
+
+    const centerLat = Number(mapCenter[0] || 40.4168)
+    const centerLon = Number(mapCenter[1] || -3.7038)
+    let lastPhysicalItem: { id: string; label: string } | null = null
+
+    const nextStages = template.stages.map((item, index) => {
+      const patch = getDefaultAdminStagePatchForGame(item.gameId)
+      const lat = centerLat + item.offsetLat
+      const lon = centerLon + item.offsetLon
+      const physicalFields = item.physicalKind
+        ? buildTemplatePhysicalFields(item.physicalKind, item.itemLabel || item.title)
+        : {}
+
+      if (item.physicalKind) {
+        const record = physicalFields as { physical_item_id?: string; physical_item_label?: string }
+        lastPhysicalItem = {
+          id: record.physical_item_id || slugifyMissionItemId(item.itemLabel || item.title),
+          label: record.physical_item_label || item.itemLabel || item.title,
+        }
+      }
+
+      const requirementConfig =
+        item.requiresPreviousItem && lastPhysicalItem
+          ? {
+              required_item_id: lastPhysicalItem.id,
+              required_item_label: lastPhysicalItem.label,
+              required_item_quantity: 1,
+              required_item_consume: false,
+            }
+          : {}
+
+      return {
+        id: `local-template-${Date.now()}-${index}`,
+        index,
+        title: item.title,
+        type: patch.type,
+        label: patch.label,
+        icon: patch.icon,
+        lat,
+        lon,
+        radius: item.radius || 50,
+        entry_mode: 'gps',
+        require_proximity: true,
+        has_hint: false,
+        has_manual_fallback: false,
+        content: item.content || patch.content,
+        objective: patch.objective,
+        config: {
+          ...patch.config,
+          ...requirementConfig,
+        },
+        config_summary: Array.from(new Set([...patch.config_summary, ...Object.keys(requirementConfig)])),
+        messages: patch.messages,
+        ...physicalFields,
+      } as EditableAdminStage
+    })
+
+    const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
+      const family = stage.type || 'signal_hunt'
+      acc[family] = (acc[family] || 0) + 1
+      return acc
+    }, {})
+
+    setOverview((current) => current
+      ? {
+          ...current,
+          stages: nextStages,
+          counts: current.counts
+            ? {
+                ...current.counts,
+                stages: nextStages.length,
+                family_counts: familyCounts,
+              }
+            : current.counts,
+        }
+      : current
+    )
+
+    setSelectedStage(nextStages[0] || null)
+    setCmsPanel('none')
+    setSaveState('idle')
+    setLocalNotice(`Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`)
+  }
+
   function createLocalNodeAt(lat?: number, lon?: number) {
     const mapCenter =
       overview?.config?.map_center ||
@@ -774,6 +906,7 @@ export default function AdminApp() {
         onSavePlayers={savePlayerProfiles}
         onUpdateMissionDraft={updateMissionDraft}
         onSaveSettings={saveMissionSettings}
+        onApplyMissionTemplate={applyMissionTemplate}
       />
     </>
   )

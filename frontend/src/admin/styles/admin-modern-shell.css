@@ -2430,3 +2430,130 @@
   font-weight: 900;
   cursor: pointer;
 }
+
+
+/* saga-mission-builder-v1 */
+.saga-mission-builder-panel {
+  gap: 14px;
+}
+
+.saga-builder-warning {
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  background: rgba(251, 191, 36, 0.10);
+  color: #fde68a;
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.saga-template-grid,
+.admin-game-catalog-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.saga-template-card,
+.admin-game-card,
+.admin-game-choice-summary,
+.admin-game-explain-box {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 18px;
+  padding: 12px;
+  color: #e5e7eb;
+}
+
+.saga-template-card {
+  display: grid;
+  gap: 10px;
+}
+
+.saga-template-card-head,
+.admin-game-choice-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.saga-template-card-head > span,
+.admin-game-choice-summary > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,0.08);
+  flex: 0 0 auto;
+}
+
+.saga-template-card p,
+.admin-game-choice-summary p,
+.admin-game-explain-box span {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.saga-template-card ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.saga-template-card button,
+.admin-game-card {
+  cursor: pointer;
+}
+
+.saga-template-card button {
+  min-height: 38px;
+  border-radius: 14px;
+  border: 1px solid rgba(14,165,233,0.35);
+  background: rgba(14,165,233,0.14);
+  color: #e0f2fe;
+  font-weight: 950;
+}
+
+.admin-game-catalog-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.admin-game-card {
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  min-height: 118px;
+}
+
+.admin-game-card.active {
+  border-color: rgba(56,189,248,0.62);
+  background: rgba(14,165,233,0.18);
+}
+
+.admin-game-card span {
+  font-size: 22px;
+}
+
+.admin-game-card strong {
+  font-size: 13px;
+}
+
+.admin-game-card small {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.admin-game-explain-box {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+
+.admin-game-list-row small {
+  white-space: normal;
+  line-height: 1.35;
+}

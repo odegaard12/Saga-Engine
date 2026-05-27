@@ -8,6 +8,12 @@ import {
   type EditableAdminStage,
   type FamilyId,
 } from '../lib/familyConfigs'
+import {
+  adminGameCatalog,
+  getAdminGameForStage,
+  getDefaultAdminStagePatchForGame,
+  type AdminGameId,
+} from '../lib/gameCatalog'
 
 type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
 
@@ -132,6 +138,7 @@ export default function NodeDetailDrawer({
   const selectedRequirement = physicalRequirementOptions.find(
     (item) => item.itemId === getDraftConfigText('required_item_id')
   )
+  const selectedGame = getAdminGameForStage(draft.type, draftConfig)
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -201,6 +208,30 @@ export default function NodeDetailDrawer({
       .filter(Boolean)
 
     updateDraftConfig('sequence', parts.length > 0 ? parts : value)
+  }
+
+  function handleDraftGameChange(nextGameId: AdminGameId) {
+    const patch = getDefaultAdminStagePatchForGame(nextGameId)
+
+    updateDraftLocal((current) => ({
+      ...(current as EditableAdminStage),
+      type: patch.type,
+      label: patch.label,
+      icon: patch.icon,
+      objective: patch.objective,
+      config: {
+        ...patch.config,
+        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
+        game_id: nextGameId,
+        game_title: patch.label,
+      },
+      config_summary: Object.keys(patch.config),
+      content: current.content || patch.content,
+      messages: {
+        ...(patch.messages || {}),
+        ...(current.messages || {}),
+      },
+    }))
   }
 
   function handleDraftFamilyChange(nextType: FamilyId) {
@@ -324,16 +355,27 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                Family
+                Juego
                 <select
-                  value={draft.type || 'signal_hunt'}
-                  onChange={(event) => handleDraftFamilyChange(event.target.value as FamilyId)}
+                  value={selectedGame.id}
+                  onChange={(event) => handleDraftGameChange(event.target.value as AdminGameId)}
                 >
-                  {familyCards.map((item) => (
-                    <option key={item.id} value={item.id}>{item.title}</option>
+                  {adminGameCatalog.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.icon} {item.title} · {item.difficulty}
+                    </option>
                   ))}
                 </select>
               </label>
+
+              <div className="admin-game-choice-summary">
+                <span>{selectedGame.icon}</span>
+                <div>
+                  <strong>{selectedGame.title}</strong>
+                  <p>{selectedGame.summary}</p>
+                  <small>{selectedGame.playerGoal}</small>
+                </div>
+              </div>
 
               <label className="admin-edit-field">
                 Node content
@@ -407,8 +449,28 @@ export default function NodeDetailDrawer({
           {activeTab === 'game' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
               <div className="admin-edit-section-head">
-                <strong>Game config</strong>
-                <span>{draft.type === 'signal_hunt' ? 'Signal Hunt' : draft.type === 'bearing_hunt' ? 'Bearing Hunt' : 'Circuit Matrix'}</span>
+                <strong>Juego</strong>
+                <span>{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
+              </div>
+
+              <div className="admin-game-catalog-grid">
+                {adminGameCatalog.map((game) => (
+                  <button
+                    key={game.id}
+                    type="button"
+                    className={selectedGame.id === game.id ? 'admin-game-card active' : 'admin-game-card'}
+                    onClick={() => handleDraftGameChange(game.id)}
+                  >
+                    <span>{game.icon}</span>
+                    <strong>{game.title}</strong>
+                    <small>{game.summary}</small>
+                  </button>
+                ))}
+              </div>
+
+              <div className="admin-game-explain-box">
+                <strong>{selectedGame.playerGoal}</strong>
+                <span>{selectedGame.editorHint}</span>
               </div>
 
               <div className="admin-family-config-grid">
