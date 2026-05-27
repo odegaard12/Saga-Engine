@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import { advancePlayer, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -46,6 +46,46 @@ function getUserFromUrl(): string {
   return params.get('user') || 'PLAYER 1'
 }
 
+function fileToFieldPhotoDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('El archivo debe ser una imagen.'))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'))
+    reader.onload = () => {
+      const image = new Image()
+      image.onerror = () => reject(new Error('No se pudo procesar la imagen.'))
+
+      image.onload = () => {
+        const maxSide = 1280
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height))
+        const width = Math.max(1, Math.round(image.width * scale))
+        const height = Math.max(1, Math.round(image.height * scale))
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Canvas no disponible.'))
+          return
+        }
+
+        ctx.drawImage(image, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+
+      image.src = String(reader.result || '')
+    }
+
+    reader.readAsDataURL(file)
+  })
+}
+
 function isPhysicalQrStage(stage: PlayerStage | null): boolean {
   if (!stage || typeof stage !== 'object') return false
 
@@ -87,7 +127,10 @@ export default function PlayerApp() {
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
+  const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
+  const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
 
+  const fieldPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
   const gpsWatchRef = useRef<number | null>(null)
@@ -177,6 +220,32 @@ export default function PlayerApp() {
 
     loadTeam()
     intervalId = window.setInterval(loadTeam, 5000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadFieldProofs() {
+      try {
+        const payload = await fetchFieldProofs(user)
+        if (!cancelled) {
+          setFieldProofs(Array.isArray(payload.proofs) ? payload.proofs : [])
+        }
+      } catch {
+        // Field photos are online-only for now; keep the map usable if this fails.
+      }
+    }
+
+    void loadFieldProofs()
+    intervalId = window.setInterval(loadFieldProofs, 15000)
 
     return () => {
       cancelled = true
@@ -407,6 +476,72 @@ export default function PlayerApp() {
     setState({ status: 'ready', payload: nextPayload })
     return nextPayload
   }
+
+  async function refreshFieldProofs() {
+    const nextProofs = await fetchFieldProofs(user)
+    setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
+    return nextProofs
+  }
+
+  function handleOpenFieldPhotoCapture() {
+    if (fieldPhotoUploading) {
+      showNotice('Subiendo foto…', 'info')
+      return
+    }
+
+    if (!playerPosition) {
+      showNotice('Activa GPS o usa modo debug para guardar una foto en el mapa.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    fieldPhotoInputRef.current?.click()
+  }
+
+  async function handleFieldPhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+
+    if (!file) return
+
+    if (!playerPosition) {
+      showNotice('No hay posición para guardar la foto.', 'warn')
+      return
+    }
+
+    try {
+      setFieldPhotoUploading(true)
+      showNotice('Preparando foto…', 'info')
+
+      const imageDataUrl = await fileToFieldPhotoDataUrl(file)
+      const note = window.prompt('Nota opcional para esta foto') || ''
+
+      const saved = await uploadFieldProof({
+        user: payload.user,
+        image_data_url: imageDataUrl,
+        lat: playerPosition.lat,
+        lon: playerPosition.lon,
+        note,
+        stage_id: currentStage?.id ? String(currentStage.id) : undefined,
+        stage_title: currentStage?.title || undefined,
+      })
+
+      setFieldProofs((current) => [
+        saved.proof,
+        ...current.filter((item) => item.id !== saved.proof.id),
+      ])
+
+      void refreshFieldProofs().catch(() => {})
+      showNotice('Foto compartida en el mapa.', 'success')
+      vibrate([10, 16, 10])
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo subir la foto.', 'warn')
+      vibrate(8)
+    } finally {
+      setFieldPhotoUploading(false)
+    }
+  }
+
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
@@ -854,6 +989,7 @@ return
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
+          fieldProofs={fieldProofs}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),
@@ -883,6 +1019,15 @@ return
           <ToastNotice notice={uiNotice} />
         </div>
 
+        <input
+          ref={fieldPhotoInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(event) => void handleFieldPhotoSelected(event)}
+        />
+
         {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
@@ -896,15 +1041,16 @@ return
             <button
               type="button"
               style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                showNotice('📸 Prueba rápida: fotos de mapa y carrusel llegarán en el siguiente PR.', 'info')
-                vibrate(8)
+                handleOpenFieldPhotoCapture()
               }}
-              aria-label="Prueba rápida"
+              aria-label="Foto de campo"
+              title="Foto de campo"
             >
-              <span aria-hidden="true" style={mapQuickIcon}>📷</span>
+              <span aria-hidden="true" style={mapQuickIcon}>{fieldPhotoUploading ? '⏳' : '📷'}</span>
             </button>
 
             <button

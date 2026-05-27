@@ -124,3 +124,31 @@ export interface PublicConfig {
   players?: string[]
   player_profiles?: PlayerProfile[]
 }
+
+
+export interface FieldProof {
+  id: string
+  user: string
+  display_name?: string
+  stage_id?: string
+  stage_title?: string
+  lat: number
+  lon: number
+  note?: string
+  image_url: string
+  thumbnail_url?: string
+  media_type?: string
+  created_at: number
+  visibility?: string
+  status?: string
+}
+
+export interface FieldProofsPayload {
+  status: 'ok'
+  proofs: FieldProof[]
+}
+
+export interface FieldProofUploadResponse {
+  status: 'ok'
+  proof: FieldProof
+}

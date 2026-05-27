@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type FocusRequest =
@@ -58,6 +58,7 @@ type MapSurfaceProps = {
   focusRequest?: FocusRequest
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
+  fieldProofs?: FieldProof[]
   selfLabel?: string
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
@@ -222,6 +223,58 @@ function buildPlayerPopup(
 }
 
 
+
+function getFieldProofImage(proof: FieldProof): string {
+  return proof.thumbnail_url || proof.image_url || ''
+}
+
+function createFieldProofIcon(proofs: FieldProof[]) {
+  const latest = proofs[0]
+  const image = escapeHtml(getFieldProofImage(latest))
+  const count = proofs.length
+
+  return L.divIcon({
+    className: 'saga-field-proof-photo-wrap',
+    html: `
+      <div class="saga-field-proof-photo-pin">
+        <img src="${image}" alt="" />
+        ${count > 1 ? `<span>${count}</span>` : ''}
+      </div>
+    `,
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
+  })
+}
+
+function buildFieldProofPopup(proofs: FieldProof[]): string {
+  const items = proofs
+    .map((proof) => {
+      const image = escapeHtml(getFieldProofImage(proof))
+      const author = escapeHtml(proof.display_name || proof.user || 'Jugador')
+      const note = escapeHtml(proof.note || '')
+      const stage = escapeHtml(proof.stage_title || '')
+      return `
+        <article class="saga-field-proof-card">
+          <img src="${image}" alt="" />
+          <strong>${author}</strong>
+          ${stage ? `<small>${stage}</small>` : ''}
+          ${note ? `<p>${note}</p>` : ''}
+        </article>
+      `
+    })
+    .join('')
+
+  return `
+    <div class="saga-field-proof-popup">
+      <div class="saga-field-proof-popup-head">
+        <strong>Fotos de campo</strong>
+        <span>${proofs.length}</span>
+      </div>
+      <div class="saga-field-proof-carousel">${items}</div>
+    </div>
+  `
+}
+
 function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
   const physicalVisual = getPhysicalNodeVisual(stage)
   const label =
@@ -277,6 +330,7 @@ export function MapSurface({
   focusRequest,
   nodeState = 'locked',
   otherPlayers = [],
+  fieldProofs = [],
   selfLabel = 'YO',
   selfProfile,
   onDebugSetPosition,
@@ -291,6 +345,7 @@ export function MapSurface({
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
+  const fieldProofLayersRef = useRef<L.Layer[]>([])
   const routeNodeLayersRef = useRef<L.Layer[]>([])
   const onNodeTapRef = useRef(onNodeTap)
   const lastNodeFrameRef = useRef<string | null>(null)
@@ -331,6 +386,8 @@ export function MapSurface({
       routeNodeLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
+      fieldProofLayersRef.current.forEach((layer) => layer.remove())
+      fieldProofLayersRef.current = []
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
@@ -732,6 +789,55 @@ export function MapSurface({
       otherPlayerMarkerStateRef.current.delete(key)
     }
   }, [otherPlayers])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    fieldProofLayersRef.current.forEach((layer) => layer.remove())
+    fieldProofLayersRef.current = []
+
+    const groups = new Map<string, FieldProof[]>()
+
+    for (const proof of fieldProofs) {
+      if (typeof proof.lat !== 'number' || typeof proof.lon !== 'number') continue
+
+      const key = proof.stage_id
+        ? `stage:${proof.stage_id}`
+        : `${proof.lat.toFixed(4)}:${proof.lon.toFixed(4)}`
+
+      const group = groups.get(key) || []
+      group.push(proof)
+      groups.set(key, group)
+    }
+
+    for (const proofs of groups.values()) {
+      proofs.sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0))
+      const latest = proofs[0]
+      const marker = L.marker([latest.lat, latest.lon], {
+        icon: createFieldProofIcon(proofs),
+        keyboard: false,
+        riseOnHover: true,
+        bubblingMouseEvents: false,
+        zIndexOffset: 760,
+      }).addTo(map)
+
+      marker.bindPopup(buildFieldProofPopup(proofs), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+        maxWidth: 280,
+      })
+
+      marker.bindTooltip(`📷 ${proofs.length > 1 ? `${proofs.length} fotos` : 'Foto de campo'}`, {
+        direction: 'top',
+        opacity: 0.92,
+      })
+
+      marker.on('click', () => marker.openPopup())
+      fieldProofLayersRef.current.push(marker)
+    }
+  }, [fieldProofs])
 
   useEffect(() => {
     const map = mapRef.current
