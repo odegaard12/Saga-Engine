@@ -2977,3 +2977,55 @@
 .admin-drawer-tabs button {
   transform: none !important;
 }
+
+
+/* admin-game-header-compact-v2 */
+.admin-family-config-section .admin-edit-section-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.admin-family-config-section .admin-edit-section-head > strong {
+  grid-column: 1 !important;
+  font-size: 14px !important;
+}
+
+.admin-game-selected-pill,
+.admin-family-config-section .admin-edit-section-head > span {
+  grid-column: 2 !important;
+  justify-self: end !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  max-width: 190px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  color: #cbd5e1 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-family-config-section .admin-game-editor-help {
+  grid-column: 1 / -1 !important;
+  margin: 0 !important;
+  padding: 7px 10px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  background: rgba(14, 165, 233, 0.08) !important;
+  border: 1px solid rgba(56, 189, 248, 0.16) !important;
+  color: #bae6fd !important;
+}
+
+.admin-game-catalog-grid {
+  margin-top: 8px !important;
+}

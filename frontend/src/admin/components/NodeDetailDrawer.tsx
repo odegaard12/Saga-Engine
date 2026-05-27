@@ -66,12 +66,31 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
     physical_qr?: { item_id?: string; label?: string; kind?: string }
   }
 
-  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+  const config =
+    typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+      ? (((stage as EditableAdminStage).config || {}) as Record<string, unknown>)
+      : {}
+
+  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  const catalogKind =
+    gameId === 'qr_collectible'
+      ? 'collectible'
+      : gameId === 'qr_key_gate'
+        ? 'requirement'
+        : gameId === 'clue_card'
+          ? 'clue'
+          : gameId === 'bonus_cache'
+            ? 'bonus'
+            : ''
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind || catalogKind
   if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
 
   const label = String(
     record.physical_item_label ||
     record.physical_qr?.label ||
+    config.physical_item_label ||
+    config.game_title ||
     stage.title ||
     `Nodo ${stage.index + 1}`
   ).trim()
@@ -79,6 +98,7 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
   const itemId = String(
     record.physical_item_id ||
     record.physical_qr?.item_id ||
+    config.physical_item_id ||
     slugifyRequirementItemId(label) ||
     `node_${stage.index + 1}`
   ).trim()
@@ -462,10 +482,10 @@ export default function NodeDetailDrawer({
             <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
               <div className="admin-edit-section-head">
                 <strong>Juego</strong>
-              <div className="admin-game-editor-help admin-game-editor-help-v1">
-                Elige qué hace el jugador en este nodo. Los juegos son plantillas editables: puedes cambiar título, texto, radio, requisitos y mensajes después.
-              </div>
-                <span>{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
+                <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
+                <small className="admin-game-editor-help admin-game-editor-help-v1">
+                  Elige la prueba; luego ajusta texto, mapa y requisitos.
+                </small>
               </div>
 
               <div className="admin-game-catalog-grid">
