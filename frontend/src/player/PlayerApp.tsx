@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat } from '../shared/api'
-import type { PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import { advancePlayer, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -9,6 +9,7 @@ import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
@@ -87,6 +88,9 @@ export default function PlayerApp() {
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
+  const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
+  const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
+  const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -177,6 +181,32 @@ export default function PlayerApp() {
 
     loadTeam()
     intervalId = window.setInterval(loadTeam, 5000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadFieldProofs() {
+      try {
+        const payload = await fetchFieldProofs(user)
+        if (!cancelled) {
+          setFieldProofs(Array.isArray(payload.proofs) ? payload.proofs : [])
+        }
+      } catch {
+        // Fotos online-only por ahora: si falla, el mapa sigue funcionando.
+      }
+    }
+
+    void loadFieldProofs()
+    intervalId = window.setInterval(loadFieldProofs, 15000)
 
     return () => {
       cancelled = true
@@ -407,6 +437,64 @@ export default function PlayerApp() {
     setState({ status: 'ready', payload: nextPayload })
     return nextPayload
   }
+
+  async function refreshFieldProofs() {
+    const nextProofs = await fetchFieldProofs(user)
+    setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
+    return nextProofs
+  }
+
+  function handleOpenFieldCamera() {
+    if (fieldPhotoUploading) {
+      showNotice('Subiendo foto…', 'info')
+      return
+    }
+
+    if (!playerPosition) {
+      showNotice('Activa GPS o usa modo debug para guardar la foto en el mapa.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFieldCameraOpen(true)
+    vibrate(8)
+  }
+
+  async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
+    if (!playerPosition) {
+      showNotice('No hay posición para guardar la foto.', 'warn')
+      return
+    }
+
+    try {
+      setFieldPhotoUploading(true)
+
+      const saved = await uploadFieldProof({
+        user: payload.user,
+        image_data_url: imageDataUrl,
+        lat: playerPosition.lat,
+        lon: playerPosition.lon,
+        note,
+        stage_id: currentStage?.id ? String(currentStage.id) : undefined,
+        stage_title: currentStage?.title || undefined,
+      })
+
+      setFieldProofs((current) => [
+        saved.proof,
+        ...current.filter((item) => item.id !== saved.proof.id),
+      ])
+
+      void refreshFieldProofs().catch(() => {})
+      showNotice('Foto compartida en el mapa.', 'success')
+      vibrate([10, 16, 10])
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo subir la foto.', 'warn')
+      vibrate(8)
+    } finally {
+      setFieldPhotoUploading(false)
+    }
+  }
+
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
@@ -854,6 +942,7 @@ return
           focusRequest={focusRequest}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
+          fieldProofs={fieldProofs}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),
@@ -883,6 +972,13 @@ return
           <ToastNotice notice={uiNotice} />
         </div>
 
+        <FieldCameraCapture
+          open={fieldCameraOpen}
+          busy={fieldPhotoUploading}
+          onClose={() => setFieldCameraOpen(false)}
+          onCapture={handleFieldCameraCapture}
+        />
+
         {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
@@ -896,15 +992,16 @@ return
             <button
               type="button"
               style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                showNotice('📸 Prueba rápida: fotos de mapa y carrusel llegarán en el siguiente PR.', 'info')
-                vibrate(8)
+                handleOpenFieldCamera()
               }}
-              aria-label="Prueba rápida"
+              aria-label="Hacer foto de campo"
+              title="Hacer foto de campo"
             >
-              <span aria-hidden="true" style={mapQuickIcon}>📷</span>
+              <span aria-hidden="true" style={mapQuickIcon}>{fieldPhotoUploading ? '⏳' : '📷'}</span>
             </button>
 
             <button

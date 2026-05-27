@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 type FocusRequest =
@@ -58,6 +58,7 @@ type MapSurfaceProps = {
   focusRequest?: FocusRequest
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
+  fieldProofs?: FieldProof[]
   selfLabel?: string
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
@@ -103,6 +104,97 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
     Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
 
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
+}
+
+type FieldProofGroup = {
+  lat: number
+  lon: number
+  proofs: FieldProof[]
+}
+
+function getFieldProofImage(proof: FieldProof): string {
+  return proof.thumbnail_url || proof.image_url || ''
+}
+
+function groupFieldProofs(proofs: FieldProof[], radiusMeters = 100): FieldProofGroup[] {
+  const sorted = [...proofs]
+    .filter((proof) => typeof proof.lat === 'number' && typeof proof.lon === 'number')
+    .sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0))
+
+  const groups: FieldProofGroup[] = []
+
+  for (const proof of sorted) {
+    const point = { lat: proof.lat, lon: proof.lon }
+    const group = groups.find((candidate) =>
+      getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
+    )
+
+    if (group) {
+      group.proofs.push(proof)
+      const count = group.proofs.length
+      group.lat = ((group.lat * (count - 1)) + proof.lat) / count
+      group.lon = ((group.lon * (count - 1)) + proof.lon) / count
+    } else {
+      groups.push({
+        lat: proof.lat,
+        lon: proof.lon,
+        proofs: [proof],
+      })
+    }
+  }
+
+  return groups
+}
+
+function createFieldProofIcon(proofs: FieldProof[]) {
+  const latest = proofs[0]
+  const image = escapeHtml(getFieldProofImage(latest))
+  const count = proofs.length
+
+  return L.divIcon({
+    className: 'saga-field-proof-photo-wrap',
+    html: `
+      <div class="saga-field-proof-photo-pin">
+        <img src="${image}" alt="" />
+        ${count > 1 ? `<span>${count}</span>` : ''}
+      </div>
+    `,
+    iconSize: [58, 58],
+    iconAnchor: [29, 29],
+  })
+}
+
+function buildFieldProofPopup(proofs: FieldProof[]): string {
+  const items = proofs
+    .map((proof) => {
+      const image = escapeHtml(getFieldProofImage(proof))
+      const author = escapeHtml(proof.display_name || proof.user || 'Jugador')
+      const note = escapeHtml(proof.note || '')
+      const stage = escapeHtml(proof.stage_title || '')
+      return `
+        <article class="saga-field-proof-card">
+          <img src="${image}" alt="" />
+          <strong>${author}</strong>
+          ${stage ? `<small>${stage}</small>` : ''}
+          ${note ? `<p>${note}</p>` : ''}
+        </article>
+      `
+    })
+    .join('')
+
+  return `
+    <div class="saga-field-proof-popup">
+      <div class="saga-field-proof-popup-head">
+        <strong>Fotos de campo</strong>
+        <span>${proofs.length}</span>
+      </div>
+      <div class="saga-field-proof-carousel">${items}</div>
+    </div>
+  `
+}
+
+function getFieldProofTooltip(proofs: FieldProof[]) {
+  return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
 }
 
 function getNodeVisualConfig(nodeState: NodeVisualState) {
@@ -277,6 +369,7 @@ export function MapSurface({
   focusRequest,
   nodeState = 'locked',
   otherPlayers = [],
+  fieldProofs = [],
   selfLabel = 'YO',
   selfProfile,
   onDebugSetPosition,
@@ -291,6 +384,7 @@ export function MapSurface({
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
+  const fieldProofLayersRef = useRef<L.Layer[]>([])
   const routeNodeLayersRef = useRef<L.Layer[]>([])
   const onNodeTapRef = useRef(onNodeTap)
   const lastNodeFrameRef = useRef<string | null>(null)
@@ -331,6 +425,8 @@ export function MapSurface({
       routeNodeLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
+      fieldProofLayersRef.current.forEach((layer) => layer.remove())
+      fieldProofLayersRef.current = []
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
@@ -732,6 +828,41 @@ export function MapSurface({
       otherPlayerMarkerStateRef.current.delete(key)
     }
   }, [otherPlayers])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    fieldProofLayersRef.current.forEach((layer) => layer.remove())
+    fieldProofLayersRef.current = []
+
+    const groups = groupFieldProofs(fieldProofs, 100)
+
+    for (const group of groups) {
+      const marker = L.marker([group.lat, group.lon], {
+        icon: createFieldProofIcon(group.proofs),
+        keyboard: false,
+        riseOnHover: true,
+        bubblingMouseEvents: false,
+        zIndexOffset: 760,
+      }).addTo(map)
+
+      marker.bindPopup(buildFieldProofPopup(group.proofs), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+        maxWidth: 292,
+      })
+
+      marker.bindTooltip(getFieldProofTooltip(group.proofs), {
+        direction: 'top',
+        opacity: 0.92,
+      })
+
+      marker.on('click', () => marker.openPopup())
+      fieldProofLayersRef.current.push(marker)
+    }
+  }, [fieldProofs])
 
   useEffect(() => {
     const map = mapRef.current

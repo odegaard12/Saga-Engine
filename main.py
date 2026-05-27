@@ -2,10 +2,12 @@ from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import json
+import base64
 import os
 import hashlib
 import hmac
 import secrets
+import sqlite3
 import time
 import ipaddress
 from pathlib import Path
@@ -29,6 +31,339 @@ from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
 
 app = FastAPI()
+
+
+FIELD_PROOF_ALLOWED_MEDIA_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+FIELD_PROOF_MAX_IMAGE_BYTES = 3_000_000
+
+
+def resolve_field_proofs_dir():
+    base = Path(DATA_DIR) / "proofs"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def resolve_runtime_sqlite_path():
+    explicit = str(os.getenv("SAGA_SQLITE_DB") or "").strip()
+    if explicit:
+        return explicit
+    return os.path.join(DATA_DIR, "saga.sqlite3")
+
+
+def connect_runtime_sqlite():
+    path = resolve_runtime_sqlite_path()
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, exist_ok=True)
+
+    conn = sqlite3.connect(path, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
+
+
+def init_field_proof_schema():
+    conn = connect_runtime_sqlite()
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS field_proofs (
+                id TEXT PRIMARY KEY,
+                user TEXT NOT NULL,
+                display_name TEXT NOT NULL DEFAULT '',
+                stage_id TEXT NOT NULL DEFAULT '',
+                stage_title TEXT NOT NULL DEFAULT '',
+                lat REAL NOT NULL,
+                lon REAL NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                image_filename TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                visibility TEXT NOT NULL DEFAULT 'team',
+                status TEXT NOT NULL DEFAULT 'active'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_field_proofs_created
+            ON field_proofs(created_at DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_field_proofs_stage
+            ON field_proofs(stage_id, created_at DESC)
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def field_proof_image_url(proof_id):
+    return f"/api/field-proofs/{proof_id}/image"
+
+
+def row_to_field_proof(row):
+    return {
+        "id": row["id"],
+        "user": row["user"],
+        "display_name": row["display_name"],
+        "stage_id": row["stage_id"],
+        "stage_title": row["stage_title"],
+        "lat": row["lat"],
+        "lon": row["lon"],
+        "note": row["note"],
+        "media_type": row["media_type"],
+        "created_at": row["created_at"],
+        "visibility": row["visibility"],
+        "status": row["status"],
+        "image_url": field_proof_image_url(row["id"]),
+        "thumbnail_url": field_proof_image_url(row["id"]),
+    }
+
+
+def list_field_proof_records(limit=180):
+    init_field_proof_schema()
+    try:
+        limit = max(1, min(400, int(limit or 180)))
+    except (TypeError, ValueError):
+        limit = 180
+
+    conn = connect_runtime_sqlite()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM field_proofs
+            WHERE status = 'active' AND visibility = 'team'
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [row_to_field_proof(row) for row in rows]
+
+
+def get_field_proof_record(proof_id):
+    init_field_proof_schema()
+
+    conn = connect_runtime_sqlite()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM field_proofs
+            WHERE id = ? AND status = 'active'
+            """,
+            (proof_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    return row_to_field_proof(row) if row else None
+
+
+def insert_field_proof_record(record):
+    init_field_proof_schema()
+
+    conn = connect_runtime_sqlite()
+    try:
+        conn.execute(
+            """
+            INSERT INTO field_proofs (
+                id,
+                user,
+                display_name,
+                stage_id,
+                stage_title,
+                lat,
+                lon,
+                note,
+                image_filename,
+                media_type,
+                created_at,
+                visibility,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["id"],
+                record["user"],
+                record["display_name"],
+                record.get("stage_id", ""),
+                record.get("stage_title", ""),
+                record["lat"],
+                record["lon"],
+                record.get("note", ""),
+                record["image_filename"],
+                record["media_type"],
+                record["created_at"],
+                record.get("visibility", "team"),
+                record.get("status", "active"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_field_proof_record(record["id"])
+
+
+def decode_field_proof_image(data_url):
+    raw = _as_str(data_url).strip()
+    if not raw.startswith("data:") or "," not in raw:
+        raise HTTPException(status_code=400, detail="image_data_url must be a data URL")
+
+    header, encoded = raw.split(",", 1)
+    header_lower = header.lower()
+    media_type = header_lower[5:].split(";")[0].strip()
+
+    if ";base64" not in header_lower:
+        raise HTTPException(status_code=400, detail="image must be base64 encoded")
+    if media_type not in FIELD_PROOF_ALLOWED_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="unsupported image type")
+
+    try:
+        payload = base64.b64decode(encoded, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid base64 image")
+
+    if not payload:
+        raise HTTPException(status_code=400, detail="empty image")
+    if len(payload) > FIELD_PROOF_MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=400, detail="image too large")
+
+    return media_type, payload
+
+
+@app.get("/api/field-proofs")
+async def get_field_proofs(user: str = "", limit: int = 180):
+    user_text = _as_str(user).strip()
+
+    if user_text and not resolve_known_player_profile(user_text):
+        raise HTTPException(status_code=403, detail="unknown player")
+
+    return {
+        "status": "ok",
+        "proofs": list_field_proof_records(limit=limit),
+    }
+
+
+@app.get("/api/field-proofs/{proof_id}/image")
+async def get_field_proof_image(proof_id: str):
+    safe_id = _as_str(proof_id).strip()
+    if not safe_id:
+        raise HTTPException(status_code=404, detail="proof not found")
+
+    proof = get_field_proof_record(safe_id)
+    if not proof:
+        raise HTTPException(status_code=404, detail="proof not found")
+
+    filename = _as_str(proof.get("image_filename")).strip()
+    base_dir = resolve_field_proofs_dir().resolve()
+    target = (base_dir / filename).resolve()
+
+    if not str(target).startswith(str(base_dir)):
+        raise HTTPException(status_code=400, detail="invalid proof path")
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="proof image not found")
+
+    return FileResponse(
+        target,
+        media_type=proof.get("media_type") or "image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.post("/api/field-proofs")
+async def create_field_proof(request: Request):
+    data = await request.json()
+
+    user = _as_str(data.get("user")).strip()
+    if not user:
+        raise HTTPException(status_code=400, detail="user required")
+
+    profile = resolve_known_player_profile(user)
+    if not profile:
+        raise HTTPException(status_code=403, detail="unknown player")
+
+    lat = _as_float(data.get("lat"))
+    lon = _as_float(data.get("lon"))
+
+    if lat is None or lon is None:
+        current = get_live_position(profile.get("id") or user)
+        if isinstance(current, dict):
+            lat = _as_float(current.get("lat"))
+            lon = _as_float(current.get("lon"))
+
+    if lat is None or lon is None:
+        raise HTTPException(status_code=400, detail="lat/lon required")
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        raise HTTPException(status_code=400, detail="invalid coordinates")
+
+    media_type, image_bytes = decode_field_proof_image(data.get("image_data_url"))
+
+    proof_id = f"proof_{secrets.token_urlsafe(12).replace('-', '').replace('_', '')}"
+    created_at = int(time.time())
+    ext = FIELD_PROOF_ALLOWED_MEDIA_TYPES[media_type]
+    month_path = time.strftime("%Y/%m", time.gmtime(created_at))
+    image_filename = f"{month_path}/{proof_id}.{ext}"
+
+    target = resolve_field_proofs_dir() / image_filename
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(image_bytes)
+
+    record = {
+        "id": proof_id,
+        "user": profile.get("id") or user,
+        "display_name": profile.get("display_name") or user,
+        "stage_id": sanitize_event_text(data.get("stage_id"), 120),
+        "stage_title": sanitize_event_text(data.get("stage_title"), 160),
+        "lat": lat,
+        "lon": lon,
+        "note": sanitize_event_text(data.get("note"), 220),
+        "image_filename": image_filename,
+        "media_type": media_type,
+        "created_at": created_at,
+        "visibility": "team",
+        "status": "active",
+    }
+
+    proof = insert_field_proof_record(record)
+
+    append_event(
+        EVENT_LOG_DB,
+        {
+            "type": "team_proof_created",
+            "status": "synced",
+            "source": "player",
+            "user": record["user"],
+            "team_id": record["user"],
+            "node_id": record["stage_id"],
+            "payload": {
+                "proof_id": proof_id,
+                "stage_title": record["stage_title"],
+                "note": record["note"],
+            },
+        },
+    )
+
+    return {
+        "status": "ok",
+        "proof": proof,
+    }
+
+
 
 VALID_PLAYER_THEMES = {"classic", "glass"}
 
