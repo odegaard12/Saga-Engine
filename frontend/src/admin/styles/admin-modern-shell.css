@@ -3058,3 +3058,42 @@
   padding: 0 10px !important;
   font-size: 11px !important;
 }
+
+
+/* admin-game-offline-status-v1 */
+.admin-game-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.admin-game-card-badges em {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.52);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+
+.admin-game-card-badges em:last-child {
+  border-color: rgba(34, 197, 94, 0.18);
+  background: rgba(22, 101, 52, 0.16);
+  color: #bbf7d0;
+}
+
+.admin-game-offline-note {
+  display: block;
+  margin-top: 8px;
+  color: #bbf7d0;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 850;
+}

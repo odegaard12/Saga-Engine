@@ -21,6 +21,20 @@ export type AdminGameId =
   | 'manual_password'
   | 'bonus_cache'
 
+export type AdminGameRuntimeStatus = 'runtime_ready' | 'runtime_partial' | 'preset_only' | 'planned'
+export type AdminGameOfflineStatus = 'offline_ready' | 'offline_partial' | 'offline_planned'
+export type AdminGameCompletionMethod =
+  | 'proximity'
+  | 'hold'
+  | 'bearing'
+  | 'puzzle'
+  | 'manual_code'
+  | 'sequence'
+  | 'qr_complete'
+  | 'photo'
+  | 'inventory_only'
+  | 'team'
+
 export type MissionTemplateId =
   | 'qr_route'
   | 'clue_hunt'
@@ -32,9 +46,13 @@ export type AdminGameCatalogItem = {
   title: string
   icon: string
   family: FamilyId
-  category: 'gps' | 'compass' | 'logic' | 'physical' | 'team'
+  category: 'gps' | 'compass' | 'logic' | 'physical' | 'photo' | 'team'
   difficulty: 'Fácil' | 'Media' | 'Alta'
   duration: string
+  runtimeStatus: AdminGameRuntimeStatus
+  offlineStatus: AdminGameOfflineStatus
+  completionMethod: AdminGameCompletionMethod
+  offlineNote: string
   summary: string
   playerGoal: string
   editorHint: string
@@ -77,6 +95,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'gps',
     difficulty: 'Fácil',
     duration: '2-4 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_partial',
+    completionMethod: 'inventory_only',
+    offlineNote: 'Funciona con misión descargada: GPS/radio y avance local.',
     summary: 'El jugador se acerca al punto y mantiene posición hasta capturar la señal.',
     playerGoal: 'Llegar al radio del nodo y confirmar presencia.',
     editorHint: 'Úsalo como nodo base de ruta. Es el más estable para exterior.',
@@ -96,6 +118,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'gps',
     difficulty: 'Fácil',
     duration: '3-6 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'proximity',
+    offlineNote: 'Usa el motor GPS; falta UI específica de frío/caliente, pero el camino offline existe.',
     summary: 'Variante de proximidad para buscar un punto con pistas de distancia.',
     playerGoal: 'Moverse hasta que la señal sea suficientemente fuerte.',
     editorHint: 'Perfecto para parques, plazas o pistas sencillas.',
@@ -115,6 +141,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'compass',
     difficulty: 'Media',
     duration: '3-5 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'bearing',
+    offlineNote: 'Funciona offline con brújula/local runtime.',
     summary: 'El jugador debe orientarse hacia un rumbo concreto.',
     playerGoal: 'Apuntar el móvil en la dirección correcta y mantener el rumbo.',
     editorHint: 'Funciona bien para orientación y caminos visibles.',
@@ -134,6 +164,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'compass',
     difficulty: 'Alta',
     duration: '5-8 min',
+    runtimeStatus: 'preset_only',
+    offlineStatus: 'offline_planned',
+    completionMethod: 'bearing',
+    offlineNote: 'Plantilla de orientación; necesita runtime de triangulación offline antes de marcarlo como listo.',
     summary: 'Variante narrativa: comparar rumbos y decidir hacia dónde avanzar.',
     playerGoal: 'Leer pistas y orientarse con varios rumbos.',
     editorHint: 'Úsalo como puzzle de orientación; por ahora usa el motor de rumbo simple.',
@@ -153,6 +187,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'logic',
     difficulty: 'Media',
     duration: '4-7 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'puzzle',
+    offlineNote: 'Tiene familia runtime; falta pulir variantes visuales, pero debe seguir funcionando offline.',
     summary: 'Puzzle visual de reparación, secuencia o matriz.',
     playerGoal: 'Resolver una lógica para desbloquear el nodo.',
     editorHint: 'Úsalo cuando quieras un descanso mental entre puntos GPS.',
@@ -172,6 +210,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'logic',
     difficulty: 'Media',
     duration: '3-6 min',
+    runtimeStatus: 'planned',
+    offlineStatus: 'offline_planned',
+    completionMethod: 'sequence',
+    offlineNote: 'Debe completarse con secuencia local y sincronizar después.',
     summary: 'Ordenar símbolos, palabras o números encontrados en ruta.',
     playerGoal: 'Introducir o deducir una secuencia correcta.',
     editorHint: 'Muy bueno para pistas físicas, carteles o QR previos.',
@@ -191,10 +233,14 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'physical',
     difficulty: 'Fácil',
     duration: '1-2 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_partial',
+    completionMethod: 'inventory_only',
+    offlineNote: 'Debe guardarse en mochila local y sincronizar inventario después.',
     summary: 'Tarjeta física opcional que se guarda en la mochila.',
     playerGoal: 'Escanear una tarjeta QR y conservar el objeto.',
     editorHint: 'Úsalo para coleccionables, logros o pistas secundarias.',
-    config: { objective: 'physical_collectible', completion_method: 'qr', game_id: 'qr_collectible' },
+    config: { objective: 'physical_collectible', completion_method: 'inventory_only', game_id: 'qr_collectible' },
     content: 'Encuentra y escanea la tarjeta QR física.',
     messages: {
       hint: 'Busca una tarjeta o símbolo físico cerca.',
@@ -210,10 +256,14 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'physical',
     difficulty: 'Fácil',
     duration: '1-3 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_partial',
+    completionMethod: 'inventory_only',
+    offlineNote: 'Debe guardar llave local y permitir requisitos offline.',
     summary: 'Objeto QR pensado para abrir otro nodo posterior.',
     playerGoal: 'Conseguir una llave física para desbloquear una prueba.',
     editorHint: 'Úsalo junto con Requisito de entrada en un nodo posterior.',
-    config: { objective: 'physical_key', completion_method: 'qr', game_id: 'qr_key_gate' },
+    config: { objective: 'physical_key', completion_method: 'inventory_only', game_id: 'qr_key_gate' },
     content: 'Escanea la llave QR. Podría hacer falta más adelante.',
     messages: {
       hint: 'Busca la llave física.',
@@ -229,10 +279,14 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'physical',
     difficulty: 'Fácil',
     duration: '1-2 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_partial',
+    completionMethod: 'inventory_only',
+    offlineNote: 'Debe guardar pista local consultable en mochila offline.',
     summary: 'Tarjeta que entrega información para resolver otro reto.',
     playerGoal: 'Escanear una pista y leer la información.',
     editorHint: 'Ideal para rutas de misterio o escape.',
-    config: { objective: 'physical_clue', completion_method: 'qr', game_id: 'clue_card' },
+    config: { objective: 'physical_clue', completion_method: 'inventory_only', game_id: 'clue_card' },
     content: 'Escanea la pista y úsala en un nodo posterior.',
     messages: {
       hint: 'La pista no está lejos del punto.',
@@ -245,9 +299,13 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     title: 'Foto de exploración',
     icon: '📷',
     family: 'signal_hunt',
-    category: 'team',
+    category: 'photo',
     difficulty: 'Fácil',
     duration: '2-4 min',
+    runtimeStatus: 'planned',
+    offlineStatus: 'offline_planned',
+    completionMethod: 'photo',
+    offlineNote: 'Debe guardar foto en cola local/IndexedDB y sincronizar cuando vuelva conexión.',
     summary: 'El equipo debe hacer una foto de campo en la zona.',
     playerGoal: 'Capturar una foto compartida en el mapa.',
     editorHint: 'Funciona muy bien con el sistema de fotos de campo.',
@@ -267,6 +325,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'team',
     difficulty: 'Media',
     duration: '5-8 min',
+    runtimeStatus: 'planned',
+    offlineStatus: 'offline_planned',
+    completionMethod: 'team',
+    offlineNote: 'Debe funcionar primero como modo capitán offline; multi-móvil real queda para más adelante.',
     summary: 'Prueba pensada para varios jugadores o roles.',
     playerGoal: 'Coordinarse para llegar, registrar prueba o compartir pista.',
     editorHint: 'Úsalo si quieres que varios jugadores participen.',
@@ -286,6 +348,10 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'logic',
     difficulty: 'Media',
     duration: '2-5 min',
+    runtimeStatus: 'planned',
+    offlineStatus: 'offline_planned',
+    completionMethod: 'manual_code',
+    offlineNote: 'Debe validar código local y sincronizar node_completed después.',
     summary: 'Resolver una palabra o código a partir de pistas.',
     playerGoal: 'Descubrir una contraseña narrativa.',
     editorHint: 'Bueno para carteles, acertijos y escape urbano.',
@@ -305,10 +371,14 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'physical',
     difficulty: 'Fácil',
     duration: '1-3 min',
+    runtimeStatus: 'runtime_partial',
+    offlineStatus: 'offline_partial',
+    completionMethod: 'inventory_only',
+    offlineNote: 'Debe guardar bonus local en mochila y sincronizar después.',
     summary: 'Extra opcional para recompensas, bromas o contenido secreto.',
     playerGoal: 'Encontrar un extra no obligatorio.',
     editorHint: 'Úsalo para dar vida al mapa sin bloquear la ruta.',
-    config: { objective: 'bonus_cache', completion_method: 'qr', game_id: 'bonus_cache' },
+    config: { objective: 'bonus_cache', completion_method: 'inventory_only', game_id: 'bonus_cache' },
     content: 'Has encontrado un bonus oculto.',
     messages: {
       hint: 'Hay algo extra cerca.',

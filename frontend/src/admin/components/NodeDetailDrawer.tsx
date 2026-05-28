@@ -528,6 +528,24 @@ export default function NodeDetailDrawer({
                     <span>{game.icon}</span>
                     <strong>{game.title}</strong>
                     <small>{game.summary}</small>
+                    <div className="admin-game-card-badges">
+                      <em>
+                        {game.runtimeStatus === 'runtime_ready'
+                          ? 'Jugable'
+                          : game.runtimeStatus === 'runtime_partial'
+                            ? 'Parcial'
+                            : game.runtimeStatus === 'preset_only'
+                              ? 'Plantilla'
+                              : 'Planeado'}
+                      </em>
+                      <em>
+                        {game.offlineStatus === 'offline_ready'
+                          ? 'Offline listo'
+                          : game.offlineStatus === 'offline_partial'
+                            ? 'Offline parcial'
+                            : 'Offline pendiente'}
+                      </em>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -535,6 +553,9 @@ export default function NodeDetailDrawer({
               <div className="admin-game-explain-box">
                 <strong>{selectedGame.playerGoal}</strong>
                 <span>{selectedGame.editorHint}</span>
+                 <small className="admin-game-offline-note">
+                   Offline obligatorio: {selectedGame.offlineNote}
+                 </small>
               </div>
 
               <div className="admin-family-config-grid">
