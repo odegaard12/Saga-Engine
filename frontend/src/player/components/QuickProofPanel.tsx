@@ -121,6 +121,7 @@ export function QuickProofPanel({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const frameRef = useRef<number | null>(null)
+  const qrSaveLockRef = useRef(false)
 
   function stopCamera() {
     if (frameRef.current !== null) {
@@ -153,6 +154,7 @@ export function QuickProofPanel({
   }, [notice])
 
   function saveQrItem(value: string) {
+    if (qrSaveLockRef.current) return
     const parsed = parseQrItem(value)
 
     if (!parsed) {
@@ -166,6 +168,8 @@ export function QuickProofPanel({
       setNotice('QR rechazado')
       return
     }
+
+    qrSaveLockRef.current = true
 
     try {
       const snapshot = collectInventoryItem({
@@ -183,8 +187,13 @@ export function QuickProofPanel({
         },
       })
 
-      setNotice(`Guardado en mochila: ${parsed.label}`)
-      setMessage(`Guardado. Mochila actualizada: ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
+      if (onInventoryItemCollected) {
+        setMessage('QR válido. Mochila actualizada.')
+      } else {
+        setNotice(`Guardado en mochila: ${parsed.label}`)
+        setMessage(`Guardado. Mochila actualizada: ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
+      }
+
       setMode('idle')
       stopCamera()
       window.dispatchEvent(new CustomEvent('saga:inventory-updated', {
@@ -220,6 +229,7 @@ export function QuickProofPanel({
     setMode('qr')
     setNotice(null)
     setMessage('Apunta la cámara a la tarjeta QR de SAGA.')
+    qrSaveLockRef.current = false
     setScanning(true)
 
     try {

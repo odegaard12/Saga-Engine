@@ -358,8 +358,9 @@ Al escanear el QR correcto de ese nodo:
 
 1. se guarda el objeto/llave/pista/bonus en mochila local;
 2. se genera evento local de inventario;
-3. se completa el nodo actual con código interno `OK`;
-4. el jugador avanza al siguiente nodo.
+3. el nodo queda listo para completar;
+4. el jugador confirma manualmente pulsando el nodo en el mapa o el botón `Completar QR`;
+5. entonces se completa con código interno `OK` y avanza al siguiente nodo.
 
 Si el jugador escanea un QR distinto, SAGA puede guardarlo en mochila, pero no debe completar el nodo actual.
 

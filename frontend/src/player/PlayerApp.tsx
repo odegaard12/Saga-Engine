@@ -116,6 +116,14 @@ function getPhysicalQrStageItemId(stage: PlayerStage | null): string {
 }
 
 
+
+function getQrReadyStageKey(stage: PlayerStage | null): string {
+  if (!stage || typeof stage !== 'object') return ''
+
+  const record = stage as unknown as Record<string, unknown>
+  return String(record.id || record.node_id || record.title || '')
+}
+
 function getMissionPhysicalQrItemIds(stages: PlayerStage[] | undefined): string[] {
   if (!Array.isArray(stages)) return []
 
@@ -161,6 +169,7 @@ export default function PlayerApp() {
   const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
+  const [routeQrReadyStageId, setRouteQrReadyStageId] = useState<string | null>(null)
   const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
@@ -431,6 +440,7 @@ export default function PlayerApp() {
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
   const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
+  const currentRouteQrReady = currentStageIsPhysicalQr && routeQrReadyStageId === getQrReadyStageKey(currentStage)
 
   const rawLivePlayerPosition = getPlayerPosition(payload)
   const secureLiveGpsContext =
@@ -503,8 +513,8 @@ export default function PlayerApp() {
   const adminHref = '/admin'
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(browserGpsPosition)
-  const primaryLabel = currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
-  const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
+  const primaryLabel = currentRouteQrReady ? 'Completar QR' : currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
+  const primaryDisabled = currentRouteQrReady ? false : gpsActionRequired ? false : !runtime.canEnter
   const missionPhysicalQrItemIds = getMissionPhysicalQrItemIds(payload.stages)
 
   async function refreshPayload() {
@@ -872,6 +882,13 @@ return
       return
     }
 
+    if (currentRouteQrReady && !submitting) {
+      setFocusRequest({ target: 'node', token: Date.now() })
+      showNotice('Completando nodo QR…', 'success')
+      void handleSubmitCode('OK')
+      return
+    }
+
     if (currentStageIsPhysicalQr) {
       if (!runtime.canEnter) {
         showNotice(
@@ -909,6 +926,12 @@ return
     }
 
     setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (currentRouteQrReady && !submitting) {
+      showNotice('Completando nodo QR…', 'success')
+      void handleSubmitCode('OK')
+      return
+    }
 
     if (currentStageIsPhysicalQr) {
       if (!runtime.canEnter) {
@@ -968,8 +991,8 @@ return
       return
     }
 
-    showNotice('QR correcto · nodo completado.', 'success')
-    void handleSubmitCode('OK')
+    setRouteQrReadyStageId(getQrReadyStageKey(currentStage))
+    showNotice('QR correcto guardado · pulsa el nodo o Completar QR.', 'success')
   }
 
   async function handleSubmitCode(code: string) {
@@ -986,6 +1009,7 @@ return
       }
 
       setInteractionOpen(false)
+      setRouteQrReadyStageId(null)
       const nextPayload = await refreshPayload()
 
       if (nextPayload.finished) {
@@ -993,7 +1017,7 @@ return
         showNotice('Mission complete.', 'success')
       } else {
         showOverlay('node')
-        showNotice('Node cleared.', 'success')
+        showNotice('Nodo completado. Avanzando.', 'success')
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown submit error'
@@ -1007,6 +1031,7 @@ return
 
         if (localResult.ok) {
           setInteractionOpen(false)
+          setRouteQrReadyStageId(null)
           setState({ status: 'ready', payload: localResult.payload })
 
           if (localResult.payload.finished) {
@@ -1014,7 +1039,7 @@ return
             showNotice('Mission complete locally. Sync when connection returns.', 'success')
           } else {
             showOverlay('node')
-            showNotice('Node cleared locally. Progress queued for sync.', 'success')
+            showNotice('Nodo completado offline. Se sincronizará después.', 'success')
           }
 
           return
