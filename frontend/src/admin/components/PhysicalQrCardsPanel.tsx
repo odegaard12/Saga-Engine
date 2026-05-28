@@ -133,19 +133,20 @@ export default function PhysicalQrCardsPanel({
           <div style={eyebrow}>QR DEL NODO</div>
           <h2 style={compact ? compactTitle : title}>Tarjeta física</h2>
           <p style={copy}>
-            Hereda el tipo elegido arriba: {kindLabels[kind]}. El jugador escanea este QR y SAGA lo guarda en Objetos.
+            Tarjeta offline de esta misión. Solo los QR generados aquí se aceptan en el player.
           </p>
         </div>
         <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
       </div>
 
       <div style={layout}>
-        <div style={qrCard}>
-          <div ref={qrWrapRef} style={qrImage}>
-            <QRCodeSVG value={payload} size={154} level="M" includeMargin />
+        <div style={compact ? compactQrCard : qrCard}>
+          <div ref={qrWrapRef} style={compact ? compactQrImage : qrImage}>
+            <QRCodeSVG value={payload} size={compact ? 132 : 154} level="M" includeMargin />
           </div>
           <strong>{cleanLabel}</strong>
           <small>{itemId}</small>
+          <span style={qrReadyPill}>Offline listo</span>
         </div>
 
         <div style={formGrid}>
@@ -171,13 +172,18 @@ export default function PhysicalQrCardsPanel({
         </div>
       </div>
 
+      <div style={offlineRuleBox}>
+        <strong>Regla de juego</strong>
+        <span>Este QR solo vale si existe en los nodos de esta misión. Si es el QR del nodo actual, guarda y avanza. Si es de otro nodo, solo guarda en mochila.</span>
+      </div>
+
       <div style={payloadBox}>
         <span>Texto interno del QR</span>
         <code>{payload}</code>
-        <small>El jugador no escribe esto. Va dentro de la imagen QR.</small>
+        <small>Payload interno SAGA. No se aceptan QR externos ni enlaces aleatorios.</small>
       </div>
 
-      <div style={actions}>
+      <div style={compact ? compactActions : actions}>
         <button type="button" style={primaryButton} onClick={handleSaveToNode}>
           Guardar QR en nodo
         </button>
@@ -352,3 +358,57 @@ const noticeBox: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
 }
+
+
+const compactQrCard: CSSProperties = {
+  ...qrCard,
+  padding: 10,
+  gap: 7,
+  borderRadius: 18,
+  background:
+    'linear-gradient(180deg, rgba(15,23,42,.42), rgba(15,23,42,.26))',
+}
+
+const compactQrImage: CSSProperties = {
+  ...qrImage,
+  width: 146,
+  height: 146,
+  borderRadius: 16,
+  boxShadow: '0 12px 28px rgba(2,6,23,.22)',
+}
+
+const qrReadyPill: CSSProperties = {
+  minHeight: 20,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 8px',
+  borderRadius: 999,
+  border: '1px solid rgba(187,247,208,.24)',
+  background: 'rgba(22,101,52,.22)',
+  color: '#bbf7d0',
+  fontSize: 9,
+  fontWeight: 950,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const offlineRuleBox: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  padding: 11,
+  borderRadius: 18,
+  border: '1px solid rgba(125,211,252,.18)',
+  background:
+    'linear-gradient(180deg, rgba(14,165,233,.13), rgba(15,23,42,.24))',
+  color: '#e0f2fe',
+  fontSize: 11,
+  lineHeight: 1.35,
+  fontWeight: 800,
+}
+
+const compactActions: CSSProperties = {
+  ...actions,
+  gridTemplateColumns: '1fr 1fr',
+}
+

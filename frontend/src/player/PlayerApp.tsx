@@ -959,16 +959,16 @@ return
     if (!currentStage || !isPhysicalQrStage(currentStage)) return
 
     if (!runtime.canEnter) {
-      showNotice('QR guardado en mochila. Acércate al nodo para completarlo.', 'info')
+      showNotice('QR válido guardado · acércate al nodo para completarlo.', 'info')
       return
     }
 
     if (!scannedQrMatchesCurrentStage(currentStage, item.item_id)) {
-      showNotice('QR guardado en mochila, pero no es la tarjeta de este nodo.', 'info')
+      showNotice('QR válido guardado · pertenece a otro nodo.', 'info')
       return
     }
 
-    showNotice('QR correcto. Completando nodo…', 'success')
+    showNotice('QR correcto · nodo completado.', 'success')
     void handleSubmitCode('OK')
   }
 
@@ -1494,8 +1494,8 @@ function getToastOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 12 : 16,
     right: mobile ? 12 : 16,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 154px)' : 176,
-    zIndex: 1250,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 206px)' : 224,
+    zIndex: 5200,
     pointerEvents: 'none',
     display: 'flex',
     justifyContent: 'center',

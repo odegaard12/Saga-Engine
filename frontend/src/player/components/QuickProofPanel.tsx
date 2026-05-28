@@ -156,13 +156,13 @@ export function QuickProofPanel({
     const parsed = parseQrItem(value)
 
     if (!parsed) {
-      setMessage('QR no válido. Solo se aceptan tarjetas QR creadas en esta misión desde Admin.')
+      setMessage('QR no válido. Usa una tarjeta generada en Admin para esta misión.')
       return
     }
 
     const allowed = new Set(allowedItemIds.map((item) => slugifyItemId(item)))
     if (allowed.size > 0 && !allowed.has(parsed.item_id)) {
-      setMessage('QR no pertenece a esta misión. No se ha guardado en la mochila.')
+      setMessage('QR rechazado: no pertenece a esta misión. No se ha guardado.')
       setNotice('QR rechazado')
       return
     }
@@ -183,8 +183,8 @@ export function QuickProofPanel({
         },
       })
 
-      setNotice(`Guardado en Objetos: ${parsed.label}`)
-      setMessage(`Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
+      setNotice(`Guardado en mochila: ${parsed.label}`)
+      setMessage(`Guardado. Mochila actualizada: ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
       setMode('idle')
       stopCamera()
       window.dispatchEvent(new CustomEvent('saga:inventory-updated', {
