@@ -67,6 +67,62 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
   return false
 }
 
+
+function normalizeQrInventoryId(value: unknown): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 90)
+}
+
+function getPhysicalQrStageItemId(stage: PlayerStage | null): string {
+  if (!stage || typeof stage !== 'object') return ''
+
+  const record = stage as unknown as Record<string, unknown>
+  const physicalQr = record.physical_qr && typeof record.physical_qr === 'object'
+    ? record.physical_qr as Record<string, unknown>
+    : {}
+
+  const direct =
+    record.physical_item_id ||
+    physicalQr.item_id ||
+    physicalQr.physical_item_id
+
+  const directId = normalizeQrInventoryId(direct)
+  if (directId) return directId
+
+  const payloadText = String(record.qr_payload || physicalQr.payload || '').trim()
+  if (!payloadText) return ''
+
+  const normalized = payloadText
+    .replace(/^saga\s*:/i, 'SAGA:')
+    .replace(/^saga1\s*:/i, 'SAGA1:')
+
+  const stripped = normalized.toUpperCase().startsWith('SAGA1:')
+    ? normalized.slice('SAGA1:'.length)
+    : normalized.toUpperCase().startsWith('SAGA:')
+      ? normalized.slice('SAGA:'.length)
+      : normalized
+
+  const parts = stripped.split(':').map((part) => part.trim()).filter(Boolean)
+  if (String(parts[0] || '').toUpperCase() === 'ITEM' && parts[1]) {
+    return normalizeQrInventoryId(parts[1])
+  }
+
+  return ''
+}
+
+function scannedQrMatchesCurrentStage(stage: PlayerStage | null, scannedItemId: unknown): boolean {
+  const expected = getPhysicalQrStageItemId(stage)
+  const scanned = normalizeQrInventoryId(scannedItemId)
+
+  if (!expected || !scanned) return false
+  return expected === scanned
+}
+
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
@@ -881,6 +937,24 @@ return
     showNotice('Interaction is not available yet.', 'info')
   }
 
+
+  function handleQrInventoryItemCollected(item: { item_id?: string; label?: string }) {
+    if (!currentStage || !isPhysicalQrStage(currentStage)) return
+
+    if (!runtime.canEnter) {
+      showNotice('QR guardado en mochila. Acércate al nodo para completarlo.', 'info')
+      return
+    }
+
+    if (!scannedQrMatchesCurrentStage(currentStage, item.item_id)) {
+      showNotice('QR guardado en mochila, pero no es la tarjeta de este nodo.', 'info')
+      return
+    }
+
+    showNotice('QR correcto. Completando nodo…', 'success')
+    void handleSubmitCode('OK')
+  }
+
   async function handleSubmitCode(code: string) {
     try {
       setSubmitting(true)
@@ -1031,6 +1105,7 @@ return
               hidden={false}
               openSignal={quickQrOpenSignal}
               showLauncher={false}
+              onInventoryItemCollected={handleQrInventoryItemCollected}
             />
 
             <button

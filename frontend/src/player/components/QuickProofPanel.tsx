@@ -8,6 +8,13 @@ interface QuickProofPanelProps {
   hidden: boolean
   openSignal?: number
   showLauncher?: boolean
+  onInventoryItemCollected?: (item: {
+    item_id: string
+    label: string
+    raw: string
+    kind: 'item' | 'proof' | 'text'
+    format: 'saga_item' | 'saga_proof' | 'plain_text' | 'url'
+  }) => void
 }
 
 type ParsedQrItem = {
@@ -110,6 +117,7 @@ export function QuickProofPanel({
   hidden,
   openSignal = 0,
   showLauncher = true,
+  onInventoryItemCollected,
 }: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
@@ -187,6 +195,8 @@ export function QuickProofPanel({
           source: 'qr',
         },
       }))
+
+      onInventoryItemCollected?.(parsed)
     } catch {
       setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
     }

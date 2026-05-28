@@ -349,6 +349,22 @@ Antes de crear más juegos, hay que ordenar el sistema.
 La prioridad no es tener 30 juegos, sino tener 6 familias buenas con 5-10 variantes editables y que el admin explique claramente cuáles son jugables ya.
 
 
+
+### QR como nodo de ruta
+
+Si un QR físico está dentro de la ruta principal, cuenta como nodo de ruta.
+
+Al escanear el QR correcto de ese nodo:
+
+1. se guarda el objeto/llave/pista/bonus en mochila local;
+2. se genera evento local de inventario;
+3. se completa el nodo actual con código interno `OK`;
+4. el jugador avanza al siguiente nodo.
+
+Si el jugador escanea un QR distinto, SAGA puede guardarlo en mochila, pero no debe completar el nodo actual.
+
+Si un QR debe ser opcional y no bloquear la ruta, no debe modelarse como nodo obligatorio de la ruta principal. Debe tratarse como bonus o side objective en una evolución posterior.
+
 ### QR offline
 
 Los QR de inventario son offline-ready.
