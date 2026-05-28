@@ -193,10 +193,10 @@ Juegos recomendados:
 
 | Juego | Estado | Offline |
 |---|---:|---:|
-| Recoger objeto QR | runtime parcial | sí, local |
-| Recoger llave QR | runtime parcial | sí, local |
-| Pista QR | runtime parcial | sí, local |
-| Bonus QR | runtime parcial | sí, local |
+| Recoger objeto QR | runtime ready | offline ready |
+| Recoger llave QR | runtime ready | offline ready |
+| Pista QR | runtime ready | offline ready |
+| Bonus QR | runtime ready | offline ready |
 | Nodo bloqueado por llave | runtime ready | sí |
 | Entregar/consumir objeto | runtime ready | sí |
 | Combinar objetos | planned | parcial |
@@ -347,3 +347,18 @@ Reorganizar editor para que sea visual:
 Antes de crear más juegos, hay que ordenar el sistema.
 
 La prioridad no es tener 30 juegos, sino tener 6 familias buenas con 5-10 variantes editables y que el admin explique claramente cuáles son jugables ya.
+
+
+### QR offline
+
+Los QR de inventario son offline-ready.
+
+El admin puede crear tarjetas QR, exportarlas y el player puede leerlas sin consultar al servidor. La validación en campo se hace contra la misión descargada y la mochila local:
+
+- QR de objeto: guarda objeto en mochila.
+- QR de llave: guarda llave para requisitos.
+- QR de pista: guarda pista consultable.
+- QR bonus: guarda recompensa.
+- QR de completado: será un método separado, `qr_complete`.
+
+El servidor solo hace sincronización/auditoría posterior. No debe ser necesario para leer y validar el QR durante la partida.
