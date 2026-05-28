@@ -678,12 +678,16 @@ export default function NodeDetailDrawer({
                   value={getDraftConfigText('completion_method', 'proximity')}
                   onChange={(event) => updateDraftConfigText('completion_method', event.target.value)}
                 >
-                  <option value="proximity">{t('editor.gameAuthoring.methodProximity')}</option>
-                  <option value="manual_code">{t('editor.gameAuthoring.methodManualCode')}</option>
-                  <option value="qr">{t('editor.gameAuthoring.methodQr')}</option>
-                  <option value="nfc">{t('editor.gameAuthoring.methodNfc')}</option>
-                  <option value="minigame">{t('editor.gameAuthoring.methodMinigame')}</option>
-                  <option value="item">{t('editor.gameAuthoring.methodItem')}</option>
+                  <option value="proximity">Llegar al sitio</option>
+                  <option value="hold">Mantenerse en la zona</option>
+                  <option value="bearing">Rumbo / brújula</option>
+                  <option value="puzzle">Puzzle visual</option>
+                  <option value="manual_code">Palabra o código</option>
+                  <option value="sequence">Secuencia</option>
+                  <option value="qr_complete">QR completa el nodo</option>
+                  <option value="photo">Foto de exploración</option>
+                  <option value="inventory_only">Guardar en mochila</option>
+                  <option value="team">Equipo / capitán</option>
                 </select>
               </label>
 
