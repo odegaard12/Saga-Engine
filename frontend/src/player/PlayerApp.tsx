@@ -115,6 +115,22 @@ function getPhysicalQrStageItemId(stage: PlayerStage | null): string {
   return ''
 }
 
+
+function getMissionPhysicalQrItemIds(stages: PlayerStage[] | undefined): string[] {
+  if (!Array.isArray(stages)) return []
+
+  const ids = new Set<string>()
+
+  for (const stage of stages) {
+    if (!stage || typeof stage !== 'object') continue
+
+    const itemId = getPhysicalQrStageItemId(stage)
+    if (itemId) ids.add(itemId)
+  }
+
+  return Array.from(ids)
+}
+
 function scannedQrMatchesCurrentStage(stage: PlayerStage | null, scannedItemId: unknown): boolean {
   const expected = getPhysicalQrStageItemId(stage)
   const scanned = normalizeQrInventoryId(scannedItemId)
@@ -489,6 +505,7 @@ export default function PlayerApp() {
   const hasBrowserGps = Boolean(browserGpsPosition)
   const primaryLabel = currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
+  const missionPhysicalQrItemIds = getMissionPhysicalQrItemIds(payload.stages)
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
@@ -1105,6 +1122,7 @@ return
               hidden={false}
               openSignal={quickQrOpenSignal}
               showLauncher={false}
+              allowedItemIds={missionPhysicalQrItemIds}
               onInventoryItemCollected={handleQrInventoryItemCollected}
             />
 

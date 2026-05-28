@@ -8,6 +8,7 @@ interface QuickProofPanelProps {
   hidden: boolean
   openSignal?: number
   showLauncher?: boolean
+  allowedItemIds?: string[]
   onInventoryItemCollected?: (item: {
     item_id: string
     label: string
@@ -99,16 +100,7 @@ function parseQrItem(value: string): ParsedQrItem | null {
     }
   }
 
-  const itemId = slugifyItemId(clean)
-  if (!itemId) return null
-
-  return {
-    item_id: itemId,
-    label: clean.slice(0, 160),
-    raw: clean.slice(0, 300),
-    kind: 'text',
-    format,
-  }
+  return null
 }
 
 export function QuickProofPanel({
@@ -117,6 +109,7 @@ export function QuickProofPanel({
   hidden,
   openSignal = 0,
   showLauncher = true,
+  allowedItemIds = [],
   onInventoryItemCollected,
 }: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
@@ -163,7 +156,14 @@ export function QuickProofPanel({
     const parsed = parseQrItem(value)
 
     if (!parsed) {
-      setMessage('QR no leído. Prueba otra vez o usa Mochila > Respaldo.')
+      setMessage('QR no válido. Solo se aceptan tarjetas QR creadas en esta misión desde Admin.')
+      return
+    }
+
+    const allowed = new Set(allowedItemIds.map((item) => slugifyItemId(item)))
+    if (allowed.size > 0 && !allowed.has(parsed.item_id)) {
+      setMessage('QR no pertenece a esta misión. No se ha guardado en la mochila.')
+      setNotice('QR rechazado')
       return
     }
 
