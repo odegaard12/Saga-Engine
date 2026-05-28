@@ -528,6 +528,24 @@ export default function NodeDetailDrawer({
                     <span>{game.icon}</span>
                     <strong>{game.title}</strong>
                     <small>{game.summary}</small>
+                    <div className="admin-game-card-badges">
+                      <em>
+                        {game.runtimeStatus === 'runtime_ready'
+                          ? 'Jugable'
+                          : game.runtimeStatus === 'runtime_partial'
+                            ? 'Parcial'
+                            : game.runtimeStatus === 'preset_only'
+                              ? 'Plantilla'
+                              : 'Planeado'}
+                      </em>
+                      <em>
+                        {game.offlineStatus === 'offline_ready'
+                          ? 'Offline listo'
+                          : game.offlineStatus === 'offline_partial'
+                            ? 'Offline parcial'
+                            : 'Offline pendiente'}
+                      </em>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -535,6 +553,9 @@ export default function NodeDetailDrawer({
               <div className="admin-game-explain-box">
                 <strong>{selectedGame.playerGoal}</strong>
                 <span>{selectedGame.editorHint}</span>
+                 <small className="admin-game-offline-note">
+                   Offline obligatorio: {selectedGame.offlineNote}
+                 </small>
               </div>
 
               <div className="admin-family-config-grid">
@@ -657,12 +678,16 @@ export default function NodeDetailDrawer({
                   value={getDraftConfigText('completion_method', 'proximity')}
                   onChange={(event) => updateDraftConfigText('completion_method', event.target.value)}
                 >
-                  <option value="proximity">{t('editor.gameAuthoring.methodProximity')}</option>
-                  <option value="manual_code">{t('editor.gameAuthoring.methodManualCode')}</option>
-                  <option value="qr">{t('editor.gameAuthoring.methodQr')}</option>
-                  <option value="nfc">{t('editor.gameAuthoring.methodNfc')}</option>
-                  <option value="minigame">{t('editor.gameAuthoring.methodMinigame')}</option>
-                  <option value="item">{t('editor.gameAuthoring.methodItem')}</option>
+                  <option value="proximity">Llegar al sitio</option>
+                  <option value="hold">Mantenerse en la zona</option>
+                  <option value="bearing">Rumbo / brújula</option>
+                  <option value="puzzle">Puzzle visual</option>
+                  <option value="manual_code">Palabra o código</option>
+                  <option value="sequence">Secuencia</option>
+                  <option value="qr_complete">QR completa el nodo</option>
+                  <option value="photo">Foto de exploración</option>
+                  <option value="inventory_only">Guardar en mochila</option>
+                  <option value="team">Equipo / capitán</option>
                 </select>
               </label>
 

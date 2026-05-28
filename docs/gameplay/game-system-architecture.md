@@ -14,6 +14,13 @@ La regla principal es:
 
 No debemos crear un motor nuevo para cada juego si se puede resolver como variante visual/configurable de una familia.
 
+## Regla offline obligatoria
+
+SAGA debe diseñarse offline-first.
+
+Ningún juego nuevo se considera terminado si no tiene camino offline. No se acepta `online_only` como estado final. Fotos, QR, códigos, secuencias y pruebas de equipo deben poder guardar evento local y sincronizar después.
+
+
 ## Estado actual
 
 Motores runtime reales actuales:
@@ -186,10 +193,10 @@ Juegos recomendados:
 
 | Juego | Estado | Offline |
 |---|---:|---:|
-| Recoger objeto QR | runtime parcial | sí, local |
-| Recoger llave QR | runtime parcial | sí, local |
-| Pista QR | runtime parcial | sí, local |
-| Bonus QR | runtime parcial | sí, local |
+| Recoger objeto QR | runtime ready | offline ready |
+| Recoger llave QR | runtime ready | offline ready |
+| Pista QR | runtime ready | offline ready |
+| Bonus QR | runtime ready | offline ready |
 | Nodo bloqueado por llave | runtime ready | sí |
 | Entregar/consumir objeto | runtime ready | sí |
 | Combinar objetos | planned | parcial |
@@ -203,13 +210,13 @@ Juegos recomendados:
 
 | Juego | Estado | Offline |
 |---|---:|---:|
-| Foto libre en mapa | runtime ready online | no |
-| Foto de exploración | planned próximo | cola offline futura |
-| Foto de equipo | planned | no |
-| Foto de objeto | planned | no |
-| Álbum de ruta | runtime parcial | no |
-| Foto como pista compartida | planned | no |
-| Foto antes/después | planned | no |
+| Foto libre en mapa | runtime parcial | offline parcial / cola local |
+| Foto de exploración | planned próximo | offline planned / cola local obligatoria |
+| Foto de equipo | planned | offline planned / modo capitán |
+| Foto de objeto | planned | offline planned / cola local |
+| Álbum de ruta | runtime parcial | offline partial / sincronización pendiente |
+| Foto como pista compartida | planned | offline planned / sincronización posterior |
+| Foto antes/después | planned | offline planned / cola local |
 
 ## 6. Equipo / multijugador
 
@@ -220,11 +227,11 @@ Juegos recomendados:
 | Juego | Estado | Offline |
 |---|---:|---:|
 | Relevo simple | planned | capitán |
-| Dos jugadores en zonas distintas | planned | no |
+| Dos jugadores en zonas distintas | planned | offline planned / modo capitán primero |
 | Capitán/equipo | planned | capitán |
-| Jugador A da pista a jugador B | planned | no |
-| Votación | planned | no |
-| Prueba simultánea | planned | no |
+| Jugador A da pista a jugador B | planned | offline planned / modo capitán primero |
+| Votación | planned | offline planned / evento local |
+| Prueba simultánea | planned | offline planned / no realtime todavía |
 | Carrera cooperativa | planned | parcial |
 
 Esta familia debe ir después. Es la más delicada.
@@ -340,3 +347,18 @@ Reorganizar editor para que sea visual:
 Antes de crear más juegos, hay que ordenar el sistema.
 
 La prioridad no es tener 30 juegos, sino tener 6 familias buenas con 5-10 variantes editables y que el admin explique claramente cuáles son jugables ya.
+
+
+### QR offline
+
+Los QR de inventario son offline-ready.
+
+El admin puede crear tarjetas QR, exportarlas y el player puede leerlas sin consultar al servidor. La validación en campo se hace contra la misión descargada y la mochila local:
+
+- QR de objeto: guarda objeto en mochila.
+- QR de llave: guarda llave para requisitos.
+- QR de pista: guarda pista consultable.
+- QR bonus: guarda recompensa.
+- QR de completado: será un método separado, `qr_complete`.
+
+El servidor solo hace sincronización/auditoría posterior. No debe ser necesario para leer y validar el QR durante la partida.
