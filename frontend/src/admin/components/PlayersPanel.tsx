@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react'
+import type { AdminProfileAction } from '../lib/adminApi'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
@@ -54,20 +55,28 @@ type PlayersPanelProps = {
   playerDrafts: PlayerDraft[]
   playerSaveState: 'idle' | 'saving' | 'saved' | 'error'
   playerSaveError: string | null
+  profileProgress: Record<string, { level: number | null; finished: boolean }>
+  profileActionState: Record<string, string>
+  profileActionError: Record<string, string>
   onUpdatePlayer: (index: number, key: keyof PlayerDraft, value: string) => void
   onDeletePlayer: (index: number) => void
   onAddPlayer: () => void
   onSavePlayers: () => void
+  onProfileAction: (profileId: string, action: AdminProfileAction) => void
 }
 
 export default function PlayersPanel({
   playerDrafts,
   playerSaveState,
   playerSaveError,
+  profileProgress,
+  profileActionState,
+  profileActionError,
   onUpdatePlayer,
   onDeletePlayer,
   onAddPlayer,
   onSavePlayers,
+  onProfileAction,
 }: PlayersPanelProps) {
   async function handleAvatarFile(event: ChangeEvent<HTMLInputElement>, index: number) {
     const file = event.currentTarget.files?.[0]
@@ -140,6 +149,52 @@ export default function PlayersPanel({
                 >
                   Delete
                 </button>
+              </div>
+
+              <div className="admin-player-progress-controls">
+                <div className="admin-player-progress-copy">
+                  <strong>Progreso de partida</strong>
+                  <span>
+                    Nivel {profileProgress[draft.id]?.level ?? 0}
+                    {profileProgress[draft.id]?.finished ? ' · finalizado' : ''}
+                  </span>
+                  {profileActionError[draft.id] ? <small>{profileActionError[draft.id]}</small> : null}
+                </div>
+
+                <div className="admin-player-progress-buttons">
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    disabled={profileActionState[draft.id] === 'running'}
+                    onClick={() => onProfileAction(draft.id, 'level_prev')}
+                  >
+                    ← 1 nodo
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    disabled={profileActionState[draft.id] === 'running'}
+                    onClick={() => onProfileAction(draft.id, 'level_next')}
+                  >
+                    +1 nodo
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    disabled={profileActionState[draft.id] === 'running'}
+                    onClick={() => onProfileAction(draft.id, 'reset_profile')}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    disabled={profileActionState[draft.id] === 'running'}
+                    onClick={() => onProfileAction(draft.id, 'mark_finished')}
+                  >
+                    Finalizar
+                  </button>
+                </div>
               </div>
 
               <div className="admin-player-form-grid">

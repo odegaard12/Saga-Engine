@@ -6,7 +6,7 @@ import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
-import type { AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
+import type { AdminProfileAction, AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
@@ -30,6 +30,9 @@ type AdminMissionControlShellProps = {
   playerDrafts: PlayerDraft[]
   playerSaveState: SaveState
   playerSaveError: string | null
+  profileProgress: Record<string, { level: number | null; finished: boolean }>
+  profileActionState: Record<string, string>
+  profileActionError: Record<string, string>
   missionDraft: Record<string, string>
   settingsSaveState: SaveState
   settingsSaveError: string | null
@@ -47,6 +50,7 @@ type AdminMissionControlShellProps = {
   onDeletePlayer: (index: number) => void
   onAddPlayer: () => void
   onSavePlayers: () => void
+  onProfileAction: (profileId: string, action: AdminProfileAction) => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
   onApplyMissionTemplate: (templateId: MissionTemplateId) => void
@@ -76,6 +80,9 @@ export default function AdminMissionControlShell({
   playerDrafts,
   playerSaveState,
   playerSaveError,
+  profileProgress,
+  profileActionState,
+  profileActionError,
   missionDraft,
   settingsSaveState,
   settingsSaveError,
@@ -93,6 +100,7 @@ export default function AdminMissionControlShell({
   onDeletePlayer,
   onAddPlayer,
   onSavePlayers,
+  onProfileAction,
   onUpdateMissionDraft,
   onSaveSettings,
   onApplyMissionTemplate,
@@ -406,6 +414,10 @@ export default function AdminMissionControlShell({
                 playerDrafts={playerDrafts}
                 playerSaveState={playerSaveState}
                 playerSaveError={playerSaveError}
+                profileProgress={profileProgress}
+                profileActionState={profileActionState}
+                profileActionError={profileActionError}
+                onProfileAction={onProfileAction}
                 onUpdatePlayer={onUpdatePlayer}
                 onDeletePlayer={onDeletePlayer}
                 onAddPlayer={onAddPlayer}

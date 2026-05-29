@@ -39,6 +39,20 @@ export type AdminReactOverviewStage = {
 
 export type AdminRawStage = Record<string, unknown>
 
+export type AdminProfileAction = 'reset_profile' | 'level_prev' | 'level_next' | 'mark_finished'
+
+export type AdminProfileActionResponse = {
+  status: 'ok' | 'error' | 'fail'
+  detail?: string
+  message?: string
+  profile_id?: string
+  action?: AdminProfileAction
+  previous_level?: number
+  level?: number
+  finished?: boolean
+  total_stages?: number
+}
+
 export type AdminConfigSaveResponse = {
   status: 'ok' | 'fail'
   message?: string
@@ -426,4 +440,12 @@ export async function saveAdminConfig(
     status: 'fail',
     message: errors.filter(Boolean).join(' | ') || 'Could not save admin config.',
   }
+}
+
+
+export function runAdminProfileAction(profileId: string, action: AdminProfileAction) {
+  return adminPostJson<AdminProfileActionResponse>('/api/admin/profile-action', {
+    profile_id: profileId,
+    action,
+  })
 }
