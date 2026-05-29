@@ -1,0 +1,44 @@
+{
+  "site_name": "SAGA",
+  "admin_title": "PUT ADMIN TITLE HERE",
+  "admin_subtitle": "PUT ADMIN SUBTITLE HERE",
+  "ui_lang": "es",
+  "player_theme": "classic",
+  "story_title": "",
+  "story_text": "",
+  "prologue_title": "PUT PROLOGUE TITLE HERE",
+  "prologue_subtitle": "PUT PROLOGUE SUBTITLE HERE",
+  "prologue_body": "PUT PROLOGUE TEXT HERE",
+  "map_center": [
+    40.4168,
+    -3.7038
+  ],
+  "map_zoom": 13,
+  "players": [
+    "PLAYER 1",
+    "PLAYER 2"
+  ],
+  "player_profiles": [
+    {
+      "id": "PLAYER 1",
+      "display_name": "PLAYER 1",
+      "mode": "solo",
+      "members": [
+        "PLAYER 1"
+      ],
+      "status": "active",
+      "avatar_url": ""
+    },
+    {
+      "id": "PLAYER 2",
+      "display_name": "PLAYER 2",
+      "mode": "solo",
+      "members": [
+        "PLAYER 2"
+      ],
+      "status": "active",
+      "avatar_url": ""
+    }
+  ],
+  "data_dir": "data"
+}

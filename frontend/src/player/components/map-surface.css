@@ -1,0 +1,42 @@
+.map-surface {
+  position: relative;
+  min-height: 100%;
+  height: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(223, 232, 221, 1), rgba(220, 231, 218, 1));
+  box-shadow: 0 22px 54px rgba(2, 6, 23, 0.14);
+}
+
+.map-surface__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-surface .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font: inherit;
+}
+
+.map-surface .leaflet-control-attribution {
+  display: none !important;
+}
+
+.map-surface .leaflet-tooltip {
+  display: none !important;
+}
+
+@media (max-width: 560px) {
+  .map-surface {
+    min-height: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}

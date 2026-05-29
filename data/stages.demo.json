@@ -1,0 +1,121 @@
+[
+  {
+    "id": 0,
+    "title": "A CARACOLA",
+    "lat": 42.0001,
+    "lon": -8.0001,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "RECONECTA O SISTEMA.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 1,
+    "title": "DIAL NODE",
+    "lat": 42.0007,
+    "lon": -8.0008,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "DIAL NODE · NAVIGATION PUZZLE",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 2,
+    "title": "ROBALEIRA",
+    "lat": 42.0013,
+    "lon": -8.0012,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "CANLE DE EMERXENCIA.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 3,
+    "title": "MELIDE",
+    "lat": 42.0019,
+    "lon": -8.0018,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "O terreo é inestable e o vento das Cíes forte. Mantén o nivel do sistema firme durante 10 segundos para ancorar a defensa.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 4,
+    "title": "SUBRIDO",
+    "lat": 42.0025,
+    "lon": -8.0024,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "A Fragua do sistema está fría.\n\nConsulta o Protocolo de Combustión no tríptico: Abre a admisión externa, pecha o centro e purga o sistema.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 5,
+    "title": "ALDEA DE PUXEIRO",
+    "lat": 42.0031,
+    "lon": -8.003,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "O ARQUIVO (A Memoria).\n\nO Vixía non pode espertar se non recorda como loitar.\nCando restaures os patróns de luz e o Arquivo recupere a súa integridade... liberarás a quinta Runa.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 6,
+    "title": "O FACHO",
+    "lat": 42.0037,
+    "lon": -8.0036,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "IGNICIÓN FINAL.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  }
+]

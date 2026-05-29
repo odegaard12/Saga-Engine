@@ -1,0 +1,515 @@
+import { useEffect, useState } from 'react'
+import AdminMissionMap from '../AdminMissionMap'
+import FamiliesPanel from './FamiliesPanel'
+import NodeDetailDrawer from './NodeDetailDrawer'
+import NodePhysicalTypePanel from './NodePhysicalTypePanel'
+import PlayersPanel from './PlayersPanel'
+import SettingsPanel from './SettingsPanel'
+import MissionBuilderPanel from './MissionBuilderPanel'
+import type { AdminProfileAction, AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
+import { familyCards } from '../lib/familyConfigs'
+import type { MissionTemplateId } from '../lib/gameCatalog'
+import type { PlayerDraft } from '../lib/playerDrafts'
+import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
+import '../styles/admin-modern-shell.css'
+
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'builder'
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
+type AdminMissionControlShellProps = {
+  title: string
+  subtitle: string
+  profiles: AdminReactOverviewProfile[]
+  stages: AdminReactOverviewStage[]
+  familyCounts: Record<string, number>
+  selectedStage: AdminReactOverviewStage | null
+  cmsPanel: CmsPanel
+  localNotice: string | null
+  saveState: SaveState
+  saveError: string | null
+  playerDrafts: PlayerDraft[]
+  playerSaveState: SaveState
+  playerSaveError: string | null
+  profileProgress: Record<string, { level: number | null; finished: boolean }>
+  profileActionState: Record<string, string>
+  profileActionError: Record<string, string>
+  missionDraft: Record<string, string>
+  settingsSaveState: SaveState
+  settingsSaveError: string | null
+  onRefresh: () => void
+  onSelectStage: (stage: AdminReactOverviewStage | null) => void
+  onCreateNode: () => void
+  onCreateNodeAt: (lat: number, lon: number) => void
+  onMoveStage: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
+  onApplyStage: (stage: AdminReactOverviewStage) => void
+  onDeleteStage: (stage: AdminReactOverviewStage) => void
+  onReorderStage: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
+  onSaveStages: () => void
+  onSetCmsPanel: (panel: CmsPanel) => void
+  onUpdatePlayer: (index: number, key: keyof PlayerDraft, value: string) => void
+  onDeletePlayer: (index: number) => void
+  onAddPlayer: () => void
+  onSavePlayers: () => void
+  onProfileAction: (profileId: string, action: AdminProfileAction) => void
+  onUpdateMissionDraft: (key: string, value: string) => void
+  onSaveSettings: () => void
+  onApplyMissionTemplate: (templateId: MissionTemplateId) => void
+}
+
+function selectedStageKey(stage: AdminReactOverviewStage | null) {
+  if (!stage) return ''
+  return String(stage.id ?? stage.index)
+}
+
+function getUiBoolean(stage: AdminReactOverviewStage | null, key: string) {
+  if (!stage) return false
+  return Boolean((stage as unknown as Record<string, unknown>)[key])
+}
+
+export default function AdminMissionControlShell({
+  title,
+  subtitle,
+  profiles,
+  stages,
+  familyCounts,
+  selectedStage,
+  cmsPanel,
+  localNotice,
+  saveState,
+  saveError,
+  playerDrafts,
+  playerSaveState,
+  playerSaveError,
+  profileProgress,
+  profileActionState,
+  profileActionError,
+  missionDraft,
+  settingsSaveState,
+  settingsSaveError,
+  onRefresh,
+  onSelectStage,
+  onCreateNode,
+  onCreateNodeAt,
+  onMoveStage,
+  onApplyStage,
+  onDeleteStage,
+  onReorderStage,
+  onSaveStages,
+  onSetCmsPanel,
+  onUpdatePlayer,
+  onDeletePlayer,
+  onAddPlayer,
+  onSavePlayers,
+  onProfileAction,
+  onUpdateMissionDraft,
+  onSaveSettings,
+  onApplyMissionTemplate,
+}: AdminMissionControlShellProps) {
+  const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
+
+  const liveSelectedStage = selectedStage
+    ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
+      stages.find((stage) => stage.index === selectedStage.index) ||
+      selectedStage
+    : null
+
+  const selectedIndex = liveSelectedStage
+    ? stages.findIndex((stage) => stage.index === liveSelectedStage.index)
+    : -1
+
+  const selectedKey = selectedStageKey(liveSelectedStage)
+  const shouldShowTypeChooser = Boolean(
+    liveSelectedStage &&
+    (
+      typeChooserStageKey === selectedKey ||
+      (
+        typeof liveSelectedStage.id === 'string' &&
+        liveSelectedStage.id.startsWith('local-') &&
+        !getUiBoolean(liveSelectedStage, '_type_choice_done')
+      )
+    )
+  )
+
+  useEffect(() => {
+    if (!liveSelectedStage) {
+      setTypeChooserStageKey(null)
+      return
+    }
+
+    if (
+      typeof liveSelectedStage.id === 'string' &&
+      liveSelectedStage.id.startsWith('local-') &&
+      !getUiBoolean(liveSelectedStage, '_type_choice_done')
+    ) {
+      setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
+    }
+  }, [selectedKey])
+
+  const mappedCount = stages.filter(
+    (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
+  ).length
+
+  function togglePanel(panel: CmsPanel) {
+    onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
+  }
+
+  const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
+  const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
+
+  return (
+    <main
+      className={selectedStage ? 'saga-admin-shell has-inspector' : 'saga-admin-shell'}
+      aria-label="SAGA Engine admin mission control"
+    >
+      <aside className="saga-left-rail" aria-label="Mission navigation">
+        <div className="saga-rail-brand">
+          <span className="saga-brand-mark">S</span>
+          <div>
+            <strong>SAGA Engine</strong>
+            <small>Mission Control</small>
+          </div>
+        </div>
+
+        <section className="saga-mission-card">
+          <span className="saga-eyebrow">Live mission</span>
+          <h1>{displayTitle}</h1>
+          <p>{displaySubtitle}</p>
+
+          <div className="saga-mini-stats">
+            <span><b>{stages.length}</b> nodes</span>
+            <span><b>{profiles.length}</b> profiles</span>
+            <span><b>{mappedCount}</b> mapped</span>
+          </div>
+        </section>
+
+        <nav className="saga-rail-actions" aria-label="Primary admin actions">
+          <button type="button" className="saga-primary-action" onClick={() => togglePanel('builder')}>
+            + Add node
+          </button>
+
+          <button
+            type="button"
+            className="saga-save-action"
+            data-state={saveState}
+            disabled={saveState === 'saving'}
+            onClick={onSaveStages}
+          >
+            {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save'}
+          </button>
+
+          <button type="button" onClick={onRefresh}>Refresh</button>
+        </nav>
+
+        <div className="saga-panel-switcher">
+<button
+            type="button"
+            className={cmsPanel === 'players' ? 'active' : ''}
+            onClick={() => togglePanel('players')}
+          >
+            Players
+          </button>
+          <button
+            type="button"
+            className={cmsPanel === 'labels' ? 'active' : ''}
+            onClick={() => togglePanel('labels')}
+          >
+            Families
+          </button>
+          <button
+            type="button"
+            className={cmsPanel === 'mission' ? 'active' : ''}
+            onClick={() => togglePanel('mission')}
+          >
+            Settings
+          </button>
+        </div>
+
+        <section className="saga-route-list" aria-label="Route nodes">
+          <div className="saga-section-title">
+            <span>Ruta</span>
+            <b>{stages.length}</b>
+          </div>
+
+          <div className="saga-node-scroll">
+            {stages.map((stage, routeIndex) => {
+              const physicalVisual = getPhysicalNodeVisual(stage)
+              const selected = selectedStage?.index === stage.index
+
+              return (
+                <div
+                  key={`${stage.index}-${stage.id ?? stage.title}`}
+                  className={selected ? 'saga-node-row active' : 'saga-node-row'}
+                >
+                  <button
+                    type="button"
+                    className="saga-node-main"
+                    onClick={() => onSelectStage(stage)}
+                  >
+                    <span className="saga-node-index">{routeIndex + 1}</span>
+                    <span className="saga-node-copy">
+                      <strong className="saga-node-title-line">
+                        {physicalVisual ? (
+                          <span
+                            className={`saga-physical-node-badge saga-physical-node-badge--${physicalVisual.tone}`}
+                            title={physicalVisual.label}
+                            aria-label={physicalVisual.label}
+                          >
+                            {physicalVisual.icon}
+                          </span>
+                        ) : null}
+                        <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
+                      </strong>
+                      <small>
+                        {physicalVisual ? physicalVisual.label : (stage.label || stage.type)}
+                        {' · '}
+                        {formatCoords(stage.lat, stage.lon)}
+                      </small>
+                    </span>
+                  </button>
+
+                  <span className="saga-node-order-actions">
+                    <button
+                      type="button"
+                      title="Subir nodo"
+                      disabled={routeIndex === 0}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'up') }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      title="Bajar nodo"
+                      disabled={routeIndex >= stages.length - 1}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'down') }}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
+
+            {stages.length === 0 ? (
+              <div className="saga-empty-mini">Pulsa Añadir nodo para crear un nodo suelto o arrancar una plantilla.</div>
+            ) : null}
+          </div>
+        </section>
+      </aside>
+
+      <section className="saga-map-workspace" aria-label="Map workspace">
+        <div className="saga-command-bar">
+          <div className="saga-command-main">
+            <button type="button" className="saga-command-primary" onClick={() => togglePanel('builder')}>
+              Add node
+            </button>
+            <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
+              {saveState === 'saving' ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" onClick={onRefresh}>Refresh</button>
+          </div>
+
+          <div className="saga-family-chips" aria-label="Family counts">
+            {familyCards.map((family) => (
+              <span key={family.id}>
+                {family.icon} {familyCounts[family.id] || 0}
+              </span>
+            ))}
+          </div>
+
+          <SaveStatus state={saveState} error={saveError} />
+        </div>
+
+        <div className="saga-map-frame">
+          <AdminMissionMap
+            stages={stages}
+            selectedStage={selectedStage}
+            onSelectStage={onSelectStage}
+            onCreateStageAt={onCreateNodeAt}
+            onMoveStage={onMoveStage}
+          />
+        </div>
+
+        {localNotice ? (
+          <div className="saga-toast" role="status">{localNotice}</div>
+        ) : null}
+      </section>
+
+      {liveSelectedStage ? (
+        <aside className="saga-inspector is-open" aria-label="Node inspector">
+          {shouldShowTypeChooser ? (
+            <div className="saga-node-type-choice-screen">
+              <NodePhysicalTypePanel
+                stage={liveSelectedStage}
+                chooserOnly
+                onApplyLocal={(nextStage) => {
+                  onApplyStage({
+                    ...(nextStage as unknown as Record<string, unknown>),
+                    _type_choice_done: true,
+                  } as unknown as AdminReactOverviewStage)
+                }}
+                onFinishChoice={() => setTypeChooserStageKey(null)}
+              />
+            </div>
+          ) : isPhysicalNode(liveSelectedStage) ? (
+            <>
+              <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
+                <NodePhysicalTypePanel
+                  stage={liveSelectedStage}
+                  onApplyLocal={onApplyStage}
+                  onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+                />
+              </div>
+
+              <div className="saga-physical-node-actions">
+                <button
+                  type="button"
+                  className="saga-danger-action"
+                  onClick={() => {
+                    if (window.confirm(`Eliminar nodo "${liveSelectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                      onDeleteStage(liveSelectedStage)
+                    }
+                  }}
+                >
+                  Eliminar nodo
+                </button>
+              </div>
+            </>
+          ) : (
+            <NodeDetailDrawer
+              stage={liveSelectedStage}
+              stages={stages}
+              onClose={() => onSelectStage(null)}
+              onApplyLocal={onApplyStage}
+              onDeleteLocal={onDeleteStage}
+              onMoveLocal={onReorderStage}
+              onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+              canMoveUp={selectedIndex > 0}
+              canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
+            />
+          )}
+        </aside>
+      ) : null}
+
+      {cmsPanel !== 'none' ? (
+        <aside className="saga-floating-panel" aria-label="CMS panel">
+          <div className="saga-floating-head">
+            <strong>{cmsPanel === 'players' ? 'Players' : cmsPanel === 'labels' ? 'Families' : cmsPanel === 'builder' ? 'Crear' : 'Mission settings'}</strong>
+            <button type="button" onClick={() => onSetCmsPanel('none')}>Close</button>
+          </div>
+
+          <div className="saga-floating-body">
+            {cmsPanel === 'builder' ? (
+              <MissionBuilderPanel
+                stages={stages}
+                onCreateNode={() => {
+                  onSetCmsPanel('none')
+                  onCreateNode()
+                }}
+                onApplyTemplate={onApplyMissionTemplate}
+              />
+            ) : null}
+
+            {cmsPanel === 'players' ? (
+              <PlayersPanel
+                playerDrafts={playerDrafts}
+                playerSaveState={playerSaveState}
+                playerSaveError={playerSaveError}
+                profileProgress={profileProgress}
+                profileActionState={profileActionState}
+                profileActionError={profileActionError}
+                onProfileAction={onProfileAction}
+                onUpdatePlayer={onUpdatePlayer}
+                onDeletePlayer={onDeletePlayer}
+                onAddPlayer={onAddPlayer}
+                onSavePlayers={onSavePlayers}
+              />
+            ) : null}
+
+            {cmsPanel === 'labels' ? <FamiliesPanel /> : null}
+
+            {cmsPanel === 'mission' ? (
+              <SettingsPanel
+                missionDraft={missionDraft}
+                settingsSaveState={settingsSaveState}
+                settingsSaveError={settingsSaveError}
+                onUpdateMissionDraft={onUpdateMissionDraft}
+                onSaveSettings={onSaveSettings}
+              />
+            ) : null}
+          </div>
+        </aside>
+      ) : null}
+
+      <nav className="saga-mobile-actions" aria-label="Mobile actions">
+        <button type="button" onClick={() => togglePanel('builder')}>+ Node</button>
+        <button type="button" onClick={onSaveStages}>Save</button>
+        <button type="button" onClick={() => togglePanel('builder')}>Builder</button>
+        <button type="button" onClick={() => togglePanel('players')}>Players</button>
+        <button type="button" onClick={() => togglePanel('mission')}>Settings</button>
+      </nav>
+    </main>
+  )
+}
+
+
+function isPhysicalNode(stage: AdminReactOverviewStage | null) {
+  if (!stage) return false
+
+  const record = stage as AdminReactOverviewStage & {
+    physical_node_kind?: string
+    physical_item_kind?: string
+    physical_qr?: { kind?: string }
+  }
+
+  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
+
+  return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
+}
+
+function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {
+  if (state === 'error') {
+    return (
+      <div className="saga-save-status error">
+        <b>Save failed</b>
+        <span>{error || 'Unknown error'}</span>
+      </div>
+    )
+  }
+
+  if (state === 'saving') {
+    return (
+      <div className="saga-save-status saving">
+        <b>Saving</b>
+        <span>Writing mission data…</span>
+      </div>
+    )
+  }
+
+  if (state === 'saved') {
+    return (
+      <div className="saga-save-status saved">
+        <b>Saved</b>
+        <span>Backend reloaded</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="saga-save-status idle">
+      <b>Unsaved</b>
+      <span>Local changes only</span>
+    </div>
+  )
+}
+
+function cleanAdminCopy(value: string, fallback: string) {
+  const normalized = value.trim()
+  if (!normalized) return fallback
+  if (/^PUT ADMIN (TITLE|SUBTITLE) HERE$/i.test(normalized)) return fallback
+  return normalized
+}
+
+function formatCoords(lat: unknown, lon: unknown) {
+  if (typeof lat !== 'number' || typeof lon !== 'number') return 'No GPS'
+  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`
+}
