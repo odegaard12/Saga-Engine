@@ -3151,39 +3151,40 @@
 }
 
 
-/* admin-toast-polish-v1 */
+/* admin-toast-bottom-polish-v2 */
 .saga-map-workspace .saga-toast {
-  position: fixed;
-  left: clamp(520px, 50vw, calc(100vw - 520px));
-  right: auto;
-  bottom: auto;
-  top: 22px;
-  transform: translateX(-50%);
-  z-index: 9200;
-  width: min(520px, calc(100vw - 44px));
-  min-height: 42px;
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px) !important;
+  transform: translateX(-50%) !important;
+  z-index: 30000 !important;
+  width: min(620px, calc(100vw - 48px)) !important;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 11px 18px;
+  padding: 12px 20px;
   border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.22);
+  border: 1px solid rgba(125, 211, 252, 0.28);
   background:
-    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.82));
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.9));
   color: #e0f2fe;
-  box-shadow: 0 18px 52px rgba(2, 6, 23, 0.36);
+  box-shadow: 0 22px 70px rgba(2, 6, 23, 0.48);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 950;
   letter-spacing: 0.01em;
+  text-align: center;
   pointer-events: none;
   backdrop-filter: blur(18px);
 }
 
 @media (max-width: 820px) {
   .saga-map-workspace .saga-toast {
-    left: 50%;
-    top: calc(env(safe-area-inset-top, 0px) + 14px);
-    width: calc(100vw - 28px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
+    width: calc(100vw - 28px) !important;
     font-size: 12px;
   }
 }
+
