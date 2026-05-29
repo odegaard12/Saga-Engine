@@ -201,10 +201,11 @@ This repository was reset at **v0.0.1** as the first public baseline.
 
 Near-term:
 
-- improve visual game authoring;
+- improve visual game authoring in Mission Control;
 - simplify the admin node editor;
-- add more reusable game presets;
-- harden QR route completion;
+- make game presets easier to understand and edit;
+- add more reusable offline-ready game presets;
+- harden QR route completion with explicit, predictable flow;
 - improve PWA/offline polish;
 - continue backend modularization.
 

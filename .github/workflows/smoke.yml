@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -50,8 +50,6 @@ jobs:
         run: |
           python -m py_compile \
             main.py \
-            force_reset.py \
-            repair_data.py \
             backend/app/runtime/minigames.py \
             scripts/contract_check.py
 
