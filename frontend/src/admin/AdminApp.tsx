@@ -14,6 +14,8 @@ import {
   loginAdmin,
   saveAdminConfig,
   saveAdminStages,
+  runAdminProfileAction,
+  type AdminProfileAction,
   type AdminRawStage,
   type AdminReactOverviewProfile,
   type AdminReactOverviewResponse,
@@ -132,6 +134,8 @@ export default function AdminApp() {
   const [playerDrafts, setPlayerDrafts] = useState<PlayerDraft[]>([])
   const [playerSaveState, setPlayerSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
+  const [profileActionState, setProfileActionState] = useState<Record<string, string>>({})
+  const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -396,6 +400,58 @@ export default function AdminApp() {
       })),
     }
   }
+
+
+  async function runPlayerProfileAction(profileId: string, action: AdminProfileAction) {
+    const cleanId = profileId.trim()
+    if (!cleanId) {
+      setLocalNotice('No se puede actuar sobre un jugador sin ID guardado.')
+      return
+    }
+
+    const dangerous = action === 'reset_profile' || action === 'mark_finished'
+    const actionLabel =
+      action === 'reset_profile'
+        ? 'resetear la partida'
+        : action === 'level_prev'
+          ? 'retroceder 1 nodo'
+          : action === 'level_next'
+            ? 'avanzar 1 nodo'
+            : 'marcar como finalizado'
+
+    if (dangerous && !window.confirm(`¿Seguro que quieres ${actionLabel} para ${cleanId}?`)) {
+      return
+    }
+
+    setProfileActionState((current) => ({ ...current, [cleanId]: 'running' }))
+    setProfileActionError((current) => ({ ...current, [cleanId]: '' }))
+
+    try {
+      const result = await runAdminProfileAction(cleanId, action)
+
+      if (result.status !== 'ok') {
+        throw new Error(result.detail || result.message || 'No se pudo actualizar el progreso.')
+      }
+
+      const refreshed = await fetchAdminReactOverview()
+      if (refreshed.status === 'ok') {
+        setOverview(refreshed)
+        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...((refreshed.config || {}) as unknown as Record<string, unknown>),
+        } as PublicConfig))
+      }
+
+      setProfileActionState((current) => ({ ...current, [cleanId]: 'saved' }))
+      setLocalNotice(`${cleanId}: ${actionLabel} aplicado. Nivel ${result.previous_level ?? '—'} → ${result.level ?? '—'}.`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido.'
+      setProfileActionState((current) => ({ ...current, [cleanId]: 'error' }))
+      setProfileActionError((current) => ({ ...current, [cleanId]: message }))
+      setLocalNotice(`${cleanId}: no se pudo cambiar progreso.`)
+    }
+  }
+
 
   async function savePlayerProfiles() {
     setPlayerSaveState('saving')
@@ -887,6 +943,16 @@ export default function AdminApp() {
         playerDrafts={playerDrafts}
         playerSaveState={playerSaveState}
         playerSaveError={playerSaveError}
+      profileProgress={Object.fromEntries((profiles || []).map((profile) => [
+        profile.id,
+        {
+          level: profile.level ?? 0,
+          finished: Boolean(profile.finished),
+        },
+      ]))}
+      profileActionState={profileActionState}
+      profileActionError={profileActionError}
+      onProfileAction={runPlayerProfileAction}
         missionDraft={missionDraft}
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}
