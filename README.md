@@ -10,15 +10,17 @@ The current public repository provides the first safe, auditable foundation rele
 
 Current public release: **v0.0.1**.
 
-SAGA Engine v0.0.1 is the first public foundation release. It provides a safe, auditable baseline for building real-world geolocated games:
+SAGA Engine v0.0.1 is the first public foundation release. It provides a safe, auditable baseline for building real-world geolocated games.
 
-- Mission Control admin;
-- player map flow;
-- offline-first game catalog;
-- QR object/key/clue/bonus cards;
-- admin player progress controls;
-- Docker deployment with runtime data mounted separately;
-- privacy and security repository guards.
+Included in this baseline:
+
+- Mission Control admin.
+- Player map flow.
+- Offline-first game catalog.
+- QR object, key, clue and bonus cards.
+- Admin player progress controls.
+- Docker deployment with runtime data mounted separately.
+- Privacy and security repository guards.
 
 This release is a stable public baseline before continuing with richer gameplay authoring features.
 
@@ -72,15 +74,15 @@ Its direction is map-first Mission Control:
 - player/team overview
 - mission status
 - event review
-- future physical interaction/inventory editing
+- continued physical interaction and inventory editing
 
 The old classic admin is no longer the intended editing surface.
 
 ## Storage model
 
-Default storage remains JSON.
+JSON storage remains supported as the simple/default runtime backend for development and portable self-host setups.
 
-Optional SQLite storage is available for runtime data when explicitly enabled:
+SQLite runtime storage is available for production-style deployments when explicitly enabled:
 
 ```bash
 SAGA_STORAGE_BACKEND=sqlite
@@ -93,7 +95,7 @@ SQLite is currently supported through adapters for:
 - player game state/progress
 - live positions/presence
 
-JSON remains the default because this avoids breaking existing self-hosted deployments.
+JSON remains supported to avoid breaking existing self-hosted deployments; production deployments can use SQLite for runtime state.
 
 ## SQLite migration dry-run
 
@@ -256,6 +258,6 @@ Producción debe ejecutarse desde la imagen Docker, con los datos runtime montad
 
 SAGA Engine uses SQLite as the production runtime source of truth.
 
-Runtime state is stored in saga.sqlite3, including mission stages, admin auth, player progress, live positions and event history.
+Runtime state can be stored in saga.sqlite3 when SQLite mode is enabled.
 
 See docs/operations/sqlite-runtime-only.md.
