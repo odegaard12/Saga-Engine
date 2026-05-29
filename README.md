@@ -4,9 +4,26 @@ SAGA Engine is a modern engine for real-world, geolocated games.
 
 It is designed for interactive missions, outdoor routes, GPS nodes, team play, physical props, QR/NFC interactions, offline-first gameplay and admin-driven Mission Control.
 
-The current public repository is focused on a safe, auditable foundation before expanding gameplay features.
+The current public repository provides the first safe, auditable foundation release before expanding gameplay features.
 
-## Current status
+## ## Public release
+
+Current public release: **v0.0.1**.
+
+SAGA Engine v0.0.1 is the first public foundation release. It provides a safe, auditable baseline for building real-world geolocated games:
+
+- Mission Control admin;
+- player map flow;
+- offline-first game catalog;
+- QR object/key/clue/bonus cards;
+- admin player progress controls;
+- Docker deployment with runtime data mounted separately;
+- privacy and security repository guards.
+
+This release is a stable public baseline before continuing with richer gameplay authoring features.
+
+
+Current status
 
 SAGA Engine currently includes:
 
