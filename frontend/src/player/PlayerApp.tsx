@@ -13,6 +13,7 @@ import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
@@ -135,6 +136,18 @@ export default function PlayerApp() {
       try {
         setState({ status: 'loading' })
         const payload = await fetchPlayerGame(user, { offlinePack: true })
+        const config = await fetchPublicConfig()
+          .then((nextConfig) => {
+            cachePublicConfig(nextConfig)
+            return nextConfig
+          })
+          .catch(() => buildFallbackPublicConfig(user))
+
+        void saveMissionPack({
+          user: payload.user || user,
+          config,
+          payload,
+        }).catch(() => undefined)
 
         if (!cancelled) {
           setState({ status: 'ready', payload })
@@ -436,6 +449,19 @@ export default function PlayerApp() {
 
   async function refreshPayload() {
     const nextPayload = await fetchPlayerGame(user)
+    const config = await fetchPublicConfig()
+      .then((nextConfig) => {
+        cachePublicConfig(nextConfig)
+        return nextConfig
+      })
+      .catch(() => buildFallbackPublicConfig(user))
+
+    await saveMissionPack({
+      user: nextPayload.user || user,
+      config,
+      payload: nextPayload,
+    }).catch(() => undefined)
+
     setState({ status: 'ready', payload: nextPayload })
     return nextPayload
   }

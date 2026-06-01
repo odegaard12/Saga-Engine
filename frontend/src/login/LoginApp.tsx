@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { fetchPublicConfig } from '../shared/api'
+import { fetchPlayerGame, fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
+import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { saveMissionPack } from '../player/offline/missionPack'
+import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -83,6 +86,19 @@ function getMeta(profile: PlayerProfile) {
   return ''
 }
 
+
+async function warmOfflineProfiles(config: PublicConfig) {
+  const profiles = normalizeProfiles(config).filter((profile) => profile.status !== 'disabled')
+
+  await Promise.allSettled(
+    profiles.map(async (profile) => {
+      const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
+      await saveMissionPack({ user: profile.id, config, payload })
+      await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`)
+    })
+  )
+}
+
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
 
@@ -92,12 +108,29 @@ export default function LoginApp() {
     async function run() {
       try {
         setState({ status: 'loading' })
+        void registerPlayerServiceWorker()
+        void cachePlayerShell('/')
+
         const config = await fetchPublicConfig()
+        cachePublicConfig(config)
+        void warmOfflineProfiles(config)
 
         if (!cancelled) {
           setState({ status: 'ready', config })
         }
       } catch (error) {
+        const cachedConfig = getCachedPublicConfig()
+
+        if (cachedConfig) {
+          void cachePlayerShell('/')
+          void warmOfflineProfiles(cachedConfig)
+
+          if (!cancelled) {
+            setState({ status: 'ready', config: cachedConfig })
+          }
+          return
+        }
+
         const message = error instanceof Error ? error.message : 'Unknown config error'
 
         if (!cancelled) {
