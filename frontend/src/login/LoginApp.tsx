@@ -5,6 +5,7 @@ import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
+import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -87,20 +88,48 @@ function getMeta(profile: PlayerProfile) {
 }
 
 
-async function warmOfflineProfiles(config: PublicConfig) {
+async function warmOfflineProfiles(config: PublicConfig): Promise<OfflineVaultSummary> {
   const profiles = normalizeProfiles(config).filter((profile) => profile.status !== 'disabled')
 
-  await Promise.allSettled(
+  await registerPlayerServiceWorker()
+  await cachePlayerShell('/').catch(() => undefined)
+
+  const players = await Promise.all(
     profiles.map(async (profile) => {
-      const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
-      await saveMissionPack({ user: profile.id, config, payload })
-      await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`)
+      try {
+        const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
+
+        await saveMissionPack({
+          user: profile.id,
+          config,
+          payload,
+        })
+
+        await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
+
+        return makeOfflineVaultPlayer(profile, {
+          ok: true,
+          stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
+          level: payload.level || 0,
+          finished: Boolean(payload.finished),
+        })
+      } catch (error) {
+        return makeOfflineVaultPlayer(profile, {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Unknown offline preparation error',
+        })
+      }
     })
   )
+
+  return saveOfflineVaultSummary(players)
 }
 
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
+  const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() => getOfflineVaultSummary())
 
   useEffect(() => {
     let cancelled = false
@@ -113,7 +142,7 @@ export default function LoginApp() {
 
         const config = await fetchPublicConfig()
         cachePublicConfig(config)
-        void warmOfflineProfiles(config)
+        void warmOfflineProfiles(config).then(setOfflineVault)
 
         if (!cancelled) {
           setState({ status: 'ready', config })
@@ -123,7 +152,7 @@ export default function LoginApp() {
 
         if (cachedConfig) {
           void cachePlayerShell('/')
-          void warmOfflineProfiles(cachedConfig)
+          void warmOfflineProfiles(cachedConfig).then(setOfflineVault)
 
           if (!cancelled) {
             setState({ status: 'ready', config: cachedConfig })
@@ -150,6 +179,35 @@ export default function LoginApp() {
     if (state.status !== 'ready') return []
     return normalizeProfiles(state.config)
   }, [state])
+
+  async function handlePrepareOffline() {
+    if (state.status !== 'ready') return
+
+    try {
+      setOfflinePrepState('saving')
+      setOfflinePrepMessage('Descargando login, jugadores, nodos y packs offline…')
+
+      const onlineConfig = await fetchPublicConfig()
+        .then((nextConfig) => {
+          cachePublicConfig(nextConfig)
+          return nextConfig
+        })
+        .catch(() => state.config)
+
+      const summary = await warmOfflineProfiles(onlineConfig)
+
+      setOfflineVault(summary)
+      setOfflinePrepState(summary.failed_count > 0 ? 'error' : 'saved')
+      setOfflinePrepMessage(
+        summary.failed_count > 0
+          ? `Preparado parcialmente: ${summary.ready_count}/${summary.profile_count} jugadores.`
+          : `Modo offline listo: ${summary.ready_count}/${summary.profile_count} jugadores.`
+      )
+    } catch (error) {
+      setOfflinePrepState('error')
+      setOfflinePrepMessage(error instanceof Error ? error.message : 'No se pudo preparar el modo offline.')
+    }
+  }
 
   const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -239,6 +297,42 @@ export default function LoginApp() {
             {subtitle ? <p style={heroSubtitle}>{subtitle}</p> : null}
             <p style={heroBody}>{body}</p>
           </div>
+        </section>
+
+        <section style={offlineVaultCard}>
+          <div style={offlineVaultTop}>
+            <div>
+              <div style={offlineVaultEyebrow}>MODO OFFLINE</div>
+              <div style={offlineVaultTitle}>Preparar este teléfono</div>
+              <div style={offlineVaultText}>
+                Guarda login, jugadores, nodos y packs para abrir SAGA sin cobertura.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              style={offlineVaultButton}
+              disabled={offlinePrepState === 'saving'}
+              onClick={handlePrepareOffline}
+            >
+              {offlinePrepState === 'saving' ? 'Descargando…' : 'Preparar offline'}
+            </button>
+          </div>
+
+          <div style={offlineVaultStatus}>
+            <span style={offlineVault.ready_count > 0 ? offlineDotOk : offlineDotPending} />
+            <span>
+              {offlineVault.ready_count > 0
+                ? `${offlineVault.ready_count}/${offlineVault.profile_count} jugadores listos · ${formatOfflineVaultAge(offlineVault)}`
+                : 'Sin descarga offline completa en este teléfono.'}
+            </span>
+          </div>
+
+          {offlinePrepMessage ? (
+            <div style={offlinePrepState === 'error' ? offlineVaultError : offlineVaultSuccess}>
+              {offlinePrepMessage}
+            </div>
+          ) : null}
         </section>
 
         <section style={listBlock}>
@@ -454,6 +548,99 @@ const heroBody: CSSProperties = {
   color: 'rgba(255,255,255,.88)',
   fontSize: 14,
   lineHeight: 1.45,
+}
+
+const offlineVaultCard: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  padding: 13,
+  borderRadius: 22,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.32), rgba(15,23,42,.22))',
+  boxShadow: '0 16px 34px rgba(15,23,42,.12), inset 0 1px 0 rgba(255,255,255,.08)',
+  backdropFilter: 'blur(18px) saturate(130%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+}
+
+const offlineVaultTop: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 10,
+  alignItems: 'center',
+}
+
+const offlineVaultEyebrow: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 9,
+  fontWeight: 1000,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+}
+
+const offlineVaultTitle: CSSProperties = {
+  marginTop: 3,
+  color: '#ffffff',
+  fontSize: 15,
+  fontWeight: 1000,
+  letterSpacing: '-0.03em',
+}
+
+const offlineVaultText: CSSProperties = {
+  marginTop: 4,
+  color: 'rgba(255,255,255,.76)',
+  fontSize: 11,
+  lineHeight: 1.35,
+  fontWeight: 700,
+}
+
+const offlineVaultButton: CSSProperties = {
+  minHeight: 38,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(187,247,208,.18)',
+  color: '#ffffff',
+  fontSize: 11,
+  fontWeight: 1000,
+}
+
+const offlineVaultStatus: CSSProperties = {
+  display: 'flex',
+  gap: 7,
+  alignItems: 'center',
+  color: 'rgba(255,255,255,.82)',
+  fontSize: 11,
+  fontWeight: 800,
+}
+
+const offlineDotOk: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
+  background: '#22c55e',
+  boxShadow: '0 0 0 4px rgba(34,197,94,.14)',
+  flex: '0 0 auto',
+}
+
+const offlineDotPending: CSSProperties = {
+  ...offlineDotOk,
+  background: '#60a5fa',
+  boxShadow: '0 0 0 4px rgba(96,165,250,.14)',
+}
+
+const offlineVaultSuccess: CSSProperties = {
+  padding: '8px 10px',
+  borderRadius: 14,
+  background: 'rgba(34,197,94,.13)',
+  color: '#dcfce7',
+  fontSize: 11,
+  fontWeight: 800,
+}
+
+const offlineVaultError: CSSProperties = {
+  ...offlineVaultSuccess,
+  background: 'rgba(251,191,36,.14)',
+  color: '#fef3c7',
 }
 
 const listBlock: CSSProperties = {
