@@ -1,5 +1,15 @@
 import type { FieldProofsPayload, FieldProofUploadResponse, PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../types/player'
 
+function withTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  return {
+    signal: controller.signal,
+    cleanup: () => window.clearTimeout(timeoutId),
+  }
+}
+
 type AdvanceResponse = {
   status: 'ok' | 'fail'
   user: string
@@ -29,31 +39,45 @@ export async function fetchPlayerGame(
   options: { offlinePack?: boolean } = {},
 ): Promise<PlayerGamePayload> {
   const suffix = options.offlinePack ? '?offline_pack=true' : ''
-  const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  const timeout = withTimeoutSignal(5000)
 
-  if (!res.ok) {
-    throw new Error(`Failed to load player payload: HTTP ${res.status}`)
+  try {
+    const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
+      signal: timeout.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to load player payload: HTTP ${res.status}`)
+    }
+
+    return res.json() as Promise<PlayerGamePayload>
+  } finally {
+    timeout.cleanup()
   }
-
-  return res.json() as Promise<PlayerGamePayload>
 }
 
 export async function fetchPublicConfig(): Promise<PublicConfig> {
-  const res = await fetch('/api/config', {
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  const timeout = withTimeoutSignal(3500)
 
-  if (!res.ok) {
-    throw new Error(`Failed to load config: HTTP ${res.status}`)
+  try {
+    const res = await fetch('/api/config', {
+      signal: timeout.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to load config: HTTP ${res.status}`)
+    }
+
+    return res.json() as Promise<PublicConfig>
+  } finally {
+    timeout.cleanup()
   }
-
-  return res.json() as Promise<PublicConfig>
 }
 
 export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
