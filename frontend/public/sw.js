@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v218-offline-login-autosave'
+const CACHE_NAME = 'saga-player-shell-v219-offline-vault'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -52,7 +52,7 @@ async function networkFirst(request) {
     return (
       (await caches.match(request)) ||
       (await caches.match(DEFAULT_SHELL_URL)) ||
-      new Response('SAGA player shell is not cached yet. Open the player online and download the mission first.', {
+      new Response('SAGA offline shell is not cached yet. Open SAGA online once and press Prepare offline.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       })
