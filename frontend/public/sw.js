@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v219-offline-vault'
+const CACHE_NAME = 'saga-player-shell-v221-navigation-cache-first'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -43,9 +43,20 @@ async function cacheFirst(request) {
   return response
 }
 
+async function fetchWithTimeout(request, timeoutMs = 2500) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(request, { signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 async function networkFirst(request) {
   try {
-    const response = await fetch(request)
+    const response = await fetchWithTimeout(request)
     await putCache(request, response)
     return response
   } catch {
@@ -58,6 +69,22 @@ async function networkFirst(request) {
       })
     )
   }
+}
+
+async function navigationCacheFirst(request) {
+  const cached =
+    (await caches.match(request)) ||
+    (await caches.match(DEFAULT_SHELL_URL))
+
+  if (cached) {
+    fetchWithTimeout(request, 2500)
+      .then((response) => putCache(request, response))
+      .catch(() => undefined)
+
+    return cached
+  }
+
+  return networkFirst(request)
 }
 
 async function cacheUrls(urls) {
@@ -122,7 +149,7 @@ self.addEventListener('fetch', (event) => {
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request))
+    event.respondWith(navigationCacheFirst(request))
     return
   }
 
