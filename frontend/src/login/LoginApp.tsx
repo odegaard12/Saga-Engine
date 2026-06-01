@@ -87,6 +87,25 @@ function getMeta(profile: PlayerProfile) {
   return ''
 }
 
+function buildConfigFromOfflineVault(summary: OfflineVaultSummary): PublicConfig | null {
+  const players = summary.players.filter((player) => player.ok)
+
+  if (players.length === 0) return null
+
+  return {
+    site_name: 'SAGA',
+    story_text: 'Datos offline preparados en este teléfono.',
+    players: players.map((player) => player.id),
+    player_profiles: players.map((player) => ({
+      id: player.id,
+      display_name: player.display_name || player.id,
+      mode: player.mode === 'team' ? 'team' : 'solo',
+      members: [player.id],
+      status: 'active',
+    })),
+  }
+}
+
 
 async function warmOfflineProfiles(config: PublicConfig): Promise<OfflineVaultSummary> {
   const profiles = normalizeProfiles(config).filter((profile) => profile.status !== 'disabled')
@@ -135,32 +154,37 @@ export default function LoginApp() {
     let cancelled = false
 
     async function run() {
-      try {
-        setState({ status: 'loading' })
-        void registerPlayerServiceWorker()
-        void cachePlayerShell('/')
+      setState({ status: 'loading' })
+      void registerPlayerServiceWorker()
+      void cachePlayerShell('/')
 
+      const vaultSummary = getOfflineVaultSummary()
+      setOfflineVault(vaultSummary)
+
+      const cachedConfig = getCachedPublicConfig()
+      const cachedProfiles = cachedConfig ? normalizeProfiles(cachedConfig).filter((profile) => profile.status !== 'disabled') : []
+      const vaultConfig = buildConfigFromOfflineVault(vaultSummary)
+      const firstConfig = cachedProfiles.length > 0 ? cachedConfig : vaultConfig
+
+      if (firstConfig && !cancelled) {
+        setState({ status: 'ready', config: firstConfig })
+      }
+
+      try {
         const config = await fetchPublicConfig()
         cachePublicConfig(config)
-        void warmOfflineProfiles(config).then(setOfflineVault)
 
         if (!cancelled) {
           setState({ status: 'ready', config })
         }
+
+        void warmOfflineProfiles(config).then((summary) => {
+          if (!cancelled) setOfflineVault(summary)
+        })
       } catch (error) {
-        const cachedConfig = getCachedPublicConfig()
+        if (firstConfig) return
 
-        if (cachedConfig) {
-          void cachePlayerShell('/')
-          void warmOfflineProfiles(cachedConfig).then(setOfflineVault)
-
-          if (!cancelled) {
-            setState({ status: 'ready', config: cachedConfig })
-          }
-          return
-        }
-
-        const message = error instanceof Error ? error.message : 'Unknown config error'
+        const message = error instanceof Error ? error.message : 'Sin conexión y sin jugadores preparados offline.'
 
         if (!cancelled) {
           setState({ status: 'error', message })
