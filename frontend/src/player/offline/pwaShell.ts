@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v219-offline-vault'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v221-navigation-cache-first'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
