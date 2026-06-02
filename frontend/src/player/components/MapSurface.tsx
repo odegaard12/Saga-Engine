@@ -1283,7 +1283,7 @@ const mapAnimations = `
 }
 
 .saga-map-offline-tiles::after {
-  content: 'MAPA BASE SIN CONEXIÓN';
+  content: 'MAPA OFFLINE · ÚLTIMA DESCARGA';
   position: absolute;
   left: 12px;
   bottom: 12px;
