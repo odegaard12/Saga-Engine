@@ -358,7 +358,10 @@ export default function PlayerApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Loading player app" body="Fetching player mission payload..." />
+        <StatusCard
+          title="Preparando modo jugador"
+          body="Cargando misión, mapa y datos guardados. Si no hay conexión, SAGA usa la última descarga offline."
+        />
       </ScreenFrame>
     )
   }
@@ -1533,24 +1536,25 @@ const overlayAnimations = `
 `
 
 const statusCard: CSSProperties = {
-  borderRadius: 20,
-  border: '1px solid rgba(15,23,42,.08)',
-  background: 'rgba(255,255,255,.9)',
-  boxShadow: '0 18px 40px rgba(15,23,42,.06)',
-  padding: 20,
-  maxWidth: 760,
-  margin: '0 auto',
+  borderRadius: 28,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.86), rgba(30,41,59,.78))',
+  boxShadow: '0 24px 70px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.08)',
+  padding: 22,
+  maxWidth: 420,
+  margin: 'calc(50dvh - 92px) auto 0',
+  color: '#f8fafc',
 }
 
 const statusTitle: CSSProperties = {
   fontSize: 20,
   fontWeight: 800,
-  color: '#0f172a',
+  color: '#ffffff',
 }
 
 const statusBody: CSSProperties = {
   fontSize: 14,
-  color: '#475569',
+  color: 'rgba(226,232,240,.78)',
   marginTop: 8,
   lineHeight: 1.5,
 }
