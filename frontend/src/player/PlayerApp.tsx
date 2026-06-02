@@ -7,7 +7,7 @@ import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
-import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { ToastNotice } from './components/ToastNotice'
 import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
@@ -30,6 +30,11 @@ type LoadState =
   | { status: 'ready'; payload: PlayerGamePayload }
 
 type NoticeTone = 'info' | 'warn' | 'success'
+
+type UiNotice = { message: string; tone: NoticeTone } | null
+
+const PLAYER_VIEWPORT_CSS_VAR = '--saga-player-vh'
+
 type OverlayState = 'activate' | 'node' | 'finish' | null
 type FocusRequest =
   | {
@@ -105,6 +110,45 @@ export default function PlayerApp() {
 
   const isPhone =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isPhone) return
+
+    let rafId: number | null = null
+
+    function applyViewportHeight() {
+      if (rafId !== null) window.cancelAnimationFrame(rafId)
+
+      rafId = window.requestAnimationFrame(() => {
+        const visualHeight = window.visualViewport?.height || window.innerHeight
+        document.documentElement.style.setProperty(PLAYER_VIEWPORT_CSS_VAR, `${Math.round(visualHeight)}px`)
+        document.body.style.setProperty(PLAYER_VIEWPORT_CSS_VAR, `${Math.round(visualHeight)}px`)
+        rafId = null
+      })
+    }
+
+    applyViewportHeight()
+
+    const timers = [
+      window.setTimeout(applyViewportHeight, 80),
+      window.setTimeout(applyViewportHeight, 260),
+      window.setTimeout(applyViewportHeight, 700),
+    ]
+
+    window.addEventListener('resize', applyViewportHeight)
+    window.addEventListener('orientationchange', applyViewportHeight)
+    window.visualViewport?.addEventListener('resize', applyViewportHeight)
+    window.visualViewport?.addEventListener('scroll', applyViewportHeight)
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+      if (rafId !== null) window.cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', applyViewportHeight)
+      window.removeEventListener('orientationchange', applyViewportHeight)
+      window.visualViewport?.removeEventListener('resize', applyViewportHeight)
+      window.visualViewport?.removeEventListener('scroll', applyViewportHeight)
+    }
+  }, [isPhone])
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -1343,8 +1387,8 @@ function ScreenFrame({
         position: mobile ? 'fixed' : 'relative',
         inset: mobile ? '-1px -1px 0 -1px' : undefined,
         width: mobile ? 'calc(100vw + 2px)' : '100vw',
-        minHeight: mobile ? '100dvh' : '100svh',
-        height: mobile ? '100dvh' : 'auto',
+        minHeight: mobile ? 'var(--saga-player-vh, 100dvh)' : '100svh',
+        height: mobile ? 'var(--saga-player-vh, 100dvh)' : 'auto',
         background: '#020617',
         padding: mobile ? 0 : 12,
         fontFamily: 'system-ui, sans-serif',
@@ -1422,9 +1466,9 @@ function getViewportStyle(mobile: boolean): CSSProperties {
     position: 'relative',
     width: '100%',
     maxWidth: mobile ? '100%' : 1320,
-    height: mobile ? '100dvh' : 'calc(100svh - 24px)',
-    minHeight: mobile ? '100dvh' : 620,
-    maxHeight: mobile ? '100dvh' : 980,
+    height: mobile ? 'var(--saga-player-vh, 100dvh)' : 'calc(100svh - 24px)',
+    minHeight: mobile ? 'var(--saga-player-vh, 100dvh)' : 620,
+    maxHeight: mobile ? 'var(--saga-player-vh, 100dvh)' : 980,
     margin: '0 auto',
     overflow: 'hidden',
     borderRadius: mobile ? 0 : 32,
@@ -1474,7 +1518,7 @@ function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 0 : 12,
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }

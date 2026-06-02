@@ -471,6 +471,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
 
 const card: CSSProperties = {
   pointerEvents: 'auto',
+  boxSizing: 'border-box', // saga-hud-bottom-stabilize-v1
   margin: '0 auto',
   display: 'grid',
   gap: 10,
