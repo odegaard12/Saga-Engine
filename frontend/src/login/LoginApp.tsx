@@ -5,6 +5,7 @@ import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
+import { prefetchMissionMapTiles } from '../player/offline/mapTileCache'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
 import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
@@ -126,6 +127,9 @@ async function warmOfflineProfiles(config: PublicConfig): Promise<OfflineVaultSu
           payload,
         })
 
+        await prefetchMissionMapTiles(Array.isArray(payload.stages) ? payload.stages : [])
+          .catch(() => undefined)
+
         await fetchTeamStatus(profile.id)
           .then((team) => {
             cacheTeamProfiles(profile.id, Array.isArray(team.profiles) ? team.profiles : [])
@@ -225,7 +229,7 @@ export default function LoginApp() {
 
     try {
       setOfflinePrepState('saving')
-      setOfflinePrepMessage('Descargando login, jugadores, nodos y packs offline…')
+      setOfflinePrepMessage('Descargando login, jugadores, nodos, fotos y mapa offline…')
 
       const onlineConfig = await fetchPublicConfig()
         .then((nextConfig) => {
@@ -241,7 +245,7 @@ export default function LoginApp() {
       setOfflinePrepMessage(
         summary.failed_count > 0
           ? `Preparado parcialmente: ${summary.ready_count}/${summary.profile_count} jugadores.`
-          : `Modo offline listo: ${summary.ready_count}/${summary.profile_count} jugadores.`
+          : `Modo offline listo: ${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados.`
       )
     } catch (error) {
       setOfflinePrepState('error')

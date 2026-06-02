@@ -475,7 +475,7 @@ const OfflineGridLayer = L.GridLayer.extend({
   createTile(coords: { x: number; y: number; z: number }) {
     const tile = document.createElement('div')
     tile.className = 'saga-offline-grid-tile'
-    tile.innerHTML = `<span>offline z${coords.z}</span>`
+    tile.innerHTML = ''
     return tile
   },
 })
@@ -1279,15 +1279,7 @@ const mapAnimations = `
   background:
     radial-gradient(circle at 50% 50%, rgba(34,197,94,.12), transparent 34%),
     linear-gradient(135deg, rgba(15,23,42,.92), rgba(30,41,59,.90));
-  color: rgba(226,232,240,.40);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 8px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  color: transparent;
 }
 
 .saga-map-offline-tiles::after {

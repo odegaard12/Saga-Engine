@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v222-offline-map-presence'
+const CACHE_NAME = 'saga-player-shell-v223-map-tile-pack'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -29,7 +29,7 @@ function isShellAsset(url) {
 }
 
 async function putCache(request, response) {
-  if (!response || !response.ok) return response
+  if (!response || (!response.ok && response.type !== 'opaque')) return response
   const cache = await caches.open(CACHE_NAME)
   await cache.put(request, response.clone())
   return response
@@ -145,6 +145,15 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
+
+  if (
+    url.hostname === 'server.arcgisonline.com' &&
+    url.pathname.includes('/World_Imagery/MapServer/tile/')
+  ) {
+    event.respondWith(cacheFirst(request))
+    return
+  }
+
   if (url.origin !== self.location.origin) return
 
   if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {

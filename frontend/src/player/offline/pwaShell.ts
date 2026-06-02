@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v222-offline-map-presence'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v223-map-tile-pack'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
