@@ -17,6 +17,36 @@ import {
 
 type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
 
+function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
+  return game.runtimeStatus !== 'planned' && game.offlineStatus !== 'offline_planned'
+}
+
+function getVisibleAdminGames(selectedGameId: string) {
+  return adminGameCatalog.filter((game) => isPlayableAdminGame(game) || game.id === selectedGameId)
+}
+
+function pickCarryOverConfig(config: Record<string, unknown>) {
+  const keepKeys = [
+    'required_item_id',
+    'required_item_label',
+    'required_item_quantity',
+    'required_item_consume',
+    'reward_item_id',
+    'reward_item_label',
+    'reward_message',
+    'physical_item_id',
+    'physical_item_label',
+    'physical_node_kind',
+    'physical_item_kind',
+  ]
+
+  return Object.fromEntries(
+    keepKeys
+      .filter((key) => Object.prototype.hasOwnProperty.call(config, key))
+      .map((key) => [key, config[key]])
+  )
+}
+
 type NodeDetailDrawerProps = {
   stage: AdminReactOverviewStage
   stages?: AdminReactOverviewStage[]
@@ -188,6 +218,7 @@ export default function NodeDetailDrawer({
     (item) => item.itemId === getDraftConfigText('required_item_id')
   )
   const selectedGame = getAdminGameForStage(draft.type, draftConfig)
+  const visibleGameCatalog = getVisibleAdminGames(selectedGame.id)
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -262,25 +293,32 @@ export default function NodeDetailDrawer({
   function handleDraftGameChange(nextGameId: AdminGameId) {
     const patch = getDefaultAdminStagePatchForGame(nextGameId)
 
-    updateDraftLocal((current) => ({
-      ...(current as EditableAdminStage),
-      type: patch.type,
-      label: patch.label,
-      icon: patch.icon,
-      objective: patch.objective,
-      config: {
+    updateDraftLocal((current) => {
+      const currentConfig =
+        typeof (current as EditableAdminStage).config === 'object' && (current as EditableAdminStage).config !== null
+          ? (((current as EditableAdminStage).config || {}) as Record<string, unknown>)
+          : {}
+
+      const carryOverConfig = pickCarryOverConfig(currentConfig)
+      const nextConfig = {
         ...patch.config,
-        ...(((current as EditableAdminStage).config || {}) as Record<string, unknown>),
+        ...carryOverConfig,
         game_id: nextGameId,
         game_title: patch.label,
-      },
-      config_summary: Object.keys(patch.config),
-      content: current.content || patch.content,
-      messages: {
-        ...(patch.messages || {}),
-        ...(current.messages || {}),
-      },
-    }))
+      }
+
+      return {
+        ...(current as EditableAdminStage),
+        type: patch.type,
+        label: patch.label,
+        icon: patch.icon,
+        objective: patch.objective,
+        config: nextConfig,
+        config_summary: Object.keys(nextConfig),
+        content: patch.content,
+        messages: patch.messages || {},
+      }
+    })
   }
 
   function handleDraftFamilyChange(nextType: FamilyId) {
@@ -421,7 +459,7 @@ export default function NodeDetailDrawer({
                   value={selectedGame.id}
                   onChange={(event) => handleDraftGameChange(event.target.value as AdminGameId)}
                 >
-                  {adminGameCatalog.map((item) => (
+                  {visibleGameCatalog.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.icon} {item.title} · {item.difficulty}
                     </option>
@@ -513,12 +551,12 @@ export default function NodeDetailDrawer({
                 <strong>Juego</strong>
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
-                  Elige la prueba; luego ajusta texto, mapa y requisitos.
+                  Elige una prueba jugable ahora. Los modos planeados quedan ocultos hasta estar completos.
                 </small>
               </div>
 
               <div className="admin-game-catalog-grid">
-                {adminGameCatalog.map((game) => (
+                {visibleGameCatalog.map((game) => (
                   <button
                     key={game.id}
                     type="button"
