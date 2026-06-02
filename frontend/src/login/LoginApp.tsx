@@ -232,6 +232,7 @@ export default function LoginApp() {
   const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
   const [offlinePrepProgress, setOfflinePrepProgress] = useState<OfflinePrepProgress | null>(null)
   const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() => getOfflineVaultSummary())
+  const [launchingPlayer, setLaunchingPlayer] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -415,7 +416,7 @@ export default function LoginApp() {
               <div style={offlineVaultEyebrow}>MODO OFFLINE</div>
               <div style={offlineVaultTitle}>Preparar este teléfono</div>
               <div style={offlineVaultText}>
-                Guarda login, jugadores, fotos y mapa de la zona de misión.
+                Deja este teléfono listo para jugar sin cobertura.
               </div>
             </div>
 
@@ -524,7 +525,26 @@ export default function LoginApp() {
                     type="button"
                     style={enterButton}
                     onClick={() => {
-                      window.location.href = `/player/${encodeURIComponent(profile.id)}`
+                      const label = profile.display_name || profile.id
+                      const href = `/player/${encodeURIComponent(profile.id)}`
+
+                      setLaunchingPlayer(label)
+
+                      try {
+                        window.sessionStorage.setItem(
+                          'saga:player-launching',
+                          JSON.stringify({
+                            label,
+                            at: new Date().toISOString(),
+                          })
+                        )
+                      } catch {
+                        // best effort
+                      }
+
+                      window.setTimeout(() => {
+                        window.location.href = href
+                      }, 180)
                     }}
                   >
                     {copy.enter}
@@ -535,6 +555,16 @@ export default function LoginApp() {
           })}
         </section>
       </div>
+
+      {launchingPlayer ? (
+        <div style={launchOverlay}>
+          <div style={launchCard}>
+            <div style={launchSpinner} />
+            <div style={launchTitle}>Entrando como {launchingPlayer}</div>
+            <div style={launchText}>Cargando misión y datos offline…</div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
@@ -781,7 +811,7 @@ const offlineProgressTop: CSSProperties = {
 }
 
 const offlineProgressTrack: CSSProperties = {
-  height: 7,
+  height: 8,
   overflow: 'hidden',
   borderRadius: 999,
   background: 'rgba(15,23,42,.36)',
@@ -791,7 +821,7 @@ const offlineProgressTrack: CSSProperties = {
 const offlineProgressFill: CSSProperties = {
   height: '100%',
   borderRadius: 999,
-  background: 'linear-gradient(90deg, rgba(34,197,94,.95), rgba(187,247,208,.95))',
+  background: 'linear-gradient(90deg, rgba(34,197,94,.98), rgba(132,204,22,.98), rgba(187,247,208,.98))',
   transition: 'width 180ms ease',
 }
 
@@ -824,6 +854,55 @@ const offlineVaultError: CSSProperties = {
   ...offlineVaultSuccess,
   background: 'rgba(251,191,36,.14)',
   color: '#fef3c7',
+}
+
+const launchOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 90,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 18,
+  background: 'rgba(2,6,23,.42)',
+  backdropFilter: 'blur(16px) saturate(120%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(120%)',
+}
+
+const launchCard: CSSProperties = {
+  width: 'min(320px, calc(100vw - 36px))',
+  display: 'grid',
+  justifyItems: 'center',
+  gap: 9,
+  padding: '18px 16px',
+  borderRadius: 26,
+  border: '1px solid rgba(255,255,255,.14)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.92), rgba(30,41,59,.82))',
+  boxShadow: '0 22px 60px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.08)',
+  color: '#ffffff',
+}
+
+const launchSpinner: CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 999,
+  border: '3px solid rgba(255,255,255,.16)',
+  borderTopColor: '#bbf7d0',
+  animation: 'sagaSpin 760ms linear infinite',
+}
+
+const launchTitle: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 15,
+  fontWeight: 1000,
+  letterSpacing: '-0.03em',
+  textAlign: 'center',
+}
+
+const launchText: CSSProperties = {
+  color: 'rgba(226,232,240,.78)',
+  fontSize: 11,
+  fontWeight: 800,
+  textAlign: 'center',
 }
 
 const listBlock: CSSProperties = {
@@ -941,6 +1020,13 @@ const enterButton: CSSProperties = {
 }
 
 const loginAnimations = `
+@keyframes sagaSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
 @keyframes sagaLoginRise {
   from {
     opacity: 0;

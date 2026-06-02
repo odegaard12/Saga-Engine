@@ -360,7 +360,7 @@ export default function PlayerApp() {
       <ScreenFrame mobile={isPhone}>
         <StatusCard
           title="Preparando jugador"
-          body="Cargando misión, mapa, fotos y presencia. Si no hay cobertura, SAGA usa la última descarga offline."
+          body="Cargando misión, mapa y datos guardados. En offline se usa la última descarga preparada."
         />
       </ScreenFrame>
     )
@@ -1360,10 +1360,30 @@ function ScreenFrame({
   )
 }
 
+function getLaunchingPlayerLabel() {
+  if (typeof window === 'undefined') return ''
+
+  try {
+    const raw = window.sessionStorage.getItem('saga:player-launching')
+    if (!raw) return ''
+
+    const parsed = JSON.parse(raw) as { label?: string; at?: string }
+    return parsed.label || ''
+  } catch {
+    return ''
+  }
+}
+
 function StatusCard({ title, body }: { title: string; body: string }) {
+  const playerLabel = getLaunchingPlayerLabel()
+
   return (
     <section style={statusCard}>
-      <div style={statusTitle}>{title}</div>
+      <style>{statusCardAnimations}</style>
+      <div style={statusLoader}>
+        <div style={statusLoaderRing} />
+      </div>
+      <div style={statusTitle}>{playerLabel ? `Entrando como ${playerLabel}` : title}</div>
       <div style={statusBody}>{body}</div>
     </section>
   )
@@ -1540,17 +1560,47 @@ const statusCard: CSSProperties = {
   left: '50%',
   top: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 'min(420px, calc(100vw - 32px))',
+  width: 'min(360px, calc(100vw - 32px))',
   boxSizing: 'border-box',
-  borderRadius: 28,
+  display: 'grid',
+  justifyItems: 'center',
+  gap: 10,
+  borderRadius: 30,
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.92), rgba(30,41,59,.84))',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.94), rgba(30,41,59,.86))',
   boxShadow: '0 24px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: 22,
+  padding: '22px 18px',
   margin: 0,
   color: '#f8fafc',
-  textAlign: 'left',
+  textAlign: 'center',
 }
+
+const statusLoader: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 999,
+  background: 'rgba(187,247,208,.10)',
+  boxShadow: '0 0 0 8px rgba(187,247,208,.045)',
+}
+
+const statusLoaderRing: CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  border: '3px solid rgba(255,255,255,.16)',
+  borderTopColor: '#bbf7d0',
+  animation: 'sagaPlayerSpin 760ms linear infinite',
+}
+
+const statusCardAnimations = `
+@keyframes sagaPlayerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+`
 
 const statusTitle: CSSProperties = {
   fontSize: 20,
