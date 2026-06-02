@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v221-navigation-cache-first'
+const CACHE_NAME = 'saga-player-shell-v222-offline-map-presence'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -146,6 +146,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+
+  if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {
+    event.respondWith(cacheFirst(request))
+    return
+  }
+
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {

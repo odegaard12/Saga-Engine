@@ -471,6 +471,15 @@ function createMissionNodeIcon(index: number, state: 'completed' | 'current' | '
   })
 }
 
+const OfflineGridLayer = L.GridLayer.extend({
+  createTile(coords: { x: number; y: number; z: number }) {
+    const tile = document.createElement('div')
+    tile.className = 'saga-offline-grid-tile'
+    tile.innerHTML = `<span>offline z${coords.z}</span>`
+    return tile
+  },
+})
+
 export function MapSurface({
   currentStage,
   missionStages = [],
@@ -527,11 +536,26 @@ export function MapSurface({
       attributionControl: false,
     })
 
+    const offlineGridLayer = new (OfflineGridLayer as unknown as {
+      new(options?: L.GridLayerOptions): L.GridLayer
+    })({
+      tileSize: 256,
+      attribution: 'SAGA offline map',
+    })
+    offlineGridLayer.addTo(map)
+
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 20,
       maxNativeZoom: 19,
       attribution: 'Tiles © Esri',
-    }).addTo(map)
+    })
+      .on('tileerror', () => {
+        mapRootRef.current?.classList.add('saga-map-offline-tiles')
+      })
+      .on('load', () => {
+        mapRootRef.current?.classList.remove('saga-map-offline-tiles')
+      })
+      .addTo(map)
 
     map.setView([42.4333, -8.65], 16)
     mapRef.current = map
@@ -563,6 +587,26 @@ export function MapSurface({
       nodeRadiusRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const handleDebugMapClick = (event: L.LeafletMouseEvent) => {
+      if (!debugSimulation || !onDebugSetPosition) return
+
+      onDebugSetPosition({
+        lat: event.latlng.lat,
+        lon: event.latlng.lng,
+      })
+    }
+
+    map.on('click', handleDebugMapClick)
+
+    return () => {
+      map.off('click', handleDebugMapClick)
+    }
+  }, [mapReadyToken, debugSimulation, onDebugSetPosition])
 
 
   useEffect(() => {
@@ -1229,6 +1273,42 @@ const canvas: React.CSSProperties = {
 }
 
 const mapAnimations = `
+.saga-offline-grid-tile {
+  box-sizing: border-box;
+  border: 1px solid rgba(148,163,184,.13);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(34,197,94,.12), transparent 34%),
+    linear-gradient(135deg, rgba(15,23,42,.92), rgba(30,41,59,.90));
+  color: rgba(226,232,240,.40);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.saga-map-offline-tiles::after {
+  content: 'MAPA BASE SIN CONEXIÓN';
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 680;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(15,23,42,.72);
+  color: rgba(255,255,255,.86);
+  font: 800 10px/1 system-ui, sans-serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+
+.leaflet-container {
+  background: #0f172a !important;
+}
+
 .saga-node-radius {
   transform-origin: center;
   cursor: pointer;

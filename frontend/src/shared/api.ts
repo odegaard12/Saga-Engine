@@ -81,17 +81,24 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
 }
 
 export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
-  const res = await fetch(`/api/team/${encodeURIComponent(user)}`, {
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  const timeout = withTimeoutSignal(3000)
 
-  if (!res.ok) {
-    throw new Error(`Failed to load team payload: HTTP ${res.status}`)
+  try {
+    const res = await fetch(`/api/team/${encodeURIComponent(user)}`, {
+      signal: timeout.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to load team payload: HTTP ${res.status}`)
+    }
+
+    return res.json() as Promise<TeamStatusPayload>
+  } finally {
+    timeout.cleanup()
   }
-
-  return res.json() as Promise<TeamStatusPayload>
 }
 
 export function advancePlayer(user: string, code: string) {
@@ -110,17 +117,24 @@ export function sendHeartbeat(args: {
 
 
 export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {
-  const res = await fetch(`/api/field-proofs?user=${encodeURIComponent(user)}`, {
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  const timeout = withTimeoutSignal(3000)
 
-  if (!res.ok) {
-    throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
+  try {
+    const res = await fetch(`/api/field-proofs?user=${encodeURIComponent(user)}`, {
+      signal: timeout.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to load field proofs: HTTP ${res.status}`)
+    }
+
+    return res.json() as Promise<FieldProofsPayload>
+  } finally {
+    timeout.cleanup()
   }
-
-  return res.json() as Promise<FieldProofsPayload>
 }
 
 export function uploadFieldProof(args: {
