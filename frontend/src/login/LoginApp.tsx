@@ -5,10 +5,10 @@ import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
-import { prefetchMissionMapTiles } from '../player/offline/mapTileCache'
+import { prefetchMissionMapTiles, type OfflineMapTileProgress } from '../player/offline/mapTileCache'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
-import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
+import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultPlayer, type OfflineVaultSummary } from '../shared/offlineVault'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -16,6 +16,14 @@ type LoadState =
   | { status: 'ready'; config: PublicConfig }
 
 type LoginLocale = 'es' | 'en'
+
+type OfflinePrepProgress = {
+  label: string
+  done: number
+  total: number
+  detail?: string
+}
+
 
 function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
@@ -110,64 +118,119 @@ function buildConfigFromOfflineVault(summary: OfflineVaultSummary): PublicConfig
 }
 
 
-async function warmOfflineProfiles(config: PublicConfig): Promise<OfflineVaultSummary> {
+async function warmOfflineProfiles(
+  config: PublicConfig,
+  onProgress?: (progress: OfflinePrepProgress) => void
+): Promise<OfflineVaultSummary> {
   const profiles = normalizeProfiles(config).filter((profile) => profile.status !== 'disabled')
 
   await registerPlayerServiceWorker()
   await cachePlayerShell('/').catch(() => undefined)
 
-  const players = await Promise.all(
-    profiles.map(async (profile) => {
-      try {
-        const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
+  const players: OfflineVaultPlayer[] = []
+  let mapPrepared = false
 
-        await saveMissionPack({
-          user: profile.id,
-          config,
-          payload,
-        })
+  onProgress?.({
+    label: 'Preparando',
+    done: 3,
+    total: 100,
+    detail: 'Guardando shell de la app',
+  })
 
-        await prefetchMissionMapTiles(Array.isArray(payload.stages) ? payload.stages : [])
-          .catch(() => undefined)
+  for (let index = 0; index < profiles.length; index += 1) {
+    const profile = profiles[index]
 
-        await fetchTeamStatus(profile.id)
-          .then((team) => {
-            cacheTeamProfiles(profile.id, Array.isArray(team.profiles) ? team.profiles : [])
-          })
-          .catch(() => undefined)
+    try {
+      const baseProgress = Math.round(8 + (index / Math.max(1, profiles.length)) * 20)
 
-        await fetchFieldProofs(profile.id)
-          .then(async (proofPayload) => {
-            const proofs = Array.isArray(proofPayload.proofs) ? proofPayload.proofs : []
-            cacheFieldProofs(profile.id, proofs)
-            await cacheFieldProofAssets(proofs)
-          })
-          .catch(() => undefined)
+      onProgress?.({
+        label: 'Jugadores',
+        done: baseProgress,
+        total: 100,
+        detail: `${index + 1}/${profiles.length} · ${profile.display_name || profile.id}`,
+      })
 
-        await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
+      const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
 
-        return makeOfflineVaultPlayer(profile, {
-          ok: true,
-          stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
-          level: payload.level || 0,
-          finished: Boolean(payload.finished),
-        })
-      } catch (error) {
-        return makeOfflineVaultPlayer(profile, {
-          ok: false,
-          error: error instanceof Error ? error.message : 'Unknown offline preparation error',
-        })
+      await saveMissionPack({
+        user: profile.id,
+        config,
+        payload,
+      })
+
+      if (!mapPrepared) {
+        mapPrepared = true
+
+        await prefetchMissionMapTiles(
+          Array.isArray(payload.stages) ? payload.stages : [],
+          (mapProgress: OfflineMapTileProgress) => {
+            const total = Math.max(1, mapProgress.total || 1)
+            const ratio = Math.max(0, Math.min(1, (mapProgress.done || 0) / total))
+
+            onProgress?.({
+              label: mapProgress.label || 'Mapa offline',
+              done: Math.round(30 + ratio * 52),
+              total: 100,
+              detail: mapProgress.detail || 'Bajando zona amplia de misión',
+            })
+          }
+        ).catch(() => undefined)
       }
-    })
-  )
 
-  return saveOfflineVaultSummary(players)
+      await fetchTeamStatus(profile.id)
+        .then((team) => {
+          cacheTeamProfiles(profile.id, Array.isArray(team.profiles) ? team.profiles : [])
+        })
+        .catch(() => undefined)
+
+      await fetchFieldProofs(profile.id)
+        .then(async (proofPayload) => {
+          const proofs = Array.isArray(proofPayload.proofs) ? proofPayload.proofs : []
+          cacheFieldProofs(profile.id, proofs)
+          await cacheFieldProofAssets(proofs)
+        })
+        .catch(() => undefined)
+
+      await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
+
+      players.push(makeOfflineVaultPlayer(profile, {
+        ok: true,
+        stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
+        level: payload.level || 0,
+        finished: Boolean(payload.finished),
+      }))
+    } catch (error) {
+      players.push(makeOfflineVaultPlayer(profile, {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Unknown offline preparation error',
+      }))
+    }
+  }
+
+  onProgress?.({
+    label: 'Finalizando',
+    done: 94,
+    total: 100,
+    detail: 'Guardando resumen offline',
+  })
+
+  const summary = saveOfflineVaultSummary(players)
+
+  onProgress?.({
+    label: 'Listo',
+    done: 100,
+    total: 100,
+    detail: `${summary.ready_count}/${summary.profile_count} jugadores preparados`,
+  })
+
+  return summary
 }
 
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
+  const [offlinePrepProgress, setOfflinePrepProgress] = useState<OfflinePrepProgress | null>(null)
   const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() => getOfflineVaultSummary())
 
   useEffect(() => {
@@ -229,7 +292,8 @@ export default function LoginApp() {
 
     try {
       setOfflinePrepState('saving')
-      setOfflinePrepMessage('Descargando login, jugadores, nodos, fotos y mapa offline…')
+      setOfflinePrepMessage('Descargando datos offline…')
+      setOfflinePrepProgress({ label: 'Conectando', done: 2, total: 100, detail: 'Preparando descarga' })
 
       const onlineConfig = await fetchPublicConfig()
         .then((nextConfig) => {
@@ -238,10 +302,11 @@ export default function LoginApp() {
         })
         .catch(() => state.config)
 
-      const summary = await warmOfflineProfiles(onlineConfig)
+      const summary = await warmOfflineProfiles(onlineConfig, setOfflinePrepProgress)
 
       setOfflineVault(summary)
       setOfflinePrepState(summary.failed_count > 0 ? 'error' : 'saved')
+      setOfflinePrepProgress({ label: summary.failed_count > 0 ? 'Parcial' : 'Listo', done: 100, total: 100, detail: `${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados` })
       setOfflinePrepMessage(
         summary.failed_count > 0
           ? `Preparado parcialmente: ${summary.ready_count}/${summary.profile_count} jugadores.`
@@ -249,6 +314,7 @@ export default function LoginApp() {
       )
     } catch (error) {
       setOfflinePrepState('error')
+      setOfflinePrepProgress({ label: 'Error', done: 100, total: 100, detail: error instanceof Error ? error.message : 'No se pudo preparar el modo offline.' })
       setOfflinePrepMessage(error instanceof Error ? error.message : 'No se pudo preparar el modo offline.')
     }
   }
@@ -349,7 +415,7 @@ export default function LoginApp() {
               <div style={offlineVaultEyebrow}>MODO OFFLINE</div>
               <div style={offlineVaultTitle}>Preparar este teléfono</div>
               <div style={offlineVaultText}>
-                Guarda login, jugadores, nodos y packs para abrir SAGA sin cobertura.
+                Guarda login, jugadores, fotos y mapa de la zona de misión.
               </div>
             </div>
 
@@ -371,6 +437,29 @@ export default function LoginApp() {
                 : 'Sin descarga offline completa en este teléfono.'}
             </span>
           </div>
+
+          {offlinePrepProgress ? (
+            <div style={offlineProgressWrap}>
+              <div style={offlineProgressTop}>
+                <span>{offlinePrepProgress.label}</span>
+                <span>{Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%</span>
+              </div>
+              <div style={offlineProgressTrack}>
+                <div
+                  style={{
+                    ...offlineProgressFill,
+                    width: `${Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%`,
+                  }}
+                />
+              </div>
+              {offlinePrepProgress.detail ? (
+                <details style={offlineProgressDetails}>
+                  <summary style={offlineProgressSummary}>Detalles</summary>
+                  <div style={offlineProgressDetailText}>{offlinePrepProgress.detail}</div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
 
           {offlinePrepMessage ? (
             <div style={offlinePrepState === 'error' ? offlineVaultError : offlineVaultSuccess}>
@@ -670,6 +759,56 @@ const offlineDotPending: CSSProperties = {
   ...offlineDotOk,
   background: '#60a5fa',
   boxShadow: '0 0 0 4px rgba(96,165,250,.14)',
+}
+
+const offlineProgressWrap: CSSProperties = {
+  display: 'grid',
+  gap: 7,
+  padding: '9px 10px',
+  borderRadius: 16,
+  background: 'rgba(255,255,255,.075)',
+  border: '1px solid rgba(255,255,255,.10)',
+}
+
+const offlineProgressTop: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  color: 'rgba(255,255,255,.90)',
+  fontSize: 11,
+  fontWeight: 950,
+}
+
+const offlineProgressTrack: CSSProperties = {
+  height: 7,
+  overflow: 'hidden',
+  borderRadius: 999,
+  background: 'rgba(15,23,42,.36)',
+  boxShadow: 'inset 0 1px 2px rgba(0,0,0,.20)',
+}
+
+const offlineProgressFill: CSSProperties = {
+  height: '100%',
+  borderRadius: 999,
+  background: 'linear-gradient(90deg, rgba(34,197,94,.95), rgba(187,247,208,.95))',
+  transition: 'width 180ms ease',
+}
+
+const offlineProgressDetails: CSSProperties = {
+  color: 'rgba(255,255,255,.72)',
+  fontSize: 10,
+  fontWeight: 750,
+}
+
+const offlineProgressSummary: CSSProperties = {
+  cursor: 'pointer',
+  listStyle: 'none',
+}
+
+const offlineProgressDetailText: CSSProperties = {
+  marginTop: 4,
+  lineHeight: 1.35,
 }
 
 const offlineVaultSuccess: CSSProperties = {
