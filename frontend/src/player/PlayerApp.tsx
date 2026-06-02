@@ -17,6 +17,7 @@ import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlineP
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
+import { cacheFieldProofAssets, cacheFieldProofs, getCachedFieldProofs } from './offline/fieldProofCache'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
@@ -212,11 +213,20 @@ export default function PlayerApp() {
     async function loadFieldProofs() {
       try {
         const payload = await fetchFieldProofs(user)
+        const proofs = Array.isArray(payload.proofs) ? payload.proofs : []
+
+        cacheFieldProofs(user, proofs)
+        void cacheFieldProofAssets(proofs)
+
         if (!cancelled) {
-          setFieldProofs(Array.isArray(payload.proofs) ? payload.proofs : [])
+          setFieldProofs(proofs)
         }
       } catch {
-        // Fotos online-only por ahora: si falla, el mapa sigue funcionando.
+        const cached = getCachedFieldProofs(user)
+
+        if (!cancelled) {
+          setFieldProofs(cached.proofs)
+        }
       }
     }
 

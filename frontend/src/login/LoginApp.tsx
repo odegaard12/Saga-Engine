@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { fetchPlayerGame, fetchPublicConfig } from '../shared/api'
+import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
+import { cacheTeamProfiles } from '../player/offline/teamPresence'
+import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
 import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 
 type LoadState =
@@ -123,6 +125,20 @@ async function warmOfflineProfiles(config: PublicConfig): Promise<OfflineVaultSu
           config,
           payload,
         })
+
+        await fetchTeamStatus(profile.id)
+          .then((team) => {
+            cacheTeamProfiles(profile.id, Array.isArray(team.profiles) ? team.profiles : [])
+          })
+          .catch(() => undefined)
+
+        await fetchFieldProofs(profile.id)
+          .then(async (proofPayload) => {
+            const proofs = Array.isArray(proofPayload.proofs) ? proofPayload.proofs : []
+            cacheFieldProofs(profile.id, proofs)
+            await cacheFieldProofAssets(proofs)
+          })
+          .catch(() => undefined)
 
         await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
 
