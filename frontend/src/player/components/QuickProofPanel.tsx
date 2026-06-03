@@ -314,6 +314,42 @@ export function QuickProofPanel({
             </button>
           </div>
 
+          {onSubmitCode ? (
+            <div style={fallbackWrap} data-saga-qr-fallback-top="true">
+              <button
+                type="button"
+                style={fallbackToggle}
+                onClick={() => setShowFallback((value) => !value)}
+                disabled={submitting}
+              >
+                {showFallback ? 'Ocultar fallback' : 'Fallback'}
+              </button>
+
+              {showFallback ? (
+                <form style={fallbackForm} onSubmit={handleFallbackSubmit}>
+                  <div style={fallbackTitle}>Código fallback</div>
+                  <div style={fallbackHint}>
+                    Si no puedes escanear el QR, introduce el código preestablecido de este nodo.
+                  </div>
+
+                  <input
+                    value={fallbackCode}
+                    onChange={(event) => setFallbackCode(event.target.value.toUpperCase())}
+                    placeholder="CÓDIGO FALLBACK"
+                    style={fallbackInput}
+                    disabled={submitting}
+                  />
+
+                  <button type="submit" style={fallbackSubmit} disabled={submitting || !fallbackCode.trim()}>
+                    {submitting ? 'Completando…' : 'Completar nodo'}
+                  </button>
+
+                  {errorMessage ? <div style={fallbackError}>{errorMessage}</div> : null}
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+
           <div style={scannerBox}>
             <video ref={videoRef} style={videoStyle} playsInline muted />
             <canvas ref={canvasRef} style={canvasStyle} />
@@ -435,14 +471,14 @@ const dockButtonWide: CSSProperties = {
 const panel: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: '50%',
-  transform: 'translate(-50%, -50%)',
+  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+  transform: 'translateX(-50%)',
   width: 'min(calc(100vw - 26px), 390px)',
-  maxHeight: 'min(74vh, 610px)',
+  maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 22px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
-  gap: 14,
+  gap: 10,
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.18)',
   background:
@@ -451,7 +487,7 @@ const panel: CSSProperties = {
   boxShadow: '0 28px 76px rgba(2,6,23,.38)',
   backdropFilter: 'blur(26px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(26px) saturate(1.12)',
-  padding: 15,
+  padding: 12,
   zIndex: 5600,
 }
 
@@ -494,7 +530,7 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 280,
+  minHeight: 174,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
   background: 'rgba(2,6,23,.66)',
@@ -503,7 +539,7 @@ const scannerBox: CSSProperties = {
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 300,
+  height: 192,
   objectFit: 'cover',
   display: 'block',
 }
@@ -538,8 +574,8 @@ const helpText: CSSProperties = {
 const noticeBox: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: '50%',
-  transform: 'translate(-50%, -50%)',
+  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+  transform: 'translateX(-50%)',
   width: 'min(calc(100vw - 28px), 340px)',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.16)',
