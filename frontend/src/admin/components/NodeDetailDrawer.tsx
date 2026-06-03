@@ -18,7 +18,7 @@ import {
 type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
 
 function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
-  return game.runtimeStatus !== 'planned' && game.offlineStatus !== 'offline_planned'
+  return game.runtimeStatus === 'runtime_ready' && game.offlineStatus === 'offline_ready'
 }
 
 function getVisibleAdminGames(selectedGameId: string) {
@@ -551,7 +551,7 @@ export default function NodeDetailDrawer({
                 <strong>Juego</strong>
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
-                  Elige una prueba jugable ahora. Los modos planeados quedan ocultos hasta estar completos.
+                  Elige una prueba estable. Los modos parciales o planeados quedan ocultos hasta estar completos.
                 </small>
               </div>
 
