@@ -1070,6 +1070,9 @@ return
               hidden={false}
               openSignal={quickQrOpenSignal}
               showLauncher={false}
+                submitting={submitting}
+                errorMessage={submitError}
+                onSubmitCode={handleSubmitCode}
             />
 
             <button
