@@ -115,6 +115,29 @@ export function QuickProofPanel({
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!document.getElementById('saga-qr-scanner-style')) {
+      const style = document.createElement('style')
+      style.id = 'saga-qr-scanner-style'
+      style.textContent = `
+        body.saga-qr-scanner-open [data-saga-player-hud="bottom"] {
+          display: none !important;
+          pointer-events: none !important;
+        }
+      `
+      document.head.appendChild(style)
+    }
+
+    const scannerOpen = mode !== 'idle'
+    document.body.classList.toggle('saga-qr-scanner-open', scannerOpen)
+
+    return () => {
+      document.body.classList.remove('saga-qr-scanner-open')
+    }
+  }, [mode])
+
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -139,6 +162,18 @@ export function QuickProofPanel({
       setNotice(null)
     }
   }, [hidden])
+
+  useEffect(() => {
+    const closeScanner = () => {
+      stopCamera()
+      setMode('idle')
+      setNotice(null)
+    }
+
+    window.addEventListener('saga:close-qr-scanner', closeScanner)
+    return () => window.removeEventListener('saga:close-qr-scanner', closeScanner)
+  }, [])
+
 
   useEffect(() => {
     return () => stopCamera()
@@ -303,8 +338,6 @@ export function QuickProofPanel({
                 : 'Pulsa QR para activar la cámara.'}
             </div>
           </div>
-
-          <div style={helpText}>{message}</div>
         </section>
       ) : null}
 
@@ -379,14 +412,14 @@ const dockButtonWide: CSSProperties = {
 const panel: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: '50%',
+  top: '46%',
   transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 26px), 390px)',
-  maxHeight: 'min(74vh, 610px)',
+  maxHeight: 'min(calc(100dvh - 36px), 560px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
-  gap: 14,
+  gap: 10,
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.18)',
   background:
@@ -395,7 +428,7 @@ const panel: CSSProperties = {
   boxShadow: '0 28px 76px rgba(2,6,23,.38)',
   backdropFilter: 'blur(26px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(26px) saturate(1.12)',
-  padding: 15,
+  padding: 12,
   zIndex: 5600,
 }
 
@@ -438,7 +471,7 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 280,
+  minHeight: 216,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
   background: 'rgba(2,6,23,.66)',
@@ -447,7 +480,7 @@ const scannerBox: CSSProperties = {
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 300,
+  height: 236,
   objectFit: 'cover',
   display: 'block',
 }
@@ -482,7 +515,7 @@ const helpText: CSSProperties = {
 const noticeBox: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: '50%',
+  top: '46%',
   transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 28px), 340px)',
   borderRadius: 20,

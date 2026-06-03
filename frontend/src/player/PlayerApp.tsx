@@ -329,8 +329,45 @@ export default function PlayerApp() {
     }
   }, [])
 
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    function closeQrIfPhysicalScannerNoLongerReachable() {
+      const readyPayload = (state as { status: 'ready'; payload: PlayerGamePayload }).payload
+      const stage = getCurrentStage(readyPayload)
+
+      if (!isPhysicalQrStage(stage)) return
+
+      const position = browserGpsPosition || localDebugPosition
+      const target = getStagePosition(stage)
+      const radius = getStageRadius(stage)
+
+      if (!position || !target || radius === null) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+        return
+      }
+
+      const distance = getDistanceMeters(position, target)
+      if (distance > radius) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+      }
+    }
+
+    closeQrIfPhysicalScannerNoLongerReachable()
+  }, [
+    state.status,
+    state.status === 'ready' ? state.payload.level : null,
+    state.status === 'ready' ? state.payload.current_stage?.id : null,
+    browserGpsPosition?.lat,
+    browserGpsPosition?.lon,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+  ])
+
   function showNotice(message: string, tone: NoticeTone) {
-    setUiNotice({ message, tone })
+    const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
+    if (normalizedTone === 'info') return
+    setUiNotice({ message, tone: normalizedTone })
 
     if (noticeTimerRef.current !== null) {
       window.clearTimeout(noticeTimerRef.current)
@@ -343,6 +380,7 @@ export default function PlayerApp() {
   }
 
   function showOverlay(nextState: OverlayState) {
+    if (nextState !== 'finish') return
     setOverlayState(nextState)
 
     if (overlayTimerRef.current !== null) {
@@ -600,6 +638,7 @@ function handleOpenFieldCamera() {
   }
 
   function handleToggleDebug() {
+    window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
     const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
 
     if (currentlyActive) {
@@ -635,7 +674,7 @@ function handleOpenFieldCamera() {
     setBrowserGpsPosition(null)
     setBrowserGpsStatus('unavailable')
     setLocalDebugEnabled(true)
-    showNotice('Debug activo. Toca el mapa para colocar tu posición simulada.', 'success')
+    showNotice('Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.', 'info')
     vibrate([10, 16, 10])
   }
 
@@ -1159,6 +1198,9 @@ return
             onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
             onDownloadFieldProofs={handleDownloadFieldProofs}
             fieldPhotoCount={fieldProofs.length}
+             submitting={submitting}
+             errorMessage={submitError}
+             onSubmitCode={handleSubmitCode}
           />
         </div>
       </div>

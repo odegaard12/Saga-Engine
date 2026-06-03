@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
@@ -38,6 +38,9 @@ interface PlayerHudProps {
   onRequestGps: () => void
   onDownloadFieldProofs?: () => void
   fieldPhotoCount?: number
+  submitting?: boolean
+  errorMessage?: string | null
+  onSubmitCode?: (code: string) => Promise<void>
 }
 
 function getGpsDisplay(gpsState: string): string {
@@ -85,9 +88,14 @@ export function PlayerHud({
   onRequestGps,
   onDownloadFieldProofs,
   fieldPhotoCount = 0,
+  submitting = false,
+  errorMessage = null,
+  onSubmitCode,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
+  const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
+  const [toolsFallbackCode, setToolsFallbackCode] = useState('')
 
   useEffect(() => {
     const handleLocaleChange = () => setLocaleState(getLocale())
@@ -205,9 +213,21 @@ export function PlayerHud({
         ? `${radiusLabel} Ya puedes abrir este nodo.`
         : `${radiusLabel} Acércate para abrir este nodo.`
 
+  async function handleToolsFallbackSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const clean = toolsFallbackCode.trim().toUpperCase()
+    if (!clean || !onSubmitCode || submitting) return
+
+    await onSubmitCode(clean)
+    setToolsFallbackCode('')
+    setToolsFallbackOpen(false)
+  }
+
   return (
     <>
       <section
+        data-saga-player-hud="bottom"
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
@@ -384,6 +404,46 @@ export function PlayerHud({
               >
                 {fieldPhotoCount > 0 ? `Descargar fotos (${fieldPhotoCount})` : 'Sin fotos'}
               </button>
+            ) : null}
+
+            {onSubmitCode && currentStage && !finished ? (
+              <section style={fallbackToolPanel}>
+                <div style={fallbackToolHead}>
+                  <strong>Fallback de nodo</strong>
+                  <span>Completa el nodo con código si falla GPS, QR, cámara, brújula o cobertura.</span>
+                </div>
+
+                <button
+                  type="button"
+                  style={toolsFallbackOpen ? fallbackToolButtonActive : fallbackToolButton}
+                  onClick={() => setToolsFallbackOpen((value) => !value)}
+                  disabled={submitting}
+                >
+                  {toolsFallbackOpen ? 'Ocultar fallback' : 'Fallback'}
+                </button>
+
+                {toolsFallbackOpen ? (
+                  <form style={fallbackToolForm} onSubmit={handleToolsFallbackSubmit}>
+                    <input
+                      value={toolsFallbackCode}
+                      onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
+                      placeholder="CÓDIGO FALLBACK"
+                      style={fallbackToolInput}
+                      disabled={submitting}
+                    />
+
+                    <button
+                      type="submit"
+                      style={fallbackToolSubmit}
+                      disabled={submitting || !toolsFallbackCode.trim()}
+                    >
+                      {submitting ? 'Completando…' : 'Completar nodo'}
+                    </button>
+
+                    {errorMessage ? <div style={fallbackToolError}>{errorMessage}</div> : null}
+                  </form>
+                ) : null}
+              </section>
             ) : null}
 
             <button
@@ -783,4 +843,76 @@ const toolsLink: CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   textDecoration: 'none',
+}
+
+
+const fallbackToolPanel: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  padding: 12,
+  borderRadius: 20,
+  border: '1px solid rgba(251,191,36,.20)',
+  background: 'rgba(251,191,36,.08)',
+}
+
+const fallbackToolHead: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  color: '#f8fafc',
+  fontSize: 12,
+  lineHeight: 1.35,
+}
+
+const fallbackToolButton: CSSProperties = {
+  minHeight: 42,
+  borderRadius: 16,
+  border: '1px solid rgba(251,191,36,.24)',
+  background: 'rgba(251,191,36,.13)',
+  color: '#fef3c7',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const fallbackToolButtonActive: CSSProperties = {
+  ...fallbackToolButton,
+  background: 'rgba(251,191,36,.20)',
+}
+
+const fallbackToolForm: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+}
+
+const fallbackToolInput: CSSProperties = {
+  width: '100%',
+  minHeight: 42,
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(15,23,42,.52)',
+  color: '#ffffff',
+  padding: '0 12px',
+  fontSize: 13,
+  fontWeight: 900,
+  outline: 'none',
+}
+
+const fallbackToolSubmit: CSSProperties = {
+  minHeight: 42,
+  borderRadius: 14,
+  border: '1px solid rgba(187,247,208,.22)',
+  background: 'rgba(34,197,94,.18)',
+  color: '#dcfce7',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const fallbackToolError: CSSProperties = {
+  color: '#fecaca',
+  fontSize: 11,
+  fontWeight: 850,
+  lineHeight: 1.35,
 }
