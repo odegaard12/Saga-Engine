@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import jsQR from 'jsqr'
 import { collectInventoryItem } from '../offline/inventory'
 
@@ -8,9 +8,6 @@ interface QuickProofPanelProps {
   hidden: boolean
   openSignal?: number
   showLauncher?: boolean
-  submitting?: boolean
-  errorMessage?: string | null
-  onSubmitCode?: (code: string) => Promise<void>
 }
 
 type ParsedQrItem = {
@@ -113,16 +110,11 @@ export function QuickProofPanel({
   hidden,
   openSignal = 0,
   showLauncher = true,
-  submitting = false,
-  errorMessage = null,
-  onSubmitCode,
 }: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
-  const [showFallback, setShowFallback] = useState(false)
-  const [fallbackCode, setFallbackCode] = useState('')
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -145,8 +137,6 @@ export function QuickProofPanel({
       stopCamera()
       setMode('idle')
       setNotice(null)
-      setShowFallback(false)
-      setFallbackCode('')
     }
   }, [hidden])
 
@@ -206,16 +196,6 @@ export function QuickProofPanel({
     if (!openSignal || hidden) return
     void startQrScan()
   }, [openSignal, hidden])
-
-  async function handleFallbackSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    const clean = fallbackCode.trim().toUpperCase()
-    if (!clean || !onSubmitCode || submitting) return
-
-    await onSubmitCode(clean)
-    setFallbackCode('')
-  }
 
   async function startQrScan() {
     if (typeof window === 'undefined') return
@@ -314,42 +294,6 @@ export function QuickProofPanel({
             </button>
           </div>
 
-          {onSubmitCode ? (
-            <div style={fallbackWrap} data-saga-qr-fallback-top="true">
-              <button
-                type="button"
-                style={fallbackToggle}
-                onClick={() => setShowFallback((value) => !value)}
-                disabled={submitting}
-              >
-                {showFallback ? 'Ocultar fallback' : 'Fallback'}
-              </button>
-
-              {showFallback ? (
-                <form style={fallbackForm} onSubmit={handleFallbackSubmit}>
-                  <div style={fallbackTitle}>Código fallback</div>
-                  <div style={fallbackHint}>
-                    Si no puedes escanear el QR, introduce el código preestablecido de este nodo.
-                  </div>
-
-                  <input
-                    value={fallbackCode}
-                    onChange={(event) => setFallbackCode(event.target.value.toUpperCase())}
-                    placeholder="CÓDIGO FALLBACK"
-                    style={fallbackInput}
-                    disabled={submitting}
-                  />
-
-                  <button type="submit" style={fallbackSubmit} disabled={submitting || !fallbackCode.trim()}>
-                    {submitting ? 'Completando…' : 'Completar nodo'}
-                  </button>
-
-                  {errorMessage ? <div style={fallbackError}>{errorMessage}</div> : null}
-                </form>
-              ) : null}
-            </div>
-          ) : null}
-
           <div style={scannerBox}>
             <video ref={videoRef} style={videoStyle} playsInline muted />
             <canvas ref={canvasRef} style={canvasStyle} />
@@ -361,42 +305,6 @@ export function QuickProofPanel({
           </div>
 
           <div style={helpText}>{message}</div>
-
-          {onSubmitCode ? (
-            <div style={fallbackWrap}>
-              <button
-                type="button"
-                style={fallbackToggle}
-                onClick={() => setShowFallback((value) => !value)}
-                disabled={submitting}
-              >
-                {showFallback ? 'Ocultar fallback' : 'Fallback'}
-              </button>
-
-              {showFallback ? (
-                <form style={fallbackForm} onSubmit={handleFallbackSubmit}>
-                  <div style={fallbackTitle}>Código fallback</div>
-                  <div style={fallbackHint}>
-                    Si no puedes escanear el QR, introduce el código preestablecido de este nodo.
-                  </div>
-
-                  <input
-                    value={fallbackCode}
-                    onChange={(event) => setFallbackCode(event.target.value.toUpperCase())}
-                    placeholder="CÓDIGO FALLBACK"
-                    style={fallbackInput}
-                    disabled={submitting}
-                  />
-
-                  <button type="submit" style={fallbackSubmit} disabled={submitting || !fallbackCode.trim()}>
-                    {submitting ? 'Completando…' : 'Completar nodo'}
-                  </button>
-
-                  {errorMessage ? <div style={fallbackError}>{errorMessage}</div> : null}
-                </form>
-              ) : null}
-            </div>
-          ) : null}
         </section>
       ) : null}
 
@@ -471,14 +379,14 @@ const dockButtonWide: CSSProperties = {
 const panel: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-  transform: 'translateX(-50%)',
+  top: '50%',
+  transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 26px), 390px)',
-  maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 22px)',
+  maxHeight: 'min(74vh, 610px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
-  gap: 10,
+  gap: 14,
   borderRadius: 28,
   border: '1px solid rgba(255,255,255,.18)',
   background:
@@ -487,7 +395,7 @@ const panel: CSSProperties = {
   boxShadow: '0 28px 76px rgba(2,6,23,.38)',
   backdropFilter: 'blur(26px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(26px) saturate(1.12)',
-  padding: 12,
+  padding: 15,
   zIndex: 5600,
 }
 
@@ -530,7 +438,7 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 174,
+  minHeight: 280,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
   background: 'rgba(2,6,23,.66)',
@@ -539,7 +447,7 @@ const scannerBox: CSSProperties = {
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 192,
+  height: 300,
   objectFit: 'cover',
   display: 'block',
 }
@@ -574,8 +482,8 @@ const helpText: CSSProperties = {
 const noticeBox: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-  transform: 'translateX(-50%)',
+  top: '50%',
+  transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 28px), 340px)',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.16)',
@@ -591,77 +499,4 @@ const noticeBox: CSSProperties = {
   backdropFilter: 'blur(20px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(20px) saturate(1.12)',
   zIndex: 5600,
-}
-
-
-const fallbackWrap: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-  paddingTop: 2,
-}
-
-const fallbackToggle: CSSProperties = {
-  minHeight: 42,
-  borderRadius: 16,
-  border: '1px solid rgba(251,191,36,.24)',
-  background: 'rgba(251,191,36,.13)',
-  color: '#fef3c7',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const fallbackForm: CSSProperties = {
-  display: 'grid',
-  gap: 9,
-  padding: 11,
-  borderRadius: 18,
-  border: '1px solid rgba(251,191,36,.20)',
-  background: 'rgba(15,23,42,.36)',
-}
-
-const fallbackTitle: CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 13,
-  fontWeight: 950,
-}
-
-const fallbackHint: CSSProperties = {
-  color: 'rgba(241,245,249,.74)',
-  fontSize: 11,
-  lineHeight: 1.35,
-  fontWeight: 760,
-}
-
-const fallbackInput: CSSProperties = {
-  width: '100%',
-  minHeight: 42,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.52)',
-  color: '#ffffff',
-  padding: '0 12px',
-  fontSize: 13,
-  fontWeight: 900,
-  outline: 'none',
-}
-
-const fallbackSubmit: CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
-  border: '1px solid rgba(187,247,208,.22)',
-  background: 'rgba(34,197,94,.18)',
-  color: '#dcfce7',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const fallbackError: CSSProperties = {
-  color: '#fecaca',
-  fontSize: 11,
-  fontWeight: 850,
-  lineHeight: 1.35,
 }
