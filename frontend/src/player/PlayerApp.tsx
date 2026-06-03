@@ -330,7 +330,8 @@ export default function PlayerApp() {
   }, [])
 
   function showNotice(message: string, tone: NoticeTone) {
-    setUiNotice({ message, tone })
+    const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
+    setUiNotice({ message, tone: normalizedTone })
 
     if (noticeTimerRef.current !== null) {
       window.clearTimeout(noticeTimerRef.current)
@@ -343,6 +344,7 @@ export default function PlayerApp() {
   }
 
   function showOverlay(nextState: OverlayState) {
+    if (nextState !== 'finish') return
     setOverlayState(nextState)
 
     if (overlayTimerRef.current !== null) {
@@ -635,7 +637,7 @@ function handleOpenFieldCamera() {
     setBrowserGpsPosition(null)
     setBrowserGpsStatus('unavailable')
     setLocalDebugEnabled(true)
-    showNotice('Debug activo. Toca el mapa para colocar tu posición simulada.', 'success')
+    showNotice('Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.', 'info')
     vibrate([10, 16, 10])
   }
 

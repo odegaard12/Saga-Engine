@@ -379,10 +379,10 @@ const dockButtonWide: CSSProperties = {
 const panel: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: 'calc(env(safe-area-inset-top, 0px) + 20px)',
-  transform: 'translateX(-50%)',
+  top: '46%',
+  transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 26px), 390px)',
-  maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)',
+  maxHeight: 'min(calc(100dvh - 36px), 560px)',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   display: 'grid',
@@ -438,7 +438,7 @@ const closeButton: CSSProperties = {
 const scannerBox: CSSProperties = {
   position: 'relative',
   overflow: 'hidden',
-  minHeight: 210,
+  minHeight: 216,
   borderRadius: 22,
   border: '1px solid rgba(187,247,208,.14)',
   background: 'rgba(2,6,23,.66)',
@@ -447,7 +447,7 @@ const scannerBox: CSSProperties = {
 
 const videoStyle: CSSProperties = {
   width: '100%',
-  height: 226,
+  height: 236,
   objectFit: 'cover',
   display: 'block',
 }
@@ -482,8 +482,8 @@ const helpText: CSSProperties = {
 const noticeBox: CSSProperties = {
   position: 'fixed',
   left: '50%',
-  top: 'calc(env(safe-area-inset-top, 0px) + 20px)',
-  transform: 'translateX(-50%)',
+  top: '46%',
+  transform: 'translate(-50%, -50%)',
   width: 'min(calc(100vw - 28px), 340px)',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.16)',

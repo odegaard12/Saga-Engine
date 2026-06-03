@@ -409,7 +409,7 @@ export function PlayerHud({
               <section style={fallbackToolPanel}>
                 <div style={fallbackToolHead}>
                   <strong>Fallback de nodo</strong>
-                  <span>Usa el código preestablecido si falla GPS, QR, cámara, brújula o cobertura.</span>
+                  <span>Completa el nodo con código si falla GPS, QR, cámara, brújula o cobertura.</span>
                 </div>
 
                 <button

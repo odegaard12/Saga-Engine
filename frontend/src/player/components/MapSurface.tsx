@@ -589,27 +589,6 @@ export function MapSurface({
   }, [])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const handleDebugMapClick = (event: L.LeafletMouseEvent) => {
-      if (!debugSimulation || !onDebugSetPosition) return
-
-      onDebugSetPosition({
-        lat: event.latlng.lat,
-        lon: event.latlng.lng,
-      })
-    }
-
-    map.on('click', handleDebugMapClick)
-
-    return () => {
-      map.off('click', handleDebugMapClick)
-    }
-  }, [mapReadyToken, debugSimulation, onDebugSetPosition])
-
-
-  useEffect(() => {
     if (typeof document === 'undefined') return
     if (document.getElementById('saga-player-aura-style')) return
 
@@ -758,7 +737,7 @@ export function MapSurface({
           opacity: 0.92,
         })
 
-        if (onNodeTapRef.current) {
+        if (onNodeTapRef.current && !debugSimulation) {
           radiusLayer.on('click', () => onNodeTapRef.current?.())
           markerLayer.on('click', () => onNodeTapRef.current?.())
         }
@@ -832,6 +811,7 @@ export function MapSurface({
     onNodeTap,
     nodeState,
     Boolean(playerPosition),
+    debugSimulation,
   ])
 
   useEffect(() => {
