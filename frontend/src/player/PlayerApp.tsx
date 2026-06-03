@@ -1159,6 +1159,9 @@ return
             onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
             onDownloadFieldProofs={handleDownloadFieldProofs}
             fieldPhotoCount={fieldProofs.length}
+             submitting={submitting}
+             errorMessage={submitError}
+             onSubmitCode={handleSubmitCode}
           />
         </div>
       </div>
