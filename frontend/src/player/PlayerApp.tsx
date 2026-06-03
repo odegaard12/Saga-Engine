@@ -329,6 +329,41 @@ export default function PlayerApp() {
     }
   }, [])
 
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    function closeQrIfPhysicalScannerNoLongerReachable() {
+      const readyPayload = (state as { status: 'ready'; payload: PlayerGamePayload }).payload
+      const stage = getCurrentStage(readyPayload)
+
+      if (!isPhysicalQrStage(stage)) return
+
+      const position = browserGpsPosition || localDebugPosition
+      const target = getStagePosition(stage)
+      const radius = getStageRadius(stage)
+
+      if (!position || !target || radius === null) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+        return
+      }
+
+      const distance = getDistanceMeters(position, target)
+      if (distance > radius) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+      }
+    }
+
+    closeQrIfPhysicalScannerNoLongerReachable()
+  }, [
+    state.status,
+    state.status === 'ready' ? state.payload.level : null,
+    state.status === 'ready' ? state.payload.current_stage?.id : null,
+    browserGpsPosition?.lat,
+    browserGpsPosition?.lon,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+  ])
+
   function showNotice(message: string, tone: NoticeTone) {
     const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
     if (normalizedTone === 'info') return
