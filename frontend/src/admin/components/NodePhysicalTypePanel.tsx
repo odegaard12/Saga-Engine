@@ -57,6 +57,22 @@ function getStageText(stage: AdminReactOverviewStage, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
+function getStageConfig(stage: AdminReactOverviewStage): Record<string, unknown> {
+  const record = stage as unknown as Record<string, unknown>
+  return record.config && typeof record.config === 'object' && !Array.isArray(record.config)
+    ? record.config as Record<string, unknown>
+    : {}
+}
+
+function buildFallbackCodeForPhysicalStage(stage: AdminReactOverviewStage) {
+  const config = getStageConfig(stage)
+  const existing = String(config.success_code || config.fallback_code || '').trim().toUpperCase()
+  if (existing) return existing
+
+  const index = typeof stage.index === 'number' ? stage.index + 1 : 1
+  return `SAGA-${String(index).padStart(2, '0')}`
+}
+
 function formatCoord(value: unknown): string {
   return typeof value === 'number' ? value.toFixed(5) : 'Sin GPS'
 }
@@ -146,6 +162,7 @@ export default function NodePhysicalTypePanel({
   }
 
   function saveQrCard(card: SavedPhysicalQrCard) {
+    const config = getStageConfig(stage)
     patchStage({
       physical_node_kind: card.kind,
       physical_qr: card,
@@ -153,6 +170,20 @@ export default function NodePhysicalTypePanel({
       physical_item_id: card.item_id,
       physical_item_label: card.label,
       physical_item_kind: card.kind,
+      config: {
+        ...config,
+        success_code: String(config.success_code || config.fallback_code || buildFallbackCodeForPhysicalStage(stage)),
+      },
+    })
+  }
+
+  function updatePhysicalFallbackCode(value: string) {
+    const config = getStageConfig(stage)
+    patchStage({
+      config: {
+        ...config,
+        success_code: value.trim().toUpperCase(),
+      },
     })
   }
 
@@ -249,6 +280,31 @@ export default function NodePhysicalTypePanel({
               <span>Mapa</span>
               <b>Mover punto</b>
             </div>
+          </div>
+
+          <div style={fallbackPanel}>
+            <div style={sectionTitle}>
+              <span>Código fallback</span>
+              <small>Emergencia offline para completar este QR si falla la cámara, el escaneo o la cobertura.</small>
+            </div>
+
+            <label style={field}>
+              Código preestablecido
+              <input
+                value={buildFallbackCodeForPhysicalStage(stage)}
+                placeholder={buildFallbackCodeForPhysicalStage(stage)}
+                onChange={(event) => updatePhysicalFallbackCode(event.target.value)}
+                style={input}
+              />
+            </label>
+
+            <button
+              type="button"
+              style={changeTypeButton}
+              onClick={() => updatePhysicalFallbackCode(`SAGA-${String(stage.index + 1).padStart(2, '0')}`)}
+            >
+              Generar fallback
+            </button>
           </div>
 
           <PhysicalQrCardsPanel
@@ -508,4 +564,14 @@ const changeTypeButton: CSSProperties = {
   color: '#f8fafc',
   fontSize: 11,
   fontWeight: 950,
+}
+
+
+const fallbackPanel: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  padding: 12,
+  borderRadius: 18,
+  border: '1px solid rgba(251,191,36,.20)',
+  background: 'rgba(251,191,36,.08)',
 }
