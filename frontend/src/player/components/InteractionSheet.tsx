@@ -236,19 +236,24 @@ export function InteractionSheet({
               style={recoveryToggle}
               onClick={() => setShowRecovery((current) => !current)}
             >
-              {showRecovery ? 'Hide fallback' : 'Fallback'}
+              {showRecovery ? 'Ocultar fallback' : 'Fallback'}
             </button>
           </div>
 
           {showRecovery ? (
             <div style={recoveryPanel}>
+              <div style={recoveryTitle}>Código de emergencia offline</div>
+              <div style={recoveryHint}>
+                Escribe el código fallback preestablecido para completar este nodo sin cobertura.
+              </div>
+
               <form style={formWrap} onSubmit={handleSubmit}>
                 <div style={inputRow}>
                   <input
                     id="interaction-code"
                     value={code}
                     onChange={(event) => setCode(event.target.value.toUpperCase())}
-                    placeholder="CODE"
+                    placeholder="CÓDIGO FALLBACK"
                     autoComplete="off"
                     spellCheck={false}
                     style={input}
@@ -260,7 +265,7 @@ export function InteractionSheet({
                     style={submitButton}
                     disabled={submitting || !code.trim()}
                   >
-                    {submitting ? '...' : 'OK'}
+                    {submitting ? '...' : 'Completar'}
                   </button>
                 </div>
 
@@ -268,7 +273,7 @@ export function InteractionSheet({
               </form>
 
               <a href={playerHref} style={fallbackLink}>
-                Open player
+                Reabrir jugador
               </a>
             </div>
           ) : null}
@@ -427,6 +432,19 @@ const recoveryToggle: CSSProperties = {
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.08em',
+}
+
+const recoveryTitle: CSSProperties = {
+  color: '#f8fafc',
+  fontSize: 14,
+  fontWeight: 900,
+  letterSpacing: '-0.02em',
+}
+
+const recoveryHint: CSSProperties = {
+  color: 'rgba(226,232,240,.72)',
+  fontSize: 12,
+  lineHeight: 1.35,
 }
 
 const recoveryPanel: CSSProperties = {

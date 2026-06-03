@@ -25,6 +25,11 @@ function getVisibleAdminGames(selectedGameId: string) {
   return adminGameCatalog.filter((game) => isPlayableAdminGame(game) || game.id === selectedGameId)
 }
 
+function buildFallbackCodeForStage(stage: AdminReactOverviewStage) {
+  const index = typeof stage.index === 'number' ? stage.index + 1 : 1
+  return `SAGA-${String(index).padStart(2, '0')}`
+}
+
 function pickCarryOverConfig(config: Record<string, unknown>) {
   const keepKeys = [
     'required_item_id',
@@ -38,6 +43,8 @@ function pickCarryOverConfig(config: Record<string, unknown>) {
     'physical_item_label',
     'physical_node_kind',
     'physical_item_kind',
+    'success_code',
+    'fallback_code',
   ]
 
   return Object.fromEntries(
@@ -305,6 +312,7 @@ export default function NodeDetailDrawer({
         ...carryOverConfig,
         game_id: nextGameId,
         game_title: patch.label,
+        success_code: String(carryOverConfig.success_code || carryOverConfig.fallback_code || buildFallbackCodeForStage(current)),
       }
 
       return {
@@ -595,6 +603,39 @@ export default function NodeDetailDrawer({
                    Offline obligatorio: {selectedGame.offlineNote}
                  </small>
               </div>
+
+              <div className="admin-edit-section-head">
+                <strong>Código fallback</strong>
+                <span>Botón de emergencia: si falla GPS, QR, cámara, brújula o cobertura, este código completa el nodo.</span>
+              </div>
+
+              <div className="admin-edit-grid">
+                <label className="admin-edit-field">
+                  Código preestablecido
+                  <input
+                    value={getDraftConfigText('success_code')}
+                    placeholder={buildFallbackCodeForStage(draft)}
+                    onFocus={() => {
+                      if (!getDraftConfigText('success_code')) {
+                        updateDraftConfigText('success_code', buildFallbackCodeForStage(draft))
+                      }
+                    }}
+                    onChange={(event) => updateDraftConfigText('success_code', event.target.value.trim().toUpperCase())}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  className="admin-node-editor-close"
+                  onClick={() => updateDraftConfigText('success_code', buildFallbackCodeForStage(draft))}
+                >
+                  Generar
+                </button>
+              </div>
+
+              <small className="admin-family-config-note">
+                No lo enseñes al jugador salvo emergencia. El monitor puede darlo para avanzar sin cobertura.
+              </small>
 
               <div className="admin-family-config-grid">
                 <label>
