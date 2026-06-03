@@ -164,6 +164,18 @@ export function QuickProofPanel({
   }, [hidden])
 
   useEffect(() => {
+    const closeScanner = () => {
+      stopCamera()
+      setMode('idle')
+      setNotice(null)
+    }
+
+    window.addEventListener('saga:close-qr-scanner', closeScanner)
+    return () => window.removeEventListener('saga:close-qr-scanner', closeScanner)
+  }, [])
+
+
+  useEffect(() => {
     return () => stopCamera()
   }, [])
 

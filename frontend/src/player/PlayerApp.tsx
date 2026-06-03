@@ -331,6 +331,7 @@ export default function PlayerApp() {
 
   function showNotice(message: string, tone: NoticeTone) {
     const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
+    if (normalizedTone === 'info') return
     setUiNotice({ message, tone: normalizedTone })
 
     if (noticeTimerRef.current !== null) {
@@ -602,6 +603,7 @@ function handleOpenFieldCamera() {
   }
 
   function handleToggleDebug() {
+    window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
     const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
 
     if (currentlyActive) {
