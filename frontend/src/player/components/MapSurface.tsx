@@ -783,7 +783,7 @@ export function MapSurface({
       .map((entry) => `${entry.index}:${entry.data.lat}:${entry.data.lon}:${entry.data.radius}`)
       .join('|') + `:active:${activeIndex}`
 
-    if (lastNodeFrameRef.current !== nodeFrameKey && !playerPosition) {
+    if (lastNodeFrameRef.current !== nodeFrameKey && !playerPosition && !debugSimulation) {
       lastNodeFrameRef.current = nodeFrameKey
       lastPlayerFrameRef.current = null
 

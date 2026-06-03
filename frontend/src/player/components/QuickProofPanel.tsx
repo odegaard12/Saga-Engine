@@ -115,6 +115,29 @@ export function QuickProofPanel({
   const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
   const [notice, setNotice] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!document.getElementById('saga-qr-scanner-style')) {
+      const style = document.createElement('style')
+      style.id = 'saga-qr-scanner-style'
+      style.textContent = `
+        body.saga-qr-scanner-open [data-saga-player-hud="bottom"] {
+          display: none !important;
+          pointer-events: none !important;
+        }
+      `
+      document.head.appendChild(style)
+    }
+
+    const scannerOpen = mode !== 'idle'
+    document.body.classList.toggle('saga-qr-scanner-open', scannerOpen)
+
+    return () => {
+      document.body.classList.remove('saga-qr-scanner-open')
+    }
+  }, [mode])
+
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -303,8 +326,6 @@ export function QuickProofPanel({
                 : 'Pulsa QR para activar la cámara.'}
             </div>
           </div>
-
-          <div style={helpText}>{message}</div>
         </section>
       ) : null}
 

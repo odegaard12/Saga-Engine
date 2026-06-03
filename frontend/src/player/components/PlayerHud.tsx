@@ -227,6 +227,7 @@ export function PlayerHud({
   return (
     <>
       <section
+        data-saga-player-hud="bottom"
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
