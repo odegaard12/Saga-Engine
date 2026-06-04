@@ -116,65 +116,66 @@ Last commit: `e840e4f gameplay: add universal offline fallback codes (#228)`
 
 ## 5. Imports in priority frontend files
 
+> Summary only. Multiline imports are counted and summarized to avoid noisy or truncated audit snippets.
+
+| File | Import declarations | External modules | Internal modules sample |
+| --- | --- | --- | --- |
+| frontend/src/player/PlayerApp.tsx | 25 | `react` | `../shared/api`, `../types/player`, `./components/PlayerShell`, `./components/PlayerHud`, `./components/QuickProofPanel`, `./components/MapSurface`, `./components/InteractionSheet`, `./components/TeamSheet`, `./components/ToastNotice`, `./components/FieldPrepPanel`… |
+| frontend/src/player/components/PlayerHud.tsx | 9 | `react` | `../../types/player`, `../runtime`, `./MissionPackPanel`, `./OfflineSyncPanel`, `./InventoryPanel`, `./ManualInventoryCollectPanel`, `./RequirementPreviewPanel`, `../../i18n` |
+| frontend/src/player/components/MapSurface.tsx | 5 | `react`, `leaflet`, `leaflet/dist/leaflet.css` | `../../types/player`, `../../shared/playerIdentity` |
+| frontend/src/admin/components/NodeDetailDrawer.tsx | 5 | `react` | `../lib/adminApi`, `../../i18n`, `../lib/familyConfigs`, `../lib/gameCatalog` |
+
 ### `frontend/src/player/PlayerApp.tsx`
-```ts
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
-import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
-import { PlayerShell } from './components/PlayerShell'
-import { PlayerHud } from './components/PlayerHud'
-import { QuickProofPanel } from './components/QuickProofPanel'
-import { MapSurface } from './components/MapSurface'
-import { InteractionSheet } from './components/InteractionSheet'
-import { TeamSheet } from './components/TeamSheet'
-import { ToastNotice, type UiNotice } from './components/ToastNotice'
-import { FieldPrepPanel } from './components/FieldPrepPanel'
-import { FieldPhotoViewer } from './components/FieldPhotoViewer'
-import { FieldCameraCapture } from './components/FieldCameraCapture'
-import { deriveStageRuntime, type PlayerPanel } from './runtime'
-import { getPlayerNameFromLocation } from '../shared/playerRoute'
-import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
-import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
-import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
-import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
-import { cacheFieldProofAssets, cacheFieldProofs, getCachedFieldProofs } from './offline/fieldProofCache'
-import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
-import { queueManualCode } from './offline/physicalEvents'
-import { getDistanceMeters } from './utils/geo'
-import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
-import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
-```
+- `react`
+- `../shared/api`
+- `../types/player`
+- `./components/PlayerShell`
+- `./components/PlayerHud`
+- `./components/QuickProofPanel`
+- `./components/MapSurface`
+- `./components/InteractionSheet`
+- `./components/TeamSheet`
+- `./components/ToastNotice`
+- `./components/FieldPrepPanel`
+- `./components/FieldPhotoViewer`
+- `./components/FieldCameraCapture`
+- `./runtime`
+- `../shared/playerRoute`
+- `../shared/offlinePublicConfig`
+- `./offline/missionPack`
+- `./offline/pwaShell`
+- `./offline/teamPresence`
+- `./offline/fieldProofCache`
+- `./offline/teamMapPresence`
+- `./offline/physicalEvents`
+- `./utils/geo`
+- `./utils/gpsStorage`
+- `./utils/stagePosition`
 
 ### `frontend/src/player/components/PlayerHud.tsx`
-```ts
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
-import type { PlayerGamePayload, PlayerStage } from '../../types/player'
-import type { PrimaryActionTone } from '../runtime'
-import { MissionPackPanel } from './MissionPackPanel'
-import { OfflineSyncPanel } from './OfflineSyncPanel'
-import { InventoryPanel } from './InventoryPanel'
-import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
-import { RequirementPreviewPanel } from './RequirementPreviewPanel'
-import { getLocale, setLocale, t, type Locale } from '../../i18n'
-```
+- `react`
+- `../../types/player`
+- `../runtime`
+- `./MissionPackPanel`
+- `./OfflineSyncPanel`
+- `./InventoryPanel`
+- `./ManualInventoryCollectPanel`
+- `./RequirementPreviewPanel`
+- `../../i18n`
 
 ### `frontend/src/player/components/MapSurface.tsx`
-```ts
-import { useEffect, useMemo, useRef, useState } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
-import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
-```
+- `react`
+- `leaflet`
+- `leaflet/dist/leaflet.css`
+- `../../types/player`
+- `../../shared/playerIdentity`
 
 ### `frontend/src/admin/components/NodeDetailDrawer.tsx`
-```ts
-import { useEffect, useState } from 'react'
-import type { AdminReactOverviewStage } from '../lib/adminApi'
-import { t } from '../../i18n'
-import {
-import {
-```
+- `react`
+- `../lib/adminApi`
+- `../../i18n`
+- `../lib/familyConfigs`
+- `../lib/gameCatalog`
 
 ## 6. Possible duplicated identifiers
 
