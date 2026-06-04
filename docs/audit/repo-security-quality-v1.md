@@ -7,6 +7,16 @@ Last commit: `e840e4f gameplay: add universal offline fallback codes (#228)`
 
 > Scope: read-only repository audit. No production deploy, no container restart, no data mutation.
 
+## 0. Executive findings
+
+- Biggest monoliths detected: `frontend/src/admin/AdminApp.tsx`, `main.py`, `frontend/src/player/PlayerApp.tsx`, `frontend/src/player/components/MapSurface.tsx`, `frontend/src/admin/components/NodeDetailDrawer.tsx` and `frontend/src/player/components/PlayerHud.tsx`.
+- The original mechanical scan found no tracked `.env`, database, backup, key, dump or archive-like paths by filename.
+- Local guards passed: privacy guard and protected-files guard.
+- `gitleaks` was not installed locally on the server during this run, so this remains delegated to CI or a later local install.
+- Frontend build passed, with one non-blocking bundle-size warning from Vite.
+- Debug/GPS/test terms exist, but several are intentional field-test/debug features and need manual classification before cleanup.
+- Main recommended next fixes before Admin UX: global ErrorBoundary, visible version/commit, canonical smoke script, offline cache reset/recovery path, offline preparation freshness indicator, mission backup/export.
+
 ## 1. Repository snapshot
 
 - Tracked files: **218**
@@ -99,24 +109,72 @@ Last commit: `e840e4f gameplay: add universal offline fallback codes (#228)`
 
 | File | Exists | Size | Lines |
 | --- | --- | --- | --- |
-| frontend/src/PlayerApp.tsx | missing | 0.0 KB | 0 |
-| frontend/src/PlayerHud.tsx | missing | 0.0 KB | 0 |
-| frontend/src/MapSurface.tsx | missing | 0.0 KB | 0 |
-| frontend/src/NodeDetailDrawer.tsx | missing | 0.0 KB | 0 |
+| frontend/src/player/PlayerApp.tsx | yes | 47.9 KB | 1659 |
+| frontend/src/player/components/PlayerHud.tsx | yes | 24.8 KB | 919 |
+| frontend/src/player/components/MapSurface.tsx | yes | 43.8 KB | 1514 |
+| frontend/src/admin/components/NodeDetailDrawer.tsx | yes | 37.6 KB | 1026 |
 
 ## 5. Imports in priority frontend files
 
-### `frontend/src/PlayerApp.tsx`
-_No imports found or file missing._
+### `frontend/src/player/PlayerApp.tsx`
+```ts
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import { PlayerShell } from './components/PlayerShell'
+import { PlayerHud } from './components/PlayerHud'
+import { QuickProofPanel } from './components/QuickProofPanel'
+import { MapSurface } from './components/MapSurface'
+import { InteractionSheet } from './components/InteractionSheet'
+import { TeamSheet } from './components/TeamSheet'
+import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { FieldPhotoViewer } from './components/FieldPhotoViewer'
+import { FieldCameraCapture } from './components/FieldCameraCapture'
+import { deriveStageRuntime, type PlayerPanel } from './runtime'
+import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
+import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, type OfflineMissionSummary } from './offline/missionPack'
+import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
+import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
+import { cacheFieldProofAssets, cacheFieldProofs, getCachedFieldProofs } from './offline/fieldProofCache'
+import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
+import { queueManualCode } from './offline/physicalEvents'
+import { getDistanceMeters } from './utils/geo'
+import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
+import { getCurrentStage, getPlayerPosition, getStagePosition, getStageRadius, normalizeGpsStatus } from './utils/stagePosition'
+```
 
-### `frontend/src/PlayerHud.tsx`
-_No imports found or file missing._
+### `frontend/src/player/components/PlayerHud.tsx`
+```ts
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import type { PrimaryActionTone } from '../runtime'
+import { MissionPackPanel } from './MissionPackPanel'
+import { OfflineSyncPanel } from './OfflineSyncPanel'
+import { InventoryPanel } from './InventoryPanel'
+import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
+import { RequirementPreviewPanel } from './RequirementPreviewPanel'
+import { getLocale, setLocale, t, type Locale } from '../../i18n'
+```
 
-### `frontend/src/MapSurface.tsx`
-_No imports found or file missing._
+### `frontend/src/player/components/MapSurface.tsx`
+```ts
+import { useEffect, useMemo, useRef, useState } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
+```
 
-### `frontend/src/NodeDetailDrawer.tsx`
-_No imports found or file missing._
+### `frontend/src/admin/components/NodeDetailDrawer.tsx`
+```ts
+import { useEffect, useState } from 'react'
+import type { AdminReactOverviewStage } from '../lib/adminApi'
+import { t } from '../../i18n'
+import {
+import {
+```
 
 ## 6. Possible duplicated identifiers
 
