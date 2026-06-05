@@ -357,6 +357,20 @@ export default function NodeDetailDrawer({
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
+        <div className="admin-node-editor-inline-topbar">
+          <div className="admin-node-editor-inline-title">
+            <span className="admin-node-editor-inline-kicker">Editor</span>
+            <strong>Editor de nodo / QR físico</strong>
+          </div>
+          <button
+            type="button"
+            className="admin-node-editor-inline-close"
+            onClick={onClose}
+            aria-label="Cerrar editor de nodo"
+          >
+            Cerrar ×
+          </button>
+        </div>
         <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
           <div className="admin-node-editor-kicker-row">
             <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor de nodo'}</span>
@@ -366,7 +380,7 @@ export default function NodeDetailDrawer({
               className="admin-node-editor-close"
               onClick={onClose}
             >
-              Cerrar
+              Cerrar ×
             </button>
           </div>
 

@@ -3188,3 +3188,378 @@
   }
 }
 
+
+/* #233 Mobile UX rescue consolidated: admin mobile controls + physical QR editor */
+
+/* Admin map: hide Leaflet +/- zoom controls. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom {
+  display: none !important;
+}
+
+/* Remove experimental/global close attempts if stale markup remains. */
+.admin-global-drawer-close,
+.admin-node-editor-global-close,
+.admin-node-editor-mobile-close,
+.admin-node-editor-inline-topbar {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Normal drawer close: visible inside its own header. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 84px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(248, 250, 252, 0.28) !important;
+  border-radius: 999px !important;
+  background: rgba(127, 29, 29, 0.88) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+/* Physical QR editor topbar: the real close lives here. */
+.saga-physical-editor-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: -2px -2px 14px !important;
+  padding: 12px 12px !important;
+  border: 1px solid rgba(125, 211, 252, 0.28) !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(180deg, rgba(8, 16, 32, 0.99), rgba(8, 16, 32, 0.92)) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32) !important;
+  backdrop-filter: blur(16px);
+}
+
+.saga-physical-editor-topbar__copy {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.saga-physical-editor-topbar__copy span {
+  color: #67e8f9 !important;
+  font-size: 0.62rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.saga-physical-editor-topbar__copy strong {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  color: #f8fafc !important;
+  font-size: 1rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.saga-physical-editor-topbar__close {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 82px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(248, 250, 252, 0.36) !important;
+  border-radius: 999px !important;
+  background: rgba(127, 29, 29, 0.9) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.saga-physical-editor-topbar__close:active,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-close:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Admin mobile rescue: bottom nav spacing and no accidental add-node button. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) {
+    min-height: 100dvh;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .saga-primary-action {
+    display: none !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-shell,
+  .admin-root:not(.admin-root-login-only) .admin-main,
+  .admin-root:not(.admin-root-login-only) .admin-content,
+  .admin-root:not(.admin-root-login-only) .admin-canvas,
+  .admin-root:not(.admin-root-login-only) .admin-map-shell,
+  .admin-root:not(.admin-root-login-only) .admin-mission-control {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+    padding: 8px 8px calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-editable {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 22px !important;
+    overflow: hidden !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+    padding: 12px 12px calc(132px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-head,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 120 !important;
+    background: rgba(15, 23, 42, 0.94) !important;
+    backdrop-filter: blur(14px);
+  }
+
+  .saga-physical-editor-topbar {
+    margin: -4px -4px 12px !important;
+    padding: 10px 10px !important;
+    border-radius: 18px !important;
+  }
+
+  .saga-physical-editor-topbar__copy strong {
+    font-size: 0.9rem !important;
+  }
+
+  .saga-physical-editor-topbar__close,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+    min-width: 78px !important;
+    min-height: 38px !important;
+    padding: 8px 11px !important;
+    font-size: 11px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-toast,
+  .admin-root:not(.admin-root-login-only) .admin-notice,
+  .admin-root:not(.admin-root-login-only) .admin-local-notice,
+  .admin-root:not(.admin-root-login-only) .admin-save-notice,
+  .admin-root:not(.admin-root-login-only) [class*="notice"],
+  .admin-root:not(.admin-root-login-only) [class*="toast"] {
+    max-width: calc(100vw - 18px) !important;
+    left: 9px !important;
+    right: 9px !important;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+}
+
+/* #233 Mobile UX rescue v13: visible duplicate cleanup */
+
+/* Map controls: remove Leaflet +/- in admin, all placements. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Hide add-node entry points on mobile/coarse pointer.
+   Future PR should replace this with safe staged pin placement. */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .admin-add-node,
+  .admin-root:not(.admin-root-login-only) .admin-create-node,
+  .admin-root:not(.admin-root-login-only) .admin-map-create-node,
+  .admin-root:not(.admin-root-login-only) .admin-node-create,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Admin duplicate top bars: keep the app header, compact/hide repeated mission mastheads. */
+  .admin-root:not(.admin-root-login-only) .admin-mission-header,
+  .admin-root:not(.admin-root-login-only) .admin-mission-hero,
+  .admin-root:not(.admin-root-login-only) .admin-dashboard-hero,
+  .admin-root:not(.admin-root-login-only) .admin-overview-hero,
+  .admin-root:not(.admin-root-login-only) .admin-summary-hero {
+    margin-top: 8px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  /* If duplicated header blocks exist, make secondary cards compact instead of huge. */
+  .admin-root:not(.admin-root-login-only) [class*="mission"][class*="header"],
+  .admin-root:not(.admin-root-login-only) [class*="Mission"][class*="Header"],
+  .admin-root:not(.admin-root-login-only) [class*="overview"][class*="header"],
+  .admin-root:not(.admin-root-login-only) [class*="Overview"][class*="Header"] {
+    min-height: 0 !important;
+  }
+
+  /* Physical QR editor: topbar is the only mode/title header in edit mode. */
+  .saga-physical-editor-topbar + div {
+    margin-top: 0 !important;
+  }
+
+  .saga-physical-editor-topbar + div [style] {
+    max-width: 100%;
+  }
+}
+
+/* #233 Mobile UX rescue v13b: safe cleanup after failed add-node JSX patch */
+
+/* Hide main add-node action without editing fragile JSX. */
+.admin-root:not(.admin-root-login-only) .saga-primary-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Strong admin map zoom removal. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Mobile/coarse pointer: hide any remaining add-node entry points. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-primary-action,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* #233 Mobile UX rescue v14b: safe node creation disabled + visible discard/delete */
+.admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-primary-action,
+.admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.saga-physical-editor-topbar__delete {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 82px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(251, 146, 60, 0.42) !important;
+  border-radius: 999px !important;
+  background: rgba(124, 45, 18, 0.92) !important;
+  color: #ffedd5 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .saga-primary-action,
+  .admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    gap: 6px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    min-width: 72px !important;
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+}

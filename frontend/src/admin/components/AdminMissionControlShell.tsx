@@ -183,7 +183,7 @@ export default function AdminMissionControlShell({
         </section>
 
         <nav className="saga-rail-actions" aria-label="Primary admin actions">
-          <button type="button" className="saga-primary-action" onClick={() => togglePanel('builder')}>
+          <button type="button" className="saga-primary-action saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
             + Add node
           </button>
 
@@ -299,7 +299,7 @@ export default function AdminMissionControlShell({
       <section className="saga-map-workspace" aria-label="Map workspace">
         <div className="saga-command-bar">
           <div className="saga-command-main">
-            <button type="button" className="saga-command-primary" onClick={() => togglePanel('builder')}>
+            <button type="button" className="saga-command-primary saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
               Add node
             </button>
             <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
@@ -357,6 +357,7 @@ export default function AdminMissionControlShell({
                   stage={liveSelectedStage}
                   onApplyLocal={onApplyStage}
                   onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+                  onClose={() => onSelectStage(null)}
                 />
               </div>
 
@@ -441,7 +442,6 @@ export default function AdminMissionControlShell({
       ) : null}
 
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={() => togglePanel('builder')}>+ Node</button>
         <button type="button" onClick={onSaveStages}>Save</button>
         <button type="button" onClick={() => togglePanel('builder')}>Builder</button>
         <button type="button" onClick={() => togglePanel('players')}>Players</button>

@@ -42,7 +42,7 @@ const ES: Record<string, string> = {
   '+ Add node': '+ Añadir nodo',
   'Unsaved': 'Sin guardar',
   'Local changes only': 'Cambios locales solamente',
-  'Node created from map click. Edit details, then save changes.': 'Nodo creado desde el mapa. Edita los detalles y guarda los cambios.',
+  'Node created from map click. Edit details, then save changes.': '',
 
   'Node editor': 'Editor de nodo',
   'Untitled node': 'Nodo sin título',

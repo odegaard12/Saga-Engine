@@ -111,8 +111,6 @@ export default function AdminMissionMap({
       doubleClickZoom: false,
     })
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map)
-
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
@@ -133,8 +131,10 @@ export default function AdminMissionMap({
     const map = mapRef.current
     if (!map || !onCreateStageAt) return
 
-    const handleMapClick = (event: L.LeafletMouseEvent) => {
-      onCreateStageAt(event.latlng.lat, event.latlng.lng)
+    const handleMapClick = (_event: L.LeafletMouseEvent) => {
+      // #233 safety: direct map click/tap must not create nodes.
+      // Safe creation will be redesigned as staged pin + confirm/cancel in #234.
+      return
     }
 
     map.on('click', handleMapClick)

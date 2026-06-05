@@ -13,6 +13,8 @@ type NodePhysicalTypePanelProps = {
   chooserOnly?: boolean
   onFinishChoice?: () => void
   onRequestChangeType?: () => void
+  onClose?: () => void
+  onDeleteLocal?: (stage: AdminReactOverviewStage) => void
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
@@ -130,9 +132,12 @@ export default function NodePhysicalTypePanel({
   chooserOnly = false,
   onFinishChoice,
   onRequestChangeType,
+  onClose,
+  onDeleteLocal,
 }: NodePhysicalTypePanelProps) {
   const mode = getPhysicalMode(stage)
   const isPhysical = mode !== 'none'
+  const isLocalNewPhysicalStage = typeof stage.id === 'string' && stage.id.startsWith('local-')
 
   function patchStage(patch: Record<string, unknown>) {
     onApplyLocal({
@@ -189,19 +194,55 @@ export default function NodePhysicalTypePanel({
 
   return (
     <section style={panel} aria-label="Tipo de nodo">
-      <div style={head}>
-        <div>
-          <div style={eyebrow}>TIPO DE NODO</div>
-          <strong style={title}>{isPhysical ? 'Nodo QR físico' : 'Nodo normal jugable'}</strong>
-          <p style={intro}>
-            {isPhysical
-              ? 'Usa este modo para objetos físicos, llaves, pistas o bonus. No muestra el editor de minijuego normal.'
-              : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
-          </p>
+      {onClose ? (
+        <div className="saga-physical-editor-topbar">
+          <div className="saga-physical-editor-topbar__copy">
+            <span>{isPhysical ? 'QR físico' : 'Nodo normal'}</span>
+            <strong>{stage.title || (isPhysical ? 'Objeto físico' : 'Nodo')}</strong>
+          </div>
+          <div className="saga-physical-editor-topbar__actions">
+            {onDeleteLocal ? (
+              <button
+                type="button"
+                className="saga-physical-editor-topbar__delete"
+                onClick={() => {
+                  const action = isLocalNewPhysicalStage ? 'Descartar nodo local' : 'Eliminar nodo'
+                  if (window.confirm(`${action} "${stage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                    onDeleteLocal(stage)
+                    onClose?.()
+                  }
+                }}
+                aria-label={isLocalNewPhysicalStage ? 'Descartar nodo local' : 'Eliminar nodo físico'}
+              >
+                {isLocalNewPhysicalStage ? 'Descartar' : 'Eliminar'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="saga-physical-editor-topbar__close"
+              onClick={onClose}
+              aria-label="Cerrar editor físico"
+            >
+              Cerrar ×
+            </button>
+          </div>
         </div>
-        <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
-      </div>
-
+      ) : null}
+        {chooserOnly ? (
+        <div style={head}>
+          <div>
+            <div style={eyebrow}>TIPO DE NODO</div>
+            <strong style={title}>{isPhysical ? 'Nodo QR físico' : 'Nodo normal jugable'}</strong>
+            <p style={intro}>
+              {isPhysical
+                ? 'Usa este modo para objetos físicos, llaves, pistas o bonus. No muestra el editor de minijuego normal.'
+                : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
+            </p>
+          </div>
+          <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
+        </div>
+  
+        ) : null}
       {chooserOnly ? (
         <div style={modeLayout}>
           <button
@@ -233,9 +274,9 @@ export default function NodePhysicalTypePanel({
         </div>
       ) : (
         <div style={changeTypeBar}>
-          <span>{isPhysical ? 'Editor de nodo físico QR' : 'Editor de nodo normal'}</span>
+          <span>{isPhysical ? 'Configurar objeto físico' : 'Configurar nodo'}</span>
           <button type="button" style={changeTypeButton} onClick={onRequestChangeType}>
-            Cambiar tipo de nodo
+            Cambiar
           </button>
         </div>
       )}
@@ -243,8 +284,8 @@ export default function NodePhysicalTypePanel({
       {!chooserOnly && isPhysical ? (
         <div style={physicalEditor}>
           <div style={sectionTitle}>
-            <span>Datos físicos</span>
-            <small>Sin opciones de minijuego</small>
+            <span>Datos del objeto</span>
+            <small>Datos básicos y código de emergencia</small>
           </div>
 
           <label style={field}>
