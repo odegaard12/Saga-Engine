@@ -1,7 +1,6 @@
 import AdminApp from './admin/AdminApp'
 import LoginApp from './login/LoginApp'
 import PlayerApp from './player/PlayerApp'
-import { ErrorBoundary } from './shared/ErrorBoundary'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 
 function ensurePlayerQueryParam(user: string): void {
@@ -21,12 +20,12 @@ export default function App() {
   const path = window.location.pathname
 
   if (path === '/admin-react' || path.startsWith('/admin-react/')) {
-    return <ErrorBoundary surface="Panel admin"><AdminApp /></ErrorBoundary>
+    return <AdminApp />
   }
 
   const user = getPlayerNameFromLocation()
-  if (!user) return <ErrorBoundary surface="Login"><LoginApp /></ErrorBoundary>
+  if (!user) return <LoginApp />
 
   ensurePlayerQueryParam(user)
-  return <ErrorBoundary surface="Player"><PlayerApp /></ErrorBoundary>
+  return <PlayerApp />
 }
