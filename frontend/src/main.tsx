@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { ErrorBoundary } from './shared/ErrorBoundary'
 import './styles/mobile-shell.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
@@ -14,6 +15,8 @@ installDebugGeolocationShim()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary surface="SAGA Engine">
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 )
