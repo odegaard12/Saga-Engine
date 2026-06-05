@@ -133,3 +133,38 @@ def test_admin_can_mark_event_with_session(tmp_path: Path, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["event"]["status"] == "ignored"
+
+def test_player_event_sync_deduplicates_client_event_id(tmp_path: Path, monkeypatch):
+    event_log = tmp_path / "events.json"
+    monkeypatch.setattr(main, "EVENT_LOG_DB", str(event_log))
+
+    client = make_client()
+    payload = {
+        "user": "PLAYER 1",
+        "events": [
+            {
+                "client_event_id": "offline-qr-001",
+                "type": "qr_scanned",
+                "source": "qr",
+                "node_id": "node-01",
+                "payload": {"physical_id": "node-01-abcd"},
+            }
+        ],
+    }
+
+    first = client.post("/api/events/sync", json=payload)
+    second = client.post("/api/events/sync", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["events"][0]["client_event_id"] == "offline-qr-001"
+    assert second.json()["events"][0]["client_event_id"] == "offline-qr-001"
+    assert second.json()["events"][0]["duplicate"] is True
+
+    events = main.list_events(str(event_log))
+    qr_events = [event for event in events if event.get("type") == "qr_scanned"]
+    sync_events = [event for event in events if event.get("type") == "offline_sync_received"]
+
+    assert len(qr_events) == 1
+    assert len(sync_events) == 2
+
