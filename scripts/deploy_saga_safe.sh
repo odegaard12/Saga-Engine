@@ -11,6 +11,8 @@ ENV_FILE="${ENV_FILE:-}"
 BUILD_IMAGE=0
 PROMOTE=0
 IMAGE=""
+SAGA_COMMIT="${SAGA_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
+SAGA_BUILD_TIME="${SAGA_BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 usage() {
   cat <<EOF
@@ -119,6 +121,8 @@ rollback_old_image() {
     --name "$APP_NAME" \
     --restart unless-stopped \
     --env-file "$env_file" \
+    -e "SAGA_COMMIT=${SAGA_COMMIT}" \
+    -e "SAGA_BUILD_TIME=${SAGA_BUILD_TIME}" \
     -p "${HOST_PORT}:${APP_PORT}" \
     -v "${DATA_DIR}:/app/data" \
     "$old_image"
@@ -147,6 +151,8 @@ echo "Data dir: $DATA_DIR"
 echo "Producción: ${HOST_PORT}->${APP_PORT}"
 echo "Candidato local: 127.0.0.1:${CANDIDATE_PORT}->${APP_PORT}"
 echo "Promote: $PROMOTE"
+echo "Commit: $SAGA_COMMIT"
+echo "Build time: $SAGA_BUILD_TIME"
 
 OLD_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$APP_NAME" 2>/dev/null || true)"
 
@@ -168,6 +174,8 @@ echo "== Arrancar candidato local, sin tocar producción =="
 docker run -d \
   --name "$CANDIDATE_NAME" \
   --env-file "$ENV_FILE_DETECTED" \
+  -e "SAGA_COMMIT=${SAGA_COMMIT}" \
+  -e "SAGA_BUILD_TIME=${SAGA_BUILD_TIME}" \
   -p "127.0.0.1:${CANDIDATE_PORT}:${APP_PORT}" \
   -v "${DATA_DIR}:/app/data" \
   "$IMAGE"
@@ -199,6 +207,8 @@ docker run -d \
   --name "$APP_NAME" \
   --restart unless-stopped \
   --env-file "$ENV_FILE_DETECTED" \
+  -e "SAGA_COMMIT=${SAGA_COMMIT}" \
+  -e "SAGA_BUILD_TIME=${SAGA_BUILD_TIME}" \
   -p "${HOST_PORT}:${APP_PORT}" \
   -v "${DATA_DIR}:/app/data" \
   "$IMAGE"

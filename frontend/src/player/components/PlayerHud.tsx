@@ -7,6 +7,7 @@ import { InventoryPanel } from './InventoryPanel'
 import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
+import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 
 type BackpackTab = 'requirements' | 'inventory' | 'collect'
 
@@ -475,6 +476,10 @@ export function PlayerHud({
             >
               Login
             </a>
+
+              <div style={toolsBuildInfo}>
+                <BuildInfoBadge mode="inline" />
+              </div>
           </aside>
         </div>
       ) : null}
@@ -845,6 +850,12 @@ const toolsLink: CSSProperties = {
   textDecoration: 'none',
 }
 
+
+const toolsBuildInfo: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  paddingTop: 2,
+}
 
 const fallbackToolPanel: CSSProperties = {
   display: 'grid',

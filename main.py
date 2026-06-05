@@ -1618,6 +1618,20 @@ async def admin_redirect_to_react():
     return Response(status_code=307, headers={"Location": "/admin-react"})
 
 
+def get_runtime_version_payload():
+    return {
+        "status": "ok",
+        "version": os.getenv("SAGA_VERSION", "dev"),
+        "commit": os.getenv("SAGA_COMMIT", "unknown"),
+        "built_at": os.getenv("SAGA_BUILD_TIME", ""),
+    }
+
+
+@app.get("/api/version")
+async def get_version():
+    return get_runtime_version_payload()
+
+
 @app.get("/api/config")
 async def get_config():
     cfg = load_config()
