@@ -10,6 +10,13 @@ function withTimeoutSignal(timeoutMs: number) {
   }
 }
 
+export type BuildInfoPayload = {
+  status: 'ok' | 'error'
+  version: string
+  commit: string
+  built_at?: string
+}
+
 type AdvanceResponse = {
   status: 'ok' | 'fail'
   user: string
@@ -33,6 +40,28 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
   return res.json() as Promise<T>
 }
+
+export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
+  const timeout = withTimeoutSignal(2000)
+
+  try {
+    const res = await fetch('/api/version', {
+      signal: timeout.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to load version: HTTP ${res.status}`)
+    }
+
+    return res.json() as Promise<BuildInfoPayload>
+  } finally {
+    timeout.cleanup()
+  }
+}
+
 
 export async function fetchPlayerGame(
   user: string,

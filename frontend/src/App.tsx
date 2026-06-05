@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react'
 import AdminApp from './admin/AdminApp'
 import LoginApp from './login/LoginApp'
 import PlayerApp from './player/PlayerApp'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
+import { BuildInfoBadge } from './shared/BuildInfoBadge'
 
 function ensurePlayerQueryParam(user: string): void {
   if (typeof window === 'undefined') return
@@ -18,14 +20,27 @@ function ensurePlayerQueryParam(user: string): void {
 
 export default function App() {
   const path = window.location.pathname
+  const isAdmin = path === '/admin-react' || path.startsWith('/admin-react/')
+  let content: ReactNode
+  let showFloatingBuildInfo = true
 
-  if (path === '/admin-react' || path.startsWith('/admin-react/')) {
-    return <AdminApp />
+  if (isAdmin) {
+    content = <AdminApp />
+  } else {
+    const user = getPlayerNameFromLocation()
+    if (!user) {
+      content = <LoginApp />
+    } else {
+      ensurePlayerQueryParam(user)
+      content = <PlayerApp />
+      showFloatingBuildInfo = false
+    }
   }
 
-  const user = getPlayerNameFromLocation()
-  if (!user) return <LoginApp />
-
-  ensurePlayerQueryParam(user)
-  return <PlayerApp />
+  return (
+    <>
+      {content}
+      {showFloatingBuildInfo ? <BuildInfoBadge /> : null}
+    </>
+  )
 }
