@@ -1765,6 +1765,7 @@ def normalize_player_event(raw_event, user, profile):
 
     node_id = sanitize_event_text(raw_event.get("node_id"), 120)
     team_id = sanitize_event_text(raw_event.get("team_id") or profile.get("id"), 120)
+    client_event_id = sanitize_event_text(raw_event.get("client_event_id"), 160)
 
     return {
         "type": event_type,
@@ -1773,6 +1774,7 @@ def normalize_player_event(raw_event, user, profile):
         "user": user,
         "team_id": team_id,
         "node_id": node_id,
+        "client_event_id": client_event_id,
         "payload": sanitize_event_payload(raw_event.get("payload")),
     }
 
@@ -1784,6 +1786,28 @@ def _event_payload_code(payload):
         if value:
             return value
     return ""
+
+def find_existing_player_client_event(user, client_event_id):
+    client_event_id = sanitize_event_text(client_event_id, 160)
+    if not client_event_id:
+        return None
+
+    try:
+        events = list_events(EVENT_LOG_DB, user=user)
+    except TypeError:
+        events = [
+            event
+            for event in list_events(EVENT_LOG_DB)
+            if _as_str(event.get("user")).strip() == _as_str(user).strip()
+        ]
+
+    for event in reversed(events):
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        existing_id = _as_str(event.get("client_event_id") or payload.get("client_event_id")).strip()
+        if existing_id == client_event_id:
+            return event
+
+    return None
 
 
 def apply_synced_player_event(normalized_event, user, profile):
@@ -1813,6 +1837,9 @@ def apply_synced_player_event(normalized_event, user, profile):
         current_level = 0
 
     current_node = stages[current_level]
+    # The server is authoritative for progression. Never trust client supplied node_id
+    # for node_completed events, even when the submitted code is valid.
+    event["node_id"] = _as_str(current_node.get("id"))
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     submitted_code = _event_payload_code(payload)
 
@@ -1838,7 +1865,6 @@ def apply_synced_player_event(normalized_event, user, profile):
     set_player_progress_level(profile_id, current_level + 1)
 
     event["status"] = "synced"
-    event["node_id"] = event.get("node_id") or _as_str(current_node.get("id"))
     event["payload"] = {
         **payload,
         "requirement": requirement_status,
@@ -1866,9 +1892,34 @@ async def sync_player_events(request: Request):
         raise HTTPException(status_code=400, detail="too many events")
 
     stored = []
+    seen_client_events = {}
     for raw_event in events:
         normalized = normalize_player_event(raw_event, user, profile)
-        stored.append(apply_synced_player_event(normalized, user, profile))
+        client_event_id = _as_str(normalized.get("client_event_id")).strip()
+
+        if client_event_id:
+            payload = normalized.get("payload") if isinstance(normalized.get("payload"), dict) else {}
+            normalized["payload"] = {
+                **payload,
+                "client_event_id": client_event_id,
+            }
+
+            existing = seen_client_events.get(client_event_id) or find_existing_player_client_event(user, client_event_id)
+            if existing:
+                duplicate = {
+                    **existing,
+                    "status": existing.get("status") or "synced",
+                    "duplicate": True,
+                }
+                stored.append(duplicate)
+                seen_client_events[client_event_id] = duplicate
+                continue
+
+        stored_event = apply_synced_player_event(normalized, user, profile)
+        stored.append(stored_event)
+
+        if client_event_id:
+            seen_client_events[client_event_id] = stored_event
 
     append_event(
         EVENT_LOG_DB,
@@ -1892,6 +1943,14 @@ async def sync_player_events(request: Request):
                 "id": event.get("id"),
                 "type": event.get("type"),
                 "status": event.get("status"),
+                "client_event_id": event.get("client_event_id") or (
+                    event.get("payload", {}).get("client_event_id")
+                    if isinstance(event.get("payload"), dict)
+                    else None
+                ),
+                "node_id": event.get("node_id"),
+                "error": event.get("error"),
+                "duplicate": bool(event.get("duplicate")),
             }
             for event in stored
         ],

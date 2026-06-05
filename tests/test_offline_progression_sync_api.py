@@ -174,3 +174,67 @@ def test_sync_node_completed_consumes_required_item(monkeypatch, tmp_path):
 
     used = list_events(main.EVENT_LOG_DB, user="PLAYER 1", event_type="inventory_item_used")
     assert len(used) == 1
+
+def test_sync_node_completed_forces_official_node_id(monkeypatch, tmp_path):
+    import main
+    from backend.app.storage.event_store import list_events
+
+    configure_offline_progression(monkeypatch, tmp_path)
+
+    response = make_client().post(
+        "/api/events/sync",
+        json={
+            "user": "PLAYER 1",
+            "events": [
+                {
+                    "client_event_id": "complete-fake-node",
+                    "type": "node_completed",
+                    "node_id": "evil-node",
+                    "payload": {"code": "OMEGA"},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["events"][0]["status"] == "synced"
+    assert payload["events"][0]["node_id"] == "1"
+    assert main.get_player_progress_level("PLAYER 1", 0) == 1
+
+    completed = list_events(main.EVENT_LOG_DB, user="PLAYER 1", event_type="node_completed")
+    assert len(completed) == 1
+    assert completed[0]["node_id"] == "1"
+    assert completed[0].get("client_event_id") == "complete-fake-node" or completed[0]["payload"]["client_event_id"] == "complete-fake-node"
+
+
+def test_sync_node_completed_deduplicates_client_event_id(monkeypatch, tmp_path):
+    import main
+    from backend.app.storage.event_store import list_events
+
+    configure_offline_progression(monkeypatch, tmp_path)
+
+    event_payload = {
+        "user": "PLAYER 1",
+        "events": [
+            {
+                "client_event_id": "complete-once",
+                "type": "node_completed",
+                "node_id": "1",
+                "payload": {"code": "OMEGA"},
+            }
+        ],
+    }
+
+    first = make_client().post("/api/events/sync", json=event_payload)
+    second = make_client().post("/api/events/sync", json=event_payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["events"][0]["status"] == "synced"
+    assert second.json()["events"][0]["duplicate"] is True
+    assert main.get_player_progress_level("PLAYER 1", 0) == 1
+
+    completed = list_events(main.EVENT_LOG_DB, user="PLAYER 1", event_type="node_completed")
+    assert len(completed) == 1
+
