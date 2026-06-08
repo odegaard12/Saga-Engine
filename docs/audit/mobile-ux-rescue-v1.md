@@ -630,3 +630,20 @@ Implemented v14b:
 - `NodePhysicalTypePanel` now receives `onDeleteLocal`.
 - Physical QR editor topbar shows a visible `Descartar` button for local unsaved nodes, or `Eliminar` for existing nodes.
 - Delete/discard uses existing `onDeleteStage` / `deleteLocalStage` flow, so it does not invent a second deletion path.
+
+## Follow-up adjustment v15: safe map-create confirmation
+
+Manual testing showed the desired UX is not to block map creation completely, but to make it safe:
+
+- tap/click map;
+- show a confirmation popup;
+- create only after explicit confirmation;
+- cancel/outside click discards without adding a local node.
+
+Implemented v15:
+
+- `AdminMissionMap` sends a create request with coordinates instead of creating directly.
+- `AdminMissionControlShell` stores `pendingCreateLocation` and renders a modal confirmation.
+- Clicking outside or pressing Cancel clears the pending location without touching local mission state.
+- Confirming calls the existing `onCreateNodeAt(lat, lon)` path.
+- `createLocalNodeAt()` now uses the route center when called without coordinates, avoiding odd fallback placement such as Bueu/default centers.

@@ -808,9 +808,20 @@ export default function AdminApp() {
       config?.map_center ||
       ([40.4168, -3.7038] as [number, number])
 
+    const mappedStagesForCenter = stages.filter(
+      (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
+    )
+
+    const routeCenter: [number, number] = mappedStagesForCenter.length > 0
+      ? [
+          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lat), 0) / mappedStagesForCenter.length,
+          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lon), 0) / mappedStagesForCenter.length,
+        ]
+      : mapCenter
+
     const nextIndex = stages.length
-    const nextLat = typeof lat === 'number' ? lat : mapCenter[0]
-    const nextLon = typeof lon === 'number' ? lon : mapCenter[1]
+    const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
+    const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -839,10 +850,11 @@ export default function AdminApp() {
     setCmsPanel('none')
     setSaveState('idle')
     syncLocalStage(nextStage)
+    setSelectedStage(nextStage)
     setLocalNotice(
       typeof lat === 'number' && typeof lon === 'number'
-        ? 'Node created from map click. Edit details, then save changes.'
-        : 'Node created at mission center. Drag it on the map or edit coordinates.'
+        ? 'Nodo creado aquí. Edita el tipo y guarda cuando esté listo.'
+        : 'Nodo creado en el centro de la ruta. Muévelo o edita coordenadas antes de guardar.'
     )
   }
 

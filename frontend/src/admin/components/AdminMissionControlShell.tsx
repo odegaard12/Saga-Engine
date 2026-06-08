@@ -106,6 +106,7 @@ export default function AdminMissionControlShell({
   onApplyMissionTemplate,
 }: AdminMissionControlShellProps) {
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
+  const [pendingCreateLocation, setPendingCreateLocation] = useState<{ lat: number; lon: number } | null>(null)
 
   const liveSelectedStage = selectedStage
     ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
@@ -151,6 +152,20 @@ export default function AdminMissionControlShell({
 
   function togglePanel(panel: CmsPanel) {
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
+  }
+
+  function requestCreateNodeAt(lat: number, lon: number) {
+    setPendingCreateLocation({ lat, lon })
+  }
+
+  function cancelPendingCreateNode() {
+    setPendingCreateLocation(null)
+  }
+
+  function confirmPendingCreateNode() {
+    if (!pendingCreateLocation) return
+    onCreateNodeAt(pendingCreateLocation.lat, pendingCreateLocation.lon)
+    setPendingCreateLocation(null)
   }
 
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')

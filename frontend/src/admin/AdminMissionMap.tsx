@@ -131,10 +131,11 @@ export default function AdminMissionMap({
     const map = mapRef.current
     if (!map || !onCreateStageAt) return
 
-    const handleMapClick = (_event: L.LeafletMouseEvent) => {
-      // #233 safety: direct map click/tap must not create nodes.
-      // Safe creation will be redesigned as staged pin + confirm/cancel in #234.
-      return
+    const handleMapClick = (event: L.LeafletMouseEvent) => {
+      // #233 v15: map click/tap opens a pending creation confirmation.
+      // Nothing is added to local mission state until the admin confirms.
+      if (map.getContainer().classList.contains('admin-map-dragging-node')) return
+      onCreateStageAt(event.latlng.lat, event.latlng.lng)
     }
 
     map.on('click', handleMapClick)
