@@ -63,3 +63,16 @@ Implemented v3:
 - made Messages clearer and translated;
 - repaired UI strings and i18n keys affected by earlier aggressive translation attempts;
 - kept QR physical editor styling unchanged because it tested well.
+
+## v4b — remove Location tab safely
+
+Manual testing showed the Location tab was redundant because coordinates are already visible in the header and map movement is the preferred way to reposition nodes.
+
+Implemented v4b:
+
+- removed the `Ubicación` tab from the normal node editor;
+- removed the active location content block safely;
+- left a compact `Activación` note inside `Básico`;
+- kept coordinates in the node header;
+- kept legacy GPS/locked messages visually translated;
+- avoided risky TSX field relocation until the game-template editor is redesigned.

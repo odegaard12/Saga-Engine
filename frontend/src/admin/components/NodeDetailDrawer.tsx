@@ -15,7 +15,20 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 
-type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages'
+function normalizeLegacyNodeCopy(value?: string) {
+  const clean = String(value || '').trim()
+  if (!clean) return ''
+  if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
+    return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
+  }
+  if (clean === 'Acércate al nodo para desbloquearlo.') {
+    return 'Acércate al nodo para desbloquearlo.'
+  }
+  return clean
+}
+
+
+type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
 
 function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
   return game.runtimeStatus === 'runtime_ready' && game.offlineStatus === 'offline_ready'
@@ -418,13 +431,6 @@ export default function NodeDetailDrawer({
           </button>
           <button
             type="button"
-            className={activeTab === 'location' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('location')}
-          >
-            Ubicación
-          </button>
-          <button
-            type="button"
             className={activeTab === 'game' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('game')}
           >
@@ -496,63 +502,6 @@ export default function NodeDetailDrawer({
             </section>
           ) : null}
 
-          {activeTab === 'location' ? (
-            <section className="admin-edit-section admin-edit-section-compact admin-node-location-panel">
-              <div className="admin-edit-section-head">
-                <strong>Location</strong>
-                <span>{formatCoords(draft.lat, draft.lon)}</span>
-              </div>
-
-              <div className="admin-edit-grid">
-                <label className="admin-edit-field">
-                  Latitude
-                  <input
-                    inputMode="decimal"
-                    value={draft.lat ?? ''}
-                    onChange={(event) => setDraftField('lat', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Longitude
-                  <input
-                    inputMode="decimal"
-                    value={draft.lon ?? ''}
-                    onChange={(event) => setDraftField('lon', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Radius meters
-                  <input
-                    inputMode="numeric"
-                    value={draft.radius ?? ''}
-                    onChange={(event) => setDraftField('radius', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Entry mode
-                  <select
-                    value={draft.entry_mode || 'gps'}
-                    onChange={(event) => setDraftField('entry_mode', event.target.value)}
-                  >
-                    <option value="gps">GPS</option>
-                    <option value="free">Free</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="admin-edit-check">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.require_proximity)}
-                  onChange={(event) => setDraftField('require_proximity', event.target.checked)}
-                />
-                Require proximity
-              </label>
-            </section>
-          ) : null}
 
           {activeTab === 'game' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-family-config-section admin-node-game-panel">
@@ -939,7 +888,7 @@ export default function NodeDetailDrawer({
               <label className="admin-edit-field">
                 Mensaje si no hay GPS
                 <input
-                  value={messages.gps_unavailable || ''}
+                  value={normalizeLegacyNodeCopy(messages.gps_unavailable)}
                   onChange={(event) => setDraftMessage('gps_unavailable', event.target.value)}
                 />
               </label>
@@ -947,7 +896,7 @@ export default function NodeDetailDrawer({
               <label className="admin-edit-field">
                 Mensaje de bloqueo / éxito
                 <input
-                  value={messages.locked || ''}
+                  value={normalizeLegacyNodeCopy(messages.locked)}
                   onChange={(event) => setDraftMessage('locked', event.target.value)}
                 />
               </label>
