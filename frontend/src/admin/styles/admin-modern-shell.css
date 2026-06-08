@@ -5005,3 +5005,47 @@ button[title*="Avanzado"] {
   font-weight: 700 !important;
   margin-top: 7px !important;
 }
+
+/* #234 v6c — actual Basics game duplicate marker
+   The TSX now marks the real Juego field inside Básico with .admin-basic-game-duplicate.
+   Juego configuration remains available in the Juego tab. */
+
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate {
+  display: none !important;
+}
+
+/* Hide the visual selected-game preview that follows that duplicated field. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate + *,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate + * + *:has(svg),
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-summary"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-preview"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-card"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="template-preview"] {
+  display: none !important;
+}
+
+/* Main node text explanation. */
+.admin-node-editor-redesign .admin-node-main-copy-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-title {
+  display: block !important;
+  color: rgba(248, 250, 252, 0.94) !important;
+  font-size: 0.86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-help {
+  display: block !important;
+  max-width: 72ch !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+}

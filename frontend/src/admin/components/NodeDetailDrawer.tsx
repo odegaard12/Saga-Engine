@@ -559,7 +559,7 @@ export default function NodeDetailDrawer({
                 />
               </label>
 
-              <label className="admin-edit-field">
+              <label className="admin-basic-game-duplicate admin-edit-field">
                 Juego
                 <select
                   value={selectedGame.id}

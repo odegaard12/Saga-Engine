@@ -130,3 +130,15 @@ Implemented v6b safely:
 - keeps the real game selector/configuration in the `Juego` tab;
 - explains `Texto principal del nodo` as player-facing instruction/clue text;
 - avoids deleting JSX blocks until the normal node editor is refactored into smaller components.
+
+## v6c — mark real duplicate game field
+
+Manual testing showed v6b CSS did not target the actual duplicated `Juego` field inside `Básico`.
+
+Implemented v6c:
+
+- marks the real duplicated `Juego` label in `Básico` with `admin-basic-game-duplicate`;
+- hides that marked field and its immediate preview via scoped CSS;
+- marks the real main-copy label with `admin-node-main-copy-field`;
+- replaces `Contenido del nodo` with `Texto principal del nodo` plus help text;
+- keeps the real game selector/configuration in the `Juego` tab.
