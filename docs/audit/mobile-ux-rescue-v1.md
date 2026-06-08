@@ -647,3 +647,17 @@ Implemented v15:
 - Clicking outside or pressing Cancel clears the pending location without touching local mission state.
 - Confirming calls the existing `onCreateNodeAt(lat, lon)` path.
 - `createLocalNodeAt()` now uses the route center when called without coordinates, avoiding odd fallback placement such as Bueu/default centers.
+
+## Follow-up adjustment v16: tiny create/discard map popover
+
+Manual test showed the v15 confirmation felt too large and jumped straight into the full type chooser.
+
+Implemented v16:
+
+- Map click/tap stores a pending location plus the screen point of the tap.
+- A tiny popover appears above the tapped point with only:
+  - `Crear`
+  - `Descartar`
+- Clicking outside or pressing `Descartar` clears the pending create request without adding a local node.
+- Only pressing `Crear` calls the existing local node creation flow and then opens the type chooser/editor.
+- Node creation without coordinates uses the route center to avoid odd fallback placement.

@@ -106,7 +106,7 @@ export default function AdminMissionControlShell({
   onApplyMissionTemplate,
 }: AdminMissionControlShellProps) {
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
-  const [pendingCreateLocation, setPendingCreateLocation] = useState<{ lat: number; lon: number } | null>(null)
+  const [pendingCreateLocation, setPendingCreateLocation] = useState<{ lat: number; lon: number; clientX: number; clientY: number } | null>(null)
 
   const liveSelectedStage = selectedStage
     ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
@@ -154,8 +154,21 @@ export default function AdminMissionControlShell({
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
   }
 
-  function requestCreateNodeAt(lat: number, lon: number) {
-    setPendingCreateLocation({ lat, lon })
+  function normalizeCreatePopoverPoint(clientPoint?: { x: number; y: number }) {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 390
+    const height = typeof window !== 'undefined' ? window.innerHeight : 760
+    const rawX = clientPoint?.x ?? width / 2
+    const rawY = clientPoint?.y ?? height / 2
+
+    return {
+      clientX: Math.min(Math.max(rawX, 82), Math.max(82, width - 82)),
+      clientY: Math.min(Math.max(rawY, 112), Math.max(112, height - 126)),
+    }
+  }
+
+  function requestCreateNodeAt(lat: number, lon: number, clientPoint?: { x: number; y: number }) {
+    const point = normalizeCreatePopoverPoint(clientPoint)
+    setPendingCreateLocation({ lat, lon, ...point })
   }
 
   function cancelPendingCreateNode() {
@@ -167,6 +180,7 @@ export default function AdminMissionControlShell({
     onCreateNodeAt(pendingCreateLocation.lat, pendingCreateLocation.lon)
     setPendingCreateLocation(null)
   }
+
 
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
@@ -339,10 +353,41 @@ export default function AdminMissionControlShell({
             stages={stages}
             selectedStage={selectedStage}
             onSelectStage={onSelectStage}
-            onCreateStageAt={onCreateNodeAt}
+            onCreateStageAt={requestCreateNodeAt}
             onMoveStage={onMoveStage}
           />
         </div>
+          {pendingCreateLocation ? (
+            <>
+              <button
+                type="button"
+                className="saga-map-create-scrim"
+                aria-label="Descartar creación de nodo"
+                onClick={cancelPendingCreateNode}
+              />
+              <section
+                className="saga-map-create-mini"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Crear nodo aquí"
+                style={{ left: pendingCreateLocation.clientX, top: pendingCreateLocation.clientY }}
+              >
+                <strong>Crear nodo aquí?</strong>
+                <small>
+                  {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
+                </small>
+                <div>
+                  <button type="button" onClick={confirmPendingCreateNode}>
+                    Crear
+                  </button>
+                  <button type="button" onClick={cancelPendingCreateNode}>
+                    Descartar
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : null}
+
 
         {localNotice ? (
           <div className="saga-toast" role="status">{localNotice}</div>
