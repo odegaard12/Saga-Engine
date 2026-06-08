@@ -21,7 +21,7 @@ function normalizeLegacyNodeCopy(value?: string) {
   if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
     return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
   }
-  if (clean === 'Move closer to unlock this node.' || clean === 'Acércate al nodo para desbloquearlo.') {
+  if (clean === 'Acércate al nodo para desbloquearlo.' || clean === 'Acércate al nodo para desbloquearlo.') {
     return 'Acércate al nodo para desbloquearlo.'
   }
   return clean

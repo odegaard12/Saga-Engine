@@ -118,3 +118,15 @@ Implemented v5d:
 - checkbox label wraps instead of clipping;
 - footer uses `grid-template-columns: minmax(0, 1fr) auto`;
 - narrow screens stack or scroll instead of cutting content.
+
+## v6b — safe Basics cleanup
+
+The first v6 attempt tried to remove the duplicated game JSX from `Básico` and broke the drawer markup.
+
+Implemented v6b safely:
+
+- restored the broken TSX;
+- hides duplicated game selector/preview in `Básico` using scoped CSS only;
+- keeps the real game selector/configuration in the `Juego` tab;
+- explains `Texto principal del nodo` as player-facing instruction/clue text;
+- avoids deleting JSX blocks until the normal node editor is refactored into smaller components.

@@ -3,6 +3,10 @@ import { getLocale } from './index'
 const sources = new WeakMap<Text, string>()
 
 const ES: Record<string, string> = {
+  'Contenido del nodo': 'Texto principal del nodo',
+  'Player-facing copy': 'Textos que verá el jugador',
+  'GPS unavailable message.': 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
+  'Move closer to unlock this node.': 'Acércate al nodo para desbloquearlo.',
   'Player added locally. Save players to persist.': 'Jugador añadido en local. Pulsa Guardar jugadores para persistir.',
   'Player removed locally. Save players to persist.': 'Jugador eliminado en local. Pulsa Guardar jugadores para persistir.',
   'Saved using fallback payload. Mission data reloaded.': 'Guardado con payload de respaldo. Datos de misión recargados.',

@@ -4953,3 +4953,55 @@ button[title*="Avanzado"] {
     display: none !important;
   }
 }
+
+/* #234 v6b — safe Basics cleanup without touching fragile JSX
+   Game selector/preview live in the Juego tab. Básico should show identity + activation + main node text. */
+
+/* Hide duplicated game selector only when it is a direct field inside Básico.
+   Activation's Interacción select is nested inside .admin-node-activation-panel and is not affected. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check),
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + div,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + article,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + section {
+  display: none !important;
+}
+
+/* Extra safety for known game preview classes if present. */
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-summary"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-preview"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-card"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="template-preview"] {
+  display: none !important;
+}
+
+/* Main node text explanation. */
+.admin-node-editor-redesign .admin-node-field-title {
+  display: block !important;
+  color: rgba(248, 250, 252, 0.94) !important;
+  font-size: 0.86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-help {
+  display: block !important;
+  max-width: 72ch !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+}
+
+/* If the title replacement did not land because the label came through i18n,
+   still add a helper below the main textarea field in Básico. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(textarea)::after {
+  content: "Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.";
+  display: block !important;
+  color: rgba(203, 213, 225, 0.70) !important;
+  font-size: 0.80rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-top: 7px !important;
+}
