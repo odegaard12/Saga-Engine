@@ -4766,3 +4766,190 @@ button[title*="Avanzado"] {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* #234 v5d — responsive containment for normal node editor
+   Fixes clipped activation card, section headings, footer status and narrow editor widths. */
+
+.admin-node-editor-redesign,
+.admin-node-editor-redesign *,
+.admin-node-editor-redesign *::before,
+.admin-node-editor-redesign *::after {
+  box-sizing: border-box !important;
+}
+
+.admin-node-editor-redesign {
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-body,
+.admin-node-editor-redesign .admin-drawer-body--modern {
+  overflow-x: hidden !important;
+}
+
+/* Prevent any inner card/grid from exceeding drawer width. */
+.admin-node-editor-redesign .admin-node-basics-panel,
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign .admin-node-game-panel,
+.admin-node-editor-redesign .admin-node-requirement-panel,
+.admin-node-editor-redesign .admin-node-messages-panel,
+.admin-node-editor-redesign .admin-node-activation-panel,
+.admin-node-editor-redesign .admin-edit-section,
+.admin-node-editor-redesign .admin-edit-grid,
+.admin-node-editor-redesign .admin-form-grid,
+.admin-node-editor-redesign .admin-node-activation-grid {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Section headers may wrap instead of being cut on the right. */
+.admin-node-editor-redesign .admin-edit-section-head {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 6px 12px !important;
+}
+
+.admin-node-editor-redesign .admin-edit-section-head strong,
+.admin-node-editor-redesign .admin-edit-section-head span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  line-height: 1.25 !important;
+}
+
+/* Activation card: fluid grid, not three fixed columns that overflow. */
+.admin-node-editor-redesign .admin-node-activation-panel {
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid .admin-edit-field,
+.admin-node-editor-redesign .admin-node-activation-grid label {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check {
+  min-width: 0 !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check span {
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.2 !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* Form fields should never force horizontal scroll. */
+.admin-node-editor-redesign input,
+.admin-node-editor-redesign select,
+.admin-node-editor-redesign textarea,
+.admin-node-editor-redesign button {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Basic panel: avoid huge two-column layout when drawer is narrow. */
+@media (max-width: 980px) {
+  .admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-activation-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Tabs: keep usable; scroll if needed instead of clipping text. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs::-webkit-scrollbar,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Footer: status text and close button must not overlap/cut. */
+.admin-node-editor-redesign .admin-drawer-footer {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer > * {
+  min-width: 0 !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer .admin-cms-side-action,
+.admin-node-editor-redesign .admin-drawer-footer button {
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer .admin-local-preview,
+.admin-node-editor-redesign .admin-drawer-footer [class*="preview"],
+.admin-node-editor-redesign .admin-drawer-footer [class*="status"],
+.admin-node-editor-redesign .admin-drawer-footer span,
+.admin-node-editor-redesign .admin-drawer-footer div {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Very narrow screens: footer stacks cleanly. */
+@media (max-width: 430px) {
+  .admin-node-editor-redesign .admin-drawer-footer {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-node-editor-redesign .admin-drawer-footer .admin-cms-side-action,
+  .admin-node-editor-redesign .admin-drawer-footer button {
+    width: 100% !important;
+  }
+}
+
+/* Badge bottom-right must not invade editor footer in narrow layouts. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-build-info--floating {
+    display: none !important;
+  }
+}

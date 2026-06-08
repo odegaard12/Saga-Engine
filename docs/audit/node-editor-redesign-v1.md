@@ -100,3 +100,21 @@ Implemented v5c:
 - adds `patchActivationStage`;
 - wires activation controls to the normal node editor draft state;
 - translates remaining visible `Save`/`Unsaved` copy.
+
+## v5d — responsive containment
+
+Manual screenshot after v5c showed content clipping inside the normal editor:
+
+- activation card right column was cut;
+- section helper text was truncated;
+- footer status overlapped with the close button;
+- some grids still assumed too much horizontal space.
+
+Implemented v5d:
+
+- global `box-sizing` containment inside normal editor;
+- fluid activation grid using `auto-fit`;
+- wrapped section helper text;
+- checkbox label wraps instead of clipping;
+- footer uses `grid-template-columns: minmax(0, 1fr) auto`;
+- narrow screens stack or scroll instead of cutting content.
