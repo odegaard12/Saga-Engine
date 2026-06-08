@@ -89,3 +89,14 @@ Implemented v4b:
 - kept coordinates in the node header;
 - kept legacy GPS/locked messages visually translated;
 - avoided risky TSX field relocation until the game-template editor is redesigned.
+
+## v5c — fix activation updater
+
+The first v5b attempt inserted activation controls but used `patchStage`, which belongs to the QR physical editor pattern and is not available inside `NodeDetailDrawer`.
+
+Implemented v5c:
+
+- detects the local `draft` setter inside `NodeDetailDrawer`;
+- adds `patchActivationStage`;
+- wires activation controls to the normal node editor draft state;
+- translates remaining visible `Save`/`Unsaved` copy.

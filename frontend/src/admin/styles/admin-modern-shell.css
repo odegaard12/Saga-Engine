@@ -4686,3 +4686,83 @@ button[title*="Avanzado"] {
     grid-template-columns: none !important;
   }
 }
+
+/* #234 v5b — activation controls inside Basics */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel {
+  grid-column: 1 / -1 !important;
+  margin: 4px 0 12px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(56, 189, 248, 0.18) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.12), transparent 34%),
+    rgba(15, 23, 42, 0.54) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 10px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid {
+  display: grid !important;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(170px, 0.95fr) minmax(190px, 1fr) !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid label {
+  margin: 0 !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid input,
+.admin-node-editor-redesign .admin-node-activation-grid select {
+  min-height: 40px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check {
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 16px !important;
+  padding: 8px 10px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check input {
+  width: 18px !important;
+  min-height: 18px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  margin: 10px 0 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign button[aria-label*="Ubicación"],
+.admin-node-editor-redesign button[title*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[aria-label*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[title*="Ubicación"] {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-activation-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

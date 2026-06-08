@@ -487,7 +487,7 @@ export default function AdminMissionControlShell({
       ) : null}
 
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={onSaveStages}>Save</button>
+        <button type="button" onClick={onSaveStages}>Guardar</button>
         <button type="button" onClick={() => togglePanel('builder')}>Builder</button>
         <button type="button" onClick={() => togglePanel('players')}>Players</button>
         <button type="button" onClick={() => togglePanel('mission')}>Settings</button>

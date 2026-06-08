@@ -21,7 +21,7 @@ function normalizeLegacyNodeCopy(value?: string) {
   if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
     return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
   }
-  if (clean === 'Acércate al nodo para desbloquearlo.') {
+  if (clean === 'Move closer to unlock this node.' || clean === 'Acércate al nodo para desbloquearlo.') {
     return 'Acércate al nodo para desbloquearlo.'
   }
   return clean
@@ -355,6 +355,96 @@ export default function NodeDetailDrawer({
     }))
   }
 
+  function patchActivationStage(patch: Partial<AdminReactOverviewStage>) {
+    setDraft((current) => ({
+      ...current,
+      ...patch,
+    }))
+  }
+
+
+  function renderActivationPanel() {
+    const rawDraft = draft as Record<string, unknown>
+    const rawRadius =
+      rawDraft.radius_m ??
+      rawDraft.radius ??
+      rawDraft.activation_radius_m ??
+      50
+    const radiusValue = String(rawRadius)
+    const interactionValue = String(
+      rawDraft.input_mode ??
+        rawDraft.inputMode ??
+        (rawDraft.require_proximity === false || rawDraft.requireProximity === false ? 'manual' : 'gps'),
+    )
+    const requireProximity = rawDraft.require_proximity !== false && rawDraft.requireProximity !== false
+
+    return (
+      <section className="admin-node-activation-panel">
+        <div className="admin-edit-section-head">
+          <strong>Activación</strong>
+          <span>Radio, proximidad y forma de interactuar</span>
+        </div>
+
+        <div className="admin-node-activation-grid">
+          <label className="admin-edit-field">
+            Radio en metros
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={radiusValue}
+              onChange={(event) => {
+                const value = Number(event.target.value)
+                const radius = Number.isFinite(value) && value > 0 ? value : 50
+                patchActivationStage({
+                  ...({ radius_m: radius } as Partial<AdminReactOverviewStage>),
+                  ...({ radius: radius } as Partial<AdminReactOverviewStage>),
+                  ...({ activation_radius_m: radius } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            />
+          </label>
+
+          <label className="admin-edit-field">
+            Interacción
+            <select
+              value={interactionValue}
+              onChange={(event) => {
+                patchActivationStage({
+                  ...({ input_mode: event.target.value } as Partial<AdminReactOverviewStage>),
+                  ...({ inputMode: event.target.value } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            >
+              <option value="gps">Por radio GPS</option>
+              <option value="manual">Manual / sin radio</option>
+              <option value="game">Según plantilla de juego</option>
+            </select>
+          </label>
+
+          <label className="admin-edit-field admin-node-activation-check">
+            <input
+              type="checkbox"
+              checked={requireProximity}
+              onChange={(event) => {
+                patchActivationStage({
+                  ...({ require_proximity: event.target.checked } as Partial<AdminReactOverviewStage>),
+                  ...({ requireProximity: event.target.checked } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            />
+            <span>Requerir estar cerca del nodo</span>
+          </label>
+        </div>
+
+        <p className="admin-node-activation-note">
+          La posición se cambia arrastrando el nodo en el mapa. Aquí configuras el radio y cómo se activa.
+        </p>
+      </section>
+    )
+  }
+
+
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="presentation">
       <aside
@@ -459,6 +549,7 @@ export default function NodeDetailDrawer({
                 <strong>Basics</strong>
                 <span>Core node identity</span>
               </div>
+              {renderActivationPanel()}
 
               <label className="admin-edit-field">
                 Title
