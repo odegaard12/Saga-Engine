@@ -3862,3 +3862,16 @@
     font-size: 11px !important;
   }
 }
+
+/* #233 v18 remove Advanced tab/menu from node editor */
+.admin-node-editor-tabs button:nth-last-child(1):has(+ .__never__) {
+  display: initial;
+}
+
+/* Defensive: if stale markup with advanced tab is served from cache, hide by title/class patterns where possible. */
+.admin-drawer-tab[aria-label*="Avanzado"],
+.admin-drawer-tab[title*="Avanzado"],
+button[aria-label*="Avanzado"],
+button[title*="Avanzado"] {
+  display: none !important;
+}

@@ -430,10 +430,7 @@ export default function AdminMissionControlShell({
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
-              onMoveLocal={onReorderStage}
               onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
-              canMoveUp={selectedIndex > 0}
-              canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
             />
           )}
         </aside>

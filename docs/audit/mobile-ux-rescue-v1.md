@@ -676,3 +676,18 @@ Implemented v17:
 - Ensured all physical QR editor usages receive `onDeleteLocal`.
 - Forced physical QR topbar actions (`Eliminar`/`Descartar` and `Cerrar ×`) to remain visible.
 - Kept quick add-node actions hidden while map creation uses the safer `Crear` / `Descartar` popover.
+
+## Follow-up adjustment v18: remove Advanced tab from node editor
+
+Manual test showed the Advanced tab duplicated actions that now live in clearer places:
+
+- route ordering is handled in the route list with `↑` / `↓`;
+- delete/discard lives in the editor topbar;
+- hidden destructive actions inside Advanced made the editor more confusing.
+
+Implemented v18:
+
+- Removed the `Avanzado` tab/menu from the normal node editor.
+- Removed the Advanced tab content block.
+- Stopped passing old movement props into `NodeDetailDrawer`.
+- Kept QR physical topbar actions visible: `Eliminar`/`Descartar` and `Cerrar ×`.

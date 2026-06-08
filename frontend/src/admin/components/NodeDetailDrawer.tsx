@@ -15,7 +15,7 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 
-type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
+type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages'
 
 function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
   return game.runtimeStatus === 'runtime_ready' && game.offlineStatus === 'offline_ready'
@@ -60,10 +60,7 @@ type NodeDetailDrawerProps = {
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
-  onMoveLocal: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
   onRequestChangeType?: () => void
-  canMoveUp: boolean
-  canMoveDown: boolean
 }
 
 function formatCoords(lat: unknown, lon: unknown) {
@@ -191,10 +188,7 @@ export default function NodeDetailDrawer({
   onClose,
   onApplyLocal,
   onDeleteLocal,
-  onMoveLocal,
   onRequestChangeType,
-  canMoveUp,
-  canMoveDown,
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
   const [activeTab, setActiveTab] = useState<DrawerTab>('basics')
@@ -449,13 +443,6 @@ export default function NodeDetailDrawer({
             onClick={() => setActiveTab('messages')}
           >
             Mensajes
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'advanced' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('advanced')}
-          >
-            Avanzado
           </button>
         </div>
 
@@ -967,59 +954,6 @@ export default function NodeDetailDrawer({
             </section>
           ) : null}
 
-          {activeTab === 'advanced' ? (
-            <>
-              <section className="admin-edit-section admin-edit-section-compact">
-                <div className="admin-edit-section-head">
-                  <strong>Route order</strong>
-                  <span>Local reorder</span>
-                </div>
-
-                <div className="admin-reorder-actions">
-                  <button
-                    type="button"
-                    className="admin-cms-side-action"
-                    disabled={!canMoveUp}
-                    onClick={() => onMoveLocal(draft, 'up')}
-                  >
-                    
-                  </button>
-
-                  <button
-                    type="button"
-                    className="admin-cms-side-action"
-                    disabled={!canMoveDown}
-                    onClick={() => onMoveLocal(draft, 'down')}
-                  >
-                    
-                  </button>
-                </div>
-
-                <small className="admin-reorder-note">
-                  Current route position: {draft.index + 1}. Save changes to persist the new order.
-                </small>
-              </section>
-
-              <section className="admin-edit-section admin-edit-section-compact admin-edit-section-danger">
-                <div className="admin-edit-section-head">
-                  <strong>Danger zone</strong>
-                  <span>Destructive action</span>
-                </div>
-
-                <button
-                  type="button"
-                  className="admin-cms-side-action admin-cms-side-action--danger"
-                  onClick={() => {
-                    if (window.confirm(`Eliminar nodo "${draft.title || 'Untitled node'}"? Save changes afterwards to persist.`)) {
-                      onDeleteLocal(draft)
-                    }
-                  }}
-                >
-                  Eliminar nodo
-                </button>
-              </section>
-            </>
-          ) : null}
         </div>
 
         <div className="admin-drawer-footer">
