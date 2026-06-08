@@ -106,6 +106,7 @@ export default function AdminMissionControlShell({
   onApplyMissionTemplate,
 }: AdminMissionControlShellProps) {
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
+  const [pendingCreateLocation, setPendingCreateLocation] = useState<{ lat: number; lon: number; clientX: number; clientY: number } | null>(null)
 
   const liveSelectedStage = selectedStage
     ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
@@ -153,6 +154,34 @@ export default function AdminMissionControlShell({
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
   }
 
+  function normalizeCreatePopoverPoint(clientPoint?: { x: number; y: number }) {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 390
+    const height = typeof window !== 'undefined' ? window.innerHeight : 760
+    const rawX = clientPoint?.x ?? width / 2
+    const rawY = clientPoint?.y ?? height / 2
+
+    return {
+      clientX: Math.min(Math.max(rawX, 82), Math.max(82, width - 82)),
+      clientY: Math.min(Math.max(rawY, 112), Math.max(112, height - 126)),
+    }
+  }
+
+  function requestCreateNodeAt(lat: number, lon: number, clientPoint?: { x: number; y: number }) {
+    const point = normalizeCreatePopoverPoint(clientPoint)
+    setPendingCreateLocation({ lat, lon, ...point })
+  }
+
+  function cancelPendingCreateNode() {
+    setPendingCreateLocation(null)
+  }
+
+  function confirmPendingCreateNode() {
+    if (!pendingCreateLocation) return
+    onCreateNodeAt(pendingCreateLocation.lat, pendingCreateLocation.lon)
+    setPendingCreateLocation(null)
+  }
+
+
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
 
@@ -183,7 +212,7 @@ export default function AdminMissionControlShell({
         </section>
 
         <nav className="saga-rail-actions" aria-label="Primary admin actions">
-          <button type="button" className="saga-primary-action" onClick={() => togglePanel('builder')}>
+          <button type="button" className="saga-primary-action saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
             + Add node
           </button>
 
@@ -194,7 +223,7 @@ export default function AdminMissionControlShell({
             disabled={saveState === 'saving'}
             onClick={onSaveStages}
           >
-            {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save'}
+            {saveState === 'saving' ? 'Guardando…' : saveState === 'saved' ? 'Guardado' : 'Guardar'}
           </button>
 
           <button type="button" onClick={onRefresh}>Refresh</button>
@@ -299,11 +328,11 @@ export default function AdminMissionControlShell({
       <section className="saga-map-workspace" aria-label="Map workspace">
         <div className="saga-command-bar">
           <div className="saga-command-main">
-            <button type="button" className="saga-command-primary" onClick={() => togglePanel('builder')}>
+            <button type="button" className="saga-command-primary saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
               Add node
             </button>
             <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
-              {saveState === 'saving' ? 'Saving…' : 'Save'}
+              {saveState === 'saving' ? 'Guardando…' : 'Guardar'}
             </button>
             <button type="button" onClick={onRefresh}>Refresh</button>
           </div>
@@ -324,10 +353,41 @@ export default function AdminMissionControlShell({
             stages={stages}
             selectedStage={selectedStage}
             onSelectStage={onSelectStage}
-            onCreateStageAt={onCreateNodeAt}
+            onCreateStageAt={requestCreateNodeAt}
             onMoveStage={onMoveStage}
           />
         </div>
+          {pendingCreateLocation ? (
+            <>
+              <button
+                type="button"
+                className="saga-map-create-scrim"
+                aria-label="Descartar creación de nodo"
+                onClick={cancelPendingCreateNode}
+              />
+              <section
+                className="saga-map-create-mini"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Crear nodo aquí"
+                style={{ left: pendingCreateLocation.clientX, top: pendingCreateLocation.clientY }}
+              >
+                <strong>Crear nodo aquí?</strong>
+                <small>
+                  {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
+                </small>
+                <div>
+                  <button type="button" onClick={confirmPendingCreateNode}>
+                    Crear
+                  </button>
+                  <button type="button" onClick={cancelPendingCreateNode}>
+                    Descartar
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : null}
+
 
         {localNotice ? (
           <div className="saga-toast" role="status">{localNotice}</div>
@@ -348,6 +408,7 @@ export default function AdminMissionControlShell({
                   } as unknown as AdminReactOverviewStage)
                 }}
                 onFinishChoice={() => setTypeChooserStageKey(null)}
+                onDeleteLocal={onDeleteStage}
               />
             </div>
           ) : isPhysicalNode(liveSelectedStage) ? (
@@ -357,21 +418,9 @@ export default function AdminMissionControlShell({
                   stage={liveSelectedStage}
                   onApplyLocal={onApplyStage}
                   onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+                  onClose={() => onSelectStage(null)}
+                  onDeleteLocal={onDeleteStage}
                 />
-              </div>
-
-              <div className="saga-physical-node-actions">
-                <button
-                  type="button"
-                  className="saga-danger-action"
-                  onClick={() => {
-                    if (window.confirm(`Eliminar nodo "${liveSelectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
-                      onDeleteStage(liveSelectedStage)
-                    }
-                  }}
-                >
-                  Eliminar nodo
-                </button>
               </div>
             </>
           ) : (
@@ -381,10 +430,7 @@ export default function AdminMissionControlShell({
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
-              onMoveLocal={onReorderStage}
               onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
-              canMoveUp={selectedIndex > 0}
-              canMoveDown={selectedIndex >= 0 && selectedIndex < stages.length - 1}
             />
           )}
         </aside>
@@ -441,8 +487,7 @@ export default function AdminMissionControlShell({
       ) : null}
 
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={() => togglePanel('builder')}>+ Node</button>
-        <button type="button" onClick={onSaveStages}>Save</button>
+        <button type="button" onClick={onSaveStages}>Guardar</button>
         <button type="button" onClick={() => togglePanel('builder')}>Builder</button>
         <button type="button" onClick={() => togglePanel('players')}>Players</button>
         <button type="button" onClick={() => togglePanel('mission')}>Settings</button>
@@ -470,7 +515,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
   if (state === 'error') {
     return (
       <div className="saga-save-status error">
-        <b>Save failed</b>
+        <b>Error al guardar</b>
         <span>{error || 'Unknown error'}</span>
       </div>
     )
@@ -488,7 +533,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
   if (state === 'saved') {
     return (
       <div className="saga-save-status saved">
-        <b>Saved</b>
+        <b>Guardado</b>
         <span>Backend reloaded</span>
       </div>
     )
@@ -496,7 +541,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
 
   return (
     <div className="saga-save-status idle">
-      <b>Unsaved</b>
+      <b>Sin guardar</b>
       <span>Local changes only</span>
     </div>
   )

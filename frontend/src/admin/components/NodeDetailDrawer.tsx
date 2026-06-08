@@ -15,7 +15,20 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 
-type DrawerTab = 'basics' | 'location' | 'game' | 'requirement' | 'messages' | 'advanced'
+function normalizeLegacyNodeCopy(value?: string) {
+  const clean = String(value || '').trim()
+  if (!clean) return ''
+  if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
+    return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
+  }
+  if (clean === 'Acércate al nodo para desbloquearlo.' || clean === 'Acércate al nodo para desbloquearlo.') {
+    return 'Acércate al nodo para desbloquearlo.'
+  }
+  return clean
+}
+
+
+type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
 
 function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
   return game.runtimeStatus === 'runtime_ready' && game.offlineStatus === 'offline_ready'
@@ -60,10 +73,7 @@ type NodeDetailDrawerProps = {
   onClose: () => void
   onApplyLocal: (stage: AdminReactOverviewStage) => void
   onDeleteLocal: (stage: AdminReactOverviewStage) => void
-  onMoveLocal: (stage: AdminReactOverviewStage, direction: 'up' | 'down') => void
   onRequestChangeType?: () => void
-  canMoveUp: boolean
-  canMoveDown: boolean
 }
 
 function formatCoords(lat: unknown, lon: unknown) {
@@ -191,10 +201,7 @@ export default function NodeDetailDrawer({
   onClose,
   onApplyLocal,
   onDeleteLocal,
-  onMoveLocal,
   onRequestChangeType,
-  canMoveUp,
-  canMoveDown,
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
   const [activeTab, setActiveTab] = useState<DrawerTab>('basics')
@@ -348,15 +355,119 @@ export default function NodeDetailDrawer({
     }))
   }
 
+  function patchActivationStage(patch: Partial<AdminReactOverviewStage>) {
+    setDraft((current) => ({
+      ...current,
+      ...patch,
+    }))
+  }
+
+
+  function renderActivationPanel() {
+    const rawDraft = draft as Record<string, unknown>
+    const rawRadius =
+      rawDraft.radius_m ??
+      rawDraft.radius ??
+      rawDraft.activation_radius_m ??
+      50
+    const radiusValue = String(rawRadius)
+    const interactionValue = String(
+      rawDraft.input_mode ??
+        rawDraft.inputMode ??
+        (rawDraft.require_proximity === false || rawDraft.requireProximity === false ? 'manual' : 'gps'),
+    )
+    const requireProximity = rawDraft.require_proximity !== false && rawDraft.requireProximity !== false
+
+    return (
+      <section className="admin-node-activation-panel">
+        <div className="admin-edit-section-head">
+          <strong>Activación</strong>
+          <span>Radio, proximidad y forma de interactuar</span>
+        </div>
+
+        <div className="admin-node-activation-grid">
+          <label className="admin-edit-field">
+            Radio en metros
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={radiusValue}
+              onChange={(event) => {
+                const value = Number(event.target.value)
+                const radius = Number.isFinite(value) && value > 0 ? value : 50
+                patchActivationStage({
+                  ...({ radius_m: radius } as Partial<AdminReactOverviewStage>),
+                  ...({ radius: radius } as Partial<AdminReactOverviewStage>),
+                  ...({ activation_radius_m: radius } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            />
+          </label>
+
+          <label className="admin-edit-field">
+            Interacción
+            <select
+              value={interactionValue}
+              onChange={(event) => {
+                patchActivationStage({
+                  ...({ input_mode: event.target.value } as Partial<AdminReactOverviewStage>),
+                  ...({ inputMode: event.target.value } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            >
+              <option value="gps">Por radio GPS</option>
+              <option value="manual">Manual / sin radio</option>
+              <option value="game">Según plantilla de juego</option>
+            </select>
+          </label>
+
+          <label className="admin-edit-field admin-node-activation-check">
+            <input
+              type="checkbox"
+              checked={requireProximity}
+              onChange={(event) => {
+                patchActivationStage({
+                  ...({ require_proximity: event.target.checked } as Partial<AdminReactOverviewStage>),
+                  ...({ requireProximity: event.target.checked } as Partial<AdminReactOverviewStage>),
+                })
+              }}
+            />
+            <span>Requerir estar cerca del nodo</span>
+          </label>
+        </div>
+
+        <p className="admin-node-activation-note">
+          La posición se cambia arrastrando el nodo en el mapa. Aquí configuras el radio y cómo se activa.
+        </p>
+      </section>
+    )
+  }
+
+
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="presentation">
       <aside
-        className="admin-drawer admin-drawer-editable"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign"
         role="dialog"
         aria-modal="true"
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
+        <div className="admin-node-editor-inline-topbar">
+          <div className="admin-node-editor-inline-title">
+            <span className="admin-node-editor-inline-kicker">Editor</span>
+            <strong>Editor de nodo / QR físico</strong>
+          </div>
+          <button
+            type="button"
+            className="admin-node-editor-inline-close"
+            onClick={onClose}
+            aria-label="Cerrar editor de nodo"
+          >
+            Cerrar ×
+          </button>
+        </div>
         <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
           <div className="admin-node-editor-kicker-row">
             <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor de nodo'}</span>
@@ -366,7 +477,7 @@ export default function NodeDetailDrawer({
               className="admin-node-editor-close"
               onClick={onClose}
             >
-              Cerrar
+              Cerrar ×
             </button>
           </div>
 
@@ -410,13 +521,6 @@ export default function NodeDetailDrawer({
           </button>
           <button
             type="button"
-            className={activeTab === 'location' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('location')}
-          >
-            Ubicación
-          </button>
-          <button
-            type="button"
             className={activeTab === 'game' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('game')}
           >
@@ -436,22 +540,16 @@ export default function NodeDetailDrawer({
           >
             Mensajes
           </button>
-          <button
-            type="button"
-            className={activeTab === 'advanced' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('advanced')}
-          >
-            Avanzado
-          </button>
         </div>
 
         <div className="admin-drawer-body admin-drawer-body--modern">
           {activeTab === 'basics' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
+            <section className="admin-edit-section admin-edit-section-compact admin-node-basics-panel">
               <div className="admin-edit-section-head">
                 <strong>Basics</strong>
                 <span>Core node identity</span>
               </div>
+              {renderActivationPanel()}
 
               <label className="admin-edit-field">
                 Title
@@ -461,7 +559,7 @@ export default function NodeDetailDrawer({
                 />
               </label>
 
-              <label className="admin-edit-field">
+              <label className="admin-basic-game-duplicate admin-edit-field">
                 Juego
                 <select
                   value={selectedGame.id}
@@ -495,66 +593,9 @@ export default function NodeDetailDrawer({
             </section>
           ) : null}
 
-          {activeTab === 'location' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
-              <div className="admin-edit-section-head">
-                <strong>Location</strong>
-                <span>{formatCoords(draft.lat, draft.lon)}</span>
-              </div>
-
-              <div className="admin-edit-grid">
-                <label className="admin-edit-field">
-                  Latitude
-                  <input
-                    inputMode="decimal"
-                    value={draft.lat ?? ''}
-                    onChange={(event) => setDraftField('lat', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Longitude
-                  <input
-                    inputMode="decimal"
-                    value={draft.lon ?? ''}
-                    onChange={(event) => setDraftField('lon', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Radius meters
-                  <input
-                    inputMode="numeric"
-                    value={draft.radius ?? ''}
-                    onChange={(event) => setDraftField('radius', numberOrNull(event.target.value))}
-                  />
-                </label>
-
-                <label className="admin-edit-field">
-                  Entry mode
-                  <select
-                    value={draft.entry_mode || 'gps'}
-                    onChange={(event) => setDraftField('entry_mode', event.target.value)}
-                  >
-                    <option value="gps">GPS</option>
-                    <option value="free">Free</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="admin-edit-check">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.require_proximity)}
-                  onChange={(event) => setDraftField('require_proximity', event.target.checked)}
-                />
-                Require proximity
-              </label>
-            </section>
-          ) : null}
 
           {activeTab === 'game' ? (
-            <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
+            <section className="admin-edit-section admin-edit-section-compact admin-family-config-section admin-node-game-panel">
               <div className="admin-edit-section-head">
                 <strong>Juego</strong>
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
@@ -806,7 +847,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <small className="admin-family-config-note">
-                This panel updates local draft state immediately. Use Save in Mission Control to persist.
+                Este panel actualiza la vista local al momento. Pulsa Guardar en Control de misión para persistir.
               </small>
             </section>
           ) : null}
@@ -876,39 +917,6 @@ export default function NodeDetailDrawer({
                     />
                     Consumir objeto al superar el nodo
                   </label>
-
-                  <details className="admin-requirement-advanced">
-                    <summary>Avanzado: editar ID manualmente</summary>
-
-                    <div className="admin-edit-grid">
-                      <label className="admin-edit-field">
-                        ID requerido
-                        <input
-                          value={getDraftConfigText('required_item_id')}
-                          placeholder="el_miedo"
-                          onChange={(event) => updateDraftConfigText('required_item_id', event.target.value.trim())}
-                        />
-                      </label>
-
-                      <label className="admin-edit-field">
-                        Nombre visible
-                        <input
-                          value={getDraftConfigText('required_item_label')}
-                          placeholder="El MIEDO"
-                          onChange={(event) => updateDraftConfigText('required_item_label', event.target.value)}
-                        />
-                      </label>
-
-                      <label className="admin-edit-field">
-                        Cantidad
-                        <input
-                          inputMode="numeric"
-                          value={getDraftConfigText('required_item_quantity', '1')}
-                          onChange={(event) => updateDraftConfigNumber('required_item_quantity', event.target.value)}
-                        />
-                      </label>
-                    </div>
-                  </details>
                 </>
               ) : (
                 <div className="admin-rule-empty-state">
@@ -920,10 +928,10 @@ export default function NodeDetailDrawer({
           ) : null}
 
           {activeTab === 'messages' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
+            <section className="admin-edit-section admin-edit-section-compact admin-node-messages-panel">
               <div className="admin-edit-section-head">
-                <strong>Messages</strong>
-                <span>Player-facing copy</span>
+                <strong>Mensajes</strong>
+                <span>Textos que verá el jugador</span>
               </div>
 
               <label className="admin-edit-field">
@@ -936,82 +944,26 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                GPS unavailable message
+                Mensaje si no hay GPS
                 <input
-                  value={messages.gps_unavailable || ''}
+                  value={normalizeLegacyNodeCopy(messages.gps_unavailable)}
                   onChange={(event) => setDraftMessage('gps_unavailable', event.target.value)}
                 />
               </label>
 
               <label className="admin-edit-field">
-                Locked / success copy
+                Mensaje de bloqueo / éxito
                 <input
-                  value={messages.locked || ''}
+                  value={normalizeLegacyNodeCopy(messages.locked)}
                   onChange={(event) => setDraftMessage('locked', event.target.value)}
                 />
               </label>
             </section>
           ) : null}
 
-          {activeTab === 'advanced' ? (
-            <>
-              <section className="admin-edit-section admin-edit-section-compact">
-                <div className="admin-edit-section-head">
-                  <strong>Route order</strong>
-                  <span>Local reorder</span>
-                </div>
-
-                <div className="admin-reorder-actions">
-                  <button
-                    type="button"
-                    className="admin-cms-side-action"
-                    disabled={!canMoveUp}
-                    onClick={() => onMoveLocal(draft, 'up')}
-                  >
-                    Move up
-                  </button>
-
-                  <button
-                    type="button"
-                    className="admin-cms-side-action"
-                    disabled={!canMoveDown}
-                    onClick={() => onMoveLocal(draft, 'down')}
-                  >
-                    Move down
-                  </button>
-                </div>
-
-                <small className="admin-reorder-note">
-                  Current route position: {draft.index + 1}. Save changes to persist the new order.
-                </small>
-              </section>
-
-              <section className="admin-edit-section admin-edit-section-compact admin-edit-section-danger">
-                <div className="admin-edit-section-head">
-                  <strong>Danger zone</strong>
-                  <span>Destructive action</span>
-                </div>
-
-                <button
-                  type="button"
-                  className="admin-cms-side-action admin-cms-side-action--danger"
-                  onClick={() => {
-                    if (window.confirm(`Delete node "${draft.title || 'Untitled node'}"? Save changes afterwards to persist.`)) {
-                      onDeleteLocal(draft)
-                    }
-                  }}
-                >
-                  Delete node
-                </button>
-              </section>
-            </>
-          ) : null}
         </div>
 
         <div className="admin-drawer-footer">
-          <div className="admin-note-pill">
-            Live local preview · use Save in Mission Control to persist
-          </div>
 
           <div className="admin-drawer-footer-actions">
             <button type="button" className="admin-cms-side-action" onClick={onClose}>

@@ -9,7 +9,7 @@ type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
   selectedStage: AdminReactOverviewStage | null
   onSelectStage: (stage: AdminReactOverviewStage) => void
-  onCreateStageAt?: (lat: number, lon: number) => void
+  onCreateStageAt?: (lat: number, lon: number, clientPoint?: { x: number; y: number }) => void
   onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
 }
 
@@ -111,8 +111,6 @@ export default function AdminMissionMap({
       doubleClickZoom: false,
     })
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map)
-
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
@@ -134,7 +132,14 @@ export default function AdminMissionMap({
     if (!map || !onCreateStageAt) return
 
     const handleMapClick = (event: L.LeafletMouseEvent) => {
-      onCreateStageAt(event.latlng.lat, event.latlng.lng)
+      // #233 v16: map click/tap opens a tiny create/discard popover.
+      // Nothing is added to local mission state until the admin confirms.
+      if (map.getContainer().classList.contains('admin-map-dragging-node')) return
+
+      onCreateStageAt(event.latlng.lat, event.latlng.lng, {
+        x: event.originalEvent.clientX,
+        y: event.originalEvent.clientY,
+      })
     }
 
     map.on('click', handleMapClick)

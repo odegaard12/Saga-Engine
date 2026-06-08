@@ -3188,3 +3188,1886 @@
   }
 }
 
+
+/* #233 Mobile UX rescue consolidated: admin mobile controls + physical QR editor */
+
+/* Admin map: hide Leaflet +/- zoom controls. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom {
+  display: none !important;
+}
+
+/* Remove experimental/global close attempts if stale markup remains. */
+.admin-global-drawer-close,
+.admin-node-editor-global-close,
+.admin-node-editor-mobile-close,
+.admin-node-editor-inline-topbar {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Normal drawer close: visible inside its own header. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 84px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(248, 250, 252, 0.28) !important;
+  border-radius: 999px !important;
+  background: rgba(127, 29, 29, 0.88) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+/* Physical QR editor topbar: the real close lives here. */
+.saga-physical-editor-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: -2px -2px 14px !important;
+  padding: 12px 12px !important;
+  border: 1px solid rgba(125, 211, 252, 0.28) !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(180deg, rgba(8, 16, 32, 0.99), rgba(8, 16, 32, 0.92)) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32) !important;
+  backdrop-filter: blur(16px);
+}
+
+.saga-physical-editor-topbar__copy {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.saga-physical-editor-topbar__copy span {
+  color: #67e8f9 !important;
+  font-size: 0.62rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.saga-physical-editor-topbar__copy strong {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  color: #f8fafc !important;
+  font-size: 1rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.saga-physical-editor-topbar__close {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 82px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(248, 250, 252, 0.36) !important;
+  border-radius: 999px !important;
+  background: rgba(127, 29, 29, 0.9) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.saga-physical-editor-topbar__close:active,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-close:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Admin mobile rescue: bottom nav spacing and no accidental add-node button. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) {
+    min-height: 100dvh;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .saga-primary-action {
+    display: none !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-shell,
+  .admin-root:not(.admin-root-login-only) .admin-main,
+  .admin-root:not(.admin-root-login-only) .admin-content,
+  .admin-root:not(.admin-root-login-only) .admin-canvas,
+  .admin-root:not(.admin-root-login-only) .admin-map-shell,
+  .admin-root:not(.admin-root-login-only) .admin-mission-control {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+    padding: 8px 8px calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-editable {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 22px !important;
+    overflow: hidden !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+    padding: 12px 12px calc(132px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-head,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 120 !important;
+    background: rgba(15, 23, 42, 0.94) !important;
+    backdrop-filter: blur(14px);
+  }
+
+  .saga-physical-editor-topbar {
+    margin: -4px -4px 12px !important;
+    padding: 10px 10px !important;
+    border-radius: 18px !important;
+  }
+
+  .saga-physical-editor-topbar__copy strong {
+    font-size: 0.9rem !important;
+  }
+
+  .saga-physical-editor-topbar__close,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+    min-width: 78px !important;
+    min-height: 38px !important;
+    padding: 8px 11px !important;
+    font-size: 11px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-toast,
+  .admin-root:not(.admin-root-login-only) .admin-notice,
+  .admin-root:not(.admin-root-login-only) .admin-local-notice,
+  .admin-root:not(.admin-root-login-only) .admin-save-notice,
+  .admin-root:not(.admin-root-login-only) [class*="notice"],
+  .admin-root:not(.admin-root-login-only) [class*="toast"] {
+    max-width: calc(100vw - 18px) !important;
+    left: 9px !important;
+    right: 9px !important;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+}
+
+/* #233 Mobile UX rescue v13: visible duplicate cleanup */
+
+/* Map controls: remove Leaflet +/- in admin, all placements. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Hide add-node entry points on mobile/coarse pointer.
+   Future PR should replace this with safe staged pin placement. */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .admin-add-node,
+  .admin-root:not(.admin-root-login-only) .admin-create-node,
+  .admin-root:not(.admin-root-login-only) .admin-map-create-node,
+  .admin-root:not(.admin-root-login-only) .admin-node-create,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Admin duplicate top bars: keep the app header, compact/hide repeated mission mastheads. */
+  .admin-root:not(.admin-root-login-only) .admin-mission-header,
+  .admin-root:not(.admin-root-login-only) .admin-mission-hero,
+  .admin-root:not(.admin-root-login-only) .admin-dashboard-hero,
+  .admin-root:not(.admin-root-login-only) .admin-overview-hero,
+  .admin-root:not(.admin-root-login-only) .admin-summary-hero {
+    margin-top: 8px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  /* If duplicated header blocks exist, make secondary cards compact instead of huge. */
+  .admin-root:not(.admin-root-login-only) [class*="mission"][class*="header"],
+  .admin-root:not(.admin-root-login-only) [class*="Mission"][class*="Header"],
+  .admin-root:not(.admin-root-login-only) [class*="overview"][class*="header"],
+  .admin-root:not(.admin-root-login-only) [class*="Overview"][class*="Header"] {
+    min-height: 0 !important;
+  }
+
+  /* Physical QR editor: topbar is the only mode/title header in edit mode. */
+  .saga-physical-editor-topbar + div {
+    margin-top: 0 !important;
+  }
+
+  .saga-physical-editor-topbar + div [style] {
+    max-width: 100%;
+  }
+}
+
+/* #233 Mobile UX rescue v13b: safe cleanup after failed add-node JSX patch */
+
+/* Hide main add-node action without editing fragile JSX. */
+.admin-root:not(.admin-root-login-only) .saga-primary-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Strong admin map zoom removal. */
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Mobile/coarse pointer: hide any remaining add-node entry points. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-primary-action,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* #233 Mobile UX rescue v14b: safe node creation disabled + visible discard/delete */
+.admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-primary-action,
+.admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .leaflet-control-container .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-top.leaflet-left .leaflet-control-zoom,
+.admin-root:not(.admin-root-login-only) .leaflet-control-zoom,
+.saga-admin-shell .leaflet-control-zoom,
+.saga-admin-map .leaflet-control-zoom,
+.admin-map .leaflet-control-zoom,
+.admin-mission-map .leaflet-control-zoom {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.saga-physical-editor-topbar__delete {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 82px !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(251, 146, 60, 0.42) !important;
+  border-radius: 999px !important;
+  background: rgba(124, 45, 18, 0.92) !important;
+  color: #ffedd5 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) .saga-primary-action,
+  .admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action,
+  .admin-root:not(.admin-root-login-only) [class*="add-node"],
+  .admin-root:not(.admin-root-login-only) [class*="AddNode"],
+  .admin-root:not(.admin-root-login-only) [class*="create-node"],
+  .admin-root:not(.admin-root-login-only) [class*="CreateNode"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    gap: 6px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    min-width: 72px !important;
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+}
+
+/* #233 v14c physical editor integrated delete/close actions */
+.saga-physical-editor-topbar__actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.saga-physical-editor-topbar__delete {
+  min-height: 38px !important;
+  border: 1px solid rgba(248, 113, 113, .34) !important;
+  border-radius: 999px !important;
+  padding: 0 13px !important;
+  background: rgba(127, 29, 29, .36) !important;
+  color: #fecaca !important;
+  font-weight: 950 !important;
+  letter-spacing: -.01em !important;
+  cursor: pointer !important;
+  box-shadow: 0 12px 28px rgba(127, 29, 29, .16) !important;
+}
+
+.saga-physical-editor-topbar__delete:active {
+  transform: translateY(1px) !important;
+}
+
+.saga-physical-node-actions {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-physical-editor-topbar {
+    gap: 10px !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    width: 100% !important;
+    min-height: 44px !important;
+    max-width: none !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+}
+
+/* #233 v15 safe map node creation confirmation */
+.saga-map-create-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 86;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.saga-map-create-confirm {
+  width: min(420px, calc(100vw - 28px));
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 26px;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+  color: #f8fafc;
+}
+
+.saga-map-create-kicker {
+  display: inline-flex;
+  margin-bottom: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.12);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.saga-map-create-confirm strong {
+  display: block;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.saga-map-create-confirm p {
+  margin: 8px 0 14px;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.92rem;
+}
+
+.saga-map-create-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.saga-map-create-actions button {
+  min-height: 44px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.92);
+  color: #f8fafc;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.saga-map-create-actions button:first-child {
+  border-color: rgba(34, 197, 94, 0.42);
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.95), rgba(5, 150, 105, 0.92));
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-map-create-overlay {
+    align-items: end;
+    padding: 12px 12px calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .saga-map-create-confirm {
+    border-radius: 24px;
+  }
+}
+
+/* #233 v16 tiny map create popover */
+.saga-map-create-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 84;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.saga-map-create-mini {
+  position: fixed;
+  z-index: 85;
+  width: 188px;
+  transform: translate(-50%, calc(-100% - 14px));
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.97);
+  color: #f8fafc;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+}
+
+.saga-map-create-mini::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid rgba(125, 211, 252, 0.32);
+  border-bottom: 1px solid rgba(125, 211, 252, 0.32);
+  background: rgba(15, 23, 42, 0.97);
+}
+
+.saga-map-create-mini strong {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.saga-map-create-mini small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.68rem;
+}
+
+.saga-map-create-mini div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.saga-map-create-mini button {
+  min-height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 12px;
+  padding: 7px 8px;
+  background: rgba(30, 41, 59, 0.95);
+  color: #f8fafc;
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.saga-map-create-mini button:first-child {
+  border-color: rgba(34, 197, 94, 0.42);
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.96), rgba(5, 150, 105, 0.94));
+}
+
+.saga-map-create-mini button:last-child {
+  color: #cbd5e1;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-map-create-mini {
+    width: 174px;
+    padding: 9px;
+    border-radius: 16px;
+  }
+
+  .saga-map-create-mini button {
+    min-height: 32px;
+    font-size: 0.72rem;
+  }
+}
+
+/* #233 v17 node editor action cleanup */
+
+/* Add-node quick actions stay hidden while map creation uses Crear/Descartar. */
+.admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-primary-action.saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* QR physical editor: delete/discard must be visible next to close. */
+.saga-physical-editor-topbar {
+  align-items: center !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+
+.saga-physical-editor-topbar__delete,
+.saga-physical-editor-topbar__close {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  border-radius: 999px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.saga-physical-editor-topbar__delete {
+  min-width: 82px !important;
+  border: 1px solid rgba(251, 146, 60, 0.42) !important;
+  padding: 9px 13px !important;
+  background: rgba(124, 45, 18, 0.92) !important;
+  color: #ffedd5 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-physical-editor-topbar {
+    gap: 8px !important;
+  }
+
+  .saga-physical-editor-topbar__copy {
+    min-width: 0 !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    gap: 6px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    min-width: 68px !important;
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+}
+
+/* #233 v18 remove Advanced tab/menu from node editor */
+.admin-node-editor-tabs button:nth-last-child(1):has(+ .__never__) {
+  display: initial;
+}
+
+/* Defensive: if stale markup with advanced tab is served from cache, hide by title/class patterns where possible. */
+.admin-drawer-tab[aria-label*="Avanzado"],
+.admin-drawer-tab[title*="Avanzado"],
+button[aria-label*="Avanzado"],
+button[title*="Avanzado"] {
+  display: none !important;
+}
+
+/* #234 v1 — Node editor visual redesign
+   Goal: less technical form, more guided editor. CSS-only first pass. */
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+  pointer-events: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer,
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer * {
+  pointer-events: auto !important;
+}
+
+/* Wider editor: use the screen instead of feeling like a narrow drawer. */
+.admin-root:not(.admin-root-login-only) .admin-drawer,
+.admin-root:not(.admin-root-login-only) .admin-drawer-editable {
+  width: min(980px, calc(100vw - 22px)) !important;
+  max-width: min(980px, calc(100vw - 22px)) !important;
+  border-radius: 30px !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.12), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.10), transparent 26%),
+    rgba(2, 6, 23, 0.94) !important;
+  box-shadow: 0 30px 110px rgba(0, 0, 0, 0.48) !important;
+}
+
+/* Header: compact but clear. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-topbar,
+.admin-root:not(.admin-root-login-only) .admin-drawer-head--modern.admin-node-editor-topbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  align-items: start !important;
+  padding: 18px 20px 14px !important;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.94)) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-title-copy h2 {
+  margin: 6px 0 8px !important;
+  font-size: clamp(1.35rem, 3.2vw, 2rem) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.055em !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-meta span {
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 999px !important;
+  padding: 7px 11px !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 1px solid rgba(148, 163, 184, 0.20) !important;
+  color: rgba(226, 232, 240, 0.92) !important;
+  font-size: 0.78rem !important;
+  font-weight: 850 !important;
+}
+
+/* Top actions: visible, tidy, not massive. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-actions button,
+.admin-root:not(.admin-root-login-only) .admin-node-delete-visible,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+  min-height: 42px !important;
+  border-radius: 999px !important;
+  padding: 10px 15px !important;
+  font-size: 0.9rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Tabs/chips: stop ugly truncation. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 18 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 9px !important;
+  padding: 12px 20px !important;
+  background: rgba(2, 6, 23, 0.86) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.10) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  min-height: 40px !important;
+  padding: 10px 15px !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  font-size: 0.9rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.025em !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab.active {
+  background: #e0f2fe !important;
+  color: #020617 !important;
+  border-color: rgba(224, 242, 254, 0.85) !important;
+  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.18) !important;
+}
+
+/* Body: turn the editor into a guided workspace. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+  padding: 18px 20px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.55), rgba(2, 6, 23, 0.20)) !important;
+  overflow-y: auto !important;
+}
+
+/* Common edit cards. Use broad selectors because the editor has legacy markup. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > section,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div,
+.admin-root:not(.admin-root-login-only) .admin-edit-section,
+.admin-root:not(.admin-root-login-only) .admin-editor-card,
+.admin-root:not(.admin-root-login-only) .admin-requirement-advanced {
+  border: 1px solid rgba(148, 163, 184, 0.15) !important;
+  border-radius: 26px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.08), transparent 34%),
+    rgba(15, 23, 42, 0.58) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+
+/* Make cards breathe without destroying inner components. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > section,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div {
+  margin-bottom: 16px !important;
+  padding: 18px !important;
+}
+
+/* Inputs: premium app style. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body input,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body select {
+  border-radius: 18px !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  background: rgba(15, 23, 42, 0.82) !important;
+  color: #f8fafc !important;
+  min-height: 46px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea {
+  min-height: 118px !important;
+  line-height: 1.45 !important;
+}
+
+/* Labels and help text. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body label,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body .admin-field-label {
+  color: rgba(226, 232, 240, 0.88) !important;
+  font-size: 0.82rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body p,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body small {
+  color: rgba(203, 213, 225, 0.72) !important;
+}
+
+/* Game/template cards: make them feel like guided templates. */
+.admin-root:not(.admin-root-login-only) [class*="game"],
+.admin-root:not(.admin-root-login-only) [class*="template"] {
+  scroll-margin-top: 128px !important;
+}
+
+/* Footer: less intrusive, still visible. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-footer {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 16 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 12px 20px !important;
+  background: rgba(2, 6, 23, 0.90) !important;
+  backdrop-filter: blur(16px) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.12) !important;
+}
+
+/* QR physical editor: match the new editor language. */
+.saga-physical-editor-topbar {
+  border-radius: 24px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.86)) !important;
+  padding: 12px !important;
+}
+
+.saga-physical-editor-topbar__copy strong {
+  font-size: clamp(1rem, 2.4vw, 1.25rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  gap: 8px !important;
+}
+
+/* Mobile: use full width, readable chips, less cramped cards. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-drawer,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-editable {
+    width: calc(100vw - 10px) !important;
+    max-width: calc(100vw - 10px) !important;
+    height: calc(100dvh - 12px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 12px - env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 22px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-topbar,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-head--modern.admin-node-editor-topbar {
+    padding: 14px 14px 10px !important;
+    gap: 10px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-title-row {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-actions {
+    justify-content: flex-start !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-actions button,
+  .admin-root:not(.admin-root-login-only) .admin-node-delete-visible,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-close {
+    min-height: 38px !important;
+    padding: 8px 12px !important;
+    font-size: 0.82rem !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+    flex-wrap: nowrap !important;
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    scroll-snap-type: x proximity !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+    scroll-snap-align: start !important;
+    min-height: 38px !important;
+    padding: 9px 13px !important;
+    font-size: 0.82rem !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+    padding: 12px 12px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > section,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div {
+    border-radius: 20px !important;
+    padding: 14px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-footer {
+    padding: 10px 12px !important;
+    align-items: stretch !important;
+  }
+}
+
+/* #234 v2 — Normal node editor cleanup
+   Fix v1 over-carding, readable tabs, compact location/messages layout. */
+
+/* Undo the too-broad v1 card styling on every direct div. It caused card-inside-card. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin-bottom: 14px !important;
+}
+
+/* Keep real semantic sections/cards nice, but not every wrapper. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > section,
+.admin-root:not(.admin-root-login-only) .admin-edit-section,
+.admin-root:not(.admin-root-login-only) .admin-editor-card {
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 24px !important;
+  background: rgba(15, 23, 42, 0.56) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+  padding: 16px !important;
+}
+
+/* If a legacy panel only has divs, the first level should be clean and compact. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div > div {
+  border-radius: 20px !important;
+}
+
+/* Real tabs: full text when possible, no ugly ellipsis. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 16px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs::-webkit-scrollbar,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs button,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tab,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  border-radius: 999px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-size: 0.86rem !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* If legacy CSS injects max-width on tab children, kill it. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs button *,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tab *,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button *,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab * {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+/* Editor body should use available width and reduce empty holes. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+  padding: 14px 18px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Compact form grids: location and common fields become responsive columns. */
+.admin-root:not(.admin-root-login-only) .admin-edit-grid,
+.admin-root:not(.admin-root-login-only) .admin-form-grid,
+.admin-root:not(.admin-root-login-only) .admin-location-grid,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+/* Avoid giant blank vertical cards in Location/Messages. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body label {
+  margin: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body input,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body select {
+  min-height: 42px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea {
+  min-height: 92px !important;
+}
+
+/* The small heading row inside tabs should not create dead space. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body h3,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body h4,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body legend {
+  margin: 0 0 10px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body p {
+  margin-top: 4px !important;
+  margin-bottom: 10px !important;
+}
+
+/* Messages tab: make copy fields clearer and less technical. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea[placeholder],
+.admin-root:not(.admin-root-login-only) .admin-drawer-body input[placeholder] {
+  color: #f8fafc !important;
+}
+
+/* Footer should not cover the form or feel like another card inside card. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-footer {
+  border-radius: 0 0 24px 24px !important;
+}
+
+/* Mobile: chips scroll horizontally with full labels; no more Bási... / Ubic... */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+    flex-wrap: nowrap !important;
+    padding: 9px 12px !important;
+    gap: 7px !important;
+    scroll-snap-type: x proximity !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs button,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tab,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+    scroll-snap-align: start !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    padding: 9px 13px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+    padding: 10px 12px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-edit-grid,
+  .admin-root:not(.admin-root-login-only) .admin-form-grid,
+  .admin-root:not(.admin-root-login-only) .admin-location-grid,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body textarea,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body label:has(textarea) {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 430px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-edit-grid,
+  .admin-root:not(.admin-root-login-only) .admin-form-grid,
+  .admin-root:not(.admin-root-login-only) .admin-location-grid,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* #234 v3 — real normal node editor layout
+   This targets the actual NodeDetailDrawer markup instead of broad drawer wrappers. */
+
+.admin-node-editor-redesign {
+  width: min(1040px, calc(100vw - 18px)) !important;
+  max-width: min(1040px, calc(100vw - 18px)) !important;
+}
+
+/* Header more editorial, less stacked. */
+.admin-node-editor-redesign .admin-node-editor-topbar {
+  padding: 16px 18px 10px !important;
+}
+
+.admin-node-editor-redesign .admin-node-editor-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+.admin-node-editor-redesign .admin-node-editor-title-copy h2 {
+  margin: 4px 0 8px !important;
+  font-size: clamp(1.35rem, 3.6vw, 2.1rem) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.055em !important;
+}
+
+/* Tabs: full-width segmented control on normal editor. */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 10px 14px !important;
+  overflow: visible !important;
+}
+
+.admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  justify-content: center !important;
+  text-align: center !important;
+  border-radius: 999px !important;
+  padding: 10px 8px !important;
+  font-size: 0.84rem !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab.active {
+  background: #e0f2fe !important;
+  color: #020617 !important;
+  border-color: rgba(224, 242, 254, 0.85) !important;
+}
+
+/* Body: remove v1/v2 card-on-card effect for normal nodes. */
+.admin-node-editor-redesign .admin-drawer-body--modern {
+  padding: 12px 14px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-body--modern > div,
+.admin-node-editor-redesign .admin-drawer-body--modern > section {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Real panels get exactly one clean surface. */
+.admin-node-editor-redesign .admin-node-basics-panel,
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign .admin-node-game-panel,
+.admin-node-editor-redesign .admin-node-requirement-panel,
+.admin-node-editor-redesign .admin-node-messages-panel {
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08), transparent 34%),
+    rgba(15, 23, 42, 0.58) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+  padding: 16px !important;
+  margin: 0 0 14px !important;
+}
+
+/* Section headers compact. */
+.admin-node-editor-redesign .admin-edit-section-head {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+.admin-node-editor-redesign .admin-edit-section-head strong {
+  font-size: 1rem !important;
+  letter-spacing: -0.025em !important;
+}
+
+.admin-node-editor-redesign .admin-edit-section-head span {
+  font-size: 0.78rem !important;
+  color: rgba(203, 213, 225, 0.72) !important;
+}
+
+/* Básico: title + game selector + game preview should not feel like three nested cards. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.95fr) minmax(280px, 1.25fr) !important;
+  gap: 14px !important;
+  align-items: start !important;
+}
+
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-field:has(textarea),
+.admin-node-editor-redesign .admin-node-basics-panel textarea {
+  grid-column: 1 / -1 !important;
+}
+
+/* Ubicación: make it dense and useful. */
+.admin-node-editor-redesign .admin-node-location-panel .admin-edit-section-head {
+  margin-bottom: 10px !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel .admin-edit-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel input,
+.admin-node-editor-redesign .admin-node-location-panel select {
+  min-height: 40px !important;
+}
+
+/* Mensajes: simple readable copy fields. */
+.admin-node-editor-redesign .admin-node-messages-panel .admin-edit-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+.admin-node-editor-redesign .admin-node-messages-panel .admin-edit-field:first-of-type {
+  grid-column: 1 / -1 !important;
+}
+
+.admin-node-editor-redesign .admin-node-messages-panel input,
+.admin-node-editor-redesign .admin-node-messages-panel textarea {
+  min-height: 42px !important;
+}
+
+/* Inputs tighter and cleaner. */
+.admin-node-editor-redesign .admin-edit-field {
+  gap: 6px !important;
+}
+
+.admin-node-editor-redesign input,
+.admin-node-editor-redesign select {
+  min-height: 42px !important;
+  border-radius: 16px !important;
+}
+
+.admin-node-editor-redesign textarea {
+  min-height: 86px !important;
+  border-radius: 16px !important;
+}
+
+/* Footer: do not look like an extra card over content. */
+.admin-node-editor-redesign .admin-drawer-footer {
+  padding: 10px 14px !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(2, 6, 23, 0.92) !important;
+}
+
+/* Mobile: tabs full but horizontally scroll if tight, no old Bási... chips. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign {
+    width: calc(100vw - 8px) !important;
+    max-width: calc(100vw - 8px) !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-title-row {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 9px 12px !important;
+    gap: 8px !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: max-content !important;
+    padding: 9px 13px !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid,
+  .admin-node-editor-redesign .admin-node-location-panel .admin-edit-grid,
+  .admin-node-editor-redesign .admin-node-messages-panel .admin-edit-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-basics-panel,
+  .admin-node-editor-redesign .admin-node-location-panel,
+  .admin-node-editor-redesign .admin-node-game-panel,
+  .admin-node-editor-redesign .admin-node-requirement-panel,
+  .admin-node-editor-redesign .admin-node-messages-panel {
+    border-radius: 20px !important;
+    padding: 13px !important;
+  }
+}
+
+/* #234 v4b — remove Location tab safely; activation lives conceptually in Basics */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel {
+  grid-column: 1 / -1 !important;
+  margin: 4px 0 12px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(56, 189, 248, 0.16) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.10), transparent 34%),
+    rgba(15, 23, 42, 0.50) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 8px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.86rem !important;
+  line-height: 1.35 !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign button[aria-label*="Ubicación"],
+.admin-node-editor-redesign button[title*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[aria-label*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[title*="Ubicación"] {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+}
+
+/* #234 v4b — remove Location tab safely; activation lives conceptually in Basics */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel {
+  grid-column: 1 / -1 !important;
+  margin: 4px 0 12px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(56, 189, 248, 0.16) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.10), transparent 34%),
+    rgba(15, 23, 42, 0.50) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 8px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.86rem !important;
+  line-height: 1.35 !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign button[aria-label*="Ubicación"],
+.admin-node-editor-redesign button[title*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[aria-label*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[title*="Ubicación"] {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+}
+
+/* #234 v5b — activation controls inside Basics */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel {
+  grid-column: 1 / -1 !important;
+  margin: 4px 0 12px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(56, 189, 248, 0.18) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.12), transparent 34%),
+    rgba(15, 23, 42, 0.54) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 10px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid {
+  display: grid !important;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(170px, 0.95fr) minmax(190px, 1fr) !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid label {
+  margin: 0 !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid input,
+.admin-node-editor-redesign .admin-node-activation-grid select {
+  min-height: 40px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check {
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 16px !important;
+  padding: 8px 10px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check input {
+  width: 18px !important;
+  min-height: 18px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  margin: 10px 0 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign button[aria-label*="Ubicación"],
+.admin-node-editor-redesign button[title*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[aria-label*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[title*="Ubicación"] {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-activation-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* #234 v5d — responsive containment for normal node editor
+   Fixes clipped activation card, section headings, footer status and narrow editor widths. */
+
+.admin-node-editor-redesign,
+.admin-node-editor-redesign *,
+.admin-node-editor-redesign *::before,
+.admin-node-editor-redesign *::after {
+  box-sizing: border-box !important;
+}
+
+.admin-node-editor-redesign {
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-body,
+.admin-node-editor-redesign .admin-drawer-body--modern {
+  overflow-x: hidden !important;
+}
+
+/* Prevent any inner card/grid from exceeding drawer width. */
+.admin-node-editor-redesign .admin-node-basics-panel,
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign .admin-node-game-panel,
+.admin-node-editor-redesign .admin-node-requirement-panel,
+.admin-node-editor-redesign .admin-node-messages-panel,
+.admin-node-editor-redesign .admin-node-activation-panel,
+.admin-node-editor-redesign .admin-edit-section,
+.admin-node-editor-redesign .admin-edit-grid,
+.admin-node-editor-redesign .admin-form-grid,
+.admin-node-editor-redesign .admin-node-activation-grid {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Section headers may wrap instead of being cut on the right. */
+.admin-node-editor-redesign .admin-edit-section-head {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 6px 12px !important;
+}
+
+.admin-node-editor-redesign .admin-edit-section-head strong,
+.admin-node-editor-redesign .admin-edit-section-head span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  line-height: 1.25 !important;
+}
+
+/* Activation card: fluid grid, not three fixed columns that overflow. */
+.admin-node-editor-redesign .admin-node-activation-panel {
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-grid .admin-edit-field,
+.admin-node-editor-redesign .admin-node-activation-grid label {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check {
+  min-width: 0 !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-check span {
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.2 !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* Form fields should never force horizontal scroll. */
+.admin-node-editor-redesign input,
+.admin-node-editor-redesign select,
+.admin-node-editor-redesign textarea,
+.admin-node-editor-redesign button {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Basic panel: avoid huge two-column layout when drawer is narrow. */
+@media (max-width: 980px) {
+  .admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-activation-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Tabs: keep usable; scroll if needed instead of clipping text. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs::-webkit-scrollbar,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Footer: status text and close button must not overlap/cut. */
+.admin-node-editor-redesign .admin-drawer-footer {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer > * {
+  min-width: 0 !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer .admin-cms-side-action,
+.admin-node-editor-redesign .admin-drawer-footer button {
+  white-space: nowrap !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer .admin-local-preview,
+.admin-node-editor-redesign .admin-drawer-footer [class*="preview"],
+.admin-node-editor-redesign .admin-drawer-footer [class*="status"],
+.admin-node-editor-redesign .admin-drawer-footer span,
+.admin-node-editor-redesign .admin-drawer-footer div {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Very narrow screens: footer stacks cleanly. */
+@media (max-width: 430px) {
+  .admin-node-editor-redesign .admin-drawer-footer {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-node-editor-redesign .admin-drawer-footer .admin-cms-side-action,
+  .admin-node-editor-redesign .admin-drawer-footer button {
+    width: 100% !important;
+  }
+}
+
+/* Badge bottom-right must not invade editor footer in narrow layouts. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+/* #234 v6b — safe Basics cleanup without touching fragile JSX
+   Game selector/preview live in the Juego tab. Básico should show identity + activation + main node text. */
+
+/* Hide duplicated game selector only when it is a direct field inside Básico.
+   Activation's Interacción select is nested inside .admin-node-activation-panel and is not affected. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check),
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + div,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + article,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(select):not(.admin-node-activation-check) + section {
+  display: none !important;
+}
+
+/* Extra safety for known game preview classes if present. */
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-summary"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-preview"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="game-card"],
+.admin-node-editor-redesign .admin-node-basics-panel [class*="template-preview"] {
+  display: none !important;
+}
+
+/* Main node text explanation. */
+.admin-node-editor-redesign .admin-node-field-title {
+  display: block !important;
+  color: rgba(248, 250, 252, 0.94) !important;
+  font-size: 0.86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-help {
+  display: block !important;
+  max-width: 72ch !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+}
+
+/* If the title replacement did not land because the label came through i18n,
+   still add a helper below the main textarea field in Básico. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-edit-grid > label:has(textarea)::after {
+  content: "Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.";
+  display: block !important;
+  color: rgba(203, 213, 225, 0.70) !important;
+  font-size: 0.80rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-top: 7px !important;
+}
+
+/* #234 v6c — actual Basics game duplicate marker
+   The TSX now marks the real Juego field inside Básico with .admin-basic-game-duplicate.
+   Juego configuration remains available in the Juego tab. */
+
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate {
+  display: none !important;
+}
+
+/* Hide the visual selected-game preview that follows that duplicated field. */
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate + *,
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate + * + *:has(svg),
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-summary"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-preview"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="game-card"],
+.admin-node-editor-redesign .admin-node-basics-panel .admin-basic-game-duplicate ~ [class*="template-preview"] {
+  display: none !important;
+}
+
+/* Main node text explanation. */
+.admin-node-editor-redesign .admin-node-main-copy-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-title {
+  display: block !important;
+  color: rgba(248, 250, 252, 0.94) !important;
+  font-size: 0.86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-help {
+  display: block !important;
+  max-width: 72ch !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-bottom: 8px !important;
+}
+
+/* #234 v7 — cleaner node drawer footer and requirement tab */
+.admin-node-editor-redesign .admin-note-pill {
+  display: none !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  min-height: 58px !important;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer-actions {
+  width: auto !important;
+  margin-left: auto !important;
+}
+
+.admin-node-editor-redesign .admin-requirement-advanced {
+  display: none !important;
+}

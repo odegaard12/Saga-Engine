@@ -123,17 +123,17 @@ export default function PhysicalQrCardsPanel({
       updated_at: new Date().toISOString(),
     })
 
-    showNotice('QR guardado en este nodo. Pulsa Guardar en Control de misión para persistir.')
+    showNotice('QR aplicado. Pulsa Guardar para persistir la misión.')
   }
 
   return (
     <section style={compact ? compactPanel : panel} aria-label="Generador QR del nodo">
       <div style={header}>
         <div>
-          <div style={eyebrow}>QR DEL NODO</div>
-          <h2 style={compact ? compactTitle : title}>Tarjeta física</h2>
+          <div style={eyebrow}>TARJETA QR</div>
+          <h2 style={compact ? compactTitle : title}>QR imprimible</h2>
           <p style={copy}>
-            Hereda el tipo elegido arriba: {kindLabels[kind]}. El jugador escanea este QR y SAGA lo guarda en Objetos.
+            Escanéalo para guardar este objeto físico en la mochila del jugador.
           </p>
         </div>
         <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
@@ -172,14 +172,14 @@ export default function PhysicalQrCardsPanel({
       </div>
 
       <div style={payloadBox}>
-        <span>Texto interno del QR</span>
+        <span>Payload interno</span>
         <code>{payload}</code>
-        <small>El jugador no escribe esto. Va dentro de la imagen QR.</small>
+        <small>Va dentro del QR. Normalmente no se escribe a mano.</small>
       </div>
 
       <div style={actions}>
         <button type="button" style={primaryButton} onClick={handleSaveToNode}>
-          Guardar QR en nodo
+          Aplicar QR al nodo
         </button>
 
         <button type="button" style={button} onClick={() => void handleCopy('Payload QR', payload)}>

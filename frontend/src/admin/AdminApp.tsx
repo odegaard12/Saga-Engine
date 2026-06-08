@@ -350,13 +350,13 @@ export default function AdminApp() {
       ]
     })
     setPlayerSaveState('idle')
-    setLocalNotice('Player added locally. Save players to persist.')
+    setLocalNotice('Jugador añadido en local. Pulsa Guardar jugadores para persistir.')
   }
 
   function deletePlayerDraft(index: number) {
     setPlayerDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index))
     setPlayerSaveState('idle')
-    setLocalNotice('Player removed locally. Save players to persist.')
+    setLocalNotice('Jugador eliminado en local. Pulsa Guardar jugadores para persistir.')
   }
 
   function buildPlayerConfigPayload() {
@@ -541,7 +541,7 @@ export default function AdminApp() {
   async function saveLocalStages() {
     if (!overview) {
       setSaveState('error')
-      setSaveError('No admin overview is loaded.')
+      setSaveError('No hay vista de administración cargada.')
       return
     }
 
@@ -576,12 +576,12 @@ export default function AdminApp() {
       setSaveState('saved')
       setLocalNotice(
         usedFallback
-          ? 'Saved using fallback payload. Mission data reloaded.'
-          : 'Saved to backend. Mission data reloaded.'
+          ? 'Guardado con payload de respaldo. Datos de misión recargados.'
+          : 'Guardado en backend. Datos de misión recargados.'
       )
     } catch (err) {
       setSaveState('error')
-      setSaveError(err instanceof Error ? err.message : 'Unknown save error')
+      setSaveError(err instanceof Error ? err.message : 'Error de guardado desconocido')
     }
   }
 
@@ -620,7 +620,7 @@ export default function AdminApp() {
 
     setSelectedStage(null)
     setSaveState('idle')
-    setLocalNotice('Node removed locally. Save changes to persist deletion.')
+    setLocalNotice('Node removed locally. Pulsa Guardar para persistir el borrado.')
   }
 
   function reorderLocalStage(
@@ -666,7 +666,7 @@ export default function AdminApp() {
     if (movedStage) {
       setSelectedStage(movedStage)
       setSaveState('idle')
-      setLocalNotice('Route order updated locally. Save changes to persist.')
+      setLocalNotice('Orden de ruta actualizado en local. Pulsa Guardar para persistir.')
     }
   }
 
@@ -701,7 +701,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(nextStage)
-    setLocalNotice('Local preview updated. Save changes to persist.')
+    setLocalNotice('Vista local actualizada. Pulsa Guardar para persistir.')
   }
 
   function applyMissionTemplate(templateId: MissionTemplateId) {
@@ -808,9 +808,20 @@ export default function AdminApp() {
       config?.map_center ||
       ([40.4168, -3.7038] as [number, number])
 
+    const mappedStagesForCenter = stages.filter(
+      (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
+    )
+
+    const routeCenter: [number, number] = mappedStagesForCenter.length > 0
+      ? [
+          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lat), 0) / mappedStagesForCenter.length,
+          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lon), 0) / mappedStagesForCenter.length,
+        ]
+      : mapCenter
+
     const nextIndex = stages.length
-    const nextLat = typeof lat === 'number' ? lat : mapCenter[0]
-    const nextLon = typeof lon === 'number' ? lon : mapCenter[1]
+    const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
+    const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -831,18 +842,19 @@ export default function AdminApp() {
       config_summary: Object.keys(getDefaultAdminConfigForFamily('signal_hunt')),
       messages: {
         hint: '',
-        gps_unavailable: 'GPS unavailable message.',
-        locked: 'Move closer to unlock this node.',
+        gps_unavailable: 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
+        locked: 'Acércate al nodo para desbloquearlo.',
       },
     }
 
     setCmsPanel('none')
     setSaveState('idle')
     syncLocalStage(nextStage)
+    setSelectedStage(nextStage)
     setLocalNotice(
       typeof lat === 'number' && typeof lon === 'number'
-        ? 'Node created from map click. Edit details, then save changes.'
-        : 'Node created at mission center. Drag it on the map or edit coordinates.'
+        ? 'Nodo creado aquí. Edita el tipo y guarda cuando esté listo.'
+        : 'Nodo creado en el centro de la ruta. Muévelo o edita coordenadas antes de guardar.'
     )
   }
 
@@ -859,7 +871,7 @@ export default function AdminApp() {
 
     setSaveState('idle')
     syncLocalStage(movedStage)
-    setLocalNotice('Node moved on map. Save changes to persist the new position.')
+    setLocalNotice('Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.')
   }
 
 
@@ -1047,7 +1059,7 @@ function NodeCard({
       <div className="admin-node-top">
         <span>{stage.index + 1}</span>
         <div>
-          <strong>{stage.title || 'Untitled node'}</strong>
+          <strong>{stage.title || 'Nodo sin título'}</strong>
           <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
         </div>
       </div>
@@ -2865,7 +2877,7 @@ const styles = `
 
 
 
-/* Delete node and CMS clarity pass */
+/* Eliminar nodo and CMS clarity pass */
 .admin-root:not(.admin-root-login-only) .admin-sidebar {
   scrollbar-width: thin;
   scrollbar-color: rgba(148,163,184,0.45) transparent;

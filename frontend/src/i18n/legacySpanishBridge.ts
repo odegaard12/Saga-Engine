@@ -3,6 +3,16 @@ import { getLocale } from './index'
 const sources = new WeakMap<Text, string>()
 
 const ES: Record<string, string> = {
+  'Contenido del nodo': 'Texto principal del nodo',
+  'Player-facing copy': 'Textos que verá el jugador',
+  'GPS unavailable message.': 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
+  'Move closer to unlock this node.': 'Acércate al nodo para desbloquearlo.',
+  'Player added locally. Save players to persist.': 'Jugador añadido en local. Pulsa Guardar jugadores para persistir.',
+  'Player removed locally. Save players to persist.': 'Jugador eliminado en local. Pulsa Guardar jugadores para persistir.',
+  'Saved using fallback payload. Mission data reloaded.': 'Guardado con payload de respaldo. Datos de misión recargados.',
+  'Saved to backend. Mission data reloaded.': 'Guardado en backend. Datos de misión recargados.',
+  'Route order updated locally. Save changes to persist.': 'Orden de ruta actualizado en local. Pulsa Guardar para persistir.',
+  'Node moved on map. Save changes to persist the new position.': 'Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.',
   'Language': 'Idioma',
   'Save': 'Guardar',
   'Saved': 'Guardado',
@@ -42,7 +52,7 @@ const ES: Record<string, string> = {
   '+ Add node': '+ Añadir nodo',
   'Unsaved': 'Sin guardar',
   'Local changes only': 'Cambios locales solamente',
-  'Node created from map click. Edit details, then save changes.': 'Nodo creado desde el mapa. Edita los detalles y guarda los cambios.',
+  'Node created from map click. Edit details, then save changes.': '',
 
   'Node editor': 'Editor de nodo',
   'Untitled node': 'Nodo sin título',
@@ -105,7 +115,7 @@ const ES: Record<string, string> = {
   'Update download': 'Actualizar descarga',
   'Save progress': 'Guardar progreso',
   'Sync pending': 'Sincronizar pendientes',
-  'Save this mission to the phone before the route. If coverage drops later, SAGA can open the stored mission and keep local progress ready for sync.': 'Guarda esta misión en el móvil antes de salir. Si luego hay mala cobertura, SAGA podrá abrir la misión guardada y mantener el progreso local listo para sincronizar.',
+  'Guardar this mission to the phone before the route. If coverage drops later, SAGA can open the stored mission and keep local progress ready for sync.': 'Guarda esta misión en el móvil antes de salir. Si luego hay mala cobertura, SAGA podrá abrir la misión guardada y mantener el progreso local listo para sincronizar.',
   'Offline sync': 'Sincronización offline',
   'Offline queue': 'Cola offline',
   'Pending': 'Pendientes',
@@ -154,7 +164,7 @@ const ES: Record<string, string> = {
   'Initial center and zoom': 'Centro inicial y zoom',
   'Player theme': 'Tema del jugador',
   'Story': 'Historia',
-  'Player-facing mission narrative': 'Narrativa visible para el jugador',
+  'Para el jugador mission narrative': 'Narrativa visible para el jugador',
   'Story title': 'Título de historia',
   'Story text': 'Texto de historia',
   'Prologue': 'Prólogo',
