@@ -223,7 +223,7 @@ export default function AdminMissionControlShell({
             disabled={saveState === 'saving'}
             onClick={onSaveStages}
           >
-            {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save'}
+            {saveState === 'saving' ? 'Guardando…' : saveState === 'saved' ? 'Guardado' : 'Guardar'}
           </button>
 
           <button type="button" onClick={onRefresh}>Refresh</button>
@@ -332,7 +332,7 @@ export default function AdminMissionControlShell({
               Add node
             </button>
             <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
-              {saveState === 'saving' ? 'Saving…' : 'Save'}
+              {saveState === 'saving' ? 'Guardando…' : 'Guardar'}
             </button>
             <button type="button" onClick={onRefresh}>Refresh</button>
           </div>
@@ -515,7 +515,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
   if (state === 'error') {
     return (
       <div className="saga-save-status error">
-        <b>Save failed</b>
+        <b>Error al guardar</b>
         <span>{error || 'Unknown error'}</span>
       </div>
     )
@@ -533,7 +533,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
   if (state === 'saved') {
     return (
       <div className="saga-save-status saved">
-        <b>Saved</b>
+        <b>Guardado</b>
         <span>Backend reloaded</span>
       </div>
     )
@@ -541,7 +541,7 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
 
   return (
     <div className="saga-save-status idle">
-      <b>Unsaved</b>
+      <b>Sin guardar</b>
       <span>Local changes only</span>
     </div>
   )

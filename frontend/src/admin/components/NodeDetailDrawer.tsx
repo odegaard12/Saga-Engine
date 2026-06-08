@@ -345,7 +345,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="presentation">
       <aside
-        className="admin-drawer admin-drawer-editable"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign"
         role="dialog"
         aria-modal="true"
         aria-label={`Node editor: ${draft.title}`}
@@ -448,7 +448,7 @@ export default function NodeDetailDrawer({
 
         <div className="admin-drawer-body admin-drawer-body--modern">
           {activeTab === 'basics' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
+            <section className="admin-edit-section admin-edit-section-compact admin-node-basics-panel">
               <div className="admin-edit-section-head">
                 <strong>Basics</strong>
                 <span>Core node identity</span>
@@ -497,7 +497,7 @@ export default function NodeDetailDrawer({
           ) : null}
 
           {activeTab === 'location' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
+            <section className="admin-edit-section admin-edit-section-compact admin-node-location-panel">
               <div className="admin-edit-section-head">
                 <strong>Location</strong>
                 <span>{formatCoords(draft.lat, draft.lon)}</span>
@@ -555,7 +555,7 @@ export default function NodeDetailDrawer({
           ) : null}
 
           {activeTab === 'game' ? (
-            <section className="admin-edit-section admin-edit-section-compact admin-family-config-section">
+            <section className="admin-edit-section admin-edit-section-compact admin-family-config-section admin-node-game-panel">
               <div className="admin-edit-section-head">
                 <strong>Juego</strong>
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
@@ -807,7 +807,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <small className="admin-family-config-note">
-                This panel updates local draft state immediately. Use Guardar in Mission Control to persist.
+                Este panel actualiza la vista local al momento. Pulsa Guardar en Control de misión para persistir.
               </small>
             </section>
           ) : null}
@@ -921,10 +921,10 @@ export default function NodeDetailDrawer({
           ) : null}
 
           {activeTab === 'messages' ? (
-            <section className="admin-edit-section admin-edit-section-compact">
+            <section className="admin-edit-section admin-edit-section-compact admin-node-messages-panel">
               <div className="admin-edit-section-head">
-                <strong>Messages</strong>
-                <span>Textos para el jugador</span>
+                <strong>Mensajes</strong>
+                <span>Textos que verá el jugador</span>
               </div>
 
               <label className="admin-edit-field">
@@ -945,7 +945,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                Bloqueo y éxito
+                Mensaje de bloqueo / éxito
                 <input
                   value={messages.locked || ''}
                   onChange={(event) => setDraftMessage('locked', event.target.value)}
@@ -958,7 +958,7 @@ export default function NodeDetailDrawer({
 
         <div className="admin-drawer-footer">
           <div className="admin-note-pill">
-            Live local preview · use Guardar in Mission Control to persist
+            Vista local en vivo · usa Guardar en Control de misión para persistir
           </div>
 
           <div className="admin-drawer-footer-actions">

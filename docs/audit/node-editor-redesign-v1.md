@@ -48,3 +48,18 @@ Implemented v2:
 - reduced textarea/input vertical waste;
 - translated visible English copy in node editor defaults and status messages;
 - kept the QR physical editor styling that tested well.
+
+## v3 — real normal node editor targeting
+
+Manual testing showed v2 still barely changed the normal node editor because the CSS was too broad and did not target the actual NodeDetailDrawer sections.
+
+Implemented v3:
+
+- added `admin-node-editor-redesign` to the real normal node drawer;
+- added specific panel classes for basics, location, game, requirement and messages;
+- rebuilt normal editor tabs as a real segmented control;
+- removed nested card-on-card styling inside the normal editor;
+- made Location compact and grid-based;
+- made Messages clearer and translated;
+- repaired UI strings and i18n keys affected by earlier aggressive translation attempts;
+- kept QR physical editor styling unchanged because it tested well.
