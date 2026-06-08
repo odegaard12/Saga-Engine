@@ -4642,3 +4642,47 @@ button[title*="Avanzado"] {
     grid-template-columns: none !important;
   }
 }
+
+/* #234 v4b — remove Location tab safely; activation lives conceptually in Basics */
+.admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel {
+  grid-column: 1 / -1 !important;
+  margin: 4px 0 12px !important;
+  padding: 14px !important;
+  border: 1px solid rgba(56, 189, 248, 0.16) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.10), transparent 34%),
+    rgba(15, 23, 42, 0.50) !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 8px !important;
+}
+
+.admin-node-editor-redesign .admin-node-activation-note {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.86rem !important;
+  line-height: 1.35 !important;
+}
+
+.admin-node-editor-redesign .admin-node-location-panel,
+.admin-node-editor-redesign button[aria-label*="Ubicación"],
+.admin-node-editor-redesign button[title*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[aria-label*="Ubicación"],
+.admin-node-editor-redesign .admin-drawer-tab[title*="Ubicación"] {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-node-editor-redesign .admin-drawer-tabs.admin-node-editor-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+}
