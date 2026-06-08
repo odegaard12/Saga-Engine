@@ -408,6 +408,7 @@ export default function AdminMissionControlShell({
                   } as unknown as AdminReactOverviewStage)
                 }}
                 onFinishChoice={() => setTypeChooserStageKey(null)}
+                onDeleteLocal={onDeleteStage}
               />
             </div>
           ) : isPhysicalNode(liveSelectedStage) ? (
@@ -418,6 +419,7 @@ export default function AdminMissionControlShell({
                   onApplyLocal={onApplyStage}
                   onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
                   onClose={() => onSelectStage(null)}
+                  onDeleteLocal={onDeleteStage}
                 />
               </div>
             </>

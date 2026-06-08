@@ -661,3 +661,18 @@ Implemented v16:
 - Clicking outside or pressing `Descartar` clears the pending create request without adding a local node.
 - Only pressing `Crear` calls the existing local node creation flow and then opens the type chooser/editor.
 - Node creation without coordinates uses the route center to avoid odd fallback placement.
+
+## Follow-up adjustment v17: node editor action cleanup
+
+Manual test showed duplicate/dangerous actions in node editors:
+
+- route ordering already has `↑` / `↓` in the route list;
+- delete is now intended to live in the editor topbar;
+- advanced editor actions were confusing and partly duplicated.
+
+Implemented v17:
+
+- Removed old `Move up`, `Move down`, and `Delete node` controls from the normal node Advanced tab.
+- Ensured all physical QR editor usages receive `onDeleteLocal`.
+- Forced physical QR topbar actions (`Eliminar`/`Descartar` and `Cerrar ×`) to remain visible.
+- Kept quick add-node actions hidden while map creation uses the safer `Crear` / `Descartar` popover.

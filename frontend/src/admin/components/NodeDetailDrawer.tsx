@@ -982,7 +982,7 @@ export default function NodeDetailDrawer({
                     disabled={!canMoveUp}
                     onClick={() => onMoveLocal(draft, 'up')}
                   >
-                    Move up
+                    
                   </button>
 
                   <button
@@ -991,7 +991,7 @@ export default function NodeDetailDrawer({
                     disabled={!canMoveDown}
                     onClick={() => onMoveLocal(draft, 'down')}
                   >
-                    Move down
+                    
                   </button>
                 </div>
 
@@ -1010,12 +1010,12 @@ export default function NodeDetailDrawer({
                   type="button"
                   className="admin-cms-side-action admin-cms-side-action--danger"
                   onClick={() => {
-                    if (window.confirm(`Delete node "${draft.title || 'Untitled node'}"? Save changes afterwards to persist.`)) {
+                    if (window.confirm(`Eliminar nodo "${draft.title || 'Untitled node'}"? Save changes afterwards to persist.`)) {
                       onDeleteLocal(draft)
                     }
                   }}
                 >
-                  Delete node
+                  Eliminar nodo
                 </button>
               </section>
             </>

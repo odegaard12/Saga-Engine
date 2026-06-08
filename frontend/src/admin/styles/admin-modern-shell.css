@@ -3789,3 +3789,76 @@
     font-size: 0.72rem;
   }
 }
+
+/* #233 v17 node editor action cleanup */
+
+/* Add-node quick actions stay hidden while map creation uses Crear/Descartar. */
+.admin-root:not(.admin-root-login-only) .saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-primary-action.saga-admin-add-node-action,
+.admin-root:not(.admin-root-login-only) .saga-command-primary.saga-admin-add-node-action {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* QR physical editor: delete/discard must be visible next to close. */
+.saga-physical-editor-topbar {
+  align-items: center !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+
+.saga-physical-editor-topbar__delete,
+.saga-physical-editor-topbar__close {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  border-radius: 999px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.saga-physical-editor-topbar__delete {
+  min-width: 82px !important;
+  border: 1px solid rgba(251, 146, 60, 0.42) !important;
+  padding: 9px 13px !important;
+  background: rgba(124, 45, 18, 0.92) !important;
+  color: #ffedd5 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-physical-editor-topbar {
+    gap: 8px !important;
+  }
+
+  .saga-physical-editor-topbar__copy {
+    min-width: 0 !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    gap: 6px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    min-width: 68px !important;
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+}
