@@ -5049,3 +5049,25 @@ button[title*="Avanzado"] {
   font-weight: 700 !important;
   margin-bottom: 8px !important;
 }
+
+/* #234 v7 — cleaner node drawer footer and requirement tab */
+.admin-node-editor-redesign .admin-note-pill {
+  display: none !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  min-height: 58px !important;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.admin-node-editor-redesign .admin-drawer-footer-actions {
+  width: auto !important;
+  margin-left: auto !important;
+}
+
+.admin-node-editor-redesign .admin-requirement-advanced {
+  display: none !important;
+}

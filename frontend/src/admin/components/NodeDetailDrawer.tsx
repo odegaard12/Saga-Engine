@@ -917,39 +917,6 @@ export default function NodeDetailDrawer({
                     />
                     Consumir objeto al superar el nodo
                   </label>
-
-                  <details className="admin-requirement-advanced">
-                    <summary>Avanzado: editar ID manualmente</summary>
-
-                    <div className="admin-edit-grid">
-                      <label className="admin-edit-field">
-                        ID requerido
-                        <input
-                          value={getDraftConfigText('required_item_id')}
-                          placeholder="el_miedo"
-                          onChange={(event) => updateDraftConfigText('required_item_id', event.target.value.trim())}
-                        />
-                      </label>
-
-                      <label className="admin-edit-field">
-                        Nombre visible
-                        <input
-                          value={getDraftConfigText('required_item_label')}
-                          placeholder="El MIEDO"
-                          onChange={(event) => updateDraftConfigText('required_item_label', event.target.value)}
-                        />
-                      </label>
-
-                      <label className="admin-edit-field">
-                        Cantidad
-                        <input
-                          inputMode="numeric"
-                          value={getDraftConfigText('required_item_quantity', '1')}
-                          onChange={(event) => updateDraftConfigNumber('required_item_quantity', event.target.value)}
-                        />
-                      </label>
-                    </div>
-                  </details>
                 </>
               ) : (
                 <div className="admin-rule-empty-state">
@@ -997,9 +964,6 @@ export default function NodeDetailDrawer({
         </div>
 
         <div className="admin-drawer-footer">
-          <div className="admin-note-pill">
-            Vista local en vivo · usa Guardar en Control de misión para persistir
-          </div>
 
           <div className="admin-drawer-footer-actions">
             <button type="button" className="admin-cms-side-action" onClick={onClose}>

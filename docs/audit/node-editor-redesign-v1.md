@@ -142,3 +142,18 @@ Implemented v6c:
 - marks the real main-copy label with `admin-node-main-copy-field`;
 - replaces `Contenido del nodo` with `Texto principal del nodo` plus help text;
 - keeps the real game selector/configuration in the `Juego` tab.
+
+## v7 — remove repeated drawer footer note
+
+Manual testing showed the drawer footer note was redundant:
+
+- `Sin guardar / Cambios locales solamente` already appears in the main admin shell;
+- the node drawer only needs a clear close action;
+- the long note consumed space and distracted from editing.
+
+Implemented v7:
+
+- removed the repeated “Vista local en vivo…” pill from the node drawer footer;
+- kept the close button;
+- removed/hidden the advanced manual requirement ID editor from the UI;
+- requirement editing stays focused on normal route/order/physical-object logic.
