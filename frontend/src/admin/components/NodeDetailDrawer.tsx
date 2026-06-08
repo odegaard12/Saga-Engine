@@ -807,7 +807,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <small className="admin-family-config-note">
-                This panel updates local draft state immediately. Use Save in Mission Control to persist.
+                This panel updates local draft state immediately. Use Guardar in Mission Control to persist.
               </small>
             </section>
           ) : null}
@@ -924,7 +924,7 @@ export default function NodeDetailDrawer({
             <section className="admin-edit-section admin-edit-section-compact">
               <div className="admin-edit-section-head">
                 <strong>Messages</strong>
-                <span>Player-facing copy</span>
+                <span>Textos para el jugador</span>
               </div>
 
               <label className="admin-edit-field">
@@ -937,7 +937,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                GPS unavailable message
+                Mensaje si no hay GPS
                 <input
                   value={messages.gps_unavailable || ''}
                   onChange={(event) => setDraftMessage('gps_unavailable', event.target.value)}
@@ -945,7 +945,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <label className="admin-edit-field">
-                Locked / success copy
+                Bloqueo y éxito
                 <input
                   value={messages.locked || ''}
                   onChange={(event) => setDraftMessage('locked', event.target.value)}
@@ -958,7 +958,7 @@ export default function NodeDetailDrawer({
 
         <div className="admin-drawer-footer">
           <div className="admin-note-pill">
-            Live local preview · use Save in Mission Control to persist
+            Live local preview · use Guardar in Mission Control to persist
           </div>
 
           <div className="admin-drawer-footer-actions">

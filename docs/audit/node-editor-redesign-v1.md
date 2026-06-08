@@ -30,3 +30,21 @@ Games should feel like editable templates:
 - Deep JSX reorder of QR physical editor fields.
 - Dedicated visual game-template picker.
 - Frontend tests.
+
+## v2 — normal node editor cleanup
+
+Manual test showed v1 helped the QR editor, but the normal node editor still had:
+
+- chips/tabs with old cramped behavior;
+- too many nested card backgrounds;
+- Location tab wasting vertical space;
+- Messages tab still showing English copy.
+
+Implemented v2:
+
+- removed the broad direct-div card styling introduced in v1;
+- made real tabs/chips use full labels and horizontal scroll on mobile;
+- added compact responsive form grids for location/common form areas;
+- reduced textarea/input vertical waste;
+- translated visible English copy in node editor defaults and status messages;
+- kept the QR physical editor styling that tested well.

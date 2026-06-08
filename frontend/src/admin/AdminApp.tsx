@@ -126,8 +126,8 @@ export default function AdminApp() {
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
   const [localNotice, setLocalNotice] = useState<string | null>(null)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveState, setGuardarState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setGuardarError] = useState<string | null>(null)
   const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   const [missionDraft, setMissionDraft] = useState<Record<string, string>>({})
@@ -350,13 +350,13 @@ export default function AdminApp() {
       ]
     })
     setPlayerSaveState('idle')
-    setLocalNotice('Player added locally. Save players to persist.')
+    setLocalNotice('Player added locally. Guardar players to persist.')
   }
 
   function deletePlayerDraft(index: number) {
     setPlayerDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index))
     setPlayerSaveState('idle')
-    setLocalNotice('Player removed locally. Save players to persist.')
+    setLocalNotice('Player removed locally. Guardar players to persist.')
   }
 
   function buildPlayerConfigPayload() {
@@ -540,13 +540,13 @@ export default function AdminApp() {
 
   async function saveLocalStages() {
     if (!overview) {
-      setSaveState('error')
-      setSaveError('No admin overview is loaded.')
+      setGuardarState('error')
+      setGuardarError('No admin overview is loaded.')
       return
     }
 
-    setSaveState('saving')
-    setSaveError(null)
+    setGuardarState('saving')
+    setGuardarError(null)
 
     try {
       let persistedStages: AdminRawStage[] = []
@@ -573,15 +573,15 @@ export default function AdminApp() {
         setSelectedStage(null)
       }
 
-      setSaveState('saved')
+      setGuardarState('saved')
       setLocalNotice(
         usedFallback
-          ? 'Saved using fallback payload. Mission data reloaded.'
-          : 'Saved to backend. Mission data reloaded.'
+          ? 'Guardard using fallback payload. Mission data reloaded.'
+          : 'Guardard to backend. Mission data reloaded.'
       )
     } catch (err) {
-      setSaveState('error')
-      setSaveError(err instanceof Error ? err.message : 'Unknown save error')
+      setGuardarState('error')
+      setGuardarError(err instanceof Error ? err.message : 'Unknown save error')
     }
   }
 
@@ -619,8 +619,8 @@ export default function AdminApp() {
     })
 
     setSelectedStage(null)
-    setSaveState('idle')
-    setLocalNotice('Node removed locally. Save changes to persist deletion.')
+    setGuardarState('idle')
+    setLocalNotice('Node removed locally. Pulsa Guardar para persistir el borrado.')
   }
 
   function reorderLocalStage(
@@ -665,8 +665,8 @@ export default function AdminApp() {
 
     if (movedStage) {
       setSelectedStage(movedStage)
-      setSaveState('idle')
-      setLocalNotice('Route order updated locally. Save changes to persist.')
+      setGuardarState('idle')
+      setLocalNotice('Orden en ruta updated locally. Guardar changes to persist.')
     }
   }
 
@@ -701,7 +701,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(nextStage)
-    setLocalNotice('Local preview updated. Save changes to persist.')
+    setLocalNotice('Vista local actualizada. Pulsa Guardar para persistir.')
   }
 
   function applyMissionTemplate(templateId: MissionTemplateId) {
@@ -798,7 +798,7 @@ export default function AdminApp() {
 
     setSelectedStage(nextStages[0] || null)
     setCmsPanel('none')
-    setSaveState('idle')
+    setGuardarState('idle')
     setLocalNotice(`Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`)
   }
 
@@ -842,13 +842,13 @@ export default function AdminApp() {
       config_summary: Object.keys(getDefaultAdminConfigForFamily('signal_hunt')),
       messages: {
         hint: '',
-        gps_unavailable: 'GPS unavailable message.',
-        locked: 'Move closer to unlock this node.',
+        gps_unavailable: 'Mensaje si no hay GPS.',
+        locked: 'Acércate al nodo para desbloquearlo.',
       },
     }
 
     setCmsPanel('none')
-    setSaveState('idle')
+    setGuardarState('idle')
     syncLocalStage(nextStage)
     setSelectedStage(nextStage)
     setLocalNotice(
@@ -869,9 +869,9 @@ export default function AdminApp() {
       lon,
     }
 
-    setSaveState('idle')
+    setGuardarState('idle')
     syncLocalStage(movedStage)
-    setLocalNotice('Node moved on map. Save changes to persist the new position.')
+    setLocalNotice('Node moved on map. Guardar changes to persist the new position.')
   }
 
 
@@ -1059,7 +1059,7 @@ function NodeCard({
       <div className="admin-node-top">
         <span>{stage.index + 1}</span>
         <div>
-          <strong>{stage.title || 'Untitled node'}</strong>
+          <strong>{stage.title || 'Nodo sin título'}</strong>
           <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
         </div>
       </div>
@@ -2877,7 +2877,7 @@ const styles = `
 
 
 
-/* Delete node and CMS clarity pass */
+/* Eliminar nodo and CMS clarity pass */
 .admin-root:not(.admin-root-login-only) .admin-sidebar {
   scrollbar-width: thin;
   scrollbar-color: rgba(148,163,184,0.45) transparent;

@@ -4182,3 +4182,190 @@ button[title*="Avanzado"] {
     align-items: stretch !important;
   }
 }
+
+/* #234 v2 — Normal node editor cleanup
+   Fix v1 over-carding, readable tabs, compact location/messages layout. */
+
+/* Undo the too-broad v1 card styling on every direct div. It caused card-inside-card. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin-bottom: 14px !important;
+}
+
+/* Keep real semantic sections/cards nice, but not every wrapper. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > section,
+.admin-root:not(.admin-root-login-only) .admin-edit-section,
+.admin-root:not(.admin-root-login-only) .admin-editor-card {
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 24px !important;
+  background: rgba(15, 23, 42, 0.56) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+  padding: 16px !important;
+}
+
+/* If a legacy panel only has divs, the first level should be clean and compact. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern > div > div {
+  border-radius: 20px !important;
+}
+
+/* Real tabs: full text when possible, no ugly ellipsis. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 16px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs::-webkit-scrollbar,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs button,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tab,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  border-radius: 999px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-size: 0.86rem !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* If legacy CSS injects max-width on tab children, kill it. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-tabs button *,
+.admin-root:not(.admin-root-login-only) .admin-drawer-tab *,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button *,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab * {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+/* Editor body should use available width and reduce empty holes. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+  padding: 14px 18px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Compact form grids: location and common fields become responsive columns. */
+.admin-root:not(.admin-root-login-only) .admin-edit-grid,
+.admin-root:not(.admin-root-login-only) .admin-form-grid,
+.admin-root:not(.admin-root-login-only) .admin-location-grid,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+/* Avoid giant blank vertical cards in Location/Messages. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body label {
+  margin: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body input,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body select {
+  min-height: 42px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea {
+  min-height: 92px !important;
+}
+
+/* The small heading row inside tabs should not create dead space. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body h3,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body h4,
+.admin-root:not(.admin-root-login-only) .admin-drawer-body legend {
+  margin: 0 0 10px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-body p {
+  margin-top: 4px !important;
+  margin-bottom: 10px !important;
+}
+
+/* Messages tab: make copy fields clearer and less technical. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-body textarea[placeholder],
+.admin-root:not(.admin-root-login-only) .admin-drawer-body input[placeholder] {
+  color: #f8fafc !important;
+}
+
+/* Footer should not cover the form or feel like another card inside card. */
+.admin-root:not(.admin-root-login-only) .admin-drawer-footer {
+  border-radius: 0 0 24px 24px !important;
+}
+
+/* Mobile: chips scroll horizontally with full labels; no more Bási... / Ubic... */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs.admin-node-editor-tabs {
+    flex-wrap: nowrap !important;
+    padding: 9px 12px !important;
+    gap: 7px !important;
+    scroll-snap-type: x proximity !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tabs button,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-tab,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs button,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-tabs .admin-drawer-tab {
+    scroll-snap-align: start !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    padding: 9px 13px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body--modern {
+    padding: 10px 12px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-edit-grid,
+  .admin-root:not(.admin-root-login-only) .admin-form-grid,
+  .admin-root:not(.admin-root-login-only) .admin-location-grid,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body textarea,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body label:has(textarea) {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 430px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-edit-grid,
+  .admin-root:not(.admin-root-login-only) .admin-form-grid,
+  .admin-root:not(.admin-root-login-only) .admin-location-grid,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body form,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-body fieldset {
+    grid-template-columns: 1fr !important;
+  }
+}
