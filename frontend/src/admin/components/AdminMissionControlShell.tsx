@@ -360,20 +360,6 @@ export default function AdminMissionControlShell({
                   onClose={() => onSelectStage(null)}
                 />
               </div>
-
-              <div className="saga-physical-node-actions">
-                <button
-                  type="button"
-                  className="saga-danger-action"
-                  onClick={() => {
-                    if (window.confirm(`Eliminar nodo "${liveSelectedStage.title || 'Sin título'}"? Guarda después para persistir.`)) {
-                      onDeleteStage(liveSelectedStage)
-                    }
-                  }}
-                >
-                  Eliminar nodo
-                </button>
-              </div>
             </>
           ) : (
             <NodeDetailDrawer

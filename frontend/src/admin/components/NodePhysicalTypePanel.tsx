@@ -139,7 +139,23 @@ export default function NodePhysicalTypePanel({
   const isPhysical = mode !== 'none'
   const isLocalNewPhysicalStage = typeof stage.id === 'string' && stage.id.startsWith('local-')
 
-  function patchStage(patch: Record<string, unknown>) {
+    const isLocalNew = typeof stage.id === 'string' && stage.id.startsWith('local-')
+
+  function requestDeleteLocal() {
+    if (!onDeleteLocal) return
+
+    const action = isLocalNew ? 'Descartar' : 'Eliminar'
+    const suffix = isLocalNew
+      ? 'Se quitará de la edición local.'
+      : 'Guarda después para persistir.'
+    const title = stage.title || 'Sin título'
+
+    if (window.confirm(`${action} nodo "${title}"? ${suffix}`)) {
+      onDeleteLocal(stage)
+    }
+  }
+
+function patchStage(patch: Record<string, unknown>) {
     onApplyLocal({
       ...(stage as unknown as Record<string, unknown>),
       ...patch,

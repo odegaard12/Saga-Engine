@@ -3563,3 +3563,55 @@
     font-size: 11px !important;
   }
 }
+
+/* #233 v14c physical editor integrated delete/close actions */
+.saga-physical-editor-topbar__actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.saga-physical-editor-topbar__delete {
+  min-height: 38px !important;
+  border: 1px solid rgba(248, 113, 113, .34) !important;
+  border-radius: 999px !important;
+  padding: 0 13px !important;
+  background: rgba(127, 29, 29, .36) !important;
+  color: #fecaca !important;
+  font-weight: 950 !important;
+  letter-spacing: -.01em !important;
+  cursor: pointer !important;
+  box-shadow: 0 12px 28px rgba(127, 29, 29, .16) !important;
+}
+
+.saga-physical-editor-topbar__delete:active {
+  transform: translateY(1px) !important;
+}
+
+.saga-physical-node-actions {
+  display: none !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-physical-editor-topbar {
+    gap: 10px !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    width: 100% !important;
+    min-height: 44px !important;
+    max-width: none !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+}
