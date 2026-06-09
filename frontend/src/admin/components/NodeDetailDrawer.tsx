@@ -605,15 +605,15 @@ export default function NodeDetailDrawer({
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
                   <button type="button" className="admin-game-guide-open" onClick={() => setIsGameGuideOpen(true)}>
                     <span>Configurar plantilla</span>
-                    <small>Abre ayuda y pasos recomendados</small>
+                    <small>Abre el asistente de configuración</small>
                   </button>
 
                   {isGameGuideOpen ? (
-                    <section className="admin-game-guide-inline-panel" role="region" aria-label="Guía de configuración de plantilla">
+                    <section className="admin-game-guide-inline-panel" role="region" aria-label="Asistente de configuración de plantilla de juego">
                       <div className="admin-game-guide-inline-head">
                         <div>
                           <span>Guía de plantilla</span>
-                          <strong>Configurar este juego</strong>
+                          <strong>Asistente de configuración</strong>
                         </div>
                         <button type="button" onClick={() => setIsGameGuideOpen(false)} aria-label="Cerrar guía de plantilla">
                           Cerrar ×
@@ -622,20 +622,20 @@ export default function NodeDetailDrawer({
 
                       <div className="admin-game-guide-inline-body">
                         <article>
-                          <b>1. Elige el tipo de reto</b>
-                          <p>Señal GPS es el nodo exterior más estable. Rumbo usa brújula. Los QR físicos sirven para objetos, llaves, pistas o bonus.</p>
+                          <b>1. Selecciona el juego</b>
+                          <p>Elige primero la plantilla: Señal GPS para ruta exterior, Rumbo para orientación, o QR físico para objeto, llave, pista o bonus.</p>
                         </article>
                         <article>
-                          <b>2. Ajusta la activación</b>
-                          <p>El radio y la proximidad están en Básico. La posición se cambia arrastrando el nodo en el mapa.</p>
+                          <b>2. Configura cómo se activa</b>
+                          <p>Define radio, proximidad y forma de interacción. La posición se cambia arrastrando el nodo en el mapa.</p>
                         </article>
                         <article>
-                          <b>3. Revisa el fallback</b>
-                          <p>Es el código de emergencia para avanzar si falla GPS, cámara, brújula o cobertura.</p>
+                          <b>3. Prepara el modo emergencia</b>
+                          <p>El fallback permite continuar si falla GPS, cámara, brújula o cobertura. No lo enseñes salvo emergencia.</p>
                         </article>
                         <article>
-                          <b>4. Escribe los mensajes</b>
-                          <p>En Mensajes ajustas pista, aviso si no hay GPS y texto de bloqueo o éxito.</p>
+                          <b>4. Escribe lo que verá el jugador</b>
+                          <p>Revisa pista, aviso si no hay GPS y texto de bloqueo/éxito. Esto es lo que más ayuda al jugador en ruta.</p>
                         </article>
                       </div>
                     </section>

@@ -5818,3 +5818,212 @@ body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* #235g — external guided game wizard
+   Opens from Juego but renders as a large app-level wizard, not a compact drawer card. */
+
+.admin-node-editor-redesign .admin-game-guide-inline {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10050 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  display: grid !important;
+  place-items: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 16px)
+    16px
+    calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  background: rgba(2, 6, 23, 0.62) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-panel,
+.admin-node-editor-redesign .admin-game-guide-inline-panel *,
+.admin-node-editor-redesign .admin-game-guide-inline-panel *::before,
+.admin-node-editor-redesign .admin-game-guide-inline-panel *::after {
+  box-sizing: border-box !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-panel {
+  width: min(1040px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  height: min(780px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px) !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  border-radius: 30px !important;
+  border: 1px solid rgba(125, 211, 252, 0.22) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.16), transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.12), transparent 36%),
+    rgba(15, 23, 42, 0.97) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.56) !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 18px !important;
+  padding: 22px 24px 18px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background: rgba(15, 23, 42, 0.42) !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-head > div,
+.admin-node-editor-redesign .admin-game-guide-inline-head span,
+.admin-node-editor-redesign .admin-game-guide-inline-head strong {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-head span {
+  display: block !important;
+  color: rgba(125, 211, 252, 0.94) !important;
+  font-size: 0.78rem !important;
+  font-weight: 950 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.10em !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-head strong {
+  display: block !important;
+  margin-top: 5px !important;
+  font-size: clamp(1.55rem, 4vw, 2.45rem) !important;
+  line-height: 1.03 !important;
+  letter-spacing: -0.055em !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-head button {
+  min-height: 48px !important;
+  padding: 11px 16px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(248, 250, 252, 0.22) !important;
+  background: rgba(248, 250, 252, 0.12) !important;
+  color: #f8fafc !important;
+  font-size: 1rem !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 22px 24px 24px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body article {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 22px !important;
+  padding: 17px !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.70), rgba(15, 23, 42, 0.44)) !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body article:first-child {
+  border-color: rgba(56, 189, 248, 0.32) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.18), transparent 42%),
+    rgba(15, 23, 42, 0.66) !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body b,
+.admin-node-editor-redesign .admin-game-guide-inline-body p {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body b {
+  display: block !important;
+  margin-bottom: 7px !important;
+  font-size: 1.02rem !important;
+  line-height: 1.22 !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-inline-body p {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.82) !important;
+  line-height: 1.48 !important;
+  font-size: 0.94rem !important;
+}
+
+/* While wizard is open, floating version badge must not compete with it. */
+.admin-root:has(.admin-game-guide-inline) .saga-build-info--floating,
+body:has(.admin-game-guide-inline) .saga-build-info--floating {
+  display: none !important;
+}
+
+/* Mobile wizard: full-height sheet with safe areas. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-node-editor-redesign .admin-game-guide-inline {
+    place-items: stretch !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 8px)
+      8px
+      calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-panel {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    border-radius: 24px !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-head {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 18px 16px 14px !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-head strong {
+    font-size: clamp(1.35rem, 8vw, 2rem) !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-head button {
+    width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-body {
+    grid-template-columns: 1fr !important;
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-body article {
+    padding: 14px !important;
+    border-radius: 20px !important;
+  }
+
+  .admin-node-editor-redesign .admin-game-guide-inline-body p {
+    font-size: 0.9rem !important;
+  }
+}
+
+/* #235g — keep technical game implementation fields out of normal editing path */
+.admin-node-editor-redesign .admin-game-technical-field,
+.admin-node-editor-redesign [class*="game-technical"],
+.admin-node-editor-redesign [data-technical="true"] {
+  display: none !important;
+}
