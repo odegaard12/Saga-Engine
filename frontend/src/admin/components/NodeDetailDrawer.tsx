@@ -450,7 +450,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
-        className="admin-drawer admin-drawer-editable admin-node-editor-redesign"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-node-editor-redesign"
         role="dialog"
         
         aria-label={`Node editor: ${draft.title}`}
