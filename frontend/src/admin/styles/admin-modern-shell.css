@@ -5245,3 +5245,60 @@ button[title*="Avanzado"] {
     align-items: start !important;
   }
 }
+
+/* #235b — guided game editor polish */
+.admin-node-editor-redesign .admin-game-technical-field {
+  display: none !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.admin-node-editor-redesign .admin-node-field-help {
+  display: block !important;
+  max-width: 72ch !important;
+  color: rgba(203, 213, 225, 0.74) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin: 0 0 6px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field::after {
+  content: "Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.";
+  display: block !important;
+  color: rgba(203, 213, 225, 0.70) !important;
+  font-size: 0.80rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-top: 2px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field:has(.admin-node-field-help)::after {
+  content: none !important;
+}
+
+.admin-node-editor-redesign .admin-note-pill {
+  display: none !important;
+}
+
+/* iOS: evitar zoom automático al enfocar clave/input en admin móvil. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root input,
+  .admin-root select,
+  .admin-root textarea,
+  .admin-root button {
+    font-size: 16px !important;
+  }
+
+  .admin-root input[type="password"],
+  .admin-root input[type="text"],
+  .admin-root input[type="number"],
+  .admin-root textarea,
+  .admin-root select {
+    min-height: 44px !important;
+  }
+}

@@ -18,7 +18,7 @@ import {
 function normalizeLegacyNodeCopy(value?: string) {
   const clean = String(value || '').trim()
   if (!clean) return ''
-  if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
+  if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.' || clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
     return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
   }
   if (clean === 'Acércate al nodo para desbloquearlo.' || clean === 'Acércate al nodo para desbloquearlo.') {
@@ -26,6 +26,7 @@ function normalizeLegacyNodeCopy(value?: string) {
   }
   return clean
 }
+
 
 
 type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
@@ -585,6 +586,7 @@ export default function NodeDetailDrawer({
 
               <label className="admin-node-main-copy-field admin-edit-field">
                 Texto principal del nodo
+                <span className="admin-node-field-help">Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.</span>
                 <textarea
                   rows={7}
                   value={draft.content || ''}
@@ -685,7 +687,7 @@ export default function NodeDetailDrawer({
               </small>
 
               <div className="admin-family-config-grid">
-                <label>
+                <label className="admin-game-technical-field">
                   Objective
                   <input
                     value={getDraftConfigText('objective')}
@@ -853,7 +855,7 @@ export default function NodeDetailDrawer({
               </label>
 
               <small className="admin-family-config-note">
-                Este panel actualiza la vista local al momento. Pulsa Guardar en Control de misión para persistir.
+                
               </small>
             </section>
           ) : null}
