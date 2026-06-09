@@ -93,3 +93,10 @@
     display: none !important;
   }
 }
+
+/* #235c — hide floating version badge on phone/coarse pointer */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}

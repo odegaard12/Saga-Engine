@@ -15,18 +15,18 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 
-function normalizeLegacyNodeCopy(value?: string) {
-  const clean = String(value || '').trim()
-  if (!clean) return ''
-  if (clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.' || clean === 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.') {
-    return 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.'
-  }
-  if (clean === 'Acércate al nodo para desbloquearlo.' || clean === 'Acércate al nodo para desbloquearlo.') {
-    return 'Acércate al nodo para desbloquearlo.'
-  }
-  return clean
+
+
+const LEGACY_NODE_COPY_ES: Record<string, string> = {
+  'GPS unavailable message.': 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
+  'Move closer to unlock this node.': 'Acércate al nodo para desbloquearlo.',
 }
 
+function normalizeLegacyNodeCopy(value?: unknown) {
+  const clean = String(value ?? '').trim()
+  if (!clean) return ''
+  return LEGACY_NODE_COPY_ES[clean] ?? clean
+}
 
 
 type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
@@ -946,7 +946,7 @@ export default function NodeDetailDrawer({
                 Hint
                 <textarea
                   rows={4}
-                  value={messages.hint || ''}
+                  value={normalizeLegacyNodeCopy(messages.hint || '')}
                   onChange={(event) => setDraftMessage('hint', event.target.value)}
                 />
               </label>

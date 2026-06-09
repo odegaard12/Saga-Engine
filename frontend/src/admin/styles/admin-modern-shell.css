@@ -5302,3 +5302,21 @@ button[title*="Avanzado"] {
     min-height: 44px !important;
   }
 }
+
+/* #235c — iOS mobile input zoom prevention in admin/login */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root input,
+  .admin-root select,
+  .admin-root textarea,
+  .admin-root button {
+    font-size: 16px !important;
+  }
+
+  .admin-root input[type="password"],
+  .admin-root input[type="text"],
+  .admin-root input[type="number"],
+  .admin-root textarea,
+  .admin-root select {
+    min-height: 44px !important;
+  }
+}
