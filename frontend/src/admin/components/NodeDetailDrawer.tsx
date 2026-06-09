@@ -608,6 +608,39 @@ export default function NodeDetailDrawer({
                     <small>Abre ayuda y pasos recomendados</small>
                   </button>
 
+                  {isGameGuideOpen ? (
+                    <section className="admin-game-guide-inline-panel" role="region" aria-label="Guía de configuración de plantilla">
+                      <div className="admin-game-guide-inline-head">
+                        <div>
+                          <span>Guía de plantilla</span>
+                          <strong>Configurar este juego</strong>
+                        </div>
+                        <button type="button" onClick={() => setIsGameGuideOpen(false)} aria-label="Cerrar guía de plantilla">
+                          Cerrar ×
+                        </button>
+                      </div>
+
+                      <div className="admin-game-guide-inline-body">
+                        <article>
+                          <b>1. Elige el tipo de reto</b>
+                          <p>Señal GPS es el nodo exterior más estable. Rumbo usa brújula. Los QR físicos sirven para objetos, llaves, pistas o bonus.</p>
+                        </article>
+                        <article>
+                          <b>2. Ajusta la activación</b>
+                          <p>El radio y la proximidad están en Básico. La posición se cambia arrastrando el nodo en el mapa.</p>
+                        </article>
+                        <article>
+                          <b>3. Revisa el fallback</b>
+                          <p>Es el código de emergencia para avanzar si falla GPS, cámara, brújula o cobertura.</p>
+                        </article>
+                        <article>
+                          <b>4. Escribe los mensajes</b>
+                          <p>En Mensajes ajustas pista, aviso si no hay GPS y texto de bloqueo o éxito.</p>
+                        </article>
+                      </div>
+                    </section>
+                  ) : null}
+
                   Elige una prueba estable. Los modos parciales o planeados quedan ocultos hasta estar completos.
                 </small>
               </div>
@@ -970,49 +1003,6 @@ export default function NodeDetailDrawer({
           ) : null}
 
         </div>
-
-          {isGameGuideOpen ? (
-            <div className="admin-game-guide-inline" role="region">
-              <section className="admin-game-guide-panel" role="dialog"  aria-label="Configurar plantilla de juego">
-                <div className="admin-game-guide-head">
-                  <div>
-                    <span>Guía de plantilla</span>
-                    <strong>Configurar este juego</strong>
-                  </div>
-                  <button type="button" onClick={() => setIsGameGuideOpen(false)} aria-label="Cerrar guía de plantilla">
-                    Cerrar ×
-                  </button>
-                </div>
-
-                <div className="admin-game-guide-body">
-                  <article>
-                    <b>1. Elige el tipo de reto</b>
-                    <p>Usa Señal GPS para nodos exteriores estables. Usa Rumbo con brújula cuando quieras que el jugador mire hacia una dirección concreta. Los QR físicos son objetos, llaves, pistas o bonus.</p>
-                  </article>
-
-                  <article>
-                    <b>2. Ajusta la activación</b>
-                    <p>El radio y la proximidad están en Básico. La posición se cambia arrastrando el nodo en el mapa.</p>
-                  </article>
-
-                  <article>
-                    <b>3. Revisa el fallback</b>
-                    <p>El código fallback es la salida de emergencia si falla GPS, cámara, brújula o cobertura. No lo enseñes salvo emergencia.</p>
-                  </article>
-
-                  <article>
-                    <b>4. Escribe el texto del jugador</b>
-                    <p>En Mensajes puedes ajustar la pista, el aviso si falla GPS y el texto de bloqueo o éxito.</p>
-                  </article>
-
-                  <article>
-                    <b>5. Guarda y prueba</b>
-                    <p>Primero guarda en Control de misión. Después abre el jugador y prueba el nodo como si estuvieras en ruta.</p>
-                  </article>
-                </div>
-              </section>
-            </div>
-          ) : null}
 
         <div className="admin-drawer-footer">
 
