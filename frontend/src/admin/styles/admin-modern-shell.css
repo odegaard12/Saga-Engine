@@ -7180,3 +7180,330 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     display: none !important;
   }
 }
+
+/* #235k — real guided game wizard */
+.admin-game-wizard-shell,
+.admin-game-wizard-shell * {
+  box-sizing: border-box !important;
+}
+
+.admin-game-wizard-shell {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 15000 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  display: grid !important;
+  place-items: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 18px)
+    18px
+    calc(env(safe-area-inset-bottom, 0px) + 18px) !important;
+  background: rgba(2, 6, 23, 0.64) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.admin-game-wizard {
+  width: min(1180px, calc(100vw - 36px)) !important;
+  max-width: min(1180px, calc(100vw - 36px)) !important;
+  height: min(860px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px) !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  overflow: hidden !important;
+  border-radius: 32px !important;
+  border: 1px solid rgba(125, 211, 252, 0.24) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.16), transparent 34%),
+    radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.13), transparent 36%),
+    rgba(15, 23, 42, 0.98) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 38px 120px rgba(0, 0, 0, 0.62) !important;
+}
+
+.admin-game-wizard-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 18px !important;
+  padding: 22px 26px 18px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;
+}
+
+.admin-game-wizard-head span {
+  display: block !important;
+  color: rgba(125, 211, 252, 0.94) !important;
+  font-size: 0.78rem !important;
+  font-weight: 950 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.11em !important;
+}
+
+.admin-game-wizard-head strong {
+  display: block !important;
+  margin-top: 5px !important;
+  font-size: clamp(1.7rem, 4vw, 2.65rem) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.055em !important;
+}
+
+.admin-game-wizard-head p {
+  margin: 8px 0 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  line-height: 1.42 !important;
+  max-width: 76ch !important;
+}
+
+.admin-game-wizard-head button,
+.admin-game-wizard-footer button,
+.admin-game-wizard-callout button {
+  min-height: 44px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(248, 250, 252, 0.20) !important;
+  background: rgba(248, 250, 252, 0.12) !important;
+  color: #f8fafc !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+.admin-game-wizard-layout {
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: 280px minmax(0, 1fr) !important;
+  overflow: hidden !important;
+}
+
+.admin-game-wizard-steps {
+  min-height: 0 !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 10px !important;
+  padding: 18px !important;
+  border-right: 1px solid rgba(148, 163, 184, 0.14) !important;
+  background: rgba(2, 6, 23, 0.28) !important;
+  overflow-y: auto !important;
+}
+
+.admin-game-wizard-steps button {
+  width: 100% !important;
+  text-align: left !important;
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  border-radius: 18px !important;
+  padding: 13px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  color: #f8fafc !important;
+  cursor: pointer !important;
+}
+
+.admin-game-wizard-steps button.active {
+  border-color: rgba(56, 189, 248, 0.44) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.22), transparent 40%),
+    rgba(15, 23, 42, 0.76) !important;
+}
+
+.admin-game-wizard-steps strong {
+  display: block !important;
+  font-size: 0.95rem !important;
+}
+
+.admin-game-wizard-steps small {
+  display: block !important;
+  margin-top: 4px !important;
+  color: rgba(203, 213, 225, 0.68) !important;
+  line-height: 1.25 !important;
+}
+
+.admin-game-wizard-main {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 22px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.admin-game-wizard-page {
+  display: grid !important;
+  gap: 16px !important;
+}
+
+.admin-game-wizard-page-head span {
+  color: rgba(125, 211, 252, 0.90) !important;
+  font-weight: 950 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  font-size: 0.75rem !important;
+}
+
+.admin-game-wizard-page-head h3 {
+  margin: 4px 0 6px !important;
+  font-size: clamp(1.35rem, 3vw, 2rem) !important;
+  letter-spacing: -0.04em !important;
+}
+
+.admin-game-wizard-page-head p {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  line-height: 1.45 !important;
+  max-width: 78ch !important;
+}
+
+.admin-game-wizard-game-grid,
+.admin-game-wizard-cards {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)) !important;
+  gap: 14px !important;
+}
+
+.admin-game-wizard-game-grid button,
+.admin-game-wizard-cards article,
+.admin-game-wizard-callout {
+  min-width: 0 !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 22px !important;
+  padding: 16px !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.48)) !important;
+  color: #f8fafc !important;
+}
+
+.admin-game-wizard-game-grid button {
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.admin-game-wizard-game-grid button:hover {
+  border-color: rgba(56, 189, 248, 0.44) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.18), transparent 42%),
+    rgba(15, 23, 42, 0.74) !important;
+}
+
+.admin-game-wizard-game-grid span {
+  display: block !important;
+  font-size: 1.6rem !important;
+  margin-bottom: 8px !important;
+}
+
+.admin-game-wizard-game-grid strong,
+.admin-game-wizard-cards b,
+.admin-game-wizard-callout b {
+  display: block !important;
+  font-size: 1rem !important;
+  margin-bottom: 5px !important;
+}
+
+.admin-game-wizard-game-grid small {
+  display: inline-flex !important;
+  margin-bottom: 8px !important;
+  color: rgba(125, 211, 252, 0.90) !important;
+  font-weight: 900 !important;
+}
+
+.admin-game-wizard-game-grid p,
+.admin-game-wizard-cards p,
+.admin-game-wizard-callout p {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  line-height: 1.43 !important;
+}
+
+.admin-game-wizard-callout {
+  display: grid !important;
+  gap: 10px !important;
+  border-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+.admin-game-wizard-callout button {
+  justify-self: start !important;
+  padding: 0 16px !important;
+  background: rgba(224, 242, 254, 0.95) !important;
+  color: #020617 !important;
+}
+
+.admin-game-wizard-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  padding: 14px 22px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.14) !important;
+  background: rgba(2, 6, 23, 0.74) !important;
+}
+
+.admin-game-wizard-footer button {
+  padding: 0 16px !important;
+}
+
+.admin-game-wizard-footer button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-game-wizard-shell {
+    place-items: stretch !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 8px)
+      8px
+      calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  .admin-game-wizard {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    border-radius: 26px !important;
+  }
+
+  .admin-game-wizard-head {
+    grid-template-columns: 1fr !important;
+    padding: 18px 16px 14px !important;
+  }
+
+  .admin-game-wizard-head button {
+    width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  .admin-game-wizard-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+
+  .admin-game-wizard-steps {
+    display: flex !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14) !important;
+    padding: 12px !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-game-wizard-steps::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-game-wizard-steps button {
+    flex: 0 0 210px !important;
+  }
+
+  .admin-game-wizard-main {
+    padding: 16px !important;
+  }
+
+  .admin-game-wizard-footer {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-game-wizard-footer button {
+    font-size: 16px !important;
+  }
+
+  .admin-game-wizard-footer button:last-child {
+    grid-column: 1 / -1 !important;
+  }
+}

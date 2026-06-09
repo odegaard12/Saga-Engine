@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import { t } from '../../i18n'
+import GameTemplateWizardPanel from './GameTemplateWizardPanel'
 import {
   familyCards,
   getAdminFamilyIcon,
@@ -604,42 +605,20 @@ export default function NodeDetailDrawer({
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
                   <button type="button" className="admin-game-guide-open" onClick={() => setIsGameGuideOpen(true)}>
-                    <span>Configurar plantilla</span>
-                    <small>Abre el asistente de configuración</small>
+                    <span>¿Cómo configuro este juego?</span>
+                    <small>Abrir asistente paso a paso</small>
                   </button>
 
                   {isGameGuideOpen ? (
-                    <section className="admin-game-guide-inline-panel" role="region" aria-label="Asistente de configuración de plantilla de juego">
-                      <div className="admin-game-guide-inline-head">
-                        <div>
-                          <span>Guía de plantilla</span>
-                          <strong>Asistente de configuración</strong>
-                        </div>
-                        <button type="button" onClick={() => setIsGameGuideOpen(false)} aria-label="Cerrar guía de plantilla">
-                          Cerrar ×
-                        </button>
-                      </div>
-
-                      <div className="admin-game-guide-inline-body">
-                        <article>
-                          <b>1. Selecciona el juego</b>
-                          <p>Elige primero la plantilla: Señal GPS para ruta exterior, Rumbo para orientación, o QR físico para objeto, llave, pista o bonus.</p>
-                        </article>
-                        <article>
-                          <b>2. Configura cómo se activa</b>
-                          <p>Define radio, proximidad y forma de interacción. La posición se cambia arrastrando el nodo en el mapa.</p>
-                        </article>
-                        <article>
-                          <b>3. Prepara el modo emergencia</b>
-                          <p>El fallback permite continuar si falla GPS, cámara, brújula o cobertura. No lo enseñes salvo emergencia.</p>
-                        </article>
-                        <article>
-                          <b>4. Escribe lo que verá el jugador</b>
-                          <p>Revisa pista, aviso si no hay GPS y texto de bloqueo/éxito. Esto es lo que más ayuda al jugador en ruta.</p>
-                        </article>
-                      </div>
-                    </section>
+                    <GameTemplateWizardPanel
+                      selectedGameTitle={draft.title || 'Juego actual'}
+                      onClose={() => setIsGameGuideOpen(false)}
+                      onGoToGame={() => { setIsGameGuideOpen(false); setActiveTab('game') }}
+                      onGoToBasics={() => { setIsGameGuideOpen(false); setActiveTab('basics') }}
+                      onGoToMessages={() => { setIsGameGuideOpen(false); setActiveTab('messages') }}
+                    />
                   ) : null}
+
 
                   Elige una prueba estable. Los modos parciales o planeados quedan ocultos hasta estar completos.
                 </small>
