@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import { t } from '../../i18n'
 import GameTemplateWizardPanel from './GameTemplateWizardPanel'
+import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import {
   familyCards,
   getAdminFamilyIcon,
@@ -206,6 +207,14 @@ export default function NodeDetailDrawer({
   onRequestChangeType,
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
+
+  function patchGuidedStage(patch: Record<string, any>) {
+    setDraft((current: any) => ({
+      ...current,
+      ...patch,
+    }))
+  }
+
   const [activeTab, setActiveTab] = useState<DrawerTab>('basics')
   const [isGameGuideOpen, setIsGameGuideOpen] = useState(false)
 
@@ -451,7 +460,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
-        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-node-editor-redesign"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-node-editor-redesign admin-guided-node-editor-enabled"
         role="dialog"
         
         aria-label={`Node editor: ${draft.title}`}
@@ -545,8 +554,19 @@ export default function NodeDetailDrawer({
           </button>
         </div>
 
-        <div className="admin-drawer-body admin-drawer-body--modern">
-          {activeTab === 'basics' ? (
+        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body">
+          
+        <GuidedNodeEditorFlow
+          stage={draft}
+          onPatch={patchGuidedStage}
+          onClose={onClose}
+          onDelete={() => {
+            if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Pulsa Guardar después para persistir.`)) {
+              onDeleteLocal(draft)
+            }
+          }}
+        />
+{activeTab === 'basics' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-node-basics-panel">
               <div className="admin-edit-section-head">
                 <strong>Basics</strong>
