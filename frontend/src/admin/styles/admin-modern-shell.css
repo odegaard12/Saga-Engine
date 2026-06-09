@@ -5320,3 +5320,180 @@ button[title*="Avanzado"] {
     min-height: 44px !important;
   }
 }
+
+/* #235d — responsive guide modal + mobile safe-area rescue */
+
+/* The guide modal must never inherit nowrap/clipping from admin panels. */
+.admin-game-guide-backdrop,
+.admin-game-guide-backdrop *,
+.admin-game-guide-backdrop *::before,
+.admin-game-guide-backdrop *::after {
+  box-sizing: border-box !important;
+}
+
+.admin-game-guide-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  display: grid !important;
+  place-items: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 12px)
+    12px
+    calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+  overflow: hidden !important;
+}
+
+.admin-game-guide-modal {
+  width: min(680px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px) !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  border-radius: clamp(20px, 5vw, 28px) !important;
+}
+
+.admin-game-guide-head {
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+.admin-game-guide-head > div,
+.admin-game-guide-head strong,
+.admin-game-guide-head span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.admin-game-guide-head button {
+  max-width: 42vw !important;
+  white-space: nowrap !important;
+}
+
+.admin-game-guide-body {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.admin-game-guide-body article,
+.admin-game-guide-body b,
+.admin-game-guide-body p {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  hyphens: auto !important;
+}
+
+/* Hide floating build badge while guide modal is open/near admin modal contexts. */
+.admin-root:has(.admin-game-guide-backdrop) .saga-build-info--floating,
+.admin-game-guide-backdrop ~ .saga-build-info--floating,
+body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
+  display: none !important;
+}
+
+/* iPhone / Android admin safe-area. Header and editor should not sit under notch/island. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root,
+  .admin-root-login-only,
+  .admin-root:not(.admin-root-login-only) {
+    padding-top: max(10px, env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .admin-root .admin-shell,
+  .admin-root .admin-login-shell,
+  .admin-root .admin-main,
+  .admin-root .admin-mission-control {
+    padding-top: max(10px, env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .admin-root .admin-topbar,
+  .admin-root .admin-header,
+  .admin-root .saga-admin-header,
+  .admin-root .saga-mission-header,
+  .admin-root .admin-mission-header {
+    padding-top: max(12px, env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .admin-game-guide-backdrop {
+    align-items: start !important;
+    place-items: start center !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 10px)
+      10px
+      calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  }
+
+  .admin-game-guide-modal {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px) !important;
+  }
+
+  .admin-game-guide-head {
+    padding: 15px 14px 12px !important;
+  }
+
+  .admin-game-guide-head strong {
+    font-size: clamp(1.18rem, 7vw, 1.55rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .admin-game-guide-head button {
+    min-height: 42px !important;
+    padding: 9px 11px !important;
+    border-radius: 15px !important;
+    font-size: 16px !important;
+  }
+
+  .admin-game-guide-body {
+    padding: 12px 14px 14px !important;
+    gap: 10px !important;
+  }
+
+  .admin-game-guide-body article {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .admin-game-guide-body p {
+    font-size: 0.88rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Prevent iOS auto-zoom when focusing admin/login inputs. */
+  .admin-root input,
+  .admin-root select,
+  .admin-root textarea,
+  .admin-root button {
+    font-size: 16px !important;
+  }
+
+  .admin-root input[type="password"],
+  .admin-root input[type="text"],
+  .admin-root input[type="number"],
+  .admin-root textarea,
+  .admin-root select {
+    min-height: 44px !important;
+  }
+
+  /* No version badge on phone/admin. Player keeps its inline Herramientas badge. */
+  .admin-root .saga-build-info--floating,
+  .admin-root-login-only .saga-build-info--floating,
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}

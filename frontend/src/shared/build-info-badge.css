@@ -100,3 +100,14 @@
     display: none !important;
   }
 }
+
+/* #235d — never show floating build badge on phone/coarse pointer or modal-like narrow admin views */
+@media (max-width: 900px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
+  display: none !important;
+}
