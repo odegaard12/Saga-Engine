@@ -6027,3 +6027,293 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .admin-node-editor-redesign [data-technical="true"] {
   display: none !important;
 }
+
+/* #235h — node editor as large centered modal, not lateral drawer
+   This makes Juego / Configurar plantilla usable without fighting the narrow side drawer. */
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9000 !important;
+  display: grid !important;
+  place-items: center !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 18px)
+    18px
+    calc(env(safe-area-inset-bottom, 0px) + 18px) !important;
+  background: rgba(2, 6, 23, 0.48) !important;
+  backdrop-filter: blur(10px) !important;
+  pointer-events: none !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer,
+.admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer-editable,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign {
+  pointer-events: auto !important;
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+
+  width: min(1120px, calc(100vw - 36px)) !important;
+  max-width: min(1120px, calc(100vw - 36px)) !important;
+  min-width: 0 !important;
+
+  height: min(860px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px) !important;
+
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  overflow: hidden !important;
+
+  border-radius: 32px !important;
+  border: 1px solid rgba(148, 163, 184, 0.20) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.13), transparent 36%),
+    radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.10), transparent 34%),
+    rgba(2, 6, 23, 0.96) !important;
+  box-shadow: 0 34px 110px rgba(0, 0, 0, 0.58) !important;
+}
+
+/* Bigger header layout: title and actions get real space. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-head,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 16px !important;
+  align-items: start !important;
+  padding: 22px 24px 16px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14) !important;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(2, 6, 23, 0.88)) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+/* Header copy can wrap instead of getting cut. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-title-copy,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-title-copy h2,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-meta,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-meta span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  overflow-wrap: anywhere !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-title-copy h2 {
+  font-size: clamp(1.8rem, 4vw, 3rem) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.065em !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-actions button,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-close,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-delete-visible {
+  min-height: 44px !important;
+  border-radius: 18px !important;
+  font-size: 0.98rem !important;
+}
+
+/* Tabs use full modal width and stop looking cramped. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-tabs,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-tabs {
+  position: sticky !important;
+  top: auto !important;
+  z-index: 24 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  padding: 14px 24px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(2, 6, 23, 0.82) !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-tabs .admin-drawer-tab {
+  flex: 1 1 150px !important;
+  min-width: 120px !important;
+  max-width: none !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+/* Body becomes a proper editor canvas. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-body,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-body--modern {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 22px 24px calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Editor cards can use two columns when there is space. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-edit-grid,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-form-grid {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-activation-panel,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-main-copy-field,
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign textarea {
+  grid-column: 1 / -1 !important;
+}
+
+/* Game guide can now be inline and wide inside the large modal. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-game-guide-inline {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 12px 0 18px !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-game-guide-inline-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  box-shadow: none !important;
+  border-radius: 24px !important;
+}
+
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-game-guide-inline-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+/* QR physical editor also benefits from the modal width. */
+.admin-root:not(.admin-root-login-only) .saga-physical-editor-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 28 !important;
+  border-radius: 22px !important;
+}
+
+/* Footer simple. */
+.admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  padding: 12px 24px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(2, 6, 23, 0.92) !important;
+}
+
+/* Phone: full-screen-ish modal sheet, still not under notch. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking {
+    place-items: stretch !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 8px)
+      8px
+      calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer,
+  .admin-root:not(.admin-root-login-only) .admin-drawer-overlay--nonblocking .admin-drawer-editable,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    border-radius: 26px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-head,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-topbar {
+    grid-template-columns: 1fr !important;
+    padding: 18px 16px 12px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-title-copy h2 {
+    font-size: clamp(2rem, 12vw, 2.8rem) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-actions {
+    justify-content: stretch !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-actions button,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-close,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-delete-visible {
+    flex: 1 1 120px !important;
+    font-size: 16px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-tabs,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding: 12px 16px !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-tabs::-webkit-scrollbar,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-node-editor-tabs .admin-drawer-tab,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-tabs .admin-drawer-tab {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-body,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-body--modern {
+    padding: 16px !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-edit-grid,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-form-grid,
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-game-guide-inline-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-footer {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-root:not(.admin-root-login-only) .admin-node-editor-redesign .admin-drawer-footer button {
+    width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  .admin-root .saga-build-info--floating,
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}
