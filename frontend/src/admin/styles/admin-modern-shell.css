@@ -5071,3 +5071,24 @@ button[title*="Avanzado"] {
 .admin-node-editor-redesign .admin-requirement-advanced {
   display: none !important;
 }
+
+/* #235a — explain main node copy before guided game config */
+.admin-node-editor-redesign .admin-node-main-copy-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field::after {
+  content: "Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.";
+  display: block !important;
+  color: rgba(203, 213, 225, 0.72) !important;
+  font-size: 0.80rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-top: 2px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field textarea {
+  min-height: 96px !important;
+}

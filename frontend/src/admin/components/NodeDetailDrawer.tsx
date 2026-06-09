@@ -582,8 +582,8 @@ export default function NodeDetailDrawer({
                 </div>
               </div>
 
-              <label className="admin-edit-field">
-                Node content
+              <label className="admin-node-main-copy-field admin-edit-field">
+                Texto principal del nodo
                 <textarea
                   rows={7}
                   value={draft.content || ''}
