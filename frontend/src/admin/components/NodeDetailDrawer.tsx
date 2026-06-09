@@ -205,6 +205,7 @@ export default function NodeDetailDrawer({
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
   const [activeTab, setActiveTab] = useState<DrawerTab>('basics')
+  const [isGameGuideOpen, setIsGameGuideOpen] = useState(false)
 
   useEffect(() => {
     setDraft(stage)
@@ -600,6 +601,11 @@ export default function NodeDetailDrawer({
                 <strong>Juego</strong>
                 <span className="admin-game-selected-pill">{selectedGame.icon} {selectedGame.title} · {selectedGame.duration}</span>
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
+                  <button type="button" className="admin-game-guide-open" onClick={() => setIsGameGuideOpen(true)}>
+                    <span>Configurar plantilla</span>
+                    <small>Guía paso a paso para este juego</small>
+                  </button>
+
                   Elige una prueba estable. Los modos parciales o planeados quedan ocultos hasta estar completos.
                 </small>
               </div>
@@ -690,7 +696,7 @@ export default function NodeDetailDrawer({
 
                 {draft.type === 'signal_hunt' ? (
                   <>
-                    <label>
+                    <label className="admin-game-technical-field">
                       Source radius meters
                       <input
                         value={getDraftConfigText('source_radius_m')}
@@ -699,7 +705,7 @@ export default function NodeDetailDrawer({
                       />
                     </label>
 
-                    <label>
+                    <label className="admin-game-technical-field">
                       Lock threshold
                       <input
                         value={getDraftConfigText('lock_threshold')}
@@ -708,7 +714,7 @@ export default function NodeDetailDrawer({
                       />
                     </label>
 
-                    <label>
+                    <label className="admin-game-technical-field">
                       Hold milliseconds
                       <input
                         value={getDraftConfigText('hold_ms')}
@@ -962,6 +968,49 @@ export default function NodeDetailDrawer({
           ) : null}
 
         </div>
+
+          {isGameGuideOpen ? (
+            <div className="admin-game-guide-backdrop" role="presentation">
+              <section className="admin-game-guide-modal" role="dialog" aria-modal="true" aria-label="Configurar plantilla de juego">
+                <div className="admin-game-guide-head">
+                  <div>
+                    <span>Guía de plantilla</span>
+                    <strong>Configurar este juego</strong>
+                  </div>
+                  <button type="button" onClick={() => setIsGameGuideOpen(false)} aria-label="Cerrar guía de plantilla">
+                    Cerrar ×
+                  </button>
+                </div>
+
+                <div className="admin-game-guide-body">
+                  <article>
+                    <b>1. Elige el tipo de reto</b>
+                    <p>Usa Señal GPS para nodos exteriores estables. Usa Rumbo con brújula cuando quieras que el jugador mire hacia una dirección concreta. Los QR físicos son objetos, llaves, pistas o bonus.</p>
+                  </article>
+
+                  <article>
+                    <b>2. Ajusta la activación</b>
+                    <p>El radio y la proximidad están en Básico. La posición se cambia arrastrando el nodo en el mapa.</p>
+                  </article>
+
+                  <article>
+                    <b>3. Revisa el fallback</b>
+                    <p>El código fallback es la salida de emergencia si falla GPS, cámara, brújula o cobertura. No lo enseñes salvo emergencia.</p>
+                  </article>
+
+                  <article>
+                    <b>4. Escribe el texto del jugador</b>
+                    <p>En Mensajes puedes ajustar la pista, el aviso si falla GPS y el texto de bloqueo o éxito.</p>
+                  </article>
+
+                  <article>
+                    <b>5. Guarda y prueba</b>
+                    <p>Primero guarda en Control de misión. Después abre el jugador y prueba el nodo como si estuvieras en ruta.</p>
+                  </article>
+                </div>
+              </section>
+            </div>
+          ) : null}
 
         <div className="admin-drawer-footer">
 

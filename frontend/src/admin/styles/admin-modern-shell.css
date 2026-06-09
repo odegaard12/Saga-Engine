@@ -5092,3 +5092,156 @@ button[title*="Avanzado"] {
 .admin-node-editor-redesign .admin-node-main-copy-field textarea {
   min-height: 96px !important;
 }
+
+/* #235 — guided game template configuration */
+.admin-node-editor-redesign .admin-node-main-copy-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field::after {
+  content: "Lo verá el jugador como instrucción o pista principal al abrir/completar este nodo. Déjalo vacío si la plantilla de juego ya lo explica todo.";
+  display: block !important;
+  color: rgba(203, 213, 225, 0.72) !important;
+  font-size: 0.80rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  margin-top: 2px !important;
+}
+
+.admin-node-editor-redesign .admin-node-main-copy-field textarea {
+  min-height: 96px !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-open {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: 0 0 14px !important;
+  padding: 14px 16px !important;
+  border: 1px solid rgba(56, 189, 248, 0.24) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.16), transparent 34%),
+    rgba(15, 23, 42, 0.72) !important;
+  color: #f8fafc !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-open span {
+  font-weight: 950 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.admin-node-editor-redesign .admin-game-guide-open small {
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-weight: 800 !important;
+}
+
+.admin-node-editor-redesign .admin-game-technical-field {
+  display: none !important;
+}
+
+.admin-game-guide-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: max(14px, env(safe-area-inset-top, 0px)) 14px max(14px, env(safe-area-inset-bottom, 0px)) !important;
+  background: rgba(2, 6, 23, 0.68) !important;
+  backdrop-filter: blur(16px) !important;
+}
+
+.admin-game-guide-modal {
+  width: min(720px, calc(100vw - 22px)) !important;
+  max-height: min(760px, calc(100dvh - 28px)) !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.14), transparent 36%),
+    rgba(15, 23, 42, 0.96) !important;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.46) !important;
+  color: #f8fafc !important;
+}
+
+.admin-game-guide-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 18px 18px 14px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14) !important;
+}
+
+.admin-game-guide-head span {
+  display: block !important;
+  color: rgba(125, 211, 252, 0.88) !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+
+.admin-game-guide-head strong {
+  display: block !important;
+  margin-top: 3px !important;
+  font-size: clamp(1.25rem, 3vw, 1.7rem) !important;
+  letter-spacing: -0.045em !important;
+}
+
+.admin-game-guide-head button {
+  flex: 0 0 auto !important;
+  min-height: 42px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(248, 250, 252, 0.20) !important;
+  background: rgba(248, 250, 252, 0.10) !important;
+  color: #f8fafc !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+.admin-game-guide-body {
+  overflow-y: auto !important;
+  padding: 14px 18px 18px !important;
+  display: grid !important;
+  gap: 12px !important;
+}
+
+.admin-game-guide-body article {
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  border-radius: 20px !important;
+  padding: 13px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+}
+
+.admin-game-guide-body b {
+  display: block !important;
+  margin-bottom: 5px !important;
+  font-size: 0.94rem !important;
+}
+
+.admin-game-guide-body p {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  line-height: 1.42 !important;
+  font-size: 0.88rem !important;
+}
+
+@media (max-width: 520px) {
+  .admin-node-editor-redesign .admin-game-guide-open {
+    display: grid !important;
+    justify-items: start !important;
+  }
+
+  .admin-game-guide-head {
+    align-items: start !important;
+  }
+}
