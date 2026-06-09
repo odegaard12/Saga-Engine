@@ -111,3 +111,10 @@
 body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
   display: none !important;
 }
+
+/* #235e — hide floating build badge on mobile and during admin editing */
+@media (max-width: 900px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}

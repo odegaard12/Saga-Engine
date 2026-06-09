@@ -448,11 +448,11 @@ export default function NodeDetailDrawer({
 
 
   return (
-    <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="presentation">
+    <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
         className="admin-drawer admin-drawer-editable admin-node-editor-redesign"
         role="dialog"
-        aria-modal="true"
+        
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -605,7 +605,7 @@ export default function NodeDetailDrawer({
                 <small className="admin-game-editor-help admin-game-editor-help-v1">
                   <button type="button" className="admin-game-guide-open" onClick={() => setIsGameGuideOpen(true)}>
                     <span>Configurar plantilla</span>
-                    <small>Guía paso a paso para este juego</small>
+                    <small>Abre ayuda y pasos recomendados</small>
                   </button>
 
                   Elige una prueba estable. Los modos parciales o planeados quedan ocultos hasta estar completos.
@@ -972,8 +972,8 @@ export default function NodeDetailDrawer({
         </div>
 
           {isGameGuideOpen ? (
-            <div className="admin-game-guide-backdrop" role="presentation">
-              <section className="admin-game-guide-modal" role="dialog" aria-modal="true" aria-label="Configurar plantilla de juego">
+            <div className="admin-game-guide-inline" role="region">
+              <section className="admin-game-guide-panel" role="dialog"  aria-label="Configurar plantilla de juego">
                 <div className="admin-game-guide-head">
                   <div>
                     <span>Guía de plantilla</span>
