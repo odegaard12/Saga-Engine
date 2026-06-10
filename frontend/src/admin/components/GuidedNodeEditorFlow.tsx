@@ -292,17 +292,6 @@ function copyText(value: string, onDone: (message: string) => void) {
     .catch(() => onDone('No se pudo copiar'))
 }
 
-function downloadTextFile(filename: string, content: string, type = 'text/plain') {
-  const blob = new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}
 
 export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete }: GuidedNodeEditorFlowProps) {
   const [stepIndex, setStepIndex] = useState(0)
@@ -444,15 +433,61 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     showNotice('QR aplicado al nodo. Pulsa Guardar para persistir.')
   }
 
-  function downloadQrSvg() {
+  function downloadQrPng() {
     const svg = qrWrapRef.current?.querySelector('svg')
     if (!svg) {
       showNotice('No se encontró el QR para descargar')
       return
     }
-    const source = `<?xml version="1.0" encoding="UTF-8"?>\n${svg.outerHTML}`
-    downloadTextFile(`saga-qr-${qrItemId(stage)}.svg`, source, 'image/svg+xml')
-    showNotice('QR descargado')
+
+    const serializer = new XMLSerializer()
+    const source = serializer.serializeToString(svg)
+    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const image = new Image()
+
+    image.onload = () => {
+      const size = 1024
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        showNotice('No se pudo preparar la imagen')
+        return
+      }
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(image, 0, 0, size, size)
+      URL.revokeObjectURL(url)
+
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) {
+          showNotice('No se pudo generar PNG')
+          return
+        }
+
+        const pngUrl = URL.createObjectURL(pngBlob)
+        const link = document.createElement('a')
+        link.href = pngUrl
+        link.download = `saga-qr-${qrItemId(stage)}.png`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(pngUrl)
+        showNotice('QR descargado como PNG')
+      }, 'image/png')
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      showNotice('No se pudo generar PNG')
+    }
+
+    image.src = url
   }
 
   function patchNumber(key: string, value: string) {
@@ -706,7 +741,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   <div className="saga-guided-v4-qractions">
                     <button type="button" className="primary" onClick={saveQrCard}>Aplicar QR</button>
                     <button type="button" onClick={() => copyText(qrPayload(stage), showNotice)}>Copiar</button>
-                    <button type="button" onClick={downloadQrSvg}>Descargar SVG</button>
+                    <button type="button" onClick={downloadQrPng}>Descargar PNG</button>
                   </div>
 
                   {notice ? <small className="saga-guided-v4-notice">{notice}</small> : null}

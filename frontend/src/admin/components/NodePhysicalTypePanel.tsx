@@ -209,18 +209,6 @@ function patchStage(patch: Record<string, unknown>) {
     })
   }
 
-  if (!chooserOnly && isPhysical) {
-    return (
-      <section className="saga-node-physical-type-panel saga-physical-guided-v3-shell" style={panel} aria-label="Editor guiado de QR físico">
-        <GuidedNodeEditorFlow
-          stage={stage as unknown as Record<string, any>}
-          onPatch={(patch) => patchStage(patch)}
-          onClose={onClose ?? (() => undefined)}
-          onDelete={requestDeleteLocal}
-        />
-      </section>
-    )
-  }
 
   if (!chooserOnly && isPhysical) {
     return (
@@ -231,6 +219,46 @@ function patchStage(patch: Record<string, unknown>) {
           onClose={onClose ?? (() => undefined)}
           onDelete={requestDeleteLocal}
         />
+      </section>
+    )
+  }
+
+  if (chooserOnly) {
+    return (
+      <section className="saga-type-chooser-v4" style={panel} aria-label="Tipo de nodo">
+        <header className="saga-type-chooser-v4-head">
+          <div>
+            <span>TIPO DE NODO</span>
+            <h2>{isPhysical ? 'QR físico' : 'Nodo de juego'}</h2>
+            <p>Escoge si este punto será un juego normal o una tarjeta QR física.</p>
+          </div>
+          <b>{isPhysical ? 'QR FÍSICO' : 'JUEGO'}</b>
+        </header>
+
+        <div className="saga-type-chooser-v4-grid">
+          <button
+            type="button"
+            className={mode === 'none' ? 'active' : ''}
+            onClick={() => setMode('none')}
+          >
+            <i>🗺️</i>
+            <strong>Nodo de juego</strong>
+            <small>Ruta, GPS, rumbo, minijuego o prueba en mapa.</small>
+          </button>
+
+          {physicalModes.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={mode === item.id ? 'active' : ''}
+              onClick={() => setMode(item.id)}
+            >
+              <i>{item.icon}</i>
+              <strong>{item.label}</strong>
+              <small>{item.help}</small>
+            </button>
+          ))}
+        </div>
       </section>
     )
   }

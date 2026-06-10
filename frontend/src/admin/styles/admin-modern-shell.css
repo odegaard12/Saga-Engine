@@ -11101,3 +11101,170 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     min-height: 44px !important;
   }
 }
+
+
+/* #236m-fix — PNG QR download and modern node type chooser. */
+
+.saga-physical-guided-v3-shell {
+  display: none !important;
+}
+
+.saga-type-chooser-v4,
+.saga-type-chooser-v4 * {
+  box-sizing: border-box !important;
+}
+
+.saga-type-chooser-v4 {
+  display: grid !important;
+  gap: 14px !important;
+  width: min(880px, calc(100vw - 24px)) !important;
+  max-width: min(880px, calc(100vw - 24px)) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow: hidden !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background:
+    radial-gradient(circle at 0 0, rgba(14, 165, 233, 0.14), transparent 34%),
+    radial-gradient(circle at 100% 0, rgba(99, 102, 241, 0.13), transparent 36%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.92)) !important;
+  color: #f8fafc !important;
+  padding: 18px !important;
+}
+
+.saga-type-chooser-v4-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+}
+
+.saga-type-chooser-v4-head span {
+  display: block !important;
+  color: rgba(125, 211, 252, 0.98) !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.saga-type-chooser-v4-head h2 {
+  margin: 4px 0 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(1.45rem, 3vw, 2.1rem) !important;
+  line-height: 1 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.saga-type-chooser-v4-head p {
+  margin: 6px 0 0 !important;
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.9rem !important;
+  line-height: 1.35 !important;
+}
+
+.saga-type-chooser-v4-head b {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 34px !important;
+  padding: 0 13px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(96, 165, 250, 0.26) !important;
+  background: rgba(15, 23, 42, 0.64) !important;
+  color: rgba(226, 232, 240, 0.96) !important;
+  font-size: 0.74rem !important;
+  white-space: nowrap !important;
+}
+
+.saga-type-chooser-v4-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+}
+
+.saga-type-chooser-v4-grid button {
+  min-height: 112px !important;
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 6px !important;
+  padding: 12px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.08), transparent 45%),
+    rgba(15, 23, 42, 0.50) !important;
+  color: #f8fafc !important;
+  text-align: center !important;
+  cursor: pointer !important;
+}
+
+.saga-type-chooser-v4-grid button.active,
+.saga-type-chooser-v4-grid button:hover {
+  border-color: rgba(56, 189, 248, 0.62) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.22), transparent 45%),
+    rgba(15, 23, 42, 0.72) !important;
+}
+
+.saga-type-chooser-v4-grid button i {
+  font-style: normal !important;
+  font-size: 1.55rem !important;
+}
+
+.saga-type-chooser-v4-grid button strong {
+  font-size: 1rem !important;
+  line-height: 1.12 !important;
+}
+
+.saga-type-chooser-v4-grid button small {
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.75rem !important;
+  line-height: 1.25 !important;
+}
+
+.saga-guided-v4-qractions button {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.saga-guided-v4-qrcard {
+  min-height: 0 !important;
+}
+
+.saga-guided-v4-qrimage {
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-type-chooser-v4 {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 20px !important;
+    padding: 12px !important;
+  }
+
+  .saga-type-chooser-v4-head {
+    display: grid !important;
+    gap: 8px !important;
+  }
+
+  .saga-type-chooser-v4-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    overflow-y: auto !important;
+  }
+
+  .saga-type-chooser-v4-grid button {
+    min-height: 76px !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    place-items: center start !important;
+    text-align: left !important;
+  }
+
+  .saga-type-chooser-v4-grid button i {
+    font-size: 1.28rem !important;
+  }
+}
