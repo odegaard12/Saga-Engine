@@ -208,6 +208,14 @@ export default function NodeDetailDrawer({
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
+  function patchGuidedV2Stage(patch: Record<string, any>) {
+    setDraft((current: any) => ({
+      ...current,
+      ...patch,
+    }))
+  }
+
+
   function patchGuidedStage(patch: Record<string, any>) {
     setDraft((current: any) => ({
       ...current,
@@ -460,7 +468,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
-        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-node-editor-redesign admin-guided-node-editor-enabled"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-node-editor-enabled admin-guided-v2-shell"
         role="dialog"
         
         aria-label={`Node editor: ${draft.title}`}
@@ -554,7 +562,7 @@ export default function NodeDetailDrawer({
           </button>
         </div>
 
-        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body">
+        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host">
           
         <GuidedNodeEditorFlow
           stage={draft}

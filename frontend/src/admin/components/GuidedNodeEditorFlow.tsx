@@ -1,559 +1,495 @@
 import { useMemo, useState } from 'react'
 
-type GuidedStep = 'type' | 'normalGame' | 'qrConfig' | 'config' | 'content' | 'rules' | 'review'
-type NodeMode = 'normal' | 'qr_object' | 'qr_key' | 'qr_clue' | 'qr_bonus'
-type NormalGame = 'signal_gps' | 'bearing_hunt'
+type StageLike = Record<string, any>
 
 type GuidedNodeEditorFlowProps = {
-  stage: any
+  stage: StageLike
   onPatch: (patch: Record<string, any>) => void
   onClose: () => void
   onDelete: () => void
 }
 
-const qrModes: Array<{
-  id: NodeMode
-  icon: string
-  title: string
-  help: string
-  itemKind: string
-}> = [
-  { id: 'qr_object', icon: '⭐', title: 'Objeto QR', help: 'Objeto físico que se recoge', itemKind: 'object' },
-  { id: 'qr_key', icon: '🔑', title: 'Llave QR', help: 'Objeto que puede desbloquear otro nodo', itemKind: 'key' },
-  { id: 'qr_clue', icon: '🧩', title: 'Pista QR', help: 'Tarjeta física con pista', itemKind: 'clue' },
-  { id: 'qr_bonus', icon: '🎁', title: 'Bonus QR', help: 'Extra o recompensa física', itemKind: 'bonus' },
+type StepKey = 'type' | 'subtype' | 'config' | 'content' | 'rules' | 'review'
+
+const STEPS: Array<{ key: StepKey; label: string }> = [
+  { key: 'type', label: 'Tipo' },
+  { key: 'subtype', label: 'Modo' },
+  { key: 'config', label: 'Configurar' },
+  { key: 'content', label: 'Contenido' },
+  { key: 'rules', label: 'Reglas' },
+  { key: 'review', label: 'Revisar' },
 ]
 
-const normalGames: Array<{
-  id: NormalGame
-  icon: string
-  title: string
-  help: string
-  tag: string
-}> = [
+const gameOptions = [
   {
     id: 'signal_gps',
     icon: '📡',
     title: 'Señal GPS',
-    help: 'El jugador llega al radio del nodo y confirma presencia.',
-    tag: 'Exterior estable',
+    desc: 'El jugador debe acercarse a una zona del mapa.',
+    patch: {
+      physical_node_kind: '',
+      physical_qr: false,
+      qr_payload: '',
+      game_family: 'signal',
+      game_type: 'signal_gps',
+      game_template_id: 'signal_gps_easy',
+      entry_mode: 'gps',
+      completion_method: 'proximity',
+      requires_proximity: true,
+      radius_m: 50,
+      proximity_radius_m: 50,
+    },
   },
   {
     id: 'bearing_hunt',
     icon: '🧭',
-    title: 'Rumbo con brújula',
-    help: 'El jugador debe orientarse hacia una dirección concreta.',
-    tag: 'Orientación',
+    title: 'Rumbo',
+    desc: 'El jugador sigue una dirección/pista de orientación.',
+    patch: {
+      physical_node_kind: '',
+      physical_qr: false,
+      qr_payload: '',
+      game_family: 'bearing',
+      game_type: 'bearing_hunt',
+      game_template_id: 'bearing_hunt_easy',
+      entry_mode: 'bearing',
+      completion_method: 'bearing',
+      requires_proximity: true,
+      radius_m: 50,
+      proximity_radius_m: 50,
+      bearing_target_deg: 90,
+      bearing_tolerance_deg: 18,
+    },
   },
 ]
 
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}
+const qrOptions = [
+  {
+    id: 'object',
+    icon: '⭐',
+    title: 'Objeto QR',
+    desc: 'Objeto físico que el jugador puede encontrar y guardar.',
+    kind: 'object',
+    template: 'physical_object_qr',
+  },
+  {
+    id: 'key',
+    icon: '🔑',
+    title: 'Llave QR',
+    desc: 'Llave física para desbloquear otro nodo o zona.',
+    kind: 'key',
+    template: 'physical_key_qr',
+  },
+  {
+    id: 'clue',
+    icon: '🧩',
+    title: 'Pista QR',
+    desc: 'Pista física que revela información de la historia.',
+    kind: 'clue',
+    template: 'physical_clue_qr',
+  },
+  {
+    id: 'bonus',
+    icon: '🎁',
+    title: 'Bonus QR',
+    desc: 'Extra opcional, recompensa o misión secundaria.',
+    kind: 'bonus',
+    template: 'physical_bonus_qr',
+  },
+]
+
+function titleOf(stage: StageLike) {
+  return String(stage.title || stage.name || 'Nuevo nodo')
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 64)
+function isQr(stage: StageLike) {
+  return Boolean(stage.physical_qr || stage.physical_node_kind || String(stage.game_family || '').includes('physical'))
 }
 
-function getTitle(stage: any) {
-  return String(stage?.title || stage?.name || 'Nodo sin título')
+function selectedGame(stage: StageLike) {
+  return gameOptions.find((item) => item.id === stage.game_type || item.id === stage.game_family) || gameOptions[0]
 }
 
-function getFallback(stage: any) {
-  return String(stage?.fallback_code || stage?.fallbackCode || '')
+function selectedQr(stage: StageLike) {
+  const kind = String(stage.physical_node_kind || stage.physical_item_kind || 'object')
+  return qrOptions.find((item) => item.kind === kind || item.id === kind) || qrOptions[0]
 }
 
-function getRadius(stage: any) {
-  const raw = Number(stage?.radius_m ?? stage?.radius ?? 50)
-  return Number.isFinite(raw) && raw > 0 ? raw : 50
-}
-
-function getNodeMode(stage: any): NodeMode | 'normal' {
-  const physicalKind = String(stage?.physical_node_kind || stage?.physical_item_kind || '')
-  if (physicalKind === 'key') return 'qr_key'
-  if (physicalKind === 'clue') return 'qr_clue'
-  if (physicalKind === 'bonus') return 'qr_bonus'
-  if (physicalKind === 'object' || stage?.physical_qr || stage?.qr_payload) return 'qr_object'
-  return 'normal'
-}
-
-function getNormalGame(stage: any): NormalGame {
-  const raw = String(stage?.game_template_id || stage?.game_type || stage?.game_family || stage?.game || '')
-  if (raw.includes('bearing') || raw.includes('rumbo')) return 'bearing_hunt'
-  return 'signal_gps'
+function fallbackCode(stage: StageLike) {
+  const raw = String(stage.fallback_code || stage.physical_fallback_code || stage.code || '')
+  if (raw) return raw
+  const id = String(stage.id || stage.node_id || stage.title || '00').match(/\d+/)?.[0] || '00'
+  return `SAGA-${id.padStart(2, '0')}`
 }
 
 export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete }: GuidedNodeEditorFlowProps) {
-  const [step, setStep] = useState<GuidedStep>('type')
-  const [selectedMode, setSelectedMode] = useState<NodeMode | 'normal'>(() => getNodeMode(stage))
-  const [selectedGame, setSelectedGame] = useState<NormalGame>(() => getNormalGame(stage))
+  const [stepIndex, setStepIndex] = useState(0)
+  const mode = isQr(stage) ? 'qr' : 'game'
+  const step = STEPS[stepIndex]?.key || 'type'
+  const game = selectedGame(stage)
+  const qr = selectedQr(stage)
+  const title = titleOf(stage)
 
-  const title = getTitle(stage)
-  const itemId = String(stage?.physical_item_id || slugify(title) || 'objeto')
-  const itemLabel = String(stage?.physical_item_label || title)
-  const fallback = getFallback(stage)
+  const progress = useMemo(() => Math.round(((stepIndex + 1) / STEPS.length) * 100), [stepIndex])
 
-  const messages = useMemo(() => asRecord(stage?.messages), [stage?.messages])
+  const goNext = () => setStepIndex((value) => Math.min(value + 1, STEPS.length - 1))
+  const goBack = () => setStepIndex((value) => Math.max(value - 1, 0))
+  const goTo = (key: StepKey) => setStepIndex(Math.max(0, STEPS.findIndex((item) => item.key === key)))
 
-  function patchMessages(patch: Record<string, string>) {
+  function chooseGameBase() {
     onPatch({
-      messages: {
-        ...messages,
-        ...patch,
-      },
+      physical_node_kind: '',
+      physical_item_kind: '',
+      physical_qr: false,
+      qr_payload: '',
+      game_family: stage.game_family && !String(stage.game_family).includes('physical') ? stage.game_family : 'signal',
+      game_type: stage.game_type && !String(stage.game_type).includes('physical') ? stage.game_type : 'signal_gps',
+      game_template_id: stage.game_template_id && !String(stage.game_template_id).includes('physical') ? stage.game_template_id : 'signal_gps_easy',
+      entry_mode: stage.entry_mode || 'gps',
+      completion_method: stage.completion_method || 'proximity',
+      requires_proximity: stage.requires_proximity ?? true,
+      radius_m: Number(stage.radius_m || stage.proximity_radius_m || 50),
+      proximity_radius_m: Number(stage.proximity_radius_m || stage.radius_m || 50),
     })
+    goTo('subtype')
   }
 
-  function generateFallback() {
-    const order = Number(stage?.route_order ?? stage?.order ?? stage?.index ?? 0)
-    const suffix = Number.isFinite(order) && order > 0 ? String(order).padStart(2, '0') : '01'
-    onPatch({ fallback_code: `SAGA-${suffix}` })
-  }
-
-  function applyNormalGame(game: NormalGame) {
-    setSelectedMode('normal')
-    setSelectedGame(game)
-    setStep('config')
-
-    if (game === 'signal_gps') {
-      onPatch({
-        physical_node_kind: '',
-        physical_qr: false,
-        qr_payload: '',
-        physical_item_id: '',
-        physical_item_label: '',
-        physical_item_kind: '',
-        game_template_id: 'signal_gps_easy',
-        game_family: 'signal',
-        game_type: 'signal_gps',
-        radius_m: getRadius(stage) || 50,
-        entry_mode: 'gps',
-        requires_proximity: true,
-        completion_method: 'proximity',
-      })
-      patchMessages({
-        gps_unavailable: messages.gps_unavailable || 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
-        locked: messages.locked || 'Acércate al nodo para desbloquearlo.',
-      })
-    }
-
-    if (game === 'bearing_hunt') {
-      onPatch({
-        physical_node_kind: '',
-        physical_qr: false,
-        qr_payload: '',
-        physical_item_id: '',
-        physical_item_label: '',
-        physical_item_kind: '',
-        game_template_id: 'bearing_hunt_easy',
-        game_family: 'bearing',
-        game_type: 'bearing_hunt',
-        radius_m: getRadius(stage) || 50,
-        entry_mode: 'bearing',
-        requires_proximity: true,
-        bearing_target_deg: Number(stage?.bearing_target_deg ?? 90),
-        bearing_tolerance_deg: Number(stage?.bearing_tolerance_deg ?? 18),
-        completion_method: 'bearing',
-      })
-      patchMessages({
-        gps_unavailable: messages.gps_unavailable || 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
-        locked: messages.locked || 'Acércate al nodo y oriéntate hacia el rumbo indicado.',
-      })
-    }
-
-    if (!fallback) generateFallback()
-  }
-
-  function applyQrMode(mode: NodeMode) {
-    const meta = qrModes.find((item) => item.id === mode) || qrModes[0]
-    const cleanId = itemId || slugify(title) || 'objeto'
-    const payload = `SAGA1:ITEM:${cleanId}:${itemLabel || title}`
-
-    setSelectedMode(mode)
-    setStep('qrConfig')
-
+  function chooseQrBase(kind = 'object', template = 'physical_object_qr') {
+    const label = titleOf(stage)
     onPatch({
-      physical_node_kind: meta.itemKind,
       physical_qr: true,
-      qr_payload: payload,
-      physical_item_id: cleanId,
-      physical_item_label: itemLabel || title,
-      physical_item_kind: meta.itemKind,
-      game_template_id: mode,
+      physical_node_kind: kind,
+      physical_item_kind: kind,
+      physical_item_id: stage.physical_item_id || String(stage.id || stage.node_id || label).replace(/\s+/g, '-').toLowerCase(),
+      physical_item_label: stage.physical_item_label || label,
       game_family: 'physical_qr',
-      game_type: mode,
+      game_type: template,
+      game_template_id: template,
+      entry_mode: 'qr',
       completion_method: 'qr_scan',
       requires_proximity: false,
+      qr_payload: stage.qr_payload || `SAGA1:ITEM:${String(stage.id || stage.node_id || label).replace(/\s+/g, '-').toLowerCase()}`,
+      fallback_code: fallbackCode(stage),
+      physical_fallback_code: fallbackCode(stage),
     })
-
-    patchMessages({
-      locked: messages.locked || 'Escanea el QR físico para guardar este objeto.',
-    })
-
-    if (!fallback) generateFallback()
+    goTo('subtype')
   }
 
-  function clearToType() {
-    setStep('type')
+  function applyGame(option: typeof gameOptions[number]) {
+    onPatch(option.patch)
+    goTo('config')
   }
 
-  function updateRadius(value: string) {
+  function applyQr(option: typeof qrOptions[number]) {
+    chooseQrBase(option.kind, option.template)
+    goTo('config')
+  }
+
+  function patchNumber(key: string, value: string) {
     const next = Number(value)
-    if (Number.isFinite(next)) onPatch({ radius_m: next })
-  }
-
-  function currentModeLabel() {
-    if (selectedMode === 'normal') {
-      const game = normalGames.find((item) => item.id === selectedGame)
-      return game ? `${game.icon} ${game.title}` : 'Nodo normal'
-    }
-    const qr = qrModes.find((item) => item.id === selectedMode)
-    return qr ? `${qr.icon} ${qr.title}` : 'QR físico'
+    onPatch({ [key]: Number.isFinite(next) ? next : 0 })
   }
 
   return (
-    <section className="saga-guided-node-editor" aria-label="Editor guiado de nodo">
-      <header className="saga-guided-hero">
-        <div>
-          <span>Editor guiado</span>
-          <strong>{title}</strong>
-          <p>{currentModeLabel()} · configura el nodo sin campos técnicos.</p>
+    <section className="saga-guided-editor-v2" aria-label="Editor guiado de nodo">
+      <header className="saga-guided-v2-header">
+        <div className="saga-guided-v2-titleblock">
+          <span>EDITOR GUIADO</span>
+          <h2>{title}</h2>
+          <div className="saga-guided-v2-chips">
+            <b>{mode === 'qr' ? `${qr.icon} ${qr.title}` : `${game.icon} ${game.title}`}</b>
+            {stage.lat != null && stage.lon != null ? <b>{Number(stage.lat).toFixed(5)}, {Number(stage.lon).toFixed(5)}</b> : null}
+            {mode === 'game' ? <b>{Number(stage.radius_m || stage.proximity_radius_m || 50)} m</b> : null}
+          </div>
         </div>
-        <div className="saga-guided-hero-actions">
-          <button type="button" onClick={clearToType}>Cambiar tipo</button>
+
+        <div className="saga-guided-v2-actions">
+          <button type="button" onClick={() => goTo('type')}>Cambiar tipo</button>
           <button type="button" className="danger" onClick={onDelete}>Eliminar</button>
-          <button type="button" onClick={onClose}>Cerrar</button>
+          <button type="button" onClick={onClose}>Cerrar ×</button>
         </div>
       </header>
 
-      <nav className="saga-guided-steps" aria-label="Pasos del editor">
-        {[
-          ['type', '1. Tipo'],
-          [selectedMode === 'normal' ? 'normalGame' : 'qrConfig', selectedMode === 'normal' ? '2. Juego' : '2. QR físico'],
-          ['config', '3. Configuración'],
-          ['content', '4. Contenido'],
-          ['rules', '5. Reglas'],
-          ['review', '6. Revisar'],
-        ].map(([id, label]) => (
+      <nav className="saga-guided-v2-stepper" aria-label="Pasos del editor guiado">
+        {STEPS.map((item, index) => (
           <button
-            key={id}
+            key={item.key}
             type="button"
-            className={step === id ? 'active' : ''}
-            onClick={() => setStep(id as GuidedStep)}
+            className={index === stepIndex ? 'active' : ''}
+            onClick={() => setStepIndex(index)}
           >
-            {label}
+            <span>{index + 1}</span>
+            <b>{item.label}</b>
           </button>
         ))}
       </nav>
 
-      {step === 'type' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>TIPO DE NODO</span>
-            <h3>Nodo normal jugable</h3>
-            <p>Usa este modo para ruta, GPS, minijuego y reglas normales.</p>
-            <b>NORMAL</b>
-          </div>
+      <div className="saga-guided-v2-progress" aria-hidden="true">
+        <i style={{ width: `${progress}%` }} />
+      </div>
 
-          <div className="saga-guided-type-grid">
-            <button type="button" onClick={() => { setSelectedMode('normal'); setStep('normalGame') }}>
-              <span>●</span>
-              <strong>Normal</strong>
-              <small>Ruta, GPS o minijuego</small>
-            </button>
-
-            {qrModes.map((mode) => (
-              <button key={mode.id} type="button" onClick={() => applyQrMode(mode.id)}>
-                <span>{mode.icon}</span>
-                <strong>{mode.title}</strong>
-                <small>{mode.help}</small>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {step === 'normalGame' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>Juego normal</span>
-            <h3>Elige qué tendrá que hacer el jugador</h3>
-            <p>Al elegir un juego se aplica una configuración base ya jugable. Luego podrás editarla sin romper nada.</p>
-          </div>
-
-          <div className="saga-guided-game-grid">
-            {normalGames.map((game) => (
-              <button key={game.id} type="button" onClick={() => applyNormalGame(game.id)}>
-                <span>{game.icon}</span>
-                <strong>{game.title}</strong>
-                <small>{game.tag}</small>
-                <p>{game.help}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep('type')}>Atrás</button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 'qrConfig' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>QR físico</span>
-            <h3>Configura la tarjeta física</h3>
-            <p>El QR se imprime o comparte. Al escanearlo, SAGA guarda el objeto, llave, pista o bonus en la partida.</p>
-          </div>
-
-          <div className="saga-guided-form-grid">
-            <label>
-              Nombre visible
-              <input
-                value={itemLabel}
-                onChange={(event) => onPatch({
-                  physical_item_label: event.target.value,
-                  qr_payload: `SAGA1:ITEM:${itemId}:${event.target.value}`,
-                })}
-              />
-            </label>
-
-            <label>
-              ID interno
-              <input
-                value={itemId}
-                onChange={(event) => onPatch({
-                  physical_item_id: slugify(event.target.value),
-                  qr_payload: `SAGA1:ITEM:${slugify(event.target.value)}:${itemLabel}`,
-                })}
-              />
-            </label>
-
-            <label className="wide">
-              Payload del QR
-              <input
-                value={String(stage?.qr_payload || `SAGA1:ITEM:${itemId}:${itemLabel}`)}
-                onChange={(event) => onPatch({ qr_payload: event.target.value })}
-              />
-              <small>Va dentro del QR. Normalmente no se escribe a mano.</small>
-            </label>
-          </div>
-
-          <div className="saga-guided-card-row">
-            {qrModes.map((mode) => (
-              <button
-                key={mode.id}
-                type="button"
-                className={selectedMode === mode.id ? 'active' : ''}
-                onClick={() => applyQrMode(mode.id)}
-              >
-                {mode.icon} {mode.title}
-              </button>
-            ))}
-          </div>
-
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep('type')}>Atrás</button>
-            <button type="button" onClick={() => setStep('content')}>Siguiente</button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 'config' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>Configuración</span>
-            <h3>Radio, proximidad y forma de interacción</h3>
-            <p>La posición se cambia arrastrando el nodo en el mapa. Aquí configuras cómo se activa.</p>
-          </div>
-
-          <div className="saga-guided-form-grid">
-            <label>
-              Radio en metros
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={getRadius(stage)}
-                onChange={(event) => updateRadius(event.target.value)}
-              />
-            </label>
-
-            <label>
-              Interacción
-              <select
-                value={String(stage?.entry_mode || (selectedGame === 'bearing_hunt' ? 'bearing' : 'gps'))}
-                onChange={(event) => onPatch({ entry_mode: event.target.value })}
-              >
-                <option value="gps">Por radio GPS</option>
-                <option value="bearing">Por rumbo/brújula</option>
-                <option value="qr">Por escaneo QR</option>
-                <option value="manual">Manual / monitor</option>
-              </select>
-            </label>
-
-            <label className="checkbox wide">
-              <input
-                type="checkbox"
-                checked={Boolean(stage?.requires_proximity ?? true)}
-                onChange={(event) => onPatch({ requires_proximity: event.target.checked })}
-              />
-              Requerir estar cerca del nodo
-            </label>
-          </div>
-
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep(selectedMode === 'normal' ? 'normalGame' : 'qrConfig')}>Atrás</button>
-            <button type="button" onClick={() => setStep('content')}>Siguiente</button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 'content' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>Contenido</span>
-            <h3>Texto que verá el jugador</h3>
-            <p>Es la instrucción o pista principal. Déjalo vacío si el propio juego ya lo explica todo.</p>
-          </div>
-
-          <div className="saga-guided-form-grid">
-            <label>
-              Título
-              <input
-                value={String(stage?.title || '')}
-                onChange={(event) => onPatch({ title: event.target.value })}
-              />
-            </label>
-
-            <label className="wide">
-              Texto principal del nodo
-              <textarea
-                value={String(stage?.description || stage?.body || '')}
-                onChange={(event) => onPatch({ description: event.target.value, body: event.target.value })}
-                rows={5}
-              />
-            </label>
-
-            <label className="wide">
-              Mensaje si no hay GPS
-              <input
-                value={String(messages.gps_unavailable || '')}
-                onChange={(event) => patchMessages({ gps_unavailable: event.target.value })}
-                placeholder="No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia."
-              />
-            </label>
-
-            <label className="wide">
-              Mensaje de bloqueo / éxito
-              <input
-                value={String(messages.locked || '')}
-                onChange={(event) => patchMessages({ locked: event.target.value })}
-                placeholder="Acércate al nodo para desbloquearlo."
-              />
-            </label>
-          </div>
-
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep(selectedMode === 'normal' ? 'config' : 'qrConfig')}>Atrás</button>
-            <button type="button" onClick={() => setStep('rules')}>Siguiente</button>
-          </div>
-        </section>
-      ) : null}
-
-      {step === 'rules' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>Reglas</span>
-            <h3>Requisito, recompensa y emergencia</h3>
-            <p>El orden de ruta ya se respeta. Usa requisitos solo para llaves, objetos o desbloqueos especiales.</p>
-          </div>
-
-          <div className="saga-guided-form-grid">
-            <label>
-              Código fallback
-              <input
-                value={fallback}
-                onChange={(event) => onPatch({ fallback_code: event.target.value })}
-                placeholder="SAGA-06"
-              />
-            </label>
-
-            <div className="saga-guided-button-card">
-              <b>Generar fallback</b>
-              <p>Úsalo como salida de emergencia si falla GPS, cámara, brújula o cobertura.</p>
-              <button type="button" onClick={generateFallback}>Generar</button>
+      <main className="saga-guided-v2-body">
+        {step === 'type' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 1</span>
+              <h3>Que tipo de nodo queres crear?</h3>
+              <p>Primeiro escolle se é un xogo no mapa ou un QR físico.</p>
             </div>
 
-            <label>
-              Método de completado
-              <select
-                value={String(stage?.completion_method || (selectedMode === 'normal' ? 'proximity' : 'qr_scan'))}
-                onChange={(event) => onPatch({ completion_method: event.target.value })}
-              >
-                <option value="proximity">Llegar al sitio</option>
-                <option value="bearing">Orientarse al rumbo</option>
-                <option value="qr_scan">Escanear QR</option>
-                <option value="manual">Manual / monitor</option>
-              </select>
-            </label>
+            <div className="saga-guided-v2-choice-grid">
+              <button type="button" className={!isQr(stage) ? 'active' : ''} onClick={chooseGameBase}>
+                <span>🗺️</span>
+                <strong>Nodo de xogo</strong>
+                <small>Señal GPS, rumbo, minixogos e probas no mapa.</small>
+              </button>
 
-            <label>
-              Recompensa / objeto
-              <input
-                value={String(stage?.reward_item_id || '')}
-                onChange={(event) => onPatch({ reward_item_id: event.target.value })}
-                placeholder="llave_torre"
-              />
-            </label>
-          </div>
+              <button type="button" className={isQr(stage) ? 'active' : ''} onClick={() => chooseQrBase()}>
+                <span>▣</span>
+                <strong>QR físico</strong>
+                <small>Objeto, chave, pista ou bonus escaneable.</small>
+              </button>
+            </div>
+          </section>
+        ) : null}
 
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep('content')}>Atrás</button>
-            <button type="button" onClick={() => setStep('review')}>Siguiente</button>
-          </div>
-        </section>
-      ) : null}
+        {step === 'subtype' && mode === 'game' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 2</span>
+              <h3>Escolle o xogo</h3>
+              <p>Este será o modo principal que verá o xogador.</p>
+            </div>
 
-      {step === 'review' ? (
-        <section className="saga-guided-page">
-          <div className="saga-guided-page-head">
-            <span>Revisar</span>
-            <h3>Configuración preparada</h3>
-            <p>El nodo ya queda configurado en la vista local. Pulsa Guardar en Control de misión para persistirlo.</p>
-          </div>
+            <div className="saga-guided-v2-choice-grid">
+              {gameOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={game.id === option.id ? 'active' : ''}
+                  onClick={() => applyGame(option)}
+                >
+                  <span>{option.icon}</span>
+                  <strong>{option.title}</strong>
+                  <small>{option.desc}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-          <div className="saga-guided-review">
-            <article>
-              <b>Tipo</b>
-              <p>{currentModeLabel()}</p>
-            </article>
-            <article>
-              <b>Activación</b>
-              <p>{selectedMode === 'normal' ? `${getRadius(stage)} m · ${stage?.requires_proximity === false ? 'sin proximidad obligatoria' : 'requiere proximidad'}` : 'Escaneo QR físico'}</p>
-            </article>
-            <article>
-              <b>Fallback</b>
-              <p>{fallback || 'Pendiente de generar'}</p>
-            </article>
-            <article>
-              <b>Jugador verá</b>
-              <p>{String(stage?.description || stage?.body || messages.locked || 'Sin texto principal todavía')}</p>
-            </article>
-          </div>
+        {step === 'subtype' && mode === 'qr' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 2</span>
+              <h3>Escolle o tipo de QR</h3>
+              <p>Define que representa o QR físico dentro da misión.</p>
+            </div>
 
-          <div className="saga-guided-inline-actions">
-            <button type="button" onClick={() => setStep('rules')}>Atrás</button>
-            <button type="button" onClick={onClose}>Cerrar editor</button>
-          </div>
-        </section>
-      ) : null}
+            <div className="saga-guided-v2-choice-grid">
+              {qrOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={qr.kind === option.kind ? 'active' : ''}
+                  onClick={() => applyQr(option)}
+                >
+                  <span>{option.icon}</span>
+                  <strong>{option.title}</strong>
+                  <small>{option.desc}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {step === 'config' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 3</span>
+              <h3>{mode === 'qr' ? 'Configurar QR físico' : 'Configurar xogo'}</h3>
+              <p>{mode === 'qr' ? 'Datos principais do obxecto escaneable.' : 'Radio, proximidade e activación do nodo.'}</p>
+            </div>
+
+            {mode === 'game' ? (
+              <div className="saga-guided-v2-formgrid">
+                <label>
+                  <span>Radio en metros</span>
+                  <input
+                    type="number"
+                    value={Number(stage.radius_m || stage.proximity_radius_m || 50)}
+                    onChange={(event) => {
+                      patchNumber('radius_m', event.target.value)
+                      patchNumber('proximity_radius_m', event.target.value)
+                    }}
+                  />
+                </label>
+
+                <label>
+                  <span>Interacción</span>
+                  <select
+                    value={String(stage.entry_mode || 'gps')}
+                    onChange={(event) => onPatch({ entry_mode: event.target.value })}
+                  >
+                    <option value="gps">Por radio GPS</option>
+                    <option value="bearing">Por rumbo</option>
+                    <option value="manual">Manual / historia</option>
+                  </select>
+                </label>
+
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(stage.requires_proximity ?? true)}
+                    onChange={(event) => onPatch({ requires_proximity: event.target.checked })}
+                  />
+                  <span>Requirir estar cerca do nodo</span>
+                </label>
+
+                <article className="saga-guided-v2-note">
+                  A posición cámbiase arrastrando o nodo no mapa. Aquí configuras como se activa.
+                </article>
+              </div>
+            ) : (
+              <div className="saga-guided-v2-formgrid">
+                <label>
+                  <span>Nome visible</span>
+                  <input
+                    value={String(stage.physical_item_label || stage.title || '')}
+                    onChange={(event) => onPatch({ physical_item_label: event.target.value, title: event.target.value })}
+                  />
+                </label>
+
+                <label>
+                  <span>Código fallback</span>
+                  <input
+                    value={fallbackCode(stage)}
+                    onChange={(event) => onPatch({ fallback_code: event.target.value, physical_fallback_code: event.target.value })}
+                  />
+                </label>
+
+                <label className="wide">
+                  <span>Payload QR</span>
+                  <input
+                    value={String(stage.qr_payload || '')}
+                    onChange={(event) => onPatch({ qr_payload: event.target.value })}
+                  />
+                </label>
+
+                <article className="saga-guided-v2-note">
+                  O fallback serve para completar o QR se falla a cámara, o escaneo ou a cobertura.
+                </article>
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {step === 'content' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 4</span>
+              <h3>Texto e historia</h3>
+              <p>O que verá o xogador ao abrir, resolver ou completar o nodo.</p>
+            </div>
+
+            <div className="saga-guided-v2-formgrid">
+              <label>
+                <span>Título</span>
+                <input value={String(stage.title || '')} onChange={(event) => onPatch({ title: event.target.value })} />
+              </label>
+
+              <label className="wide">
+                <span>Texto principal do nodo</span>
+                <textarea
+                  value={String(stage.description || stage.body || '')}
+                  onChange={(event) => onPatch({ description: event.target.value, body: event.target.value })}
+                  placeholder="Escribe a pista, instrución ou parte da historia..."
+                />
+              </label>
+
+              <label className="wide">
+                <span>Mensaxe ao completar</span>
+                <textarea
+                  value={String(stage.success_message || '')}
+                  onChange={(event) => onPatch({ success_message: event.target.value })}
+                  placeholder="Exemplo: Ben feito. Desbloqueaches a seguinte pista."
+                />
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        {step === 'rules' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 5</span>
+              <h3>Regras e desbloqueos</h3>
+              <p>Define se o nodo require algún obxecto ou condición previa.</p>
+            </div>
+
+            <div className="saga-guided-v2-formgrid">
+              <label>
+                <span>Requisito</span>
+                <select
+                  value={String(stage.required_item_id || '') ? 'item' : 'none'}
+                  onChange={(event) => {
+                    if (event.target.value === 'none') onPatch({ required_item_id: '', requires_item: false })
+                    else onPatch({ requires_item: true })
+                  }}
+                >
+                  <option value="none">Sen requisito</option>
+                  <option value="item">Require obxecto/chave</option>
+                </select>
+              </label>
+
+              <label>
+                <span>ID do obxecto requerido</span>
+                <input
+                  value={String(stage.required_item_id || '')}
+                  onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value) })}
+                  placeholder="Exemplo: chave-facho"
+                />
+              </label>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={Boolean(stage.consume_required_item)}
+                  onChange={(event) => onPatch({ consume_required_item: event.target.checked })}
+                />
+                <span>Consumir obxecto ao completar</span>
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        {step === 'review' ? (
+          <section className="saga-guided-v2-page">
+            <div className="saga-guided-v2-pagehead">
+              <span>Paso 6</span>
+              <h3>Revisar nodo</h3>
+              <p>Resumo antes de pechar. Lembra gardar a misión no control principal.</p>
+            </div>
+
+            <div className="saga-guided-v2-review">
+              <article><b>Tipo</b><span>{mode === 'qr' ? 'QR físico' : 'Nodo de xogo'}</span></article>
+              <article><b>Modo</b><span>{mode === 'qr' ? qr.title : game.title}</span></article>
+              <article><b>Activación</b><span>{String(stage.entry_mode || (mode === 'qr' ? 'qr' : 'gps'))}</span></article>
+              <article><b>Radio</b><span>{mode === 'qr' ? 'Non aplica' : `${Number(stage.radius_m || stage.proximity_radius_m || 50)} m`}</span></article>
+            </div>
+          </section>
+        ) : null}
+      </main>
+
+      <footer className="saga-guided-v2-footer">
+        <button type="button" onClick={goBack} disabled={stepIndex === 0}>Atrás</button>
+        <button type="button" className="secondary" onClick={() => goTo('type')}>Cambiar tipo</button>
+        {stepIndex < STEPS.length - 1 ? (
+          <button type="button" className="primary" onClick={goNext}>Siguiente</button>
+        ) : (
+          <button type="button" className="primary" onClick={onClose}>Listo</button>
+        )}
+      </footer>
     </section>
   )
 }
