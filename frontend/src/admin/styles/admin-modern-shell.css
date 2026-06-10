@@ -11268,3 +11268,33 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     font-size: 1.28rem !important;
   }
 }
+
+/* #236n — legacy guided cleanup.
+   Normal nodes were blank because v3 body classes hid the v4 wizard. */
+
+.admin-guided-v4-shell .saga-guided-editor-v4,
+.admin-guided-v4-body-host > .saga-guided-editor-v4 {
+  display: grid !important;
+  visibility: visible !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  opacity: 1 !important;
+}
+
+/* If a cached/old class slips into the DOM, v4 still wins. */
+.admin-guided-v3-body-host.admin-guided-v4-body-host > .saga-guided-editor-v4,
+.admin-guided-v2-body-host.admin-guided-v4-body-host > .saga-guided-editor-v4 {
+  display: grid !important;
+  visibility: visible !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  opacity: 1 !important;
+}
+
+.admin-guided-v4-shell .admin-drawer-head,
+.admin-guided-v4-shell .admin-drawer-tabs,
+.admin-guided-v4-shell .admin-node-editor-tabs,
+.admin-guided-v4-shell .admin-node-editor-inline-topbar,
+.admin-guided-v4-shell .admin-drawer-footer {
+  display: none !important;
+}
