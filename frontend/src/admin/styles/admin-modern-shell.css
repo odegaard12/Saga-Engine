@@ -10092,3 +10092,371 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     min-height: 86px !important;
   }
 }
+
+/* #236i-fix — viewport-safe guided wizard. Footer visible, no legacy content below. */
+
+/* Old drawer chrome must never show in the guided editor. */
+.admin-guided-v3-shell .admin-drawer-head,
+.admin-guided-v3-shell .admin-drawer-tabs,
+.admin-guided-v3-shell .admin-node-editor-tabs,
+.admin-guided-v3-shell .admin-node-editor-inline-topbar,
+.admin-guided-v3-shell .admin-drawer-footer {
+  display: none !important;
+}
+
+/* If old blocks ever survive inside body, hide them hard. */
+.admin-guided-v3-body-host > :not(.saga-guided-editor-v3),
+.admin-guided-v3-body-host .admin-edit-section,
+.admin-guided-v3-body-host .admin-node-basics-panel,
+.admin-guided-v3-body-host .admin-node-activation-panel,
+.admin-guided-v3-body-host .admin-node-game-panel,
+.admin-guided-v3-body-host .admin-node-requirement-panel,
+.admin-guided-v3-body-host .admin-node-messages-panel {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+/* Center overlay over the existing sidebar/map without changing them. */
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v3-shell),
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v3-shell) {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 10px)
+    10px
+    calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  pointer-events: none !important;
+}
+
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v3-shell) > *,
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v3-shell) > * {
+  pointer-events: auto !important;
+}
+
+/* Modal must fit viewport at 100% browser zoom. */
+.saga-node-editor-host .admin-guided-v3-shell,
+.admin-drawer-overlay--nonblocking .admin-guided-v3-shell,
+.saga-physical-guided-v3-shell {
+  margin: auto !important;
+  width: min(1120px, calc(100vw - 20px)) !important;
+  max-width: min(1120px, calc(100vw - 20px)) !important;
+  height: min(680px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px) !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+.saga-physical-guided-v3-shell {
+  width: min(940px, calc(100vw - 20px)) !important;
+  max-width: min(940px, calc(100vw - 20px)) !important;
+  padding: 0 !important;
+}
+
+/* The wizard is a fixed grid: header, steps, progress, content, footer. */
+.saga-guided-editor-v3 {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-rows: auto auto 3px minmax(0, 1fr) auto !important;
+}
+
+/* Compact header and stepper. */
+.saga-guided-v3-header {
+  padding: 12px 18px 9px !important;
+}
+
+.saga-guided-v3-titleblock h2 {
+  font-size: clamp(1.45rem, 2.7vw, 2.2rem) !important;
+}
+
+.saga-guided-v3-chips {
+  margin-top: 5px !important;
+}
+
+.saga-guided-v3-chips b {
+  min-height: 22px !important;
+  padding: 3px 8px !important;
+  font-size: 0.62rem !important;
+}
+
+.saga-guided-v3-actions button {
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  font-size: 0.8rem !important;
+}
+
+.saga-guided-v3-stepper {
+  padding: 8px 18px !important;
+  gap: 7px !important;
+}
+
+.saga-guided-v3-stepper button {
+  min-height: 30px !important;
+}
+
+.saga-guided-v3-stepper button b {
+  font-size: 0.72rem !important;
+}
+
+/* Body uses remaining space only. No page-level scrollbar unless absolutely necessary. */
+.saga-guided-v3-body {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 10px 18px !important;
+}
+
+.saga-guided-v3-page {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 14px 16px !important;
+  gap: 9px !important;
+}
+
+.saga-guided-v3-pagehead h3 {
+  font-size: clamp(1.15rem, 2vw, 1.55rem) !important;
+  margin: 3px 0 2px !important;
+}
+
+.saga-guided-v3-pagehead p {
+  font-size: 0.84rem !important;
+}
+
+/* Choice cards fill space but stay inside modal. */
+.saga-guided-v3-page--choices {
+  align-content: start !important;
+}
+
+.saga-guided-v3-choice-grid {
+  gap: 10px !important;
+}
+
+.saga-guided-v3-choice-grid--two {
+  height: min(240px, 32dvh) !important;
+  min-height: 0 !important;
+}
+
+.saga-guided-v3-choice-grid button {
+  min-height: 116px !important;
+  padding: 12px !important;
+}
+
+.saga-guided-v3-choice-grid--two button {
+  min-height: 100% !important;
+}
+
+.saga-guided-v3-choice-grid button i {
+  width: 54px !important;
+  height: 54px !important;
+  font-size: 1.45rem !important;
+}
+
+.saga-guided-v3-choice-grid strong {
+  font-size: 1rem !important;
+}
+
+.saga-guided-v3-choice-grid small {
+  font-size: 0.76rem !important;
+}
+
+/* Form pages compact enough to fit. */
+.saga-guided-v3-formgrid {
+  gap: 8px !important;
+}
+
+.saga-guided-v3-formgrid input,
+.saga-guided-v3-formgrid select,
+.saga-guided-v3-formgrid textarea {
+  min-height: 32px !important;
+  padding: 6px 8px !important;
+  font-size: 13px !important;
+}
+
+.saga-guided-v3-formgrid textarea {
+  min-height: clamp(58px, 12dvh, 96px) !important;
+}
+
+/* QR generator inside content step: compact and contained. */
+.saga-guided-editor-v3 [aria-label="Generador QR del nodo"] {
+  max-height: 100% !important;
+  overflow: hidden !important;
+  padding: 9px !important;
+  gap: 7px !important;
+  border-radius: 15px !important;
+}
+
+.saga-guided-editor-v3 [aria-label="Generador QR del nodo"] svg {
+  width: clamp(70px, 11dvh, 108px) !important;
+  height: clamp(70px, 11dvh, 108px) !important;
+}
+
+.saga-guided-editor-v3 [aria-label="Generador QR del nodo"] input,
+.saga-guided-editor-v3 [aria-label="Generador QR del nodo"] button {
+  min-height: 30px !important;
+  font-size: 0.74rem !important;
+}
+
+/* Footer always visible. */
+.saga-guided-v3-footer {
+  position: relative !important;
+  z-index: 5 !important;
+  padding: 9px 18px 11px !important;
+  flex-shrink: 0 !important;
+}
+
+.saga-guided-v3-footer button {
+  min-height: 32px !important;
+  font-size: 0.78rem !important;
+}
+
+/* Mobile: full-height sheet, no clipped footer. */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-drawer-overlay--nonblocking:has(.admin-guided-v3-shell),
+  .admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v3-shell) {
+    align-items: stretch !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 6px)
+      6px
+      calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+  }
+
+  .saga-node-editor-host .admin-guided-v3-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v3-shell,
+  .saga-physical-guided-v3-shell {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) !important;
+    border-radius: 20px !important;
+  }
+
+  .saga-guided-v3-header {
+    padding: 8px 9px 6px !important;
+  }
+
+  .saga-guided-v3-titleblock h2 {
+    font-size: clamp(1.12rem, 6vw, 1.55rem) !important;
+  }
+
+  .saga-guided-v3-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .saga-guided-v3-actions button {
+    min-height: 29px !important;
+    padding: 0 5px !important;
+    font-size: 0.66rem !important;
+  }
+
+  .saga-guided-v3-stepper {
+    display: flex !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    padding: 6px 9px !important;
+    scrollbar-width: none !important;
+  }
+
+  .saga-guided-v3-stepper::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .saga-guided-v3-stepper button {
+    flex: 0 0 auto !important;
+    min-height: 27px !important;
+    padding: 0 7px !important;
+  }
+
+  .saga-guided-v3-stepper button b {
+    font-size: 0.62rem !important;
+  }
+
+  .saga-guided-v3-body {
+    padding: 7px 8px !important;
+  }
+
+  .saga-guided-v3-page {
+    padding: 9px !important;
+    border-radius: 14px !important;
+    gap: 7px !important;
+  }
+
+  .saga-guided-v3-pagehead h3 {
+    font-size: clamp(0.98rem, 4.7vw, 1.22rem) !important;
+  }
+
+  .saga-guided-v3-pagehead p {
+    font-size: 0.74rem !important;
+  }
+
+  .saga-guided-v3-choice-grid,
+  .saga-guided-v3-choice-grid--two,
+  .saga-guided-v3-formgrid,
+  .saga-guided-v3-review {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+
+  .saga-guided-v3-choice-grid--two {
+    height: auto !important;
+  }
+
+  .saga-guided-v3-choice-grid button {
+    min-height: 76px !important;
+    padding: 8px !important;
+  }
+
+  .saga-guided-v3-choice-grid button i {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.16rem !important;
+  }
+
+  .saga-guided-v3-formgrid textarea {
+    min-height: clamp(50px, 10dvh, 78px) !important;
+  }
+
+  .saga-guided-v3-footer {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 6px !important;
+    padding: 7px 8px calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  .saga-guided-v3-footer button {
+    min-height: 29px !important;
+    padding: 0 5px !important;
+    font-size: 0.66rem !important;
+  }
+}
+
+/* Very short heights: remove extras to fit. */
+@media (max-height: 720px) {
+  .saga-guided-v3-chips,
+  .saga-guided-v3-pagehead p {
+    display: none !important;
+  }
+
+  .saga-guided-v3-titleblock h2 {
+    font-size: 1.2rem !important;
+  }
+
+  .saga-guided-v3-choice-grid button {
+    min-height: 68px !important;
+  }
+
+  .saga-guided-v3-formgrid textarea {
+    min-height: 48px !important;
+  }
+}
