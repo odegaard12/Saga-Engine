@@ -3,6 +3,10 @@ import { getLocale } from './index'
 const sources = new WeakMap<Text, string>()
 
 const ES: Record<string, string> = {
+  'Locked / success copy': 'Mensaje de bloqueo / éxito',
+  'Source radius meters': 'Radio de origen',
+  'Lock threshold': 'Umbral de captura',
+  'Hold milliseconds': 'Tiempo de confirmación',
   'Contenido del nodo': 'Texto principal del nodo',
   'Player-facing copy': 'Textos que verá el jugador',
   'GPS unavailable message.': 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',

@@ -86,3 +86,35 @@
     transform: none;
   }
 }
+
+/* #235b — no floating version badge on phone/coarse pointer */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+/* #235c — hide floating version badge on phone/coarse pointer */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+/* #235d — never show floating build badge on phone/coarse pointer or modal-like narrow admin views */
+@media (max-width: 900px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}
+
+body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
+  display: none !important;
+}
+
+/* #235e — hide floating build badge on mobile and during admin editing */
+@media (max-width: 900px), (pointer: coarse) {
+  .saga-build-info--floating {
+    display: none !important;
+  }
+}

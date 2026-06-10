@@ -187,7 +187,7 @@ export default function AdminMissionControlShell({
 
   return (
     <main
-      className={selectedStage ? 'saga-admin-shell has-inspector' : 'saga-admin-shell'}
+      className={selectedStage ? 'saga-admin-shell has-node-editor' : 'saga-admin-shell'}
       aria-label="SAGA Engine admin mission control"
     >
       <aside className="saga-left-rail" aria-label="Mission navigation">
@@ -395,7 +395,7 @@ export default function AdminMissionControlShell({
       </section>
 
       {liveSelectedStage ? (
-        <aside className="saga-inspector is-open" aria-label="Node inspector">
+        <aside className="saga-node-editor-host is-open" aria-label="Editor de nodo">
           {shouldShowTypeChooser ? (
             <div className="saga-node-type-choice-screen">
               <NodePhysicalTypePanel
