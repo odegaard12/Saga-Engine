@@ -15,12 +15,12 @@ This release upgrades Mission Control from a technical node editor into a guided
 - Cleaner desktop and mobile editor behavior.
 - Old v2/v3 guided editor paths removed from the active editor.
 - Mission Control Builder/sidebar preserved.
-- CodeQL moved from broken dynamic default setup to explicit repository workflow.
 
 ## Validation
 
 Validated before release:
 
+- CodeQL automatic runs are temporarily parked as manual-only after a GitHub runner/token initialization issue; product validation remains green.
 - privacy guard
 - protected-file guard
 - Python compile
