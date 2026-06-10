@@ -476,7 +476,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
-        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-node-editor-enabled admin-guided-v2-shell admin-guided-v3-shell"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-node-editor-enabled admin-guided-v2-shell admin-guided-v3-shell admin-guided-v4-shell"
         role="dialog"
         
         aria-label={`Node editor: ${draft.title}`}
@@ -538,7 +538,7 @@ export default function NodeDetailDrawer({
             </div>
           </div>
         </div>
-        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host admin-guided-v3-body-host">
+        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host admin-guided-v3-body-host admin-guided-v4-body-host">
           <GuidedNodeEditorFlow
             stage={draft}
             onPatch={patchGuidedV3Stage}

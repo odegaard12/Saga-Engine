@@ -222,6 +222,19 @@ function patchStage(patch: Record<string, unknown>) {
     )
   }
 
+  if (!chooserOnly && isPhysical) {
+    return (
+      <section className="saga-node-physical-type-panel saga-physical-guided-v4-shell" style={panel} aria-label="Editor guiado de QR físico">
+        <GuidedNodeEditorFlow
+          stage={stage as unknown as Record<string, any>}
+          onPatch={(patch) => patchStage(patch)}
+          onClose={onClose ?? (() => undefined)}
+          onDelete={requestDeleteLocal}
+        />
+      </section>
+    )
+  }
+
   return (
     <section className="saga-node-physical-type-panel" style={panel} aria-label="Tipo de nodo">
       {onClose ? (

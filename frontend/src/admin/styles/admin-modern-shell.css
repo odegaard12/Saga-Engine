@@ -10460,3 +10460,644 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     min-height: 48px !important;
   }
 }
+
+/* #236jkl — guided catalog editor v4.
+   Uses adminGameCatalog for all games, guided settings, compact QR with visible download. */
+
+/* Hide all previous editor variants and classic drawer content inside v4. */
+.admin-guided-v4-shell .admin-drawer-head,
+.admin-guided-v4-shell .admin-drawer-tabs,
+.admin-guided-v4-shell .admin-node-editor-tabs,
+.admin-guided-v4-shell .admin-node-editor-inline-topbar,
+.admin-guided-v4-shell .admin-drawer-footer,
+.admin-guided-v4-body-host > :not(.saga-guided-editor-v4) {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v4-shell),
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v4-shell) {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 10px)
+    10px
+    calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  pointer-events: none !important;
+}
+
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v4-shell) > *,
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v4-shell) > * {
+  pointer-events: auto !important;
+}
+
+.saga-node-editor-host .admin-guided-v4-shell,
+.admin-drawer-overlay--nonblocking .admin-guided-v4-shell,
+.saga-physical-guided-v4-shell {
+  margin: auto !important;
+  width: min(1120px, calc(100vw - 20px)) !important;
+  max-width: min(1120px, calc(100vw - 20px)) !important;
+  height: min(690px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px) !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+.saga-physical-guided-v4-shell {
+  width: min(960px, calc(100vw - 20px)) !important;
+  max-width: min(960px, calc(100vw - 20px)) !important;
+  padding: 0 !important;
+}
+
+.saga-guided-editor-v4,
+.saga-guided-editor-v4 * {
+  box-sizing: border-box !important;
+}
+
+.saga-guided-editor-v4 {
+  display: grid !important;
+  grid-template-rows: auto auto 3px minmax(0, 1fr) auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  color: #f8fafc !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.14), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(99, 102, 241, 0.13), transparent 32%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.985), rgba(15, 23, 42, 0.965)) !important;
+}
+
+.saga-guided-v4-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+  padding: 12px 18px 8px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.10) !important;
+}
+
+.saga-guided-v4-titleblock {
+  min-width: 0 !important;
+}
+
+.saga-guided-v4-titleblock > span,
+.saga-guided-v4-pagehead > span {
+  display: block !important;
+  color: rgba(125, 211, 252, 0.98) !important;
+  font-size: 0.62rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.saga-guided-v4-titleblock h2 {
+  margin: 4px 0 0 !important;
+  font-size: clamp(1.38rem, 2.7vw, 2.18rem) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.055em !important;
+}
+
+.saga-guided-v4-chips {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+  margin-top: 5px !important;
+}
+
+.saga-guided-v4-chips b {
+  min-height: 22px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: rgba(226, 232, 240, 0.9) !important;
+  font-size: 0.6rem !important;
+  white-space: nowrap !important;
+}
+
+.saga-guided-v4-actions {
+  display: flex !important;
+  gap: 7px !important;
+}
+
+.saga-guided-v4-actions button,
+.saga-guided-v4-footer button,
+.saga-guided-v4-qractions button {
+  min-height: 32px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(248, 250, 252, 0.18) !important;
+  background: rgba(248, 250, 252, 0.10) !important;
+  color: #f8fafc !important;
+  padding: 0 11px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+  font-size: 0.76rem !important;
+}
+
+.saga-guided-v4-actions .primary-soft,
+.saga-guided-v4-footer .primary,
+.saga-guided-v4-qractions .primary {
+  border-color: rgba(96, 165, 250, 0.48) !important;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.96), rgba(99, 102, 241, 0.88)) !important;
+}
+
+.saga-guided-v4-actions .danger {
+  border-color: rgba(248, 113, 113, 0.38) !important;
+  background: rgba(127, 29, 29, 0.34) !important;
+}
+
+.saga-guided-v4-stepper {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  padding: 8px 18px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08) !important;
+}
+
+.saga-guided-v4-stepper button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 30px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  background: rgba(15, 23, 42, 0.62) !important;
+  color: rgba(226, 232, 240, 0.78) !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+  padding: 0 8px !important;
+}
+
+.saga-guided-v4-stepper button.active {
+  background: rgba(224, 242, 254, 0.96) !important;
+  color: #020617 !important;
+}
+
+.saga-guided-v4-stepper span {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 17px !important;
+  height: 17px !important;
+  border-radius: 999px !important;
+  background: rgba(2, 6, 23, 0.16) !important;
+  font-size: 0.58rem !important;
+}
+
+.saga-guided-v4-stepper b {
+  font-size: 0.68rem !important;
+  white-space: nowrap !important;
+}
+
+.saga-guided-v4-progress {
+  background: rgba(148, 163, 184, 0.10) !important;
+}
+
+.saga-guided-v4-progress i {
+  display: block !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.96), rgba(99, 102, 241, 0.96)) !important;
+}
+
+.saga-guided-v4-body {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 10px 18px !important;
+}
+
+.saga-guided-v4-page {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  gap: 9px !important;
+  padding: 13px 15px !important;
+  border-radius: 17px !important;
+  border: 1px solid rgba(148, 163, 184, 0.13) !important;
+  background:
+    radial-gradient(circle at 0 0, rgba(14, 165, 233, 0.07), transparent 34%),
+    rgba(15, 23, 42, 0.34) !important;
+}
+
+.saga-guided-v4-pagehead h3 {
+  margin: 3px 0 2px !important;
+  font-size: clamp(1.1rem, 2vw, 1.48rem) !important;
+  line-height: 1.05 !important;
+}
+
+.saga-guided-v4-pagehead p {
+  margin: 0 !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.32 !important;
+}
+
+.saga-guided-v4-choice-grid,
+.saga-guided-v4-catalog-grid,
+.saga-guided-v4-review {
+  display: grid !important;
+  gap: 9px !important;
+  min-height: 0 !important;
+}
+
+.saga-guided-v4-choice-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)) !important;
+}
+
+.saga-guided-v4-choice-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  height: min(220px, 30dvh) !important;
+}
+
+.saga-guided-v4-catalog-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+}
+
+.saga-guided-v4-choice-grid button,
+.saga-guided-v4-catalog-grid button,
+.saga-guided-v4-review article,
+.saga-guided-v4-note,
+.saga-guided-v4-qrpanel {
+  min-width: 0 !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 15px !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.08), transparent 42%),
+    rgba(15, 23, 42, 0.48) !important;
+  color: #f8fafc !important;
+}
+
+.saga-guided-v4-choice-grid button,
+.saga-guided-v4-catalog-grid button {
+  min-height: 96px !important;
+  padding: 10px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  display: grid !important;
+  gap: 5px !important;
+}
+
+.saga-guided-v4-choice-grid--two button {
+  min-height: 100% !important;
+  text-align: center !important;
+  place-items: center !important;
+  align-content: center !important;
+}
+
+.saga-guided-v4-choice-grid button.active,
+.saga-guided-v4-catalog-grid button.active,
+.saga-guided-v4-choice-grid button:hover,
+.saga-guided-v4-catalog-grid button:hover {
+  border-color: rgba(56, 189, 248, 0.62) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.20), transparent 44%),
+    rgba(15, 23, 42, 0.70) !important;
+}
+
+.saga-guided-v4-choice-grid i,
+.saga-guided-v4-catalog-grid i {
+  font-style: normal !important;
+  font-size: 1.35rem !important;
+}
+
+.saga-guided-v4-choice-grid strong,
+.saga-guided-v4-catalog-grid strong,
+.saga-guided-v4-review b,
+.saga-guided-v4-note b {
+  display: block !important;
+  font-size: 0.92rem !important;
+  line-height: 1.1 !important;
+}
+
+.saga-guided-v4-choice-grid small,
+.saga-guided-v4-catalog-grid small,
+.saga-guided-v4-review span,
+.saga-guided-v4-note span,
+.saga-guided-v4-catalog-grid em {
+  color: rgba(203, 213, 225, 0.74) !important;
+  font-size: 0.72rem !important;
+  line-height: 1.25 !important;
+  font-style: normal !important;
+}
+
+.saga-guided-v4-formgrid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+}
+
+.saga-guided-v4-formgrid label {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.saga-guided-v4-formgrid label.wide,
+.saga-guided-v4-formgrid .wide {
+  grid-column: 1 / -1 !important;
+}
+
+.saga-guided-v4-formgrid label.checkbox {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.saga-guided-v4-formgrid label > span,
+.saga-guided-v4-qrside label > span {
+  color: rgba(203, 213, 225, 0.78) !important;
+  font-size: 0.66rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+.saga-guided-v4-formgrid input,
+.saga-guided-v4-formgrid select,
+.saga-guided-v4-formgrid textarea,
+.saga-guided-v4-qrside input {
+  width: 100% !important;
+  min-height: 31px !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 10px !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #f8fafc !important;
+  padding: 6px 8px !important;
+  font: inherit !important;
+  font-size: 13px !important;
+}
+
+.saga-guided-v4-formgrid textarea {
+  min-height: clamp(52px, 11dvh, 86px) !important;
+  resize: vertical !important;
+}
+
+.saga-guided-v4-formgrid small {
+  color: rgba(203, 213, 225, 0.66) !important;
+  font-size: 0.66rem !important;
+  line-height: 1.2 !important;
+}
+
+.saga-guided-v4-note {
+  padding: 10px !important;
+}
+
+.saga-guided-v4-review {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+}
+
+.saga-guided-v4-review article {
+  padding: 11px !important;
+}
+
+/* QR compact panel with visible download */
+.saga-guided-v4-qrpanel {
+  display: grid !important;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1.3fr) !important;
+  gap: 10px !important;
+  padding: 10px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.saga-guided-v4-qrcard {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 6px !important;
+  text-align: center !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #020617 !important;
+  padding: 10px !important;
+}
+
+.saga-guided-v4-qrimage {
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+}
+
+.saga-guided-v4-qrimage svg {
+  width: clamp(92px, 18dvh, 138px) !important;
+  height: clamp(92px, 18dvh, 138px) !important;
+}
+
+.saga-guided-v4-qrcard strong {
+  font-size: 0.92rem !important;
+}
+
+.saga-guided-v4-qrcard small {
+  font-size: 0.68rem !important;
+  color: rgba(15, 23, 42, 0.7) !important;
+}
+
+.saga-guided-v4-qrside {
+  display: grid !important;
+  gap: 8px !important;
+  align-content: start !important;
+  min-width: 0 !important;
+}
+
+.saga-guided-v4-qrside label {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.saga-guided-v4-qractions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.saga-guided-v4-notice {
+  color: rgba(187, 247, 208, 0.95) !important;
+  font-weight: 900 !important;
+}
+
+.saga-guided-v4-footer {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(130px, auto) !important;
+  justify-content: end !important;
+  gap: 8px !important;
+  padding: 9px 18px 11px !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.10) !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+.saga-guided-v4-footer button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+}
+
+.saga-guided-v4-footer .secondary {
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+
+/* Mobile */
+@media (max-width: 760px), (pointer: coarse) {
+  .admin-drawer-overlay--nonblocking:has(.admin-guided-v4-shell),
+  .admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v4-shell) {
+    align-items: stretch !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 6px)
+      6px
+      calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+  }
+
+  .saga-node-editor-host .admin-guided-v4-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v4-shell,
+  .saga-physical-guided-v4-shell {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) !important;
+    border-radius: 20px !important;
+  }
+
+  .saga-guided-v4-header {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    padding: 8px 9px 6px !important;
+  }
+
+  .saga-guided-v4-titleblock h2 {
+    font-size: clamp(1.08rem, 5.8vw, 1.48rem) !important;
+  }
+
+  .saga-guided-v4-actions,
+  .saga-guided-v4-qractions {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    display: grid !important;
+    gap: 6px !important;
+  }
+
+  .saga-guided-v4-actions button,
+  .saga-guided-v4-footer button,
+  .saga-guided-v4-qractions button {
+    min-height: 29px !important;
+    padding: 0 5px !important;
+    font-size: 0.65rem !important;
+  }
+
+  .saga-guided-v4-stepper {
+    display: flex !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    padding: 6px 9px !important;
+    scrollbar-width: none !important;
+  }
+
+  .saga-guided-v4-stepper::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .saga-guided-v4-stepper button {
+    flex: 0 0 auto !important;
+    min-height: 27px !important;
+  }
+
+  .saga-guided-v4-body {
+    padding: 7px 8px !important;
+  }
+
+  .saga-guided-v4-page {
+    padding: 9px !important;
+    gap: 7px !important;
+  }
+
+  .saga-guided-v4-pagehead h3 {
+    font-size: clamp(0.98rem, 4.6vw, 1.2rem) !important;
+  }
+
+  .saga-guided-v4-pagehead p {
+    font-size: 0.72rem !important;
+  }
+
+  .saga-guided-v4-choice-grid,
+  .saga-guided-v4-choice-grid--two,
+  .saga-guided-v4-catalog-grid,
+  .saga-guided-v4-formgrid,
+  .saga-guided-v4-review,
+  .saga-guided-v4-qrpanel {
+    grid-template-columns: 1fr !important;
+  }
+
+  .saga-guided-v4-choice-grid--two {
+    height: auto !important;
+  }
+
+  .saga-guided-v4-choice-grid button,
+  .saga-guided-v4-catalog-grid button {
+    min-height: 74px !important;
+    padding: 8px !important;
+  }
+
+  .saga-guided-v4-catalog-grid {
+    overflow-y: auto !important;
+  }
+
+  .saga-guided-v4-formgrid textarea {
+    min-height: clamp(48px, 10dvh, 72px) !important;
+  }
+
+  .saga-guided-v4-qrpanel {
+    gap: 7px !important;
+    overflow-y: auto !important;
+  }
+
+  .saga-guided-v4-qrcard {
+    padding: 8px !important;
+  }
+
+  .saga-guided-v4-qrimage svg {
+    width: clamp(72px, 12dvh, 102px) !important;
+    height: clamp(72px, 12dvh, 102px) !important;
+  }
+
+  .saga-guided-v4-footer {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 6px !important;
+    padding: 7px 8px calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+}
+
+@media (max-height: 720px) {
+  .saga-guided-v4-chips,
+  .saga-guided-v4-pagehead p {
+    display: none !important;
+  }
+
+  .saga-guided-v4-titleblock h2 {
+    font-size: 1.16rem !important;
+  }
+
+  .saga-guided-v4-choice-grid button,
+  .saga-guided-v4-catalog-grid button {
+    min-height: 64px !important;
+  }
+
+  .saga-guided-v4-formgrid textarea {
+    min-height: 44px !important;
+  }
+}
