@@ -1,3 +1,47 @@
+# SAGA Engine v0.1.0 — Guided Mission Control editor
+
+This release upgrades Mission Control from a technical node editor into a guided game-authoring workflow.
+
+## Highlights
+
+- Guided node editor with six steps: Type, Mode, Settings, Texts, Rules and Review.
+- Real `adminGameCatalog` integration.
+- Playable games shown by default.
+- Experimental/planned games behind an explicit toggle.
+- Guided per-game settings instead of raw technical config.
+- Player-facing text and message editing in one place.
+- Unified normal-node and physical-QR editing.
+- QR preview and PNG export.
+- Cleaner desktop and mobile editor behavior.
+- Old v2/v3 guided editor paths removed from the active editor.
+- Mission Control Builder/sidebar preserved.
+- CodeQL moved from broken dynamic default setup to explicit repository workflow.
+
+## Validation
+
+Validated before release:
+
+- privacy guard
+- protected-file guard
+- Python compile
+- frontend production build
+- candidate deploy smoke
+- production deploy smoke
+- `/`, `/admin-react`, `/player/PLAYER%201`
+
+## Follow-up
+
+Next work:
+
+1. Validate GPS signal lock end-to-end.
+2. Validate compass/bearing end-to-end.
+3. Create a gameplay validation matrix.
+4. Polish only specific game settings that fail real testing.
+5. Add new minigames after GPS and bearing are stable.
+
+
+---
+
 # SAGA Engine v0.0.1
 
 First public foundation release.
