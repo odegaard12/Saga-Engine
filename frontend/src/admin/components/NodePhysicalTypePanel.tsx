@@ -209,7 +209,7 @@ function patchStage(patch: Record<string, unknown>) {
   }
 
   return (
-    <section style={panel} aria-label="Tipo de nodo">
+    <section className="saga-node-physical-type-panel" style={panel} aria-label="Tipo de nodo">
       {onClose ? (
         <div className="saga-physical-editor-topbar">
           <div className="saga-physical-editor-topbar__copy">
@@ -217,6 +217,13 @@ function patchStage(patch: Record<string, unknown>) {
             <strong>{stage.title || (isPhysical ? 'Objeto físico' : 'Nodo')}</strong>
           </div>
           <div className="saga-physical-editor-topbar__actions">
+            <button
+              type="button"
+              className="saga-physical-editor-topbar__change"
+              onClick={onRequestChangeType}
+            >
+              Cambiar tipo
+            </button>
             {onDeleteLocal ? (
               <button
                 type="button"

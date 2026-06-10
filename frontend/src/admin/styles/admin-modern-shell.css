@@ -7779,3 +7779,416 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* #236b — compact node editor visual redesign.
+   Goal: match the clean mockups: no giant guided banner, no duplicated actions,
+   compact header, compact tabs, useful above-the-fold content. */
+
+/* Kill unfinished guided editor attempt if any stale markup survives. */
+.saga-guided-node-editor,
+.admin-guided-node-editor-enabled .saga-guided-node-editor {
+  display: none !important;
+}
+
+.admin-guided-node-editor-enabled .admin-drawer-body > :not(.saga-guided-node-editor) {
+  display: revert !important;
+}
+
+/* Modal host sizing: centered, usable, not huge-scroll by default. */
+.saga-node-editor-host {
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 14px)
+    14px
+    calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+}
+
+.saga-node-editor-host .admin-drawer,
+.saga-node-editor-host .admin-drawer-editable,
+.saga-node-editor-host .admin-node-editor-large-modal,
+.saga-node-editor-host .admin-node-editor-redesign {
+  width: min(1120px, calc(100vw - 28px)) !important;
+  max-width: min(1120px, calc(100vw - 28px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  border-radius: 24px !important;
+}
+
+/* Remove redundant experimental inline topbar. */
+.saga-node-editor-host .admin-node-editor-inline-topbar {
+  display: none !important;
+}
+
+/* Compact main header. */
+.saga-node-editor-host .admin-node-editor-topbar,
+.saga-node-editor-host .admin-drawer-head--modern.admin-node-editor-topbar {
+  padding: 14px 18px 12px !important;
+  min-height: 0 !important;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0.88)) !important;
+}
+
+.saga-node-editor-host .admin-node-editor-kicker-row {
+  margin: 0 0 4px !important;
+}
+
+.saga-node-editor-host .admin-kicker {
+  font-size: 0.72rem !important;
+  letter-spacing: 0.12em !important;
+}
+
+.saga-node-editor-host .admin-node-editor-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+}
+
+.saga-node-editor-host .admin-node-editor-title-copy h2 {
+  font-size: clamp(1.75rem, 3.2vw, 2.55rem) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.055em !important;
+  margin: 0 !important;
+}
+
+.saga-node-editor-host .admin-node-editor-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin-top: 6px !important;
+}
+
+.saga-node-editor-host .admin-node-editor-meta span {
+  padding: 5px 9px !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+  border-radius: 999px !important;
+}
+
+.saga-node-editor-host .admin-node-editor-actions {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+.saga-node-editor-host .admin-node-editor-actions button,
+.saga-node-editor-host .admin-node-editor-close,
+.saga-node-editor-host .admin-node-delete-visible {
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  border-radius: 14px !important;
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+}
+
+/* Compact tab bar. */
+.saga-node-editor-host .admin-node-editor-tabs,
+.saga-node-editor-host .admin-drawer-tabs {
+  padding: 10px 18px !important;
+  gap: 8px !important;
+  background: rgba(2, 6, 23, 0.74) !important;
+}
+
+.saga-node-editor-host .admin-drawer-tab {
+  min-height: 38px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 0.9rem !important;
+  flex: 1 1 0 !important;
+}
+
+/* Compact body. */
+.saga-node-editor-host .admin-drawer-body,
+.saga-node-editor-host .admin-drawer-body--modern {
+  padding: 14px 18px 18px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Hide footer with repeated Cerrar/Vista local; close is already in header. */
+.saga-node-editor-host .admin-drawer-footer {
+  display: none !important;
+}
+
+/* Normal node: make Básico look like the mockup. */
+.saga-node-editor-host .admin-node-basics-panel {
+  display: grid !important;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Remove duplicated/verbose basic heading. */
+.saga-node-editor-host .admin-node-basics-panel > .admin-edit-section-head {
+  display: none !important;
+}
+
+/* Remove old duplicate game summary from Básico. Juego has its own tab. */
+.saga-node-editor-host .admin-basic-game-duplicate,
+.saga-node-editor-host .admin-game-choice-summary {
+  display: none !important;
+}
+
+/* Cards in basic view. */
+.saga-node-editor-host .admin-node-activation-panel,
+.saga-node-editor-host .admin-node-basics-panel .admin-node-main-copy-field,
+.saga-node-editor-host .admin-node-basics-panel .admin-edit-field:not(.admin-basic-game-duplicate) {
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at 0 0, rgba(14, 165, 233, 0.08), transparent 38%),
+    rgba(15, 23, 42, 0.46) !important;
+  box-shadow: none !important;
+}
+
+.saga-node-editor-host .admin-node-activation-panel {
+  grid-row: 1 / span 3 !important;
+  padding: 16px !important;
+}
+
+.saga-node-editor-host .admin-node-activation-panel .admin-edit-section-head {
+  margin-bottom: 12px !important;
+}
+
+.saga-node-editor-host .admin-node-activation-panel .admin-edit-section-head h3,
+.saga-node-editor-host .admin-node-activation-panel .admin-edit-section-head strong {
+  font-size: 1.05rem !important;
+}
+
+.saga-node-editor-host .admin-node-activation-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.saga-node-editor-host .admin-node-activation-note {
+  margin-top: 12px !important;
+  padding: 12px !important;
+  border-radius: 14px !important;
+  font-size: 0.84rem !important;
+}
+
+/* Title + main text as right column. */
+.saga-node-editor-host .admin-node-basics-panel > .admin-edit-field:not(.admin-basic-game-duplicate):not(.admin-node-main-copy-field) {
+  padding: 16px !important;
+}
+
+.saga-node-editor-host .admin-node-main-copy-field {
+  padding: 16px !important;
+}
+
+.saga-node-editor-host .admin-node-field-help {
+  display: block !important;
+  margin: 4px 0 10px !important;
+  color: rgba(203, 213, 225, 0.72) !important;
+  font-size: 0.85rem !important;
+  line-height: 1.35 !important;
+}
+
+.saga-node-editor-host .admin-node-basics-panel input,
+.saga-node-editor-host .admin-node-basics-panel select,
+.saga-node-editor-host .admin-node-basics-panel textarea {
+  font-size: 15px !important;
+  border-radius: 12px !important;
+}
+
+.saga-node-editor-host .admin-node-basics-panel textarea {
+  min-height: 138px !important;
+}
+
+/* Make other tab panels less massive too. */
+.saga-node-editor-host .admin-edit-section,
+.saga-node-editor-host .admin-edit-section-compact {
+  padding: 16px !important;
+  border-radius: 18px !important;
+}
+
+/* QR / physical editor compact redesign. */
+.saga-node-physical-type-panel {
+  width: min(620px, calc(100vw - 28px)) !important;
+  max-width: min(620px, calc(100vw - 28px)) !important;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  border-radius: 24px !important;
+  padding: 14px !important;
+}
+
+.saga-node-physical-type-panel .saga-physical-editor-topbar,
+.saga-physical-editor-topbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+  padding: 12px !important;
+  border-radius: 18px !important;
+  margin-bottom: 12px !important;
+}
+
+.saga-physical-editor-topbar__copy span {
+  font-size: 0.72rem !important;
+  letter-spacing: 0.12em !important;
+}
+
+.saga-physical-editor-topbar__copy strong {
+  font-size: clamp(1.2rem, 4vw, 1.55rem) !important;
+  line-height: 1.02 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.saga-physical-editor-topbar__actions {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+}
+
+.saga-physical-editor-topbar__change,
+.saga-physical-editor-topbar__delete,
+.saga-physical-editor-topbar__close {
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  border-radius: 14px !important;
+  font-size: 0.82rem !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+}
+
+.saga-physical-editor-topbar__change {
+  border: 1px solid rgba(96, 165, 250, 0.46) !important;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(99, 102, 241, 0.86)) !important;
+  color: #f8fafc !important;
+}
+
+.saga-physical-editor-topbar__delete {
+  border-color: rgba(248, 113, 113, 0.38) !important;
+  background: rgba(127, 29, 29, 0.34) !important;
+}
+
+.saga-physical-editor-topbar__close {
+  border-color: rgba(248, 250, 252, 0.20) !important;
+  background: rgba(248, 250, 252, 0.10) !important;
+}
+
+/* The blue "Configurar objeto físico" row should be compact, not a giant banner. */
+.saga-node-physical-type-panel > div {
+  max-width: 100% !important;
+}
+
+.saga-node-physical-type-panel input,
+.saga-node-physical-type-panel textarea,
+.saga-node-physical-type-panel button {
+  font-size: 15px !important;
+}
+
+/* Mobile: compact and usable, no giant stacked duplicated top actions. */
+@media (max-width: 760px), (pointer: coarse) {
+  .saga-node-editor-host {
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 8px)
+      8px
+      calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  .saga-node-editor-host .admin-drawer,
+  .saga-node-editor-host .admin-drawer-editable,
+  .saga-node-editor-host .admin-node-editor-large-modal,
+  .saga-node-editor-host .admin-node-editor-redesign {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    border-radius: 22px !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-topbar,
+  .saga-node-editor-host .admin-drawer-head--modern.admin-node-editor-topbar {
+    padding: 12px 12px 10px !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-title-row {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-title-copy h2 {
+    font-size: clamp(1.55rem, 8.5vw, 2.25rem) !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    width: 100% !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-actions button,
+  .saga-node-editor-host .admin-node-editor-close,
+  .saga-node-editor-host .admin-node-delete-visible {
+    width: 100% !important;
+    min-height: 38px !important;
+    padding: 0 8px !important;
+    font-size: 0.86rem !important;
+  }
+
+  .saga-node-editor-host .admin-node-editor-tabs,
+  .saga-node-editor-host .admin-drawer-tabs {
+    padding: 8px 12px !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .saga-node-editor-host .admin-drawer-tab {
+    min-width: 116px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .saga-node-editor-host .admin-drawer-body,
+  .saga-node-editor-host .admin-drawer-body--modern {
+    padding: 12px !important;
+  }
+
+  .saga-node-editor-host .admin-node-basics-panel {
+    grid-template-columns: 1fr !important;
+  }
+
+  .saga-node-editor-host .admin-node-activation-panel {
+    grid-row: auto !important;
+  }
+
+  .saga-node-physical-type-panel {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+    border-radius: 22px !important;
+    padding: 12px !important;
+  }
+
+  .saga-physical-editor-topbar {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .saga-physical-editor-topbar__actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    gap: 7px !important;
+  }
+
+  .saga-physical-editor-topbar__change,
+  .saga-physical-editor-topbar__delete,
+  .saga-physical-editor-topbar__close {
+    width: 100% !important;
+    min-height: 36px !important;
+    padding: 0 6px !important;
+    font-size: 0.76rem !important;
+  }
+}
