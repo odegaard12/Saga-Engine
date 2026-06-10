@@ -538,38 +538,6 @@ export default function NodeDetailDrawer({
             </div>
           </div>
         </div>
-
-        <div className="admin-drawer-tabs admin-node-editor-tabs admin-guided-node-stepper" role="tablist" aria-label="Flujo guiado de edición del nodo">
-          <button
-            type="button"
-            className={activeTab === 'basics' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('basics')}
-          >
-            <span className="admin-guided-step-index">1</span><span className="admin-guided-step-label">Tipo</span>
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'game' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('game')}
-          >
-            <span className="admin-guided-step-index">2</span><span className="admin-guided-step-label">Juego</span>
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'requirement' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('requirement')}
-          >
-            <span className="admin-guided-step-index">3</span><span className="admin-guided-step-label">Reglas</span>
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'messages' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
-            onClick={() => setActiveTab('messages')}
-          >
-            <span className="admin-guided-step-index">4</span><span className="admin-guided-step-label">Mensajes</span>
-          </button>
-        </div>
-
         <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host admin-guided-v3-body-host">
 
           <GuidedNodeEditorFlow

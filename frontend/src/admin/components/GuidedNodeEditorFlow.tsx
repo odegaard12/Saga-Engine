@@ -67,19 +67,19 @@ const gameOptions = [
 
 const qrOptions = [
   {
-    id: 'object',
+    id: 'collectible',
     icon: '⭐',
     title: 'Objeto QR',
     desc: 'Objeto físico que o xogador pode atopar e gardar.',
-    kind: 'object',
+    kind: 'collectible',
     template: 'physical_object_qr',
   },
   {
-    id: 'key',
+    id: 'requirement',
     icon: '🔑',
     title: 'Llave QR',
     desc: 'Chave física para desbloquear outro nodo ou zona.',
-    kind: 'key',
+    kind: 'requirement',
     template: 'physical_key_qr',
   },
   {
@@ -132,7 +132,8 @@ function selectedGame(stage: StageLike) {
 }
 
 function selectedQr(stage: StageLike) {
-  const kind = String(stage.physical_node_kind || stage.physical_item_kind || 'object')
+  const raw = String(stage.physical_node_kind || stage.physical_item_kind || 'collectible')
+  const kind = raw === 'object' ? 'collectible' : raw === 'key' ? 'requirement' : raw
   return qrOptions.find((item) => item.kind === kind || item.id === kind) || qrOptions[0]
 }
 
@@ -184,12 +185,22 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     goTo('subtype')
   }
 
-  function chooseQrBase(kind = 'object', template = 'physical_object_qr') {
+  function chooseQrBase(kind = 'collectible', template = 'physical_object_qr') {
     const label = titleOf(stage)
     const itemId = stage.physical_item_id || slugOf(stage.id || stage.node_id || label)
 
+    const payload = stage.qr_payload || `SAGA1:ITEM:${itemId}:${label}`
+    const card = {
+      item_id: itemId,
+      label,
+      kind,
+      payload,
+      card_text: `${label}\nQR SAGA\nEscanea esta tarjeta en SAGA.`,
+      updated_at: new Date().toISOString(),
+    }
+
     onPatch({
-      physical_qr: true,
+      physical_qr: card,
       physical_node_kind: kind,
       physical_item_kind: kind,
       physical_item_id: itemId,
@@ -200,9 +211,13 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       entry_mode: 'qr',
       completion_method: 'qr_scan',
       requires_proximity: false,
-      qr_payload: stage.qr_payload || `SAGA1:ITEM:${itemId}`,
+      qr_payload: payload,
       fallback_code: fallbackCode(stage),
       physical_fallback_code: fallbackCode(stage),
+      config: {
+        ...(stage.config && typeof stage.config === 'object' ? stage.config : {}),
+        success_code: fallbackCode(stage),
+      },
     })
     goTo('subtype')
   }

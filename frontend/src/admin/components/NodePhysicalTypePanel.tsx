@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
+import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import PhysicalQrCardsPanel, {
   type PhysicalQrKind,
   type SavedPhysicalQrCard,
@@ -206,6 +207,19 @@ function patchStage(patch: Record<string, unknown>) {
         success_code: value.trim().toUpperCase(),
       },
     })
+  }
+
+  if (!chooserOnly && isPhysical) {
+    return (
+      <section className="saga-node-physical-type-panel saga-physical-guided-v3-shell" style={panel} aria-label="Editor guiado de QR físico">
+        <GuidedNodeEditorFlow
+          stage={stage as unknown as Record<string, any>}
+          onPatch={(patch) => patchStage(patch)}
+          onClose={onClose ?? (() => undefined)}
+          onDelete={requestDeleteLocal}
+        />
+      </section>
+    )
   }
 
   return (
