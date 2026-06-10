@@ -469,7 +469,7 @@ export default function NodeDetailDrawer({
         <div className="admin-node-editor-inline-topbar">
           <div className="admin-node-editor-inline-title">
             <span className="admin-node-editor-inline-kicker">Editor</span>
-            <strong>Editor de nodo / QR físico</strong>
+            <strong>Editor guiado de nodo / QR físico</strong>
           </div>
           <button
             type="button"
@@ -482,7 +482,7 @@ export default function NodeDetailDrawer({
         </div>
         <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
           <div className="admin-node-editor-kicker-row">
-            <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor de nodo'}</span>
+            <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor guiado de nodo'}</span>
 
             <button
               type="button"
@@ -523,34 +523,34 @@ export default function NodeDetailDrawer({
           </div>
         </div>
 
-        <div className="admin-drawer-tabs admin-node-editor-tabs" role="tablist" aria-label="Node editor tabs">
+        <div className="admin-drawer-tabs admin-node-editor-tabs admin-guided-node-stepper" role="tablist" aria-label="Flujo guiado de edición del nodo">
           <button
             type="button"
             className={activeTab === 'basics' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('basics')}
           >
-            Básico
+            <span className="admin-guided-step-index">1</span><span className="admin-guided-step-label">Tipo</span>
           </button>
           <button
             type="button"
             className={activeTab === 'game' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('game')}
           >
-            Juego
+            <span className="admin-guided-step-index">2</span><span className="admin-guided-step-label">Juego</span>
           </button>
           <button
             type="button"
             className={activeTab === 'requirement' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('requirement')}
           >
-            Requisito
+            <span className="admin-guided-step-index">3</span><span className="admin-guided-step-label">Reglas</span>
           </button>
           <button
             type="button"
             className={activeTab === 'messages' ? 'admin-drawer-tab active' : 'admin-drawer-tab'}
             onClick={() => setActiveTab('messages')}
           >
-            Mensajes
+            <span className="admin-guided-step-index">4</span><span className="admin-guided-step-label">Mensajes</span>
           </button>
         </div>
 
