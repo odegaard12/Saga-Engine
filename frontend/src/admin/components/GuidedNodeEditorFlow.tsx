@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react'
+import PhysicalQrCardsPanel, {
+  type PhysicalQrKind,
+  type SavedPhysicalQrCard,
+} from './PhysicalQrCardsPanel'
 
 type StageLike = Record<string, any>
 
@@ -29,7 +33,7 @@ const gameOptions = [
     patch: {
       physical_node_kind: '',
       physical_item_kind: '',
-      physical_qr: false,
+      physical_qr: null,
       qr_payload: '',
       game_family: 'signal',
       game_type: 'signal_gps',
@@ -49,7 +53,7 @@ const gameOptions = [
     patch: {
       physical_node_kind: '',
       physical_item_kind: '',
-      physical_qr: false,
+      physical_qr: null,
       qr_payload: '',
       game_family: 'bearing',
       game_type: 'bearing_hunt',
@@ -65,7 +69,14 @@ const gameOptions = [
   },
 ]
 
-const qrOptions = [
+const qrOptions: Array<{
+  id: PhysicalQrKind
+  icon: string
+  title: string
+  desc: string
+  kind: PhysicalQrKind
+  template: string
+}> = [
   {
     id: 'collectible',
     icon: '⭐',
@@ -105,9 +116,9 @@ function titleOf(stage: StageLike) {
 }
 
 function nodeNumber(stage: StageLike) {
+  if (typeof stage.index === 'number') return String(stage.index + 1)
   const raw = String(stage.title || stage.name || stage.id || stage.node_id || '')
-  const found = raw.match(/\d+/)?.[0]
-  return found || ''
+  return raw.match(/\d+/)?.[0] || ''
 }
 
 function displayTitle(stage: StageLike) {
@@ -115,6 +126,14 @@ function displayTitle(stage: StageLike) {
   const title = titleOf(stage)
   if (n && !title.trim().startsWith(`${n}.`)) return `${n}. ${title}`
   return title
+}
+
+function normalizeQrKind(value: unknown): PhysicalQrKind {
+  const raw = String(value || 'collectible')
+  if (raw === 'object') return 'collectible'
+  if (raw === 'key') return 'requirement'
+  if (raw === 'requirement' || raw === 'clue' || raw === 'bonus' || raw === 'collectible') return raw
+  return 'collectible'
 }
 
 function isQr(stage: StageLike) {
@@ -132,24 +151,35 @@ function selectedGame(stage: StageLike) {
 }
 
 function selectedQr(stage: StageLike) {
-  const raw = String(stage.physical_node_kind || stage.physical_item_kind || 'collectible')
-  const kind = raw === 'object' ? 'collectible' : raw === 'key' ? 'requirement' : raw
-  return qrOptions.find((item) => item.kind === kind || item.id === kind) || qrOptions[0]
+  const kind = normalizeQrKind(stage.physical_node_kind || stage.physical_item_kind)
+  return qrOptions.find((item) => item.kind === kind) || qrOptions[0]
 }
 
 function slugOf(value: unknown) {
   return String(value || 'item')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'objeto_saga'
 }
 
 function fallbackCode(stage: StageLike) {
-  const raw = String(stage.fallback_code || stage.physical_fallback_code || stage.code || '')
-  if (raw) return raw
+  const config = stage.config && typeof stage.config === 'object' ? stage.config : {}
+  const raw = String(stage.fallback_code || stage.physical_fallback_code || config.success_code || config.fallback_code || '')
+  if (raw) return raw.toUpperCase()
   const n = nodeNumber(stage) || '00'
   return `SAGA-${n.padStart(2, '0')}`
+}
+
+function qrLabel(stage: StageLike) {
+  return String(stage.physical_item_label || stage.title || 'Objeto SAGA')
+}
+
+function qrItemId(stage: StageLike) {
+  return String(stage.physical_item_id || slugOf(stage.id || stage.node_id || qrLabel(stage)))
 }
 
 export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete }: GuidedNodeEditorFlowProps) {
@@ -160,7 +190,6 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   const game = selectedGame(stage)
   const qr = selectedQr(stage)
   const title = displayTitle(stage)
-
   const progress = useMemo(() => Math.round(((stepIndex + 1) / STEPS.length) * 100), [stepIndex])
 
   const goNext = () => setStepIndex((value) => Math.min(value + 1, STEPS.length - 1))
@@ -171,7 +200,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     onPatch({
       physical_node_kind: '',
       physical_item_kind: '',
-      physical_qr: false,
+      physical_qr: null,
       qr_payload: '',
       game_family: 'signal',
       game_type: 'signal_gps',
@@ -185,12 +214,11 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     goTo('subtype')
   }
 
-  function chooseQrBase(kind = 'collectible', template = 'physical_object_qr') {
-    const label = titleOf(stage)
-    const itemId = stage.physical_item_id || slugOf(stage.id || stage.node_id || label)
-
-    const payload = stage.qr_payload || `SAGA1:ITEM:${itemId}:${label}`
-    const card = {
+  function buildQrPatch(kind: PhysicalQrKind, template: string, card?: SavedPhysicalQrCard) {
+    const label = card?.label || qrLabel(stage)
+    const itemId = card?.item_id || qrItemId(stage)
+    const payload = card?.payload || stage.qr_payload || `SAGA1:ITEM:${itemId}:${label}`
+    const nextCard: SavedPhysicalQrCard = card || {
       item_id: itemId,
       label,
       kind,
@@ -199,12 +227,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       updated_at: new Date().toISOString(),
     }
 
-    onPatch({
-      physical_qr: card,
+    const config = stage.config && typeof stage.config === 'object' ? stage.config : {}
+
+    return {
+      physical_qr: nextCard,
       physical_node_kind: kind,
       physical_item_kind: kind,
       physical_item_id: itemId,
-      physical_item_label: stage.physical_item_label || label,
+      physical_item_label: label,
       game_family: 'physical_qr',
       game_type: template,
       game_template_id: template,
@@ -215,10 +245,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       fallback_code: fallbackCode(stage),
       physical_fallback_code: fallbackCode(stage),
       config: {
-        ...(stage.config && typeof stage.config === 'object' ? stage.config : {}),
+        ...config,
         success_code: fallbackCode(stage),
       },
-    })
+    }
+  }
+
+  function chooseQrBase(kind: PhysicalQrKind = 'collectible', template = 'physical_object_qr') {
+    onPatch(buildQrPatch(kind, template))
     goTo('subtype')
   }
 
@@ -228,8 +262,13 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   function applyQr(option: typeof qrOptions[number]) {
-    chooseQrBase(option.kind, option.template)
+    onPatch(buildQrPatch(option.kind, option.template))
     goTo('config')
+  }
+
+  function saveQrCard(card: SavedPhysicalQrCard) {
+    const option = qrOptions.find((item) => item.kind === card.kind) || qr
+    onPatch(buildQrPatch(card.kind, option.template, card))
   }
 
   function patchNumber(key: string, value: string) {
@@ -405,7 +444,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label>
                   <span>Nome visible</span>
                   <input
-                    value={String(stage.physical_item_label || stage.title || '')}
+                    value={qrLabel(stage)}
                     onChange={(event) => onPatch({ physical_item_label: event.target.value, title: event.target.value })}
                   />
                 </label>
@@ -414,7 +453,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   <span>Código fallback</span>
                   <input
                     value={fallbackCode(stage)}
-                    onChange={(event) => onPatch({ fallback_code: event.target.value, physical_fallback_code: event.target.value })}
+                    onChange={(event) => {
+                      const config = stage.config && typeof stage.config === 'object' ? stage.config : {}
+                      onPatch({
+                        fallback_code: event.target.value,
+                        physical_fallback_code: event.target.value,
+                        config: { ...config, success_code: event.target.value },
+                      })
+                    }}
                   />
                 </label>
 
@@ -438,34 +484,43 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
           <section className="saga-guided-v3-page">
             <div className="saga-guided-v3-pagehead">
               <span>Paso 4</span>
-              <h3>Texto e historia</h3>
-              <p>O que verá o xogador ao abrir, resolver ou completar o nodo.</p>
+              <h3>{mode === 'qr' ? 'Tarxeta QR e contido' : 'Texto e historia'}</h3>
+              <p>{mode === 'qr' ? 'Xera, revisa e descarga o QR imprimible.' : 'O que verá o xogador ao abrir, resolver ou completar o nodo.'}</p>
             </div>
 
-            <div className="saga-guided-v3-formgrid">
-              <label>
-                <span>Título</span>
-                <input value={String(stage.title || '')} onChange={(event) => onPatch({ title: event.target.value })} />
-              </label>
+            {mode === 'qr' ? (
+              <PhysicalQrCardsPanel
+                initialLabel={qrLabel(stage)}
+                initialKind={qr.kind}
+                compact
+                onSaveToNode={saveQrCard}
+              />
+            ) : (
+              <div className="saga-guided-v3-formgrid">
+                <label>
+                  <span>Título</span>
+                  <input value={String(stage.title || '')} onChange={(event) => onPatch({ title: event.target.value })} />
+                </label>
 
-              <label className="wide">
-                <span>Texto principal do nodo</span>
-                <textarea
-                  value={String(stage.description || stage.body || '')}
-                  onChange={(event) => onPatch({ description: event.target.value, body: event.target.value })}
-                  placeholder="Escribe a pista, instrución ou parte da historia..."
-                />
-              </label>
+                <label className="wide">
+                  <span>Texto principal do nodo</span>
+                  <textarea
+                    value={String(stage.description || stage.body || stage.content || '')}
+                    onChange={(event) => onPatch({ description: event.target.value, body: event.target.value, content: event.target.value })}
+                    placeholder="Escribe a pista, instrución ou parte da historia..."
+                  />
+                </label>
 
-              <label className="wide">
-                <span>Mensaxe ao completar</span>
-                <textarea
-                  value={String(stage.success_message || '')}
-                  onChange={(event) => onPatch({ success_message: event.target.value })}
-                  placeholder="Exemplo: Ben feito. Desbloqueaches a seguinte pista."
-                />
-              </label>
-            </div>
+                <label className="wide">
+                  <span>Mensaxe ao completar</span>
+                  <textarea
+                    value={String(stage.success_message || '')}
+                    onChange={(event) => onPatch({ success_message: event.target.value })}
+                    placeholder="Exemplo: Ben feito. Desbloqueaches a seguinte pista."
+                  />
+                </label>
+              </div>
+            )}
           </section>
         ) : null}
 
