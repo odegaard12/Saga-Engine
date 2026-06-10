@@ -208,6 +208,14 @@ export default function NodeDetailDrawer({
 }: NodeDetailDrawerProps) {
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
+  function patchGuidedV3Stage(patch: Record<string, any>) {
+    setDraft((current: any) => ({
+      ...current,
+      ...patch,
+    }))
+  }
+
+
   function patchGuidedV2Stage(patch: Record<string, any>) {
     setDraft((current: any) => ({
       ...current,
@@ -468,7 +476,7 @@ export default function NodeDetailDrawer({
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
-        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-node-editor-enabled admin-guided-v2-shell"
+        className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-node-editor-enabled admin-guided-v2-shell admin-guided-v3-shell"
         role="dialog"
         
         aria-label={`Node editor: ${draft.title}`}
@@ -562,18 +570,18 @@ export default function NodeDetailDrawer({
           </button>
         </div>
 
-        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host">
-          
-        <GuidedNodeEditorFlow
-          stage={draft}
-          onPatch={patchGuidedStage}
-          onClose={onClose}
-          onDelete={() => {
-            if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Pulsa Guardar después para persistir.`)) {
-              onDeleteLocal(draft)
-            }
-          }}
-        />
+        <div className="admin-drawer-body admin-drawer-body--modern admin-guided-node-editor-body admin-guided-v2-body-host admin-guided-v3-body-host">
+
+          <GuidedNodeEditorFlow
+            stage={draft}
+            onPatch={patchGuidedV3Stage}
+            onClose={onClose}
+            onDelete={() => {
+              if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Pulsa Guardar después para persistir.`)) {
+                onDeleteLocal(draft)
+              }
+            }}
+          />
 {activeTab === 'basics' ? (
             <section className="admin-edit-section admin-edit-section-compact admin-node-basics-panel">
               <div className="admin-edit-section-head">

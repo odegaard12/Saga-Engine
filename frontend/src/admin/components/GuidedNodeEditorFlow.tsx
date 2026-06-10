@@ -23,11 +23,12 @@ const STEPS: Array<{ key: StepKey; label: string }> = [
 const gameOptions = [
   {
     id: 'signal_gps',
-    icon: '📡',
+    icon: '🗺️',
     title: 'Señal GPS',
-    desc: 'El jugador debe acercarse a una zona del mapa.',
+    desc: 'O xogador debe achegarse a unha zona do mapa.',
     patch: {
       physical_node_kind: '',
+      physical_item_kind: '',
       physical_qr: false,
       qr_payload: '',
       game_family: 'signal',
@@ -44,9 +45,10 @@ const gameOptions = [
     id: 'bearing_hunt',
     icon: '🧭',
     title: 'Rumbo',
-    desc: 'El jugador sigue una dirección/pista de orientación.',
+    desc: 'O xogador segue unha dirección, pista ou orientación.',
     patch: {
       physical_node_kind: '',
+      physical_item_kind: '',
       physical_qr: false,
       qr_payload: '',
       game_family: 'bearing',
@@ -68,7 +70,7 @@ const qrOptions = [
     id: 'object',
     icon: '⭐',
     title: 'Objeto QR',
-    desc: 'Objeto físico que el jugador puede encontrar y guardar.',
+    desc: 'Objeto físico que o xogador pode atopar e gardar.',
     kind: 'object',
     template: 'physical_object_qr',
   },
@@ -76,7 +78,7 @@ const qrOptions = [
     id: 'key',
     icon: '🔑',
     title: 'Llave QR',
-    desc: 'Llave física para desbloquear otro nodo o zona.',
+    desc: 'Chave física para desbloquear outro nodo ou zona.',
     kind: 'key',
     template: 'physical_key_qr',
   },
@@ -84,7 +86,7 @@ const qrOptions = [
     id: 'clue',
     icon: '🧩',
     title: 'Pista QR',
-    desc: 'Pista física que revela información de la historia.',
+    desc: 'Pista física que revela información da historia.',
     kind: 'clue',
     template: 'physical_clue_qr',
   },
@@ -92,18 +94,37 @@ const qrOptions = [
     id: 'bonus',
     icon: '🎁',
     title: 'Bonus QR',
-    desc: 'Extra opcional, recompensa o misión secundaria.',
+    desc: 'Extra opcional, recompensa ou misión secundaria.',
     kind: 'bonus',
     template: 'physical_bonus_qr',
   },
 ]
 
 function titleOf(stage: StageLike) {
-  return String(stage.title || stage.name || 'Nuevo nodo')
+  return String(stage.title || stage.name || 'NEW NODE')
+}
+
+function nodeNumber(stage: StageLike) {
+  const raw = String(stage.title || stage.name || stage.id || stage.node_id || '')
+  const found = raw.match(/\d+/)?.[0]
+  return found || ''
+}
+
+function displayTitle(stage: StageLike) {
+  const n = nodeNumber(stage)
+  const title = titleOf(stage)
+  if (n && !title.trim().startsWith(`${n}.`)) return `${n}. ${title}`
+  return title
 }
 
 function isQr(stage: StageLike) {
-  return Boolean(stage.physical_qr || stage.physical_node_kind || String(stage.game_family || '').includes('physical'))
+  return Boolean(
+    stage.physical_qr ||
+    stage.physical_node_kind ||
+    stage.physical_item_kind ||
+    String(stage.game_family || '').includes('physical') ||
+    String(stage.game_type || '').includes('physical')
+  )
 }
 
 function selectedGame(stage: StageLike) {
@@ -115,20 +136,29 @@ function selectedQr(stage: StageLike) {
   return qrOptions.find((item) => item.kind === kind || item.id === kind) || qrOptions[0]
 }
 
+function slugOf(value: unknown) {
+  return String(value || 'item')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function fallbackCode(stage: StageLike) {
   const raw = String(stage.fallback_code || stage.physical_fallback_code || stage.code || '')
   if (raw) return raw
-  const id = String(stage.id || stage.node_id || stage.title || '00').match(/\d+/)?.[0] || '00'
-  return `SAGA-${id.padStart(2, '0')}`
+  const n = nodeNumber(stage) || '00'
+  return `SAGA-${n.padStart(2, '0')}`
 }
 
 export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete }: GuidedNodeEditorFlowProps) {
   const [stepIndex, setStepIndex] = useState(0)
+
   const mode = isQr(stage) ? 'qr' : 'game'
   const step = STEPS[stepIndex]?.key || 'type'
   const game = selectedGame(stage)
   const qr = selectedQr(stage)
-  const title = titleOf(stage)
+  const title = displayTitle(stage)
 
   const progress = useMemo(() => Math.round(((stepIndex + 1) / STEPS.length) * 100), [stepIndex])
 
@@ -142,12 +172,12 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       physical_item_kind: '',
       physical_qr: false,
       qr_payload: '',
-      game_family: stage.game_family && !String(stage.game_family).includes('physical') ? stage.game_family : 'signal',
-      game_type: stage.game_type && !String(stage.game_type).includes('physical') ? stage.game_type : 'signal_gps',
-      game_template_id: stage.game_template_id && !String(stage.game_template_id).includes('physical') ? stage.game_template_id : 'signal_gps_easy',
-      entry_mode: stage.entry_mode || 'gps',
-      completion_method: stage.completion_method || 'proximity',
-      requires_proximity: stage.requires_proximity ?? true,
+      game_family: 'signal',
+      game_type: 'signal_gps',
+      game_template_id: 'signal_gps_easy',
+      entry_mode: 'gps',
+      completion_method: 'proximity',
+      requires_proximity: true,
       radius_m: Number(stage.radius_m || stage.proximity_radius_m || 50),
       proximity_radius_m: Number(stage.proximity_radius_m || stage.radius_m || 50),
     })
@@ -156,11 +186,13 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
 
   function chooseQrBase(kind = 'object', template = 'physical_object_qr') {
     const label = titleOf(stage)
+    const itemId = stage.physical_item_id || slugOf(stage.id || stage.node_id || label)
+
     onPatch({
       physical_qr: true,
       physical_node_kind: kind,
       physical_item_kind: kind,
-      physical_item_id: stage.physical_item_id || String(stage.id || stage.node_id || label).replace(/\s+/g, '-').toLowerCase(),
+      physical_item_id: itemId,
       physical_item_label: stage.physical_item_label || label,
       game_family: 'physical_qr',
       game_type: template,
@@ -168,7 +200,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       entry_mode: 'qr',
       completion_method: 'qr_scan',
       requires_proximity: false,
-      qr_payload: stage.qr_payload || `SAGA1:ITEM:${String(stage.id || stage.node_id || label).replace(/\s+/g, '-').toLowerCase()}`,
+      qr_payload: stage.qr_payload || `SAGA1:ITEM:${itemId}`,
       fallback_code: fallbackCode(stage),
       physical_fallback_code: fallbackCode(stage),
     })
@@ -191,26 +223,29 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   return (
-    <section className="saga-guided-editor-v2" aria-label="Editor guiado de nodo">
-      <header className="saga-guided-v2-header">
-        <div className="saga-guided-v2-titleblock">
-          <span>EDITOR GUIADO</span>
+    <section className="saga-guided-editor-v3" aria-label="Editor guiado de nodo">
+      <header className="saga-guided-v3-header">
+        <div className="saga-guided-v3-titleblock">
+          <span>EDITOR DE NODO</span>
           <h2>{title}</h2>
-          <div className="saga-guided-v2-chips">
-            <b>{mode === 'qr' ? `${qr.icon} ${qr.title}` : `${game.icon} ${game.title}`}</b>
-            {stage.lat != null && stage.lon != null ? <b>{Number(stage.lat).toFixed(5)}, {Number(stage.lon).toFixed(5)}</b> : null}
+
+          <div className="saga-guided-v3-chips">
+            <b>{mode === 'qr' ? `${qr.icon} ${qr.title}` : `📡 ${game.title}`}</b>
+            {stage.lat != null && stage.lon != null ? (
+              <b>{Number(stage.lat).toFixed(5)}, {Number(stage.lon).toFixed(5)}</b>
+            ) : null}
             {mode === 'game' ? <b>{Number(stage.radius_m || stage.proximity_radius_m || 50)} m</b> : null}
           </div>
         </div>
 
-        <div className="saga-guided-v2-actions">
-          <button type="button" onClick={() => goTo('type')}>Cambiar tipo</button>
+        <div className="saga-guided-v3-actions">
+          <button type="button" className="primary-soft" onClick={() => goTo('type')}>Cambiar tipo</button>
           <button type="button" className="danger" onClick={onDelete}>Eliminar</button>
           <button type="button" onClick={onClose}>Cerrar ×</button>
         </div>
       </header>
 
-      <nav className="saga-guided-v2-stepper" aria-label="Pasos del editor guiado">
+      <nav className="saga-guided-v3-stepper" aria-label="Pasos del editor guiado">
         {STEPS.map((item, index) => (
           <button
             key={item.key}
@@ -224,28 +259,28 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ))}
       </nav>
 
-      <div className="saga-guided-v2-progress" aria-hidden="true">
+      <div className="saga-guided-v3-progress" aria-hidden="true">
         <i style={{ width: `${progress}%` }} />
       </div>
 
-      <main className="saga-guided-v2-body">
+      <main className="saga-guided-v3-body">
         {step === 'type' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page saga-guided-v3-page--choices">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 1</span>
               <h3>Que tipo de nodo queres crear?</h3>
               <p>Primeiro escolle se é un xogo no mapa ou un QR físico.</p>
             </div>
 
-            <div className="saga-guided-v2-choice-grid">
-              <button type="button" className={!isQr(stage) ? 'active' : ''} onClick={chooseGameBase}>
-                <span>🗺️</span>
+            <div className="saga-guided-v3-choice-grid saga-guided-v3-choice-grid--two">
+              <button type="button" className={mode === 'game' ? 'active' : ''} onClick={chooseGameBase}>
+                <i>🗺️</i>
                 <strong>Nodo de xogo</strong>
                 <small>Señal GPS, rumbo, minixogos e probas no mapa.</small>
               </button>
 
-              <button type="button" className={isQr(stage) ? 'active' : ''} onClick={() => chooseQrBase()}>
-                <span>▣</span>
+              <button type="button" className={mode === 'qr' ? 'active' : ''} onClick={() => chooseQrBase()}>
+                <i>▣</i>
                 <strong>QR físico</strong>
                 <small>Objeto, chave, pista ou bonus escaneable.</small>
               </button>
@@ -254,14 +289,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'subtype' && mode === 'game' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page saga-guided-v3-page--choices">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 2</span>
               <h3>Escolle o xogo</h3>
               <p>Este será o modo principal que verá o xogador.</p>
             </div>
 
-            <div className="saga-guided-v2-choice-grid">
+            <div className="saga-guided-v3-choice-grid">
               {gameOptions.map((option) => (
                 <button
                   key={option.id}
@@ -269,7 +304,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   className={game.id === option.id ? 'active' : ''}
                   onClick={() => applyGame(option)}
                 >
-                  <span>{option.icon}</span>
+                  <i>{option.icon}</i>
                   <strong>{option.title}</strong>
                   <small>{option.desc}</small>
                 </button>
@@ -279,14 +314,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'subtype' && mode === 'qr' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page saga-guided-v3-page--choices">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 2</span>
               <h3>Escolle o tipo de QR</h3>
               <p>Define que representa o QR físico dentro da misión.</p>
             </div>
 
-            <div className="saga-guided-v2-choice-grid">
+            <div className="saga-guided-v3-choice-grid">
               {qrOptions.map((option) => (
                 <button
                   key={option.id}
@@ -294,7 +329,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   className={qr.kind === option.kind ? 'active' : ''}
                   onClick={() => applyQr(option)}
                 >
-                  <span>{option.icon}</span>
+                  <i>{option.icon}</i>
                   <strong>{option.title}</strong>
                   <small>{option.desc}</small>
                 </button>
@@ -304,15 +339,15 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'config' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 3</span>
               <h3>{mode === 'qr' ? 'Configurar QR físico' : 'Configurar xogo'}</h3>
               <p>{mode === 'qr' ? 'Datos principais do obxecto escaneable.' : 'Radio, proximidade e activación do nodo.'}</p>
             </div>
 
             {mode === 'game' ? (
-              <div className="saga-guided-v2-formgrid">
+              <div className="saga-guided-v3-formgrid">
                 <label>
                   <span>Radio en metros</span>
                   <input
@@ -337,7 +372,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   </select>
                 </label>
 
-                <label className="checkbox">
+                <label className="checkbox wide">
                   <input
                     type="checkbox"
                     checked={Boolean(stage.requires_proximity ?? true)}
@@ -346,12 +381,12 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   <span>Requirir estar cerca do nodo</span>
                 </label>
 
-                <article className="saga-guided-v2-note">
+                <article className="saga-guided-v3-note">
                   A posición cámbiase arrastrando o nodo no mapa. Aquí configuras como se activa.
                 </article>
               </div>
             ) : (
-              <div className="saga-guided-v2-formgrid">
+              <div className="saga-guided-v3-formgrid">
                 <label>
                   <span>Nome visible</span>
                   <input
@@ -376,7 +411,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   />
                 </label>
 
-                <article className="saga-guided-v2-note">
+                <article className="saga-guided-v3-note">
                   O fallback serve para completar o QR se falla a cámara, o escaneo ou a cobertura.
                 </article>
               </div>
@@ -385,14 +420,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'content' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 4</span>
               <h3>Texto e historia</h3>
               <p>O que verá o xogador ao abrir, resolver ou completar o nodo.</p>
             </div>
 
-            <div className="saga-guided-v2-formgrid">
+            <div className="saga-guided-v3-formgrid">
               <label>
                 <span>Título</span>
                 <input value={String(stage.title || '')} onChange={(event) => onPatch({ title: event.target.value })} />
@@ -420,14 +455,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'rules' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 5</span>
               <h3>Regras e desbloqueos</h3>
               <p>Define se o nodo require algún obxecto ou condición previa.</p>
             </div>
 
-            <div className="saga-guided-v2-formgrid">
+            <div className="saga-guided-v3-formgrid">
               <label>
                 <span>Requisito</span>
                 <select
@@ -451,7 +486,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 />
               </label>
 
-              <label className="checkbox">
+              <label className="checkbox wide">
                 <input
                   type="checkbox"
                   checked={Boolean(stage.consume_required_item)}
@@ -464,14 +499,14 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
 
         {step === 'review' ? (
-          <section className="saga-guided-v2-page">
-            <div className="saga-guided-v2-pagehead">
+          <section className="saga-guided-v3-page">
+            <div className="saga-guided-v3-pagehead">
               <span>Paso 6</span>
               <h3>Revisar nodo</h3>
               <p>Resumo antes de pechar. Lembra gardar a misión no control principal.</p>
             </div>
 
-            <div className="saga-guided-v2-review">
+            <div className="saga-guided-v3-review">
               <article><b>Tipo</b><span>{mode === 'qr' ? 'QR físico' : 'Nodo de xogo'}</span></article>
               <article><b>Modo</b><span>{mode === 'qr' ? qr.title : game.title}</span></article>
               <article><b>Activación</b><span>{String(stage.entry_mode || (mode === 'qr' ? 'qr' : 'gps'))}</span></article>
@@ -481,7 +516,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         ) : null}
       </main>
 
-      <footer className="saga-guided-v2-footer">
+      <footer className="saga-guided-v3-footer">
         <button type="button" onClick={goBack} disabled={stepIndex === 0}>Atrás</button>
         <button type="button" className="secondary" onClick={() => goTo('type')}>Cambiar tipo</button>
         {stepIndex < STEPS.length - 1 ? (
