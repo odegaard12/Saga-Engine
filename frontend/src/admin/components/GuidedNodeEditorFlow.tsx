@@ -29,7 +29,33 @@ const STEPS: Array<{ key: StepKey; label: string }> = [
   { key: 'review', label: 'Revisar' },
 ]
 
-const READY_STATUSES = new Set(['runtime_ready', 'runtime_partial', 'preset_only'])
+const READY_STATUSES = new Set(['runtime_ready'])
+
+const TECHNICAL_CONFIG_KEYS = new Set([
+  'game_id',
+  'game_title',
+  'objective',
+  'source_lat',
+  'source_lon',
+  'max_signal',
+  'noise_floor',
+  'jitter',
+  'decay_curve',
+  'timeout_ms',
+  'update_rate_ms',
+  'use_audio',
+  'use_vibration',
+  'use_direction_hint',
+  'false_peaks',
+  'dead_zones',
+])
+
+const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
+  'GPS unavailable message.': 'Activa GPS para localizar la señal.',
+  'Move closer to unlock this node.': 'Acércate más al punto para desbloquear el nodo.',
+  'Complete this node to continue.': 'Completa este nodo para continuar.',
+}
+
 
 const QR_KIND_BY_GAME_ID: Partial<Record<AdminGameId, PhysicalQrKind>> = {
   qr_collectible: 'collectible',
@@ -208,8 +234,12 @@ function isQrStage(stage: StageLike): boolean {
   )
 }
 
-function gameOptions(): AdminGameCatalogItem[] {
-  return adminGameCatalog.filter((game) => game.category !== 'physical')
+function gameOptions(showExperimental = false): AdminGameCatalogItem[] {
+  return adminGameCatalog.filter((game) => {
+    if (game.category === 'physical') return false
+    if (showExperimental) return true
+    return isPlayableNow(game)
+  })
 }
 
 function qrOptions(): AdminGameCatalogItem[] {
@@ -218,9 +248,9 @@ function qrOptions(): AdminGameCatalogItem[] {
 
 function statusLabel(game: AdminGameCatalogItem) {
   if (game.runtimeStatus === 'runtime_ready') return 'Jugable'
-  if (game.runtimeStatus === 'runtime_partial') return 'Parcial'
+  if (game.runtimeStatus === 'runtime_partial') return 'Experimental'
   if (game.runtimeStatus === 'preset_only') return 'Plantilla'
-  return 'Planificado'
+  return 'No listo'
 }
 
 function offlineLabel(game: AdminGameCatalogItem) {
@@ -228,6 +258,59 @@ function offlineLabel(game: AdminGameCatalogItem) {
   if (game.offlineStatus === 'offline_partial') return 'Offline parcial'
   return 'Offline pendiente'
 }
+
+function isPlayableNow(game: AdminGameCatalogItem) {
+  return READY_STATUSES.has(game.runtimeStatus)
+}
+
+function isExperimentalOrPlanned(game: AdminGameCatalogItem) {
+  return !isPlayableNow(game)
+}
+
+function normalizeMessage(value: unknown, fallback: string) {
+  const raw = String(value || '').trim()
+  if (!raw) return fallback
+  return LEGACY_MESSAGE_FALLBACKS[raw] || raw
+}
+
+function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
+  const keys = new Set<string>()
+
+  if ('completion_method' in config) keys.add('completion_method')
+
+  if (game.category === 'gps' || game.completionMethod === 'proximity' || game.completionMethod === 'hold' || game.completionMethod === 'team') {
+    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  if (game.category === 'compass' || game.completionMethod === 'bearing') {
+    for (const key of ['target_bearing_deg', 'tolerance_deg', 'hold_ms']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  if (game.category === 'logic' || game.completionMethod === 'puzzle') {
+    for (const key of ['grid_cols', 'grid_rows', 'difficulty']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  if (game.completionMethod === 'manual_code') {
+    for (const key of ['expected_code', 'difficulty']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  if (game.completionMethod === 'sequence') {
+    for (const key of ['sequence', 'difficulty']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  return Array.from(keys).filter((key) => !TECHNICAL_CONFIG_KEYS.has(key))
+}
+
 
 function slugOf(value: unknown) {
   return String(value || 'item')
@@ -296,12 +379,13 @@ function copyText(value: string, onDone: (message: string) => void) {
 export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete }: GuidedNodeEditorFlowProps) {
   const [stepIndex, setStepIndex] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+  const [showExperimentalGames, setShowExperimentalGames] = useState(false)
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
 
   const mode = isQrStage(stage) ? 'qr' : 'game'
   const selected = gameFromStage(stage)
   const selectedQr = mode === 'qr' ? selected : qrGameForKind(normalizeQrKind(stage.physical_node_kind || stage.physical_item_kind))
-  const selectedGame = mode === 'game' ? selected : gameOptions()[0]
+  const selectedGame = mode === 'game' ? selected : gameOptions(showExperimentalGames)[0]
   const step = STEPS[stepIndex]?.key || 'type'
   const title = displayTitle(stage)
   const config = configOf(stage)
@@ -495,10 +579,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     onPatch({ [key]: Number.isFinite(next) ? next : 0 })
   }
 
-  const configKeys = Array.from(new Set([
-    ...CONFIG_ORDER.filter((key) => key in config),
-    ...Object.keys(config).filter((key) => !CONFIG_ORDER.includes(key)),
-  ]))
+  const configKeys = guidedConfigKeysForGame(mode === 'qr' ? selectedQr : selectedGame, config)
 
   return (
     <section className="saga-guided-editor-v4" aria-label="Editor guiado de nodo">
@@ -544,7 +625,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
             </div>
 
             <div className="saga-guided-v4-choice-grid saga-guided-v4-choice-grid--two">
-              <button type="button" className={mode === 'game' ? 'active' : ''} onClick={() => applyGame(gameOptions()[0])}>
+              <button type="button" className={mode === 'game' ? 'active' : ''} onClick={() => applyGame(gameOptions(false)[0])}>
                 <i>🗺️</i>
                 <strong>Nodo de xogo</strong>
                 <small>GPS, rumbo, lóxica, código, foto ou equipo.</small>
@@ -567,8 +648,15 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
               <p>Mostra o catálogo real. Os planificados poden prepararse, pero os máis seguros son “Jugable”.</p>
             </div>
 
+            <div className="saga-guided-v4-toggle-row">
+              <span>{showExperimentalGames ? 'Mostrando también juegos experimentales/no listos.' : 'Mostrando solo juegos jugables ahora.'}</span>
+              <button type="button" onClick={() => setShowExperimentalGames((value) => !value)}>
+                {showExperimentalGames ? 'Ocultar no listos' : 'Mostrar experimentales'}
+              </button>
+            </div>
+
             <div className="saga-guided-v4-catalog-grid">
-              {gameOptions().map((game) => (
+              {gameOptions(showExperimentalGames).map((game) => (
                 <button
                   key={game.id}
                   type="button"
@@ -578,7 +666,9 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   <i>{game.icon}</i>
                   <strong>{game.title}</strong>
                   <small>{game.summary}</small>
-                  <em>{statusLabel(game)} · {offlineLabel(game)} · {game.duration}</em>
+                  <em className={isExperimentalOrPlanned(game) ? 'warning' : ''}>
+                    {statusLabel(game)} · {offlineLabel(game)} · {game.duration}
+                  </em>
                 </button>
               ))}
             </div>
@@ -647,7 +737,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 </label>
 
                 {configKeys.map((key) => {
-                  const meta = CONFIG_FIELD_META[key] || { label: key, help: 'Ajuste avanzado del juego.', type: 'text' as const }
+                  const meta = CONFIG_FIELD_META[key] || { label: key, help: 'Ajuste avanzado oculto normalmente. Revisa solo si sabes qué hace.', type: 'text' as const }
                   if (key === 'completion_method') return null
 
                   return (
@@ -757,7 +847,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label className="wide">
                   <span>Texto principal</span>
                   <textarea
-                    value={String(stage.content || stage.description || stage.body || '')}
+                    value={String(stage.content || stage.description || stage.body || selectedGame.content || '')}
                     onChange={(event) => onPatch({ content: event.target.value, description: event.target.value, body: event.target.value })}
                     placeholder={selectedGame.content}
                   />
@@ -766,7 +856,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label>
                   <span>Pista</span>
                   <textarea
-                    value={String(stage.messages?.hint || '')}
+                    value={normalizeMessage(stage.messages?.hint, selectedGame.messages.hint)}
                     onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), hint: event.target.value } })}
                     placeholder={selectedGame.messages.hint}
                   />
@@ -775,7 +865,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label>
                   <span>Sin GPS / sensor</span>
                   <textarea
-                    value={String(stage.messages?.gps_unavailable || '')}
+                    value={normalizeMessage(stage.messages?.gps_unavailable, selectedGame.messages.gps_unavailable)}
                     onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), gps_unavailable: event.target.value } })}
                     placeholder={selectedGame.messages.gps_unavailable}
                   />
@@ -784,7 +874,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label>
                   <span>Bloqueado / no completado</span>
                   <textarea
-                    value={String(stage.messages?.locked || '')}
+                    value={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)}
                     onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), locked: event.target.value } })}
                     placeholder={selectedGame.messages.locked}
                   />
@@ -793,7 +883,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 <label>
                   <span>Al completar</span>
                   <textarea
-                    value={String(stage.success_message || '')}
+                    value={String(stage.success_message || 'Ben feito. Desbloqueaches a seguinte pista.')}
                     onChange={(event) => onPatch({ success_message: event.target.value })}
                     placeholder="Ben feito. Desbloqueaches a seguinte pista."
                   />
