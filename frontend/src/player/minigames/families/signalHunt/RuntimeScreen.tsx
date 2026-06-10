@@ -558,13 +558,13 @@ function getConfigSource(resolved: ResolvedSignalHuntMinigame, stage: PlayerStag
 }
 
 function getGpsCopy(state: GpsState, hasSource: boolean): string {
-  if (!hasSource) return 'Falta source_lat/source_lon en la config o coordenadas del nodo.'
+  if (!hasSource) return 'Faltan coordenadas del nodo. Revisa la posición en el mapa.'
   if (state === 'requesting') return 'Solicitando posición GPS.'
-  if (state === 'tracking') return 'GPS real activo. Acércate a la fuente para subir señal.'
+  if (state === 'tracking') return 'GPS activo. Acércate al punto hasta que suba la señal.'
   if (state === 'denied') return 'Permiso de ubicación denegado. Revisa permisos del navegador.'
-  if (state === 'unsupported') return 'Este navegador no expone geolocalización.'
-  if (state === 'locked') return 'Fuente capturada.'
-  return 'Preparando barrido de señal.'
+  if (state === 'unsupported') return 'Este navegador no permite usar geolocalización.'
+  if (state === 'locked') return 'Señal capturada.'
+  return 'Preparando búsqueda de señal.'
 }
 
 export function SignalHuntRuntimeScreen({
@@ -581,8 +581,7 @@ export function SignalHuntRuntimeScreen({
   const stageRadius = toNumber((stage as unknown as Record<string, unknown>).radius)
 
   const sourceRadius = clamp(Number(cfg.source_radius_m ?? stageRadius ?? 20), 1, 10000)
-  const configuredLockThreshold = clamp(Number(cfg.lock_threshold ?? 85), 1, 100)
-  const lockThreshold = Math.min(configuredLockThreshold, 30)
+  const lockThreshold = clamp(Number(cfg.lock_threshold ?? 65), 1, 100)
   const holdMs = clamp(Number(cfg.hold_ms ?? 1500), 100, 10000)
   const maxSignal = clamp(Number(cfg.max_signal ?? 100), 1, 100)
   const noiseFloor = clamp(Number(cfg.noise_floor ?? 4), 0, 35)
@@ -594,6 +593,7 @@ export function SignalHuntRuntimeScreen({
   const [signal, setSignal] = useState(hasSource ? noiseFloor : 0)
   const [holdProgress, setHoldProgress] = useState(0)
   const [locked, setLocked] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   const watchIdRef = useRef<number | null>(null)
   const holdStartRef = useRef<number | null>(null)
@@ -645,7 +645,7 @@ export function SignalHuntRuntimeScreen({
         watchIdRef.current = null
       }
     }
-  }, [hasSource])
+  }, [hasSource, retryNonce])
 
   useEffect(() => {
     if (!hasSource || distance === null) return
@@ -717,28 +717,28 @@ export function SignalHuntRuntimeScreen({
   }, [cfg.use_vibration, completeLock, holdMs, inWindow, locked])
 
   const command = useMemo(() => {
-    if (submitting) return { main: 'SYNC', sub: 'Guardando captura', small: false }
-    if (locked) return { main: 'LOCKED', sub: 'Fuente capturada', small: false }
-    if (!hasSource) return { main: 'NO SOURCE', sub: 'Configura coordenadas', small: true }
-    if (gpsState === 'requesting' || gpsState === 'idle') return { main: 'SCAN', sub: 'Buscando GPS', small: false }
+    if (submitting) return { main: 'GUARDAR', sub: 'Guardando captura', small: true }
+    if (locked) return { main: 'CAPTURA', sub: 'Señal capturada', small: true }
+    if (!hasSource) return { main: 'SIN PUNTO', sub: 'Configura el nodo en el mapa', small: true }
+    if (gpsState === 'requesting' || gpsState === 'idle') return { main: 'BUSCAR', sub: 'Buscando GPS', small: false }
     if (gpsState === 'denied') return { main: 'GPS', sub: 'Permiso bloqueado', small: false }
     if (gpsState === 'unsupported') return { main: 'GPS', sub: 'No disponible', small: false }
-    if (inWindow) return { main: 'HOLD', sub: 'Mantén posición', small: false }
-    if (rising) return { main: 'RISING', sub: 'La señal mejora', small: false }
-    return { main: 'WEAK', sub: 'Busca más intensidad', small: false }
+    if (inWindow) return { main: 'MANTÉN', sub: 'Mantén posición', small: true }
+    if (rising) return { main: 'CERCA', sub: 'La señal mejora', small: false }
+    return { main: 'DÉBIL', sub: 'Busca más intensidad', small: false }
   }, [gpsState, hasSource, inWindow, locked, rising, submitting])
 
   const statusLabel = submitting
-    ? 'SYNC'
+    ? 'GUARDAR'
     : locked
-      ? 'LOCK'
+      ? 'OK'
       : inWindow
-        ? 'HOLD'
+        ? 'MANTÉN'
         : gpsState === 'tracking'
-          ? 'LIVE'
+          ? 'GPS'
           : gpsState === 'missing_source'
             ? 'CONFIG'
-            : 'SCAN'
+            : 'BUSCAR'
 
   const rootClassName = [
     'sh-root',
@@ -765,7 +765,7 @@ export function SignalHuntRuntimeScreen({
   const showSensorPanel = gpsState !== 'tracking' && !locked
 
   return (
-    <section className={rootClassName} style={styleVars} aria-label="Signal hunt runtime">
+    <section className={rootClassName} style={styleVars} aria-label="Captura de señal GPS">
       <style>{STYLES}</style>
 
       <div className="sh-card">
@@ -773,7 +773,7 @@ export function SignalHuntRuntimeScreen({
           <div className="sh-mode">
             <span className="sh-pulse" aria-hidden="true" />
             <div>
-              <span className="sh-overline">Signal lock</span>
+              <span className="sh-overline">Captura GPS</span>
             </div>
           </div>
 
@@ -835,8 +835,17 @@ export function SignalHuntRuntimeScreen({
                   type="button"
                   disabled={gpsState === 'requesting'}
                   onClick={() => {
-                    setGpsState('idle')
+                    if (watchIdRef.current !== null) {
+                      navigator.geolocation.clearWatch(watchIdRef.current)
+                      watchIdRef.current = null
+                    }
+                    holdStartRef.current = null
+                    windowPulseRef.current = false
+                    setGpsState('requesting')
                     setPosition(null)
+                    setSignal(noiseFloor)
+                    setHoldProgress(0)
+                    setRetryNonce((value) => value + 1)
                   }}
                 >
                   Reintentar GPS
