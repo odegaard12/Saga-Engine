@@ -23,7 +23,6 @@ import {
 } from './lib/adminApi'
 import {
   familyCards,
-  getDefaultAdminConfigForFamily,
   type EditableAdminStage,
   type FamilyId,
 } from './lib/familyConfigs'
@@ -839,13 +838,14 @@ export default function AdminApp() {
     const nextIndex = stages.length
     const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
     const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('bearing_compass')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
       index: nextIndex,
       title: `NEW NODE ${nextIndex + 1}`,
-      type: 'signal_hunt',
-      label: 'Signal Hunt',
+      type: defaultGamePatch.type,
+      label: defaultGamePatch.label,
       lat: nextLat,
       lon: nextLon,
       radius: 50,
@@ -853,15 +853,11 @@ export default function AdminApp() {
       require_proximity: true,
       has_hint: false,
       has_manual_fallback: false,
-      content: '',
-      objective: 'proximity_lock',
-      config: getDefaultAdminConfigForFamily('signal_hunt'),
-      config_summary: Object.keys(getDefaultAdminConfigForFamily('signal_hunt')),
-      messages: {
-        hint: '',
-        gps_unavailable: 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
-        locked: 'Acércate al nodo para desbloquearlo.',
-      },
+      content: defaultGamePatch.content,
+      objective: defaultGamePatch.objective,
+      config: defaultGamePatch.config,
+      config_summary: defaultGamePatch.config_summary,
+      messages: defaultGamePatch.messages,
     }
 
     setCmsPanel('none')
