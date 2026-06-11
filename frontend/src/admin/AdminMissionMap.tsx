@@ -50,35 +50,6 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
 }
 
 
-function getOriginalPoint(event: L.LeafletEvent): { x: number; y: number } | null {
-  const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
-  if (!original) return null
-
-  const pointer = original as Event & {
-    touches?: TouchList
-    changedTouches?: TouchList
-    clientX?: number
-    clientY?: number
-  }
-
-  if (pointer.touches && pointer.touches.length > 0) {
-    const touch = pointer.touches[0]
-    return { x: touch.clientX, y: touch.clientY }
-  }
-
-  if (pointer.changedTouches && pointer.changedTouches.length > 0) {
-    const touch = pointer.changedTouches[0]
-    return { x: touch.clientX, y: touch.clientY }
-  }
-
-  if (typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number') {
-    return { x: pointer.clientX, y: pointer.clientY }
-  }
-
-  return null
-}
-
-
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -127,7 +98,6 @@ export default function AdminMissionMap({
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
   const dragClickSuppressUntilRef = useRef(0)
-  const markerPointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null)
 
   const mappedStages = useMemo(
     () => stages.filter(hasCoords),
@@ -249,50 +219,27 @@ export default function AdminMissionMap({
         onSelectStage(stage)
       })
 
-      marker.on('mousedown touchstart', (event: L.LeafletEvent) => {
-        const point = getOriginalPoint(event)
-        markerPointerStartRef.current = point ? { ...point, at: Date.now() } : { x: 0, y: 0, at: Date.now() }
-      })
+      marker.on('click', (event: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(event.originalEvent)
+        L.DomEvent.preventDefault(event.originalEvent)
 
-      marker.on('preclick click', (event: L.LeafletEvent) => {
-        const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
-        if (original) {
-          L.DomEvent.stopPropagation(original)
-          L.DomEvent.preventDefault(original)
-        }
-      })
-
-      marker.on('mouseup touchend', (event: L.LeafletEvent) => {
-        const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
-        if (original) {
-          L.DomEvent.stopPropagation(original)
-          L.DomEvent.preventDefault(original)
+        if (
+          map.getContainer().classList.contains('admin-map-dragging-node') ||
+          Date.now() < dragClickSuppressUntilRef.current
+        ) {
+          return
         }
 
-        const now = Date.now()
-        const startPoint = markerPointerStartRef.current
-        const endPoint = getOriginalPoint(event)
-        markerPointerStartRef.current = null
-
-        const longPress = startPoint ? now - startPoint.at > 240 : true
-        const moved = startPoint && endPoint ? Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y) > 6 : true
-        const suppressed =
-          now < dragClickSuppressUntilRef.current ||
-          map.getContainer().classList.contains('admin-map-dragging-node')
-
-        if (!suppressed && !longPress && !moved) {
-          onSelectStage(stage)
-        }
+        onSelectStage(stage)
       })
 
       marker.on('dragstart', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 2400
-        markerPointerStartRef.current = null
+        dragClickSuppressUntilRef.current = Date.now() + 2500
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
       marker.on('drag', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 2400
+        dragClickSuppressUntilRef.current = Date.now() + 2500
         const next = marker.getLatLng()
         ring.setLatLng(next)
       })
@@ -304,8 +251,7 @@ export default function AdminMissionMap({
           L.DomEvent.preventDefault(original)
         }
 
-        dragClickSuppressUntilRef.current = Date.now() + 2400
-        markerPointerStartRef.current = null
+        dragClickSuppressUntilRef.current = Date.now() + 2500
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)
