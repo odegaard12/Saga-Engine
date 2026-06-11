@@ -720,7 +720,7 @@ export function SignalHuntRuntimeScreen({
     if (submitting) return { main: 'GUARDAR', sub: 'Guardando captura', small: true }
     if (locked) return { main: 'CAPTURA', sub: 'Señal capturada', small: true }
     if (!hasSource) return { main: 'SIN PUNTO', sub: 'Configura el nodo en el mapa', small: true }
-    if (gpsState === 'requesting' || gpsState === 'idle') return { main: 'BUSCAR', sub: 'Buscando GPS', small: false }
+    if (gpsState === 'requesting' || gpsState === 'idle') return { main: 'GPS', sub: 'Buscando posición', small: false }
     if (gpsState === 'denied') return { main: 'GPS', sub: 'Permiso bloqueado', small: false }
     if (gpsState === 'unsupported') return { main: 'GPS', sub: 'No disponible', small: false }
     if (inWindow) return { main: 'MANTÉN', sub: 'Mantén posición', small: true }
@@ -738,7 +738,7 @@ export function SignalHuntRuntimeScreen({
           ? 'GPS'
           : gpsState === 'missing_source'
             ? 'CONFIG'
-            : 'BUSCAR'
+            : 'GPS'
 
   const rootClassName = [
     'sh-root',
@@ -748,9 +748,10 @@ export function SignalHuntRuntimeScreen({
   ].filter(Boolean).join(' ')
 
   const captureDeg = Math.round(holdProgress * 360)
-  const signalPct = `${Math.round(normalizedSignal)}%`
+  const displaySignal = position ? normalizedSignal : 0
+  const signalPct = `${Math.round(displaySignal)}%`
   const thresholdPct = `${lockThreshold}%`
-  const signalRatio = clamp(normalizedSignal / 100, 0, 1)
+  const signalRatio = clamp(displaySignal / 100, 0, 1)
   const signalScale = 0.72 + signalRatio * 0.36
 
   const styleVars = {
@@ -779,7 +780,7 @@ export function SignalHuntRuntimeScreen({
 
           <div className="sh-live">
             <span>{statusLabel}</span>
-            <strong>{Math.round(normalizedSignal)}%</strong>
+            <strong>{Math.round(displaySignal)}%</strong>
           </div>
         </header>
 
@@ -796,8 +797,8 @@ export function SignalHuntRuntimeScreen({
           <div className="sh-core">
             <div className="sh-lock-burst" />
             <div>
-              <strong>{Math.round(normalizedSignal)}%</strong>
-              <span>Signal</span>
+              <strong>{Math.round(displaySignal)}%</strong>
+              <span>Señal</span>
             </div>
           </div>
         </div>
