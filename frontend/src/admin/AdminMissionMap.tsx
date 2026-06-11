@@ -234,12 +234,12 @@ export default function AdminMissionMap({
       })
 
       marker.on('dragstart', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 2500
+        dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
       marker.on('drag', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 2500
+        dragClickSuppressUntilRef.current = Date.now() + 700
         const next = marker.getLatLng()
         ring.setLatLng(next)
       })
@@ -251,7 +251,7 @@ export default function AdminMissionMap({
           L.DomEvent.preventDefault(original)
         }
 
-        dragClickSuppressUntilRef.current = Date.now() + 2500
+        dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)

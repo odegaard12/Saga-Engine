@@ -886,7 +886,7 @@ export default function AdminApp() {
       lon,
     }
 
-    suppressStageSelectUntilRef.current = Date.now() + 2500
+    suppressStageSelectUntilRef.current = Date.now() + 700
     setSaveState('idle')
     syncLocalStage(movedStage, { select: false, notice: false })
     setSelectedStage(null)
