@@ -49,6 +49,36 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
   }
 }
 
+
+function getOriginalPoint(event: L.LeafletEvent): { x: number; y: number } | null {
+  const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
+  if (!original) return null
+
+  const pointer = original as Event & {
+    touches?: TouchList
+    changedTouches?: TouchList
+    clientX?: number
+    clientY?: number
+  }
+
+  if (pointer.touches && pointer.touches.length > 0) {
+    const touch = pointer.touches[0]
+    return { x: touch.clientX, y: touch.clientY }
+  }
+
+  if (pointer.changedTouches && pointer.changedTouches.length > 0) {
+    const touch = pointer.changedTouches[0]
+    return { x: touch.clientX, y: touch.clientY }
+  }
+
+  if (typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number') {
+    return { x: pointer.clientX, y: pointer.clientY }
+  }
+
+  return null
+}
+
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -97,6 +127,7 @@ export default function AdminMissionMap({
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
   const dragClickSuppressUntilRef = useRef(0)
+  const markerPointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null)
 
   const mappedStages = useMemo(
     () => stages.filter(hasCoords),
@@ -206,10 +237,23 @@ export default function AdminMissionMap({
         onSelectStage(stage)
       })
 
+      marker.on('mousedown touchstart', (event: L.LeafletEvent) => {
+        const point = getOriginalPoint(event)
+        markerPointerStartRef.current = point ? { ...point, at: Date.now() } : { x: 0, y: 0, at: Date.now() }
+      })
+
       marker.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
 
-        if (Date.now() < dragClickSuppressUntilRef.current) {
+        const now = Date.now()
+        const start = markerPointerStartRef.current
+        const end = getOriginalPoint(event)
+        markerPointerStartRef.current = null
+
+        const longPress = start ? now - start.at > 240 : false
+        const moved = start && end ? Math.hypot(end.x - start.x, end.y - start.y) > 6 : false
+
+        if (now < dragClickSuppressUntilRef.current || longPress || moved) {
           return
         }
 
@@ -217,17 +261,26 @@ export default function AdminMissionMap({
       })
 
       marker.on('dragstart', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 900
+        dragClickSuppressUntilRef.current = Date.now() + 2200
+        markerPointerStartRef.current = null
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
       marker.on('drag', () => {
+        dragClickSuppressUntilRef.current = Date.now() + 2200
         const next = marker.getLatLng()
         ring.setLatLng(next)
       })
 
-      marker.on('dragend', () => {
-        dragClickSuppressUntilRef.current = Date.now() + 900
+      marker.on('dragend', (event: L.LeafletEvent) => {
+        const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
+        if (original) {
+          L.DomEvent.stopPropagation(original)
+          L.DomEvent.preventDefault(original)
+        }
+
+        dragClickSuppressUntilRef.current = Date.now() + 2200
+        markerPointerStartRef.current = null
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)

@@ -52,3 +52,10 @@ Necesitamos una matriz manual antes de añadir nuevos minijuegos:
 - Mantener “Señal GPS”.
 - Corregir admin drag para que mover nodo no abra el editor.
 - No ampliar minijuegos hasta cerrar GPS real/debug y Rumbo.
+
+## Parche aplicado
+
+- El shim de debug GPS ya no exige que exista `navigator.geolocation`.
+- Si hay coordenadas debug, devuelve posición fake aunque el navegador no tenga GPS real.
+- Si no hay debug ni GPS real, devuelve error claro.
+- Esto permite probar desde casa con `?debug_gps=1` o perfil debug sin depender tanto del navegador.
