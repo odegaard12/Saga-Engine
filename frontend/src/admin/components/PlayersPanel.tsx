@@ -6,6 +6,15 @@ import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIden
 
 const AVATAR_CANVAS_SIZE = 160
 
+function shortAvatarValue(value: string): string {
+  if (!value) return ''
+  if (value.startsWith('data:image/')) {
+    return `${Math.round(value.length / 1024)} KB · data:image`
+  }
+  if (value.length > 72) return `${value.slice(0, 54)}…${value.slice(-12)}`
+  return value
+}
+
 function fileToAvatarDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -256,6 +265,39 @@ export default function PlayersPanel({
                   </label>
                 </div>
 
+                <div className="admin-player-avatar-saved-preview">
+                  <div
+                    className="admin-player-avatar"
+                    style={{
+                      width: 72,
+                      height: 72,
+                      fontSize: 20,
+                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                      color: '#ffffff',
+                      boxShadow: '0 14px 30px rgba(15,23,42,0.32)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {draft.avatar_url ? (
+                      <img
+                        src={draft.avatar_url}
+                        alt=""
+                        className="admin-player-avatar-image"
+                      />
+                    ) : (
+                      draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
+                    )}
+                  </div>
+                  <div>
+                    <strong>{draft.avatar_url ? 'Foto guardada en este perfil' : 'Sin foto guardada'}</strong>
+                    <span>
+                      {draft.avatar_url
+                        ? `Se usará en jugador/equipo · ${shortAvatarValue(draft.avatar_url)}`
+                        : 'Sube una foto y pulsa Guardar jugadores para verla en modo jugador.'}
+                    </span>
+                  </div>
+                </div>
+
                 <label className="admin-player-avatar-upload">
                   Foto/avatar
                   <input
@@ -263,7 +305,11 @@ export default function PlayersPanel({
                     accept="image/png,image/jpeg,image/webp"
                     onChange={(event) => void handleAvatarFile(event, index)}
                   />
-                  <span>Se comprime en el navegador y se guarda en la configuración runtime, no en el repo.</span>
+                  <span>
+                    {draft.avatar_url
+                      ? 'Hay foto guardada. El selector puede salir vacío por seguridad del navegador.'
+                      : 'Se comprime en el navegador y se guarda en la configuración runtime, no en el repo.'}
+                  </span>
                 </label>
 
                 <label>

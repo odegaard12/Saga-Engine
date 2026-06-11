@@ -61,8 +61,10 @@ export type SignalHuntConfig = {
   source_lat?: number
   source_lon?: number
   source_radius_m?: number
+  lock_radius_m?: number
   lock_threshold: number
   hold_ms: number
+  easy_checkpoint?: boolean
   max_signal?: number
   noise_floor?: number
   jitter?: number

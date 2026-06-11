@@ -560,7 +560,7 @@ function getConfigSource(resolved: ResolvedSignalHuntMinigame, stage: PlayerStag
 function getGpsCopy(state: GpsState, hasSource: boolean): string {
   if (!hasSource) return 'Faltan coordenadas del nodo. Revisa la posición en el mapa.'
   if (state === 'requesting') return 'Solicitando posición GPS.'
-  if (state === 'tracking') return 'GPS activo. Acércate al punto hasta que suba la señal.'
+  if (state === 'tracking') return 'GPS activo. Busca el pico de señal y mantén posición en la zona de captura.'
   if (state === 'denied') return 'Permiso de ubicación denegado. Revisa permisos del navegador.'
   if (state === 'unsupported') return 'Este navegador no permite usar geolocalización.'
   if (state === 'locked') return 'Señal capturada.'
@@ -580,9 +580,16 @@ export function SignalHuntRuntimeScreen({
 
   const stageRadius = toNumber((stage as unknown as Record<string, unknown>).radius)
 
-  const sourceRadius = clamp(Number(cfg.source_radius_m ?? stageRadius ?? 20), 1, 10000)
-  const lockThreshold = clamp(Number(cfg.lock_threshold ?? 65), 1, 100)
-  const holdMs = clamp(Number(cfg.hold_ms ?? 1500), 100, 10000)
+  const sourceRadius = clamp(Number(cfg.source_radius_m ?? stageRadius ?? 55), 1, 10000)
+  const easyCheckpoint = cfg.easy_checkpoint === true
+  const rawLockThreshold = clamp(Number(cfg.lock_threshold ?? 88), 1, 100)
+  const lockThreshold = easyCheckpoint ? rawLockThreshold : clamp(Math.max(rawLockThreshold, 82), 1, 100)
+  const rawHoldMs = clamp(Number(cfg.hold_ms ?? 3500), 100, 10000)
+  const holdMs = easyCheckpoint ? rawHoldMs : clamp(Math.max(rawHoldMs, 3000), 100, 10000)
+  const configuredLockRadius = toNumber(cfg.lock_radius_m)
+  const lockRadius = configuredLockRadius !== null
+    ? clamp(configuredLockRadius, 2, sourceRadius)
+    : clamp(sourceRadius * 0.32, 8, Math.min(35, sourceRadius))
   const maxSignal = clamp(Number(cfg.max_signal ?? 100), 1, 100)
   const noiseFloor = clamp(Number(cfg.noise_floor ?? 4), 0, 35)
   const jitter = clamp(Number(cfg.jitter ?? 1), 0, 20)
@@ -659,7 +666,8 @@ export function SignalHuntRuntimeScreen({
   }, [decayCurve, distance, hasSource, jitter, maxSignal, noiseFloor, sourceRadius])
 
   const normalizedSignal = clamp((signal / maxSignal) * 100, 0, 100)
-  const inWindow = !locked && hasSource && gpsState === 'tracking' && normalizedSignal >= lockThreshold
+  const inLockRadius = distance !== null && distance <= lockRadius
+  const inWindow = !locked && hasSource && gpsState === 'tracking' && normalizedSignal >= lockThreshold && inLockRadius
   const rising = !locked && hasSource && normalizedSignal >= Math.max(15, lockThreshold * 0.62)
 
   const completeLock = useCallback(async () => {
@@ -724,7 +732,7 @@ export function SignalHuntRuntimeScreen({
     if (gpsState === 'denied') return { main: 'GPS', sub: 'Permiso bloqueado', small: false }
     if (gpsState === 'unsupported') return { main: 'GPS', sub: 'No disponible', small: false }
     if (inWindow) return { main: 'MANTÉN', sub: 'Mantén posición', small: true }
-    if (rising) return { main: 'CERCA', sub: 'La señal mejora', small: false }
+    if (rising) return { main: 'CERCA', sub: inLockRadius ? 'Afina la señal' : 'Busca la zona de captura', small: false }
     return { main: 'DÉBIL', sub: 'Busca más intensidad', small: false }
   }, [gpsState, hasSource, inWindow, locked, rising, submitting])
 
@@ -815,6 +823,9 @@ export function SignalHuntRuntimeScreen({
             <i aria-hidden="true" />
             <span>umbral</span>
             <strong>{Math.round(lockThreshold)}%</strong>
+            <i aria-hidden="true" />
+            <span>zona</span>
+            <strong>{formatMeters(lockRadius)}</strong>
             <i aria-hidden="true" />
             <span>captura</span>
             <strong>{Math.round(holdMs / 100) / 10}s</strong>
