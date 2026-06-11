@@ -96,6 +96,7 @@ export default function AdminMissionMap({
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
+  const dragClickSuppressUntilRef = useRef(0)
 
   const mappedStages = useMemo(
     () => stages.filter(hasCoords),
@@ -207,11 +208,16 @@ export default function AdminMissionMap({
 
       marker.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
+
+        if (Date.now() < dragClickSuppressUntilRef.current) {
+          return
+        }
+
         onSelectStage(stage)
       })
 
       marker.on('dragstart', () => {
-        onSelectStage(stage)
+        dragClickSuppressUntilRef.current = Date.now() + 900
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
@@ -221,6 +227,7 @@ export default function AdminMissionMap({
       })
 
       marker.on('dragend', () => {
+        dragClickSuppressUntilRef.current = Date.now() + 900
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)
@@ -267,7 +274,7 @@ export default function AdminMissionMap({
         <div>
           <div style={kicker}>Mission map</div>
           <div style={title}>{mappedStages.length} mapped nodes</div>
-          <div style={helper}>Click map to add · drag numbered pins to move</div>
+          <div style={helper}>Click en mapa para crear · arrastra pines para mover · click en pin para editar</div>
         </div>
         <div style={legend}>
           <span><i style={{ background: '#34d399' }} /> Signal</span>
