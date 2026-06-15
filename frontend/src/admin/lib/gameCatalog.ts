@@ -7,6 +7,7 @@ import {
 } from './familyConfigs'
 
 export type AdminGameId =
+  | 'shake_antenna_charge'
   | 'gps_signal_lock'
   | 'hot_cold_search'
   | 'bearing_compass'
@@ -34,6 +35,7 @@ export type AdminGameCompletionMethod =
   | 'photo'
   | 'inventory_only'
   | 'team'
+  | 'motion'
 
 export type MissionTemplateId =
   | 'qr_route'
@@ -46,7 +48,7 @@ export type AdminGameCatalogItem = {
   title: string
   icon: string
   family: FamilyId
-  category: 'gps' | 'compass' | 'logic' | 'physical' | 'photo' | 'team'
+  category: 'gps' | 'compass' | 'logic' | 'physical' | 'photo' | 'team' | 'motion'
   difficulty: 'Fácil' | 'Media' | 'Alta'
   duration: string
   runtimeStatus: AdminGameRuntimeStatus
@@ -88,116 +90,37 @@ export type MissionTemplate = {
 
 export const adminGameCatalog: AdminGameCatalogItem[] = [
   {
-    id: 'gps_signal_lock',
-    title: 'Señal GPS',
-    icon: '📡',
-    family: 'signal_hunt',
-    category: 'gps',
-    difficulty: 'Fácil',
-    duration: '2-4 min',
-    runtimeStatus: 'runtime_ready',
-    offlineStatus: 'offline_ready',
-    completionMethod: 'proximity',
-    offlineNote: 'Funciona con misión descargada: GPS, radio y avance local.',
-    summary: 'El jugador se acerca al punto y mantiene posición hasta capturar la señal.',
-    playerGoal: 'Llegar al radio del nodo y confirmar presencia.',
-    editorHint: 'Úsalo como nodo base de ruta. Es el más estable para exterior.',
-    config: { objective: 'proximity_lock', source_radius_m: 75, lock_threshold: 65, hold_ms: 1500, game_id: 'gps_signal_lock' },
-    content: 'Acércate al punto marcado y mantente dentro del radio hasta capturar la señal.',
-    messages: {
-      hint: 'Busca el punto marcado en el mapa.',
-      gps_unavailable: 'Activa GPS para localizar la señal.',
-      locked: 'Acércate más al punto para capturar la señal.',
-    },
-  },
-  {
-    id: 'hot_cold_search',
-    title: 'Frío / caliente',
-    icon: '🌡️',
-    family: 'signal_hunt',
-    category: 'gps',
-    difficulty: 'Fácil',
-    duration: '3-6 min',
-    runtimeStatus: 'runtime_partial',
-    offlineStatus: 'offline_ready',
-    completionMethod: 'proximity',
-    offlineNote: 'Usa motor GPS offline; falta UI específica de frío/caliente.',
-    summary: 'Variante de proximidad para buscar un punto con pistas de distancia.',
-    playerGoal: 'Moverse hasta que la señal sea suficientemente fuerte.',
-    editorHint: 'Perfecto para parques, plazas o pistas sencillas.',
-    config: { objective: 'hot_cold', source_radius_m: 55, lock_threshold: 78, hold_ms: 1200, game_id: 'hot_cold_search' },
-    content: 'La señal se hace más fuerte al acercarte. Encuentra el punto exacto.',
-    messages: {
-      hint: 'La zona está cerca; usa la intensidad de señal.',
-      gps_unavailable: 'Sin GPS no se puede calcular la señal.',
-      locked: 'La señal aún es débil. Sigue buscando.',
-    },
-  },
-  {
-    id: 'bearing_compass',
-    title: 'Rumbo con brújula',
-    icon: '🧭',
-    family: 'bearing_hunt',
-    category: 'compass',
-    difficulty: 'Media',
-    duration: '3-5 min',
-    runtimeStatus: 'runtime_ready',
-    offlineStatus: 'offline_ready',
-    completionMethod: 'bearing',
-    offlineNote: 'Funciona offline con brújula/local runtime.',
-    summary: 'El jugador debe orientarse hacia un rumbo concreto.',
-    playerGoal: 'Apuntar el móvil en la dirección correcta y mantener el rumbo.',
-    editorHint: 'Funciona bien para orientación y caminos visibles.',
-    config: { objective: 'single_lock', target_bearing_deg: 270, tolerance_deg: 12, hold_ms: 1200, game_id: 'bearing_compass' },
-    content: 'Usa la brújula y apunta hacia el rumbo indicado.',
-    messages: {
-      hint: 'Gira despacio hasta alinear la brújula.',
-      gps_unavailable: 'La brújula puede necesitar movimiento o permisos.',
-      locked: 'Aún no estás en el rumbo correcto.',
-    },
-  },
-  {
-    id: 'three_bearing_triangle',
-    title: 'Triangulación',
-    icon: '📐',
-    family: 'bearing_hunt',
-    category: 'compass',
-    difficulty: 'Alta',
-    duration: '5-8 min',
-    runtimeStatus: 'preset_only',
-    offlineStatus: 'offline_planned',
-    completionMethod: 'bearing',
-    offlineNote: 'Plantilla de orientación; falta runtime de triangulación offline.',
-    summary: 'Variante narrativa: comparar rumbos y decidir hacia dónde avanzar.',
-    playerGoal: 'Leer pistas y orientarse con varios rumbos.',
-    editorHint: 'Úsalo como puzzle de orientación; por ahora usa el motor de rumbo simple.',
-    config: { objective: 'triangulation_hint', target_bearing_deg: 45, tolerance_deg: 15, hold_ms: 1400, game_id: 'three_bearing_triangle' },
-    content: 'Tres señales apuntan a una zona. Elige el rumbo más coherente y avanza.',
-    messages: {
-      hint: 'Piensa en la intersección de las pistas.',
-      gps_unavailable: 'La brújula no está lista.',
-      locked: 'Todavía no coincide el rumbo.',
-    },
-  },
-  {
     id: 'logic_circuit',
-    title: 'Circuito lógico',
+    title: 'Matriz de circuitos',
     icon: '🧩',
     family: 'circuit_matrix',
     category: 'logic',
     difficulty: 'Media',
     duration: '4-7 min',
-    runtimeStatus: 'runtime_partial',
+    runtimeStatus: 'runtime_ready',
     offlineStatus: 'offline_ready',
     completionMethod: 'puzzle',
-    offlineNote: 'Tiene familia runtime; falta pulir variantes visuales.',
-    summary: 'Puzzle visual de reparación, secuencia o matriz.',
-    playerGoal: 'Resolver una lógica para desbloquear el nodo.',
+    offlineNote: 'Funciona completamente en local y sincroniza el resultado después.',
+    summary: 'Juego táctil de reparar una ruta de energía en una matriz.',
+    playerGoal: 'Memorizar una ruta y repetirla en el orden exacto.',
     editorHint: 'Úsalo cuando quieras un descanso mental entre puntos GPS.',
-    config: { objective: 'path_restore', grid_cols: 5, grid_rows: 5, difficulty: 2, game_id: 'logic_circuit' },
-    content: 'Repara el circuito para abrir el siguiente tramo.',
+    config: {
+      objective: 'path_restore',
+      completion_method: 'puzzle',
+      grid_cols: 5,
+      grid_rows: 5,
+      difficulty: 'normal',
+      max_errors: 3,
+      preview_cell_ms: 460,
+      path_length: 11,
+      seed: '',
+      pattern_mode: 'random_each_game',
+      path_cells: [],
+      game_id: 'logic_circuit',
+    },
+    content: 'Memoriza la ruta de energía y repítela en el mismo orden.',
     messages: {
-      hint: 'Busca continuidad entre las piezas.',
+      hint: 'Memoriza la secuencia. Después repítela sin guía.',
       gps_unavailable: 'Este reto puede jugarse sin GPS si el nodo ya está abierto.',
       locked: 'Completa el circuito para continuar.',
     },
@@ -396,9 +319,9 @@ export const missionTemplates: MissionTemplate[] = [
     summary: 'Juego base listo: ruta GPS, llave QR, nodo bloqueado y bonus opcional.',
     goodFor: 'Primer juego real, rutas cortas, grupos pequeños, pruebas con tarjetas físicas.',
     stages: [
-      { gameId: 'gps_signal_lock', title: 'Inicio de ruta', content: 'Llega al punto inicial y activa la misión.', offsetLat: 0, offsetLon: 0, radius: 55 },
+      { gameId: 'logic_circuit', title: 'Inicio de ruta', content: 'Llega al punto inicial y activa la misión.', offsetLat: 0, offsetLon: 0, radius: 55 },
       { gameId: 'qr_key_gate', title: 'Llave del camino', content: 'Escanea la llave QR física.', offsetLat: 0.00045, offsetLon: 0.00028, radius: 45, physicalKind: 'requirement', itemLabel: 'Llave del camino' },
-      { gameId: 'gps_signal_lock', title: 'Puerta bloqueada', content: 'Este nodo pide la llave anterior.', offsetLat: 0.00088, offsetLon: 0.00062, radius: 55, requiresPreviousItem: true },
+      { gameId: 'logic_circuit', title: 'Puerta bloqueada', content: 'Este nodo pide la llave anterior.', offsetLat: 0.00088, offsetLon: 0.00062, radius: 55, requiresPreviousItem: true },
       { gameId: 'bonus_cache', title: 'Bonus final', content: 'Extra opcional al terminar la ruta.', offsetLat: 0.00118, offsetLon: 0.00092, radius: 45, physicalKind: 'bonus', itemLabel: 'Bonus final' },
     ],
   },
@@ -409,9 +332,9 @@ export const missionTemplates: MissionTemplate[] = [
     summary: 'Cadena jugable de pistas físicas y búsqueda GPS, sin puzzles pendientes.',
     goodFor: 'Misterio sencillo, historia local, juego familiar, rutas con tarjetas.',
     stages: [
-      { gameId: 'gps_signal_lock', title: 'Punto de inicio', content: 'Llega al punto de salida y abre la primera pista.', offsetLat: 0, offsetLon: 0, radius: 55 },
+      { gameId: 'logic_circuit', title: 'Punto de inicio', content: 'Llega al punto de salida y abre la primera pista.', offsetLat: 0, offsetLon: 0, radius: 55 },
       { gameId: 'clue_card', title: 'Pista 1', content: 'Escanea la primera pista QR.', offsetLat: 0.00042, offsetLon: -0.00030, radius: 45, physicalKind: 'clue', itemLabel: 'Pista 1' },
-      { gameId: 'hot_cold_search', title: 'Busca la señal', content: 'La señal se hace más fuerte al acercarte.', offsetLat: 0.00080, offsetLon: -0.00058, radius: 55 },
+      { gameId: 'logic_circuit', title: 'Busca la señal', content: 'La señal se hace más fuerte al acercarte.', offsetLat: 0.00080, offsetLon: -0.00058, radius: 55 },
       { gameId: 'bonus_cache', title: 'Recompensa oculta', content: 'Encuentra el bonus final.', offsetLat: 0.00108, offsetLon: -0.00088, radius: 45, physicalKind: 'bonus', itemLabel: 'Recompensa oculta' },
     ],
   },
@@ -422,9 +345,9 @@ export const missionTemplates: MissionTemplate[] = [
     summary: 'Escape urbano simple con llave física y cierre GPS; evita pruebas aún planificadas.',
     goodFor: 'Cidade, instituto, evento corto, juego con historia sin depender de conexión.',
     stages: [
-      { gameId: 'gps_signal_lock', title: 'Entrada', content: 'Activa el punto de entrada del escape.', offsetLat: 0, offsetLon: 0, radius: 50 },
+      { gameId: 'logic_circuit', title: 'Entrada', content: 'Activa el punto de entrada del escape.', offsetLat: 0, offsetLon: 0, radius: 50 },
       { gameId: 'qr_key_gate', title: 'Llave QR', content: 'Escanea la llave física para abrir la salida.', offsetLat: -0.00040, offsetLon: 0.00036, radius: 45, physicalKind: 'requirement', itemLabel: 'Llave QR' },
-      { gameId: 'gps_signal_lock', title: 'Salida bloqueada', content: 'Usa la llave anterior y llega al punto de salida.', offsetLat: -0.00075, offsetLon: 0.00068, radius: 55, requiresPreviousItem: true },
+      { gameId: 'logic_circuit', title: 'Salida bloqueada', content: 'Usa la llave anterior y llega al punto de salida.', offsetLat: -0.00075, offsetLon: 0.00068, radius: 55, requiresPreviousItem: true },
       { gameId: 'clue_card', title: 'Epílogo', content: 'Escanea la tarjeta final de historia.', offsetLat: -0.00105, offsetLon: 0.00095, radius: 45, physicalKind: 'clue', itemLabel: 'Epílogo' },
     ],
   },
@@ -435,8 +358,8 @@ export const missionTemplates: MissionTemplate[] = [
     summary: 'Ritmo variado con GPS, brújula, objeto QR y bonus, todo jugable offline.',
     goodFor: 'Niños, familias, grupos pequeños, parques y rutas sencillas.',
     stages: [
-      { gameId: 'gps_signal_lock', title: 'Punto de salida', content: 'Empieza la gymkhana.', offsetLat: 0, offsetLon: 0, radius: 60 },
-      { gameId: 'bearing_compass', title: 'Rumbo de explorador', content: 'Usa la brújula para orientar la búsqueda.', offsetLat: 0.00035, offsetLon: 0.00035, radius: 55 },
+      { gameId: 'logic_circuit', title: 'Punto de salida', content: 'Empieza la gymkhana.', offsetLat: 0, offsetLon: 0, radius: 60 },
+      { gameId: 'logic_circuit', title: 'Rumbo de explorador', content: 'Usa la brújula para orientar la búsqueda.', offsetLat: 0.00035, offsetLon: 0.00035, radius: 55 },
       { gameId: 'qr_collectible', title: 'Objeto del equipo', content: 'Escanea el objeto QR del equipo.', offsetLat: 0.00065, offsetLon: 0.00070, radius: 45, physicalKind: 'collectible', itemLabel: 'Objeto del equipo' },
       { gameId: 'bonus_cache', title: 'Regalo oculto', content: 'Busca el bonus final.', offsetLat: 0.00095, offsetLon: 0.00105, radius: 45, physicalKind: 'bonus', itemLabel: 'Regalo oculto' },
     ],
@@ -452,7 +375,16 @@ export function getAdminGameForStage(type?: string | null, config?: Record<strin
   const explicit = adminGameCatalog.find((game) => game.id === gameId)
   if (explicit) return explicit
 
-  return adminGameCatalog.find((game) => game.family === type) || adminGameCatalog[0]
+  // Legacy: signal_hunt sin game_id ya no debe caer en QR físico.
+  if (type === 'signal_hunt') {
+    return adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
+  }
+
+  return (
+    adminGameCatalog.find((game) => game.family === type && game.category !== 'physical') ||
+    adminGameCatalog.find((game) => game.family === type) ||
+    adminGameCatalog[0]
+  )
 }
 
 export function getMissionTemplateById(templateId: MissionTemplateId): MissionTemplate {

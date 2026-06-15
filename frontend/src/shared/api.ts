@@ -67,14 +67,20 @@ export async function fetchPlayerGame(
   user: string,
   options: { offlinePack?: boolean } = {},
 ): Promise<PlayerGamePayload> {
-  const suffix = options.offlinePack ? '?offline_pack=true' : ''
+  const params = new URLSearchParams()
+  if (options.offlinePack) params.set('offline_pack', 'true')
+  params.set('_', String(Date.now()))
+  const suffix = `?${params.toString()}`
   const timeout = withTimeoutSignal(5000)
 
   try {
     const res = await fetch(`/api/game/${encodeURIComponent(user)}${suffix}`, {
       signal: timeout.signal,
+      cache: 'no-store',
       headers: {
         Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
       },
     })
 

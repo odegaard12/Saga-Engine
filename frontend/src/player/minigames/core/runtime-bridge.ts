@@ -18,6 +18,34 @@ function asObject<T>(value: unknown): Partial<T> {
   return value && typeof value === 'object' ? (value as Partial<T>) : {}
 }
 
+function normalizeConfigDrivenStageSource(stage: PlayerStage): StageMinigameSource | null {
+  const stageConfig = asObject<Record<string, unknown>>(stage.config)
+  const runtimeConfig = asObject<Record<string, unknown>>(stage.minigame?.config)
+  const config = {
+    ...runtimeConfig,
+    ...stageConfig,
+  }
+
+  const gameId = String(config.game_id || '').trim()
+
+  if (gameId === 'shake_antenna_charge') {
+    return {
+      type: 'circuit_matrix',
+      version: 'v1',
+      config: {
+        objective: 'path_restore',
+        grid_cols: 5,
+        grid_rows: 5,
+        difficulty: 2,
+        game_id: 'logic_circuit',
+      },
+      label: 'Circuito lógico',
+    }
+  }
+
+  return null
+}
+
 function normalizeRuntimeSource(runtime?: StageMinigameRuntime | null): StageMinigameSource | null {
   if (!runtime) return null
 
@@ -46,6 +74,9 @@ function normalizeCompatibleStageSource(stage: PlayerStage): StageMinigameSource
 
 export function getStageMinigameSource(stage: PlayerStage | null | undefined): StageMinigameSource | null {
   if (!stage) return null
+
+  const configDrivenSource = normalizeConfigDrivenStageSource(stage)
+  if (configDrivenSource) return configDrivenSource
 
   const runtimeSource = normalizeRuntimeSource(stage.minigame)
   if (runtimeSource) return runtimeSource

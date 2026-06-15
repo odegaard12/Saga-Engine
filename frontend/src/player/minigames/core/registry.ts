@@ -12,6 +12,10 @@ import {
   signalHuntController,
   signalHuntDefinition,
 } from '../families/signalHunt/definition'
+import {
+  motionChallengeController,
+  motionChallengeDefinition,
+} from '../families/motionChallenge/definition'
 
 export const MINIGAME_REGISTRY: RegisteredMinigame[] = [
   {
@@ -25,6 +29,10 @@ export const MINIGAME_REGISTRY: RegisteredMinigame[] = [
   {
     definition: signalHuntDefinition,
     controller: signalHuntController,
+  },
+  {
+    definition: motionChallengeDefinition,
+    controller: motionChallengeController,
   },
 ]
 

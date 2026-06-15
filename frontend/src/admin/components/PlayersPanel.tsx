@@ -6,6 +6,15 @@ import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIden
 
 const AVATAR_CANVAS_SIZE = 160
 
+function shortAvatarValue(value: string): string {
+  if (!value) return ''
+  if (value.startsWith('data:image/')) {
+    return `${Math.round(value.length / 1024)} KB · data:image`
+  }
+  if (value.length > 72) return `${value.slice(0, 54)}…${value.slice(-12)}`
+  return value
+}
+
 function fileToAvatarDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -139,7 +148,7 @@ export default function PlayersPanel({
                 </div>
                 <div>
                   <strong>{draft.display_name || draft.id || `Player ${index + 1}`}</strong>
-                  <span>{draft.mode === 'team' ? 'Team profile' : 'Solo profile'} · {draft.status || 'active'}</span>
+                  <span>{draft.mode === 'team' ? 'Equipo' : 'Jugador individual'}</span>
                 </div>
 
                 <button
@@ -224,17 +233,44 @@ export default function PlayersPanel({
                     <option value="team">team</option>
                   </select>
                 </label>
-
-                <label>
-                  Status
-                  <input
-                    value={draft.status}
-                    onChange={(event) => onUpdatePlayer(index, 'status', event.target.value)}
-                  />
-                </label>
               </div>
 
               <div className="admin-player-avatar-tools">
+                <div className="admin-player-avatar-preview-row">
+                  <div
+                    className="admin-player-avatar"
+                    style={{
+                      width: 74,
+                      height: 74,
+                      fontSize: 20,
+                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                      color: '#ffffff',
+                      boxShadow: '0 14px 30px rgba(15,23,42,0.32)',
+                      overflow: 'hidden',
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    {draft.avatar_url ? (
+                      <img
+                        src={draft.avatar_url}
+                        alt=""
+                        className="admin-player-avatar-image"
+                      />
+                    ) : (
+                      draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
+                    )}
+                  </div>
+
+                  <div>
+                    <strong>{draft.avatar_url ? 'Foto guardada' : 'Sin foto'}</strong>
+                    <span>
+                      {draft.avatar_url
+                        ? shortAvatarValue(draft.avatar_url)
+                        : 'Se mostrarán iniciales hasta subir una imagen.'}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="admin-player-avatar-preview-row">
                   <label>
                     Color
@@ -257,22 +293,13 @@ export default function PlayersPanel({
                 </div>
 
                 <label className="admin-player-avatar-upload">
-                  Foto/avatar
+                  {draft.avatar_url ? 'Cambiar foto' : 'Subir foto'}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     onChange={(event) => void handleAvatarFile(event, index)}
                   />
-                  <span>Se comprime en el navegador y se guarda en la configuración runtime, no en el repo.</span>
-                </label>
-
-                <label>
-                  URL/data URL avatar
-                  <input
-                    value={draft.avatar_url}
-                    placeholder="Al subir imagen aparecerá aquí un data:image/..."
-                    onChange={(event) => onUpdatePlayer(index, 'avatar_url', event.target.value)}
-                  />
+                  <span>La imagen se comprime y se guarda en runtime al pulsar Guardar jugadores.</span>
                 </label>
 
                 {draft.avatar_url ? (

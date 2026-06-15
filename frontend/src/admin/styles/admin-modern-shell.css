@@ -11458,3 +11458,193 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     -webkit-line-clamp: 2 !important;
   }
 }
+
+/* #circuit-pattern-desktop-fit-v1
+   Matriz: ajustes completos en PC sin scroll interno. */
+
+@media (min-width: 901px) and (min-height: 700px) {
+  /*
+   * El modal anterior estaba limitado a 690px.
+   * En escritorio debe aprovechar prácticamente toda la altura.
+   */
+  .saga-node-editor-host .admin-guided-v4-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v4-shell {
+    width: min(1320px, calc(100vw - 28px)) !important;
+    max-width: min(1320px, calc(100vw - 28px)) !important;
+    height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 28px
+    ) !important;
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 28px
+    ) !important;
+  }
+
+  .saga-guided-v4-header {
+    padding: 9px 16px 7px !important;
+  }
+
+  .saga-guided-v4-titleblock h2 {
+    margin-top: 2px !important;
+    font-size: clamp(1.25rem, 2vw, 1.65rem) !important;
+  }
+
+  /*
+   * Los chips repiten información y quitan altura útil.
+   */
+  .saga-guided-v4-chips {
+    display: none !important;
+  }
+
+  .saga-guided-v4-actions button {
+    min-height: 30px !important;
+  }
+
+  .saga-guided-v4-stepper {
+    gap: 6px !important;
+    padding: 6px 16px !important;
+  }
+
+  .saga-guided-v4-stepper button {
+    min-height: 28px !important;
+  }
+
+  .saga-guided-v4-body {
+    padding: 7px 13px !important;
+  }
+
+  .saga-guided-v4-page {
+    gap: 7px !important;
+    padding: 9px 11px !important;
+    overflow: hidden !important;
+  }
+
+  .saga-guided-v4-pagehead h3 {
+    margin: 2px 0 0 !important;
+    font-size: 1.3rem !important;
+  }
+
+  /*
+   * La explicación del catálogo ya está en el propio editor de patrón.
+   */
+  .saga-guided-v4-page:has(.cpe)
+  .saga-guided-v4-pagehead p {
+    display: none !important;
+  }
+
+  /*
+   * El formulario de Matriz no debe tener su propio scroll.
+   */
+  .saga-guided-v4-formgrid:has(.cpe) {
+    grid-template-columns:
+      repeat(3, minmax(0,1fr)) !important;
+    gap: 7px !important;
+    align-content: start !important;
+    overflow: hidden !important;
+    padding-right: 0 !important;
+  }
+
+  /*
+   * Radio y método no aportan nada a un puzzle lógico:
+   * el juego ya se abre como interacción libre.
+   */
+  .saga-guided-v4-formgrid:has(.cpe)
+  > .saga-guided-v4-note {
+    display: none !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  > label:nth-of-type(1),
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  > label:nth-of-type(2) {
+    display: none !important;
+  }
+
+  /*
+   * Tamaño, filas y dificultad quedan en una fila compacta.
+   */
+  .saga-guided-v4-formgrid:has(.cpe)
+  > label {
+    gap: 2px !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  > label > small {
+    display: none !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  input,
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  select {
+    min-height: 29px !important;
+    padding: 4px 7px !important;
+  }
+
+  /*
+   * El editor visual usa todo el ancho, pero no toda la altura.
+   */
+  .saga-guided-v4-formgrid:has(.cpe)
+  > .wide {
+    grid-column: 1 / -1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  .cpe {
+    max-height: 430px !important;
+  }
+
+  .saga-guided-v4-footer {
+    padding: 7px 16px 8px !important;
+  }
+
+  .saga-guided-v4-footer button {
+    min-height: 30px !important;
+  }
+}
+
+/*
+ * Portátiles con poca altura:
+ * tablero todavía más compacto.
+ */
+@media (
+  min-width: 901px
+) and (
+  min-height: 700px
+) and (
+  max-height: 820px
+) {
+  .saga-guided-v4-header {
+    padding-top: 7px !important;
+    padding-bottom: 5px !important;
+  }
+
+  .saga-guided-v4-stepper {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+  }
+
+  .saga-guided-v4-pagehead > span {
+    display: none !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  .cpe-board-shell {
+    width: min(100%, 285px) !important;
+    max-width: 285px !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  .cpe {
+    max-height: 370px !important;
+  }
+}

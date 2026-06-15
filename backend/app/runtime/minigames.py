@@ -10,6 +10,7 @@ SUPPORTED_MINIGAME_TYPES = {
     "circuit_matrix",
     "bearing_hunt",
     "signal_hunt",
+    "motion_challenge",
 }
 
 def _as_str(value, default=""):
@@ -55,6 +56,7 @@ MINIGAME_SPECS = {
     "circuit_matrix": {"label": "Circuit Matrix"},
     "bearing_hunt": {"label": "Bearing Hunt"},
     "signal_hunt": {"label": "Signal Hunt"},
+    "motion_challenge": {"label": "Motion Challenge"},
 }
 
 def _clamp_int(value, default, minimum=None, maximum=None):
@@ -122,6 +124,91 @@ def get_minigame_spec(minigame_type):
         normalized = "signal_hunt"
     return MINIGAME_SPECS[normalized]
 
+
+CIRCUIT_OBJECTIVES = {
+    "path_restore",
+    "power_balance",
+    "switch_logic",
+    "signal_route",
+}
+
+CIRCUIT_PATTERN_MODES = {
+    "random_each_game",
+    "fixed",
+}
+
+CIRCUIT_DIFFICULTIES = {
+    "easy",
+    "normal",
+    "hard",
+}
+
+
+def _normalize_circuit_difficulty(value):
+    if isinstance(value, str):
+        text = value.strip().lower()
+
+        if text in CIRCUIT_DIFFICULTIES:
+            return text
+
+    return _clamp_int(value, 2, 1, 5)
+
+
+def _normalize_circuit_path_cells(value, rows, cols):
+    if not isinstance(value, list):
+        return []
+
+    if len(value) < 4:
+        return []
+
+    cells = []
+    seen = set()
+    previous = None
+    maximum = max(1, int(rows) * int(cols))
+
+    if len(value) > maximum:
+        return []
+
+    for item in value:
+        text = _as_str(item).strip()
+        parts = text.split(":")
+
+        if len(parts) != 2:
+            return []
+
+        try:
+            row = int(parts[0])
+            col = int(parts[1])
+        except (TypeError, ValueError):
+            return []
+
+        if row < 0 or row >= rows:
+            return []
+
+        if col < 0 or col >= cols:
+            return []
+
+        cell = f"{row}:{col}"
+
+        if cell in seen:
+            return []
+
+        if previous is not None:
+            distance = (
+                abs(row - previous[0])
+                + abs(col - previous[1])
+            )
+
+            if distance != 1:
+                return []
+
+        cells.append(cell)
+        seen.add(cell)
+        previous = (row, col)
+
+    return cells
+
+
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
@@ -129,26 +216,186 @@ def normalize_minigame_config(minigame_type, raw_cfg):
         normalized_type = "signal_hunt"
 
     if normalized_type == "circuit_matrix":
+        rows = _clamp_int(
+            raw.get("grid_rows"),
+            5,
+            4,
+            6,
+        )
+
+        cols = _clamp_int(
+            raw.get("grid_cols"),
+            5,
+            4,
+            6,
+        )
+
+        objective = (
+            _as_str(
+                raw.get("objective")
+                or "path_restore"
+            )
+            .strip()
+            .lower()
+        )
+
+        if objective not in CIRCUIT_OBJECTIVES:
+            objective = "path_restore"
+
+        path_cells = _normalize_circuit_path_cells(
+            raw.get("path_cells"),
+            rows,
+            cols,
+        )
+
+        raw_pattern_mode = (
+            _as_str(raw.get("pattern_mode"))
+            .strip()
+            .lower()
+        )
+
+        if raw_pattern_mode in CIRCUIT_PATTERN_MODES:
+            pattern_mode = raw_pattern_mode
+        elif len(path_cells) >= 4:
+            pattern_mode = "fixed"
+        else:
+            pattern_mode = "random_each_game"
+
+        if pattern_mode != "fixed":
+            path_cells = []
+
+        if pattern_mode == "fixed" and path_cells:
+            path_length = len(path_cells)
+        else:
+            path_length = _clamp_int(
+                raw.get("path_length"),
+                11,
+                4,
+                rows * cols,
+            )
+
         out = {
-            "objective": _as_str(raw.get("objective") or "path_restore").strip().lower() or "path_restore",
-            "grid_cols": _clamp_int(raw.get("grid_cols"), 5, 2, 8),
-            "grid_rows": _clamp_int(raw.get("grid_rows"), 5, 2, 8),
-            "difficulty": _clamp_int(raw.get("difficulty"), 2, 1, 5),
-            "max_moves": _clamp_int(raw.get("max_moves"), 0, 0) or None,
-            "max_time_ms": _clamp_int(raw.get("max_time_ms"), 0, 0) or None,
-            "allow_rotate": _as_bool(raw.get("allow_rotate"), True),
-            "allow_toggle": _as_bool(raw.get("allow_toggle"), True),
-            "allow_swap": _as_bool(raw.get("allow_swap"), False),
-            "start_nodes": raw.get("start_nodes") if isinstance(raw.get("start_nodes"), list) else [],
-            "end_nodes": raw.get("end_nodes") if isinstance(raw.get("end_nodes"), list) else [],
-            "target_pattern": raw.get("target_pattern") if isinstance(raw.get("target_pattern"), list) else [],
-            "blocked_cells": raw.get("blocked_cells") if isinstance(raw.get("blocked_cells"), list) else [],
-            "hint_mode": _as_str(raw.get("hint_mode") or "light").strip().lower() or "light",
-            "auto_check": _as_bool(raw.get("auto_check"), True),
-            "success_animation": _as_str(raw.get("success_animation") or "restore").strip().lower() or "restore",
+            "objective": objective,
+            "game_id": (
+                _as_str(
+                    raw.get("game_id")
+                    or "logic_circuit"
+                )
+                .strip()
+                or "logic_circuit"
+            ),
+            "completion_method": "puzzle",
+            "grid_cols": cols,
+            "grid_rows": rows,
+            "difficulty": (
+                _normalize_circuit_difficulty(
+                    raw.get("difficulty")
+                )
+            ),
+            "max_errors": _clamp_int(
+                raw.get("max_errors"),
+                3,
+                1,
+                6,
+            ),
+            "preview_cell_ms": _clamp_int(
+                raw.get("preview_cell_ms"),
+                460,
+                220,
+                900,
+            ),
+            "path_length": path_length,
+            "pattern_mode": pattern_mode,
+            "path_cells": path_cells,
+            "max_moves": (
+                _clamp_int(
+                    raw.get("max_moves"),
+                    0,
+                    0,
+                )
+                or None
+            ),
+            "max_time_ms": (
+                _clamp_int(
+                    raw.get("max_time_ms"),
+                    0,
+                    0,
+                )
+                or None
+            ),
+            "allow_rotate": _as_bool(
+                raw.get("allow_rotate"),
+                True,
+            ),
+            "allow_toggle": _as_bool(
+                raw.get("allow_toggle"),
+                True,
+            ),
+            "allow_swap": _as_bool(
+                raw.get("allow_swap"),
+                False,
+            ),
+            "start_nodes": (
+                raw.get("start_nodes")
+                if isinstance(
+                    raw.get("start_nodes"),
+                    list,
+                )
+                else []
+            ),
+            "end_nodes": (
+                raw.get("end_nodes")
+                if isinstance(
+                    raw.get("end_nodes"),
+                    list,
+                )
+                else []
+            ),
+            "target_pattern": (
+                raw.get("target_pattern")
+                if isinstance(
+                    raw.get("target_pattern"),
+                    list,
+                )
+                else []
+            ),
+            "blocked_cells": (
+                raw.get("blocked_cells")
+                if isinstance(
+                    raw.get("blocked_cells"),
+                    list,
+                )
+                else []
+            ),
+            "hint_mode": (
+                _as_str(
+                    raw.get("hint_mode")
+                    or "light"
+                )
+                .strip()
+                .lower()
+                or "light"
+            ),
+            "auto_check": _as_bool(
+                raw.get("auto_check"),
+                True,
+            ),
+            "success_animation": (
+                _as_str(
+                    raw.get("success_animation")
+                    or "restore"
+                )
+                .strip()
+                .lower()
+                or "restore"
+            ),
         }
-        if raw.get("seed") not in (None, ""):
-            out["seed"] = _as_str(raw.get("seed")).strip()
+
+        out["seed"] = (
+            _as_str(raw.get("seed"))
+            .strip()
+        )
+
         return out
 
     if normalized_type == "bearing_hunt":
@@ -173,6 +420,41 @@ def normalize_minigame_config(minigame_type, raw_cfg):
             "show_numeric_bearing": _as_bool(raw.get("show_numeric_bearing"), False),
             "show_compass_ring": _as_bool(raw.get("show_compass_ring"), True),
             "allow_recenter": _as_bool(raw.get("allow_recenter"), True),
+        }
+        return out
+
+
+    if normalized_type == "motion_challenge":
+        difficulty = _as_str(raw.get("difficulty") or "normal").strip().lower() or "normal"
+        if difficulty not in {"easy", "normal", "hard"}:
+            difficulty = "normal"
+
+        duration_mode = _as_str(raw.get("duration_mode") or "normal").strip().lower() or "normal"
+        if duration_mode not in {"short", "normal", "long"}:
+            duration_mode = "normal"
+
+        penalty_mode = _as_str(raw.get("penalty_mode") or "normal").strip().lower() or "normal"
+        if penalty_mode not in {"soft", "normal", "hard"}:
+            penalty_mode = "normal"
+
+        out = {
+            "objective": _as_str(raw.get("objective") or "shake_charge").strip().lower() or "shake_charge",
+            "game_id": _as_str(raw.get("game_id") or "shake_antenna_charge").strip() or "shake_antenna_charge",
+            "difficulty": difficulty,
+            "duration_mode": duration_mode,
+            "penalty_mode": penalty_mode,
+            "allow_touch_fallback": _as_bool(raw.get("allow_touch_fallback"), True),
+            "energy_target": _clamp_int(raw.get("energy_target"), 100, 40, 300),
+            "time_limit_ms": _clamp_int(raw.get("time_limit_ms"), 35000, 12000, 120000),
+            "stabilize_ms": _clamp_int(raw.get("stabilize_ms"), 2000, 600, 8000),
+            "calibration_ms": _clamp_int(raw.get("calibration_ms"), 1000, 400, 3000),
+            "good_min": _as_float(raw.get("good_min"), 1.2),
+            "good_max": _as_float(raw.get("good_max"), 3.8),
+            "overcharge_threshold": _as_float(raw.get("overcharge_threshold"), 5.4),
+            "idle_decay": _as_float(raw.get("idle_decay"), 0.15),
+            "charge_rate": _as_float(raw.get("charge_rate"), 2.4),
+            "stability_min": _clamp_int(raw.get("stability_min"), 35, 0, 100),
+            "use_vibration": _as_bool(raw.get("use_vibration"), True),
         }
         return out
 

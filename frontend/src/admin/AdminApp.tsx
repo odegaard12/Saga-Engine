@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import AdminMissionMap from './AdminMissionMap'
 import AdminMissionControlShell from './components/AdminMissionControlShell'
@@ -23,7 +23,6 @@ import {
 } from './lib/adminApi'
 import {
   familyCards,
-  getDefaultAdminConfigForFamily,
   type EditableAdminStage,
   type FamilyId,
 } from './lib/familyConfigs'
@@ -136,6 +135,7 @@ export default function AdminApp() {
   const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
   const [profileActionState, setProfileActionState] = useState<Record<string, string>>({})
   const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
+  const suppressStageSelectUntilRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -195,6 +195,14 @@ export default function AdminApp() {
       { label: 'Theme', value: cfg?.player_theme || 'classic', detail: 'Player shell' },
     ]
   }, [config, overview])
+
+  function selectLocalStage(stage: AdminReactOverviewStage | null) {
+    if (stage && Date.now() < suppressStageSelectUntilRef.current) {
+      return
+    }
+
+    setSelectedStage(stage)
+  }
 
   function getConfigTextValue(source: Record<string, unknown>, key: string, fallback = '') {
     const value = source[key]
@@ -671,7 +679,10 @@ export default function AdminApp() {
   }
 
 
-  function syncLocalStage(nextStage: AdminReactOverviewStage) {
+  function syncLocalStage(
+    nextStage: AdminReactOverviewStage,
+    options: { select?: boolean; notice?: string | false } = {}
+  ) {
     setOverview((current) => {
       if (!current) return current
 
@@ -700,8 +711,13 @@ export default function AdminApp() {
       }
     })
 
-    setSelectedStage(nextStage)
-    setLocalNotice('Vista local actualizada. Pulsa Guardar para persistir.')
+    if (options.select !== false) {
+      setSelectedStage(nextStage)
+    }
+
+    if (options.notice !== false) {
+      setLocalNotice(options.notice || 'Vista local actualizada. Pulsa Guardar para persistir.')
+    }
   }
 
   function applyMissionTemplate(templateId: MissionTemplateId) {
@@ -822,29 +838,26 @@ export default function AdminApp() {
     const nextIndex = stages.length
     const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
     const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
       index: nextIndex,
       title: `NEW NODE ${nextIndex + 1}`,
-      type: 'signal_hunt',
-      label: 'Signal Hunt',
+      type: defaultGamePatch.type,
+      label: defaultGamePatch.label,
       lat: nextLat,
       lon: nextLon,
       radius: 50,
-      entry_mode: 'gps',
-      require_proximity: true,
+      entry_mode: 'free',
+      require_proximity: false,
       has_hint: false,
       has_manual_fallback: false,
-      content: '',
-      objective: 'proximity_lock',
-      config: getDefaultAdminConfigForFamily('signal_hunt'),
-      config_summary: Object.keys(getDefaultAdminConfigForFamily('signal_hunt')),
-      messages: {
-        hint: '',
-        gps_unavailable: 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
-        locked: 'Acércate al nodo para desbloquearlo.',
-      },
+      content: defaultGamePatch.content,
+      objective: defaultGamePatch.objective,
+      config: defaultGamePatch.config,
+      config_summary: defaultGamePatch.config_summary,
+      messages: defaultGamePatch.messages,
     }
 
     setCmsPanel('none')
@@ -869,8 +882,10 @@ export default function AdminApp() {
       lon,
     }
 
+    suppressStageSelectUntilRef.current = Date.now() + 700
     setSaveState('idle')
-    syncLocalStage(movedStage)
+    syncLocalStage(movedStage, { select: false, notice: false })
+    setSelectedStage(null)
     setLocalNotice('Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.')
   }
 
@@ -969,7 +984,7 @@ export default function AdminApp() {
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}
         onRefresh={loadOverview}
-        onSelectStage={setSelectedStage}
+        onSelectStage={selectLocalStage}
         onCreateNode={() => createLocalNodeAt()}
         onCreateNodeAt={createLocalNodeAt}
         onMoveStage={moveLocalStage}

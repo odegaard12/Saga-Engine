@@ -209,10 +209,12 @@ export default function NodeDetailDrawer({
   const [draft, setDraft] = useState<AdminReactOverviewStage>(stage)
 
   function patchGuidedV3Stage(patch: Record<string, any>) {
-    setDraft((current: any) => ({
-      ...current,
+    const nextDraft = {
+      ...(draft as any),
       ...patch,
-    }))
+    } as AdminReactOverviewStage
+    setDraft(nextDraft)
+    onApplyLocal(nextDraft)
   }
 
 
@@ -371,11 +373,13 @@ export default function NodeDetailDrawer({
       ...(current as EditableAdminStage),
       type: nextType,
       label:
-        nextType === 'bearing_hunt'
-          ? 'Bearing Hunt'
-          : nextType === 'circuit_matrix'
-            ? 'Circuit Matrix'
-            : 'Signal Hunt',
+        nextType === 'motion_challenge'
+          ? 'Motion Challenge'
+          : nextType === 'bearing_hunt'
+            ? 'Bearing Hunt'
+            : nextType === 'circuit_matrix'
+              ? 'Circuit Matrix'
+              : 'Signal Hunt',
       icon: getAdminFamilyIcon(nextType),
       objective: String(nextConfig.objective || ''),
       config: nextConfig,

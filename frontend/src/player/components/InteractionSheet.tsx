@@ -30,7 +30,17 @@ function vibrate(pattern: number | number[]) {
   window.navigator.vibrate(pattern)
 }
 
+function isMotionStage(stage: PlayerStage | null) {
+  if (!stage) return false
+  const config = stage.config && typeof stage.config === 'object' ? stage.config : {}
+  const runtimeConfig = stage.minigame?.config && typeof stage.minigame.config === 'object' ? stage.minigame.config : {}
+  const gameId = String((config as Record<string, unknown>).game_id || (runtimeConfig as Record<string, unknown>).game_id || '')
+  return stage.minigame?.type === 'motion_challenge' || stage.type === 'motion_challenge' || gameId === 'shake_antenna_charge'
+}
+
 function getCompactLine(stage: PlayerStage | null) {
+  if (isMotionStage(stage)) return ''
+
   const hint = String(stage?.messages?.hint || '').trim()
   if (hint) return hint
 

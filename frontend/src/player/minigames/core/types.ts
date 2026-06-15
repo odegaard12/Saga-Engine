@@ -2,6 +2,7 @@ export type MinigameFamily =
   | 'circuit_matrix'
   | 'bearing_hunt'
   | 'signal_hunt'
+  | 'motion_challenge'
 
 export type MinigameVersion = 'v1'
 

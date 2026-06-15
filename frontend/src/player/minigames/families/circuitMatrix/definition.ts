@@ -9,10 +9,10 @@ import type {
 export const circuitMatrixDefinition: CircuitMatrixDefinition = {
   family: 'circuit_matrix',
   version: 'v1',
-  label: 'Circuit Matrix',
-  tagline: 'Restore the route',
+  label: 'Matriz de circuitos',
+  tagline: 'Memoriza y restaura la ruta',
   description:
-    'Logic-heavy circuit restoration minigame for pathing, switching, power balancing and route recovery.',
+    'Juego táctil de memoria para restaurar una ruta de energía en una matriz.',
 
   validation_mode: 'client',
   fallback_policy: 'manual_code',
@@ -36,7 +36,13 @@ export const circuitMatrixDefinition: CircuitMatrixDefinition = {
     objective: 'path_restore',
     grid_cols: 5,
     grid_rows: 5,
-    difficulty: 2,
+    difficulty: 'normal',
+    max_errors: 3,
+    preview_cell_ms: 460,
+    path_length: 11,
+    seed: '',
+    pattern_mode: 'random_each_game',
+    path_cells: [],
     max_moves: null,
     max_time_ms: null,
     allow_rotate: true,
@@ -71,11 +77,65 @@ function validateCircuitMatrixConfig(
     errors.push('grid_rows must be an integer between 2 and 8')
   }
 
+  const difficulty = value.difficulty
+
   if (
-    value.difficulty !== undefined &&
-    (!Number.isInteger(value.difficulty) || value.difficulty < 1 || value.difficulty > 5)
+    difficulty !== undefined &&
+    !(
+      (typeof difficulty === 'number' &&
+        Number.isInteger(difficulty) &&
+        difficulty >= 1 &&
+        difficulty <= 5) ||
+      difficulty === 'easy' ||
+      difficulty === 'normal' ||
+      difficulty === 'hard'
+    )
   ) {
-    errors.push('difficulty must be an integer between 1 and 5')
+    errors.push(
+      'difficulty must be 1-5 or easy/normal/hard',
+    )
+  }
+
+  if (
+    value.max_errors !== undefined &&
+    (!Number.isInteger(value.max_errors) ||
+      value.max_errors < 1 ||
+      value.max_errors > 6)
+  ) {
+    errors.push('max_errors must be an integer between 1 and 6')
+  }
+
+  if (
+    value.preview_cell_ms !== undefined &&
+    (!Number.isInteger(value.preview_cell_ms) ||
+      value.preview_cell_ms < 220 ||
+      value.preview_cell_ms > 900)
+  ) {
+    errors.push('preview_cell_ms must be an integer between 220 and 900')
+  }
+
+  if (
+    value.path_length !== undefined &&
+    (!Number.isInteger(value.path_length) || value.path_length < 4)
+  ) {
+    errors.push('path_length must be an integer >= 4')
+  }
+
+  if (
+    value.pattern_mode !== undefined &&
+    value.pattern_mode !== 'random_each_game' &&
+    value.pattern_mode !== 'fixed'
+  ) {
+    errors.push(
+      'pattern_mode must be random_each_game or fixed'
+    )
+  }
+
+  if (
+    value.path_cells !== undefined &&
+    !Array.isArray(value.path_cells)
+  ) {
+    errors.push('path_cells must be an array')
   }
 
   if (value.max_moves !== null && value.max_moves !== undefined) {
@@ -114,8 +174,8 @@ async function runCircuitMatrixPreflight(
     missing_preferred: missing_preferred as never[],
     messages:
       missing_required.length === 0
-        ? ['Circuit matrix ready.']
-        : ['Touch interaction is required for this minigame.'],
+        ? ['Matriz de circuitos preparada.']
+        : ['Se necesita interacción táctil para jugar.'],
   }
 }
 
