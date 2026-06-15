@@ -59,7 +59,7 @@ export function deriveStageRuntime(args: {
     entry.require_proximity === false &&
     !mappedStage
 
-  const gpsAvailable = gpsState === 'ready' || gpsState === 'stale'
+  const gpsAvailable = gpsState === 'ready' || debugEnabled
 
   if (explicitFreeEntry) {
     return {

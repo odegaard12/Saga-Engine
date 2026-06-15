@@ -5,7 +5,7 @@ export default function FamiliesPanel() {
   return (
     <div className="admin-cms-local-panel">
       <strong>Juegos disponibles</strong>
-      <span>13 plantillas editables. Internamente usan 3 motores estables: GPS, brújula y lógica.</span>
+      <span>{adminGameCatalog.length} plantillas editables. Motores actuales: movimiento, QR/físico y lógica. GPS/brújula quedan solo como motores internos legacy si una misión antigua los usa.</span>
 
       <div className="admin-local-list">
         {adminGameCatalog.map((game) => (

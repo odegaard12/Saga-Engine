@@ -1,6 +1,6 @@
 import type { AdminReactOverviewStage } from './adminApi'
 
-export type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+export type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'motion_challenge'
 
 export type EditableAdminStage = AdminReactOverviewStage & {
   config?: Record<string, unknown>
@@ -12,6 +12,12 @@ export const familyCards: Array<{
   title: string
   detail: string
 }> = [
+  {
+    id: 'motion_challenge',
+    icon: '⚡',
+    title: 'Motion Challenge',
+    detail: 'Movimiento del móvil, agitar, calibrar y retos físicos.',
+  },
   {
     id: 'signal_hunt',
     icon: '📡',
@@ -33,12 +39,14 @@ export const familyCards: Array<{
 ]
 
 export function getAdminFamilyLabel(type: string) {
+  if (type === 'motion_challenge') return 'Motion Challenge'
   if (type === 'bearing_hunt') return 'Bearing Hunt'
-  if (type === 'circuit_matrix') return 'Circuit Matrix'
+  if (type === 'circuit_matrix') return 'Matriz de circuitos'
   return 'Signal Hunt'
 }
 
 export function getAdminFamilyIcon(type: string) {
+  if (type === 'motion_challenge') return '⚡'
   if (type === 'bearing_hunt') return '🧭'
   if (type === 'circuit_matrix') return '🧩'
   return '📡'
@@ -58,7 +66,55 @@ function toAdminConfigNumber(value: unknown, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function normalizeCircuitDifficulty(value: unknown) {
+  const raw = String(value ?? '').trim().toLowerCase()
+
+  if (
+    raw === 'easy' ||
+    raw === 'facil' ||
+    raw === 'fácil' ||
+    raw === '1'
+  ) {
+    return 'easy'
+  }
+
+  if (
+    raw === 'hard' ||
+    raw === 'dificil' ||
+    raw === 'difícil' ||
+    raw === '3' ||
+    raw === '4' ||
+    raw === '5'
+  ) {
+    return 'hard'
+  }
+
+  return 'normal'
+}
+
 export function getDefaultAdminConfigForFamily(type: string): Record<string, unknown> {
+  if (type === 'motion_challenge') {
+    return {
+      objective: 'shake_charge',
+      game_id: 'shake_antenna_charge',
+      difficulty: 'normal',
+      duration_mode: 'normal',
+      penalty_mode: 'normal',
+      allow_touch_fallback: true,
+      energy_target: 100,
+      time_limit_ms: 35000,
+      stabilize_ms: 2000,
+      calibration_ms: 1000,
+      good_min: 1.2,
+      good_max: 3.8,
+      overcharge_threshold: 5.4,
+      idle_decay: 0.15,
+      charge_rate: 2.4,
+      stability_min: 35,
+      use_vibration: true,
+    }
+  }
+
   if (type === 'bearing_hunt') {
     return {
       objective: 'single_lock',
@@ -71,9 +127,17 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
   if (type === 'circuit_matrix') {
     return {
       objective: 'path_restore',
+      game_id: 'logic_circuit',
+      completion_method: 'puzzle',
       grid_cols: 5,
       grid_rows: 5,
-      difficulty: 2,
+      difficulty: 'normal',
+      max_errors: 3,
+      preview_cell_ms: 460,
+      path_length: 11,
+      seed: '',
+      pattern_mode: 'random_each_game',
+      path_cells: [],
     }
   }
 
@@ -91,6 +155,28 @@ export function normalizeAdminConfigForFamily(
 ) {
   const raw = input || {}
 
+  if (type === 'motion_challenge') {
+    return {
+      objective: String(raw.objective || 'shake_charge'),
+      game_id: String(raw.game_id || 'shake_antenna_charge'),
+      difficulty: String(raw.difficulty || 'normal'),
+      duration_mode: String(raw.duration_mode || 'normal'),
+      penalty_mode: String(raw.penalty_mode || 'normal'),
+      allow_touch_fallback: raw.allow_touch_fallback !== false,
+      energy_target: toAdminConfigNumber(raw.energy_target, 100),
+      time_limit_ms: toAdminConfigNumber(raw.time_limit_ms, 35000),
+      stabilize_ms: toAdminConfigNumber(raw.stabilize_ms, 2000),
+      calibration_ms: toAdminConfigNumber(raw.calibration_ms, 1000),
+      good_min: toAdminConfigNumber(raw.good_min, 1.2),
+      good_max: toAdminConfigNumber(raw.good_max, 3.8),
+      overcharge_threshold: toAdminConfigNumber(raw.overcharge_threshold, 5.4),
+      idle_decay: toAdminConfigNumber(raw.idle_decay, 0.15),
+      charge_rate: toAdminConfigNumber(raw.charge_rate, 2.4),
+      stability_min: toAdminConfigNumber(raw.stability_min, 35),
+      use_vibration: raw.use_vibration !== false,
+    }
+  }
+
   if (type === 'bearing_hunt') {
     const bearing =
       raw.target_bearing_deg !== undefined
@@ -106,11 +192,49 @@ export function normalizeAdminConfigForFamily(
   }
 
   if (type === 'circuit_matrix') {
+    const pathCells = Array.isArray(raw.path_cells)
+      ? raw.path_cells.map(String)
+      : []
+
+    const patternMode =
+      raw.pattern_mode === 'fixed' ||
+      pathCells.length >= 4
+        ? 'fixed'
+        : 'random_each_game'
+
     return {
       objective: String(raw.objective || 'path_restore'),
-      grid_cols: toAdminConfigNumber(raw.grid_cols ?? raw.grid_size, 5),
-      grid_rows: toAdminConfigNumber(raw.grid_rows ?? raw.grid_size, 5),
-      difficulty: toAdminConfigNumber(raw.difficulty, 2),
+      game_id: String(raw.game_id || 'logic_circuit'),
+      completion_method: 'puzzle',
+      grid_cols: toAdminConfigNumber(
+        raw.grid_cols ?? raw.grid_size,
+        5,
+      ),
+      grid_rows: toAdminConfigNumber(
+        raw.grid_rows ?? raw.grid_size,
+        5,
+      ),
+      difficulty: normalizeCircuitDifficulty(
+        raw.difficulty,
+      ),
+      max_errors: toAdminConfigNumber(
+        raw.max_errors,
+        3,
+      ),
+      preview_cell_ms: toAdminConfigNumber(
+        raw.preview_cell_ms,
+        460,
+      ),
+      path_length:
+        patternMode === 'fixed'
+          ? pathCells.length
+          : toAdminConfigNumber(
+              raw.path_length,
+              11,
+            ),
+      seed: String(raw.seed || ''),
+      pattern_mode: patternMode,
+      path_cells: pathCells,
     }
   }
 

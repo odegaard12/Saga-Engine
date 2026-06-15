@@ -14,6 +14,14 @@ IMAGE=""
 SAGA_COMMIT="${SAGA_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 SAGA_BUILD_TIME="${SAGA_BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
+SAGA_VERSION="${SAGA_VERSION:-}"
+
+if [ -z "$SAGA_VERSION" ] && [ -f VERSION ]; then
+  SAGA_VERSION="$(tr -d '\r\n ' < VERSION)"
+fi
+
+SAGA_VERSION="${SAGA_VERSION:-dev}"
+
 usage() {
   cat <<EOF
 Usage:
@@ -36,6 +44,7 @@ Environment overrides:
   HOST_PORT=8096
   APP_PORT=5000
   CANDIDATE_PORT=18096
+  SAGA_VERSION=v0.2.0
 EOF
 }
 
@@ -153,6 +162,7 @@ echo "Candidato local: 127.0.0.1:${CANDIDATE_PORT}->${APP_PORT}"
 echo "Promote: $PROMOTE"
 echo "Commit: $SAGA_COMMIT"
 echo "Build time: $SAGA_BUILD_TIME"
+echo "Version: $SAGA_VERSION"
 
 OLD_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$APP_NAME" 2>/dev/null || true)"
 
@@ -174,6 +184,7 @@ echo "== Arrancar candidato local, sin tocar producción =="
 docker run -d \
   --name "$CANDIDATE_NAME" \
   --env-file "$ENV_FILE_DETECTED" \
+  -e "SAGA_VERSION=${SAGA_VERSION}" \
   -e "SAGA_COMMIT=${SAGA_COMMIT}" \
   -e "SAGA_BUILD_TIME=${SAGA_BUILD_TIME}" \
   -p "127.0.0.1:${CANDIDATE_PORT}:${APP_PORT}" \
@@ -207,6 +218,7 @@ docker run -d \
   --name "$APP_NAME" \
   --restart unless-stopped \
   --env-file "$ENV_FILE_DETECTED" \
+  -e "SAGA_VERSION=${SAGA_VERSION}" \
   -e "SAGA_COMMIT=${SAGA_COMMIT}" \
   -e "SAGA_BUILD_TIME=${SAGA_BUILD_TIME}" \
   -p "${HOST_PORT}:${APP_PORT}" \

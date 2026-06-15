@@ -49,6 +49,7 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
   }
 }
 
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -96,6 +97,7 @@ export default function AdminMissionMap({
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
+  const dragClickSuppressUntilRef = useRef(0)
 
   const mappedStages = useMemo(
     () => stages.filter(hasCoords),
@@ -134,7 +136,10 @@ export default function AdminMissionMap({
     const handleMapClick = (event: L.LeafletMouseEvent) => {
       // #233 v16: map click/tap opens a tiny create/discard popover.
       // Nothing is added to local mission state until the admin confirms.
-      if (map.getContainer().classList.contains('admin-map-dragging-node')) return
+      if (
+        map.getContainer().classList.contains('admin-map-dragging-node') ||
+        Date.now() < dragClickSuppressUntilRef.current
+      ) return
 
       onCreateStageAt(event.latlng.lat, event.latlng.lng, {
         x: event.originalEvent.clientX,
@@ -202,25 +207,51 @@ export default function AdminMissionMap({
 
       ring.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
+        L.DomEvent.preventDefault(event.originalEvent)
+
+        if (
+          map.getContainer().classList.contains('admin-map-dragging-node') ||
+          Date.now() < dragClickSuppressUntilRef.current
+        ) {
+          return
+        }
+
         onSelectStage(stage)
       })
 
       marker.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
+        L.DomEvent.preventDefault(event.originalEvent)
+
+        if (
+          map.getContainer().classList.contains('admin-map-dragging-node') ||
+          Date.now() < dragClickSuppressUntilRef.current
+        ) {
+          return
+        }
+
         onSelectStage(stage)
       })
 
       marker.on('dragstart', () => {
-        onSelectStage(stage)
+        dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
       marker.on('drag', () => {
+        dragClickSuppressUntilRef.current = Date.now() + 700
         const next = marker.getLatLng()
         ring.setLatLng(next)
       })
 
-      marker.on('dragend', () => {
+      marker.on('dragend', (event: L.LeafletEvent) => {
+        const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
+        if (original) {
+          L.DomEvent.stopPropagation(original)
+          L.DomEvent.preventDefault(original)
+        }
+
+        dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng)
@@ -267,7 +298,7 @@ export default function AdminMissionMap({
         <div>
           <div style={kicker}>Mission map</div>
           <div style={title}>{mappedStages.length} mapped nodes</div>
-          <div style={helper}>Click map to add · drag numbered pins to move</div>
+          <div style={helper}>Click en mapa para crear · arrastra pines para mover · click en pin para editar</div>
         </div>
         <div style={legend}>
           <span><i style={{ background: '#34d399' }} /> Signal</span>

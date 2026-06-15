@@ -3,6 +3,7 @@ import type { ResolvedMinigame } from './resolver'
 import { BearingHuntRuntimeScreen } from '../families/bearingHunt/RuntimeScreen'
 import { CircuitMatrixRuntimeScreen } from '../families/circuitMatrix/RuntimeScreen'
 import { SignalHuntRuntimeScreen } from '../families/signalHunt/RuntimeScreen'
+import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame
@@ -34,6 +35,18 @@ export function FamilyRuntimeHost({
   if (resolved.family === 'bearing_hunt') {
     return (
       <BearingHuntRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
+  if (resolved.family === 'motion_challenge') {
+    return (
+      <MotionChallengeRuntimeScreen
         resolved={resolved}
         stage={stage}
         helperText={helperText}

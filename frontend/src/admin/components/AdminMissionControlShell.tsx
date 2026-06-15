@@ -8,6 +8,7 @@ import SettingsPanel from './SettingsPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
 import type { AdminProfileAction, AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
+import { getAdminGameForStage } from '../lib/gameCatalog'
 import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
@@ -262,6 +263,12 @@ export default function AdminMissionControlShell({
           <div className="saga-node-scroll">
             {stages.map((stage, routeIndex) => {
               const physicalVisual = getPhysicalNodeVisual(stage)
+              const stageConfig =
+                typeof (stage as unknown as { config?: unknown }).config === 'object' &&
+                (stage as unknown as { config?: unknown }).config !== null
+                  ? ((stage as unknown as { config?: Record<string, unknown> }).config || {})
+                  : {}
+              const displayGame = getAdminGameForStage(stage.type, stageConfig)
               const selected = selectedStage?.index === stage.index
 
               return (
@@ -289,7 +296,7 @@ export default function AdminMissionControlShell({
                         <span className="saga-node-title-text">{stage.title || 'Untitled node'}</span>
                       </strong>
                       <small>
-                        {physicalVisual ? physicalVisual.label : (stage.label || stage.type)}
+                        {physicalVisual ? physicalVisual.label : (displayGame.title || stage.label || stage.type)}
                         {' · '}
                         {formatCoords(stage.lat, stage.lon)}
                       </small>

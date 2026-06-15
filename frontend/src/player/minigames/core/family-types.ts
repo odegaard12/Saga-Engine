@@ -1,3 +1,28 @@
+export type MotionChallengeObjective =
+  | 'shake_charge'
+  | 'figure_eight'
+  | 'rotary_safe'
+
+export type MotionChallengeConfig = {
+  objective: MotionChallengeObjective
+  game_id?: string
+  difficulty?: 'easy' | 'normal' | 'hard'
+  duration_mode?: 'short' | 'normal' | 'long'
+  penalty_mode?: 'soft' | 'normal' | 'hard'
+  allow_touch_fallback?: boolean
+  energy_target?: number
+  time_limit_ms?: number
+  stabilize_ms?: number
+  calibration_ms?: number
+  good_min?: number
+  good_max?: number
+  overcharge_threshold?: number
+  idle_decay?: number
+  charge_rate?: number
+  stability_min?: number
+  use_vibration?: boolean
+}
+
 export type CircuitMatrixObjective =
   | 'path_restore'
   | 'power_balance'
@@ -21,7 +46,7 @@ export type CircuitMatrixConfig = {
   grid_cols: number
   grid_rows: number
   seed?: string
-  difficulty?: 1 | 2 | 3 | 4 | 5
+  difficulty?: 1 | 2 | 3 | 4 | 5 | 'easy' | 'normal' | 'hard'
   max_moves?: number | null
   max_time_ms?: number | null
   allow_rotate?: boolean
@@ -34,6 +59,12 @@ export type CircuitMatrixConfig = {
   hint_mode?: 'none' | 'light' | 'guided'
   auto_check?: boolean
   success_animation?: 'pulse' | 'restore' | 'flash'
+
+  max_errors?: number
+  preview_cell_ms?: number
+  path_length?: number
+  pattern_mode?: 'random_each_game' | 'fixed'
+  path_cells?: string[]
 }
 
 export type BearingHuntConfig = {
@@ -61,8 +92,10 @@ export type SignalHuntConfig = {
   source_lat?: number
   source_lon?: number
   source_radius_m?: number
+  lock_radius_m?: number
   lock_threshold: number
   hold_ms: number
+  easy_checkpoint?: boolean
   max_signal?: number
   noise_floor?: number
   jitter?: number
@@ -88,3 +121,4 @@ export type AnyMinigameConfig =
   | CircuitMatrixConfig
   | BearingHuntConfig
   | SignalHuntConfig
+  | MotionChallengeConfig

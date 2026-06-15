@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   adminGameCatalog,
@@ -8,6 +8,7 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard, PhysicalQrKind } from './PhysicalQrCardsPanel'
+import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
 
 type StageLike = Record<string, any>
 
@@ -19,6 +20,7 @@ type GuidedNodeEditorFlowProps = {
 }
 
 type StepKey = 'type' | 'subtype' | 'config' | 'content' | 'rules' | 'review'
+type EditorMode = 'game' | 'qr'
 
 const STEPS: Array<{ key: StepKey; label: string }> = [
   { key: 'type', label: 'Tipo' },
@@ -32,6 +34,7 @@ const STEPS: Array<{ key: StepKey; label: string }> = [
 const READY_STATUSES = new Set(['runtime_ready'])
 
 const TECHNICAL_CONFIG_KEYS = new Set([
+  'completion_method',
   'game_id',
   'game_title',
   'objective',
@@ -48,6 +51,9 @@ const TECHNICAL_CONFIG_KEYS = new Set([
   'use_direction_hint',
   'false_peaks',
   'dead_zones',
+  'seed',
+  'path_cells',
+  'pattern_mode',
 ])
 
 const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
@@ -97,6 +103,7 @@ const CONFIG_FIELD_META: Record<string, {
       { value: 'photo', label: 'Foto' },
       { value: 'inventory_only', label: 'Objeto/mochila' },
       { value: 'team', label: 'Equipo' },
+      { value: 'motion', label: 'Movimiento / sensor' },
     ],
   },
   source_radius_m: {
@@ -136,8 +143,13 @@ const CONFIG_FIELD_META: Record<string, {
   },
   difficulty: {
     label: 'Dificultad',
-    help: 'Nivel interno de dificultad del reto.',
-    type: 'number',
+    help: 'Nivel de dificultad del reto.',
+    type: 'select',
+    options: [
+      { value: 'easy', label: 'Fácil' },
+      { value: 'normal', label: 'Normal' },
+      { value: 'hard', label: 'Difícil' },
+    ],
   },
   expected_code: {
     label: 'Código esperado',
@@ -207,31 +219,62 @@ function normalizeQrKind(value: unknown): PhysicalQrKind {
   return 'collectible'
 }
 
+function hasExplicitQrMarker(stage: StageLike): boolean {
+  return Boolean(
+    stage.physical_qr ||
+    stage.physical_node_kind ||
+    stage.physical_item_kind ||
+    stage.physical_item_id ||
+    stage.physical_item_label ||
+    stage.qr_payload ||
+    String(stage.game_family || '').includes('physical') ||
+    String(stage.game_type || '').includes('qr_') ||
+    String(stage.game_template_id || '').includes('qr_')
+  )
+}
+
 function gameFromStage(stage: StageLike): AdminGameCatalogItem {
   const config = configOf(stage)
-  const configured = typeof config.game_id === 'string' ? getAdminGame(config.game_id) : null
-  if (configured) return configured
+  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  const explicit = gameId ? adminGameCatalog.find((game) => game.id === gameId) : null
+  if (explicit) return explicit
+
   if (typeof stage.game_type === 'string') {
     const byGameType = adminGameCatalog.find((game) => game.id === stage.game_type)
     if (byGameType) return byGameType
   }
+
   if (typeof stage.game_template_id === 'string') {
     const byTemplate = adminGameCatalog.find((game) => game.id === stage.game_template_id)
     if (byTemplate) return byTemplate
   }
-  return adminGameCatalog.find((game) => game.family === stage.type) || adminGameCatalog[0]
+
+  // Legacy: los nodos antiguos signal_hunt sin game_id eran GPS/señal.
+  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer signal_hunt físico/QR.
+  if (stage.type === 'signal_hunt' && !hasExplicitQrMarker(stage)) {
+    return adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
+  }
+
+  return (
+    adminGameCatalog.find((game) => game.family === stage.type && game.category !== 'physical') ||
+    adminGameCatalog.find((game) => game.family === stage.type) ||
+    adminGameCatalog[0]
+  )
 }
 
 function isQrStage(stage: StageLike): boolean {
-  const game = gameFromStage(stage)
-  return Boolean(
-    game.category === 'physical' ||
-    stage.physical_qr ||
-    stage.physical_node_kind ||
-    stage.physical_item_kind ||
-    String(stage.game_family || '').includes('physical') ||
-    String(stage.game_type || '').includes('qr_')
-  )
+  const config = configOf(stage)
+  const gameId =
+    typeof config.game_id === 'string'
+      ? config.game_id
+      : typeof stage.game_type === 'string'
+        ? stage.game_type
+        : typeof stage.game_template_id === 'string'
+          ? stage.game_template_id
+          : ''
+  const explicit = gameId ? adminGameCatalog.find((game) => game.id === gameId) : null
+
+  return Boolean(hasExplicitQrMarker(stage) || explicit?.category === 'physical')
 }
 
 function gameOptions(showExperimental = false): AdminGameCatalogItem[] {
@@ -263,6 +306,96 @@ function isPlayableNow(game: AdminGameCatalogItem) {
   return READY_STATUSES.has(game.runtimeStatus)
 }
 
+function usesLocationRadius(game: AdminGameCatalogItem) {
+  return (
+    game.category === 'gps' ||
+    game.category === 'compass' ||
+    game.category === 'photo' ||
+    game.category === 'team' ||
+    game.completionMethod === 'proximity' ||
+    game.completionMethod === 'hold' ||
+    game.completionMethod === 'bearing'
+  )
+}
+
+function normalizeDifficultyForEditor(value: unknown) {
+  const raw = String(value ?? '').trim().toLowerCase()
+
+  if (
+    raw === 'easy' ||
+    raw === 'facil' ||
+    raw === 'fácil' ||
+    raw === '1'
+  ) {
+    return 'easy'
+  }
+
+  if (
+    raw === 'hard' ||
+    raw === 'dificil' ||
+    raw === 'difícil' ||
+    raw === '3' ||
+    raw === '4' ||
+    raw === '5'
+  ) {
+    return 'hard'
+  }
+
+  return 'normal'
+}
+
+function isValidFixedCircuitConfig(
+  config: Record<string, unknown>,
+) {
+  if (config.pattern_mode !== 'fixed') return true
+  if (!Array.isArray(config.path_cells)) return false
+  if (config.path_cells.length < 4) return false
+
+  const rows = Math.max(
+    4,
+    Math.min(6, Number(config.grid_rows || 5)),
+  )
+
+  const cols = Math.max(
+    4,
+    Math.min(6, Number(config.grid_cols || 5)),
+  )
+
+  const seen = new Set<string>()
+  let previous: [number, number] | null = null
+
+  for (const rawCell of config.path_cells) {
+    const cell = String(rawCell)
+
+    if (!/^\d+:\d+$/.test(cell)) return false
+    if (seen.has(cell)) return false
+
+    const [row, col] = cell.split(':').map(Number)
+
+    if (
+      row < 0 ||
+      row >= rows ||
+      col < 0 ||
+      col >= cols
+    ) {
+      return false
+    }
+
+    if (
+      previous &&
+      Math.abs(row - previous[0]) +
+        Math.abs(col - previous[1]) !== 1
+    ) {
+      return false
+    }
+
+    seen.add(cell)
+    previous = [row, col]
+  }
+
+  return true
+}
+
 function isExperimentalOrPlanned(game: AdminGameCatalogItem) {
   return !isPlayableNow(game)
 }
@@ -275,8 +408,6 @@ function normalizeMessage(value: unknown, fallback: string) {
 
 function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
   const keys = new Set<string>()
-
-  if ('completion_method' in config) keys.add('completion_method')
 
   if (game.category === 'gps' || game.completionMethod === 'proximity' || game.completionMethod === 'hold' || game.completionMethod === 'team') {
     for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms']) {
@@ -292,6 +423,12 @@ function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<stri
 
   if (game.category === 'logic' || game.completionMethod === 'puzzle') {
     for (const key of ['grid_cols', 'grid_rows', 'difficulty']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  if (game.category === 'motion' || game.completionMethod === 'motion') {
+    for (const key of ['difficulty', 'time_limit_ms', 'stabilize_ms']) {
       if (key in config) keys.add(key)
     }
   }
@@ -380,12 +517,22 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   const [stepIndex, setStepIndex] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [showExperimentalGames, setShowExperimentalGames] = useState(false)
+  const [editorMode, setEditorMode] = useState<EditorMode>(() => isQrStage(stage) ? 'qr' : 'game')
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
 
-  const mode = isQrStage(stage) ? 'qr' : 'game'
+  useEffect(() => {
+    setEditorMode(isQrStage(stage) ? 'qr' : 'game')
+    setStepIndex(0)
+  }, [stage.id, stage.index])
+
+  const mode = editorMode
   const selected = gameFromStage(stage)
-  const selectedQr = mode === 'qr' ? selected : qrGameForKind(normalizeQrKind(stage.physical_node_kind || stage.physical_item_kind))
-  const selectedGame = mode === 'game' ? selected : gameOptions(showExperimentalGames)[0]
+  const selectedQr = mode === 'qr' && selected.category === 'physical'
+    ? selected
+    : qrGameForKind(normalizeQrKind(stage.physical_node_kind || stage.physical_item_kind))
+  const selectedGame = mode === 'game' && selected.category !== 'physical'
+    ? selected
+    : gameOptions(showExperimentalGames)[0]
   const step = STEPS[stepIndex]?.key || 'type'
   const title = displayTitle(stage)
   const config = configOf(stage)
@@ -412,6 +559,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   function applyGame(game: AdminGameCatalogItem) {
+    setEditorMode('game')
     const base = getDefaultAdminStagePatchForGame(game.id)
     const nextConfig = {
       ...(base.config || {}),
@@ -422,9 +570,10 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
 
     onPatch({
       ...base,
+      _clear_physical_fields: true,
       physical_qr: null,
-      physical_node_kind: '',
-      physical_item_kind: '',
+      physical_node_kind: null,
+      physical_item_kind: null,
       physical_item_id: '',
       physical_item_label: '',
       qr_payload: '',
@@ -437,8 +586,10 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
           ? 'bearing'
           : game.completionMethod === 'manual_code'
             ? 'manual'
-            : 'gps',
-      requires_proximity: game.category !== 'logic',
+            : game.category === 'motion' || game.completionMethod === 'motion' || game.category === 'logic'
+              ? 'free'
+              : 'gps',
+      requires_proximity: !(game.category === 'logic' || game.category === 'motion' || game.completionMethod === 'motion'),
       radius_m: Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50),
       proximity_radius_m: Number(stage.proximity_radius_m || stage.radius_m || stage.radius || 50),
       config: nextConfig,
@@ -447,6 +598,63 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       description: game.content,
     })
     goTo('config')
+  }
+
+  function finalizeAndClose() {
+    if (
+      mode === 'game' &&
+      selectedGame.id === 'logic_circuit' &&
+      !isValidFixedCircuitConfig(config)
+    ) {
+      showNotice(
+        'El patrón fijo está incompleto o contiene saltos.',
+      )
+      goTo('config')
+      return
+    }
+
+    if (mode === 'game') {
+      const base = getDefaultAdminStagePatchForGame(selectedGame.id)
+      const nextConfig = {
+        ...(base.config || {}),
+        ...config,
+        game_id: selectedGame.id,
+        game_title: selectedGame.title,
+        completion_method: selectedGame.completionMethod,
+      }
+
+      onPatch({
+        ...base,
+        _clear_physical_fields: true,
+        physical_qr: null,
+        physical_node_kind: null,
+        physical_item_kind: null,
+        physical_item_id: '',
+        physical_item_label: '',
+        qr_payload: '',
+        game_family: selectedGame.family,
+        game_type: selectedGame.id,
+        game_template_id: selectedGame.id,
+        completion_method: selectedGame.completionMethod,
+        entry_mode:
+          selectedGame.completionMethod === 'bearing'
+            ? 'bearing'
+            : selectedGame.completionMethod === 'manual_code'
+              ? 'manual'
+              : selectedGame.category === 'motion' || selectedGame.completionMethod === 'motion' || selectedGame.category === 'logic'
+                ? 'free'
+                : 'gps',
+        requires_proximity: !(selectedGame.category === 'logic' || selectedGame.category === 'motion' || selectedGame.completionMethod === 'motion'),
+        radius_m: Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50),
+        proximity_radius_m: Number(stage.proximity_radius_m || stage.radius_m || stage.radius || 50),
+        config: nextConfig,
+        messages: stage.messages || selectedGame.messages,
+        content: String(stage.content || stage.description || selectedGame.content || ''),
+        description: String(stage.description || stage.content || selectedGame.content || ''),
+      })
+    }
+
+    onClose()
   }
 
   function buildQrPatch(game: AdminGameCatalogItem, card?: SavedPhysicalQrCard) {
@@ -496,6 +704,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   function applyQr(game: AdminGameCatalogItem) {
+    setEditorMode('qr')
     onPatch(buildQrPatch(game))
     goTo('config')
   }
@@ -625,13 +834,13 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
             </div>
 
             <div className="saga-guided-v4-choice-grid saga-guided-v4-choice-grid--two">
-              <button type="button" className={mode === 'game' ? 'active' : ''} onClick={() => applyGame(gameOptions(false)[0])}>
+              <button type="button" className={mode === 'game' ? 'active' : ''} onClick={() => { setEditorMode('game'); goTo('subtype') }}>
                 <i>🗺️</i>
                 <strong>Nodo de xogo</strong>
-                <small>GPS, rumbo, lóxica, código, foto ou equipo.</small>
+                <small>Escolle unha plantilla xogable no seguinte paso.</small>
               </button>
 
-              <button type="button" className={mode === 'qr' ? 'active' : ''} onClick={() => applyQr(qrOptions()[0])}>
+              <button type="button" className={mode === 'qr' ? 'active' : ''} onClick={() => { setEditorMode('qr'); goTo('subtype') }}>
                 <i>▣</i>
                 <strong>QR físico</strong>
                 <small>Objeto, chave, pista ou bonus imprimible.</small>
@@ -716,25 +925,20 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                   <span>{selectedGame.offlineNote}</span>
                 </article>
 
-                <label>
-                  <span>Radio visible del nodo</span>
-                  <input
-                    type="number"
-                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
-                    onChange={(event) => {
-                      patchNumber('radius_m', event.target.value)
-                      patchNumber('proximity_radius_m', event.target.value)
-                      patchNumber('radius', event.target.value)
-                    }}
-                  />
-                </label>
-
-                <label>
-                  <span>Método principal</span>
-                  <select value={String(config.completion_method || selectedGame.completionMethod)} onChange={(event) => patchConfig('completion_method', event.target.value)}>
-                    {CONFIG_FIELD_META.completion_method.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                </label>
+                {usesLocationRadius(selectedGame) ? (
+                  <label>
+                    <span>Radio visible del nodo</span>
+                    <input
+                      type="number"
+                      value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
+                      onChange={(event) => {
+                        patchNumber('radius_m', event.target.value)
+                        patchNumber('proximity_radius_m', event.target.value)
+                        patchNumber('radius', event.target.value)
+                      }}
+                    />
+                  </label>
+                ) : null}
 
                 {configKeys.map((key) => {
                   const meta = CONFIG_FIELD_META[key] || { label: key, help: 'Ajuste avanzado oculto normalmente. Revisa solo si sabes qué hace.', type: 'text' as const }
@@ -744,7 +948,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                     <label key={key} className={key === 'objective' ? 'wide' : ''}>
                       <span>{meta.label}</span>
                       {meta.type === 'select' ? (
-                        <select value={formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)}>
+                        <select value={key === 'difficulty' ? normalizeDifficultyForEditor(config[key]) : formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)}>
                           {meta.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                         </select>
                       ) : (
@@ -758,6 +962,22 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                     </label>
                   )
                 })}
+
+                {selectedGame.id === 'logic_circuit' ? (
+                  <div className="wide">
+                    <CircuitPatternEditor
+                      config={config}
+                      onChange={(values) =>
+                        onPatch({
+                          config: {
+                            ...config,
+                            ...values,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="saga-guided-v4-formgrid">
@@ -972,7 +1192,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         {stepIndex < STEPS.length - 1 ? (
           <button type="button" className="primary" onClick={goNext}>Siguiente</button>
         ) : (
-          <button type="button" className="primary" onClick={onClose}>Listo</button>
+          <button type="button" className="primary" onClick={finalizeAndClose}>Listo</button>
         )}
       </footer>
     </section>

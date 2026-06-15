@@ -789,13 +789,6 @@ return
       setLocalDebugPosition(null)
       setFollowPlayer(true)
 
-      const storedGps = readStoredGpsPosition(user)
-      if (storedGps) {
-        setBrowserGpsPosition(storedGps)
-        setBrowserGpsStatus('stale')
-        setFocusRequest({ target: 'player', token: Date.now() })
-      }
-
       if (options.forceFocus || !gpsCenteredRef.current) {
         gpsCenteredRef.current = true
         setFocusRequest({ target: 'player', token: Date.now() })
@@ -1101,7 +1094,7 @@ return
           onCapture={handleFieldCameraCapture}
         />
 
-        {activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
+        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
           <div style={getMapQuickControlsStyle(isPhone)}>
             <QuickProofPanel
               user={user}
@@ -1322,7 +1315,7 @@ function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     left: '50%',
     bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 138px)' : 148,
     transform: 'translateX(-50%)',
-    zIndex: 4600,
+    zIndex: 1600,
     display: 'inline-flex',
     flexDirection: 'row',
     alignItems: 'center',

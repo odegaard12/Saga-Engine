@@ -2,12 +2,14 @@ import type {
   BearingHuntConfig,
   CircuitMatrixConfig,
   SignalHuntConfig,
+  MotionChallengeConfig,
 } from './family-types'
 import type { MinigameFamily, MinigameVersion } from './types'
 
 import { bearingHuntDefinition } from '../families/bearingHunt/definition'
 import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
+import { motionChallengeDefinition } from '../families/motionChallenge/definition'
 
 // React player policy: family-native runtimes are the normal path.
 // Compatibility helpers may normalize older stage shapes, but the React player resolver only executes family-native runtimes.
@@ -51,10 +53,21 @@ export type ResolvedSignalHuntMinigame = {
   config: SignalHuntConfig
 }
 
+export type ResolvedMotionChallengeMinigame = {
+  family: 'motion_challenge'
+  type: 'motion_challenge'
+  version: 'v1'
+  compatibility: MinigameCompatibility
+  label: string
+  definition: typeof motionChallengeDefinition
+  config: MotionChallengeConfig
+}
+
 export type ResolvedMinigame =
   | ResolvedCircuitMatrixMinigame
   | ResolvedBearingHuntMinigame
   | ResolvedSignalHuntMinigame
+  | ResolvedMotionChallengeMinigame
 
 function asObject<T>(value: unknown): Partial<T> {
   return value && typeof value === 'object' ? (value as Partial<T>) : {}
@@ -68,7 +81,8 @@ export function isNativeMinigameFamily(value: string): value is MinigameFamily {
   return (
     value === 'circuit_matrix' ||
     value === 'bearing_hunt' ||
-    value === 'signal_hunt'
+    value === 'signal_hunt' ||
+    value === 'motion_challenge'
   )
 }
 
@@ -123,6 +137,23 @@ function resolveSignalHuntNative(
   }
 }
 
+function resolveMotionChallengeNative(
+  input: ResolveMinigameInput
+): ResolvedMotionChallengeMinigame {
+  return {
+    family: 'motion_challenge',
+    type: 'motion_challenge',
+    version: normalizeVersion(input.version),
+    compatibility: 'native',
+    label: motionChallengeDefinition.label,
+    definition: motionChallengeDefinition,
+    config: {
+      ...motionChallengeDefinition.default_config,
+      ...asObject<MotionChallengeConfig>(input.config),
+    },
+  }
+}
+
 function resolveNativeMinigame(
   input: ResolveMinigameInput & { type: MinigameFamily }
 ): ResolvedMinigame {
@@ -132,6 +163,10 @@ function resolveNativeMinigame(
 
   if (input.type === 'bearing_hunt') {
     return resolveBearingHuntNative(input)
+  }
+
+  if (input.type === 'motion_challenge') {
+    return resolveMotionChallengeNative(input)
   }
 
   return resolveSignalHuntNative(input)
@@ -164,5 +199,5 @@ export function getResolvedMinigameLabel(input: ResolveMinigameInput): string | 
 }
 
 export function listSupportedRuntimeTypes(): string[] {
-  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix']
+  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix', 'motion_challenge']
 }
