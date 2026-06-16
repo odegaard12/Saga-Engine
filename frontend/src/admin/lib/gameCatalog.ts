@@ -14,6 +14,7 @@ export type AdminGameId =
   | 'three_bearing_triangle'
   | 'logic_circuit'
   | 'sequence_code'
+  | 'place_mosaic'
   | 'qr_collectible'
   | 'qr_key_gate'
   | 'clue_card'
@@ -155,6 +156,44 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'Busca qué sucede antes, después y al final de la historia.',
       gps_unavailable: 'Este reto funciona sin GPS cuando el nodo está abierto.',
       locked: 'El orden todavía no coincide con las pistas del tríptico.',
+    },
+  },
+  {
+    id: 'place_mosaic',
+    title: 'Mosaico del lugar',
+    icon: '🖼️',
+    family: 'circuit_matrix',
+    category: 'photo',
+    difficulty: 'Media',
+    duration: '3-8 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'puzzle',
+    offlineNote: 'La fotografía viaja dentro de la misión y el puzle funciona completamente sin conexión.',
+    summary: 'Reconstruir una fotografía del lugar real intercambiando sus piezas.',
+    playerGoal: 'Observar el entorno, ordenar el mosaico y reconocer un detalle del punto real.',
+    editorHint: 'Sube una fotografía clara del molino, estatua, edificio, piedra o detalle que el jugador tendrá delante.',
+    config: {
+      objective: 'image_mosaic',
+      game_id: 'place_mosaic',
+      completion_method: 'puzzle',
+      image_data_url: '',
+      image_alt: '',
+      grid_size: 3,
+      grid_cols: 3,
+      grid_rows: 3,
+      preview_ms: 2500,
+      max_moves: 0,
+      require_final_question: false,
+      final_question: '¿Qué detalle aparece en el lugar real?',
+      final_choices: ['Puerta', 'Escudo', 'Campana'],
+      final_correct_index: 0,
+    },
+    content: 'Reconstruye la fotografía observando el lugar real.',
+    messages: {
+      hint: 'Compara formas, colores y detalles con el elemento que tienes delante.',
+      gps_unavailable: 'Este reto puede jugarse sin GPS cuando el nodo ya está abierto.',
+      locked: 'Completa el mosaico para continuar.',
     },
   },
   {
@@ -364,11 +403,11 @@ export const missionTemplates: MissionTemplate[] = [
     id: 'family_gymkhana',
     title: 'Gymkhana familiar',
     icon: '🎁',
-    summary: 'Ritmo variado con GPS, brújula, objeto QR y bonus, todo jugable offline.',
+    summary: 'Ritmo variado con mosaico, lógica, objeto QR y bonus, todo jugable offline.',
     goodFor: 'Niños, familias, grupos pequeños, parques y rutas sencillas.',
     stages: [
       { gameId: 'logic_circuit', title: 'Punto de salida', content: 'Empieza la gymkhana.', offsetLat: 0, offsetLon: 0, radius: 60 },
-      { gameId: 'logic_circuit', title: 'Rumbo de explorador', content: 'Usa la brújula para orientar la búsqueda.', offsetLat: 0.00035, offsetLon: 0.00035, radius: 55 },
+      { gameId: 'place_mosaic', title: 'Observa el lugar', content: 'Reconstruye la imagen usando el elemento real como referencia.', offsetLat: 0.00035, offsetLon: 0.00035, radius: 55 },
       { gameId: 'qr_collectible', title: 'Objeto del equipo', content: 'Escanea el objeto QR del equipo.', offsetLat: 0.00065, offsetLon: 0.00070, radius: 45, physicalKind: 'collectible', itemLabel: 'Objeto del equipo' },
       { gameId: 'bonus_cache', title: 'Regalo oculto', content: 'Busca el bonus final.', offsetLat: 0.00095, offsetLon: 0.00105, radius: 45, physicalKind: 'bonus', itemLabel: 'Regalo oculto' },
     ],

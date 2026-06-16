@@ -286,6 +286,68 @@ def check_minigame_normalization() -> None:
     )
 
 
+    sample_mosaic_image = (
+        "data:image/png;base64,"
+        + "AA=="
+    )
+
+    place_mosaic = normalize_minigame_config(
+        "circuit_matrix",
+        {
+            "objective": "image_mosaic",
+            "game_id": "place_mosaic",
+            "completion_method": "puzzle",
+            "image_data_url": (
+                sample_mosaic_image
+            ),
+            "image_alt": "Molino",
+            "grid_size": 3,
+            "preview_ms": 2500,
+            "max_moves": 30,
+            "require_final_question": True,
+            "final_question": (
+                "¿Qué hay sobre la puerta?"
+            ),
+            "final_choices": [
+                "Escudo",
+                "Campana",
+                "Ventana",
+            ],
+            "final_correct_index": 0,
+        },
+    )
+
+    assert_equal(
+        place_mosaic["objective"],
+        "image_mosaic",
+        "mosaic objective",
+    )
+
+    assert_equal(
+        place_mosaic["game_id"],
+        "place_mosaic",
+        "mosaic game id",
+    )
+
+    assert_equal(
+        place_mosaic["image_data_url"],
+        sample_mosaic_image,
+        "mosaic image preserved",
+    )
+
+    assert_equal(
+        place_mosaic["grid_size"],
+        3,
+        "mosaic grid size",
+    )
+
+    assert_equal(
+        place_mosaic["final_correct_index"],
+        0,
+        "mosaic correct answer",
+    )
+
+
     sequence_code = normalize_minigame_config(
         "circuit_matrix",
         {
@@ -415,6 +477,97 @@ def check_stage_runtime_contract(main) -> None:
     assert_equal(summary["label"], "Bearing Hunt", "admin overview bearing label")
     # The current overview contract only requires the family identity to survive.
     # Detailed config editing can be covered by a later schema/editor contract.
+
+
+    raw_mosaic = {
+        "id": 8,
+        "title": "Mosaic contract node",
+        "type": "circuit_matrix",
+        "lat": 42.0,
+        "lon": -8.0,
+        "radius": 50,
+        "content": (
+            "Reconstruye la fotografía."
+        ),
+        "config": {
+            "objective": "image_mosaic",
+            "game_id": "place_mosaic",
+            "completion_method": "puzzle",
+            "image_data_url": (
+                "data:image/png;base64,"
+                + "AA=="
+            ),
+            "grid_size": 3,
+            "preview_ms": 2500,
+            "max_moves": 0,
+            "require_final_question": False,
+            "final_choices": [
+                "Escudo",
+                "Campana",
+            ],
+            "final_correct_index": 0,
+        },
+        "minigame": {
+            "type": "circuit_matrix",
+            "version": "v1",
+            "label": "Mosaico del lugar",
+            "config": {
+                "objective": "image_mosaic",
+                "game_id": "place_mosaic",
+                "completion_method": "puzzle",
+                "image_data_url": (
+                    "data:image/png;base64,"
+                    + "AA=="
+                ),
+                "grid_size": 3,
+                "preview_ms": 2500,
+                "max_moves": 0,
+                "require_final_question": False,
+                "final_choices": [
+                    "Escudo",
+                    "Campana",
+                ],
+                "final_correct_index": 0,
+            },
+        },
+    }
+
+    mosaic_node = main.normalize_stage(
+        raw_mosaic
+    )
+
+    mosaic_runtime = (
+        main.build_stage_minigame_runtime(
+            mosaic_node
+        )
+    )
+
+    assert_equal(
+        mosaic_runtime["label"],
+        "Mosaico del lugar",
+        "mosaic runtime label",
+    )
+
+    assert_equal(
+        mosaic_runtime["config"]["game_id"],
+        "place_mosaic",
+        "mosaic runtime game id",
+    )
+
+    assert_equal(
+        mosaic_runtime["config"]["grid_size"],
+        3,
+        "mosaic runtime grid size",
+    )
+
+    assert_equal(
+        main.stage_accepts_code(
+            raw_mosaic,
+            "OK",
+        ),
+        True,
+        "mosaic completion accepts OK",
+    )
 
 
     raw_sequence = {

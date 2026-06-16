@@ -64,6 +64,167 @@ function validateCircuitMatrixConfig(
   const raw = (config && typeof config === 'object' ? config : {}) as Partial<CircuitMatrixConfig>
 
   if (
+    raw.game_id === 'place_mosaic' ||
+    raw.objective === 'image_mosaic'
+  ) {
+    const imageDataUrl = String(
+      raw.image_data_url ?? '',
+    ).trim()
+
+    const gridSize = Number(
+      raw.grid_size ??
+      raw.grid_cols ??
+      raw.grid_rows ??
+      3,
+    )
+
+    const previewMs = Number(
+      raw.preview_ms ?? 2500,
+    )
+
+    const maxMoves = Number(
+      raw.max_moves ?? 0,
+    )
+
+    const finalChoices =
+      Array.isArray(raw.final_choices)
+        ? raw.final_choices
+            .map((item) =>
+              String(item).trim(),
+            )
+            .filter(Boolean)
+            .slice(0, 4)
+        : []
+
+    const finalCorrectIndex = Number(
+      raw.final_correct_index ?? 0,
+    )
+
+    const value: CircuitMatrixConfig = {
+      ...circuitMatrixDefinition.default_config,
+      ...raw,
+      objective: 'image_mosaic',
+      game_id: 'place_mosaic',
+      completion_method: 'puzzle',
+      image_data_url: imageDataUrl,
+      image_alt: String(
+        raw.image_alt ?? '',
+      ).trim(),
+      grid_size: gridSize,
+      grid_cols: gridSize,
+      grid_rows: gridSize,
+      preview_ms: previewMs,
+      max_moves: maxMoves,
+      require_final_question:
+        raw.require_final_question === true,
+      final_question: String(
+        raw.final_question ?? '',
+      ).trim(),
+      final_choices: finalChoices,
+      final_correct_index:
+        finalCorrectIndex,
+    }
+
+    const errors: string[] = []
+
+    if (
+      imageDataUrl.length > 600000 ||
+      !(
+        imageDataUrl.startsWith(
+          'data:image/jpeg;base64,',
+        ) ||
+        imageDataUrl.startsWith(
+          'data:image/png;base64,',
+        ) ||
+        imageDataUrl.startsWith(
+          'data:image/webp;base64,',
+        )
+      )
+    ) {
+      errors.push(
+        'image_data_url must contain a supported compressed image',
+      )
+    }
+
+    if (
+      !Number.isInteger(gridSize) ||
+      gridSize < 2 ||
+      gridSize > 4
+    ) {
+      errors.push(
+        'grid_size must be an integer between 2 and 4',
+      )
+    }
+
+    if (
+      !Number.isInteger(previewMs) ||
+      previewMs < 0 ||
+      previewMs > 6000
+    ) {
+      errors.push(
+        'preview_ms must be an integer between 0 and 6000',
+      )
+    }
+
+    if (
+      !Number.isInteger(maxMoves) ||
+      maxMoves < 0 ||
+      maxMoves > 500
+    ) {
+      errors.push(
+        'max_moves must be an integer between 0 and 500',
+      )
+    }
+
+    if (
+      value.require_final_question === true
+    ) {
+      if (
+        String(value.final_question || '')
+          .trim().length < 3
+      ) {
+        errors.push(
+          'final_question must contain at least 3 characters',
+        )
+      }
+
+      if (
+        finalChoices.length < 2 ||
+        finalChoices.length > 4
+      ) {
+        errors.push(
+          'final_choices must contain between 2 and 4 answers',
+        )
+      }
+
+      if (
+        !Number.isInteger(
+          finalCorrectIndex,
+        ) ||
+        finalCorrectIndex < 0 ||
+        finalCorrectIndex >=
+          finalChoices.length
+      ) {
+        errors.push(
+          'final_correct_index is outside final_choices',
+        )
+      }
+    }
+
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        errors,
+      }
+    }
+
+    return {
+      ok: true,
+      value,
+    }
+  }
+
+  if (
     raw.game_id === 'sequence_code' ||
     raw.objective === 'sequence_order'
   ) {

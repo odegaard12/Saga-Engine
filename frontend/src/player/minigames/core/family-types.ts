@@ -29,6 +29,7 @@ export type CircuitMatrixObjective =
   | 'switch_logic'
   | 'signal_route'
   | 'sequence_order'
+  | 'image_mosaic'
 
 export type BearingHuntObjective =
   | 'single_lock'
@@ -50,6 +51,15 @@ export type CircuitMatrixConfig = {
   max_attempts?: number
   hint_text?: string
   shuffle_choices?: boolean
+
+  image_data_url?: string
+  image_alt?: string
+  grid_size?: number
+  preview_ms?: number
+  require_final_question?: boolean
+  final_question?: string
+  final_choices?: string[]
+  final_correct_index?: number
   grid_cols: number
   grid_rows: number
   seed?: string

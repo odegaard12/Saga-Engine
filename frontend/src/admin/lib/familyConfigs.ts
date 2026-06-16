@@ -205,6 +205,129 @@ export function normalizeAdminConfigForFamily(
   if (
     type === 'circuit_matrix' &&
     (
+      raw.game_id === 'place_mosaic' ||
+      raw.objective === 'image_mosaic'
+    )
+  ) {
+    const gridSize = Math.max(
+      2,
+      Math.min(
+        4,
+        Math.round(
+          toAdminConfigNumber(
+            raw.grid_size ??
+              raw.grid_cols ??
+              raw.grid_rows,
+            3,
+          ),
+        ),
+      ),
+    )
+
+    const rawImage = String(
+      raw.image_data_url || '',
+    ).trim()
+
+    const validImage =
+      rawImage.length <= 600000 &&
+      (
+        rawImage.startsWith(
+          'data:image/jpeg;base64,',
+        ) ||
+        rawImage.startsWith(
+          'data:image/png;base64,',
+        ) ||
+        rawImage.startsWith(
+          'data:image/webp;base64,',
+        )
+      )
+
+    const choices = Array.isArray(
+      raw.final_choices,
+    )
+      ? raw.final_choices
+          .map((item) =>
+            String(item).trim().slice(0, 60),
+          )
+          .filter(Boolean)
+          .slice(0, 4)
+      : []
+
+    const safeChoices =
+      choices.length >= 2
+        ? choices
+        : [
+            'Puerta',
+            'Escudo',
+            'Campana',
+          ]
+
+    const correctIndex = Math.max(
+      0,
+      Math.min(
+        safeChoices.length - 1,
+        Math.round(
+          toAdminConfigNumber(
+            raw.final_correct_index,
+            0,
+          ),
+        ),
+      ),
+    )
+
+    return {
+      objective: 'image_mosaic',
+      game_id: 'place_mosaic',
+      completion_method: 'puzzle',
+      image_data_url:
+        validImage
+          ? rawImage
+          : '',
+      image_alt: String(
+        raw.image_alt || '',
+      ).trim().slice(0, 120),
+      grid_size: gridSize,
+      grid_cols: gridSize,
+      grid_rows: gridSize,
+      preview_ms: Math.max(
+        0,
+        Math.min(
+          6000,
+          Math.round(
+            toAdminConfigNumber(
+              raw.preview_ms,
+              2500,
+            ),
+          ),
+        ),
+      ),
+      max_moves: Math.max(
+        0,
+        Math.min(
+          500,
+          Math.round(
+            toAdminConfigNumber(
+              raw.max_moves,
+              0,
+            ),
+          ),
+        ),
+      ),
+      require_final_question:
+        raw.require_final_question === true,
+      final_question: String(
+        raw.final_question ||
+        '¿Qué detalle aparece en el lugar real?',
+      ).trim().slice(0, 180),
+      final_choices: safeChoices,
+      final_correct_index:
+        correctIndex,
+    }
+  }
+
+  if (
+    type === 'circuit_matrix' &&
+    (
       raw.game_id === 'sequence_code' ||
       raw.objective === 'sequence_order'
     )

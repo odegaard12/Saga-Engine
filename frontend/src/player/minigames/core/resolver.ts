@@ -102,7 +102,9 @@ function resolveCircuitMatrixNative(
     label:
       config.game_id === 'sequence_code'
         ? 'Código secuencial'
-        : circuitMatrixDefinition.label,
+        : config.game_id === 'place_mosaic'
+          ? 'Mosaico del lugar'
+          : circuitMatrixDefinition.label,
     definition: circuitMatrixDefinition,
     config,
   }
