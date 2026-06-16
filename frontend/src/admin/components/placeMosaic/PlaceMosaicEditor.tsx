@@ -615,12 +615,22 @@ export default function PlaceMosaicEditor({
     4,
   )
 
-  const previewMs = clampInteger(
+  const configuredPreviewMs = clampInteger(
     config.preview_ms,
-    2500,
+    5000,
     0,
     6000,
   )
+
+  const previewMs =
+    configuredPreviewMs <= 0
+      ? 0
+      : configuredPreviewMs <= 2500
+        ? 5000
+        : Math.max(
+            4000,
+            configuredPreviewMs,
+          )
 
   const maxMoves = clampInteger(
     config.max_moves,
@@ -957,7 +967,7 @@ export default function PlaceMosaicEditor({
             </label>
 
             <label>
-              Mostrar imagen completa
+              Tiempo para observar la imagen
               <select
                 value={previewMs}
                 onChange={(event) =>
@@ -972,19 +982,24 @@ export default function PlaceMosaicEditor({
                 <option value={0}>
                   No mostrar
                 </option>
-                <option value={1500}>
-                  1,5 segundos
-                </option>
-                <option value={2500}>
-                  2,5 segundos
-                </option>
+
                 <option value={4000}>
                   4 segundos
                 </option>
+
+                <option value={5000}>
+                  5 segundos · recomendado
+                </option>
+
                 <option value={6000}>
                   6 segundos
                 </option>
               </select>
+
+              <small>
+                La imagen inicial nunca durará
+                menos de cuatro segundos.
+              </small>
             </label>
 
             <label>

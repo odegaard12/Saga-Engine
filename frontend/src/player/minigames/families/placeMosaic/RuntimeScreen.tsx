@@ -20,6 +20,7 @@ interface Props {
 type Phase =
   | 'preview'
   | 'playing'
+  | 'completed'
   | 'question'
   | 'success'
   | 'failed'
@@ -132,47 +133,18 @@ const STYLES = `
   box-shadow:
     inset 0 0 0 1px
     rgba(255,255,255,.18);
-  transition:
-    transform .12s ease,
-    box-shadow .12s ease;
 }
 
 .mosaic-tile:active {
-  transform: scale(.97);
+  filter: brightness(1.07);
 }
 
 .mosaic-tile.selected {
   position: relative;
   z-index: 2;
-  transform: scale(.965);
   box-shadow:
     0 0 0 3px #72df91,
-    0 0 25px rgba(114,223,145,.48);
-}
-
-.mosaic-tile.swapping {
-  position: relative;
-  z-index: 3;
-  animation:
-    mosaic-swap-pulse .16s ease
-    both;
-}
-
-@keyframes mosaic-swap-pulse {
-  0% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-
-  48% {
-    transform: scale(.91);
-    filter: brightness(1.32);
-  }
-
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
+    0 0 18px rgba(114,223,145,.34);
 }
 
 .mosaic-help {
@@ -330,6 +302,79 @@ const STYLES = `
   border-radius: inherit;
   background: #72df91;
   transition: width .1s linear;
+}
+
+.mosaic-completed {
+  display: grid;
+  gap: 13px;
+}
+
+.mosaic-completed-photo {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(114,223,145,.26);
+  border-radius: 18px;
+  background: #0b0c0d;
+  aspect-ratio: 1;
+  box-shadow:
+    0 18px 44px rgba(0,0,0,.28);
+}
+
+.mosaic-completed-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mosaic-completed-badge {
+  position: absolute;
+  inset: auto 12px 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid rgba(114,223,145,.35);
+  border-radius: 999px;
+  background: rgba(11,28,17,.92);
+  color: #bbf7d0;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.mosaic-completed-badge i {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: #72df91;
+  color: #102016;
+  font-style: normal;
+  font-size: 13px;
+}
+
+.mosaic-next-step {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px;
+  background: #17191c;
+}
+
+.mosaic-next-step strong {
+  color: #f4f4f5;
+  font-size: 14px;
+}
+
+.mosaic-next-step span {
+  color: rgba(244,244,245,.57);
+  font-size: 11px;
+  line-height: 1.42;
 }
 
 .mosaic-question {
@@ -499,13 +544,11 @@ const STYLES = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mosaic-tile,
   .mosaic-progress-track i,
   .mosaic-preview-progress i {
     transition: none;
   }
 
-  .mosaic-tile.swapping,
   .mosaic-result.success::before {
     animation: none;
   }
@@ -680,12 +723,22 @@ export function PlaceMosaicRuntimeScreen({
   const totalPieces =
     gridSize * gridSize
 
-  const previewMs = clampInteger(
+  const configuredPreviewMs = clampInteger(
     config.preview_ms,
-    2500,
+    5000,
     0,
     6000,
   )
+
+  const previewMs =
+    configuredPreviewMs <= 0
+      ? 0
+      : configuredPreviewMs <= 2500
+        ? 5000
+        : Math.max(
+            4000,
+            configuredPreviewMs,
+          )
 
   const maxMoves = clampInteger(
     config.max_moves,
@@ -760,20 +813,8 @@ export function PlaceMosaicRuntimeScreen({
     setPreviewRemainingMs,
   ] = useState(previewMs)
 
-  const [swapPositions, setSwapPositions] =
-    useState<number[]>([])
-
-  const [swapping, setSwapping] =
-    useState(false)
-
-  const [celebrating, setCelebrating] =
-    useState(false)
-
   const continueLockRef =
     useRef(false)
-
-  const swapTimerRef =
-    useRef<number | null>(null)
 
   const activePreviewDuration =
     previewKind === 'peek'
@@ -804,16 +845,6 @@ export function PlaceMosaicRuntimeScreen({
 
   const reset = useCallback(
     (showPreview = true) => {
-      if (
-        swapTimerRef.current !== null
-      ) {
-        window.clearTimeout(
-          swapTimerRef.current,
-        )
-
-        swapTimerRef.current = null
-      }
-
       setOrder(
         shuffledOrder(totalPieces),
       )
@@ -821,9 +852,6 @@ export function PlaceMosaicRuntimeScreen({
       setMoves(0)
       setAnswerIndex(null)
       setMessage('')
-      setSwapPositions([])
-      setSwapping(false)
-      setCelebrating(false)
       setPreviewKind('intro')
       setPreviewRemainingMs(previewMs)
       setPhase(
@@ -845,20 +873,6 @@ export function PlaceMosaicRuntimeScreen({
     gridSize,
     reset,
   ])
-
-  useEffect(
-    () =>
-      () => {
-        if (
-          swapTimerRef.current !== null
-        ) {
-          window.clearTimeout(
-            swapTimerRef.current,
-          )
-        }
-      },
-    [],
-  )
 
   useEffect(() => {
     if (phase !== 'preview') return
@@ -916,21 +930,17 @@ export function PlaceMosaicRuntimeScreen({
 
   function enterSuccess() {
     haptic([20, 35, 75])
-    setCelebrating(true)
     setMessage('')
     setPhase('success')
   }
 
   function pressTile(position: number) {
-    if (
-      phase !== 'playing' ||
-      swapping
-    ) {
+    if (phase !== 'playing') {
       return
     }
 
     if (selected === null) {
-      haptic(12)
+      haptic(10)
       setSelected(position)
       setMessage(
         'Pieza seleccionada. Toca otra para intercambiarlas.',
@@ -939,68 +949,42 @@ export function PlaceMosaicRuntimeScreen({
     }
 
     if (selected === position) {
-      haptic(8)
       setSelected(null)
       setMessage('')
       return
     }
 
-    const firstPosition = selected
+    const nextOrder = [...order]
 
-    setSwapping(true)
-    setSwapPositions([
-      firstPosition,
-      position,
-    ])
+    ;[
+      nextOrder[selected],
+      nextOrder[position],
+    ] = [
+      nextOrder[position],
+      nextOrder[selected],
+    ]
+
+    const nextMoves = moves + 1
+
+    haptic(12)
+    setOrder(nextOrder)
+    setMoves(nextMoves)
+    setSelected(null)
     setMessage('')
-    haptic([10, 22, 10])
 
-    swapTimerRef.current =
-      window.setTimeout(
-        () => {
-          const nextOrder = [...order]
+    if (solvedOrder(nextOrder)) {
+      haptic([18, 28, 55])
+      setPhase('completed')
+      return
+    }
 
-          ;[
-            nextOrder[firstPosition],
-            nextOrder[position],
-          ] = [
-            nextOrder[position],
-            nextOrder[firstPosition],
-          ]
-
-          const nextMoves =
-            moves + 1
-
-          setOrder(nextOrder)
-          setMoves(nextMoves)
-          setSelected(null)
-          setSwapPositions([])
-          setSwapping(false)
-          swapTimerRef.current = null
-
-          if (
-            solvedOrder(nextOrder)
-          ) {
-            if (requireQuestion) {
-              haptic([18, 28, 18])
-              setPhase('question')
-            } else {
-              enterSuccess()
-            }
-
-            return
-          }
-
-          if (
-            maxMoves > 0 &&
-            nextMoves >= maxMoves
-          ) {
-            haptic([45, 55, 45])
-            setPhase('failed')
-          }
-        },
-        150,
-      )
+    if (
+      maxMoves > 0 &&
+      nextMoves >= maxMoves
+    ) {
+      haptic([45, 55, 45])
+      setPhase('failed')
+    }
   }
 
   function checkQuestion() {
@@ -1025,10 +1009,17 @@ export function PlaceMosaicRuntimeScreen({
     )
   }
 
+  const canContinue =
+    phase === 'success' ||
+    (
+      phase === 'completed' &&
+      !requireQuestion
+    )
+
   const continueRoute =
     useCallback(async () => {
       if (
-        phase !== 'success' ||
+        !canContinue ||
         submitting ||
         continuing ||
         continueLockRef.current
@@ -1047,9 +1038,9 @@ export function PlaceMosaicRuntimeScreen({
         throw error
       }
     }, [
+      canContinue,
       continuing,
       onWin,
-      phase,
       submitting,
     ])
 
@@ -1125,7 +1116,7 @@ export function PlaceMosaicRuntimeScreen({
               <div>
                 {previewKind === 'peek'
                   ? 'Comprueba un detalle antes de volver al mosaico.'
-                  : 'Mira las formas, los colores y los detalles principales.'}
+                  : 'Observa con calma las formas, los colores y los detalles principales.'}
               </div>
 
               <div className="mosaic-preview-progress">
@@ -1156,6 +1147,99 @@ export function PlaceMosaicRuntimeScreen({
     )
   }
 
+  if (phase === 'completed') {
+    return (
+      <section
+        className="mosaic-shell"
+        aria-label="Imagen completada"
+      >
+        <style>{STYLES}</style>
+
+        <div className="mosaic-body">
+          <header className="mosaic-head">
+            <div>
+              <h2>Imagen completada</h2>
+
+              <p>
+                Todas las piezas están
+                correctamente colocadas.
+              </p>
+            </div>
+          </header>
+
+          <div className="mosaic-completed">
+            <div className="mosaic-completed-photo">
+              <img
+                src={imageData}
+                alt={String(
+                  config.image_alt ||
+                  'Fotografía completada',
+                )}
+              />
+
+              <div className="mosaic-completed-badge">
+                <i>✓</i>
+                Completado
+              </div>
+            </div>
+
+            {requireQuestion ? (
+              <div className="mosaic-next-step">
+                <strong>
+                  Queda una comprobación
+                </strong>
+
+                <span>
+                  Observa ahora el elemento
+                  real antes de responder.
+                </span>
+              </div>
+            ) : (
+              <div className="mosaic-next-step">
+                <strong>
+                  Reto completado
+                </strong>
+
+                <span>
+                  Ya puedes continuar al
+                  siguiente punto de la ruta.
+                </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primary"
+              disabled={
+                !requireQuestion &&
+                (
+                  submitting ||
+                  continuing
+                )
+              }
+              onClick={() => {
+                if (requireQuestion) {
+                  setAnswerIndex(null)
+                  setMessage('')
+                  setPhase('question')
+                  return
+                }
+
+                void continueRoute()
+              }}
+            >
+              {requireQuestion
+                ? 'Ahora responde a esta pregunta'
+                : submitting || continuing
+                  ? 'Avanzando…'
+                  : 'Continuar al siguiente nodo'}
+            </button>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   if (phase === 'success') {
     return (
       <section
@@ -1164,30 +1248,20 @@ export function PlaceMosaicRuntimeScreen({
       >
         <style>{STYLES}</style>
 
-        <div
-          className={[
-            'mosaic-result',
-            'success',
-            celebrating
-              ? 'celebrating'
-              : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
+        <div className="mosaic-result success">
           <div className="mosaic-result-inner">
             <div className="mosaic-result-icon">
               ✓
             </div>
 
             <strong>
-              Lugar reconstruido
+              Lugar verificado
             </strong>
 
             <p>
-              Has completado el mosaico y
-              reconocido correctamente el
-              punto de la ruta.
+              La imagen y la comprobación
+              final son correctas.
+              Puedes continuar la ruta.
             </p>
 
             <button
@@ -1258,11 +1332,13 @@ export function PlaceMosaicRuntimeScreen({
         <div className="mosaic-body">
           <header className="mosaic-head">
             <div>
-              <h2>Comprueba el lugar</h2>
+              <h2>
+                Ahora responde a esta pregunta
+              </h2>
 
               <p>
-                El mosaico está completo.
-                Mira ahora el elemento real.
+                Observa el elemento real y
+                elige la respuesta correcta.
               </p>
             </div>
           </header>
@@ -1448,11 +1524,6 @@ export function PlaceMosaicRuntimeScreen({
                       selected === position
                         ? 'selected'
                         : '',
-                      swapPositions.includes(
-                        position,
-                      )
-                        ? 'swapping'
-                        : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -1469,7 +1540,6 @@ export function PlaceMosaicRuntimeScreen({
                       backgroundPosition:
                         `${x}% ${y}%`,
                     }}
-                    disabled={swapping}
                     onClick={() =>
                       pressTile(position)
                     }
