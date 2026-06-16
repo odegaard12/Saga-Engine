@@ -71,6 +71,11 @@ const CSS = `
   color: #166534;
 }
 
+.pme-status.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .pme-layout {
   display: grid;
   grid-template-columns:
@@ -109,6 +114,25 @@ const CSS = `
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.pme-file-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 11px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.pme-file-meta b {
+  flex: 0 0 auto;
+  color: #14532d;
 }
 
 .pme-empty {
@@ -361,6 +385,32 @@ function validImage(value: unknown) {
   )
 }
 
+function dataUrlBytes(
+  value: string,
+) {
+  const separator =
+    value.indexOf(',')
+
+  if (separator < 0) return 0
+
+  const encoded =
+    value.slice(separator + 1)
+
+  const padding =
+    encoded.endsWith('==')
+      ? 2
+      : encoded.endsWith('=')
+        ? 1
+        : 0
+
+  return Math.max(
+    0,
+    Math.floor(
+      encoded.length * .75,
+    ) - padding,
+  )
+}
+
 function answerChoices(value: unknown) {
   const items = Array.isArray(value)
     ? value
@@ -547,6 +597,17 @@ export default function PlaceMosaicEditor({
   const hasImage =
     validImage(imageData)
 
+  const imageKilobytes =
+    hasImage
+      ? Math.max(
+          1,
+          Math.round(
+            dataUrlBytes(imageData) /
+            1024,
+          ),
+        )
+      : 0
+
   const gridSize = clampInteger(
     config.grid_size,
     3,
@@ -602,6 +663,13 @@ export default function PlaceMosaicEditor({
 
   const configReady =
     hasImage && questionValid
+
+  const statusText =
+    !hasImage
+      ? 'Falta la fotografía'
+      : !questionValid
+        ? 'Revisa la pregunta'
+        : 'Listo para guardar'
 
   async function handleImage(
     event: ChangeEvent<HTMLInputElement>,
@@ -692,14 +760,16 @@ export default function PlaceMosaicEditor({
         <span
           className={[
             'pme-status',
-            configReady ? 'ok' : '',
+            configReady
+              ? 'ok'
+              : hasImage
+                ? 'warn'
+                : '',
           ]
             .filter(Boolean)
             .join(' ')}
         >
-          {configReady
-            ? 'Listo para guardar'
-            : 'Falta la fotografía'}
+          {statusText}
         </span>
       </header>
 
@@ -725,6 +795,16 @@ export default function PlaceMosaicEditor({
               pueda observar en el lugar real.
             </div>
           )}
+
+          {hasImage ? (
+            <div className="pme-file-meta">
+              <span>
+                ✓ Lista para modo offline
+              </span>
+
+              <b>{imageKilobytes} KB</b>
+            </div>
+          ) : null}
 
           <label className="pme-upload">
             {hasImage

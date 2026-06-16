@@ -144,9 +144,35 @@ const STYLES = `
 .mosaic-tile.selected {
   position: relative;
   z-index: 2;
+  transform: scale(.965);
   box-shadow:
     0 0 0 3px #72df91,
-    0 0 24px rgba(114,223,145,.42);
+    0 0 25px rgba(114,223,145,.48);
+}
+
+.mosaic-tile.swapping {
+  position: relative;
+  z-index: 3;
+  animation:
+    mosaic-swap-pulse .16s ease
+    both;
+}
+
+@keyframes mosaic-swap-pulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  48% {
+    transform: scale(.91);
+    filter: brightness(1.32);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 .mosaic-help {
@@ -161,6 +187,46 @@ const STYLES = `
 
 .mosaic-help b {
   color: #72df91;
+}
+
+.mosaic-progress {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.mosaic-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(244,244,245,.48);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.mosaic-progress-head b {
+  color: rgba(244,244,245,.82);
+}
+
+.mosaic-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+}
+
+.mosaic-progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      #3fbf68,
+      #72df91
+    );
+  transition: width .28s ease;
 }
 
 .mosaic-actions {
@@ -212,14 +278,58 @@ const STYLES = `
 .mosaic-preview-overlay {
   position: absolute;
   inset: auto 10px 10px;
+  display: grid;
+  gap: 7px;
   padding: 10px 12px;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 12px;
-  background: rgba(8,9,10,.78);
-  backdrop-filter: blur(8px);
+  background: rgba(8,9,10,.82);
+  backdrop-filter: blur(9px);
   color: #f4f4f5;
   font-size: 12px;
   font-weight: 850;
+}
+
+.mosaic-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mosaic-preview-meta b {
+  color: #72df91;
+  font-size: 11px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.mosaic-preview-meta span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(114,223,145,.34);
+  border-radius: 999px;
+  background: rgba(114,223,145,.11);
+  color: #bbf7d0;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.mosaic-preview-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+
+.mosaic-preview-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #72df91;
+  transition: width .1s linear;
 }
 
 .mosaic-question {
@@ -251,7 +361,30 @@ const STYLES = `
 }
 
 .mosaic-choice {
+  display: grid;
+  grid-template-columns:
+    29px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
   text-align: left;
+}
+
+.mosaic-choice-index {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: rgba(244,244,245,.68);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.mosaic-choice.active
+.mosaic-choice-index {
+  background: #72df91;
+  color: #102016;
 }
 
 .mosaic-choice.active {
@@ -317,6 +450,67 @@ const STYLES = `
   width: min(100%,290px);
 }
 
+.mosaic-result.success {
+  position: relative;
+  overflow: hidden;
+}
+
+.mosaic-result.success::before {
+  content: "";
+  position: absolute;
+  inset: -45%;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent,
+      rgba(114,223,145,.15),
+      transparent 22%,
+      transparent 55%,
+      rgba(114,223,145,.10),
+      transparent 78%
+    );
+  animation:
+    mosaic-success-glow
+    1.4s ease-out
+    both;
+}
+
+.mosaic-result.success
+.mosaic-result-inner {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes mosaic-success-glow {
+  from {
+    opacity: 0;
+    transform: scale(.72) rotate(-18deg);
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.18) rotate(28deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mosaic-tile,
+  .mosaic-progress-track i,
+  .mosaic-preview-progress i {
+    transition: none;
+  }
+
+  .mosaic-tile.swapping,
+  .mosaic-result.success::before {
+    animation: none;
+  }
+}
+
 @media (max-width: 460px) {
   .mosaic-body {
     padding: 13px;
@@ -380,47 +574,68 @@ function choicesOf(value: unknown) {
 }
 
 function shuffledOrder(count: number) {
-  const values = Array.from(
-    { length: count },
-    (_, index) => index,
-  )
+  const minimumMisplaced =
+    count <= 4
+      ? Math.min(3, count)
+      : Math.ceil(count * .62)
 
   for (
-    let index = values.length - 1;
-    index > 0;
-    index -= 1
+    let attempt = 0;
+    attempt < 18;
+    attempt += 1
   ) {
-    const swapIndex =
-      Math.floor(
-        Math.random() * (index + 1),
+    const values = Array.from(
+      { length: count },
+      (_, index) => index,
+    )
+
+    for (
+      let index = values.length - 1;
+      index > 0;
+      index -= 1
+    ) {
+      const swapIndex =
+        Math.floor(
+          Math.random() * (index + 1),
+        )
+
+      ;[
+        values[index],
+        values[swapIndex],
+      ] = [
+        values[swapIndex],
+        values[index],
+      ]
+    }
+
+    const misplaced =
+      values.reduce(
+        (
+          total,
+          value,
+          index,
+        ) =>
+          total +
+          (
+            value === index
+              ? 0
+              : 1
+          ),
+        0,
       )
 
-    ;[
-      values[index],
-      values[swapIndex],
-    ] = [
-      values[swapIndex],
-      values[index],
-    ]
+    if (
+      misplaced >= minimumMisplaced
+    ) {
+      return values
+    }
   }
 
-  if (
-    values.length > 1 &&
-    values.every(
-      (value, index) =>
-        value === index,
-    )
-  ) {
-    ;[
-      values[0],
-      values[1],
-    ] = [
-      values[1],
-      values[0],
-    ]
-  }
-
-  return values
+  return Array.from(
+    { length: count },
+    (_, index) =>
+      (index + 1) % count,
+  )
 }
 
 function solvedOrder(order: number[]) {
@@ -428,6 +643,17 @@ function solvedOrder(order: number[]) {
     (value, index) =>
       value === index,
   )
+}
+
+function haptic(
+  pattern: number | number[],
+) {
+  if (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.vibrate === 'function'
+  ) {
+    navigator.vibrate(pattern)
+  }
 }
 
 export function PlaceMosaicRuntimeScreen({
@@ -526,11 +752,68 @@ export function PlaceMosaicRuntimeScreen({
   const [continuing, setContinuing] =
     useState(false)
 
+  const [previewKind, setPreviewKind] =
+    useState<'intro' | 'peek'>('intro')
+
+  const [
+    previewRemainingMs,
+    setPreviewRemainingMs,
+  ] = useState(previewMs)
+
+  const [swapPositions, setSwapPositions] =
+    useState<number[]>([])
+
+  const [swapping, setSwapping] =
+    useState(false)
+
+  const [celebrating, setCelebrating] =
+    useState(false)
+
   const continueLockRef =
     useRef(false)
 
+  const swapTimerRef =
+    useRef<number | null>(null)
+
+  const activePreviewDuration =
+    previewKind === 'peek'
+      ? 1400
+      : previewMs
+
+  const previewSeconds =
+    Math.max(
+      1,
+      Math.ceil(
+        previewRemainingMs / 1000,
+      ),
+    )
+
+  const previewProgress =
+    activePreviewDuration > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            (
+              previewRemainingMs /
+              activePreviewDuration
+            ) * 100,
+          ),
+        )
+      : 0
+
   const reset = useCallback(
     (showPreview = true) => {
+      if (
+        swapTimerRef.current !== null
+      ) {
+        window.clearTimeout(
+          swapTimerRef.current,
+        )
+
+        swapTimerRef.current = null
+      }
+
       setOrder(
         shuffledOrder(totalPieces),
       )
@@ -538,6 +821,11 @@ export function PlaceMosaicRuntimeScreen({
       setMoves(0)
       setAnswerIndex(null)
       setMessage('')
+      setSwapPositions([])
+      setSwapping(false)
+      setCelebrating(false)
+      setPreviewKind('intro')
+      setPreviewRemainingMs(previewMs)
       setPhase(
         showPreview && previewMs > 0
           ? 'preview'
@@ -558,71 +846,161 @@ export function PlaceMosaicRuntimeScreen({
     reset,
   ])
 
+  useEffect(
+    () =>
+      () => {
+        if (
+          swapTimerRef.current !== null
+        ) {
+          window.clearTimeout(
+            swapTimerRef.current,
+          )
+        }
+      },
+    [],
+  )
+
   useEffect(() => {
     if (phase !== 'preview') return
 
-    const timer =
-      window.setTimeout(
-        () => setPhase('playing'),
-        previewMs,
+    const duration =
+      previewKind === 'peek'
+        ? 1400
+        : previewMs
+
+    if (duration <= 0) {
+      setPhase('playing')
+      return
+    }
+
+    setPreviewRemainingMs(duration)
+
+    const startedAt =
+      performance.now()
+
+    const interval =
+      window.setInterval(
+        () => {
+          const elapsed =
+            performance.now() -
+            startedAt
+
+          setPreviewRemainingMs(
+            Math.max(
+              0,
+              duration - elapsed,
+            ),
+          )
+        },
+        100,
       )
 
-    return () =>
+    const timer =
+      window.setTimeout(
+        () => {
+          setPreviewRemainingMs(0)
+          setPhase('playing')
+        },
+        duration,
+      )
+
+    return () => {
+      window.clearInterval(interval)
       window.clearTimeout(timer)
+    }
   }, [
     phase,
+    previewKind,
     previewMs,
   ])
 
+  function enterSuccess() {
+    haptic([20, 35, 75])
+    setCelebrating(true)
+    setMessage('')
+    setPhase('success')
+  }
+
   function pressTile(position: number) {
-    if (phase !== 'playing') return
+    if (
+      phase !== 'playing' ||
+      swapping
+    ) {
+      return
+    }
 
     if (selected === null) {
+      haptic(12)
       setSelected(position)
       setMessage(
-        'Ahora toca la pieza con la que quieres intercambiarla.',
+        'Pieza seleccionada. Toca otra para intercambiarlas.',
       )
       return
     }
 
     if (selected === position) {
+      haptic(8)
       setSelected(null)
       setMessage('')
       return
     }
 
-    const nextOrder = [...order]
+    const firstPosition = selected
 
-    ;[
-      nextOrder[selected],
-      nextOrder[position],
-    ] = [
-      nextOrder[position],
-      nextOrder[selected],
-    ]
-
-    const nextMoves = moves + 1
-
-    setOrder(nextOrder)
-    setMoves(nextMoves)
-    setSelected(null)
+    setSwapping(true)
+    setSwapPositions([
+      firstPosition,
+      position,
+    ])
     setMessage('')
+    haptic([10, 22, 10])
 
-    if (solvedOrder(nextOrder)) {
-      setPhase(
-        requireQuestion
-          ? 'question'
-          : 'success',
+    swapTimerRef.current =
+      window.setTimeout(
+        () => {
+          const nextOrder = [...order]
+
+          ;[
+            nextOrder[firstPosition],
+            nextOrder[position],
+          ] = [
+            nextOrder[position],
+            nextOrder[firstPosition],
+          ]
+
+          const nextMoves =
+            moves + 1
+
+          setOrder(nextOrder)
+          setMoves(nextMoves)
+          setSelected(null)
+          setSwapPositions([])
+          setSwapping(false)
+          swapTimerRef.current = null
+
+          if (
+            solvedOrder(nextOrder)
+          ) {
+            if (requireQuestion) {
+              haptic([18, 28, 18])
+              setPhase('question')
+            } else {
+              enterSuccess()
+            }
+
+            return
+          }
+
+          if (
+            maxMoves > 0 &&
+            nextMoves >= maxMoves
+          ) {
+            haptic([45, 55, 45])
+            setPhase('failed')
+          }
+        },
+        150,
       )
-      return
-    }
-
-    if (
-      maxMoves > 0 &&
-      nextMoves >= maxMoves
-    ) {
-      setPhase('failed')
-    }
   }
 
   function checkQuestion() {
@@ -636,14 +1014,14 @@ export function PlaceMosaicRuntimeScreen({
     if (
       answerIndex === correctIndex
     ) {
-      setMessage('')
-      setPhase('success')
+      enterSuccess()
       return
     }
 
+    haptic([38, 45, 38])
     setAnswerIndex(null)
     setMessage(
-      'Esa respuesta no coincide. Observa el lugar real y vuelve a intentarlo.',
+      'No coincide. Observa el lugar real y prueba otra respuesta.',
     )
   }
 
@@ -734,18 +1112,44 @@ export function PlaceMosaicRuntimeScreen({
             />
 
             <div className="mosaic-preview-overlay">
-              Mira las formas, los colores
-              y los detalles principales.
+              <div className="mosaic-preview-meta">
+                <b>
+                  {previewKind === 'peek'
+                    ? 'Referencia rápida'
+                    : 'Memoriza'}
+                </b>
+
+                <span>{previewSeconds}</span>
+              </div>
+
+              <div>
+                {previewKind === 'peek'
+                  ? 'Comprueba un detalle antes de volver al mosaico.'
+                  : 'Mira las formas, los colores y los detalles principales.'}
+              </div>
+
+              <div className="mosaic-preview-progress">
+                <i
+                  style={{
+                    width:
+                      `${previewProgress}%`,
+                  }}
+                />
+              </div>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={() =>
+            className="primary"
+            onClick={() => {
+              setPreviewRemainingMs(0)
               setPhase('playing')
-            }
+            }}
           >
-            Empezar ahora
+            {previewKind === 'peek'
+              ? 'Volver al mosaico'
+              : 'Empezar ahora'}
           </button>
         </div>
       </section>
@@ -760,7 +1164,17 @@ export function PlaceMosaicRuntimeScreen({
       >
         <style>{STYLES}</style>
 
-        <div className="mosaic-result">
+        <div
+          className={[
+            'mosaic-result',
+            'success',
+            celebrating
+              ? 'celebrating'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className="mosaic-result-inner">
             <div className="mosaic-result-icon">
               ✓
@@ -881,7 +1295,11 @@ export function PlaceMosaicRuntimeScreen({
                       setMessage('')
                     }}
                   >
-                    {choice}
+                    <span className="mosaic-choice-index">
+                      {index + 1}
+                    </span>
+
+                    <span>{choice}</span>
                   </button>
                 ),
               )}
@@ -927,6 +1345,30 @@ export function PlaceMosaicRuntimeScreen({
           maxMoves - moves,
         )
       : null
+
+  const correctPieces =
+    order.reduce(
+      (
+        total,
+        originalPiece,
+        position,
+      ) =>
+        total +
+        (
+          originalPiece === position
+            ? 1
+            : 0
+        ),
+      0,
+    )
+
+  const completionPercent =
+    Math.round(
+      (
+        correctPieces /
+        totalPieces
+      ) * 100,
+    )
 
   return (
     <section
@@ -1006,6 +1448,11 @@ export function PlaceMosaicRuntimeScreen({
                       selected === position
                         ? 'selected'
                         : '',
+                      swapPositions.includes(
+                        position,
+                      )
+                        ? 'swapping'
+                        : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -1022,6 +1469,7 @@ export function PlaceMosaicRuntimeScreen({
                       backgroundPosition:
                         `${x}% ${y}%`,
                     }}
+                    disabled={swapping}
                     onClick={() =>
                       pressTile(position)
                     }
@@ -1033,13 +1481,46 @@ export function PlaceMosaicRuntimeScreen({
 
           <div className="mosaic-help">
             <span>
-              <b>Toca dos piezas</b> para
-              intercambiarlas.
+              <b>
+                {selected === null
+                  ? 'Toca una pieza'
+                  : 'Ahora toca otra'}
+              </b>
+              {' '}
+              {selected === null
+                ? 'para seleccionarla.'
+                : 'para intercambiarlas.'}
             </span>
 
             <span>
               {gridSize} × {gridSize}
             </span>
+          </div>
+
+          <div
+            className="mosaic-progress"
+            aria-label={
+              `${correctPieces} de ${totalPieces} piezas bien colocadas`
+            }
+          >
+            <div className="mosaic-progress-head">
+              <span>
+                Piezas bien colocadas
+              </span>
+
+              <b>
+                {correctPieces}/{totalPieces}
+              </b>
+            </div>
+
+            <div className="mosaic-progress-track">
+              <i
+                style={{
+                  width:
+                    `${completionPercent}%`,
+                }}
+              />
+            </div>
           </div>
         </section>
 
@@ -1062,10 +1543,13 @@ export function PlaceMosaicRuntimeScreen({
             type="button"
             onClick={() => {
               setSelected(null)
+              setMessage('')
+              setPreviewKind('peek')
+              setPreviewRemainingMs(1400)
               setPhase('preview')
             }}
           >
-            Ver fotografía
+            Ver referencia · 1,4 s
           </button>
         </div>
       </div>
