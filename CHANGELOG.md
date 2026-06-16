@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.4.0 — Place Mosaic production release
+
+- Adds Place Mosaic as the third production-ready reusable game.
+- Adds a visual Mission Control editor for uploading and optimizing photographs.
+- Supports 2×2, 3×3 and 4×4 mosaics.
+- Supports configurable photograph preview time and movement limits.
+- Adds optional real-world observation questions after reconstructing the image.
+- Adds an explicit completed-image step before the final question or route advance.
+- Removes the distracting tile resize animation.
+- Adds immediate tile exchange, progress feedback and mobile haptics.
+- Preserves offline play and later event synchronization.
+- Adds backend normalization and regression contracts for mosaic configuration.
+- Updates the player service-worker cache.
+
 ## v0.3.1 — Vite security update
 
 - Updates Vite from 8.0.10 to 8.0.16.

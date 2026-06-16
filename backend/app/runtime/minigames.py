@@ -237,6 +237,34 @@ def _normalize_sequence_tokens(value):
     return tokens
 
 
+def _normalize_mosaic_choices(value):
+    if not isinstance(value, list):
+        return [
+            "Puerta",
+            "Escudo",
+            "Campana",
+        ]
+
+    choices = []
+
+    for item in value:
+        text = _as_str(item).strip()[:60]
+
+        if text:
+            choices.append(text)
+
+    choices = choices[:4]
+
+    if len(choices) < 2:
+        return [
+            "Puerta",
+            "Escudo",
+            "Campana",
+        ]
+
+    return choices
+
+
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
@@ -252,6 +280,106 @@ def normalize_minigame_config(minigame_type, raw_cfg):
             .strip()
             or "logic_circuit"
         )
+
+        if game_id == "place_mosaic":
+            image_data_url = (
+                _as_str(
+                    raw.get("image_data_url")
+                )
+                .strip()
+            )
+
+            valid_image = (
+                len(image_data_url) <= 600000
+                and (
+                    image_data_url.startswith(
+                        "data:image/jpeg;base64,"
+                    )
+                    or image_data_url.startswith(
+                        "data:image/png;base64,"
+                    )
+                    or image_data_url.startswith(
+                        "data:image/webp;base64,"
+                    )
+                )
+            )
+
+            if not valid_image:
+                image_data_url = ""
+
+            grid_size = _clamp_int(
+                (
+                    raw.get("grid_size")
+                    if raw.get("grid_size") is not None
+                    else raw.get("grid_cols")
+                ),
+                3,
+                2,
+                4,
+            )
+
+            choices = (
+                _normalize_mosaic_choices(
+                    raw.get("final_choices")
+                )
+            )
+
+            correct_index = _clamp_int(
+                raw.get("final_correct_index"),
+                0,
+                0,
+                len(choices) - 1,
+            )
+
+            return {
+                "objective": "image_mosaic",
+                "game_id": "place_mosaic",
+                "completion_method": "puzzle",
+                "image_data_url": image_data_url,
+                "image_alt": (
+                    _as_str(
+                        raw.get("image_alt")
+                    )
+                    .strip()[:120]
+                ),
+                "grid_size": grid_size,
+                "grid_cols": grid_size,
+                "grid_rows": grid_size,
+                "preview_ms": _clamp_int(
+                    raw.get("preview_ms"),
+                    2500,
+                    0,
+                    6000,
+                ),
+                "max_moves": _clamp_int(
+                    raw.get("max_moves"),
+                    0,
+                    0,
+                    500,
+                ),
+                "require_final_question": (
+                    _as_bool(
+                        raw.get(
+                            "require_final_question"
+                        ),
+                        False,
+                    )
+                ),
+                "final_question": (
+                    _as_str(
+                        raw.get("final_question")
+                        or (
+                            "¿Qué detalle aparece "
+                            "en el lugar real?"
+                        )
+                    )
+                    .strip()[:180]
+                ),
+                "final_choices": choices,
+                "final_correct_index": (
+                    correct_index
+                ),
+            }
 
         if game_id == "sequence_code":
             sequence = _normalize_sequence_tokens(
@@ -589,6 +717,12 @@ def build_stage_minigame_runtime(node):
         and config.get("game_id") == "sequence_code"
     ):
         label = "Código secuencial"
+
+    if (
+        minigame_type == "circuit_matrix"
+        and config.get("game_id") == "place_mosaic"
+    ):
+        label = "Mosaico del lugar"
 
     return {
         "type": minigame_type,

@@ -10,7 +10,7 @@
 
 SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
 
-Current public release: **v0.3.1**.
+Current public release: **v0.4.0**.
 
 ---
 
@@ -165,14 +165,32 @@ QR inventory works locally and is compatible with offline player progress.
 |---|---|
 | Circuit Matrix | Production-ready |
 | Sequence Code | Production-ready |
+| Place Mosaic | Production-ready |
 | QR object/key/clue/bonus nodes | Production-ready |
 | Guided Mission Control editor | Production-ready |
 | Offline progress and event synchronization | Production-ready foundation |
 | GPS signal and bearing games | Validation/polish pending |
-| Photo and team games | Planned |
+| Team games | Planned |
 | Motion Challenge | Parked experimental prototype |
 
 ---
+
+### Place Mosaic
+
+The third production-ready reusable game:
+
+- upload and optimize a photograph directly in Mission Control;
+- configure 2×2, 3×3 or 4×4 puzzles;
+- show the original photograph for four to six seconds;
+- shuffle the pieces for every play session;
+- exchange pieces with a simple two-tap interaction;
+- show correctly placed pieces and remaining moves;
+- optionally require a final real-world observation question;
+- display an explicit completed-image step before the question;
+- complete and advance through the normal offline mission flow.
+
+The photograph and puzzle configuration are stored with the mission
+runtime data, outside the public repository.
 
 ## Offline-first direction
 

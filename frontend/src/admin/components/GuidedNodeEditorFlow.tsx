@@ -10,6 +10,7 @@ import {
 import type { SavedPhysicalQrCard, PhysicalQrKind } from './PhysicalQrCardsPanel'
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
 import SequenceCodeEditor from './sequenceCode/SequenceCodeEditor'
+import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
 
 type StageLike = Record<string, any>
 
@@ -58,6 +59,15 @@ const TECHNICAL_CONFIG_KEYS = new Set([
   'shuffle_choices',
   'hint_text',
   'max_attempts',
+  'image_data_url',
+  'image_alt',
+  'grid_size',
+  'preview_ms',
+  'max_moves',
+  'require_final_question',
+  'final_question',
+  'final_choices',
+  'final_correct_index',
 ])
 
 const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
@@ -450,6 +460,77 @@ function isValidSequenceCodeConfig(
 
 
 
+function isValidPlaceMosaicConfig(
+  config: Record<string, unknown>,
+) {
+  const image = String(
+    config.image_data_url || '',
+  ).trim()
+
+  const imageValid =
+    image.length <= 600000 &&
+    (
+      image.startsWith(
+        'data:image/jpeg;base64,',
+      ) ||
+      image.startsWith(
+        'data:image/png;base64,',
+      ) ||
+      image.startsWith(
+        'data:image/webp;base64,',
+      )
+    )
+
+  const gridSize = Number(
+    config.grid_size ??
+    config.grid_cols ??
+    3,
+  )
+
+  if (
+    !imageValid ||
+    !Number.isInteger(gridSize) ||
+    gridSize < 2 ||
+    gridSize > 4
+  ) {
+    return false
+  }
+
+  if (
+    config.require_final_question !== true
+  ) {
+    return true
+  }
+
+  const question = String(
+    config.final_question || '',
+  ).trim()
+
+  const choices = Array.isArray(
+    config.final_choices,
+  )
+    ? config.final_choices
+        .map((item) =>
+          String(item).trim(),
+        )
+        .filter(Boolean)
+    : []
+
+  const correctIndex = Number(
+    config.final_correct_index ?? 0,
+  )
+
+  return (
+    question.length >= 3 &&
+    choices.length >= 2 &&
+    choices.length <= 4 &&
+    Number.isInteger(correctIndex) &&
+    correctIndex >= 0 &&
+    correctIndex < choices.length
+  )
+}
+
+
 function normalizeCopy(value: unknown) {
   return String(value || '')
     .trim()
@@ -470,6 +551,24 @@ function shouldReplaceSequenceTitle(value: unknown) {
     'codigo secuencial',
   ]).has(title)
 }
+
+function shouldReplacePlaceMosaicTitle(
+  value: unknown,
+) {
+  const title = normalizeCopy(value)
+
+  if (!title) return true
+  if (/^new node(?:\s+\d+)?$/.test(title)) return true
+  if (/^nuevo nodo(?:\s+\d+)?$/.test(title)) return true
+
+  return new Set([
+    'restaurar el circuito',
+    'matriz de circuitos',
+    'código secuencial',
+    'codigo secuencial',
+  ]).has(title)
+}
+
 
 function isLegacySequenceCopy(value: unknown) {
   const content = normalizeCopy(value)
@@ -509,7 +608,10 @@ function normalizeMessage(value: unknown, fallback: string) {
 }
 
 function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
-  if (game.id === 'sequence_code') {
+  if (
+    game.id === 'sequence_code' ||
+    game.id === 'place_mosaic'
+  ) {
     return []
   }
 
@@ -678,7 +780,12 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       game.id === 'sequence_code' &&
       shouldReplaceSequenceTitle(stage.title)
         ? 'La clave del tríptico'
-        : stage.title
+        : game.id === 'place_mosaic' &&
+            shouldReplacePlaceMosaicTitle(
+              stage.title,
+            )
+          ? 'Mosaico del lugar'
+          : stage.title
 
     onPatch({
       ...base,
@@ -714,6 +821,18 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   function finalizeAndClose() {
+    if (
+      mode === 'game' &&
+      selectedGame.id === 'place_mosaic' &&
+      !isValidPlaceMosaicConfig(config)
+    ) {
+      showNotice(
+        'Sube una fotografía y revisa la pregunta final.',
+      )
+      goTo('config')
+      return
+    }
+
     if (
       mode === 'game' &&
       selectedGame.id === 'sequence_code' &&
@@ -774,7 +893,12 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         selectedGame.id === 'sequence_code' &&
         shouldReplaceSequenceTitle(stage.title)
           ? 'La clave del tríptico'
-          : stage.title
+          : selectedGame.id === 'place_mosaic' &&
+              shouldReplacePlaceMosaicTitle(
+                stage.title,
+              )
+            ? 'Mosaico del lugar'
+            : stage.title
 
       onPatch({
         ...base,
@@ -1136,6 +1260,22 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 {selectedGame.id === 'sequence_code' ? (
                   <div className="wide">
                     <SequenceCodeEditor
+                      config={config}
+                      onChange={(values) =>
+                        onPatch({
+                          config: {
+                            ...config,
+                            ...values,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {selectedGame.id === 'place_mosaic' ? (
+                  <div className="wide">
+                    <PlaceMosaicEditor
                       config={config}
                       onChange={(values) =>
                         onPatch({

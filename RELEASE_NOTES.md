@@ -1,35 +1,76 @@
-# SAGA Engine v0.3.1 — Vite security update
+# SAGA Engine v0.4.0 — Place Mosaic production release
 
-This maintenance release updates the frontend build tooling from Vite 8.0.10 to Vite 8.0.16.
+SAGA Engine adds its third production-ready reusable game:
+**Place Mosaic**.
 
-## Security fixes
+## Place Mosaic
 
-- Resolves CVE-2026-53571: Vite `server.fs.deny` bypass through Windows alternate paths.
-- Resolves CVE-2026-53632: NTLMv2 hash disclosure through UNC path handling in launch-editor.
-- Removes the open high and moderate Vite advisories reported for v0.3.0.
+- Reconstruct a photograph connected to the physical place.
+- Use 2×2, 3×3 or 4×4 boards.
+- Shuffle the pieces for each play session.
+- Show the original photograph for four, five or six seconds.
+- Exchange two pieces through a simple two-tap interaction.
+- Show correctly positioned pieces, progress and remaining moves.
+- Reopen a short reference view during the puzzle.
+- Display the reconstructed photograph when the mosaic is complete.
+- Optionally ask a final observation question about the real location.
+- Advance exactly once after successful completion.
 
-## Scope
+## Mission Control
 
-This release intentionally contains no gameplay or mission-authoring changes.
+- Dedicated visual Place Mosaic editor.
+- Local image upload and automatic optimization.
+- Photograph size and offline readiness feedback.
+- Alternative text configuration.
+- Board size, preview duration and movement-limit controls.
+- Optional final question with two to four answers.
+- Explicit correct-answer selection.
+- Validation prevents incomplete puzzles from being saved as ready.
 
-Production features remain:
+## Player experience
 
-- Circuit Matrix;
-- Sequence Code;
-- physical QR objects, keys, clues and bonuses;
-- guided Mission Control;
-- offline progress and synchronization foundations.
+- Visual style aligned with Circuit Matrix and Sequence Code.
+- No tile shrinking or distracting swap animation.
+- Immediate tile exchange.
+- Mobile haptic feedback where supported.
+- Clear `Imagen completada` transition.
+- Clear `Ahora responde a esta pregunta` step when configured.
+- Final `Lugar verificado` confirmation before continuing.
+
+## Offline and runtime
+
+- Photograph and puzzle configuration are included in mission runtime data.
+- Existing player offline foundations remain active.
+- Completion uses the standard node-completion and synchronization flow.
+- Runtime databases, mission data and player progress remain outside the image.
 
 ## Validation
 
-- `npm audit` reports zero known vulnerabilities.
-- Frontend TypeScript and Vite production build pass.
-- Repository privacy and protected-files guards pass.
-- Python compilation passes.
-- SAGA runtime contracts pass.
-- Candidate Docker deployment passes smoke checks.
-- Existing SQLite runtime data is preserved.
+- Repository privacy guard.
+- Protected-files guard.
+- Python compilation.
+- TypeScript and Vite production build.
+- Zero-vulnerability npm audit.
+- Backend runtime contracts.
+- Place Mosaic configuration normalization contracts.
+- Candidate-first Docker deployment.
+- Production smoke checks for `/`, `/admin-react` and the player route.
+
+## Production support
+
+| Feature | Status |
+|---|---|
+| Circuit Matrix | Production-ready |
+| Sequence Code | Production-ready |
+| Place Mosaic | Production-ready |
+| QR objects, keys, clues and bonuses | Production-ready |
+| Guided Mission Control | Production-ready |
+| Offline progress and synchronization | Production-ready foundation |
+| GPS signal and bearing games | Further field validation pending |
+| Motion Challenge | Parked experimental prototype |
 
 ## Upgrade
 
-The deployment rebuilds the frontend and application image. Mission, player, inventory and progress data remain outside the image and are not modified.
+The deployment rebuilds the application image while preserving the
+external SQLite database and all mission, player, inventory and
+progress data.
