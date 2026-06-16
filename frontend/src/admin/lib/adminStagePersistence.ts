@@ -175,3 +175,189 @@ export function mergeOverviewIntoRawStages(
     })
   })
 }
+
+function persistenceRecord(
+  value: unknown,
+): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function persistenceStageType(
+  stage: AdminRawStage,
+) {
+  const minigame = persistenceRecord(
+    stage.minigame,
+  )
+
+  return String(
+    minigame.type ||
+    stage.type ||
+    '',
+  )
+}
+
+function persistenceStageConfig(
+  stage: AdminRawStage,
+) {
+  const minigame = persistenceRecord(
+    stage.minigame,
+  )
+
+  const minigameConfig = persistenceRecord(
+    minigame.config,
+  )
+
+  if (
+    Object.keys(minigameConfig).length > 0
+  ) {
+    return minigameConfig
+  }
+
+  return persistenceRecord(stage.config)
+}
+
+function stablePersistenceValue(
+  value: unknown,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stablePersistenceValue)
+  }
+
+  if (
+    value &&
+    typeof value === 'object'
+  ) {
+    const record = value as Record<
+      string,
+      unknown
+    >
+
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [
+          key,
+          stablePersistenceValue(
+            record[key],
+          ),
+        ]),
+    )
+  }
+
+  return value ?? null
+}
+
+function persistenceJson(value: unknown) {
+  return JSON.stringify(
+    stablePersistenceValue(value),
+  )
+}
+
+export function verifyPersistedStages(
+  expectedStages: AdminRawStage[],
+  actualStages: AdminRawStage[],
+) {
+  const errors: string[] = []
+
+  if (
+    expectedStages.length !== actualStages.length
+  ) {
+    errors.push(
+      `número de nodos esperado `
+      + `${expectedStages.length}, `
+      + `guardado ${actualStages.length}`,
+    )
+  }
+
+  expectedStages.forEach(
+    (expected, index) => {
+      const actual = actualStages[index]
+
+      if (!actual) {
+        errors.push(
+          `falta el nodo ${index + 1}`,
+        )
+        return
+      }
+
+      const expectedType =
+        persistenceStageType(expected)
+
+      const actualType =
+        persistenceStageType(actual)
+
+      const expectedId = String(
+        expected.id ?? index,
+      )
+
+      const actualId = String(
+        actual.id ?? index,
+      )
+
+      if (expectedId !== actualId) {
+        errors.push(
+          `orden/ID del nodo ${index + 1}: `
+          + `${expectedId} != ${actualId}`,
+        )
+      }
+
+      if (
+        String(expected.title || '') !==
+        String(actual.title || '')
+      ) {
+        errors.push(
+          `título del nodo ${index + 1}`,
+        )
+      }
+
+      if (expectedType !== actualType) {
+        errors.push(
+          `tipo del nodo ${index + 1}: `
+          + `${expectedType} != ${actualType}`,
+        )
+      }
+
+      for (const field of [
+        'lat',
+        'lon',
+        'radius',
+        'entry_mode',
+        'require_proximity',
+      ]) {
+        if (
+          persistenceJson(expected[field]) !==
+          persistenceJson(actual[field])
+        ) {
+          errors.push(
+            `${field} del nodo ${index + 1}`,
+          )
+        }
+      }
+
+      const expectedConfig =
+        normalizeAdminConfigForFamily(
+          expectedType,
+          persistenceStageConfig(expected),
+        )
+
+      const actualConfig =
+        normalizeAdminConfigForFamily(
+          actualType,
+          persistenceStageConfig(actual),
+        )
+
+      if (
+        persistenceJson(expectedConfig) !==
+        persistenceJson(actualConfig)
+      ) {
+        errors.push(
+          `configuración del nodo ${index + 1}`,
+        )
+      }
+    },
+  )
+
+  return errors
+}

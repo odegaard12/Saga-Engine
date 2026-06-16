@@ -9,6 +9,7 @@ import {
 } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard, PhysicalQrKind } from './PhysicalQrCardsPanel'
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
+import SequenceCodeEditor from './sequenceCode/SequenceCodeEditor'
 
 type StageLike = Record<string, any>
 
@@ -54,6 +55,9 @@ const TECHNICAL_CONFIG_KEYS = new Set([
   'seed',
   'path_cells',
   'pattern_mode',
+  'shuffle_choices',
+  'hint_text',
+  'max_attempts',
 ])
 
 const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
@@ -396,6 +400,104 @@ function isValidFixedCircuitConfig(
   return true
 }
 
+
+function isValidSequenceCodeConfig(
+  config: Record<string, unknown>,
+) {
+  if (!Array.isArray(config.sequence)) {
+    return false
+  }
+
+  const sequence = config.sequence.map(
+    (item) => String(item).trim(),
+  )
+
+  if (
+    sequence.length < 3 ||
+    sequence.length > 10
+  ) {
+    return false
+  }
+
+  if (
+    sequence.some(
+      (item) => !item || item.length > 32,
+    )
+  ) {
+    return false
+  }
+
+  const unique = new Set(
+    sequence.map((item) =>
+      item.toLocaleLowerCase(),
+    ),
+  )
+
+  if (unique.size !== sequence.length) {
+    return false
+  }
+
+  const maxAttempts = Number(
+    config.max_attempts ?? 3,
+  )
+
+  return (
+    Number.isInteger(maxAttempts) &&
+    maxAttempts >= 1 &&
+    maxAttempts <= 8
+  )
+}
+
+
+
+function normalizeCopy(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase()
+}
+
+function shouldReplaceSequenceTitle(value: unknown) {
+  const title = normalizeCopy(value)
+
+  if (!title) return true
+  if (/^new node(?:\s+\d+)?$/.test(title)) return true
+  if (/^nuevo nodo(?:\s+\d+)?$/.test(title)) return true
+
+  return new Set([
+    'restaurar el circuito',
+    'matriz de circuitos',
+    'código secuencial',
+    'codigo secuencial',
+  ]).has(title)
+}
+
+function isLegacySequenceCopy(value: unknown) {
+  const content = normalizeCopy(value)
+
+  if (!content) return true
+
+  return (
+    content.includes('memoriza la secuencia') ||
+    content.includes('memoriza la ruta de energía') ||
+    content.includes('memoriza la ruta de energia') ||
+    content.includes('busca el punto marcado') ||
+    content === 'ordena las fichas para reconstruir el código.' ||
+    content === 'ordena las fichas para reconstruir el codigo.'
+  )
+}
+
+function isLegacySequenceHint(value: unknown) {
+  const hint = normalizeCopy(value)
+
+  if (!hint) return true
+
+  return (
+    hint.includes('memoriza la secuencia') ||
+    hint.includes('recuerda el orden en el que encontraste')
+  )
+}
+
+
 function isExperimentalOrPlanned(game: AdminGameCatalogItem) {
   return !isPlayableNow(game)
 }
@@ -407,6 +509,10 @@ function normalizeMessage(value: unknown, fallback: string) {
 }
 
 function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
+  if (game.id === 'sequence_code') {
+    return []
+  }
+
   const keys = new Set<string>()
 
   if (game.category === 'gps' || game.completionMethod === 'proximity' || game.completionMethod === 'hold' || game.completionMethod === 'team') {
@@ -568,8 +674,15 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       completion_method: game.completionMethod,
     }
 
+    const nextTitle =
+      game.id === 'sequence_code' &&
+      shouldReplaceSequenceTitle(stage.title)
+        ? 'La clave del tríptico'
+        : stage.title
+
     onPatch({
       ...base,
+      title: nextTitle,
       _clear_physical_fields: true,
       physical_qr: null,
       physical_node_kind: null,
@@ -603,6 +716,18 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   function finalizeAndClose() {
     if (
       mode === 'game' &&
+      selectedGame.id === 'sequence_code' &&
+      !isValidSequenceCodeConfig(config)
+    ) {
+      showNotice(
+        'La secuencia necesita entre 3 y 10 fichas diferentes.',
+      )
+      goTo('config')
+      return
+    }
+
+    if (
+      mode === 'game' &&
       selectedGame.id === 'logic_circuit' &&
       !isValidFixedCircuitConfig(config)
     ) {
@@ -622,6 +747,34 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         game_title: selectedGame.title,
         completion_method: selectedGame.completionMethod,
       }
+
+      const rawContent = String(
+        stage.content ||
+        stage.description ||
+        selectedGame.content ||
+        '',
+      )
+
+      const nextContent =
+        selectedGame.id === 'sequence_code' &&
+        isLegacySequenceCopy(rawContent)
+          ? selectedGame.content
+          : rawContent || selectedGame.content
+
+      const currentMessages =
+        stage.messages || selectedGame.messages
+
+      const nextMessages =
+        selectedGame.id === 'sequence_code' &&
+        isLegacySequenceHint(currentMessages?.hint)
+          ? selectedGame.messages
+          : currentMessages
+
+      const nextTitle =
+        selectedGame.id === 'sequence_code' &&
+        shouldReplaceSequenceTitle(stage.title)
+          ? 'La clave del tríptico'
+          : stage.title
 
       onPatch({
         ...base,
@@ -648,9 +801,10 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
         radius_m: Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50),
         proximity_radius_m: Number(stage.proximity_radius_m || stage.radius_m || stage.radius || 50),
         config: nextConfig,
-        messages: stage.messages || selectedGame.messages,
-        content: String(stage.content || stage.description || selectedGame.content || ''),
-        description: String(stage.description || stage.content || selectedGame.content || ''),
+        title: nextTitle,
+        messages: nextMessages,
+        content: nextContent,
+        description: nextContent,
       })
     }
 
@@ -966,6 +1120,22 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 {selectedGame.id === 'logic_circuit' ? (
                   <div className="wide">
                     <CircuitPatternEditor
+                      config={config}
+                      onChange={(values) =>
+                        onPatch({
+                          config: {
+                            ...config,
+                            ...values,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {selectedGame.id === 'sequence_code' ? (
+                  <div className="wide">
+                    <SequenceCodeEditor
                       config={config}
                       onChange={(values) =>
                         onPatch({

@@ -286,6 +286,89 @@ def check_minigame_normalization() -> None:
     )
 
 
+    sequence_code = normalize_minigame_config(
+        "circuit_matrix",
+        {
+            "objective": "sequence_order",
+            "game_id": "sequence_code",
+            "completion_method": "sequence",
+            "sequence": [
+                "NORTE",
+                "RÍO",
+                "TORRE",
+            ],
+            "difficulty": "normal",
+            "max_attempts": 3,
+            "hint_text": "Ordena las pistas.",
+        },
+    )
+
+    assert_equal(
+        sequence_code["objective"],
+        "sequence_order",
+        "sequence objective",
+    )
+
+    assert_equal(
+        sequence_code["game_id"],
+        "sequence_code",
+        "sequence game id",
+    )
+
+    assert_equal(
+        sequence_code["completion_method"],
+        "sequence",
+        "sequence completion method",
+    )
+
+    assert_equal(
+        sequence_code["sequence"],
+        ["NORTE", "RÍO", "TORRE"],
+        "sequence tokens",
+    )
+
+    assert_equal(
+        sequence_code["max_attempts"],
+        3,
+        "sequence max attempts",
+    )
+
+    duplicate_sequence = normalize_minigame_config(
+        "circuit_matrix",
+        {
+            "game_id": "sequence_code",
+            "sequence": [
+                "NORTE",
+                "norte",
+                "TORRE",
+            ],
+        },
+    )
+
+    assert_equal(
+        duplicate_sequence["sequence"],
+        [],
+        "duplicate sequence rejected",
+    )
+
+    short_sequence = normalize_minigame_config(
+        "circuit_matrix",
+        {
+            "game_id": "sequence_code",
+            "sequence": [
+                "UNO",
+                "DOS",
+            ],
+        },
+    )
+
+    assert_equal(
+        short_sequence["sequence"],
+        [],
+        "short sequence rejected",
+    )
+
+
 def check_stage_runtime_contract(main) -> None:
     raw_bearing = {
         "id": 7,
@@ -332,6 +415,150 @@ def check_stage_runtime_contract(main) -> None:
     assert_equal(summary["label"], "Bearing Hunt", "admin overview bearing label")
     # The current overview contract only requires the family identity to survive.
     # Detailed config editing can be covered by a later schema/editor contract.
+
+
+    raw_sequence = {
+        "id": 9,
+        "title": "Sequence contract node",
+        "type": "circuit_matrix",
+        "lat": 42.0,
+        "lon": -8.0,
+        "radius": 50,
+        "content": "Order the clues.",
+        "config": {
+            "objective": "sequence_order",
+            "game_id": "sequence_code",
+            "completion_method": "sequence",
+            "sequence": [
+                "NORTE",
+                "RÍO",
+                "TORRE",
+            ],
+            "max_attempts": 3,
+            "hint_text": "Ordena las pistas.",
+        },
+        "minigame": {
+            "type": "circuit_matrix",
+            "version": "v1",
+            "label": "Código secuencial",
+            "config": {
+                "objective": "sequence_order",
+                "game_id": "sequence_code",
+                "completion_method": "sequence",
+                "sequence": [
+                    "NORTE",
+                    "RÍO",
+                    "TORRE",
+                ],
+                "max_attempts": 3,
+                "hint_text": "Ordena las pistas.",
+            },
+        },
+    }
+
+    sequence_node = main.normalize_stage(
+        raw_sequence
+    )
+
+    assert_equal(
+        sequence_node["interaction"]["type"],
+        "circuit_matrix",
+        "sequence runtime family",
+    )
+
+    sequence_runtime = (
+        main.build_stage_minigame_runtime(
+            sequence_node
+        )
+    )
+
+    assert_equal(
+        sequence_runtime["label"],
+        "Código secuencial",
+        "sequence runtime label",
+    )
+
+    assert_equal(
+        sequence_runtime["config"]["game_id"],
+        "sequence_code",
+        "sequence runtime game id",
+    )
+
+    assert_equal(
+        sequence_runtime["config"]["sequence"],
+        ["NORTE", "RÍO", "TORRE"],
+        "sequence runtime tokens",
+    )
+
+
+    assert_equal(
+        main.stage_accepts_code(
+            raw_sequence,
+            "OK",
+        ),
+        True,
+        "sequence completion accepts minigame OK",
+    )
+
+    assert_equal(
+        main.stage_accepts_code(
+            raw_sequence,
+            "WRONG",
+        ),
+        False,
+        "sequence completion rejects wrong code",
+    )
+
+    sequence_inside = main.evaluate_entry(
+        sequence_node,
+        distance_m=20,
+        gps_available=True,
+        debug_enabled=False,
+    )
+
+    assert_equal(
+        sequence_inside["can_enter"],
+        True,
+        "sequence GPS entry inside radius",
+    )
+
+    sequence_outside = main.evaluate_entry(
+        sequence_node,
+        distance_m=80,
+        gps_available=True,
+        debug_enabled=False,
+    )
+
+    assert_equal(
+        sequence_outside["can_enter"],
+        False,
+        "sequence GPS entry outside radius",
+    )
+
+    assert_equal(
+        sequence_outside["reason"],
+        "out_of_range",
+        "sequence outside radius reason",
+    )
+
+    sequence_debug = main.evaluate_entry(
+        sequence_node,
+        distance_m=None,
+        gps_available=False,
+        debug_enabled=True,
+    )
+
+    assert_equal(
+        sequence_debug["can_enter"],
+        True,
+        "sequence debug bypass",
+    )
+
+    assert_equal(
+        sequence_debug["reason"],
+        "debug_bypass",
+        "sequence debug bypass reason",
+    )
 
 
 def check_minigame_precedence_contract(main) -> None:

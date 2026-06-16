@@ -266,18 +266,41 @@ function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResp
 
 function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse {
   if (!payload || typeof payload !== 'object') {
-    return { status: 'ok' }
+    return {
+      status: 'fail',
+      message: 'Admin save returned an empty response.',
+    }
   }
 
   const obj = payload as Record<string, unknown>
-  const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
-  const message = typeof obj.message === 'string' ? obj.message : undefined
+  const rawStatus =
+    typeof obj.status === 'string'
+      ? obj.status.toLowerCase()
+      : ''
 
-  if (rawStatus === 'fail') {
-    return { status: 'fail', message: message || 'Admin save endpoint returned fail.' }
+  const message =
+    typeof obj.message === 'string'
+      ? obj.message
+      : typeof obj.detail === 'string'
+        ? obj.detail
+        : undefined
+
+  if (
+    rawStatus !== 'ok' &&
+    rawStatus !== 'success'
+  ) {
+    return {
+      status: 'fail',
+      message:
+        message ||
+        `Admin save returned status ${rawStatus || 'missing'}.`,
+    }
   }
 
-  return { status: 'ok', message }
+  return {
+    status: 'ok',
+    message,
+  }
 }
 
 export async function fetchAdminStages(password?: string): Promise<AdminStagesResponse> {
@@ -354,18 +377,41 @@ export async function saveAdminStages(
 
 function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveResponse {
   if (!payload || typeof payload !== 'object') {
-    return { status: 'ok' }
+    return {
+      status: 'fail',
+      message: 'Admin config save returned an empty response.',
+    }
   }
 
   const obj = payload as Record<string, unknown>
-  const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
-  const message = typeof obj.message === 'string' ? obj.message : undefined
+  const rawStatus =
+    typeof obj.status === 'string'
+      ? obj.status.toLowerCase()
+      : ''
 
-  if (rawStatus === 'fail') {
-    return { status: 'fail', message: message || 'Admin config save endpoint returned fail.' }
+  const message =
+    typeof obj.message === 'string'
+      ? obj.message
+      : typeof obj.detail === 'string'
+        ? obj.detail
+        : undefined
+
+  if (
+    rawStatus !== 'ok' &&
+    rawStatus !== 'success'
+  ) {
+    return {
+      status: 'fail',
+      message:
+        message ||
+        `Admin config save returned status ${rawStatus || 'missing'}.`,
+    }
   }
 
-  return { status: 'ok', message }
+  return {
+    status: 'ok',
+    message,
+  }
 }
 
 function adminConfigPayloadVariants(password: string | undefined, config: Record<string, unknown>) {

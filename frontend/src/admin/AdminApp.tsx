@@ -41,6 +41,7 @@ import {
   buildRawStagesFromOverview,
   mergeOverviewIntoRawStages,
   stageSaveIdentity,
+  verifyPersistedStages,
 } from './lib/adminStagePersistence'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
 
@@ -569,10 +570,44 @@ export default function AdminApp() {
         persistedStages = buildRawStagesFromOverview(overview.stages || [])
       }
 
-      const saved = await saveAdminStages(undefined, persistedStages)
+      const saved = await saveAdminStages(
+        undefined,
+        persistedStages,
+      )
 
       if (saved.status !== 'ok') {
-        throw new Error(saved.message || 'Could not save admin stages.')
+        throw new Error(
+          saved.message ||
+          'Could not save admin stages.',
+        )
+      }
+
+      const verifiedRaw =
+        await fetchAdminStages()
+
+      if (
+        verifiedRaw.status !== 'ok'
+      ) {
+        throw new Error(
+          verifiedRaw.message ||
+          'No se pudo verificar el guardado.',
+        )
+      }
+
+      const persistenceErrors =
+        verifyPersistedStages(
+          persistedStages,
+          verifiedRaw.stages || [],
+        )
+
+      if (persistenceErrors.length > 0) {
+        throw new Error(
+          'El backend no guardó exactamente '
+          + 'lo enviado: '
+          + persistenceErrors
+              .slice(0, 6)
+              .join(', '),
+        )
       }
 
       const refreshed = await fetchAdminReactOverview()
@@ -584,8 +619,8 @@ export default function AdminApp() {
       setSaveState('saved')
       setLocalNotice(
         usedFallback
-          ? 'Guardado con payload de respaldo. Datos de misión recargados.'
-          : 'Guardado en backend. Datos de misión recargados.'
+          ? 'Guardado, verificado y recargado mediante payload de respaldo.'
+          : 'Guardado y verificado contra el backend. Datos de misión recargados.'
       )
     } catch (err) {
       setSaveState('error')

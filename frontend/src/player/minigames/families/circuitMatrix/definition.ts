@@ -62,6 +62,95 @@ function validateCircuitMatrixConfig(
   config: unknown
 ): { ok: true; value: CircuitMatrixConfig } | { ok: false; errors: string[] } {
   const raw = (config && typeof config === 'object' ? config : {}) as Partial<CircuitMatrixConfig>
+
+  if (
+    raw.game_id === 'sequence_code' ||
+    raw.objective === 'sequence_order'
+  ) {
+    const sequence = Array.isArray(raw.sequence)
+      ? raw.sequence.map((item) => String(item).trim())
+      : []
+
+    const maxAttempts = Number(
+      raw.max_attempts ?? 3,
+    )
+
+    const value: CircuitMatrixConfig = {
+      ...circuitMatrixDefinition.default_config,
+      ...raw,
+      objective: 'sequence_order',
+      game_id: 'sequence_code',
+      completion_method: 'sequence',
+      sequence,
+      max_attempts: maxAttempts,
+      hint_text: String(raw.hint_text ?? '').trim(),
+      shuffle_choices: true,
+    }
+
+    const errors: string[] = []
+
+    if (
+      sequence.length < 3 ||
+      sequence.length > 10
+    ) {
+      errors.push(
+        'sequence must contain between 3 and 10 tokens',
+      )
+    }
+
+    if (
+      sequence.some(
+        (item) => !item || item.length > 32,
+      )
+    ) {
+      errors.push(
+        'sequence tokens must contain 1-32 characters',
+      )
+    }
+
+    const unique = new Set(
+      sequence.map((item) =>
+        item.toLocaleLowerCase(),
+      ),
+    )
+
+    if (unique.size !== sequence.length) {
+      errors.push(
+        'sequence tokens must be unique',
+      )
+    }
+
+    if (
+      !Number.isInteger(maxAttempts) ||
+      maxAttempts < 1 ||
+      maxAttempts > 8
+    ) {
+      errors.push(
+        'max_attempts must be an integer between 1 and 8',
+      )
+    }
+
+    if (
+      String(value.hint_text || '').length > 240
+    ) {
+      errors.push(
+        'hint_text must contain at most 240 characters',
+      )
+    }
+
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        errors,
+      }
+    }
+
+    return {
+      ok: true,
+      value,
+    }
+  }
+
   const value: CircuitMatrixConfig = {
     ...circuitMatrixDefinition.default_config,
     ...raw,
