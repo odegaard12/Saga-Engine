@@ -2,7 +2,7 @@
 
 **Self-hosted engine for real-world, geolocated games and interactive routes.**
 
-![release](https://img.shields.io/badge/release-v0.2.0-0ea5e9)
+![release](https://img.shields.io/badge/release-v0.4.0-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![backend](https://img.shields.io/badge/backend-FastAPI-111827)
 ![frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-111827)
@@ -55,8 +55,8 @@ Admin monitors and adjusts players
 |---|---|
 | **Mission** | The whole game route or experience. |
 | **Node** | A step on the route, usually linked to a map position. |
-| **Game family** | Reusable runtime, such as GPS signal hunt or compass bearing. |
-| **Preset** | A configured game option shown in the editor. |
+| **Game family** | Reusable runtime that can support one or more playable game presets. |
+| **Game preset** | A playable configuration selected and edited in Mission Control. |
 | **Requirement** | Something needed before a node can be completed. |
 | **Inventory item** | QR/NFC/object collected by the player. |
 | **Progress** | Player state, current node, finished status and offline queue. |
@@ -68,25 +68,24 @@ Admin monitors and adjusts players
 Current player foundations:
 
 - map-first route view;
-- GPS/radius based nodes;
+- GPS/radius-based node access;
 - QR inventory collection;
-- player/team identity markers;
-- local/offline-first foundations;
-- mission pack/preload foundation;
+- player and team identity markers;
+- local and offline-first progress;
+- mission pack and preload foundations;
 - field photo pins;
-- route progress flow.
-- Circuit Matrix memory puzzle;
+- route progression and node completion;
+- Circuit Matrix visual-memory puzzle;
 - Sequence Code physical-clue puzzle;
+- Place Mosaic image-reconstruction puzzle;
 - fixed or per-game random circuit patterns;
 - offline QR objects, keys, clues and bonus cards.
 
 Player loop:
 
 ```text
-Move -> Find -> Scan -> Collect -> Solve -> Continue
+Move -> Find -> Observe -> Scan -> Collect -> Solve -> Continue
 ```
-
----
 
 ## Mission Control admin
 
@@ -105,18 +104,31 @@ The old classic admin has been retired. `/admin` redirects to `/admin-react`.
 
 ---
 
-## Current game families
+## Runtime families and game presets
+
+SAGA separates reusable runtime families from the playable presets
+configured in Mission Control.
+
+### Runtime families
+
+| Runtime family | Current use |
+|---|---|
+| `circuit_matrix` | Hosts Circuit Matrix, Sequence Code and Place Mosaic. |
+| `signal_hunt` | Experimental GPS runtime pending field validation. |
+| `bearing_hunt` | Experimental direction runtime pending redesign and validation. |
+
+### Production game presets
 
 ```text
-signal_hunt
-bearing_hunt
-circuit_matrix
+Circuit Matrix
+Sequence Code
+Place Mosaic
 ```
 
-Authoring direction:
+Authoring model:
 
 ```text
-Family -> Preset/Game -> Completion method -> Requirement -> Reward
+Runtime family -> Game preset -> Configuration -> Requirement -> Reward
 ```
 
 ---
@@ -128,10 +140,9 @@ Family -> Preset/Game -> Completion method -> Requirement -> Reward
 The first complete reusable puzzle runtime:
 
 - visual memory route;
-- fixed patterns shared by every player;
-- random pattern generated for each new game;
-- visual pattern drawing and generation in Mission Control;
-- configurable board, difficulty, preview speed and allowed errors;
+- fixed or per-game random patterns;
+- visual pattern authoring in Mission Control;
+- configurable board, preview speed and allowed errors;
 - strict validation against jumps, duplicates and invalid cells;
 - offline completion and later synchronization.
 
@@ -139,14 +150,31 @@ The first complete reusable puzzle runtime:
 
 The second production-ready reusable game:
 
-- three to ten configurable words, numbers or symbols;
+- configurable words, numbers or symbols;
 - visual authoring and ordering in Mission Control;
 - shuffled choices for every play session;
-- configurable attempts and optional hint after an error;
+- configurable attempts and optional hints;
 - physical-story and triptych gameplay model;
 - strict persistence verification after saving;
-- offline play and later synchronization;
-- validated transition to the following mission node.
+- validated transition to the following mission node;
+- offline play and later synchronization.
+
+### Place Mosaic
+
+The third production-ready reusable game:
+
+- photograph upload and optimization in Mission Control;
+- 2×2, 3×3 and 4×4 puzzles;
+- configurable initial photograph preview;
+- shuffled pieces for every play session;
+- immediate two-tap piece exchange;
+- correctly positioned piece and movement feedback;
+- explicit completed-image confirmation;
+- optional real-world observation question;
+- normal offline completion and route advancement.
+
+Photographs and mission configuration remain in external runtime data
+and are not committed to the public repository.
 
 ### Physical QR nodes
 
@@ -159,38 +187,20 @@ Mission Control can create and export QR cards for:
 
 QR inventory works locally and is compatible with offline player progress.
 
-### Current support level
+## Current support level
 
 | Capability | Status |
 |---|---|
 | Circuit Matrix | Production-ready |
 | Sequence Code | Production-ready |
 | Place Mosaic | Production-ready |
-| QR object/key/clue/bonus nodes | Production-ready |
+| QR objects, keys, clues and bonuses | Production-ready |
 | Guided Mission Control editor | Production-ready |
 | Offline progress and event synchronization | Production-ready foundation |
-| GPS signal and bearing games | Validation/polish pending |
-| Team games | Planned |
+| GPS Signal Hunt | Experimental; field validation pending |
+| Bearing Hunt | Experimental; redesign and validation pending |
 | Motion Challenge | Parked experimental prototype |
-
----
-
-### Place Mosaic
-
-The third production-ready reusable game:
-
-- upload and optimize a photograph directly in Mission Control;
-- configure 2×2, 3×3 or 4×4 puzzles;
-- show the original photograph for four to six seconds;
-- shuffle the pieces for every play session;
-- exchange pieces with a simple two-tap interaction;
-- show correctly placed pieces and remaining moves;
-- optionally require a final real-world observation question;
-- display an explicit completed-image step before the question;
-- complete and advance through the normal offline mission flow.
-
-The photograph and puzzle configuration are stored with the mission
-runtime data, outside the public repository.
+| Team games | Planned |
 
 ## Offline-first direction
 
@@ -266,25 +276,27 @@ ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
 
 ## Repository status
 
-The repository began with **v0.0.1** as its public foundation. **v0.3.0** provides two production-ready logic games, physical QR nodes, guided authoring and validated offline progression.
+The repository began with **v0.0.1** as its public foundation.
 
-`main` intentionally starts from one public release commit. Earlier private/internal iteration history is not part of the public baseline.
+**v0.4.0** provides three production-ready reusable games—Circuit
+Matrix, Sequence Code and Place Mosaic—together with physical QR nodes,
+guided authoring and validated offline progression.
 
----
+The public Git history starts at the v0.0.1 baseline. Earlier private
+or internal iteration history is intentionally not included.
 
 ## Roadmap
 
 Near-term:
 
-- improve visual game authoring in Mission Control;
-- simplify the admin node editor;
-- make game presets easier to understand and edit;
-- add more reusable offline-ready game presets;
-- harden QR route completion with explicit, predictable flow;
-- improve PWA/offline polish;
-- continue backend modularization.
-
----
+- continue simplifying Mission Control and the node editor;
+- improve reusable game templates and real mission examples;
+- validate, redesign or replace experimental GPS and bearing games;
+- add more distinctive offline-ready game presets;
+- harden QR route completion with an explicit and predictable flow;
+- improve PWA installation, caching and offline recovery;
+- reduce frontend bundle size through code splitting;
+- continue backend and frontend modularization.
 
 ## License
 
