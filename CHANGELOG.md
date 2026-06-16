@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.1 — Vite security update
+
+- Updates Vite from 8.0.10 to 8.0.16.
+- Resolves CVE-2026-53571.
+- Resolves CVE-2026-53632.
+- Keeps gameplay, mission data and runtime contracts unchanged.
+- Validates a zero-vulnerability npm audit.
+- Rebuilds and verifies the production frontend.
+
 ## v0.3.0 — Sequence Code production release
 
 - Adds Sequence Code as the second production-ready game.

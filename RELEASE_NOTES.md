@@ -1,65 +1,35 @@
-# SAGA Engine v0.3.0 — Sequence Code production release
+# SAGA Engine v0.3.1 — Vite security update
 
-SAGA Engine adds its second production-ready reusable game: **Sequence Code**.
+This maintenance release updates the frontend build tooling from Vite 8.0.10 to Vite 8.0.16.
 
-## Sequence Code
+## Security fixes
 
-- Players reconstruct an ordered sequence from physical clues, stories, maps or triptychs.
-- Three to ten configurable words, numbers or symbols.
-- Choices are shuffled for every play session.
-- Configurable number of attempts.
-- Optional contextual hint after the first error.
-- Wrong answers do not advance mission progress.
-- A correct answer completes the node and loads the following mission node.
-- Fully usable offline with later synchronization.
-- Visual design aligned with Circuit Matrix and the general SAGA player interface.
+- Resolves CVE-2026-53571: Vite `server.fs.deny` bypass through Windows alternate paths.
+- Resolves CVE-2026-53632: NTLMv2 hash disclosure through UNC path handling in launch-editor.
+- Removes the open high and moderate Vite advisories reported for v0.3.0.
 
-## Mission Control
+## Scope
 
-- Dedicated visual Sequence Code editor.
-- Add, edit, delete and reorder sequence tokens.
-- Stable text inputs that keep focus while typing.
-- Clear example for narrative and physical-clue missions.
-- Validation for empty, duplicated, short or oversized sequences.
-- Save confirmation only after the backend returns the exact stored configuration.
-- Verification covers title, order, coordinates, radius, entry mode and minigame configuration.
+This release intentionally contains no gameplay or mission-authoring changes.
 
-## Player and PWA reliability
+Production features remain:
 
-- Player mission data refreshes when returning to the tab.
-- Public configuration and version requests bypass stale HTTP caches.
-- Navigation uses network-first behavior with an offline fallback.
-- Service-worker cache version updated.
-- Existing offline mission data remains available when the network is unavailable.
+- Circuit Matrix;
+- Sequence Code;
+- physical QR objects, keys, clues and bonuses;
+- guided Mission Control;
+- offline progress and synchronization foundations.
 
 ## Validation
 
-- Repository privacy guard.
-- Protected-files guard.
-- Python compilation.
-- TypeScript production build.
-- Backend runtime contracts.
-- Sequence persistence from administrator to SQLite and player payload.
-- Wrong answer remains on the current node.
-- Correct `OK` completion advances exactly one level.
-- Following node is loaded after completion.
-- Candidate-first Docker deployment and smoke tests.
-- Manual mobile visual approval.
+- `npm audit` reports zero known vulnerabilities.
+- Frontend TypeScript and Vite production build pass.
+- Repository privacy and protected-files guards pass.
+- Python compilation passes.
+- SAGA runtime contracts pass.
+- Candidate Docker deployment passes smoke checks.
+- Existing SQLite runtime data is preserved.
 
-## Production support
+## Upgrade
 
-| Feature | Status |
-|---|---|
-| Circuit Matrix | Production-ready |
-| Sequence Code | Production-ready |
-| QR objects, keys, clues and bonuses | Production-ready |
-| Guided Mission Control | Production-ready |
-| Offline progress and synchronization | Production-ready foundation |
-| GPS signal and bearing games | Further field validation pending |
-| Motion Challenge | Parked experimental prototype |
-| Photo and team games | Planned |
-
-## Upgrade notes
-
-Runtime state remains outside the repository. Existing SQLite mission, player,
-inventory and progress data is preserved during deployment.
+The deployment rebuilds the frontend and application image. Mission, player, inventory and progress data remain outside the image and are not modified.
