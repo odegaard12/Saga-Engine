@@ -10,7 +10,7 @@
 
 SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
 
-Current public release: **v0.2.0**.
+Current public release: **v0.3.0**.
 
 ---
 
@@ -76,6 +76,7 @@ Current player foundations:
 - field photo pins;
 - route progress flow.
 - Circuit Matrix memory puzzle;
+- Sequence Code physical-clue puzzle;
 - fixed or per-game random circuit patterns;
 - offline QR objects, keys, clues and bonus cards.
 
@@ -134,6 +135,19 @@ The first complete reusable puzzle runtime:
 - strict validation against jumps, duplicates and invalid cells;
 - offline completion and later synchronization.
 
+### Sequence Code
+
+The second production-ready reusable game:
+
+- three to ten configurable words, numbers or symbols;
+- visual authoring and ordering in Mission Control;
+- shuffled choices for every play session;
+- configurable attempts and optional hint after an error;
+- physical-story and triptych gameplay model;
+- strict persistence verification after saving;
+- offline play and later synchronization;
+- validated transition to the following mission node.
+
 ### Physical QR nodes
 
 Mission Control can create and export QR cards for:
@@ -150,11 +164,12 @@ QR inventory works locally and is compatible with offline player progress.
 | Capability | Status |
 |---|---|
 | Circuit Matrix | Production-ready |
+| Sequence Code | Production-ready |
 | QR object/key/clue/bonus nodes | Production-ready |
 | Guided Mission Control editor | Production-ready |
 | Offline progress and event synchronization | Production-ready foundation |
 | GPS signal and bearing games | Validation/polish pending |
-| Sequence code, photo and team games | Planned |
+| Photo and team games | Planned |
 | Motion Challenge | Parked experimental prototype |
 
 ---
@@ -233,7 +248,7 @@ ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
 
 ## Repository status
 
-The repository began with **v0.0.1** as its public foundation. **v0.2.0** adds guided authoring, physical QR nodes and the first production-ready puzzle runtime.
+The repository began with **v0.0.1** as its public foundation. **v0.3.0** provides two production-ready logic games, physical QR nodes, guided authoring and validated offline progression.
 
 `main` intentionally starts from one public release commit. Earlier private/internal iteration history is not part of the public baseline.
 

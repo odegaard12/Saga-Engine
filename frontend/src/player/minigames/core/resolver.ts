@@ -89,17 +89,22 @@ export function isNativeMinigameFamily(value: string): value is MinigameFamily {
 function resolveCircuitMatrixNative(
   input: ResolveMinigameInput
 ): ResolvedCircuitMatrixMinigame {
+  const config: CircuitMatrixConfig = {
+    ...circuitMatrixDefinition.default_config,
+    ...asObject<CircuitMatrixConfig>(input.config),
+  }
+
   return {
     family: 'circuit_matrix',
     type: 'circuit_matrix',
     version: normalizeVersion(input.version),
     compatibility: 'native',
-    label: circuitMatrixDefinition.label,
+    label:
+      config.game_id === 'sequence_code'
+        ? 'Código secuencial'
+        : circuitMatrixDefinition.label,
     definition: circuitMatrixDefinition,
-    config: {
-      ...circuitMatrixDefinition.default_config,
-      ...asObject<CircuitMatrixConfig>(input.config),
-    },
+    config,
   }
 }
 

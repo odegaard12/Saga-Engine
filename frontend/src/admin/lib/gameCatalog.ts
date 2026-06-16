@@ -132,20 +132,29 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     family: 'circuit_matrix',
     category: 'logic',
     difficulty: 'Media',
-    duration: '3-6 min',
-    runtimeStatus: 'planned',
-    offlineStatus: 'offline_planned',
+    duration: '2-5 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
     completionMethod: 'sequence',
-    offlineNote: 'Debe validar secuencia local y sincronizar después.',
-    summary: 'Ordenar símbolos, palabras o números encontrados en ruta.',
-    playerGoal: 'Introducir o deducir una secuencia correcta.',
-    editorHint: 'Muy bueno para pistas físicas, carteles o QR previos.',
-    config: { objective: 'sequence', sequence: ['norte', 'rio', 'torre'], difficulty: 2, game_id: 'sequence_code' },
-    content: 'Ordena las pistas encontradas y desbloquea la secuencia.',
+    offlineNote: 'Funciona completamente en local y sincroniza el resultado al recuperar conexión.',
+    summary: 'Deducir el orden oculto usando un tríptico, mapa, historia o conjunto de pistas físicas.',
+    playerGoal: 'Consultar el material de misión y reconstruir el orden exacto de las pistas.',
+    editorHint: 'Escribe de tres a diez elementos en el orden correcto. El jugador deberá deducirlo usando su tríptico o material físico.',
+    config: {
+      objective: 'sequence_order',
+      game_id: 'sequence_code',
+      completion_method: 'sequence',
+      sequence: ['ROBLE', 'CAMPANA', 'PUENTE', 'TORRE'],
+      difficulty: 'normal',
+      max_attempts: 3,
+      hint_text: 'Busca qué sucede antes de cruzar el puente y cuál es el último destino.',
+      shuffle_choices: true,
+    },
+    content: 'Consulta tu tríptico y pulsa las fichas en el orden que revelan las pistas.',
     messages: {
-      hint: 'El orden importa. Revisa pistas anteriores.',
-      gps_unavailable: 'Este puzzle no depende de GPS.',
-      locked: 'La secuencia aún no encaja.',
+      hint: 'Busca qué sucede antes, después y al final de la historia.',
+      gps_unavailable: 'Este reto funciona sin GPS cuando el nodo está abierto.',
+      locked: 'El orden todavía no coincide con las pistas del tríptico.',
     },
   },
   {
@@ -394,7 +403,11 @@ export function getMissionTemplateById(templateId: MissionTemplateId): MissionTe
 export function getDefaultAdminStagePatchForGame(gameId: AdminGameId) {
   const game = getAdminGame(gameId)
   const config: Record<string, unknown> = {
-    ...getDefaultAdminConfigForFamily(game.family),
+    ...(
+      game.id === 'sequence_code'
+        ? {}
+        : getDefaultAdminConfigForFamily(game.family)
+    ),
     ...game.config,
     game_id: game.id,
     game_title: game.title,

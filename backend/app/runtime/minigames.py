@@ -209,6 +209,34 @@ def _normalize_circuit_path_cells(value, rows, cols):
     return cells
 
 
+
+def _normalize_sequence_tokens(value):
+    if not isinstance(value, list):
+        return []
+
+    if len(value) < 3 or len(value) > 10:
+        return []
+
+    tokens = []
+    seen = set()
+
+    for raw_item in value:
+        token = _as_str(raw_item).strip()
+
+        if not token or len(token) > 32:
+            return []
+
+        identity = token.casefold()
+
+        if identity in seen:
+            return []
+
+        tokens.append(token)
+        seen.add(identity)
+
+    return tokens
+
+
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
@@ -216,6 +244,54 @@ def normalize_minigame_config(minigame_type, raw_cfg):
         normalized_type = "signal_hunt"
 
     if normalized_type == "circuit_matrix":
+        game_id = (
+            _as_str(
+                raw.get("game_id")
+                or "logic_circuit"
+            )
+            .strip()
+            or "logic_circuit"
+        )
+
+        if game_id == "sequence_code":
+            sequence = _normalize_sequence_tokens(
+                raw.get("sequence")
+            )
+
+            difficulty = (
+                _as_str(
+                    raw.get("difficulty")
+                    or "normal"
+                )
+                .strip()
+                .lower()
+                or "normal"
+            )
+
+            if difficulty not in CIRCUIT_DIFFICULTIES:
+                difficulty = "normal"
+
+            return {
+                "objective": "sequence_order",
+                "game_id": "sequence_code",
+                "completion_method": "sequence",
+                "sequence": sequence,
+                "difficulty": difficulty,
+                "max_attempts": _clamp_int(
+                    raw.get("max_attempts"),
+                    3,
+                    1,
+                    8,
+                ),
+                "hint_text": (
+                    _as_str(
+                        raw.get("hint_text")
+                    )
+                    .strip()[:240]
+                ),
+                "shuffle_choices": True,
+            }
+
         rows = _clamp_int(
             raw.get("grid_rows"),
             5,
@@ -502,9 +578,21 @@ def build_stage_minigame_runtime(node):
         minigame_type = "signal_hunt"
     spec = get_minigame_spec(minigame_type)
     config = normalize_minigame_config(minigame_type, interaction.get("config") or {})
+
+    label = (
+        spec.get("label")
+        or minigame_type.replace("_", " ").title()
+    )
+
+    if (
+        minigame_type == "circuit_matrix"
+        and config.get("game_id") == "sequence_code"
+    ):
+        label = "Código secuencial"
+
     return {
         "type": minigame_type,
-        "label": spec.get("label") or minigame_type.replace("_", " ").title(),
+        "label": label,
         "version": "v1",
         "config": config,
     }

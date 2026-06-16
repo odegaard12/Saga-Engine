@@ -45,12 +45,17 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
   const timeout = withTimeoutSignal(2000)
 
   try {
-    const res = await fetch('/api/version', {
-      signal: timeout.signal,
-      headers: {
-        Accept: 'application/json',
+    const res = await fetch(
+      `/api/version?_=${Date.now()}`,
+      {
+        signal: timeout.signal,
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
       },
-    })
+    )
 
     if (!res.ok) {
       throw new Error(`Failed to load version: HTTP ${res.status}`)
@@ -98,12 +103,18 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   const timeout = withTimeoutSignal(3500)
 
   try {
-    const res = await fetch('/api/config', {
-      signal: timeout.signal,
-      headers: {
-        Accept: 'application/json',
+    const res = await fetch(
+      `/api/config?_=${Date.now()}`,
+      {
+        signal: timeout.signal,
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
       },
-    })
+    )
 
     if (!res.ok) {
       throw new Error(`Failed to load config: HTTP ${res.status}`)

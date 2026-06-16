@@ -28,6 +28,7 @@ export type CircuitMatrixObjective =
   | 'power_balance'
   | 'switch_logic'
   | 'signal_route'
+  | 'sequence_order'
 
 export type BearingHuntObjective =
   | 'single_lock'
@@ -43,6 +44,12 @@ export type SignalHuntObjective =
 
 export type CircuitMatrixConfig = {
   objective: CircuitMatrixObjective
+  game_id?: string
+  completion_method?: 'puzzle' | 'sequence'
+  sequence?: string[]
+  max_attempts?: number
+  hint_text?: string
+  shuffle_choices?: boolean
   grid_cols: number
   grid_rows: number
   seed?: string

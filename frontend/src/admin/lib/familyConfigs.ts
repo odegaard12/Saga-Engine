@@ -92,6 +92,17 @@ function normalizeCircuitDifficulty(value: unknown) {
   return 'normal'
 }
 
+
+function normalizeSequenceTokens(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .slice(0, 10)
+}
+
+
 export function getDefaultAdminConfigForFamily(type: string): Record<string, unknown> {
   if (type === 'motion_challenge') {
     return {
@@ -188,6 +199,44 @@ export function normalizeAdminConfigForFamily(
       target_bearing_deg: toAdminConfigNumber(bearing, 270),
       tolerance_deg: toAdminConfigNumber(raw.tolerance_deg, 12),
       hold_ms: toAdminConfigNumber(raw.hold_ms, 1200),
+    }
+  }
+
+  if (
+    type === 'circuit_matrix' &&
+    (
+      raw.game_id === 'sequence_code' ||
+      raw.objective === 'sequence_order'
+    )
+  ) {
+    const sequence = normalizeSequenceTokens(
+      raw.sequence,
+    )
+
+    return {
+      objective: 'sequence_order',
+      game_id: 'sequence_code',
+      completion_method: 'sequence',
+      sequence,
+      difficulty: normalizeCircuitDifficulty(
+        raw.difficulty,
+      ),
+      max_attempts: Math.max(
+        1,
+        Math.min(
+          8,
+          Math.round(
+            toAdminConfigNumber(
+              raw.max_attempts,
+              3,
+            ),
+          ),
+        ),
+      ),
+      hint_text: String(
+        raw.hint_text || '',
+      ).trim().slice(0, 240),
+      shuffle_choices: true,
     }
   }
 

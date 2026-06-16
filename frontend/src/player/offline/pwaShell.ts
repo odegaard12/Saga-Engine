@@ -1,14 +1,60 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v224-route-tile-coverage'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v300-sequence-code-live-refresh'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
   if (!('serviceWorker' in navigator)) return null
 
+  const hadController = Boolean(
+    navigator.serviceWorker.controller,
+  )
+
+  const reloadKey =
+    `${PLAYER_SHELL_CACHE}:controller-reload`
+
+  if (hadController) {
+    navigator.serviceWorker.addEventListener(
+      'controllerchange',
+      () => {
+        try {
+          if (
+            window.sessionStorage.getItem(
+              reloadKey,
+            ) === '1'
+          ) {
+            return
+          }
+
+          window.sessionStorage.setItem(
+            reloadKey,
+            '1',
+          )
+        } catch {
+          // Reload still works when sessionStorage is unavailable.
+        }
+
+        window.location.reload()
+      },
+      { once: true },
+    )
+  }
+
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    const registration =
+      await navigator.serviceWorker.register(
+        '/sw.js',
+        {
+          scope: '/',
+          updateViaCache: 'none',
+        },
+      )
+
+    await registration.update().catch(
+      () => undefined,
+    )
+
     return registration
   } catch {
-    // Offline shell is best-effort; mission data is still stored in IndexedDB.
+    // Offline shell is best-effort; mission data remains local.
     return null
   }
 }

@@ -175,6 +175,91 @@ export default function PlayerApp() {
       cancelled = true
     }
   }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let running = false
+
+    async function refreshMissionFromServer() {
+      if (running) return
+      if (interactionOpen || submitting) return
+
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState !== 'visible'
+      ) {
+        return
+      }
+
+      running = true
+
+      try {
+        const nextPayload = await fetchPlayerGame(
+          user,
+          { offlinePack: true },
+        )
+
+        const nextConfig = await fetchPublicConfig()
+          .then((config) => {
+            cachePublicConfig(config)
+            return config
+          })
+          .catch(() =>
+            buildFallbackPublicConfig(user),
+          )
+
+        await saveMissionPack({
+          user: nextPayload.user || user,
+          config: nextConfig,
+          payload: nextPayload,
+        }).catch(() => undefined)
+
+        if (!cancelled) {
+          setState({
+            status: 'ready',
+            payload: nextPayload,
+          })
+        }
+      } catch {
+        // Keep the currently loaded mission while offline.
+      } finally {
+        running = false
+      }
+    }
+
+    const refresh = () => {
+      void refreshMissionFromServer()
+    }
+
+    window.addEventListener('focus', refresh)
+    document.addEventListener(
+      'visibilitychange',
+      refresh,
+    )
+
+    const intervalId = window.setInterval(
+      refresh,
+      30000,
+    )
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(
+        'focus',
+        refresh,
+      )
+      document.removeEventListener(
+        'visibilitychange',
+        refresh,
+      )
+      window.clearInterval(intervalId)
+    }
+  }, [
+    user,
+    interactionOpen,
+    submitting,
+  ])
+
   useEffect(() => {
     let cancelled = false
     let intervalId: number | null = null

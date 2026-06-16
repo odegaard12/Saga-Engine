@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v224-route-tile-coverage'
+const CACHE_NAME = 'saga-player-shell-v300-sequence-code-live-refresh'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -71,20 +71,31 @@ async function networkFirst(request) {
   }
 }
 
-async function navigationCacheFirst(request) {
-  const cached =
-    (await caches.match(request)) ||
-    (await caches.match(DEFAULT_SHELL_URL))
+async function navigationNetworkFirst(request) {
+  try {
+    const response = await fetchWithTimeout(
+      request,
+      5000,
+    )
 
-  if (cached) {
-    fetchWithTimeout(request, 2500)
-      .then((response) => putCache(request, response))
-      .catch(() => undefined)
-
-    return cached
+    await putCache(request, response)
+    return response
+  } catch {
+    return (
+      (await caches.match(request)) ||
+      (await caches.match(DEFAULT_SHELL_URL)) ||
+      new Response(
+        'SAGA offline shell is not cached yet.',
+        {
+          status: 503,
+          headers: {
+            'Content-Type':
+              'text/plain; charset=utf-8',
+          },
+        },
+      )
+    )
   }
-
-  return networkFirst(request)
 }
 
 async function cacheUrls(urls) {
@@ -164,7 +175,7 @@ self.addEventListener('fetch', (event) => {
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(navigationCacheFirst(request))
+    event.respondWith(navigationNetworkFirst(request))
     return
   }
 
