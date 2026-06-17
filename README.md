@@ -2,7 +2,7 @@
 
 **Self-hosted engine for real-world, geolocated games and interactive routes.**
 
-![release](https://img.shields.io/badge/release-v0.4.0-0ea5e9)
+![release](https://img.shields.io/badge/release-v0.5.0-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![backend](https://img.shields.io/badge/backend-FastAPI-111827)
 ![frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-111827)
@@ -10,7 +10,7 @@
 
 SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
 
-Current public release: **v0.4.0**.
+Current public release: **v0.5.0**.
 
 ---
 
@@ -78,6 +78,9 @@ Current player foundations:
 - Circuit Matrix visual-memory puzzle;
 - Sequence Code physical-clue puzzle;
 - Place Mosaic image-reconstruction puzzle;
+- Tilt Maze gyroscope-and-touch maze challenge;
+- immersive native-game panels without duplicated outer headers;
+- node fallback codes kept exclusively in Tools;
 - fixed or per-game random circuit patterns;
 - offline QR objects, keys, clues and bonus cards.
 
@@ -113,7 +116,7 @@ configured in Mission Control.
 
 | Runtime family | Current use |
 |---|---|
-| `circuit_matrix` | Hosts Circuit Matrix, Sequence Code and Place Mosaic. |
+| `circuit_matrix` | Hosts Circuit Matrix, Sequence Code, Place Mosaic and Tilt Maze. |
 | `signal_hunt` | Experimental GPS runtime pending field validation. |
 | `bearing_hunt` | Experimental direction runtime pending redesign and validation. |
 
@@ -123,6 +126,7 @@ configured in Mission Control.
 Circuit Matrix
 Sequence Code
 Place Mosaic
+Tilt Maze
 ```
 
 Authoring model:
@@ -176,6 +180,25 @@ The third production-ready reusable game:
 Photographs and mission configuration remain in external runtime data
 and are not committed to the public repository.
 
+### Tilt Maze
+
+The fourth production-ready reusable game:
+
+- automatically generated mazes with no manual wall editing;
+- short 7×7, medium 9×9 and long 11×11 layouts;
+- fixed layouts shared by all players or a new layout per game;
+- mobile tilt control using orientation and motion sensor APIs;
+- screen-orientation-aware axis mapping and recalibration;
+- touch controls retained as an accessibility and compatibility fallback;
+- configurable time, lives, holes and required objects;
+- deterministic validation of generated routes;
+- offline play and standard node-completion synchronization;
+- normal transition to the following mission node.
+
+The player opens directly into the game interface. Duplicate outer titles,
+player labels and instructions are removed. Emergency node fallback remains
+available from **Tools**, rather than inside every game.
+
 ### Physical QR nodes
 
 Mission Control can create and export QR cards for:
@@ -194,6 +217,7 @@ QR inventory works locally and is compatible with offline player progress.
 | Circuit Matrix | Production-ready |
 | Sequence Code | Production-ready |
 | Place Mosaic | Production-ready |
+| Tilt Maze | Production-ready |
 | QR objects, keys, clues and bonuses | Production-ready |
 | Guided Mission Control editor | Production-ready |
 | Offline progress and event synchronization | Production-ready foundation |
@@ -278,9 +302,15 @@ ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
 
 The repository began with **v0.0.1** as its public foundation.
 
-**v0.4.0** provides three production-ready reusable games—Circuit
-Matrix, Sequence Code and Place Mosaic—together with physical QR nodes,
-guided authoring and validated offline progression.
+**v0.5.0** provides four production-ready reusable games—Circuit Matrix,
+Sequence Code, Place Mosaic and Tilt Maze—together with physical QR nodes,
+guided authoring, immersive player game panels and validated offline
+progression.
+
+Tilt Maze adds generated mazes, mobile sensor control, touch fallback,
+configurable hazards and objectives, and standard route advancement.
+Native games now avoid duplicated outer headers, while emergency node
+fallback remains centralized in Tools.
 
 The public Git history starts at the v0.0.1 baseline. Earlier private
 or internal iteration history is intentionally not included.
@@ -288,6 +318,8 @@ or internal iteration history is intentionally not included.
 ## Roadmap
 
 Near-term:
+
+- validate mobile sensor behaviour across different browsers and devices;
 
 - continue simplifying Mission Control and the node editor;
 - improve reusable game templates and real mission examples;

@@ -30,6 +30,7 @@ export type CircuitMatrixObjective =
   | 'signal_route'
   | 'sequence_order'
   | 'image_mosaic'
+  | 'balance_maze'
 
 export type BearingHuntObjective =
   | 'single_lock'
@@ -46,7 +47,7 @@ export type SignalHuntObjective =
 export type CircuitMatrixConfig = {
   objective: CircuitMatrixObjective
   game_id?: string
-  completion_method?: 'puzzle' | 'sequence'
+  completion_method?: 'puzzle' | 'sequence' | 'motion'
   sequence?: string[]
   max_attempts?: number
   hint_text?: string
@@ -60,6 +61,16 @@ export type CircuitMatrixConfig = {
   final_question?: string
   final_choices?: string[]
   final_correct_index?: number
+
+  maze_seed?: string
+  time_limit_s?: number
+  lives?: number
+  hole_count?: number
+  collectible_count?: number
+  sensor_enabled?: boolean
+  tilt_threshold?: number
+  step_cooldown_ms?: number
+
   grid_cols: number
   grid_rows: number
   seed?: string

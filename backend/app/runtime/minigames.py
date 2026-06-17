@@ -281,6 +281,113 @@ def normalize_minigame_config(minigame_type, raw_cfg):
             or "logic_circuit"
         )
 
+        if game_id == "tilt_maze":
+            difficulty = (
+                _as_str(
+                    raw.get("difficulty")
+                    or "normal"
+                )
+                .strip()
+                .lower()
+                or "normal"
+            )
+
+            if difficulty not in CIRCUIT_DIFFICULTIES:
+                difficulty = "normal"
+
+            fallback_size = (
+                7
+                if difficulty == "easy"
+                else 11
+                if difficulty == "hard"
+                else 9
+            )
+
+            pattern_mode = (
+                "random_each_game"
+                if (
+                    _as_str(
+                        raw.get("pattern_mode")
+                    )
+                    .strip()
+                    .lower()
+                    == "random_each_game"
+                )
+                else "fixed"
+            )
+
+            return {
+                "objective": "balance_maze",
+                "game_id": "tilt_maze",
+                "completion_method": "motion",
+                "difficulty": difficulty,
+                "grid_rows": _clamp_int(
+                    raw.get("grid_rows"),
+                    fallback_size,
+                    5,
+                    13,
+                ),
+                "grid_cols": _clamp_int(
+                    raw.get("grid_cols"),
+                    fallback_size,
+                    5,
+                    13,
+                ),
+                "pattern_mode": pattern_mode,
+                "maze_seed": (
+                    _as_str(
+                        raw.get("maze_seed")
+                        or "saga-maze"
+                    )
+                    .strip()[:80]
+                    or "saga-maze"
+                ),
+                "time_limit_s": _clamp_int(
+                    raw.get("time_limit_s"),
+                    75,
+                    20,
+                    180,
+                ),
+                "lives": _clamp_int(
+                    raw.get("lives"),
+                    3,
+                    1,
+                    5,
+                ),
+                "hole_count": _clamp_int(
+                    raw.get("hole_count"),
+                    4,
+                    0,
+                    18,
+                ),
+                "collectible_count": _clamp_int(
+                    raw.get(
+                        "collectible_count"
+                    ),
+                    2,
+                    0,
+                    6,
+                ),
+                "sensor_enabled": _as_bool(
+                    raw.get("sensor_enabled"),
+                    True,
+                ),
+                "tilt_threshold": _clamp_int(
+                    raw.get("tilt_threshold"),
+                    12,
+                    6,
+                    30,
+                ),
+                "step_cooldown_ms": _clamp_int(
+                    raw.get(
+                        "step_cooldown_ms"
+                    ),
+                    360,
+                    180,
+                    800,
+                ),
+            }
+
         if game_id == "place_mosaic":
             image_data_url = (
                 _as_str(

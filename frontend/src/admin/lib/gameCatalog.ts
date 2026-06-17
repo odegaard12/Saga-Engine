@@ -15,6 +15,7 @@ export type AdminGameId =
   | 'logic_circuit'
   | 'sequence_code'
   | 'place_mosaic'
+  | 'tilt_maze'
   | 'qr_collectible'
   | 'qr_key_gate'
   | 'clue_card'
@@ -194,6 +195,45 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'Compara formas, colores y detalles con el elemento que tienes delante.',
       gps_unavailable: 'Este reto puede jugarse sin GPS cuando el nodo ya está abierto.',
       locked: 'Completa el mosaico para continuar.',
+    },
+  },
+  {
+    id: 'tilt_maze',
+    title: 'Laberinto de equilibrio',
+    icon: '🎱',
+    family: 'circuit_matrix',
+    category: 'motion',
+    difficulty: 'Media',
+    duration: '2-6 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'motion',
+    offlineNote: 'El laberinto, los controles táctiles y el sensor funcionan completamente sin conexión.',
+    summary: 'Guiar una bola por un laberinto generado automáticamente inclinando el móvil.',
+    playerGoal: 'Recoger los objetos, evitar los agujeros y alcanzar la salida.',
+    editorHint: 'Elige tamaño y dificultad. Puedes fijar un laberinto o generar uno nuevo en cada partida.',
+    config: {
+      objective: 'balance_maze',
+      game_id: 'tilt_maze',
+      completion_method: 'motion',
+      difficulty: 'normal',
+      grid_rows: 9,
+      grid_cols: 9,
+      pattern_mode: 'fixed',
+      maze_seed: 'saga-maze',
+      time_limit_s: 75,
+      lives: 3,
+      hole_count: 4,
+      collectible_count: 2,
+      sensor_enabled: true,
+      tilt_threshold: 12,
+      step_cooldown_ms: 360,
+    },
+    content: 'Inclina el móvil o usa los botones para guiar la bola hasta la salida.',
+    messages: {
+      hint: 'Muévete despacio, recoge los objetos y evita los agujeros.',
+      gps_unavailable: 'Este reto funciona sin GPS cuando el nodo está abierto.',
+      locked: 'Supera el laberinto para continuar.',
     },
   },
   {

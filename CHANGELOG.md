@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.5.0 — Tilt Maze production release
+
+- Adds Tilt Maze as the fourth production-ready reusable game.
+- Generates validated mazes automatically; manual wall editing is not required.
+- Supports 7×7, 9×9 and 11×11 layouts.
+- Supports a fixed maze for all players or a new maze per game.
+- Adds mobile tilt control using orientation and motion sensor APIs.
+- Maps sensor axes to portrait and landscape screen orientation.
+- Adds recalibration, sensor-status feedback and touch-control fallback.
+- Adds configurable time, lives, holes and required objects.
+- Adds dedicated visual authoring and maze preview in Mission Control.
+- Fixes desktop clipping in the Tilt Maze, Place Mosaic and Circuit Pattern editors.
+- Gives desktop game editors a single natural vertical scroll area.
+- Removes duplicated title, game label, player name and instructions from native-game panels.
+- Expands the usable player game area.
+- Keeps emergency node fallback only in Tools.
+- Preserves offline completion and later synchronization.
+- Updates backend normalization and runtime contracts for Tilt Maze.
+
+
 ## v0.4.0 — Place Mosaic production release
 
 - Adds Place Mosaic as the third production-ready reusable game.

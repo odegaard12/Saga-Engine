@@ -3,7 +3,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type FormEvent,
   type TouchEvent,
 } from 'react'
 import type { PlayerStage } from '../../types/player'
@@ -16,9 +15,7 @@ interface InteractionSheetProps {
   user: string
   currentStage: PlayerStage | null
   helperText: string
-  playerHref: string
   submitting: boolean
-  errorMessage: string | null
   onClose: () => void
   onSubmitCode: (code: string) => Promise<void>
 }
@@ -55,14 +52,10 @@ export function InteractionSheet({
   user,
   currentStage,
   helperText,
-  playerHref,
   submitting,
-  errorMessage,
   onClose,
   onSubmitCode,
 }: InteractionSheetProps) {
-  const [code, setCode] = useState('')
-  const [showRecovery, setShowRecovery] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
 
   const touchStartYRef = useRef<number | null>(null)
@@ -84,11 +77,16 @@ export function InteractionSheet({
     resolvedRuntime && resolvedRuntime.compatibility === 'native'
   )
 
+  // Cualquier minijuego ya contiene su propio título,
+  // instrucciones, estado y botones. El contenedor exterior
+  // no debe repetir esa información.
+  const compactGameMode =
+    shouldRenderFamilyRuntime ||
+    Boolean(minigameDefinition)
+
   const compactLine = getCompactLine(currentStage)
 
   useEffect(() => {
-    setCode('')
-    setShowRecovery(false)
     setDragOffset(0)
   }, [stageId])
 
@@ -99,13 +97,6 @@ export function InteractionSheet({
   }, [open, stageId, currentStage])
 
   if (!open || !currentStage) return null
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const normalized = code.trim().toUpperCase()
-    if (!normalized || submitting) return
-    await onSubmitCode(normalized)
-  }
 
   async function handleNativeWin() {
     vibrate([12, 20, 12])
@@ -162,12 +153,20 @@ export function InteractionSheet({
     <>
       <style>{sheetAnimations}</style>
 
-      <div style={overlay}>
+      <div
+        style={
+          compactGameMode
+            ? compactGameOverlay
+            : overlay
+        }
+      >
         <div style={backdrop} onClick={submitting ? undefined : handleClose} />
 
         <section
           style={{
-            ...sheet,
+            ...(compactGameMode
+              ? compactGameSheet
+              : sheet),
             transform: `translateY(${dragOffset}px)`,
             transition:
               dragOffset === 0
@@ -177,6 +176,19 @@ export function InteractionSheet({
           aria-modal="true"
           role="dialog"
         >
+          {compactGameMode ? (
+            <button
+              type="button"
+              style={compactGameCloseButton}
+              onClick={handleClose}
+              disabled={submitting}
+              aria-label="Cerrar juego"
+              title="Cerrar juego"
+            >
+              ×
+            </button>
+          ) : (
+            <>
           <div
             style={dragHandleWrap}
             onTouchStart={(event) => {
@@ -215,6 +227,8 @@ export function InteractionSheet({
               CLOSE
             </button>
           </div>
+            </>
+          )}
 
           {shouldRenderFamilyRuntime && resolvedRuntime ? (
             <FamilyRuntimeHost
@@ -240,53 +254,6 @@ export function InteractionSheet({
             </section>
           )}
 
-          <div style={footerRow}>
-            <button
-              type="button"
-              style={recoveryToggle}
-              onClick={() => setShowRecovery((current) => !current)}
-            >
-              {showRecovery ? 'Ocultar fallback' : 'Fallback'}
-            </button>
-          </div>
-
-          {showRecovery ? (
-            <div style={recoveryPanel}>
-              <div style={recoveryTitle}>Código de emergencia offline</div>
-              <div style={recoveryHint}>
-                Escribe el código fallback preestablecido para completar este nodo sin cobertura.
-              </div>
-
-              <form style={formWrap} onSubmit={handleSubmit}>
-                <div style={inputRow}>
-                  <input
-                    id="interaction-code"
-                    value={code}
-                    onChange={(event) => setCode(event.target.value.toUpperCase())}
-                    placeholder="CÓDIGO FALLBACK"
-                    autoComplete="off"
-                    spellCheck={false}
-                    style={input}
-                    disabled={submitting}
-                  />
-
-                  <button
-                    type="submit"
-                    style={submitButton}
-                    disabled={submitting || !code.trim()}
-                  >
-                    {submitting ? '...' : 'Completar'}
-                  </button>
-                </div>
-
-                {errorMessage ? <div style={errorText}>{errorMessage}</div> : null}
-              </form>
-
-              <a href={playerHref} style={fallbackLink}>
-                Reabrir jugador
-              </a>
-            </div>
-          ) : null}
         </section>
       </div>
     </>
@@ -302,6 +269,12 @@ const overlay: CSSProperties = {
   justifyContent: 'center',
   padding: 12,
 }
+
+const compactGameOverlay: CSSProperties = {
+  ...overlay,
+  padding: 2,
+}
+
 
 const backdrop: CSSProperties = {
   position: 'absolute',
@@ -329,6 +302,45 @@ const sheet: CSSProperties = {
   animation: 'sagaSheetUp 220ms cubic-bezier(0.22, 1, 0.36, 1)',
   willChange: 'transform',
 }
+
+const compactGameSheet: CSSProperties = {
+  ...sheet,
+  width: 'min(100%, 1080px)',
+  maxHeight: 'calc(100dvh - 4px)',
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  padding: 0,
+  gap: 0,
+  border: 'none',
+  borderRadius: 24,
+  background: 'transparent',
+  boxShadow: 'none',
+}
+
+
+const compactGameCloseButton: CSSProperties = {
+  position: 'absolute',
+  top: 7,
+  right: 7,
+  zIndex: 50,
+  width: 38,
+  height: 38,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 0,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.22)',
+  background: 'rgba(2,6,23,.86)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  boxShadow: '0 7px 20px rgba(2,6,23,.38)',
+  color: '#fff',
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1,
+  cursor: 'pointer',
+}
+
 
 const dragHandleWrap: CSSProperties = {
   display: 'flex',
@@ -425,108 +437,6 @@ const bridgeText: CSSProperties = {
   color: '#cbd5e1',
   fontSize: 14,
   lineHeight: 1.5,
-}
-
-const footerRow: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-start',
-}
-
-const recoveryToggle: CSSProperties = {
-  minHeight: 32,
-  padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'transparent',
-  color: 'rgba(255,255,255,.66)',
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-}
-
-const recoveryTitle: CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 14,
-  fontWeight: 900,
-  letterSpacing: '-0.02em',
-}
-
-const recoveryHint: CSSProperties = {
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 12,
-  lineHeight: 1.35,
-}
-
-const recoveryPanel: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.03)',
-  padding: 12,
-  display: 'grid',
-  gap: 10,
-}
-
-const formWrap: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-}
-
-const inputRow: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  gap: 10,
-}
-
-const input: CSSProperties = {
-  minHeight: 44,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(2,6,23,.50)',
-  color: '#f8fafc',
-  fontSize: 14,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  padding: '0 14px',
-  outline: 'none',
-}
-
-const submitButton: CSSProperties = {
-  minHeight: 44,
-  minWidth: 62,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 14,
-  border: '1px solid rgba(22,163,74,.24)',
-  background: 'linear-gradient(180deg, rgba(34,197,94,.24), rgba(22,163,74,.18))',
-  color: '#dcfce7',
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  padding: '0 16px',
-}
-
-const errorText: CSSProperties = {
-  color: '#fecaca',
-  fontSize: 13,
-  fontWeight: 700,
-  lineHeight: 1.4,
-}
-
-const fallbackLink: CSSProperties = {
-  minHeight: 36,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  color: '#e2e8f0',
-  fontSize: 12,
-  fontWeight: 800,
-  textDecoration: 'none',
 }
 
 const sheetAnimations = `

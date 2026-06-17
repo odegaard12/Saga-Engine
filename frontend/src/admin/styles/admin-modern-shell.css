@@ -11648,3 +11648,185 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
     max-height: 370px !important;
   }
 }
+
+/* #246-custom-game-desktop-scroll
+ * Desktop game editors use one natural content scrollbar.
+ * Nothing inside Mosaico, Laberinto, Código or Matriz is clipped.
+ */
+
+.saga-guided-v4-custom-editor {
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+@media (min-width: 901px) and (pointer: fine) {
+  .saga-node-editor-host .admin-guided-v4-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v4-shell {
+    width: min(1500px, calc(100vw - 24px)) !important;
+    max-width: min(1500px, calc(100vw - 24px)) !important;
+    height: min(
+      920px,
+      calc(
+        100dvh
+        - env(safe-area-inset-top, 0px)
+        - env(safe-area-inset-bottom, 0px)
+        - 24px
+      )
+    ) !important;
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 24px
+    ) !important;
+  }
+
+  .saga-guided-v4-body {
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .saga-guided-v4-page:has(
+    .saga-guided-v4-custom-editor
+  ) {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    align-content: start !important;
+    grid-template-rows: auto auto !important;
+  }
+
+  .saga-guided-v4-formgrid:has(
+    .saga-guided-v4-custom-editor
+  ) {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    align-content: start !important;
+    padding-right: 0 !important;
+  }
+
+  .saga-guided-v4-formgrid:has(
+    .saga-guided-v4-custom-editor
+  ) > .saga-guided-v4-custom-editor {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .saga-guided-v4-custom-editor > .tme,
+  .saga-guided-v4-custom-editor > .pme,
+  .saga-guided-v4-custom-editor > .cpe,
+  .saga-guided-v4-custom-editor > .sce {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .saga-guided-v4-custom-editor .tme-layout,
+  .saga-guided-v4-custom-editor .pme-layout {
+    height: auto !important;
+    min-height: 0 !important;
+    align-items: start !important;
+  }
+
+  .saga-guided-v4-custom-editor .tme-layout {
+    grid-template-columns:
+      minmax(300px, 0.78fr)
+      minmax(480px, 1.22fr) !important;
+  }
+
+  .saga-guided-v4-custom-editor .pme-layout {
+    grid-template-columns:
+      minmax(320px, 0.85fr)
+      minmax(480px, 1.15fr) !important;
+  }
+
+  .saga-guided-v4-custom-editor .tme-card,
+  .saga-guided-v4-custom-editor .pme-card {
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .saga-guided-v4-custom-editor .tme-board {
+    width: min(100%, 390px) !important;
+    max-width: 390px !important;
+    max-height: none !important;
+    margin-inline: auto !important;
+  }
+
+  .saga-guided-v4-custom-editor .pme-photo,
+  .saga-guided-v4-custom-editor .pme-board,
+  .saga-guided-v4-custom-editor .pme-empty {
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+    max-height: none !important;
+    margin-inline: auto !important;
+  }
+
+  .saga-guided-v4-formgrid:has(.cpe)
+  > .saga-guided-v4-custom-editor {
+    overflow: visible !important;
+  }
+
+  .saga-guided-v4-custom-editor .cpe {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .saga-guided-v4-custom-editor .cpe-board-shell {
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+  }
+}
+
+@media (
+  min-width: 901px
+) and (
+  pointer: fine
+) and (
+  max-height: 820px
+) {
+  .saga-guided-v4-header {
+    padding-top: 7px !important;
+    padding-bottom: 5px !important;
+  }
+
+  .saga-guided-v4-stepper {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+  }
+
+  .saga-guided-v4-body {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .saga-guided-v4-custom-editor .tme-board {
+    width: min(100%, 320px) !important;
+    max-width: 320px !important;
+  }
+
+  .saga-guided-v4-custom-editor .pme-photo,
+  .saga-guided-v4-custom-editor .pme-board,
+  .saga-guided-v4-custom-editor .pme-empty {
+    width: min(100%, 300px) !important;
+    max-width: 300px !important;
+  }
+
+  .saga-guided-v4-custom-editor .cpe-board-shell {
+    width: min(100%, 310px) !important;
+    max-width: 310px !important;
+  }
+}

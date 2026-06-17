@@ -11,6 +11,7 @@ import type { SavedPhysicalQrCard, PhysicalQrKind } from './PhysicalQrCardsPanel
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
 import SequenceCodeEditor from './sequenceCode/SequenceCodeEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
+import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 
 type StageLike = Record<string, any>
 
@@ -249,19 +250,54 @@ function hasExplicitQrMarker(stage: StageLike): boolean {
 
 function gameFromStage(stage: StageLike): AdminGameCatalogItem {
   const config = configOf(stage)
-  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
-  const explicit = gameId ? adminGameCatalog.find((game) => game.id === gameId) : null
-  if (explicit) return explicit
 
-  if (typeof stage.game_type === 'string') {
-    const byGameType = adminGameCatalog.find((game) => game.id === stage.game_type)
-    if (byGameType) return byGameType
+  const configId =
+    typeof config.game_id === 'string'
+      ? config.game_id
+      : ''
+
+  const gameTypeId =
+    typeof stage.game_type === 'string'
+      ? stage.game_type
+      : ''
+
+  const templateId =
+    typeof stage.game_template_id === 'string'
+      ? stage.game_template_id
+      : ''
+
+  const byConfig = configId
+    ? adminGameCatalog.find(
+        (game) => game.id === configId,
+      )
+    : null
+
+  const byGameType = gameTypeId
+    ? adminGameCatalog.find(
+        (game) => game.id === gameTypeId,
+      )
+    : null
+
+  const byTemplate = templateId
+    ? adminGameCatalog.find(
+        (game) => game.id === templateId,
+      )
+    : null
+
+  // Al cambiar de juego, los dos identificadores superiores
+  // se actualizan juntos. Si coinciden, son la identidad más
+  // reciente y evitan mostrar un editor antiguo por config obsoleta.
+  if (
+    byGameType &&
+    byTemplate &&
+    byGameType.id === byTemplate.id
+  ) {
+    return byGameType
   }
 
-  if (typeof stage.game_template_id === 'string') {
-    const byTemplate = adminGameCatalog.find((game) => game.id === stage.game_template_id)
-    if (byTemplate) return byTemplate
-  }
+  if (byConfig) return byConfig
+  if (byTemplate) return byTemplate
+  if (byGameType) return byGameType
 
   // Legacy: los nodos antiguos signal_hunt sin game_id eran GPS/señal.
   // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer signal_hunt físico/QR.
@@ -460,6 +496,42 @@ function isValidSequenceCodeConfig(
 
 
 
+function isValidTiltMazeConfig(
+  config: Record<string, unknown>,
+) {
+  const rows = Number(
+    config.grid_rows ?? 9,
+  )
+
+  const cols = Number(
+    config.grid_cols ?? 9,
+  )
+
+  const timeLimit = Number(
+    config.time_limit_s ?? 75,
+  )
+
+  const lives = Number(
+    config.lives ?? 3,
+  )
+
+  return (
+    Number.isInteger(rows) &&
+    rows >= 5 &&
+    rows <= 13 &&
+    Number.isInteger(cols) &&
+    cols >= 5 &&
+    cols <= 13 &&
+    Number.isInteger(timeLimit) &&
+    timeLimit >= 20 &&
+    timeLimit <= 180 &&
+    Number.isInteger(lives) &&
+    lives >= 1 &&
+    lives <= 5
+  )
+}
+
+
 function isValidPlaceMosaicConfig(
   config: Record<string, unknown>,
 ) {
@@ -537,22 +609,7 @@ function normalizeCopy(value: unknown) {
     .toLocaleLowerCase()
 }
 
-function shouldReplaceSequenceTitle(value: unknown) {
-  const title = normalizeCopy(value)
-
-  if (!title) return true
-  if (/^new node(?:\s+\d+)?$/.test(title)) return true
-  if (/^nuevo nodo(?:\s+\d+)?$/.test(title)) return true
-
-  return new Set([
-    'restaurar el circuito',
-    'matriz de circuitos',
-    'código secuencial',
-    'codigo secuencial',
-  ]).has(title)
-}
-
-function shouldReplacePlaceMosaicTitle(
+function shouldReplaceGeneratedGameTitle(
   value: unknown,
 ) {
   const title = normalizeCopy(value)
@@ -566,7 +623,25 @@ function shouldReplacePlaceMosaicTitle(
     'matriz de circuitos',
     'código secuencial',
     'codigo secuencial',
+    'la clave del tríptico',
+    'la clave del triptico',
+    'mosaico del lugar',
+    'laberinto de equilibrio',
   ]).has(title)
+}
+
+
+function shouldReplaceSequenceTitle(
+  value: unknown,
+) {
+  return shouldReplaceGeneratedGameTitle(value)
+}
+
+
+function shouldReplacePlaceMosaicTitle(
+  value: unknown,
+) {
+  return shouldReplaceGeneratedGameTitle(value)
 }
 
 
@@ -607,10 +682,25 @@ function normalizeMessage(value: unknown, fallback: string) {
   return LEGACY_MESSAGE_FALLBACKS[raw] || raw
 }
 
+const CUSTOM_GAME_EDITOR_IDS = new Set([
+  'logic_circuit',
+  'sequence_code',
+  'place_mosaic',
+  'tilt_maze',
+])
+
+function hasCustomGameEditor(
+  game: AdminGameCatalogItem,
+) {
+  return CUSTOM_GAME_EDITOR_IDS.has(game.id)
+}
+
+
 function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
   if (
     game.id === 'sequence_code' ||
-    game.id === 'place_mosaic'
+    game.id === 'place_mosaic' ||
+    game.id === 'tilt_maze'
   ) {
     return []
   }
@@ -744,6 +834,11 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   const step = STEPS[stepIndex]?.key || 'type'
   const title = displayTitle(stage)
   const config = configOf(stage)
+
+  const customGameEditor =
+    mode === 'game' &&
+    hasCustomGameEditor(selectedGame)
+
   const progress = useMemo(() => Math.round(((stepIndex + 1) / STEPS.length) * 100), [stepIndex])
 
   const goNext = () => setStepIndex((value) => Math.min(value + 1, STEPS.length - 1))
@@ -776,16 +871,21 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
       completion_method: game.completionMethod,
     }
 
-    const nextTitle =
-      game.id === 'sequence_code' &&
-      shouldReplaceSequenceTitle(stage.title)
+    const defaultTitle =
+      game.id === 'sequence_code'
         ? 'La clave del tríptico'
-        : game.id === 'place_mosaic' &&
-            shouldReplacePlaceMosaicTitle(
-              stage.title,
-            )
+        : game.id === 'place_mosaic'
           ? 'Mosaico del lugar'
-          : stage.title
+          : game.id === 'tilt_maze'
+            ? 'Laberinto de equilibrio'
+            : game.id === 'logic_circuit'
+              ? 'Matriz de circuitos'
+              : game.title
+
+    const nextTitle =
+      shouldReplaceGeneratedGameTitle(stage.title)
+        ? defaultTitle
+        : stage.title
 
     onPatch({
       ...base,
@@ -821,6 +921,18 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   }
 
   function finalizeAndClose() {
+    if (
+      mode === 'game' &&
+      selectedGame.id === 'tilt_maze' &&
+      !isValidTiltMazeConfig(config)
+    ) {
+      showNotice(
+        'Revisa tamaño, tiempo y vidas del laberinto.',
+      )
+      goTo('config')
+      return
+    }
+
     if (
       mode === 'game' &&
       selectedGame.id === 'place_mosaic' &&
@@ -1193,15 +1305,24 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
             <div className="saga-guided-v4-pagehead">
               <span>Paso 3</span>
               <h3>{mode === 'qr' ? 'Configurar QR físico' : 'Ajustes del juego'}</h3>
-              <p>{(mode === 'qr' ? selectedQr : selectedGame).editorHint}</p>
+              {customGameEditor ? null : (
+                <p>
+                  {(mode === 'qr'
+                    ? selectedQr
+                    : selectedGame
+                  ).editorHint}
+                </p>
+              )}
             </div>
 
             {mode === 'game' ? (
               <div className="saga-guided-v4-formgrid">
-                <article className="saga-guided-v4-note wide">
-                  <b>{selectedGame.playerGoal}</b>
-                  <span>{selectedGame.offlineNote}</span>
-                </article>
+                {!customGameEditor ? (
+                  <article className="saga-guided-v4-note wide">
+                    <b>{selectedGame.playerGoal}</b>
+                    <span>{selectedGame.offlineNote}</span>
+                  </article>
+                ) : null}
 
                 {usesLocationRadius(selectedGame) ? (
                   <label>
@@ -1242,8 +1363,9 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 })}
 
                 {selectedGame.id === 'logic_circuit' ? (
-                  <div className="wide">
+                  <div className="wide saga-guided-v4-custom-editor">
                     <CircuitPatternEditor
+                      key={selectedGame.id}
                       config={config}
                       onChange={(values) =>
                         onPatch({
@@ -1258,8 +1380,26 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 ) : null}
 
                 {selectedGame.id === 'sequence_code' ? (
-                  <div className="wide">
+                  <div className="wide saga-guided-v4-custom-editor">
                     <SequenceCodeEditor
+                      key={selectedGame.id}
+                      config={config}
+                      onChange={(values) =>
+                        onPatch({
+                          config: {
+                            ...config,
+                            ...values,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {selectedGame.id === 'tilt_maze' ? (
+                  <div className="wide saga-guided-v4-custom-editor">
+                    <TiltMazeEditor
+                      key={selectedGame.id}
                       config={config}
                       onChange={(values) =>
                         onPatch({
@@ -1274,8 +1414,9 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
                 ) : null}
 
                 {selectedGame.id === 'place_mosaic' ? (
-                  <div className="wide">
+                  <div className="wide saga-guided-v4-custom-editor">
                     <PlaceMosaicEditor
+                      key={selectedGame.id}
                       config={config}
                       onChange={(values) =>
                         onPatch({
