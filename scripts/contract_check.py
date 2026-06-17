@@ -50,6 +50,62 @@ def check_minigame_normalization() -> None:
     assert_true("bearing_hunt" in SUPPORTED_MINIGAME_TYPES, "bearing_hunt supported")
     assert_true("circuit_matrix" in SUPPORTED_MINIGAME_TYPES, "circuit_matrix supported")
 
+    tilt_maze = normalize_minigame_config(
+        "circuit_matrix",
+        {
+            "objective": "balance_maze",
+            "game_id": "tilt_maze",
+            "completion_method": "motion",
+            "difficulty": "normal",
+            "grid_rows": 9,
+            "grid_cols": 9,
+            "pattern_mode": "fixed",
+            "maze_seed": "contract-maze",
+            "time_limit_s": 75,
+            "lives": 3,
+            "hole_count": 4,
+            "collectible_count": 2,
+            "sensor_enabled": True,
+        },
+    )
+
+    assert_equal(
+        tilt_maze["objective"],
+        "balance_maze",
+        "tilt maze objective",
+    )
+
+    assert_equal(
+        tilt_maze["game_id"],
+        "tilt_maze",
+        "tilt maze game id",
+    )
+
+    assert_equal(
+        tilt_maze["grid_rows"],
+        9,
+        "tilt maze rows",
+    )
+
+    assert_equal(
+        tilt_maze["grid_cols"],
+        9,
+        "tilt maze cols",
+    )
+
+    assert_equal(
+        tilt_maze["time_limit_s"],
+        75,
+        "tilt maze time",
+    )
+
+    assert_equal(
+        tilt_maze["lives"],
+        3,
+        "tilt maze lives",
+    )
+
+
     bearing = normalize_minigame_config(
         "bearing_hunt",
         {

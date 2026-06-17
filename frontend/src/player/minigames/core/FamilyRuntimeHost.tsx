@@ -4,6 +4,7 @@ import { BearingHuntRuntimeScreen } from '../families/bearingHunt/RuntimeScreen'
 import { CircuitMatrixRuntimeScreen } from '../families/circuitMatrix/RuntimeScreen'
 import { SequenceCodeRuntimeScreen } from '../families/sequenceCode/RuntimeScreen'
 import { PlaceMosaicRuntimeScreen } from '../families/placeMosaic/RuntimeScreen'
+import { TiltMazeRuntimeScreen } from '../families/tiltMaze/RuntimeScreen'
 import { SignalHuntRuntimeScreen } from '../families/signalHunt/RuntimeScreen'
 import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
 
@@ -22,6 +23,21 @@ export function FamilyRuntimeHost({
   submitting,
   onWin,
 }: FamilyRuntimeHostProps) {
+  if (
+    resolved.family === 'circuit_matrix' &&
+    resolved.config.game_id === 'tilt_maze'
+  ) {
+    return (
+      <TiltMazeRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
   if (
     resolved.family === 'circuit_matrix' &&
     resolved.config.game_id === 'place_mosaic'

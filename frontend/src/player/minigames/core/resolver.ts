@@ -104,7 +104,9 @@ function resolveCircuitMatrixNative(
         ? 'Código secuencial'
         : config.game_id === 'place_mosaic'
           ? 'Mosaico del lugar'
-          : circuitMatrixDefinition.label,
+          : config.game_id === 'tilt_maze'
+            ? 'Laberinto de equilibrio'
+            : circuitMatrixDefinition.label,
     definition: circuitMatrixDefinition,
     config,
   }

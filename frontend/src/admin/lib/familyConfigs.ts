@@ -205,6 +205,142 @@ export function normalizeAdminConfigForFamily(
   if (
     type === 'circuit_matrix' &&
     (
+      raw.game_id === 'tilt_maze' ||
+      raw.objective === 'balance_maze'
+    )
+  ) {
+    const difficulty =
+      normalizeCircuitDifficulty(
+        raw.difficulty,
+      )
+
+    const fallbackSize =
+      difficulty === 'easy'
+        ? 7
+        : difficulty === 'hard'
+          ? 11
+          : 9
+
+    return {
+      objective: 'balance_maze',
+      game_id: 'tilt_maze',
+      completion_method: 'motion',
+      difficulty,
+      grid_rows: Math.max(
+        5,
+        Math.min(
+          13,
+          Math.round(
+            toAdminConfigNumber(
+              raw.grid_rows,
+              fallbackSize,
+            ),
+          ),
+        ),
+      ),
+      grid_cols: Math.max(
+        5,
+        Math.min(
+          13,
+          Math.round(
+            toAdminConfigNumber(
+              raw.grid_cols,
+              fallbackSize,
+            ),
+          ),
+        ),
+      ),
+      pattern_mode:
+        raw.pattern_mode ===
+        'random_each_game'
+          ? 'random_each_game'
+          : 'fixed',
+      maze_seed:
+        String(
+          raw.maze_seed ||
+          'saga-maze',
+        ).trim().slice(0, 80) ||
+        'saga-maze',
+      time_limit_s: Math.max(
+        20,
+        Math.min(
+          180,
+          Math.round(
+            toAdminConfigNumber(
+              raw.time_limit_s,
+              75,
+            ),
+          ),
+        ),
+      ),
+      lives: Math.max(
+        1,
+        Math.min(
+          5,
+          Math.round(
+            toAdminConfigNumber(
+              raw.lives,
+              3,
+            ),
+          ),
+        ),
+      ),
+      hole_count: Math.max(
+        0,
+        Math.min(
+          18,
+          Math.round(
+            toAdminConfigNumber(
+              raw.hole_count,
+              4,
+            ),
+          ),
+        ),
+      ),
+      collectible_count: Math.max(
+        0,
+        Math.min(
+          6,
+          Math.round(
+            toAdminConfigNumber(
+              raw.collectible_count,
+              2,
+            ),
+          ),
+        ),
+      ),
+      sensor_enabled:
+        raw.sensor_enabled !== false,
+      tilt_threshold: Math.max(
+        6,
+        Math.min(
+          30,
+          Math.round(
+            toAdminConfigNumber(
+              raw.tilt_threshold,
+              12,
+            ),
+          ),
+        ),
+      ),
+      step_cooldown_ms: Math.max(
+        180,
+        Math.min(
+          800,
+          Math.round(
+            toAdminConfigNumber(
+              raw.step_cooldown_ms,
+              360,
+            ),
+          ),
+        ),
+      ),
+    }
+  }
+
+  if (
+    type === 'circuit_matrix' &&
+    (
       raw.game_id === 'place_mosaic' ||
       raw.objective === 'image_mosaic'
     )

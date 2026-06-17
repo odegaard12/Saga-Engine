@@ -64,6 +64,150 @@ function validateCircuitMatrixConfig(
   const raw = (config && typeof config === 'object' ? config : {}) as Partial<CircuitMatrixConfig>
 
   if (
+    raw.game_id === 'tilt_maze' ||
+    raw.objective === 'balance_maze'
+  ) {
+    const difficulty =
+      raw.difficulty === 'easy' ||
+      raw.difficulty === 'hard'
+        ? raw.difficulty
+        : 'normal'
+
+    const fallbackSize =
+      difficulty === 'easy'
+        ? 7
+        : difficulty === 'hard'
+          ? 11
+          : 9
+
+    const numberValue = (
+      value: unknown,
+      fallback: number,
+    ) => {
+      const parsed = Number(value)
+
+      return Number.isFinite(parsed)
+        ? Math.round(parsed)
+        : fallback
+    }
+
+    const value: CircuitMatrixConfig = {
+      ...circuitMatrixDefinition.default_config,
+      ...raw,
+      objective: 'balance_maze',
+      game_id: 'tilt_maze',
+      completion_method: 'motion',
+      difficulty,
+      grid_rows: numberValue(
+        raw.grid_rows,
+        fallbackSize,
+      ),
+      grid_cols: numberValue(
+        raw.grid_cols,
+        fallbackSize,
+      ),
+      pattern_mode:
+        raw.pattern_mode ===
+        'random_each_game'
+          ? 'random_each_game'
+          : 'fixed',
+      maze_seed:
+        String(
+          raw.maze_seed ||
+          'saga-maze',
+        ).trim() ||
+        'saga-maze',
+      time_limit_s: numberValue(
+        raw.time_limit_s,
+        75,
+      ),
+      lives: numberValue(
+        raw.lives,
+        3,
+      ),
+      hole_count: numberValue(
+        raw.hole_count,
+        4,
+      ),
+      collectible_count: numberValue(
+        raw.collectible_count,
+        2,
+      ),
+      sensor_enabled:
+        raw.sensor_enabled !== false,
+      tilt_threshold: numberValue(
+        raw.tilt_threshold,
+        12,
+      ),
+      step_cooldown_ms: numberValue(
+        raw.step_cooldown_ms,
+        360,
+      ),
+    }
+
+    const errors: string[] = []
+
+    if (
+      value.grid_rows < 5 ||
+      value.grid_rows > 13 ||
+      value.grid_cols < 5 ||
+      value.grid_cols > 13
+    ) {
+      errors.push(
+        'maze grid must be between 5 and 13 cells',
+      )
+    }
+
+    if (
+      (value.time_limit_s || 0) < 20 ||
+      (value.time_limit_s || 0) > 180
+    ) {
+      errors.push(
+        'time_limit_s must be between 20 and 180',
+      )
+    }
+
+    if (
+      (value.lives || 0) < 1 ||
+      (value.lives || 0) > 5
+    ) {
+      errors.push(
+        'lives must be between 1 and 5',
+      )
+    }
+
+    if (
+      (value.hole_count || 0) < 0 ||
+      (value.hole_count || 0) > 18
+    ) {
+      errors.push(
+        'hole_count must be between 0 and 18',
+      )
+    }
+
+    if (
+      (value.collectible_count || 0) < 0 ||
+      (value.collectible_count || 0) > 6
+    ) {
+      errors.push(
+        'collectible_count must be between 0 and 6',
+      )
+    }
+
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        errors,
+      }
+    }
+
+    return {
+      ok: true,
+      value,
+    }
+  }
+
+  if (
     raw.game_id === 'place_mosaic' ||
     raw.objective === 'image_mosaic'
   ) {

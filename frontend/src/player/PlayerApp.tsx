@@ -1295,9 +1295,7 @@ return
         user={payload.user}
         currentStage={currentStage}
         helperText={runtime.helperText}
-        playerHref={playerHref}
         submitting={submitting}
-        errorMessage={submitError}
         onClose={() => {
           if (!submitting) setInteractionOpen(false)
         }}
