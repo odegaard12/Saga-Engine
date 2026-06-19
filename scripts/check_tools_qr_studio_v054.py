@@ -24,16 +24,12 @@ for token in [
     if token not in panel:
         raise SystemExit(f'ERROR offline conjunto: falta {token}')
 
-if (
-    'fotografías del mapa' not in panel
-    and 'fotografías visibles en el mapa' not in panel
-):
-    raise SystemExit(
-        'ERROR offline conjunto: '
-        'falta explicar que incluye fotografías del mapa'
-    )
-
 for forbidden in [
+    'Preparar y resolver',
+    'Antes de salir',
+    'Acciones independientes del juego offline.',
+    'Preparar para jugar',
+    'Fallback de nodo',
     'CENTRO DE CAMPO',
     'CONTENIDO DE CAMPO',
     'UBICACIÓN Y DIAGNÓSTICO',
@@ -72,7 +68,7 @@ for token in [
     if token not in guided:
         raise SystemExit(f'ERROR integración QR: falta {token}')
 
-cache = 'saga-player-shell-v517-tools-qr-studio'
+cache = 'saga-player-shell-v518-tools-copy-cleanup'
 if cache not in pwa or cache not in sw:
     raise SystemExit('ERROR caché PWA no coordinada')
 

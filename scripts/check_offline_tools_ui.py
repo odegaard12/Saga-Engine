@@ -35,7 +35,7 @@ sw = read(
 )
 
 required_panel = [
-    "Preparar para jugar",
+    "Juego offline",
     "Preparar juego offline",
     "Guardar progreso",
     "Sincronizar",

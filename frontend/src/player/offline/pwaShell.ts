@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v517-tools-qr-studio'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v518-tools-copy-cleanup'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null

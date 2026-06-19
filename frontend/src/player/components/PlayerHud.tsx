@@ -357,12 +357,8 @@ export function PlayerHud({
           >
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
-                <div style={toolsKicker}>
-                  HERRAMIENTAS
-                </div>
-
                 <div style={toolsTitle}>
-                  Preparar y resolver
+                  Herramientas
                 </div>
 
                 <div style={toolsSubtitle}>
@@ -385,16 +381,6 @@ export function PlayerHud({
             </div>
 
             <section style={toolsSection}>
-              <div style={toolsSectionHead}>
-                <strong style={toolsSectionTitle}>
-                  Antes de salir
-                </strong>
-
-                <span style={toolsSectionText}>
-                  Prepara el juego completo para usarlo sin cobertura.
-                </span>
-              </div>
-
               <MissionPackPanel
                 user={user}
                 payload={missionPayload}
@@ -406,10 +392,6 @@ export function PlayerHud({
                 <strong style={toolsSectionTitle}>
                   Accesos rápidos
                 </strong>
-
-                <span style={toolsSectionText}>
-                  Acciones independientes del juego offline.
-                </span>
               </div>
 
               <div style={toolsActionGrid}>
@@ -458,10 +440,6 @@ export function PlayerHud({
                 </span>
 
                 <div className="saga-tools-language-row">
-                  <span>
-                    {t('common.language', locale)}
-                  </span>
-
                   <button
                     type="button"
                     className={
@@ -504,8 +482,8 @@ export function PlayerHud({
             {onSubmitCode && currentStage && !finished ? (
               <section style={fallbackToolPanel}>
                 <div style={fallbackToolHead}>
-                  <strong>Fallback de nodo</strong>
-                  <span>Completa el nodo con código si falla GPS, QR, cámara, brújula o cobertura.</span>
+                  <strong>Código alternativo</strong>
+                  <span>Úsalo si no puedes escanear el QR.</span>
                 </div>
 
                 <button
@@ -514,7 +492,7 @@ export function PlayerHud({
                   onClick={() => setToolsFallbackOpen((value) => !value)}
                   disabled={submitting}
                 >
-                  {toolsFallbackOpen ? 'Ocultar fallback' : 'Fallback'}
+                  {toolsFallbackOpen ? 'Ocultar código' : 'Introducir código'}
                 </button>
 
                 {toolsFallbackOpen ? (
@@ -522,7 +500,7 @@ export function PlayerHud({
                     <input
                       value={toolsFallbackCode}
                       onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                      placeholder="CÓDIGO FALLBACK"
+                      placeholder="CÓDIGO ALTERNATIVO"
                       style={fallbackToolInput}
                       disabled={submitting}
                     />
@@ -541,40 +519,28 @@ export function PlayerHud({
               </section>
             ) : null}
 
-            <section style={toolsSupportPanel}>
-              <div style={toolsSectionHead}>
-                <strong style={toolsSectionTitle}>
-                  Soporte
-                </strong>
+            <div style={toolsSecondaryRow}>
+              <button
+                type="button"
+                style={
+                  debugEnabled
+                    ? toolsButtonDangerActive
+                    : toolsQuietButton
+                }
+                onClick={() => {
+                  onToggleDebug()
+                  onCloseTools()
+                }}
+              >
+                {debugEnabled
+                  ? 'Salir de prueba GPS'
+                  : 'Modo prueba GPS'}
+              </button>
 
-                <span style={toolsSupportText}>
-                  Opciones de comprobación y versión instalada.
-                </span>
+              <div style={toolsBuildInfo}>
+                <BuildInfoBadge mode="inline" />
               </div>
-
-              <div style={toolsSecondaryRow}>
-                <button
-                  type="button"
-                  style={
-                    debugEnabled
-                      ? toolsButtonDangerActive
-                      : toolsQuietButton
-                  }
-                  onClick={() => {
-                    onToggleDebug()
-                    onCloseTools()
-                  }}
-                >
-                  {debugEnabled
-                    ? 'Salir de prueba GPS'
-                    : 'Modo prueba GPS'}
-                </button>
-
-                <div style={toolsBuildInfo}>
-                  <BuildInfoBadge mode="inline" />
-                </div>
-              </div>
-            </section>
+            </div>
           </aside>
         </div>
       ) : null}
@@ -919,13 +885,6 @@ const toolsHeaderCopy: CSSProperties = {
   minWidth: 0,
 }
 
-const toolsKicker: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 9,
-  fontWeight: 950,
-  letterSpacing: '0.16em',
-}
-
 const toolsTitle: CSSProperties = {
   ...sheetTitle,
   marginTop: 0,
@@ -953,12 +912,6 @@ const toolsSectionTitle: CSSProperties = {
   color: '#f8fafc',
   fontSize: 12,
   fontWeight: 950,
-}
-
-const toolsSectionText: CSSProperties = {
-  color: 'rgba(226,232,240,.66)',
-  fontSize: 10,
-  lineHeight: 1.35,
 }
 
 const toolsActionGrid: CSSProperties = {
@@ -1038,21 +991,6 @@ const toolsQuietButton: CSSProperties = {
   background: 'rgba(255,255,255,.05)',
   color: 'rgba(226,232,240,.78)',
   fontSize: 10,
-}
-
-const toolsSupportPanel: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  padding: 10,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.09)',
-  background: 'rgba(15,23,42,.18)',
-}
-
-const toolsSupportText: CSSProperties = {
-  color: 'rgba(226,232,240,.62)',
-  fontSize: 10,
-  lineHeight: 1.35,
 }
 
 const toolsSecondaryRow: CSSProperties = {

@@ -80,7 +80,7 @@ required_offline = [
     "cacheMissionMapTiles",
     "cacheFieldProofAssets",
     "fetchFieldProofs",
-    "Preparar para jugar",
+    "Juego offline",
     "Preparar juego offline",
     "Guardar progreso",
     "Sincronizar",
@@ -107,7 +107,7 @@ if "fullscreen" not in manifest.get(
     )
 
 cache_name = (
-    "saga-player-shell-v517-tools-qr-studio"
+    "saga-player-shell-v518-tools-copy-cleanup"
 )
 
 if (

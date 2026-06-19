@@ -248,19 +248,9 @@ export function MissionPackPanel({
   return (
     <section style={card}>
       <div style={topRow}>
-        <div style={titleBlock}>
-          <span style={eyebrow}>
-            JUEGO OFFLINE
-          </span>
-
-          <strong style={title}>
-            Preparar para jugar
-          </strong>
-
-          <small style={description}>
-            Misión, mapa, juegos y fotografías del mapa.
-          </small>
-        </div>
+        <strong style={title}>
+          Juego offline
+        </strong>
 
         <span
           style={
@@ -352,30 +342,11 @@ const topRow: CSSProperties = {
   gap: 10,
 }
 
-const titleBlock: CSSProperties = {
-  display: 'grid',
-  gap: 3,
-  minWidth: 0,
-}
-
-const eyebrow: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 8,
-  fontWeight: 950,
-  letterSpacing: '0.14em',
-}
-
 const title: CSSProperties = {
   color: '#ffffff',
   fontSize: 16,
   fontWeight: 950,
   letterSpacing: '-0.02em',
-}
-
-const description: CSSProperties = {
-  color: 'rgba(226,232,240,.68)',
-  fontSize: 10,
-  lineHeight: 1.35,
 }
 
 const badge: CSSProperties = {
