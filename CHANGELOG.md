@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.5.3 — Offline GPS and field map release
+2026-06-19
+
+- Starts the player from a fresh GPS fix and rejects stale stored coordinates for initial centring.
+- Preserves free map exploration and adds a predictable compass overview/follow cycle.
+- Keeps player tracking stable while new GPS readings arrive.
+- Uses explicit mission-node semantics: completed green, next active yellow and locked future red.
+- Restricts the animated mission halo to the next active node.
+- Keeps a visible number on every node and uses one compact QR type badge without duplicate lock symbols.
+- Adds a road-following mission guide through OSRM when routing is available.
+- Caches road-route geometry locally and avoids drawing a misleading straight-line fallback.
+- Redesigns Tools and offline preparation around mission/map download, progress save and synchronization.
+- Coordinates the player service-worker cache as `saga-player-shell-v516-road-guide-tools`.
+- Adds guards for map markers, routing, offline recovery, GPS hardening and Tools UI.
+- Validates runtime contracts in Docker, TypeScript/Vite, npm audit and candidate-first deployment.
+
 ## v0.5.0 — Tilt Maze production release
 
 - Adds Tilt Maze as the fourth production-ready reusable game.
@@ -18,7 +34,6 @@
 - Keeps emergency node fallback only in Tools.
 - Preserves offline completion and later synchronization.
 - Updates backend normalization and runtime contracts for Tilt Maze.
-
 
 ## v0.4.0 — Place Mosaic production release
 
