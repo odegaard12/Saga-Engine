@@ -1,32 +1,47 @@
-# SAGA Engine v0.5.3 — Offline GPS and field map release
+# SAGA Engine v0.5.4 — Tools and QR Studio release
 
-SAGA Engine v0.5.3 hardens real-world field missions with a safer GPS startup, clearer node states, a cached road-following guide and a redesigned offline Tools experience.
+SAGA Engine v0.5.4 improves the field experience without adding another game.
+It consolidates offline preparation into a compact Tools panel and adds a safe,
+validated QR card workflow to Mission Control.
 
-## Highlights
+## Compact field Tools
 
-- Starts from a fresh GPS reading and avoids initial centring on stale coordinates.
-- Preserves free map exploration and the compass overview/follow cycle.
-- Keeps completed nodes green, the next active node yellow with the only halo, and future locked nodes red.
-- Keeps a visible number on every node.
-- Uses one compact QR type badge for collectible, key/requirement, clue or bonus roles.
-- Adds a high-contrast road-following guide when route geometry is available.
-- Caches successful route geometry locally and avoids a misleading straight-line fallback.
-- Reorganizes Tools around mission/map download, progress save, connection recovery and synchronization.
-- Coordinates the PWA cache as `saga-player-shell-v516-road-guide-tools`.
+- Aligns Tools with the established SAGA player design.
+- Removes duplicated headings and explanatory copy.
+- Uses one action to prepare mission data, map tiles, games and field photographs for offline play.
+- Keeps photograph downloads for the device gallery as a separate action.
+- Preserves progress save, synchronization, GPS centring, language, fallback code and diagnostics.
+- Leaves the bottom navigation and mobile safe areas unchanged.
+
+## QR Studio
+
+- Adds clear, dark and photographic card presets.
+- Supports configurable accent colour and square or rounded cards.
+- Optimizes uploaded header photographs without placing them over QR modules.
+- Keeps QR codes on a white, high-contrast surface with error-correction level H.
+- Adds camera validation using exact payload comparison.
+- Blocks PNG export until the current payload and design have been validated.
+- Invalidates the previous validation after any payload, photograph, colour, shape or preset change.
+- Does not modify inventory, node completion or player progress during validation.
+
+## Offline preparation
+
+The preparation action now caches the player shell, mission configuration, map
+tiles and field-proof assets together. Successful preparation remains compatible
+with later progress saving and pending-event synchronization.
 
 ## Validation
 
-- Marker, routing, offline/GPS and Tools guards.
-- Privacy and protected-files guards.
+- Dedicated Tools and QR Studio guard.
+- Offline/GPS hardening and recovery guards.
+- Marker, routing, privacy and protected-files guards.
 - Runtime contracts inside Docker.
 - TypeScript and Vite production build.
 - npm audit with zero known vulnerabilities.
-- Candidate-first deployment and smoke checks for `/`, `/admin-react` and `/player/PLAYER%201`.
+- Candidate-first Docker deployment and smoke checks for `/`, `/admin-react` and `/player/PLAYER%201`.
 
-## Known follow-up work
+## Follow-up work
 
-- Field-test routing across urban, rural and mountain missions.
-- Add selectable route profiles when supported.
-- Store route geometry in downloadable mission packs.
-- Continue tuning QR badges and node overlap on real phones.
-- Split the large frontend bundle through dynamic imports.
+- Test QR scanning across more phones, cameras, screens, printers and lighting conditions.
+- Consider PDF/A4 batch export after the single-card workflow is proven.
+- Continue reducing the frontend bundle through game-level dynamic imports.

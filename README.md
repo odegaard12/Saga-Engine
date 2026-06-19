@@ -2,7 +2,7 @@
 
 **Self-hosted engine for real-world, geolocated games and interactive routes.**
 
-![release](https://img.shields.io/badge/release-v0.5.3-0ea5e9)
+![release](https://img.shields.io/badge/release-v0.5.4-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![backend](https://img.shields.io/badge/backend-FastAPI-111827)
 ![frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-111827)
@@ -10,7 +10,7 @@
 
 SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
 
-Current public release: **v0.5.3**.
+Current public release: **v0.5.4**.
 
 ---
 
@@ -75,7 +75,8 @@ Current player foundations:
 - player and team identity markers;
 - local and offline-first progress;
 - mission pack, map-tile preload and connection-recovery foundations;
-- redesigned field Tools for offline preparation, progress save and synchronization;
+- compact field Tools for unified offline preparation, progress save and synchronization;
+- separate downloads for photographs intended for the device gallery;
 - field photo pins;
 - route progression and node completion;
 - Circuit Matrix visual-memory puzzle;
@@ -101,7 +102,7 @@ Mission Control is the main authoring and control interface.
 |---|---|
 | Mission editing | Map-first route editing and node ordering. |
 | Game authoring | Game catalog with runtime/offline status. |
-| QR props | QR card builder for objects, keys, clues and bonus cards. |
+| QR props | QR card studio with safe presets, photographs and camera validation. |
 | Players | Profile management and progress controls. |
 | Live control | Reset, move back, move forward or finish a player run. |
 | Families | Overview of gameplay families. |
@@ -211,6 +212,8 @@ Mission Control can create and export QR cards for:
 - clue cards;
 - optional bonus rewards.
 
+The QR Studio adds clear, dark and photographic card presets, configurable accents and card shapes, high-error-correction QR rendering, and camera validation before PNG export. Changing the payload or visual design invalidates the previous validation without changing node progression.
+
 QR inventory works locally and is compatible with offline player progress.
 
 ## Current support level
@@ -222,6 +225,7 @@ QR inventory works locally and is compatible with offline player progress.
 | Place Mosaic | Production-ready |
 | Tilt Maze | Production-ready |
 | QR objects, keys, clues and bonuses | Production-ready |
+| QR card design and camera validation | Production-ready foundation |
 | Guided Mission Control editor | Production-ready |
 | Offline progress and event synchronization | Production-ready foundation |
 | GPS Signal Hunt | Experimental; field validation pending |
@@ -238,7 +242,7 @@ Current foundations:
 - local player progress;
 - QR inventory cards;
 - physical event queue foundations;
-- mission pack, map-tile and road-route cache foundations;
+- unified mission, map-tile, game, field-photo and road-route cache foundations;
 - explicit offline preparation, connection recovery and later synchronization;
 - sync-oriented backend events;
 - runtime data separated from repository code.
@@ -306,20 +310,20 @@ ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
 
 The repository began with **v0.0.1** as its public foundation.
 
-**v0.5.3** hardens SAGA for real field use. The player starts from a fresh GPS
-fix instead of centring on stale coordinates, preserves free map exploration,
-supports a predictable compass overview/follow cycle and keeps tracking stable.
+**v0.5.4** completes the field Tools and QR authoring pass. The player now uses
+a compact Tools panel aligned with the rest of the mobile interface, with one
+unified offline preparation action for mission data, map tiles, games and field
+photographs. Gallery-oriented photograph downloads remain a separate action.
 
-Mission nodes now use explicit progression semantics: completed nodes are green,
-the next active node is yellow with the only mission halo, and future locked
-nodes are red. QR nodes retain their number and use one compact type badge.
+Mission Control now includes a QR card studio with safe visual presets,
+photographic headers, configurable accents and shapes, high-correction QR
+rendering and camera validation before PNG export. Validation compares the
+scanned payload exactly and is invalidated whenever the payload or card design
+changes, without altering player progress.
 
-When online routing is available, the map requests a road-following guide and
-caches the geometry locally. Tools and offline preparation now focus on mission
-and map download, progress save, connection recovery and synchronization.
-
-The four production-ready games remain Circuit Matrix, Sequence Code, Place
-Mosaic and Tilt Maze. Earlier private history remains intentionally excluded.
+The field map, GPS tracking, road guide, node-state semantics, bottom navigation
+and the four production-ready reusable games remain unchanged. Earlier private
+history remains intentionally excluded.
 
 ## Roadmap
 
@@ -330,7 +334,8 @@ Near-term:
 - improve reusable game templates and real mission examples;
 - validate, redesign or replace experimental GPS and bearing games;
 - add more distinctive offline-ready game presets;
-- harden QR route completion with an explicit and predictable flow;
+- field-test QR cards on different phones, printers and lighting conditions;
+- add optional PDF/A4 batch export after the single-card workflow is proven;
 - field-test road routing in urban and rural missions and add selectable route profiles;
 - improve PWA installation, caching and offline recovery;
 - reduce frontend bundle size through code splitting;
