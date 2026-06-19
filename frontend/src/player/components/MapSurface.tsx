@@ -22,11 +22,11 @@ const physicalNodeVisuals: Record<
   }
 > = {
   collectible: {
-    icon: '●',
-    label: 'Objeto QR',
+    icon: '\u2605',
+    label: 'Coleccionable QR',
   },
   requirement: {
-    icon: '◆',
+    icon: '\u{1F512}\uFE0E',
     label: 'Requisito QR',
   },
   clue: {
@@ -34,7 +34,7 @@ const physicalNodeVisuals: Record<
     label: 'Pista QR',
   },
   bonus: {
-    icon: '+',
+    icon: '\u{1F381}\uFE0E',
     label: 'Bonus QR',
   },
 }
@@ -336,27 +336,30 @@ function getNodeVisualConfig(
 ) {
   if (nodeState === 'engaging') {
     return {
-      ringColor: '#38bdf8',
+      ringColor: '#d6a900',
+      ringFillColor: '#f4c95d',
       ringWeight: 3,
-      ringOpacity: 0.66,
-      ringFillOpacity: 0.075,
+      ringOpacity: 0.58,
+      ringFillOpacity: 0.07,
     }
   }
 
   if (nodeState === 'ready') {
     return {
-      ringColor: '#22c55e',
-      ringWeight: 3,
-      ringOpacity: 0.62,
-      ringFillOpacity: 0.065,
+      ringColor: '#d6a900',
+      ringFillColor: '#f4c95d',
+      ringWeight: 2,
+      ringOpacity: 0.50,
+      ringFillOpacity: 0.055,
     }
   }
 
   return {
-    ringColor: '#f59e0b',
+    ringColor: '#d6a900',
+    ringFillColor: '#f4c95d',
     ringWeight: 2,
     ringOpacity: 0.44,
-    ringFillOpacity: 0.035,
+    ringFillOpacity: 0.04,
   }
 }
 
@@ -446,33 +449,48 @@ function createMissionNodeIcon(
   const physicalVisual =
     getPhysicalNodeVisual(stage)
 
+  const number =
+    String(index + 1)
+
   const label =
     physicalVisual?.icon ||
     (
       state === 'completed'
         ? '✓'
-        : String(index + 1)
+        : number
     )
 
   const title =
     physicalVisual?.label ||
     (
       state === 'completed'
-        ? `Nodo ${index + 1} completado`
+        ? `Nodo ${number} completado`
         : state === 'current'
-          ? `Nodo actual ${index + 1}`
-          : `Nodo ${index + 1} bloqueado`
+          ? `Nodo actual ${number}`
+          : `Nodo ${number} bloqueado`
     )
+
+  const symbolClass =
+    physicalVisual
+      ? 'saga-mission-node-symbol--physical'
+      : state === 'completed'
+        ? 'saga-mission-node-symbol--check'
+        : 'saga-mission-node-symbol--number'
+
+  const lockBadge =
+    state === 'locked' && !physicalVisual
+      ? '<span class="saga-mission-node-lock-badge" aria-hidden="true">&#128274;&#65038;</span>'
+      : ''
+
+  const halo =
+    state === 'current'
+      ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>'
+      : ''
 
   const size =
     state === 'current'
-      ? 36
-      : 32
-
-  const physicalClass =
-    physicalVisual
-      ? ' saga-mission-node-pin--physical'
-      : ''
+      ? 52
+      : 44
 
   return L.divIcon({
     className:
@@ -485,12 +503,18 @@ function createMissionNodeIcon(
       ),
     html:
       `<div ` +
-      `class="saga-mission-node-pin ` +
-      `saga-mission-node-pin--${state}` +
-      `${physicalClass}" ` +
+      `class="saga-mission-node-marker ` +
+      `saga-mission-node-marker--${state}" ` +
       `title="${escapeHtml(title)}" ` +
       `aria-label="${escapeHtml(title)}">` +
-      `<span>${escapeHtml(label)}</span>` +
+      halo +
+      `<div class="saga-mission-node-pin ` +
+      `saga-mission-node-pin--${state}">` +
+      `<span class="saga-mission-node-symbol ` +
+      `${symbolClass}">` +
+      `${escapeHtml(label)}</span>` +
+      lockBadge +
+      `</div>` +
       `</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -669,7 +693,7 @@ export function MapSurface({
       .saga-player-aura--gps {
         animation:
           sagaPlayerAuraBreathe
-          3.2s
+          4.8s
           ease-in-out
           infinite;
       }
@@ -677,19 +701,18 @@ export function MapSurface({
       .saga-player-aura--debug {
         animation:
           sagaPlayerAuraBreathe
-          2.6s
+          4.2s
           ease-in-out
           infinite;
       }
 
-      .saga-avatar-pin--self {
-        animation:
-          sagaPlayerPinBreathe
-          3.6s
-          ease-in-out
-          infinite;
-        transform-origin: center;
-        will-change: transform, filter;
+      .saga-avatar-pin--self,
+      .saga-avatar-pin--self img {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: translateZ(0) !important;
+        filter: none !important;
+        will-change: auto !important;
       }
 
       .saga-mission-node-icon-wrap {
@@ -697,127 +720,193 @@ export function MapSurface({
         border: 0 !important;
       }
 
+      .saga-mission-node-marker {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        overflow: visible;
+      }
+
+      .saga-mission-node-marker--current {
+        width: 52px;
+        height: 52px;
+      }
+
       .saga-mission-node-pin {
-        width: 32px;
-        height: 32px;
+        position: relative;
+        z-index: 2;
+        width: 34px;
+        height: 34px;
         box-sizing: border-box;
         display: flex;
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        border: 2px solid rgba(255,255,255,.76);
-        color: #f8fafc;
+        border:
+          2px solid
+          rgba(255,255,255,.86);
+        color: #ffffff;
         font-family:
+          "Segoe UI Symbol",
+          "Noto Sans Symbols 2",
           system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
           sans-serif;
         font-size: 12px;
         font-weight: 900;
         line-height: 1;
-        backdrop-filter: blur(8px);
         transform: translateZ(0);
+        animation: none;
       }
 
       .saga-mission-node-pin--completed {
         background:
           linear-gradient(
             145deg,
-            rgba(34,197,94,.97),
-            rgba(21,128,61,.95)
+            #22c55e,
+            #15803d
           );
-        border-color: rgba(220,252,231,.90);
-        color: #ffffff;
+        border-color:
+          rgba(220,252,231,.94);
         box-shadow:
-          0 5px 14px rgba(20,83,45,.27);
+          0 6px 16px
+            rgba(20,83,45,.34),
+          inset 0 1px 0
+            rgba(255,255,255,.24);
       }
 
       .saga-mission-node-pin--locked {
         background:
           linear-gradient(
             145deg,
-            rgba(30,41,59,.95),
-            rgba(15,23,42,.98)
+            #dc4c4c,
+            #991b1b
           );
-        border-color: rgba(148,163,184,.56);
-        color: #cbd5e1;
+        border-color:
+          rgba(254,226,226,.92);
         box-shadow:
-          0 5px 14px rgba(2,6,23,.23);
+          0 6px 16px
+            rgba(127,29,29,.34),
+          inset 0 1px 0
+            rgba(255,255,255,.20);
       }
 
       .saga-mission-node-pin--current {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         background:
           linear-gradient(
             145deg,
-            rgba(14,165,233,.98),
-            rgba(2,132,199,.97)
+            #f4c95d,
+            #d6a900
           );
-        border-color: rgba(224,242,254,.96);
-        color: #ffffff;
+        border-color:
+          rgba(255,248,214,.98);
+        color: #2f2504;
         font-size: 13px;
         box-shadow:
-          0 0 0 5px rgba(56,189,248,.10),
-          0 7px 18px rgba(3,105,161,.29);
-        animation:
-          sagaNodeBreathe
-          3.2s
-          ease-in-out
-          infinite;
-        will-change: transform, box-shadow;
+          0 7px 18px
+            rgba(113,83,0,.34),
+          inset 0 1px 0
+            rgba(255,255,255,.42);
+        animation: none;
+        will-change: auto;
       }
 
-      .saga-mission-node-pin--physical {
-        font-size: 14px;
+      .saga-mission-node-halo {
+        position: absolute;
+        z-index: 1;
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border:
+          2px solid
+          rgba(244,201,93,.72);
+        box-shadow:
+          0 0 0 2px
+          rgba(214,169,0,.12);
+        pointer-events: none;
+        transform-origin: center;
+        animation:
+          sagaCurrentNodeHalo
+          3.8s
+          cubic-bezier(.22,.61,.36,1)
+          infinite;
+      }
+
+      .saga-mission-node-symbol {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        line-height: 1;
+      }
+
+      .saga-mission-node-symbol--check {
+        font-size: 18px;
+      }
+
+      .saga-mission-node-symbol--number {
+        font-size: 13px;
+        font-variant-numeric:
+          tabular-nums;
+      }
+
+      .saga-mission-node-symbol--physical {
+        font-size: 16px;
+      }
+
+      .saga-mission-node-lock-badge {
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        width: 14px;
+        height: 14px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        color: #7f1d1d;
+        background:
+          rgba(255,255,255,.97);
+        border:
+          1px solid
+          rgba(127,29,29,.22);
+        box-shadow:
+          0 2px 5px
+          rgba(69,10,10,.24);
+        font-size: 8px;
+        line-height: 1;
       }
 
       @keyframes sagaPlayerAuraBreathe {
         0%,
         100% {
-          opacity: .40;
+          opacity: .36;
         }
 
         50% {
-          opacity: .60;
+          opacity: .50;
         }
       }
 
-      @keyframes sagaPlayerPinBreathe {
-        0%,
+      @keyframes sagaCurrentNodeHalo {
+        0% {
+          transform: scale(.88);
+          opacity: .56;
+        }
+
+        68% {
+          transform: scale(1.18);
+          opacity: .10;
+        }
+
         100% {
-          transform: scale(1);
-          filter:
-            drop-shadow(
-              0 5px 11px
-              rgba(15,23,42,.20)
-            );
-        }
-
-        50% {
-          transform: scale(1.022);
-          filter:
-            drop-shadow(
-              0 6px 14px
-              rgba(15,23,42,.26)
-            );
-        }
-      }
-
-      @keyframes sagaNodeBreathe {
-        0%,
-        100% {
-          transform: scale(1);
-          box-shadow:
-            0 0 0 5px rgba(56,189,248,.10),
-            0 7px 18px rgba(3,105,161,.29);
-        }
-
-        50% {
-          transform: scale(1.03);
-          box-shadow:
-            0 0 0 7px rgba(56,189,248,.05),
-            0 8px 20px rgba(3,105,161,.33);
+          transform: scale(1.24);
+          opacity: 0;
         }
       }
 
@@ -827,8 +916,7 @@ export function MapSurface({
       ) {
         .saga-player-aura--gps,
         .saga-player-aura--debug,
-        .saga-avatar-pin--self,
-        .saga-mission-node-pin--current {
+        .saga-mission-node-halo {
           animation: none !important;
         }
       }
@@ -939,16 +1027,15 @@ export function MapSurface({
       const center: L.LatLngExpression = [data.lat, data.lon]
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
-        const physicalVisual = getPhysicalNodeVisual(entry.stage)
 
         const radiusLayer = L.circle(center, {
           radius: data.radius,
-          color: physicalVisual ? '#0f172a' : visual.ringColor,
-          weight: physicalVisual ? 1 : visual.ringWeight,
-          opacity: physicalVisual ? 0.26 : visual.ringOpacity,
-          fillColor: physicalVisual ? '#ffffff' : visual.ringColor,
-          fillOpacity: physicalVisual ? 0.02 : visual.ringFillOpacity,
-          className: physicalVisual ? 'saga-node-radius saga-node-radius--physical' : `saga-node-radius saga-node-radius--${nodeState}`,
+          color: visual.ringColor,
+          weight: visual.ringWeight,
+          opacity: visual.ringOpacity,
+          fillColor: visual.ringFillColor,
+          fillOpacity: visual.ringFillOpacity,
+          className: `saga-node-radius saga-node-radius--current saga-node-radius--${nodeState}`,
         }).addTo(map)
 
         const markerLayer = L.marker(center, {
@@ -976,13 +1063,13 @@ export function MapSurface({
 
       const ringColor =
         state === 'completed'
-          ? '#22c55e'
-          : '#64748b'
+          ? '#15803d'
+          : '#b91c1c'
 
       const ringFill =
         state === 'completed'
-          ? '#bbf7d0'
-          : '#0f172a'
+          ? '#22c55e'
+          : '#dc4c4c'
 
       const ghostRadius = L.circle(center, {
         radius: Math.max(16, Math.min(data.radius, 40)),
@@ -990,13 +1077,14 @@ export function MapSurface({
         weight: 2,
         opacity:
           state === 'completed'
-            ? 0.34
-            : 0.27,
+            ? 0.32
+            : 0.28,
         fillColor: ringFill,
         fillOpacity:
           state === 'completed'
-            ? 0.07
-            : 0.025,
+            ? 0.055
+            : 0.04,
+        className: `saga-node-radius saga-node-radius--${state}`,
         interactive: false,
       }).addTo(map)
 
@@ -1078,18 +1166,18 @@ export function MapSurface({
     } else {
       const auraClassName =
         auraMode === 'debug' ? 'saga-player-aura--debug' : 'saga-player-aura--gps'
-      const auraColor = auraMode === 'debug' ? '#ef4444' : '#22c55e'
-      const auraFill = auraMode === 'debug' ? '#f87171' : '#4ade80'
+      const auraColor = auraMode === 'debug' ? '#c2410c' : '#0891b2'
+      const auraFill = auraMode === 'debug' ? '#fb923c' : '#22d3ee'
 
       if (!playerAuraRef.current || playerAuraModeRef.current !== auraMode) {
         playerAuraRef.current?.remove()
         playerAuraRef.current = L.circleMarker(nextLatLng, {
-          radius: 34,
+          radius: 27,
           color: auraColor,
-          weight: 5,
-          opacity: 0.9,
+          weight: 2,
+          opacity: 0.58,
           fillColor: auraFill,
-          fillOpacity: 0.30,
+          fillOpacity: 0.08,
           className: auraClassName,
           interactive: false,
         }).addTo(map)
@@ -1682,16 +1770,12 @@ const mapAnimations = `
   cursor: pointer;
 }
 
-.saga-node-radius--locked {
-  animation: sagaNodeHaloLocked 2200ms ease-in-out infinite;
-}
-
-.saga-node-radius--ready {
-  animation: sagaNodeHaloReady 1100ms ease-in-out infinite;
-}
-
+.saga-node-radius--completed,
+.saga-node-radius--current,
+.saga-node-radius--locked,
+.saga-node-radius--ready,
 .saga-node-radius--engaging {
-  animation: sagaNodeHaloEngaging 520ms ease-in-out 3;
+  animation: none;
 }
 
 .saga-node-core {
@@ -1845,32 +1929,61 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin {
-  will-change: transform;
+  will-change: auto;
   transform: translateZ(0);
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 950;
-          border: 3px solid rgba(255,255,255,.94);
-          box-shadow: 0 12px 30px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.35);
-          color: #ffffff;
-          background: linear-gradient(135deg, var(--saga-player-color, #22c55e), rgba(15,23,42,.72));
-          overflow: hidden;
-          transition: transform 160ms ease, opacity 160ms ease;
-        }
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 950;
+  border:
+    3px solid
+    rgba(255,255,255,.94);
+  box-shadow:
+    0 12px 30px
+      rgba(15,23,42,.34),
+    inset 0 1px 0
+      rgba(255,255,255,.35);
+  color: #ffffff;
+  background:
+    linear-gradient(
+      135deg,
+      var(--saga-player-color,#0891b2),
+      rgba(15,23,42,.72)
+    );
+  overflow: hidden;
+  transition: none;
+  animation: none;
+}
+
+.saga-avatar-pin img {
+  animation: none;
+  transform: none;
+  opacity: 1;
+}
 
 .saga-avatar-pin--self {
-  min-width: 42px;
-  padding: 0 7px;
-          width: 46px;
-          height: 46px;
-          border-color: rgba(255,255,255,.98);
-          box-shadow: 0 14px 34px rgba(15,23,42,.38), 0 0 0 8px color-mix(in srgb, var(--saga-player-color, #22c55e) 20%, transparent);
-        }
+  min-width: 46px;
+  padding: 0;
+  width: 46px;
+  height: 46px;
+  border-color:
+    rgba(207,250,254,.98);
+  box-shadow:
+    0 12px 28px
+      rgba(8,145,178,.28),
+    0 0 0 4px
+      rgba(34,211,238,.16),
+    inset 0 1px 0
+      rgba(255,255,255,.36);
+  opacity: 1;
+  transform: translateZ(0);
+  transition: none;
+  animation: none;
+}
 
 .saga-avatar-pin--live {
           border-color: rgba(187,247,208,.92);
@@ -1887,23 +2000,9 @@ const mapAnimations = `
           border-color: rgba(203,213,225,.82);
         }
 
-@keyframes sagaNodeHaloLocked {
-  0% { stroke-opacity: .72; fill-opacity: .06; }
-  50% { stroke-opacity: .40; fill-opacity: .02; }
-  100% { stroke-opacity: .72; fill-opacity: .06; }
-}
 
-@keyframes sagaNodeHaloReady {
-  0% { stroke-opacity: .94; fill-opacity: .12; }
-  50% { stroke-opacity: .36; fill-opacity: .02; }
-  100% { stroke-opacity: .94; fill-opacity: .12; }
-}
 
-@keyframes sagaNodeHaloEngaging {
-  0% { stroke-opacity: 1; fill-opacity: .16; }
-  50% { stroke-opacity: .30; fill-opacity: .01; }
-  100% { stroke-opacity: 1; fill-opacity: .16; }
-}
+
 `
 
 export default MapSurface
