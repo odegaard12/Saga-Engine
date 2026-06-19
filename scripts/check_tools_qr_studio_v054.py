@@ -20,10 +20,18 @@ for token in [
     'cacheMissionMapTiles',
     'cacheFieldProofAssets',
     'fetchFieldProofs',
-    'fotografías visibles en el mapa',
 ]:
     if token not in panel:
         raise SystemExit(f'ERROR offline conjunto: falta {token}')
+
+if (
+    'fotografías del mapa' not in panel
+    and 'fotografías visibles en el mapa' not in panel
+):
+    raise SystemExit(
+        'ERROR offline conjunto: '
+        'falta explicar que incluye fotografías del mapa'
+    )
 
 for forbidden in [
     'CENTRO DE CAMPO',

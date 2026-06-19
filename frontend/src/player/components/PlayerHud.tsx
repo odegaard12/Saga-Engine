@@ -357,8 +357,17 @@ export function PlayerHud({
           >
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
-                <div style={toolsTitle}>Herramientas</div>
-                <div style={toolsSubtitle}>Offline, fotos y ayuda</div>
+                <div style={toolsKicker}>
+                  HERRAMIENTAS
+                </div>
+
+                <div style={toolsTitle}>
+                  Preparar y resolver
+                </div>
+
+                <div style={toolsSubtitle}>
+                  Offline, fotos y ayuda
+                </div>
               </div>
 
               <button
@@ -375,40 +384,122 @@ export function PlayerHud({
               </button>
             </div>
 
-            <MissionPackPanel user={user} payload={missionPayload} />
+            <section style={toolsSection}>
+              <div style={toolsSectionHead}>
+                <strong style={toolsSectionTitle}>
+                  Antes de salir
+                </strong>
 
-            <div style={toolsUtilityGrid}>
-              {onDownloadFieldProofs ? (
+                <span style={toolsSectionText}>
+                  Prepara el juego completo para usarlo sin cobertura.
+                </span>
+              </div>
+
+              <MissionPackPanel
+                user={user}
+                payload={missionPayload}
+              />
+            </section>
+
+            <section style={toolsSection}>
+              <div style={toolsSectionHead}>
+                <strong style={toolsSectionTitle}>
+                  Accesos rápidos
+                </strong>
+
+                <span style={toolsSectionText}>
+                  Acciones independientes del juego offline.
+                </span>
+              </div>
+
+              <div style={toolsActionGrid}>
+                {onDownloadFieldProofs ? (
+                  <button
+                    type="button"
+                    style={
+                      fieldPhotoCount > 0
+                        ? toolsButton
+                        : {
+                            ...toolsButton,
+                            opacity: 0.55,
+                            cursor: 'not-allowed',
+                          }
+                    }
+                    disabled={fieldPhotoCount <= 0}
+                    onClick={
+                      fieldPhotoCount > 0
+                        ? onDownloadFieldProofs
+                        : undefined
+                    }
+                  >
+                    {fieldPhotoCount > 0
+                      ? `Descargar fotos (${fieldPhotoCount})`
+                      : 'Sin fotos para descargar'}
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
-                  style={fieldPhotoCount > 0 ? toolsButton : { ...toolsButton, opacity: 0.55, cursor: 'not-allowed' }}
-                  disabled={fieldPhotoCount <= 0}
-                  onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
+                  style={toolsButton}
+                  onClick={() => {
+                    onRequestGps()
+                    onCloseTools()
+                  }}
                 >
-                  {fieldPhotoCount > 0 ? `Descargar fotos (${fieldPhotoCount})` : 'Sin fotos para descargar'}
+                  Centrar ubicación
                 </button>
-              ) : null}
-
-              <button
-                type="button"
-                style={toolsButton}
-                onClick={() => {
-                  onRequestGps()
-                  onCloseTools()
-                }}
-              >
-                Centrar ubicación
-              </button>
-            </div>
-
-            <div style={toolsCompactRow}>
-              <div className="saga-tools-language-row">
-                <span>{t('common.language', locale)}</span>
-                <button type="button" className={locale === 'en' ? 'active' : ''} onClick={() => chooseLocale('en')}>EN</button>
-                <button type="button" className={locale === 'es' ? 'active' : ''} onClick={() => chooseLocale('es')}>ES</button>
               </div>
-              <a href={loginHref} style={toolsLoginLink} onClick={onCloseTools}>Entrar</a>
-            </div>
+            </section>
+
+            <section style={toolsSettingsCard}>
+              <div style={toolsLanguageBlock}>
+                <span style={toolsMiniLabel}>
+                  Idioma
+                </span>
+
+                <div className="saga-tools-language-row">
+                  <span>
+                    {t('common.language', locale)}
+                  </span>
+
+                  <button
+                    type="button"
+                    className={
+                      locale === 'en'
+                        ? 'active'
+                        : ''
+                    }
+                    onClick={() =>
+                      chooseLocale('en')
+                    }
+                  >
+                    EN
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      locale === 'es'
+                        ? 'active'
+                        : ''
+                    }
+                    onClick={() =>
+                      chooseLocale('es')
+                    }
+                  >
+                    ES
+                  </button>
+                </div>
+              </div>
+
+              <a
+                href={loginHref}
+                style={toolsLoginLink}
+                onClick={onCloseTools}
+              >
+                Entrar
+              </a>
+            </section>
 
             {onSubmitCode && currentStage && !finished ? (
               <section style={fallbackToolPanel}>
@@ -450,21 +541,40 @@ export function PlayerHud({
               </section>
             ) : null}
 
-            <div style={toolsSecondaryRow}>
-              <button
-                type="button"
-                style={debugEnabled ? toolsButtonDangerActive : toolsQuietButton}
-                onClick={() => {
-                  onToggleDebug()
-                  onCloseTools()
-                }}
-              >
-                {debugEnabled ? 'Salir de prueba GPS' : 'Modo prueba GPS'}
-              </button>
-              <div style={toolsBuildInfo}>
-                <BuildInfoBadge mode="inline" />
+            <section style={toolsSupportPanel}>
+              <div style={toolsSectionHead}>
+                <strong style={toolsSectionTitle}>
+                  Soporte
+                </strong>
+
+                <span style={toolsSupportText}>
+                  Opciones de comprobación y versión instalada.
+                </span>
               </div>
-            </div>
+
+              <div style={toolsSecondaryRow}>
+                <button
+                  type="button"
+                  style={
+                    debugEnabled
+                      ? toolsButtonDangerActive
+                      : toolsQuietButton
+                  }
+                  onClick={() => {
+                    onToggleDebug()
+                    onCloseTools()
+                  }}
+                >
+                  {debugEnabled
+                    ? 'Salir de prueba GPS'
+                    : 'Modo prueba GPS'}
+                </button>
+
+                <div style={toolsBuildInfo}>
+                  <BuildInfoBadge mode="inline" />
+                </div>
+              </div>
+            </section>
           </aside>
         </div>
       ) : null}
@@ -776,31 +886,187 @@ const toolsBackdrop: CSSProperties = sheetBackdrop
 const toolsSheet: CSSProperties = {
   ...sheet,
   maxHeight: 'min(76dvh, 680px)',
-  gap: 10,
+  gap: 12,
   padding: 12,
-  paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
-  borderRadius: 28,
-  border: '1px solid rgba(148,163,184,.22)',
-  background: 'radial-gradient(circle at 18% 0%, rgba(37,99,235,.18), transparent 32%), linear-gradient(180deg, rgba(15,23,42,.98), rgba(30,41,59,.96))',
-  boxShadow: '0 30px 90px rgba(2,6,23,.56)',
+  paddingBottom:
+    'calc(18px + env(safe-area-inset-bottom, 0px))',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,.18)',
+  background:
+    'radial-gradient(circle at top left, rgba(187,247,208,.10), transparent 34%), linear-gradient(180deg, rgba(71,85,105,.97), rgba(51,65,85,.94))',
+  color: '#f8fafc',
+  boxShadow: '0 24px 70px rgba(2,6,23,.44)',
+  backdropFilter: 'blur(24px) saturate(1.08)',
+  WebkitBackdropFilter:
+    'blur(24px) saturate(1.08)',
 }
 
 const toolsHeader: CSSProperties = {
   ...sheetHeader,
   alignItems: 'center',
   margin: '-12px -12px 0',
-  padding: '13px 14px 11px',
-  borderRadius: '28px 28px 20px 20px',
-  background: 'linear-gradient(135deg, rgba(30,64,175,.94), rgba(15,23,42,.96) 72%)',
-  borderBottom: '1px solid rgba(147,197,253,.20)',
+  padding: '13px 14px 12px',
+  borderRadius: '30px 30px 19px 19px',
+  background:
+    'linear-gradient(180deg, rgba(71,85,105,.98), rgba(71,85,105,.82))',
+  borderBottom:
+    '1px solid rgba(255,255,255,.10)',
 }
 
-const toolsHeaderCopy: CSSProperties = { display: 'grid', gap: 3, minWidth: 0 }
-const toolsTitle: CSSProperties = { ...sheetTitle, marginTop: 0, fontSize: 20 }
-const toolsSubtitle: CSSProperties = { color: 'rgba(219,234,254,.72)', fontSize: 11, lineHeight: 1.3, marginTop: 2 }
-const toolsUtilityGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }
-const toolsCompactRow: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }
-const toolsSecondaryRow: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 2 }
+const toolsHeaderCopy: CSSProperties = {
+  display: 'grid',
+  gap: 3,
+  minWidth: 0,
+}
+
+const toolsKicker: CSSProperties = {
+  color: '#bbf7d0',
+  fontSize: 9,
+  fontWeight: 950,
+  letterSpacing: '0.16em',
+}
+
+const toolsTitle: CSSProperties = {
+  ...sheetTitle,
+  marginTop: 0,
+  fontSize: 21,
+}
+
+const toolsSubtitle: CSSProperties = {
+  color: 'rgba(226,232,240,.72)',
+  fontSize: 11,
+  lineHeight: 1.35,
+}
+
+const toolsSection: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+}
+
+const toolsSectionHead: CSSProperties = {
+  display: 'grid',
+  gap: 3,
+  padding: '0 2px',
+}
+
+const toolsSectionTitle: CSSProperties = {
+  color: '#f8fafc',
+  fontSize: 12,
+  fontWeight: 950,
+}
+
+const toolsSectionText: CSSProperties = {
+  color: 'rgba(226,232,240,.66)',
+  fontSize: 10,
+  lineHeight: 1.35,
+}
+
+const toolsActionGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(145px, 1fr))',
+  gap: 8,
+}
+
+const toolsSettingsCard: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'minmax(0, 1fr) auto',
+  alignItems: 'stretch',
+  gap: 8,
+  padding: 10,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.10)',
+  background: 'rgba(15,23,42,.22)',
+}
+
+const toolsLanguageBlock: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  minWidth: 0,
+}
+
+const toolsMiniLabel: CSSProperties = {
+  color: 'rgba(187,247,208,.78)',
+  fontSize: 9,
+  fontWeight: 950,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+}
+
+const toolsButton: CSSProperties = {
+  minHeight: 42,
+  padding: '0 12px',
+  borderRadius: 15,
+  border: '1px solid rgba(255,255,255,.12)',
+  background:
+    'linear-gradient(180deg, rgba(100,116,139,.54), rgba(71,85,105,.54))',
+  color: '#f8fafc',
+  fontSize: 11,
+  fontWeight: 900,
+  boxShadow:
+    'inset 0 1px 0 rgba(255,255,255,.05)',
+}
+
+const toolsButtonDangerActive: CSSProperties = {
+  ...toolsButton,
+  background: 'rgba(220,38,38,.18)',
+  border:
+    '1px solid rgba(248,113,113,.22)',
+  color: '#fee2e2',
+}
+
+const toolsLoginLink: CSSProperties = {
+  minWidth: 84,
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 14px',
+  borderRadius: 15,
+  border: '1px solid rgba(187,247,208,.18)',
+  background: 'rgba(34,197,94,.12)',
+  color: '#dcfce7',
+  fontSize: 11,
+  fontWeight: 900,
+  textDecoration: 'none',
+}
+
+const toolsQuietButton: CSSProperties = {
+  ...toolsButton,
+  minHeight: 36,
+  background: 'rgba(255,255,255,.05)',
+  color: 'rgba(226,232,240,.78)',
+  fontSize: 10,
+}
+
+const toolsSupportPanel: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  padding: 10,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,.09)',
+  background: 'rgba(15,23,42,.18)',
+}
+
+const toolsSupportText: CSSProperties = {
+  color: 'rgba(226,232,240,.62)',
+  fontSize: 10,
+  lineHeight: 1.35,
+}
+
+const toolsSecondaryRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+}
+
+const toolsBuildInfo: CSSProperties = {
+  display: 'grid',
+  justifyItems: 'end',
+  gap: 4,
+}
 
 const closeButton: CSSProperties = {
   position: 'relative',
@@ -818,53 +1084,6 @@ const closeButton: CSSProperties = {
   fontWeight: 950,
   cursor: 'pointer',
   boxShadow: '0 12px 28px rgba(2,6,23,.24)',
-}
-
-const toolsButton: CSSProperties = {
-  minHeight: 40,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#f8fafc',
-  fontSize: 12,
-  fontWeight: 900,
-}
-
-const toolsButtonDangerActive: CSSProperties = {
-  ...toolsButton,
-  background: 'rgba(220,38,38,.18)',
-  border: '1px solid rgba(248,113,113,.22)',
-  color: '#fee2e2',
-}
-
-const toolsLoginLink: CSSProperties = {
-  minHeight: 46,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#ffffff',
-  fontSize: 12,
-  fontWeight: 800,
-  textDecoration: 'none',
-}
-
-
-const toolsQuietButton: CSSProperties = {
-  ...toolsButton,
-  minHeight: 34,
-  padding: '0 10px',
-  background: 'rgba(255,255,255,.04)',
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 10,
-}
-
-const toolsBuildInfo: CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  paddingTop: 2,
 }
 
 const fallbackToolPanel: CSSProperties = {
