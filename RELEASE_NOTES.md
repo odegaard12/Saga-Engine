@@ -1,77 +1,32 @@
-# SAGA Engine v0.5.0 — Tilt Maze production release
+# SAGA Engine v0.5.3 — Offline GPS and field map release
 
-SAGA Engine adds its fourth production-ready reusable game:
-**Tilt Maze / Laberinto de equilibrio**.
+SAGA Engine v0.5.3 hardens real-world field missions with a safer GPS startup, clearer node states, a cached road-following guide and a redesigned offline Tools experience.
 
-## Tilt Maze
+## Highlights
 
-- Automatically generates valid mazes.
-- Requires no manual wall editing.
-- Supports short 7×7, medium 9×9 and long 11×11 layouts.
-- Supports one fixed maze for all players or a new maze per game.
-- Includes configurable time, lives, holes and required objects.
-- Validates generated routes and runtime configuration.
-- Works offline and uses the normal mission completion flow.
-
-## Mobile control
-
-- Uses mobile orientation and motion sensor APIs.
-- Supports portrait and landscape screen orientation.
-- Includes recalibration and clear sensor-status feedback.
-- Uses a reduced movement threshold for practical phone control.
-- Keeps touch controls as an accessibility and compatibility fallback.
-- Detects browsers that are not providing usable sensor data.
-
-## Mission Control
-
-- Adds a dedicated visual Tilt Maze editor.
-- Shows a generated maze preview.
-- Allows administrators to generate another maze.
-- Keeps maze design automatic instead of exposing manual wall editing.
-- Fixes desktop clipping in Tilt Maze, Place Mosaic and Circuit Pattern.
-- Uses one natural vertical scroll area for large desktop game editors.
-- Preserves the existing mobile editor layouts.
-
-## Player experience
-
-- Native games open directly into their own game interface.
-- Removes duplicated outer title, game label, player name and instructions.
-- Gives the game itself more usable screen space.
-- Keeps a small close control.
-- Removes Fallback and SOS controls from the game panel.
-- Keeps emergency node fallback exclusively in Tools.
-
-## Completion and offline behaviour
-
-Circuit Matrix, Sequence Code, Place Mosaic and Tilt Maze all use the
-standard native-game completion callback. A successful game completes the
-current node, closes the interaction, refreshes mission state and loads the
-next node. Existing offline queue and later synchronization behaviour remain
-active.
-
-## Production support
-
-| Feature | Status |
-|---|---|
-| Circuit Matrix | Production-ready |
-| Sequence Code | Production-ready |
-| Place Mosaic | Production-ready |
-| Tilt Maze | Production-ready |
-| QR objects, keys, clues and bonuses | Production-ready |
-| Guided Mission Control | Production-ready |
-| Offline progress and synchronization | Production-ready foundation |
-| GPS Signal Hunt | Experimental; field validation pending |
-| Bearing Hunt | Experimental; redesign pending |
-| Motion Challenge | Parked experimental prototype |
+- Starts from a fresh GPS reading and avoids initial centring on stale coordinates.
+- Preserves free map exploration and the compass overview/follow cycle.
+- Keeps completed nodes green, the next active node yellow with the only halo, and future locked nodes red.
+- Keeps a visible number on every node.
+- Uses one compact QR type badge for collectible, key/requirement, clue or bonus roles.
+- Adds a high-contrast road-following guide when route geometry is available.
+- Caches successful route geometry locally and avoids a misleading straight-line fallback.
+- Reorganizes Tools around mission/map download, progress save, connection recovery and synchronization.
+- Coordinates the PWA cache as `saga-player-shell-v516-road-guide-tools`.
 
 ## Validation
 
-- Repository privacy guard.
-- Protected-files guard.
-- Python compilation.
+- Marker, routing, offline/GPS and Tools guards.
+- Privacy and protected-files guards.
+- Runtime contracts inside Docker.
 - TypeScript and Vite production build.
-- npm security audit.
-- Backend and gameplay runtime contracts.
-- Candidate-first Docker deployment.
-- Production smoke checks for `/`, `/admin-react` and the player route.
-- External SQLite mission and player data preserved.
+- npm audit with zero known vulnerabilities.
+- Candidate-first deployment and smoke checks for `/`, `/admin-react` and `/player/PLAYER%201`.
+
+## Known follow-up work
+
+- Field-test routing across urban, rural and mountain missions.
+- Add selectable route profiles when supported.
+- Store route geometry in downloadable mission packs.
+- Continue tuning QR badges and node overlap on real phones.
+- Split the large frontend bundle through dynamic imports.
