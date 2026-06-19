@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saga-player-shell-v515-map-ux'
+const CACHE_NAME = 'saga-player-shell-v516-road-guide-tools'
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 

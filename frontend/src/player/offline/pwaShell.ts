@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v515-map-ux'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v516-road-guide-tools'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null

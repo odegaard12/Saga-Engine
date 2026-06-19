@@ -237,194 +237,58 @@ export function MissionPackPanel({
 
   return (
     <section style={card}>
-      <div style={header}>
-        <div>
-          <strong style={title}>
-            Modo sin conexión
-          </strong>
-
-          <div style={statusLine}>
-            {nodes} nodos
-            {' · '}
-            Nivel {summary?.currentLevel ?? payload.level ?? 0}
-            {' · '}
-            {pending} pendientes
-            {tileCount !== null
-              ? ` · ${tileCount} teselas`
-              : ''}
-          </div>
-        </div>
-
-        <span
-          style={
-            online
-              ? readyBadge
-              : offlineBadge
-          }
-        >
-          {online
-            ? downloaded
-              ? 'PREPARADO'
-              : 'EN LÍNEA'
-            : 'SIN CONEXIÓN'}
+      <div style={topRow}>
+        <span style={eyebrow}>SIN CONEXIÓN</span>
+        <span style={online ? readyBadge : offlineBadge}>
+          {online ? downloaded ? 'PREPARADO' : 'EN LÍNEA' : 'SIN RED'}
         </span>
       </div>
-
-      <button
-        type="button"
-        style={primary}
-        disabled={busy || !online}
-        onClick={download}
-      >
-        {action === 'download'
-          ? 'Preparando misión y mapa…'
-          : 'DESCARGAR MISIÓN Y MAPA'}
+      <div style={intro}>
+        <strong style={title}>Preparar esta misión</strong>
+        <p style={description}>Guarda el juego y el mapa para continuar aunque pierdas cobertura.</p>
+      </div>
+      <div style={metrics}>
+        <div style={metric}><strong>{nodes}</strong><span>Nodos</span></div>
+        <div style={metric}><strong>{pending}</strong><span>Pendientes</span></div>
+        <div style={metric}><strong>{tileCount !== null ? tileCount : downloaded ? '✓' : '—'}</strong><span>Mapa</span></div>
+      </div>
+      <button type="button" style={primary} disabled={busy || !online} onClick={download}>
+        {action === 'download' ? 'Preparando misión y mapa…' : downloaded ? 'Actualizar descarga offline' : 'Descargar para usar sin conexión'}
       </button>
-
       <div style={actions}>
-        <button
-          type="button"
-          style={secondary}
-          disabled={busy}
-          onClick={save}
-        >
-          {action === 'save'
-            ? 'Guardando…'
-            : 'Guardar progreso'}
-        </button>
-
-        <button
-          type="button"
-          style={secondary}
-          disabled={
-            busy ||
-            !online ||
-            pending === 0
-          }
-          onClick={sync}
-        >
-          {action === 'sync'
-            ? 'Sincronizando…'
-            : pending > 0
-              ? 'Sincronizar'
-              : 'Al día'}
+        <button type="button" style={secondary} disabled={busy} onClick={save}>{action === 'save' ? 'Guardando…' : 'Guardar progreso'}</button>
+        <button type="button" style={secondary} disabled={busy || !online || pending === 0} onClick={sync}>
+          {action === 'sync' ? 'Sincronizando…' : pending > 0 ? `Sincronizar (${pending})` : 'Todo al día'}
         </button>
       </div>
-
-      {message ? (
-        <div
-          style={
-            error
-              ? messageError
-              : messageOk
-          }
-        >
-          {message}
-        </div>
-      ) : null}
+      {message ? <div style={error ? messageError : messageOk}>{message}</div> : null}
+      <div style={footnote}>Incluye la interfaz, los datos de la misión y las teselas de mapa disponibles.</div>
     </section>
   )
+
 }
 
 const card: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-  padding: 14,
-  borderRadius: 22,
-  border:
-    '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.58), rgba(15,23,42,.36))',
+  display: 'grid', gap: 12, padding: 16, borderRadius: 24,
+  border: '1px solid rgba(96,165,250,.24)',
+  background: 'linear-gradient(150deg, rgba(30,64,175,.22), rgba(15,23,42,.78) 55%, rgba(15,23,42,.62))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
 }
-
-const header: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 10,
-}
-
-const title: CSSProperties = {
-  display: 'block',
-  color: '#ffffff',
-  fontSize: 15,
-  fontWeight: 900,
-}
-
-const statusLine: CSSProperties = {
-  marginTop: 3,
-  color: 'rgba(226,232,240,.68)',
-  fontSize: 10,
-  lineHeight: 1.35,
-}
-
-const badge: CSSProperties = {
-  minHeight: 22,
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '0 8px',
-  borderRadius: 999,
-  fontSize: 9,
-  fontWeight: 900,
-}
-
-const readyBadge: CSSProperties = {
-  ...badge,
-  background: 'rgba(34,197,94,.15)',
-  color: '#dcfce7',
-}
-
-const offlineBadge: CSSProperties = {
-  ...badge,
-  background: 'rgba(245,158,11,.15)',
-  color: '#fef3c7',
-}
-
-const button: CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
-  fontSize: 11,
-  fontWeight: 900,
-}
-
-const primary: CSSProperties = {
-  ...button,
-  border:
-    '1px solid rgba(96,165,250,.24)',
-  background:
-    'linear-gradient(180deg, rgba(59,130,246,.88), rgba(37,99,235,.82))',
-  color: '#ffffff',
-}
-
-const actions: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(2, minmax(0, 1fr))',
-  gap: 8,
-}
-
-const secondary: CSSProperties = {
-  ...button,
-  border:
-    '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.07)',
-  color: '#f8fafc',
-}
-
-const messageBase: CSSProperties = {
-  padding: '7px 9px',
-  borderRadius: 11,
-  fontSize: 10,
-  fontWeight: 800,
-}
-
-const messageOk: CSSProperties = {
-  ...messageBase,
-  background: 'rgba(34,197,94,.10)',
-  color: '#dcfce7',
-}
-
-const messageError: CSSProperties = {
-  ...messageBase,
-  background: 'rgba(220,38,38,.12)',
-  color: '#fee2e2',
-}
+const topRow: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }
+const eyebrow: CSSProperties = { color: '#93c5fd', fontSize: 9, fontWeight: 950, letterSpacing: '0.16em' }
+const intro: CSSProperties = { display: 'grid', gap: 5 }
+const title: CSSProperties = { color: '#fff', fontSize: 18, fontWeight: 950, letterSpacing: '-0.02em' }
+const description: CSSProperties = { margin: 0, color: 'rgba(226,232,240,.76)', fontSize: 12, lineHeight: 1.45 }
+const badge: CSSProperties = { minHeight: 24, display: 'inline-flex', alignItems: 'center', padding: '0 9px', borderRadius: 999, fontSize: 9, fontWeight: 950 }
+const readyBadge: CSSProperties = { ...badge, background: 'rgba(34,197,94,.14)', border: '1px solid rgba(74,222,128,.20)', color: '#dcfce7' }
+const offlineBadge: CSSProperties = { ...badge, background: 'rgba(245,158,11,.14)', border: '1px solid rgba(251,191,36,.20)', color: '#fef3c7' }
+const metrics: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }
+const metric: CSSProperties = { minHeight: 58, display: 'grid', placeItems: 'center', alignContent: 'center', gap: 2, borderRadius: 16, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(15,23,42,.44)', color: '#fff', fontSize: 15, fontWeight: 950 }
+const button: CSSProperties = { minHeight: 46, borderRadius: 16, fontSize: 12, fontWeight: 950 }
+const primary: CSSProperties = { ...button, border: '1px solid rgba(147,197,253,.28)', background: 'linear-gradient(180deg,#3b82f6,#1d4ed8)', color: '#fff', boxShadow: '0 12px 26px rgba(29,78,216,.24)' }
+const actions: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }
+const secondary: CSSProperties = { ...button, border: '1px solid rgba(148,163,184,.16)', background: 'rgba(51,65,85,.72)', color: '#f8fafc' }
+const messageBase: CSSProperties = { padding: '9px 11px', borderRadius: 13, fontSize: 11, fontWeight: 850 }
+const messageOk: CSSProperties = { ...messageBase, background: 'rgba(34,197,94,.11)', color: '#dcfce7' }
+const messageError: CSSProperties = { ...messageBase, background: 'rgba(220,38,38,.13)', color: '#fee2e2' }
+const footnote: CSSProperties = { color: 'rgba(148,163,184,.72)', fontSize: 10, lineHeight: 1.4 }

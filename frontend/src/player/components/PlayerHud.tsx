@@ -349,16 +349,19 @@ export function PlayerHud({
           <aside
             style={{
               ...toolsSheet,
-              width: compact ? '100%' : 'min(100%, 460px)',
+              width: compact ? '100%' : 'min(100%, 520px)',
             }}
             aria-modal="true"
             role="dialog"
             onClick={(event) => event.stopPropagation()}
           >
             <div style={toolsHeader}>
-              <div>
+              <div style={toolsHeaderCopy}>
+                <div style={toolsEyebrow}>CENTRO DE CAMPO</div>
                 <div style={toolsTitle}>Herramientas</div>
-                <div style={toolsSubtitle}>Juego offline, GPS, idioma y soporte</div>
+                <div style={toolsSubtitle}>
+                  Mapa sin conexión, ubicación, fotos e idioma
+                </div>
               </div>
 
               <button
@@ -377,6 +380,7 @@ export function PlayerHud({
 
             <MissionPackPanel user={user} payload={missionPayload} />
 
+            <div style={toolsSectionLabel}>IDIOMA</div>
             <div className="saga-tools-language-row">
               <span>{t('common.language', locale)}</span>
               <button
@@ -394,6 +398,7 @@ export function PlayerHud({
                 ES
               </button>
             </div>
+            <div style={toolsSectionLabel}>CONTENIDO DE CAMPO</div>
             {onDownloadFieldProofs ? (
               <button
                 type="button"
@@ -445,6 +450,7 @@ export function PlayerHud({
               </section>
             ) : null}
 
+            <div style={toolsSectionLabel}>UBICACIÓN Y DIAGNÓSTICO</div>
             <button
               type="button"
               style={toolsButton}
@@ -788,21 +794,31 @@ const toolsBackdrop: CSSProperties = sheetBackdrop
 
 const toolsSheet: CSSProperties = {
   ...sheet,
-  maxHeight: 'min(84dvh, 760px)',
-  paddingBottom:
-    'calc(18px + env(safe-area-inset-bottom, 0px))',
+  maxHeight: 'min(88dvh, 820px)',
+  gap: 12,
+  padding: 14,
+  paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
+  borderRadius: 28,
+  border: '1px solid rgba(148,163,184,.22)',
+  background: 'radial-gradient(circle at 18% 0%, rgba(37,99,235,.18), transparent 32%), linear-gradient(180deg, rgba(15,23,42,.98), rgba(30,41,59,.96))',
+  boxShadow: '0 30px 90px rgba(2,6,23,.56)',
 }
 
-const toolsHeader: CSSProperties = sheetHeader
-
-const toolsTitle: CSSProperties = sheetTitle
-
-const toolsSubtitle: CSSProperties = {
-  color: 'rgba(226,232,240,.68)',
-  fontSize: 12,
-  lineHeight: 1.35,
-  marginTop: 4,
+const toolsHeader: CSSProperties = {
+  ...sheetHeader,
+  alignItems: 'center',
+  margin: '-14px -14px 2px',
+  padding: '16px 16px 14px',
+  borderRadius: '28px 28px 20px 20px',
+  background: 'linear-gradient(135deg, rgba(30,64,175,.94), rgba(15,23,42,.96) 72%)',
+  borderBottom: '1px solid rgba(147,197,253,.20)',
 }
+
+const toolsHeaderCopy: CSSProperties = { display: 'grid', gap: 3, minWidth: 0 }
+const toolsEyebrow: CSSProperties = { color: '#bfdbfe', fontSize: 9, fontWeight: 950, letterSpacing: '0.16em' }
+const toolsTitle: CSSProperties = { ...sheetTitle, marginTop: 0, fontSize: 22 }
+const toolsSubtitle: CSSProperties = { color: 'rgba(219,234,254,.76)', fontSize: 12, lineHeight: 1.35, marginTop: 2 }
+const toolsSectionLabel: CSSProperties = { marginTop: 3, color: 'rgba(191,219,254,.74)', fontSize: 9, fontWeight: 950, letterSpacing: '0.14em' }
 
 const closeButton: CSSProperties = {
   position: 'relative',

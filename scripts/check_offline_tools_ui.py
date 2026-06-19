@@ -35,9 +35,9 @@ sw = read(
 )
 
 required_panel = [
-    "Juego offline",
-    "DESCARGAR JUEGO OFFLINE",
-    "Guardar avance",
+    "Preparar esta misión",
+    "Descargar para usar sin conexión",
+    "Guardar progreso",
     "Sincronizar",
     "syncPendingOfflineEvents",
     "flushOfflineEvents",
@@ -53,7 +53,7 @@ for item in required_panel:
 
 if "queueOfflineEvent" in panel:
     raise SystemExit(
-        "ERROR: Guardar avance genera "
+        "ERROR: Guardar progreso genera "
         "un evento artificial"
     )
 
@@ -62,7 +62,7 @@ if "OfflineSyncPanel" in hud:
         "ERROR: PlayerHud usa la tarjeta antigua"
     )
 
-if "maxHeight: 'min(84dvh, 760px)'" not in hud:
+if "maxHeight: 'min(88dvh, 820px)'" not in hud:
     raise SystemExit(
         "ERROR: Herramientas perdió "
         "su altura ampliada"

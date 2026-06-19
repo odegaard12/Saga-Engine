@@ -78,8 +78,9 @@ for item in required_map:
 
 required_offline = [
     "cacheMissionMapTiles",
-    "DESCARGAR JUEGO OFFLINE",
-    "Guardar avance",
+    "Preparar esta misión",
+    "Descargar para usar sin conexión",
+    "Guardar progreso",
     "Sincronizar",
 ]
 
@@ -104,7 +105,7 @@ if "fullscreen" not in manifest.get(
     )
 
 cache_name = (
-    "saga-player-shell-v514-node-visuals"
+    "saga-player-shell-v516-road-guide-tools"
 )
 
 if (
