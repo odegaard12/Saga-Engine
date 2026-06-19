@@ -56,6 +56,8 @@ type MapSurfaceProps = {
   debugSimulation?: boolean
   followPlayer?: boolean
   focusRequest?: FocusRequest
+  refreshToken?: number
+  onUserMapMove?: () => void
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
   fieldProofs?: FieldProof[]
@@ -490,6 +492,8 @@ export function MapSurface({
   debugSimulation,
   followPlayer = true,
   focusRequest,
+  refreshToken = 0,
+  onUserMapMove,
   nodeState = 'locked',
   otherPlayers = [],
   fieldProofs = [],
@@ -505,6 +509,8 @@ export function MapSurface({
   const [mapReadyToken, setMapReadyToken] = useState(0)
   const [mapZoom, setMapZoom] = useState(16)
   const mapRef = useRef<L.Map | null>(null)
+  const tileLayerRef =
+    useRef<L.TileLayer | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
   const playerMarkerRef = useRef<L.Marker | null>(null)
@@ -515,6 +521,8 @@ export function MapSurface({
   const fieldProofLayersRef = useRef<L.Layer[]>([])
   const routeNodeLayersRef = useRef<L.Layer[]>([])
   const onNodeTapRef = useRef(onNodeTap)
+  const onUserMapMoveRef =
+    useRef(onUserMapMove)
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
@@ -522,6 +530,11 @@ export function MapSurface({
   useEffect(() => {
     onNodeTapRef.current = onNodeTap
   }, [onNodeTap])
+
+  useEffect(() => {
+    onUserMapMoveRef.current =
+      onUserMapMove
+  }, [onUserMapMove])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -544,18 +557,29 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 20,
-      maxNativeZoom: 19,
-      attribution: 'Tiles © Esri',
-    })
+    const tileLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 20,
+        maxNativeZoom: 19,
+        attribution: 'Tiles © Esri',
+      },
+    )
+
+    tileLayer
       .on('tileerror', () => {
-        mapRootRef.current?.classList.add('saga-map-offline-tiles')
+        mapRootRef.current?.classList.add(
+          'saga-map-offline-tiles',
+        )
       })
       .on('load', () => {
-        mapRootRef.current?.classList.remove('saga-map-offline-tiles')
+        mapRootRef.current?.classList.remove(
+          'saga-map-offline-tiles',
+        )
       })
-      .addTo(map)
+
+    tileLayer.addTo(map)
+    tileLayerRef.current = tileLayer
 
     map.setView([42.4333, -8.65], 16)
     mapRef.current = map
@@ -580,6 +604,7 @@ export function MapSurface({
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
+      tileLayerRef.current = null
       playerMarkerRef.current = null
       playerAuraRef.current = null
       playerAuraModeRef.current = null
@@ -587,6 +612,21 @@ export function MapSurface({
       nodeRadiusRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const handleManualMove = () => {
+      onUserMapMoveRef.current?.()
+    }
+
+    map.on('dragstart', handleManualMove)
+
+    return () => {
+      map.off('dragstart', handleManualMove)
+    }
+  }, [mapReadyToken])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -907,36 +947,33 @@ export function MapSurface({
 
     playerMarkerRef.current.setZIndexOffset(1000)
 
-    const playerFrameKey = stageMapData
-      ? `${stageMapData.lat}:${stageMapData.lon}:player`
-      : `player:${selfLabel}`
+    if (followPlayer) {
+      const playerFrameKey =
+        `${playerPosition.lat.toFixed(6)}:` +
+        `${playerPosition.lon.toFixed(6)}`
 
-    if (followPlayer && lastPlayerFrameRef.current !== playerFrameKey) {
-      lastPlayerFrameRef.current = playerFrameKey
+      if (
+        lastPlayerFrameRef.current !==
+        playerFrameKey
+      ) {
+        lastPlayerFrameRef.current =
+          playerFrameKey
 
-      if (stageMapData) {
-        const distance = getDistanceMeters(playerPosition, {
-          lat: stageMapData.lat,
-          lon: stageMapData.lon,
-        })
-
-        if (distance <= 350) {
-          const bounds = L.latLngBounds(
-            [stageMapData.lat, stageMapData.lon],
-            [playerPosition.lat, playerPosition.lon]
+        const distanceFromCenter =
+          map.distance(
+            map.getCenter(),
+            nextLatLng,
           )
-          map.fitBounds(bounds.pad(0.30), {
-            maxZoom: 18,
+
+        if (distanceFromCenter > 6) {
+          map.panTo(nextLatLng, {
             animate: true,
-            duration: 0.25,
+            duration: 0.32,
           })
         }
-      } else {
-        map.setView([playerPosition.lat, playerPosition.lon], 18, {
-          animate: true,
-          duration: 0.25,
-        })
       }
+    } else {
+      lastPlayerFrameRef.current = null
     }
   }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, selfProfile, gpsState, debugSimulation])
 
@@ -1127,6 +1164,73 @@ export function MapSurface({
 
   useEffect(() => {
     const map = mapRef.current
+    if (!map) return
+
+    const refreshMap = () => {
+      window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false })
+
+        if (
+          typeof navigator === 'undefined' ||
+          navigator.onLine !== false
+        ) {
+          mapRootRef.current?.classList.remove(
+            'saga-map-offline-tiles',
+          )
+
+          tileLayerRef.current?.redraw()
+        }
+      })
+    }
+
+    refreshMap()
+
+    window.addEventListener(
+      'online',
+      refreshMap,
+    )
+
+    window.addEventListener(
+      'pageshow',
+      refreshMap,
+    )
+
+    const visibilityHandler = () => {
+      if (
+        document.visibilityState === 'visible'
+      ) {
+        refreshMap()
+      }
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      visibilityHandler,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'online',
+        refreshMap,
+      )
+
+      window.removeEventListener(
+        'pageshow',
+        refreshMap,
+      )
+
+      document.removeEventListener(
+        'visibilitychange',
+        visibilityHandler,
+      )
+    }
+  }, [
+    mapReadyToken,
+    refreshToken,
+  ])
+
+  useEffect(() => {
+    const map = mapRef.current
     if (!map || !focusRequest) return
     if (lastFocusTokenRef.current === focusRequest.token) return
     lastFocusTokenRef.current = focusRequest.token
@@ -1144,57 +1248,92 @@ export function MapSurface({
     }
 
     if (focusRequest.target === 'route') {
-      if (stageMapData && playerPosition) {
-        const bounds = L.latLngBounds(
-          [stageMapData.lat, stageMapData.lon],
-          [playerPosition.lat, playerPosition.lon]
+      const sourceStages =
+        Array.isArray(missionStages) &&
+        missionStages.length > 0
+          ? missionStages
+          : currentStage
+            ? [currentStage]
+            : []
+
+      const routePoints =
+        sourceStages
+          .map(resolveStageMapData)
+          .filter(
+            (
+              value,
+            ): value is NonNullable<
+              ReturnType<
+                typeof resolveStageMapData
+              >
+            > => Boolean(value),
+          )
+          .map((value) =>
+            L.latLng(
+              value.lat,
+              value.lon,
+            ),
+          )
+
+      if (playerPosition) {
+        routePoints.push(
+          L.latLng(
+            playerPosition.lat,
+            playerPosition.lon,
+          ),
         )
+      }
 
-        const routeDistance = getDistanceMeters(playerPosition, {
-          lat: stageMapData.lat,
-          lon: stageMapData.lon,
+      if (routePoints.length === 1) {
+        map.stop()
+        map.flyTo(routePoints[0], 17, {
+          animate: true,
+          duration: 0.55,
+          easeLinearity: 0.22,
         })
+        return
+      }
 
-        const targetZoom =
-          routeDistance > 100000 ? 6 :
-          routeDistance > 25000 ? 8 :
-          routeDistance > 5000 ? 11 :
-          routeDistance > 1000 ? 13 :
-          routeDistance > 250 ? 15 :
-          17
+      if (routePoints.length > 1) {
+        const bounds =
+          L.latLngBounds(routePoints)
 
         map.stop()
-        map.invalidateSize({ pan: false })
+        map.invalidateSize({
+          pan: false,
+        })
 
-        if (routeDistance > 100000) {
-          const center = bounds.getCenter()
-          map.flyTo(center, targetZoom, {
-            animate: true,
-            duration: 0.65,
-            easeLinearity: 0.22,
-          })
-        } else {
-          map.flyToBounds(bounds.pad(0.18), {
-            paddingTopLeft: [44, 132],
+        map.flyToBounds(
+          bounds.pad(0.14),
+          {
+            paddingTopLeft: [44, 130],
             paddingBottomRight: [44, 190],
-            maxZoom: targetZoom,
+            maxZoom: 17,
             animate: true,
             duration: 0.65,
             easeLinearity: 0.22,
-          })
-        }
+          },
+        )
 
         return
       }
 
       if (playerPosition) {
         map.stop()
-        map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
-          animate: true,
-          duration: 0.25,
-        })
-        return
+        map.flyTo(
+          [
+            playerPosition.lat,
+            playerPosition.lon,
+          ],
+          18,
+          {
+            animate: true,
+            duration: 0.35,
+          },
+        )
       }
+
+      return
     }
 
     if (focusRequest.target === 'node' && stageMapData) {
@@ -1212,6 +1351,8 @@ export function MapSurface({
     stageMapData?.lat,
     stageMapData?.lon,
     stageMapData?.radius,
+    missionStages,
+    currentStage,
   ])
 
   return (

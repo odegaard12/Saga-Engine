@@ -6,7 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def read(path: str) -> str:
-    return (ROOT / path).read_text(encoding="utf-8")
+    return (
+        ROOT / path
+    ).read_text(encoding="utf-8")
 
 
 hud = read(
@@ -34,49 +36,49 @@ sw = read(
 
 required_panel = [
     "Juego offline",
-    "Descargar juego offline",
-    "Actualizar juego offline",
-    "Guardar avance actual",
-    "Sincronizar ahora",
+    "DESCARGAR JUEGO OFFLINE",
+    "Guardar avance",
+    "Sincronizar",
     "syncPendingOfflineEvents",
     "flushOfflineEvents",
-    "QR / objetos",
+    "cacheMissionMapTiles",
 ]
 
 for item in required_panel:
     if item not in panel:
         raise SystemExit(
-            f"ERROR: falta en el panel offline: {item}"
+            "ERROR: falta en panel offline: "
+            f"{item}"
         )
 
 if "queueOfflineEvent" in panel:
     raise SystemExit(
         "ERROR: Guardar avance genera "
-        "un evento offline artificial"
+        "un evento artificial"
     )
 
 if "OfflineSyncPanel" in hud:
     raise SystemExit(
-        "ERROR: PlayerHud todavía usa "
-        "la tarjeta offline antigua"
+        "ERROR: PlayerHud usa la tarjeta antigua"
     )
 
 if "maxHeight: 'min(84dvh, 760px)'" not in hud:
     raise SystemExit(
-        "ERROR: Herramientas no tiene "
-        "la altura ampliada"
+        "ERROR: Herramientas perdió "
+        "su altura ampliada"
     )
 
-required_browser_adjustments = [
+required_browser = [
     "getMobileBrowserChromeLift",
     "return standalone ? 0 : 22",
     "138 + browserChromeLift",
 ]
 
-for item in required_browser_adjustments:
+for item in required_browser:
     if item not in player:
         raise SystemExit(
-            f"ERROR: falta ajuste del navegador: {item}"
+            "ERROR: falta ajuste navegador: "
+            f"{item}"
         )
 
 
@@ -114,10 +116,8 @@ sw_cache = cache_value(
 
 if pwa_cache != sw_cache:
     raise SystemExit(
-        "ERROR: pwaShell y service worker "
-        "usan cachés diferentes"
+        "ERROR: cachés PWA diferentes"
     )
 
 print("Offline tools UI guard passed.")
-print("Legacy OfflineSyncPanel: retained but unused.")
 print("Cache PWA:", pwa_cache)

@@ -99,6 +99,7 @@ export default function PlayerApp() {
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
+  const [mapRefreshToken, setMapRefreshToken] = useState(0)
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -126,11 +127,10 @@ export default function PlayerApp() {
           : null
       )
       setBrowserGpsCapturedAt(null)
+      // La ubicación almacenada sirve como respaldo,
+      // pero nunca debe centrar el mapa al arrancar.
       setFollowPlayer(true)
       gpsCenteredRef.current = false
-      window.setTimeout(() => {
-        setFocusRequest({ target: 'player', token: Date.now() })
-      }, 250)
     }
 
     if (hasRememberedGpsReady(user)) {
@@ -240,6 +240,10 @@ export default function PlayerApp() {
             status: 'ready',
             payload: nextPayload,
           })
+
+          setMapRefreshToken(
+            (value) => value + 1
+          )
         }
       } catch {
         // Keep the currently loaded mission while offline.
@@ -252,8 +256,22 @@ export default function PlayerApp() {
       void refreshMissionFromServer()
     }
 
+    const refreshAfterReconnect = () => {
+      void refreshMissionFromServer()
+
+      // Algunos móviles anuncian online antes de que
+      // la red esté realmente utilizable.
+      window.setTimeout(
+        refreshMissionFromServer,
+        1200,
+      )
+    }
+
     window.addEventListener('focus', refresh)
-    window.addEventListener('online', refresh)
+    window.addEventListener(
+      'online',
+      refreshAfterReconnect,
+    )
     document.addEventListener(
       'visibilitychange',
       refresh,
@@ -272,7 +290,7 @@ export default function PlayerApp() {
       )
       window.removeEventListener(
         'online',
-        refresh,
+        refreshAfterReconnect,
       )
       document.removeEventListener(
         'visibilitychange',
@@ -597,8 +615,13 @@ export default function PlayerApp() {
     : 'unavailable'
 
   // A stale position may center the map, but never unlock a node.
+  // La posición antigua no se dibuja ni centra.
+  // Solo se usa GPS vivo o posición debug.
   const playerPosition =
-    localDebugPosition || browserGpsPosition
+    localDebugPosition ||
+    (browserGpsFresh
+      ? browserGpsPosition
+      : null)
 
   const unlockPosition =
     localDebugPosition ||
@@ -679,7 +702,15 @@ export default function PlayerApp() {
       payload: nextPayload,
     }).catch(() => undefined)
 
-    setState({ status: 'ready', payload: nextPayload })
+    setState({
+      status: 'ready',
+      payload: nextPayload,
+    })
+
+    setMapRefreshToken(
+      (value) => value + 1
+    )
+
     return nextPayload
   }
 
@@ -824,7 +855,7 @@ function handleOpenFieldCamera() {
             : null
         )
         setBrowserGpsCapturedAt(null)
-        setFocusRequest({ target: 'player', token: Date.now() })
+        gpsCenteredRef.current = false
       }
 
       showNotice('Debug desactivado. Recuperando GPS real…', 'info')
@@ -871,15 +902,21 @@ function handleOpenFieldCamera() {
   }
 
   function handleFocusPlayer() {
+    setRouteOverviewActive(false)
+
     if (!playerPosition) {
-      showNotice('No player position is available yet.', 'warn')
-      vibrate(8)
+      void handleRequestLiveGps({
+        forceFocus: true,
+      })
       return
     }
 
-    setFocusRequest({ target: 'player', token: Date.now() })
     setFollowPlayer(true)
-    showNotice('Centered on player.', 'info')
+    setFocusRequest({
+      target: 'player',
+      token: Date.now(),
+    })
+
     vibrate(8)
   }
 
@@ -906,23 +943,46 @@ function handleOpenFieldCamera() {
 
   function handleToggleRouteOverview() {
     if (!playerPosition) {
-void handleRequestLiveGps({ forceFocus: true })
+      void handleRequestLiveGps({
+        forceFocus: true,
+      })
       return
     }
 
+    const stages =
+      Array.isArray(payload.stages)
+        ? payload.stages
+        : []
+
+    const hasRouteNodes =
+      stages.some(
+        (stage) =>
+          typeof stage.lat === 'number' &&
+          typeof stage.lon === 'number',
+      )
+
     const nextToken = Date.now()
 
-    if (!currentStage || routeOverviewActive) {
+    if (
+      routeOverviewActive ||
+      !hasRouteNodes
+    ) {
       setRouteOverviewActive(false)
       setFollowPlayer(true)
-      setFocusRequest({ target: 'player', token: nextToken })
-return
+      setFocusRequest({
+        target: 'player',
+        token: nextToken,
+      })
+      return
     }
 
     setRouteOverviewActive(true)
     setFollowPlayer(false)
-    setFocusRequest({ target: 'route', token: nextToken })
-}
+    setFocusRequest({
+      target: 'route',
+      token: nextToken,
+    })
+  }
 
   function openInteraction() {
     setSubmitError(null)
@@ -992,11 +1052,18 @@ return
       if (hasOfflineMission) setOfflinePrepVisible(false)
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
-      setFollowPlayer(true)
 
-      if (options.forceFocus || !gpsCenteredRef.current) {
+      const shouldFocus =
+        options.forceFocus ||
+        !gpsCenteredRef.current
+
+      if (shouldFocus) {
         gpsCenteredRef.current = true
-        setFocusRequest({ target: 'player', token: Date.now() })
+        setFollowPlayer(true)
+        setFocusRequest({
+          target: 'player',
+          token: Date.now(),
+        })
       }
 
       void sendHeartbeat({
@@ -1056,7 +1123,15 @@ return
         payload: offlinePayload,
       })
 
-      setState({ status: 'ready', payload: offlinePayload })
+      setState({
+        status: 'ready',
+        payload: offlinePayload,
+      })
+
+      setMapRefreshToken(
+        (value) => value + 1
+      )
+
       setOfflineSummary(await getOfflineMissionSummary(payload.user))
       setOfflinePrepState('saved')
       await cachePlayerShell(playerHref).catch(() => undefined)
@@ -1193,7 +1268,14 @@ return
 
         if (localResult.ok) {
           setInteractionOpen(false)
-          setState({ status: 'ready', payload: localResult.payload })
+          setState({
+            status: 'ready',
+            payload: localResult.payload,
+          })
+
+          setMapRefreshToken(
+            (value) => value + 1
+          )
 
           if (localResult.payload.finished) {
             showOverlay('finish')
@@ -1250,6 +1332,11 @@ return
           debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
           followPlayer={followPlayer}
           focusRequest={focusRequest}
+          refreshToken={mapRefreshToken}
+          onUserMapMove={() => {
+            setFollowPlayer(false)
+            setRouteOverviewActive(false)
+          }}
           nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
           otherPlayers={teamMapMarkers}
           fieldProofs={fieldProofs}
@@ -1341,15 +1428,33 @@ return
 
             <button
               type="button"
-              style={mapRouteToggleInlineButton}
+              style={
+                routeOverviewActive
+                  ? mapQuickButtonActive
+                  : mapRouteToggleInlineButton
+              }
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
                 handleToggleRouteOverview()
               }}
-              aria-label={routeOverviewActive ? 'Volver a mi ubicación' : 'Ver mi ubicación y el nodo'}
+              aria-label={
+                routeOverviewActive
+                  ? 'Volver a mi ubicación y seguirme'
+                  : 'Ver todos los nodos'
+              }
+              title={
+                routeOverviewActive
+                  ? 'Volver a mi ubicación y seguirme'
+                  : 'Ver todos los nodos'
+              }
             >
-              <span aria-hidden="true" style={mapQuickIcon}>{routeOverviewActive ? '📍' : '🧭'}</span>
+              <span
+                aria-hidden="true"
+                style={mapQuickIcon}
+              >
+                {routeOverviewActive ? '📍' : '🧭'}
+              </span>
             </button>
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
@@ -1746,7 +1851,9 @@ function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile ? 0 : 12,
+    bottom: mobile
+      ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)'
+      : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }

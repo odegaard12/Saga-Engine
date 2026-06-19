@@ -39,3 +39,24 @@ physical-node flows without changing their game rules.
 - Expands the Tools sheet while preserving safe-area padding.
 - Raises photo, players and route controls by 22 px in normal mobile browsers.
 - Keeps the existing position in installed/full-screen PWA mode.
+
+## Map recovery and offline tiles
+
+- Stored GPS no longer centers or draws the player at application start.
+- The first fresh GPS reading centers the player.
+- The compass button centers the player and enables continuous following.
+- Dragging the map disables following until the compass is pressed again.
+- Leaflet invalidates and redraws after connectivity recovery, page restoration and mission refresh.
+- Offline preparation downloads satellite tiles around mission nodes at zoom levels 15–18.
+- The offline tools card is shorter and uses the same visual language as other Tools controls.
+- Mobile bottom controls respect the safe-area inset.
+- Installed PWA mode prefers fullscreen where supported.
+
+## Compass route toggle
+
+- First compass press displays all mission nodes and the current player position.
+- Second press returns to the player and restores continuous following.
+- Manual map dragging disables following without blocking free exploration.
+- The main preparation action is labelled DESCARGAR JUEGO OFFLINE.
+- That action stores the mission, application shell and map tiles.
+- Save-progress and synchronization remain separate actions.
