@@ -1851,9 +1851,7 @@ function getBottomOverlayStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     left: mobile ? 10 : 12,
     right: mobile ? 10 : 12,
-    bottom: mobile
-      ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)'
-      : 12,
+    bottom: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }

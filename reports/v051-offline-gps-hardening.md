@@ -60,3 +60,12 @@ physical-node flows without changing their game rules.
 - The main preparation action is labelled DESCARGAR JUEGO OFFLINE.
 - That action stores the mission, application shell and map tiles.
 - Save-progress and synchronization remain separate actions.
+
+## Bottom bar and marker polish
+
+- Restores the installed-player bottom overlay to bottom zero.
+- Keeps the browser-only lift for Safari and normal mobile browsers.
+- Removes stars from collectible QR markers.
+- Uses cleaner numbered nodes and subdued locked-node styling.
+- Replaces harsh blinking with slow breathing animations.
+- Avoids rebuilding the local-player icon on every GPS update.

@@ -14,11 +14,29 @@ type FocusRequest =
 type NodeVisualState = 'locked' | 'ready' | 'engaging'
 type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
-const physicalNodeVisuals: Record<PhysicalNodeKind, { icon: string; label: string }> = {
-  collectible: { icon: '⭐', label: 'Coleccionable QR' },
-  requirement: { icon: '🔒', label: 'Requisito QR' },
-  clue: { icon: '🧩', label: 'Pista QR' },
-  bonus: { icon: '🎁', label: 'Bonus QR' },
+const physicalNodeVisuals: Record<
+  PhysicalNodeKind,
+  {
+    icon: string
+    label: string
+  }
+> = {
+  collectible: {
+    icon: '●',
+    label: 'Objeto QR',
+  },
+  requirement: {
+    icon: '◆',
+    label: 'Requisito QR',
+  },
+  clue: {
+    icon: '?',
+    label: 'Pista QR',
+  },
+  bonus: {
+    icon: '+',
+    label: 'Bonus QR',
+  },
 }
 
 function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
@@ -313,17 +331,15 @@ function getFieldProofTooltip(proofs: FieldProof[]) {
   return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
 }
 
-function getNodeVisualConfig(nodeState: NodeVisualState) {
+function getNodeVisualConfig(
+  nodeState: NodeVisualState,
+) {
   if (nodeState === 'engaging') {
     return {
-      ringColor: '#22c55e',
+      ringColor: '#38bdf8',
       ringWeight: 3,
-      ringOpacity: 0.96,
-      ringFillOpacity: 0.14,
-      markerRadius: 8,
-      markerWeight: 3,
-      markerStroke: '#16a34a',
-      markerFill: '#ffffff',
+      ringOpacity: 0.66,
+      ringFillOpacity: 0.075,
     }
   }
 
@@ -331,24 +347,16 @@ function getNodeVisualConfig(nodeState: NodeVisualState) {
     return {
       ringColor: '#22c55e',
       ringWeight: 3,
-      ringOpacity: 0.88,
-      ringFillOpacity: 0.10,
-      markerRadius: 8,
-      markerWeight: 3,
-      markerStroke: '#16a34a',
-      markerFill: '#dcfce7',
+      ringOpacity: 0.62,
+      ringFillOpacity: 0.065,
     }
   }
 
   return {
-    ringColor: '#22c55e',
+    ringColor: '#f59e0b',
     ringWeight: 2,
-    ringOpacity: 0.70,
-    ringFillOpacity: 0.06,
-    markerRadius: 8,
-    markerWeight: 3,
-    markerStroke: '#16a34a',
-    markerFill: '#dcfce7',
+    ringOpacity: 0.44,
+    ringFillOpacity: 0.035,
   }
 }
 
@@ -430,46 +438,62 @@ function buildPlayerPopup(
 }
 
 
-function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
-  const physicalVisual = getPhysicalNodeVisual(stage)
+function createMissionNodeIcon(
+  index: number,
+  state: 'completed' | 'current' | 'locked',
+  stage?: PlayerStage,
+) {
+  const physicalVisual =
+    getPhysicalNodeVisual(stage)
+
   const label =
     physicalVisual?.icon ||
-    (state === 'completed'
-      ? '✓'
-      : state === 'locked'
-      ? '🔒'
-      : String(index + 1))
+    (
+      state === 'completed'
+        ? '✓'
+        : String(index + 1)
+    )
 
-  const styles = physicalVisual
-    ? 'background:rgba(255,255,255,.96);border-color:rgba(15,23,42,.72);color:#020617;'
-    : state === 'completed'
-      ? 'background:rgba(34,197,94,.92);border-color:rgba(255,255,255,.82);color:#052e16;'
-      : state === 'locked'
-      ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
-      : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
+  const title =
+    physicalVisual?.label ||
+    (
+      state === 'completed'
+        ? `Nodo ${index + 1} completado`
+        : state === 'current'
+          ? `Nodo actual ${index + 1}`
+          : `Nodo ${index + 1} bloqueado`
+    )
 
-  const shadow = physicalVisual
-    ? 'box-shadow:0 8px 18px rgba(15,23,42,.26);'
-    : 'box-shadow:0 8px 24px rgba(15,23,42,.28);'
+  const size =
+    state === 'current'
+      ? 36
+      : 32
+
+  const physicalClass =
+    physicalVisual
+      ? ' saga-mission-node-pin--physical'
+      : ''
 
   return L.divIcon({
-    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
-    html: `<div style="
-      width:${physicalVisual ? '34px' : '30px'};
-      height:${physicalVisual ? '34px' : '30px'};
-      border-radius:999px;
-      border:2px solid;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:${physicalVisual ? '17px' : state === 'locked' ? '14px' : '13px'};
-      font-weight:900;
-      backdrop-filter:blur(10px);
-      ${styles}
-      ${shadow}
-    " title="${physicalVisual ? physicalVisual.label : ''}">${label}</div>`,
-    iconSize: physicalVisual ? [34, 34] : [30, 30],
-    iconAnchor: physicalVisual ? [17, 17] : [15, 15],
+    className:
+      `saga-mission-node-icon-wrap ` +
+      `saga-mission-node-icon-wrap--${state}` +
+      (
+        physicalVisual
+          ? ' saga-mission-node-icon-wrap--physical'
+          : ''
+      ),
+    html:
+      `<div ` +
+      `class="saga-mission-node-pin ` +
+      `saga-mission-node-pin--${state}` +
+      `${physicalClass}" ` +
+      `title="${escapeHtml(title)}" ` +
+      `aria-label="${escapeHtml(title)}">` +
+      `<span>${escapeHtml(label)}</span>` +
+      `</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -513,8 +537,14 @@ export function MapSurface({
     useRef<L.TileLayer | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
-  const playerMarkerRef = useRef<L.Marker | null>(null)
-  const playerAuraRef = useRef<L.CircleMarker | null>(null)
+  const playerMarkerRef =
+    useRef<L.Marker | null>(null)
+
+  const playerMarkerIconKeyRef =
+    useRef<string | null>(null)
+
+  const playerAuraRef =
+    useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
@@ -606,6 +636,7 @@ export function MapSurface({
       mapRef.current = null
       tileLayerRef.current = null
       playerMarkerRef.current = null
+      playerMarkerIconKeyRef.current = null
       playerAuraRef.current = null
       playerAuraModeRef.current = null
       nodeMarkerRef.current = null
@@ -636,19 +667,173 @@ export function MapSurface({
     style.id = 'saga-player-aura-style'
     style.textContent = `
       .saga-player-aura--gps {
-        animation: sagaPlayerAuraPulse 1.35s ease-in-out infinite;
+        animation:
+          sagaPlayerAuraBreathe
+          3.2s
+          ease-in-out
+          infinite;
       }
 
       .saga-player-aura--debug {
-        animation: sagaPlayerAuraPulse 1.05s ease-in-out infinite;
+        animation:
+          sagaPlayerAuraBreathe
+          2.6s
+          ease-in-out
+          infinite;
       }
 
-      @keyframes sagaPlayerAuraPulse {
-        0% { opacity: 0.95; }
-        50% { opacity: 0.25; }
-        100% { opacity: 0.95; }
+      .saga-avatar-pin--self {
+        animation:
+          sagaPlayerPinBreathe
+          3.6s
+          ease-in-out
+          infinite;
+        transform-origin: center;
+        will-change: transform, filter;
+      }
+
+      .saga-mission-node-icon-wrap {
+        background: transparent !important;
+        border: 0 !important;
+      }
+
+      .saga-mission-node-pin {
+        width: 32px;
+        height: 32px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 2px solid rgba(255,255,255,.76);
+        color: #f8fafc;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        backdrop-filter: blur(8px);
+        transform: translateZ(0);
+      }
+
+      .saga-mission-node-pin--completed {
+        background:
+          linear-gradient(
+            145deg,
+            rgba(34,197,94,.97),
+            rgba(21,128,61,.95)
+          );
+        border-color: rgba(220,252,231,.90);
+        color: #ffffff;
+        box-shadow:
+          0 5px 14px rgba(20,83,45,.27);
+      }
+
+      .saga-mission-node-pin--locked {
+        background:
+          linear-gradient(
+            145deg,
+            rgba(30,41,59,.95),
+            rgba(15,23,42,.98)
+          );
+        border-color: rgba(148,163,184,.56);
+        color: #cbd5e1;
+        box-shadow:
+          0 5px 14px rgba(2,6,23,.23);
+      }
+
+      .saga-mission-node-pin--current {
+        width: 36px;
+        height: 36px;
+        background:
+          linear-gradient(
+            145deg,
+            rgba(14,165,233,.98),
+            rgba(2,132,199,.97)
+          );
+        border-color: rgba(224,242,254,.96);
+        color: #ffffff;
+        font-size: 13px;
+        box-shadow:
+          0 0 0 5px rgba(56,189,248,.10),
+          0 7px 18px rgba(3,105,161,.29);
+        animation:
+          sagaNodeBreathe
+          3.2s
+          ease-in-out
+          infinite;
+        will-change: transform, box-shadow;
+      }
+
+      .saga-mission-node-pin--physical {
+        font-size: 14px;
+      }
+
+      @keyframes sagaPlayerAuraBreathe {
+        0%,
+        100% {
+          opacity: .40;
+        }
+
+        50% {
+          opacity: .60;
+        }
+      }
+
+      @keyframes sagaPlayerPinBreathe {
+        0%,
+        100% {
+          transform: scale(1);
+          filter:
+            drop-shadow(
+              0 5px 11px
+              rgba(15,23,42,.20)
+            );
+        }
+
+        50% {
+          transform: scale(1.022);
+          filter:
+            drop-shadow(
+              0 6px 14px
+              rgba(15,23,42,.26)
+            );
+        }
+      }
+
+      @keyframes sagaNodeBreathe {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow:
+            0 0 0 5px rgba(56,189,248,.10),
+            0 7px 18px rgba(3,105,161,.29);
+        }
+
+        50% {
+          transform: scale(1.03);
+          box-shadow:
+            0 0 0 7px rgba(56,189,248,.05),
+            0 8px 20px rgba(3,105,161,.33);
+        }
+      }
+
+      @media (
+        prefers-reduced-motion:
+        reduce
+      ) {
+        .saga-player-aura--gps,
+        .saga-player-aura--debug,
+        .saga-avatar-pin--self,
+        .saga-mission-node-pin--current {
+          animation: none !important;
+        }
       }
     `
+
     document.head.appendChild(style)
   }, [])
 
@@ -789,16 +974,29 @@ export function MapSurface({
         continue
       }
 
-      const ringColor = state === 'completed' ? '#22c55e' : '#ef4444'
-      const ringFill = state === 'completed' ? '#bbf7d0' : '#fecaca'
+      const ringColor =
+        state === 'completed'
+          ? '#22c55e'
+          : '#64748b'
+
+      const ringFill =
+        state === 'completed'
+          ? '#bbf7d0'
+          : '#0f172a'
 
       const ghostRadius = L.circle(center, {
         radius: Math.max(16, Math.min(data.radius, 40)),
         color: ringColor,
         weight: 2,
-        opacity: state === 'completed' ? 0.42 : 0.58,
+        opacity:
+          state === 'completed'
+            ? 0.34
+            : 0.27,
         fillColor: ringFill,
-        fillOpacity: state === 'completed' ? 0.10 : 0.14,
+        fillOpacity:
+          state === 'completed'
+            ? 0.07
+            : 0.025,
         interactive: false,
       }).addTo(map)
 
@@ -911,38 +1109,95 @@ export function MapSurface({
       gps_status: gpsState,
     }
 
-    if (!playerMarkerRef.current) {
-      playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon(selfMarkerProfile, 'self'),
-        keyboard: false,
-      }).addTo(map)
+    const selfMarkerIconKey = [
+      getPlayerAvatarUrl(selfMarkerProfile),
+      getPlayerAvatarInitials(
+        selfMarkerProfile,
+      ),
+      getPlayerColor(selfMarkerProfile),
+    ].join('|')
 
-      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
-        direction: 'top',
-        opacity: 0.92,
-      })
+    if (!playerMarkerRef.current) {
+      playerMarkerRef.current = L.marker(
+        nextLatLng,
+        {
+          icon: createAvatarIcon(
+            selfMarkerProfile,
+            'self',
+          ),
+          keyboard: false,
+        },
+      ).addTo(map)
+
+      playerMarkerIconKeyRef.current =
+        selfMarkerIconKey
+
+      playerMarkerRef.current.bindTooltip(
+        selfMarkerProfile.display_name || 'YO',
+        {
+          direction: 'top',
+          opacity: 0.92,
+        },
+      )
+
       playerMarkerRef.current.bindPopup(
-        buildPlayerPopup(selfMarkerProfile, 'self'),
+        buildPlayerPopup(
+          selfMarkerProfile,
+          'self',
+        ),
         {
           closeButton: true,
           autoPan: true,
           keepInView: true,
-        }
+        },
       )
+
       playerMarkerRef.current.off('click')
-      playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
+
+      playerMarkerRef.current.on(
+        'click',
+        () =>
+          playerMarkerRef.current?.openPopup(),
+      )
     } else {
-      playerMarkerRef.current.setLatLng(nextLatLng)
-      playerMarkerRef.current.setIcon(createAvatarIcon(selfMarkerProfile, 'self'))
-      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
-        direction: 'top',
-        opacity: 0.92,
-      })
-      playerMarkerRef.current.bindPopup(buildPlayerPopup(selfMarkerProfile, 'self'), {
-        closeButton: true,
-        autoPan: true,
-        keepInView: true,
-      })
+      playerMarkerRef.current.setLatLng(
+        nextLatLng,
+      )
+
+      if (
+        playerMarkerIconKeyRef.current !==
+        selfMarkerIconKey
+      ) {
+        playerMarkerRef.current.setIcon(
+          createAvatarIcon(
+            selfMarkerProfile,
+            'self',
+          ),
+        )
+
+        playerMarkerIconKeyRef.current =
+          selfMarkerIconKey
+      }
+
+      playerMarkerRef.current.bindTooltip(
+        selfMarkerProfile.display_name || 'YO',
+        {
+          direction: 'top',
+          opacity: 0.92,
+        },
+      )
+
+      playerMarkerRef.current.bindPopup(
+        buildPlayerPopup(
+          selfMarkerProfile,
+          'self',
+        ),
+        {
+          closeButton: true,
+          autoPan: true,
+          keepInView: true,
+        },
+      )
     }
 
     playerMarkerRef.current.setZIndexOffset(1000)

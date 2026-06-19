@@ -104,7 +104,7 @@ if "fullscreen" not in manifest.get(
     )
 
 cache_name = (
-    "saga-player-shell-v512-map-recovery"
+    "saga-player-shell-v513-marker-polish"
 )
 
 if (
