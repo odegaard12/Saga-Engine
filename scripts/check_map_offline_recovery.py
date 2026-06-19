@@ -78,8 +78,10 @@ for item in required_map:
 
 required_offline = [
     "cacheMissionMapTiles",
-    "Preparar esta misión",
-    "Descargar para usar sin conexión",
+    "cacheFieldProofAssets",
+    "fetchFieldProofs",
+    "Juego offline",
+    "Preparar juego offline",
     "Guardar progreso",
     "Sincronizar",
 ]
@@ -105,7 +107,7 @@ if "fullscreen" not in manifest.get(
     )
 
 cache_name = (
-    "saga-player-shell-v516-road-guide-tools"
+    "saga-player-shell-v518-tools-copy-cleanup"
 )
 
 if (
