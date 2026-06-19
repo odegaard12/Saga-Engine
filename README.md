@@ -2,7 +2,7 @@
 
 **Self-hosted engine for real-world, geolocated games and interactive routes.**
 
-![release](https://img.shields.io/badge/release-v0.5.0-0ea5e9)
+![release](https://img.shields.io/badge/release-v0.5.3-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![backend](https://img.shields.io/badge/backend-FastAPI-111827)
 ![frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-111827)
@@ -10,7 +10,7 @@
 
 SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
 
-Current public release: **v0.5.0**.
+Current public release: **v0.5.3**.
 
 ---
 
@@ -67,12 +67,15 @@ Admin monitors and adjusts players
 
 Current player foundations:
 
-- map-first route view;
-- GPS/radius-based node access;
+- map-first route view with state-aware mission markers;
+- fresh-GPS startup, stale-position rejection and radius-based node access;
+- compass overview/follow toggle and free map exploration;
+- road-following route guide with local geometry cache when routing is available;
 - QR inventory collection;
 - player and team identity markers;
 - local and offline-first progress;
-- mission pack and preload foundations;
+- mission pack, map-tile preload and connection-recovery foundations;
+- redesigned field Tools for offline preparation, progress save and synchronization;
 - field photo pins;
 - route progression and node completion;
 - Circuit Matrix visual-memory puzzle;
@@ -235,7 +238,8 @@ Current foundations:
 - local player progress;
 - QR inventory cards;
 - physical event queue foundations;
-- mission pack/preload foundations;
+- mission pack, map-tile and road-route cache foundations;
+- explicit offline preparation, connection recovery and later synchronization;
 - sync-oriented backend events;
 - runtime data separated from repository code.
 
@@ -302,30 +306,32 @@ ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
 
 The repository began with **v0.0.1** as its public foundation.
 
-**v0.5.0** provides four production-ready reusable games—Circuit Matrix,
-Sequence Code, Place Mosaic and Tilt Maze—together with physical QR nodes,
-guided authoring, immersive player game panels and validated offline
-progression.
+**v0.5.3** hardens SAGA for real field use. The player starts from a fresh GPS
+fix instead of centring on stale coordinates, preserves free map exploration,
+supports a predictable compass overview/follow cycle and keeps tracking stable.
 
-Tilt Maze adds generated mazes, mobile sensor control, touch fallback,
-configurable hazards and objectives, and standard route advancement.
-Native games now avoid duplicated outer headers, while emergency node
-fallback remains centralized in Tools.
+Mission nodes now use explicit progression semantics: completed nodes are green,
+the next active node is yellow with the only mission halo, and future locked
+nodes are red. QR nodes retain their number and use one compact type badge.
 
-The public Git history starts at the v0.0.1 baseline. Earlier private
-or internal iteration history is intentionally not included.
+When online routing is available, the map requests a road-following guide and
+caches the geometry locally. Tools and offline preparation now focus on mission
+and map download, progress save, connection recovery and synchronization.
+
+The four production-ready games remain Circuit Matrix, Sequence Code, Place
+Mosaic and Tilt Maze. Earlier private history remains intentionally excluded.
 
 ## Roadmap
 
 Near-term:
 
 - validate mobile sensor behaviour across different browsers and devices;
-
 - continue simplifying Mission Control and the node editor;
 - improve reusable game templates and real mission examples;
 - validate, redesign or replace experimental GPS and bearing games;
 - add more distinctive offline-ready game presets;
 - harden QR route completion with an explicit and predictable flow;
+- field-test road routing in urban and rural missions and add selectable route profiles;
 - improve PWA installation, caching and offline recovery;
 - reduce frontend bundle size through code splitting;
 - continue backend and frontend modularization.
