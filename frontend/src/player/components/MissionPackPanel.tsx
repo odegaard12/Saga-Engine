@@ -225,7 +225,7 @@ export function MissionPackPanel({
           `${remaining === 1 ? '' : 's'}`,
         )
       } else {
-        setMessage('Todo sincronizado')
+        setMessage('Progreso sincronizado')
       }
     } catch {
       setError(true)
@@ -240,7 +240,7 @@ export function MissionPackPanel({
       <div style={header}>
         <div>
           <strong style={title}>
-            Juego offline
+            Modo sin conexión
           </strong>
 
           <div style={statusLine}>
@@ -264,9 +264,9 @@ export function MissionPackPanel({
         >
           {online
             ? downloaded
-              ? 'LISTO'
-              : 'ONLINE'
-            : 'SIN RED'}
+              ? 'PREPARADO'
+              : 'EN LÍNEA'
+            : 'SIN CONEXIÓN'}
         </span>
       </div>
 
@@ -277,8 +277,8 @@ export function MissionPackPanel({
         onClick={download}
       >
         {action === 'download'
-          ? 'DESCARGANDO JUEGO OFFLINE…'
-          : 'DESCARGAR JUEGO OFFLINE'}
+          ? 'Preparando misión y mapa…'
+          : 'DESCARGAR MISIÓN Y MAPA'}
       </button>
 
       <div style={actions}>
@@ -290,7 +290,7 @@ export function MissionPackPanel({
         >
           {action === 'save'
             ? 'Guardando…'
-            : 'Guardar avance'}
+            : 'Guardar progreso'}
         </button>
 
         <button
@@ -329,11 +329,11 @@ export function MissionPackPanel({
 const card: CSSProperties = {
   display: 'grid',
   gap: 10,
-  padding: 12,
-  borderRadius: 18,
+  padding: 14,
+  borderRadius: 22,
   border:
     '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.28)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.58), rgba(15,23,42,.36))',
 }
 
 const header: CSSProperties = {
@@ -346,7 +346,7 @@ const header: CSSProperties = {
 const title: CSSProperties = {
   display: 'block',
   color: '#ffffff',
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 900,
 }
 

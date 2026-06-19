@@ -446,76 +446,41 @@ function createMissionNodeIcon(
   state: 'completed' | 'current' | 'locked',
   stage?: PlayerStage,
 ) {
-  const physicalVisual =
-    getPhysicalNodeVisual(stage)
+  const physicalVisual = getPhysicalNodeVisual(stage)
+  const number = String(index + 1)
+  const title = physicalVisual
+    ? `${physicalVisual.label} · Nodo ${number}`
+    : state === 'completed'
+      ? `Nodo ${number} completado`
+      : state === 'current'
+        ? `Nodo actual ${number}`
+        : `Nodo ${number} bloqueado`
 
-  const number =
-    String(index + 1)
+  const topBadge = physicalVisual
+    ? `<span class="saga-mission-node-type-badge" aria-hidden="true">${escapeHtml(physicalVisual.icon)}</span>`
+    : ''
 
-  const label =
-    physicalVisual?.icon ||
-    (
-      state === 'completed'
-        ? '✓'
-        : number
-    )
-
-  const title =
-    physicalVisual?.label ||
-    (
-      state === 'completed'
-        ? `Nodo ${number} completado`
-        : state === 'current'
-          ? `Nodo actual ${number}`
-          : `Nodo ${number} bloqueado`
-    )
-
-  const symbolClass =
-    physicalVisual
-      ? 'saga-mission-node-symbol--physical'
-      : state === 'completed'
-        ? 'saga-mission-node-symbol--check'
-        : 'saga-mission-node-symbol--number'
-
-  const lockBadge =
-    state === 'locked' && !physicalVisual
-      ? '<span class="saga-mission-node-lock-badge" aria-hidden="true">&#128274;&#65038;</span>'
+  const stateBadge = state === 'completed'
+    ? '<span class="saga-mission-node-state-badge saga-mission-node-state-badge--done" aria-hidden="true">✓</span>'
+    : state === 'locked'
+      ? '<span class="saga-mission-node-state-badge saga-mission-node-state-badge--locked" aria-hidden="true">&#128274;&#65038;</span>'
       : ''
 
-  const halo =
-    state === 'current'
-      ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>'
-      : ''
+  const halo = state === 'current'
+    ? '<span class="saga-mission-node-halo" aria-hidden="true"></span><span class="saga-mission-node-halo saga-mission-node-halo--outer" aria-hidden="true"></span>'
+    : ''
 
-  const size =
-    state === 'current'
-      ? 52
-      : 44
+  const size = state === 'current' ? 58 : 50
 
   return L.divIcon({
-    className:
-      `saga-mission-node-icon-wrap ` +
-      `saga-mission-node-icon-wrap--${state}` +
-      (
-        physicalVisual
-          ? ' saga-mission-node-icon-wrap--physical'
-          : ''
-      ),
+    className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}`,
     html:
-      `<div ` +
-      `class="saga-mission-node-marker ` +
-      `saga-mission-node-marker--${state}" ` +
-      `title="${escapeHtml(title)}" ` +
-      `aria-label="${escapeHtml(title)}">` +
-      halo +
-      `<div class="saga-mission-node-pin ` +
-      `saga-mission-node-pin--${state}">` +
-      `<span class="saga-mission-node-symbol ` +
-      `${symbolClass}">` +
-      `${escapeHtml(label)}</span>` +
-      lockBadge +
-      `</div>` +
-      `</div>`,
+      `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">` +
+      halo + topBadge +
+      `<div class="saga-mission-node-pin saga-mission-node-pin--${state}">` +
+      `<span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span>` +
+      stateBadge +
+      `</div></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -910,6 +875,39 @@ export function MapSurface({
         }
       }
 
+
+      .saga-mission-node-marker { width: 50px; height: 50px; }
+      .saga-mission-node-marker--current { width: 58px; height: 58px; }
+      .saga-mission-node-pin { width: 36px; height: 36px; }
+      .saga-mission-node-pin--current { width: 42px; height: 42px; }
+      .saga-mission-node-symbol--number { font-size: 14px; font-weight: 950; }
+      .saga-mission-node-type-badge {
+        position: absolute; top: -1px; left: 50%; z-index: 4;
+        transform: translate(-50%, -42%); min-width: 18px; height: 18px;
+        padding: 0 3px; display: grid; place-items: center; border-radius: 999px;
+        background: rgba(15,23,42,.94); color: #fff; border: 1.5px solid rgba(255,255,255,.92);
+        box-shadow: 0 3px 8px rgba(15,23,42,.34); font-size: 10px; line-height: 1;
+      }
+      .saga-mission-node-state-badge {
+        position: absolute; right: -4px; bottom: -4px; z-index: 4;
+        width: 15px; height: 15px; display: grid; place-items: center;
+        border-radius: 999px; border: 1px solid rgba(255,255,255,.88);
+        box-shadow: 0 2px 6px rgba(15,23,42,.28); font-size: 8px;
+      }
+      .saga-mission-node-state-badge--done { background: #ecfdf5; color: #166534; }
+      .saga-mission-node-state-badge--locked { background: #fff1f2; color: #991b1b; }
+      .saga-mission-node-halo { width: 48px; height: 48px; border-width: 3px; animation-duration: 2.8s; }
+      .saga-mission-node-halo--outer { width: 54px; height: 54px; opacity: .34; animation-delay: 1.4s; }
+      .saga-avatar-pin--self {
+        animation: sagaPlayerLocator 2.4s ease-in-out infinite !important;
+        opacity: 1 !important; transform-origin: center !important;
+      }
+      .saga-avatar-pin--self img { opacity: 1 !important; animation: none !important; }
+      @keyframes sagaPlayerLocator {
+        0%,100% { transform: scale(1) translateZ(0); box-shadow: 0 12px 28px rgba(8,145,178,.28),0 0 0 4px rgba(34,211,238,.16); }
+        50% { transform: scale(1.025) translateZ(0); box-shadow: 0 14px 32px rgba(8,145,178,.38),0 0 0 8px rgba(34,211,238,.10); }
+      }
+
       @media (
         prefers-reduced-motion:
         reduce
@@ -1003,14 +1001,24 @@ export function MapSurface({
     const routeLatLngs = stageNodes.map((entry) => L.latLng(entry.data.lat, entry.data.lon))
 
     if (routeLatLngs.length > 1) {
-      const routeLine = L.polyline(routeLatLngs, {
-        color: '#64748b',
-        weight: 3,
+      const routeCasing = L.polyline(routeLatLngs, {
+        color: '#0f172a',
+        weight: 7,
         opacity: 0.42,
-        dashArray: '6 8',
+        lineCap: 'round',
+        lineJoin: 'round',
         interactive: false,
       }).addTo(map)
-      routeNodeLayersRef.current.push(routeLine)
+      const routeLine = L.polyline(routeLatLngs, {
+        color: '#f8fafc',
+        weight: 3,
+        opacity: 0.82,
+        dashArray: '10 7',
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false,
+      }).addTo(map)
+      routeNodeLayersRef.current.push(routeCasing, routeLine)
     }
 
     let activeRadiusLayer: L.Circle | null = null
@@ -1025,6 +1033,23 @@ export function MapSurface({
           : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
+      const coincident = stageNodes.filter((candidate) =>
+        getDistanceMeters(
+          { lat: data.lat, lon: data.lon },
+          { lat: candidate.data.lat, lon: candidate.data.lon },
+        ) <= 8
+      )
+      const coincidentIndex = coincident.findIndex((candidate) => candidate.index === index)
+      const markerPoint = coincident.length > 1
+        ? spreadAround(
+            { lat: data.lat, lon: data.lon },
+            Math.max(0, coincidentIndex),
+            coincident.length,
+            mapZoom >= 18 ? 9 : 13,
+            -90,
+          )
+        : { lat: data.lat, lon: data.lon }
+      const markerCenter: L.LatLngExpression = [markerPoint.lat, markerPoint.lon]
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
 
@@ -1038,7 +1063,7 @@ export function MapSurface({
           className: `saga-node-radius saga-node-radius--current saga-node-radius--${nodeState}`,
         }).addTo(map)
 
-        const markerLayer = L.marker(center, {
+        const markerLayer = L.marker(markerCenter, {
           icon: createMissionNodeIcon(index, 'current', entry.stage),
           keyboard: false,
           zIndexOffset: 720,
@@ -1088,7 +1113,7 @@ export function MapSurface({
         interactive: false,
       }).addTo(map)
 
-      const ghostMarker = L.marker(center, {
+      const ghostMarker = L.marker(markerCenter, {
         icon: createMissionNodeIcon(index, state, entry.stage),
         keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
