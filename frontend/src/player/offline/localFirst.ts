@@ -233,7 +233,8 @@ export async function flushOfflineEvents(
     return saveOfflineSnapshot({
       ...snapshot,
       sync_status: "online",
-      last_successful_sync_at: snapshot.last_successful_sync_at || nowIso(),
+      last_successful_sync_at:
+        snapshot.last_successful_sync_at || nowIso(),
     });
   }
 
@@ -256,32 +257,101 @@ export async function flushOfflineEvents(
     }
 
     const payload = await response.json().catch(() => ({}));
-    const acceptedEvents: unknown[] = Array.isArray(payload.events) ? payload.events : [];
+    const responseEvents: unknown[] =
+      Array.isArray(payload.events) ? payload.events : [];
 
-    const acceptedClientIds: string[] = acceptedEvents
-      .map((event: unknown) => {
-        if (!event || typeof event !== "object") return "";
-        const rawId = (event as Record<string, unknown>).client_event_id;
-        return typeof rawId === "string" ? rawId : "";
-      })
-      .filter((clientEventId): clientEventId is string => clientEventId.length > 0);
+    if (responseEvents.length === 0) {
+      throw new Error("sync response did not include event results");
+    }
 
-    const fallbackIds: string[] =
-      acceptedClientIds.length > 0
-        ? acceptedClientIds
-        : snapshot.queued_events.map((event) => event.client_event_id);
+    const acceptedIds = new Set<string>();
+    const failedById = new Map<string, string>();
 
-    return removeQueuedEvents(user, fallbackIds);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "sync failed";
-    const failed = snapshot.queued_events.reduce((current, event) => {
-      const updated = markEventAttempt(user, event.client_event_id, message);
-      return updated;
-    }, snapshot);
+    for (const rawEvent of responseEvents) {
+      if (!rawEvent || typeof rawEvent !== "object") continue;
+
+      const event =
+        rawEvent as Record<string, unknown>;
+
+      const clientEventId =
+        typeof event.client_event_id === "string"
+          ? event.client_event_id
+          : "";
+
+      if (!clientEventId) continue;
+
+      const status =
+        String(event.status || "").trim().toLowerCase();
+
+      const duplicate = event.duplicate === true;
+
+      if (
+        duplicate ||
+        ["pending", "synced", "ok", "applied", "ignored"].includes(
+          status,
+        )
+      ) {
+        acceptedIds.add(clientEventId);
+        continue;
+      }
+
+      failedById.set(
+        clientEventId,
+        String(event.error || status || "backend rejected event"),
+      );
+    }
+
+    if (acceptedIds.size === 0 && failedById.size === 0) {
+      throw new Error(
+        "sync response could not be matched to queued events",
+      );
+    }
+
+    const attemptTime = nowIso();
+
+    const queuedEvents = snapshot.queued_events
+      .filter(
+        (event) => !acceptedIds.has(event.client_event_id),
+      )
+      .map((event) => {
+        const errorMessage =
+          failedById.get(event.client_event_id);
+
+        if (!errorMessage) return event;
+
+        return {
+          ...event,
+          attempts: event.attempts + 1,
+          last_attempt_at: attemptTime,
+          last_error: errorMessage,
+        };
+      });
 
     return saveOfflineSnapshot({
-      ...failed,
+      ...snapshot,
+      sync_status:
+        failedById.size > 0 ? "error" : "online",
+      last_successful_sync_at:
+        acceptedIds.size > 0
+          ? nowIso()
+          : snapshot.last_successful_sync_at,
+      queued_events: queuedEvents,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "sync failed";
+
+    const attemptTime = nowIso();
+
+    return saveOfflineSnapshot({
+      ...snapshot,
       sync_status: "error",
+      queued_events: snapshot.queued_events.map((event) => ({
+        ...event,
+        attempts: event.attempts + 1,
+        last_attempt_at: attemptTime,
+        last_error: message,
+      })),
     });
   }
 }

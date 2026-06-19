@@ -14,11 +14,11 @@ type FocusRequest =
 type NodeVisualState = 'locked' | 'ready' | 'engaging'
 type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
-const physicalNodeVisuals: Record<PhysicalNodeKind, { icon: string; label: string }> = {
-  collectible: { icon: '⭐', label: 'Coleccionable QR' },
-  requirement: { icon: '🔒', label: 'Requisito QR' },
-  clue: { icon: '🧩', label: 'Pista QR' },
-  bonus: { icon: '🎁', label: 'Bonus QR' },
+const physicalNodeVisuals: Record<PhysicalNodeKind, { kind: PhysicalNodeKind; label: string }> = {
+  collectible: { kind: 'collectible', label: 'Coleccionable QR' },
+  requirement: { kind: 'requirement', label: 'Llave o requisito QR' },
+  clue: { kind: 'clue', label: 'Pista QR' },
+  bonus: { kind: 'bonus', label: 'Bonus QR' },
 }
 
 function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
@@ -29,22 +29,25 @@ function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
   return null
 }
 
-function getPhysicalNodeVisual(stage: unknown): { icon: string; label: string } | null {
+function getPhysicalNodeVisual(stage: unknown): { kind: PhysicalNodeKind; label: string } | null {
   if (!stage || typeof stage !== 'object') return null
-
   const record = stage as Record<string, unknown>
   const flatKind = normalizePhysicalKind(record.physical_node_kind || record.physical_item_kind)
   if (flatKind) return physicalNodeVisuals[flatKind]
-
   const physicalQr = record.physical_qr
   if (physicalQr && typeof physicalQr === 'object') {
     const qrKind = normalizePhysicalKind((physicalQr as Record<string, unknown>).kind)
     if (qrKind) return physicalNodeVisuals[qrKind]
   }
-
   return null
 }
 
+function getPhysicalNodeTypeIconSvg(kind: PhysicalNodeKind): string {
+  if (kind === 'collectible') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17l-5.56 2.92 1.06-6.2L3 9.33l6.22-.9L12 2.8Z"/></svg>`
+  if (kind === 'requirement') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3a5.5 5.5 0 1 0 3.88 9.4L22 16v3h-3v2h-3v-3.17l-1.5-1.5-1.62 1.62A5.5 5.5 0 0 0 14.5 3Zm0 3a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>`
+  if (kind === 'clue') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-3.4 13.12V19a2 2 0 0 0 2 2h2.8a2 2 0 0 0 2-2v-2.88A7 7 0 0 0 12 3Zm-.05 3.9c2.15 0 3.6 1.2 3.6 2.98 0 1.45-.8 2.2-1.9 2.87-.85.52-1.08.85-1.08 1.53v.37h-1.84v-.52c0-1.04.41-1.72 1.41-2.33.92-.56 1.39-.98 1.39-1.76 0-.82-.63-1.38-1.61-1.38-.95 0-1.61.52-1.84 1.41l-1.78-.47c.41-1.66 1.77-2.7 3.65-2.7Zm-1.23 9.48h2.15v2.1h-2.15v-2.1Z"/></svg>`
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4V10Zm2 2v6h5v-6H6Zm7 0v6h5v-6h-5ZM3 7.75C3 6.78 3.78 6 4.75 6h3.18A3 3 0 1 1 12 1.6 3 3 0 1 1 16.07 6h3.18C20.22 6 21 6.78 21 7.75V11h-8V6h-2v5H3V7.75Z"/></svg>`
+}
 
 type MapSurfaceProps = {
   currentStage: PlayerStage | null
@@ -56,6 +59,8 @@ type MapSurfaceProps = {
   debugSimulation?: boolean
   followPlayer?: boolean
   focusRequest?: FocusRequest
+  refreshToken?: number
+  onUserMapMove?: () => void
   nodeState?: NodeVisualState
   otherPlayers?: TeamProfileLiveStatus[]
   fieldProofs?: FieldProof[]
@@ -70,7 +75,7 @@ type MapSurfaceProps = {
 
 function getPhysicalNodeTooltipPrefix(stage: unknown): string {
   const visual = getPhysicalNodeVisual(stage)
-  return visual ? `${visual.icon} ${visual.label} · ` : ''
+  return visual ? `${visual.label} · ` : ''
 }
 
 function resolveStageMapData(stage: PlayerStage | null) {
@@ -311,42 +316,35 @@ function getFieldProofTooltip(proofs: FieldProof[]) {
   return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
 }
 
-function getNodeVisualConfig(nodeState: NodeVisualState) {
+function getNodeVisualConfig(
+  nodeState: NodeVisualState,
+) {
   if (nodeState === 'engaging') {
     return {
-      ringColor: '#22c55e',
+      ringColor: '#d6a900',
+      ringFillColor: '#f4c95d',
       ringWeight: 3,
-      ringOpacity: 0.96,
-      ringFillOpacity: 0.14,
-      markerRadius: 8,
-      markerWeight: 3,
-      markerStroke: '#16a34a',
-      markerFill: '#ffffff',
+      ringOpacity: 0.58,
+      ringFillOpacity: 0.07,
     }
   }
 
   if (nodeState === 'ready') {
     return {
-      ringColor: '#22c55e',
-      ringWeight: 3,
-      ringOpacity: 0.88,
-      ringFillOpacity: 0.10,
-      markerRadius: 8,
-      markerWeight: 3,
-      markerStroke: '#16a34a',
-      markerFill: '#dcfce7',
+      ringColor: '#d6a900',
+      ringFillColor: '#f4c95d',
+      ringWeight: 2,
+      ringOpacity: 0.50,
+      ringFillOpacity: 0.055,
     }
   }
 
   return {
-    ringColor: '#22c55e',
+    ringColor: '#d6a900',
+    ringFillColor: '#f4c95d',
     ringWeight: 2,
-    ringOpacity: 0.70,
-    ringFillOpacity: 0.06,
-    markerRadius: 8,
-    markerWeight: 3,
-    markerStroke: '#16a34a',
-    markerFill: '#dcfce7',
+    ringOpacity: 0.44,
+    ringFillOpacity: 0.04,
   }
 }
 
@@ -430,45 +428,54 @@ function buildPlayerPopup(
 
 function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
   const physicalVisual = getPhysicalNodeVisual(stage)
-  const label =
-    physicalVisual?.icon ||
-    (state === 'completed'
-      ? '✓'
-      : state === 'locked'
-      ? '🔒'
-      : String(index + 1))
-
-  const styles = physicalVisual
-    ? 'background:rgba(255,255,255,.96);border-color:rgba(15,23,42,.72);color:#020617;'
-    : state === 'completed'
-      ? 'background:rgba(34,197,94,.92);border-color:rgba(255,255,255,.82);color:#052e16;'
-      : state === 'locked'
-      ? 'background:rgba(127,29,29,.92);border-color:rgba(254,202,202,.72);color:#fff1f2;'
-      : 'background:rgba(34,197,94,.96);border-color:rgba(255,255,255,.94);color:#052e16;'
-
-  const shadow = physicalVisual
-    ? 'box-shadow:0 8px 18px rgba(15,23,42,.26);'
-    : 'box-shadow:0 8px 24px rgba(15,23,42,.28);'
-
+  const number = String(index + 1)
+  const stateLabel = state === 'completed' ? 'completado' : state === 'current' ? 'siguiente nodo' : 'bloqueado'
+  const title = physicalVisual ? `${physicalVisual.label} · Nodo ${number} · ${stateLabel}` : `Nodo ${number} · ${stateLabel}`
+  const typeBadge = physicalVisual ? `<span class="saga-mission-node-type-badge saga-mission-node-type-badge--${physicalVisual.kind}" aria-hidden="true">${getPhysicalNodeTypeIconSvg(physicalVisual.kind)}</span>` : ''
+  const halo = state === 'current' ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>' : ''
+  const size = state === 'current' ? 56 : 48
   return L.divIcon({
     className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
-    html: `<div style="
-      width:${physicalVisual ? '34px' : '30px'};
-      height:${physicalVisual ? '34px' : '30px'};
-      border-radius:999px;
-      border:2px solid;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:${physicalVisual ? '17px' : state === 'locked' ? '14px' : '13px'};
-      font-weight:900;
-      backdrop-filter:blur(10px);
-      ${styles}
-      ${shadow}
-    " title="${physicalVisual ? physicalVisual.label : ''}">${label}</div>`,
-    iconSize: physicalVisual ? [34, 34] : [30, 30],
-    iconAnchor: physicalVisual ? [17, 17] : [15, 15],
+    html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div></div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   })
+}
+
+type RoadRoutePoint = { lat: number; lon: number }
+type CachedRoadRoute = { path: RoadRoutePoint[]; snapped: RoadRoutePoint[]; savedAt: number }
+const ROAD_ROUTE_CACHE_PREFIX = 'saga-road-route-v1:'
+
+function getRoadRouteCacheKey(points: RoadRoutePoint[]): string {
+  const signature = points.map((p) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`).join('|')
+  let hash = 2166136261
+  for (let i = 0; i < signature.length; i += 1) { hash ^= signature.charCodeAt(i); hash = Math.imul(hash, 16777619) }
+  return `${ROAD_ROUTE_CACHE_PREFIX}${(hash >>> 0).toString(16)}`
+}
+
+function readRoadRouteCache(key: string): CachedRoadRoute | null {
+  try { const value = JSON.parse(window.localStorage.getItem(key) || 'null') as CachedRoadRoute | null; return value && Array.isArray(value.path) && value.path.length > 1 ? value : null } catch { return null }
+}
+function writeRoadRouteCache(key: string, route: CachedRoadRoute) { try { window.localStorage.setItem(key, JSON.stringify(route)) } catch {} }
+
+async function fetchRoadRoute(points: RoadRoutePoint[], signal: AbortSignal): Promise<CachedRoadRoute> {
+  const path: RoadRoutePoint[] = []; const snapped: RoadRoutePoint[] = []
+  for (let start = 0; start < points.length - 1; start += 24) {
+    const chunk = points.slice(start, Math.min(points.length, start + 25)); if (chunk.length < 2) break
+    const coords = chunk.map((p) => `${p.lon},${p.lat}`).join(';')
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false&continue_straight=false`
+    const response = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (!response.ok) throw new Error(`Road route HTTP ${response.status}`)
+    const payload = await response.json() as { code?: string; routes?: Array<{ geometry?: { coordinates?: unknown[] } }>; waypoints?: Array<{ location?: unknown[] }> }
+    if (payload.code !== 'Ok') throw new Error(`Road route ${payload.code || 'invalid'}`)
+    const geometry = payload.routes?.[0]?.geometry?.coordinates
+    if (!Array.isArray(geometry)) throw new Error('Road route without geometry')
+    const segment = geometry.filter((v): v is [number, number] => Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number').map(([lon, lat]) => ({ lat, lon }))
+    if (path.length && segment.length) segment.shift(); path.push(...segment)
+    const snappedSegment = (payload.waypoints || []).map((w) => w.location).filter((v): v is [number, number] => Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number').map(([lon, lat]) => ({ lat, lon }))
+    if (snapped.length && snappedSegment.length) snappedSegment.shift(); snapped.push(...snappedSegment)
+  }
+  if (path.length < 2) throw new Error('Road route unavailable')
+  return { path, snapped, savedAt: Date.now() }
 }
 
 const OfflineGridLayer = L.GridLayer.extend({
@@ -490,6 +497,8 @@ export function MapSurface({
   debugSimulation,
   followPlayer = true,
   focusRequest,
+  refreshToken = 0,
+  onUserMapMove,
   nodeState = 'locked',
   otherPlayers = [],
   fieldProofs = [],
@@ -505,16 +514,28 @@ export function MapSurface({
   const [mapReadyToken, setMapReadyToken] = useState(0)
   const [mapZoom, setMapZoom] = useState(16)
   const mapRef = useRef<L.Map | null>(null)
+  const tileLayerRef =
+    useRef<L.TileLayer | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
-  const playerMarkerRef = useRef<L.Marker | null>(null)
-  const playerAuraRef = useRef<L.CircleMarker | null>(null)
+  const playerMarkerRef =
+    useRef<L.Marker | null>(null)
+
+  const playerMarkerIconKeyRef =
+    useRef<string | null>(null)
+
+  const playerAuraRef =
+    useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
   const fieldProofLayersRef = useRef<L.Layer[]>([])
   const routeNodeLayersRef = useRef<L.Layer[]>([])
+  const roadRouteLayersRef = useRef<L.Layer[]>([])
+  const roadRouteAbortRef = useRef<AbortController | null>(null)
   const onNodeTapRef = useRef(onNodeTap)
+  const onUserMapMoveRef =
+    useRef(onUserMapMove)
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
@@ -522,6 +543,11 @@ export function MapSurface({
   useEffect(() => {
     onNodeTapRef.current = onNodeTap
   }, [onNodeTap])
+
+  useEffect(() => {
+    onUserMapMoveRef.current =
+      onUserMapMove
+  }, [onUserMapMove])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
@@ -544,18 +570,29 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 20,
-      maxNativeZoom: 19,
-      attribution: 'Tiles © Esri',
-    })
+    const tileLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 20,
+        maxNativeZoom: 19,
+        attribution: 'Tiles © Esri',
+      },
+    )
+
+    tileLayer
       .on('tileerror', () => {
-        mapRootRef.current?.classList.add('saga-map-offline-tiles')
+        mapRootRef.current?.classList.add(
+          'saga-map-offline-tiles',
+        )
       })
       .on('load', () => {
-        mapRootRef.current?.classList.remove('saga-map-offline-tiles')
+        mapRootRef.current?.classList.remove(
+          'saga-map-offline-tiles',
+        )
       })
-      .addTo(map)
+
+    tileLayer.addTo(map)
+    tileLayerRef.current = tileLayer
 
     map.setView([42.4333, -8.65], 16)
     mapRef.current = map
@@ -573,6 +610,9 @@ export function MapSurface({
       nodeRadiusRef.current?.remove()
       routeNodeLayersRef.current.forEach((layer) => layer.remove())
       routeNodeLayersRef.current = []
+      roadRouteAbortRef.current?.abort()
+      roadRouteLayersRef.current.forEach((layer) => layer.remove())
+      roadRouteLayersRef.current = []
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
       fieldProofLayersRef.current.forEach((layer) => layer.remove())
@@ -580,7 +620,9 @@ export function MapSurface({
       otherPlayerMarkerStateRef.current.clear()
       map.remove()
       mapRef.current = null
+      tileLayerRef.current = null
       playerMarkerRef.current = null
+      playerMarkerIconKeyRef.current = null
       playerAuraRef.current = null
       playerAuraModeRef.current = null
       nodeMarkerRef.current = null
@@ -589,26 +631,51 @@ export function MapSurface({
   }, [])
 
   useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const handleManualMove = () => {
+      onUserMapMoveRef.current?.()
+    }
+
+    map.on('dragstart', handleManualMove)
+
+    return () => {
+      map.off('dragstart', handleManualMove)
+    }
+  }, [mapReadyToken])
+
+  useEffect(() => {
     if (typeof document === 'undefined') return
     if (document.getElementById('saga-player-aura-style')) return
 
     const style = document.createElement('style')
     style.id = 'saga-player-aura-style'
     style.textContent = `
-      .saga-player-aura--gps {
-        animation: sagaPlayerAuraPulse 1.35s ease-in-out infinite;
-      }
-
-      .saga-player-aura--debug {
-        animation: sagaPlayerAuraPulse 1.05s ease-in-out infinite;
-      }
-
-      @keyframes sagaPlayerAuraPulse {
-        0% { opacity: 0.95; }
-        50% { opacity: 0.25; }
-        100% { opacity: 0.95; }
-      }
+      .saga-player-aura--gps { animation: sagaPlayerAuraBreathe 3.2s ease-in-out infinite; }
+      .saga-player-aura--debug { animation: sagaPlayerAuraBreathe 3s ease-in-out infinite; }
+      .saga-avatar-pin--self { animation: sagaPlayerLocator 2.3s ease-in-out infinite !important; opacity: 1 !important; transform-origin: center !important; }
+      .saga-avatar-pin--self img { animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
+      .saga-mission-node-icon-wrap { background: transparent !important; border: 0 !important; }
+      .saga-mission-node-marker { position: relative; width: 48px; height: 48px; display: grid; place-items: center; overflow: visible; }
+      .saga-mission-node-marker--current { width: 56px; height: 56px; }
+      .saga-mission-node-pin { position: relative; z-index: 3; width: 35px; height: 35px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; border: 2px solid rgba(255,255,255,.92); color: #fff; font-family: system-ui,sans-serif; font-weight: 950; line-height: 1; animation: none; }
+      .saga-mission-node-pin--completed { background: linear-gradient(145deg,#22c55e,#15803d); border-color: rgba(220,252,231,.96); box-shadow: 0 6px 16px rgba(20,83,45,.34); }
+      .saga-mission-node-pin--current { width: 42px; height: 42px; background: linear-gradient(145deg,#f4c95d,#d6a900); border-color: rgba(255,248,214,.99); color: #302404; box-shadow: 0 8px 20px rgba(113,83,0,.40); }
+      .saga-mission-node-pin--locked { background: linear-gradient(145deg,#dc4c4c,#991b1b); border-color: rgba(254,226,226,.94); box-shadow: 0 6px 16px rgba(127,29,29,.34); }
+      .saga-mission-node-symbol--number { font-size: 14px; font-weight: 950; font-variant-numeric: tabular-nums; }
+      .saga-mission-node-type-badge { position: absolute; top: -2px; left: 50%; z-index: 5; width: 20px; height: 20px; display: grid; place-items: center; transform: translate(-50%,-42%); border-radius: 999px; background: rgba(15,23,42,.96); color: #fff; border: 1.5px solid rgba(255,255,255,.94); box-shadow: 0 3px 9px rgba(15,23,42,.38); }
+      .saga-mission-node-type-badge svg { width: 12px; height: 12px; display: block; fill: currentColor; }
+      .saga-mission-node-type-badge--collectible { color: #fde68a; } .saga-mission-node-type-badge--requirement { color: #bfdbfe; } .saga-mission-node-type-badge--clue { color: #e9d5ff; } .saga-mission-node-type-badge--bonus { color: #fecdd3; }
+      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(244,201,93,.88); box-shadow: 0 0 0 3px rgba(214,169,0,.13),0 0 18px rgba(244,201,93,.28); pointer-events: none; transform-origin: center; animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-node-radius--completed,.saga-node-radius--locked { display: none; animation: none; }
+      .saga-node-radius--current,.saga-node-radius--ready,.saga-node-radius--engaging { animation: none; }
+      @keyframes sagaPlayerAuraBreathe { 0%,100% { opacity:.42; } 50% { opacity:.66; } }
+      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1); box-shadow:0 12px 28px rgba(8,145,178,.30),0 0 0 4px rgba(34,211,238,.17); } 50% { transform:scale(1.035); box-shadow:0 14px 34px rgba(8,145,178,.44),0 0 0 10px rgba(34,211,238,.10); } }
+      @keyframes sagaCurrentNodeHalo { 0% { transform:scale(.82); opacity:.84; } 72% { transform:scale(1.34); opacity:.12; } 100% { transform:scale(1.40); opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { .saga-player-aura--gps,.saga-player-aura--debug,.saga-avatar-pin--self,.saga-mission-node-halo { animation:none !important; } }
     `
+
     document.head.appendChild(style)
   }, [])
 
@@ -664,6 +731,10 @@ export function MapSurface({
     nodeRadiusRef.current?.remove()
     routeNodeLayersRef.current.forEach((layer) => layer.remove())
     routeNodeLayersRef.current = []
+    roadRouteAbortRef.current?.abort()
+    roadRouteAbortRef.current = null
+    roadRouteLayersRef.current.forEach((layer) => layer.remove())
+    roadRouteLayersRef.current = []
     nodeMarkerRef.current = null
     nodeRadiusRef.current = null
 
@@ -687,17 +758,23 @@ export function MapSurface({
     }
 
     const activeIndex = Math.max(0, Math.min(currentLevel || 0, stageNodes.length - 1))
-    const routeLatLngs = stageNodes.map((entry) => L.latLng(entry.data.lat, entry.data.lon))
-
-    if (routeLatLngs.length > 1) {
-      const routeLine = L.polyline(routeLatLngs, {
-        color: '#64748b',
-        weight: 3,
-        opacity: 0.42,
-        dashArray: '6 8',
-        interactive: false,
-      }).addTo(map)
-      routeNodeLayersRef.current.push(routeLine)
+    const routePoints = stageNodes.map((entry) => ({ lat: entry.data.lat, lon: entry.data.lon }))
+    if (routePoints.length > 1) {
+      const cacheKey = getRoadRouteCacheKey(routePoints)
+      const drawRoadRoute = (road: CachedRoadRoute) => {
+        roadRouteLayersRef.current.forEach((layer) => layer.remove()); roadRouteLayersRef.current = []
+        const latLngs = road.path.map((p) => L.latLng(p.lat, p.lon)); if (latLngs.length < 2) return
+        const shadow = L.polyline(latLngs, { color:'#0f172a', weight:10, opacity:.48, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--shadow' }).addTo(map)
+        const casing = L.polyline(latLngs, { color:'#fff', weight:7, opacity:.90, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--casing' }).addTo(map)
+        const guide = L.polyline(latLngs, { color:'#2563eb', weight:4, opacity:.96, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--route' }).addTo(map)
+        roadRouteLayersRef.current.push(shadow,casing,guide)
+        routePoints.forEach((point,index) => { const snapped = road.snapped[index]; if (!snapped) return; const distance = getDistanceMeters(point,snapped); if (distance < 6 || distance > 1500) return; const connector = L.polyline([L.latLng(point.lat,point.lon),L.latLng(snapped.lat,snapped.lon)], { color:'#60a5fa', weight:2, opacity:.82, dashArray:'4 6', lineCap:'round', interactive:false, className:'saga-road-guide saga-road-guide--connector' }).addTo(map); roadRouteLayersRef.current.push(connector) })
+      }
+      const cached = readRoadRouteCache(cacheKey); if (cached) drawRoadRoute(cached)
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        const controller = new AbortController(); roadRouteAbortRef.current = controller
+        void fetchRoadRoute(routePoints,controller.signal).then((road) => { if (controller.signal.aborted || roadRouteAbortRef.current !== controller) return; writeRoadRouteCache(cacheKey,road); drawRoadRoute(road) }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) console.warn('SAGA road route unavailable',error) })
+      }
     }
 
     let activeRadiusLayer: L.Circle | null = null
@@ -712,21 +789,37 @@ export function MapSurface({
           : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
+      const coincident = stageNodes.filter((candidate) =>
+        getDistanceMeters(
+          { lat: data.lat, lon: data.lon },
+          { lat: candidate.data.lat, lon: candidate.data.lon },
+        ) <= 8
+      )
+      const coincidentIndex = coincident.findIndex((candidate) => candidate.index === index)
+      const markerPoint = coincident.length > 1
+        ? spreadAround(
+            { lat: data.lat, lon: data.lon },
+            Math.max(0, coincidentIndex),
+            coincident.length,
+            mapZoom >= 18 ? 9 : 13,
+            -90,
+          )
+        : { lat: data.lat, lon: data.lon }
+      const markerCenter: L.LatLngExpression = [markerPoint.lat, markerPoint.lon]
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
-        const physicalVisual = getPhysicalNodeVisual(entry.stage)
 
         const radiusLayer = L.circle(center, {
           radius: data.radius,
-          color: physicalVisual ? '#0f172a' : visual.ringColor,
-          weight: physicalVisual ? 1 : visual.ringWeight,
-          opacity: physicalVisual ? 0.26 : visual.ringOpacity,
-          fillColor: physicalVisual ? '#ffffff' : visual.ringColor,
-          fillOpacity: physicalVisual ? 0.02 : visual.ringFillOpacity,
-          className: physicalVisual ? 'saga-node-radius saga-node-radius--physical' : `saga-node-radius saga-node-radius--${nodeState}`,
+          color: visual.ringColor,
+          weight: visual.ringWeight,
+          opacity: visual.ringOpacity,
+          fillColor: visual.ringFillColor,
+          fillOpacity: visual.ringFillOpacity,
+          className: `saga-node-radius saga-node-radius--current saga-node-radius--${nodeState}`,
         }).addTo(map)
 
-        const markerLayer = L.marker(center, {
+        const markerLayer = L.marker(markerCenter, {
           icon: createMissionNodeIcon(index, 'current', entry.stage),
           keyboard: false,
           zIndexOffset: 720,
@@ -749,34 +842,13 @@ export function MapSurface({
         continue
       }
 
-      const ringColor = state === 'completed' ? '#22c55e' : '#ef4444'
-      const ringFill = state === 'completed' ? '#bbf7d0' : '#fecaca'
-
-      const ghostRadius = L.circle(center, {
-        radius: Math.max(16, Math.min(data.radius, 40)),
-        color: ringColor,
-        weight: 2,
-        opacity: state === 'completed' ? 0.42 : 0.58,
-        fillColor: ringFill,
-        fillOpacity: state === 'completed' ? 0.10 : 0.14,
-        interactive: false,
-      }).addTo(map)
-
-      const ghostMarker = L.marker(center, {
-        icon: createMissionNodeIcon(index, state, entry.stage),
-        keyboard: false,
+      const ghostMarker = L.marker(markerCenter, {
+        icon: createMissionNodeIcon(index, state, entry.stage), keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
       }).addTo(map)
+      ghostMarker.bindTooltip(state === 'locked' ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}` : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, { direction: 'top', opacity: .88 })
+      routeNodeLayersRef.current.push(ghostMarker)
 
-      ghostMarker.bindTooltip(
-        state === 'locked' ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}` : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`,
-        {
-          direction: 'top',
-          opacity: 0.88,
-        }
-      )
-
-      routeNodeLayersRef.current.push(ghostRadius, ghostMarker)
     }
 
     const nodeFrameKey = stageNodes
@@ -840,18 +912,18 @@ export function MapSurface({
     } else {
       const auraClassName =
         auraMode === 'debug' ? 'saga-player-aura--debug' : 'saga-player-aura--gps'
-      const auraColor = auraMode === 'debug' ? '#ef4444' : '#22c55e'
-      const auraFill = auraMode === 'debug' ? '#f87171' : '#4ade80'
+      const auraColor = auraMode === 'debug' ? '#c2410c' : '#0891b2'
+      const auraFill = auraMode === 'debug' ? '#fb923c' : '#22d3ee'
 
       if (!playerAuraRef.current || playerAuraModeRef.current !== auraMode) {
         playerAuraRef.current?.remove()
         playerAuraRef.current = L.circleMarker(nextLatLng, {
-          radius: 34,
+          radius: 27,
           color: auraColor,
-          weight: 5,
-          opacity: 0.9,
+          weight: 2,
+          opacity: 0.58,
           fillColor: auraFill,
-          fillOpacity: 0.30,
+          fillOpacity: 0.08,
           className: auraClassName,
           interactive: false,
         }).addTo(map)
@@ -871,72 +943,126 @@ export function MapSurface({
       gps_status: gpsState,
     }
 
-    if (!playerMarkerRef.current) {
-      playerMarkerRef.current = L.marker(nextLatLng, {
-        icon: createAvatarIcon(selfMarkerProfile, 'self'),
-        keyboard: false,
-      }).addTo(map)
+    const selfMarkerIconKey = [
+      getPlayerAvatarUrl(selfMarkerProfile),
+      getPlayerAvatarInitials(
+        selfMarkerProfile,
+      ),
+      getPlayerColor(selfMarkerProfile),
+    ].join('|')
 
-      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
-        direction: 'top',
-        opacity: 0.92,
-      })
+    if (!playerMarkerRef.current) {
+      playerMarkerRef.current = L.marker(
+        nextLatLng,
+        {
+          icon: createAvatarIcon(
+            selfMarkerProfile,
+            'self',
+          ),
+          keyboard: false,
+        },
+      ).addTo(map)
+
+      playerMarkerIconKeyRef.current =
+        selfMarkerIconKey
+
+      playerMarkerRef.current.bindTooltip(
+        selfMarkerProfile.display_name || 'YO',
+        {
+          direction: 'top',
+          opacity: 0.92,
+        },
+      )
+
       playerMarkerRef.current.bindPopup(
-        buildPlayerPopup(selfMarkerProfile, 'self'),
+        buildPlayerPopup(
+          selfMarkerProfile,
+          'self',
+        ),
         {
           closeButton: true,
           autoPan: true,
           keepInView: true,
-        }
+        },
       )
+
       playerMarkerRef.current.off('click')
-      playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
+
+      playerMarkerRef.current.on(
+        'click',
+        () =>
+          playerMarkerRef.current?.openPopup(),
+      )
     } else {
-      playerMarkerRef.current.setLatLng(nextLatLng)
-      playerMarkerRef.current.setIcon(createAvatarIcon(selfMarkerProfile, 'self'))
-      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
-        direction: 'top',
-        opacity: 0.92,
-      })
-      playerMarkerRef.current.bindPopup(buildPlayerPopup(selfMarkerProfile, 'self'), {
-        closeButton: true,
-        autoPan: true,
-        keepInView: true,
-      })
+      playerMarkerRef.current.setLatLng(
+        nextLatLng,
+      )
+
+      if (
+        playerMarkerIconKeyRef.current !==
+        selfMarkerIconKey
+      ) {
+        playerMarkerRef.current.setIcon(
+          createAvatarIcon(
+            selfMarkerProfile,
+            'self',
+          ),
+        )
+
+        playerMarkerIconKeyRef.current =
+          selfMarkerIconKey
+      }
+
+      playerMarkerRef.current.bindTooltip(
+        selfMarkerProfile.display_name || 'YO',
+        {
+          direction: 'top',
+          opacity: 0.92,
+        },
+      )
+
+      playerMarkerRef.current.bindPopup(
+        buildPlayerPopup(
+          selfMarkerProfile,
+          'self',
+        ),
+        {
+          closeButton: true,
+          autoPan: true,
+          keepInView: true,
+        },
+      )
     }
 
     playerMarkerRef.current.setZIndexOffset(1000)
 
-    const playerFrameKey = stageMapData
-      ? `${stageMapData.lat}:${stageMapData.lon}:player`
-      : `player:${selfLabel}`
+    if (followPlayer) {
+      const playerFrameKey =
+        `${playerPosition.lat.toFixed(6)}:` +
+        `${playerPosition.lon.toFixed(6)}`
 
-    if (followPlayer && lastPlayerFrameRef.current !== playerFrameKey) {
-      lastPlayerFrameRef.current = playerFrameKey
+      if (
+        lastPlayerFrameRef.current !==
+        playerFrameKey
+      ) {
+        lastPlayerFrameRef.current =
+          playerFrameKey
 
-      if (stageMapData) {
-        const distance = getDistanceMeters(playerPosition, {
-          lat: stageMapData.lat,
-          lon: stageMapData.lon,
-        })
-
-        if (distance <= 350) {
-          const bounds = L.latLngBounds(
-            [stageMapData.lat, stageMapData.lon],
-            [playerPosition.lat, playerPosition.lon]
+        const distanceFromCenter =
+          map.distance(
+            map.getCenter(),
+            nextLatLng,
           )
-          map.fitBounds(bounds.pad(0.30), {
-            maxZoom: 18,
+
+        if (distanceFromCenter > 6) {
+          map.panTo(nextLatLng, {
             animate: true,
-            duration: 0.25,
+            duration: 0.32,
           })
         }
-      } else {
-        map.setView([playerPosition.lat, playerPosition.lon], 18, {
-          animate: true,
-          duration: 0.25,
-        })
       }
+    } else {
+      lastPlayerFrameRef.current = null
     }
   }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, selfProfile, gpsState, debugSimulation])
 
@@ -1127,6 +1253,73 @@ export function MapSurface({
 
   useEffect(() => {
     const map = mapRef.current
+    if (!map) return
+
+    const refreshMap = () => {
+      window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false })
+
+        if (
+          typeof navigator === 'undefined' ||
+          navigator.onLine !== false
+        ) {
+          mapRootRef.current?.classList.remove(
+            'saga-map-offline-tiles',
+          )
+
+          tileLayerRef.current?.redraw()
+        }
+      })
+    }
+
+    refreshMap()
+
+    window.addEventListener(
+      'online',
+      refreshMap,
+    )
+
+    window.addEventListener(
+      'pageshow',
+      refreshMap,
+    )
+
+    const visibilityHandler = () => {
+      if (
+        document.visibilityState === 'visible'
+      ) {
+        refreshMap()
+      }
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      visibilityHandler,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'online',
+        refreshMap,
+      )
+
+      window.removeEventListener(
+        'pageshow',
+        refreshMap,
+      )
+
+      document.removeEventListener(
+        'visibilitychange',
+        visibilityHandler,
+      )
+    }
+  }, [
+    mapReadyToken,
+    refreshToken,
+  ])
+
+  useEffect(() => {
+    const map = mapRef.current
     if (!map || !focusRequest) return
     if (lastFocusTokenRef.current === focusRequest.token) return
     lastFocusTokenRef.current = focusRequest.token
@@ -1144,57 +1337,92 @@ export function MapSurface({
     }
 
     if (focusRequest.target === 'route') {
-      if (stageMapData && playerPosition) {
-        const bounds = L.latLngBounds(
-          [stageMapData.lat, stageMapData.lon],
-          [playerPosition.lat, playerPosition.lon]
+      const sourceStages =
+        Array.isArray(missionStages) &&
+        missionStages.length > 0
+          ? missionStages
+          : currentStage
+            ? [currentStage]
+            : []
+
+      const routePoints =
+        sourceStages
+          .map(resolveStageMapData)
+          .filter(
+            (
+              value,
+            ): value is NonNullable<
+              ReturnType<
+                typeof resolveStageMapData
+              >
+            > => Boolean(value),
+          )
+          .map((value) =>
+            L.latLng(
+              value.lat,
+              value.lon,
+            ),
+          )
+
+      if (playerPosition) {
+        routePoints.push(
+          L.latLng(
+            playerPosition.lat,
+            playerPosition.lon,
+          ),
         )
+      }
 
-        const routeDistance = getDistanceMeters(playerPosition, {
-          lat: stageMapData.lat,
-          lon: stageMapData.lon,
+      if (routePoints.length === 1) {
+        map.stop()
+        map.flyTo(routePoints[0], 17, {
+          animate: true,
+          duration: 0.55,
+          easeLinearity: 0.22,
         })
+        return
+      }
 
-        const targetZoom =
-          routeDistance > 100000 ? 6 :
-          routeDistance > 25000 ? 8 :
-          routeDistance > 5000 ? 11 :
-          routeDistance > 1000 ? 13 :
-          routeDistance > 250 ? 15 :
-          17
+      if (routePoints.length > 1) {
+        const bounds =
+          L.latLngBounds(routePoints)
 
         map.stop()
-        map.invalidateSize({ pan: false })
+        map.invalidateSize({
+          pan: false,
+        })
 
-        if (routeDistance > 100000) {
-          const center = bounds.getCenter()
-          map.flyTo(center, targetZoom, {
-            animate: true,
-            duration: 0.65,
-            easeLinearity: 0.22,
-          })
-        } else {
-          map.flyToBounds(bounds.pad(0.18), {
-            paddingTopLeft: [44, 132],
+        map.flyToBounds(
+          bounds.pad(0.14),
+          {
+            paddingTopLeft: [44, 130],
             paddingBottomRight: [44, 190],
-            maxZoom: targetZoom,
+            maxZoom: 17,
             animate: true,
             duration: 0.65,
             easeLinearity: 0.22,
-          })
-        }
+          },
+        )
 
         return
       }
 
       if (playerPosition) {
         map.stop()
-        map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
-          animate: true,
-          duration: 0.25,
-        })
-        return
+        map.flyTo(
+          [
+            playerPosition.lat,
+            playerPosition.lon,
+          ],
+          18,
+          {
+            animate: true,
+            duration: 0.35,
+          },
+        )
       }
+
+      return
     }
 
     if (focusRequest.target === 'node' && stageMapData) {
@@ -1212,6 +1440,8 @@ export function MapSurface({
     stageMapData?.lat,
     stageMapData?.lon,
     stageMapData?.radius,
+    missionStages,
+    currentStage,
   ])
 
   return (
@@ -1286,16 +1516,12 @@ const mapAnimations = `
   cursor: pointer;
 }
 
-.saga-node-radius--locked {
-  animation: sagaNodeHaloLocked 2200ms ease-in-out infinite;
-}
-
-.saga-node-radius--ready {
-  animation: sagaNodeHaloReady 1100ms ease-in-out infinite;
-}
-
+.saga-node-radius--completed,
+.saga-node-radius--current,
+.saga-node-radius--locked,
+.saga-node-radius--ready,
 .saga-node-radius--engaging {
-  animation: sagaNodeHaloEngaging 520ms ease-in-out 3;
+  animation: none;
 }
 
 .saga-node-core {
@@ -1449,32 +1675,61 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin {
-  will-change: transform;
+  will-change: auto;
   transform: translateZ(0);
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 950;
-          border: 3px solid rgba(255,255,255,.94);
-          box-shadow: 0 12px 30px rgba(15,23,42,.34), inset 0 1px 0 rgba(255,255,255,.35);
-          color: #ffffff;
-          background: linear-gradient(135deg, var(--saga-player-color, #22c55e), rgba(15,23,42,.72));
-          overflow: hidden;
-          transition: transform 160ms ease, opacity 160ms ease;
-        }
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 950;
+  border:
+    3px solid
+    rgba(255,255,255,.94);
+  box-shadow:
+    0 12px 30px
+      rgba(15,23,42,.34),
+    inset 0 1px 0
+      rgba(255,255,255,.35);
+  color: #ffffff;
+  background:
+    linear-gradient(
+      135deg,
+      var(--saga-player-color,#0891b2),
+      rgba(15,23,42,.72)
+    );
+  overflow: hidden;
+  transition: none;
+  animation: none;
+}
+
+.saga-avatar-pin img {
+  animation: none;
+  transform: none;
+  opacity: 1;
+}
 
 .saga-avatar-pin--self {
-  min-width: 42px;
-  padding: 0 7px;
-          width: 46px;
-          height: 46px;
-          border-color: rgba(255,255,255,.98);
-          box-shadow: 0 14px 34px rgba(15,23,42,.38), 0 0 0 8px color-mix(in srgb, var(--saga-player-color, #22c55e) 20%, transparent);
-        }
+  min-width: 46px;
+  padding: 0;
+  width: 46px;
+  height: 46px;
+  border-color:
+    rgba(207,250,254,.98);
+  box-shadow:
+    0 12px 28px
+      rgba(8,145,178,.28),
+    0 0 0 4px
+      rgba(34,211,238,.16),
+    inset 0 1px 0
+      rgba(255,255,255,.36);
+  opacity: 1;
+  transform: translateZ(0);
+  transition: none;
+  animation: none;
+}
 
 .saga-avatar-pin--live {
           border-color: rgba(187,247,208,.92);
@@ -1491,23 +1746,9 @@ const mapAnimations = `
           border-color: rgba(203,213,225,.82);
         }
 
-@keyframes sagaNodeHaloLocked {
-  0% { stroke-opacity: .72; fill-opacity: .06; }
-  50% { stroke-opacity: .40; fill-opacity: .02; }
-  100% { stroke-opacity: .72; fill-opacity: .06; }
-}
 
-@keyframes sagaNodeHaloReady {
-  0% { stroke-opacity: .94; fill-opacity: .12; }
-  50% { stroke-opacity: .36; fill-opacity: .02; }
-  100% { stroke-opacity: .94; fill-opacity: .12; }
-}
 
-@keyframes sagaNodeHaloEngaging {
-  0% { stroke-opacity: 1; fill-opacity: .16; }
-  50% { stroke-opacity: .30; fill-opacity: .01; }
-  100% { stroke-opacity: 1; fill-opacity: .16; }
-}
+
 `
 
 export default MapSurface

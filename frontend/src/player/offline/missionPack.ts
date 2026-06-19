@@ -169,6 +169,7 @@ function updateOfflineEvent(event: OfflineEvent) {
 
 function eventToSyncPayload(event: OfflineEvent) {
   return {
+    client_event_id: event.id,
     type: event.type,
     source: event.source || 'offline_queue',
     team_id: event.team_id,
@@ -229,7 +230,14 @@ export async function syncPendingOfflineEvents(user: string) {
 
     const payload = await response.json() as {
       status?: string
-      events?: Array<{ id?: string; type?: string; status?: string }>
+      events?: Array<{
+        id?: string
+        type?: string
+        status?: string
+        client_event_id?: string
+        error?: string
+        duplicate?: boolean
+      }>
     }
 
     if (payload.status !== 'ok') {
@@ -239,11 +247,26 @@ export async function syncPendingOfflineEvents(user: string) {
     let syncedCount = 0
     let failedCount = 0
 
+    const backendByClientId = new Map(
+      (payload.events || [])
+        .filter((event) => Boolean(event?.client_event_id))
+        .map((event) => [String(event.client_event_id), event] as const)
+    )
+
     await Promise.all(
       syncing.map((event, index) => {
-        const backendEvent = payload.events?.[index]
-        const backendStatus = String(backendEvent?.status || '').toLowerCase()
-        const isSynced = !backendStatus || ['pending', 'synced', 'ok', 'applied'].includes(backendStatus)
+        const backendEvent =
+          backendByClientId.get(event.id) ||
+          payload.events?.[index]
+
+        const backendStatus =
+          String(backendEvent?.status || '').toLowerCase()
+
+        const isSynced =
+          backendEvent?.duplicate === true ||
+          ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(
+            backendStatus
+          )
 
         if (isSynced) syncedCount += 1
         else failedCount += 1
@@ -252,7 +275,11 @@ export async function syncPendingOfflineEvents(user: string) {
           ...event,
           status: isSynced ? 'synced' : 'failed',
           backend_event_id: backendEvent?.id,
-          last_error: isSynced ? undefined : backendStatus || 'Backend did not accept this event.',
+          last_error: isSynced
+            ? undefined
+            : backendEvent?.error ||
+              backendStatus ||
+              'Backend did not accept this event.',
         })
       })
     )
