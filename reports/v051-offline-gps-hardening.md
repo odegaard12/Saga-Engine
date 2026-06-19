@@ -28,3 +28,14 @@ physical-node flows without changing their game rules.
 - Removes the legacy global geolocation shim from normal startup.
 - Keeps the explicit map debug workflow inside PlayerApp.
 - Uses the same cache version in `pwaShell.ts` and `sw.js`.
+
+## Tools and mobile browser UI
+
+- Replaces the separate mission-pack and queue cards with one offline control panel.
+- Makes `Download offline game` the primary action.
+- Keeps explicit actions for updating local progress and synchronizing both queues.
+- Saving the current snapshot no longer creates an artificial queue event.
+- Shows mission-progression and QR/inventory pending counts separately.
+- Expands the Tools sheet while preserving safe-area padding.
+- Raises photo, players and route controls by 22 px in normal mobile browsers.
+- Keeps the existing position in installed/full-screen PWA mode.

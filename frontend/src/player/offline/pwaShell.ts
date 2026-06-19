@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v510-offline-gps-hardening'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v511-offline-tools-ui'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null

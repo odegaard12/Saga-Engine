@@ -2,7 +2,6 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
-import { OfflineSyncPanel } from './OfflineSyncPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { ManualInventoryCollectPanel } from './ManualInventoryCollectPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
@@ -359,7 +358,7 @@ export function PlayerHud({
             <div style={toolsHeader}>
               <div>
                 <div style={toolsTitle}>Herramientas</div>
-                <div style={toolsSubtitle}>Offline, sync, idioma y soporte</div>
+                <div style={toolsSubtitle}>Juego offline, GPS, idioma y soporte</div>
               </div>
 
               <button
@@ -377,7 +376,6 @@ export function PlayerHud({
             </div>
 
             <MissionPackPanel user={user} payload={missionPayload} />
-            <OfflineSyncPanel user={user} />
 
             <div className="saga-tools-language-row">
               <span>{t('common.language', locale)}</span>
@@ -788,7 +786,12 @@ const toolsOverlay: CSSProperties = {
 
 const toolsBackdrop: CSSProperties = sheetBackdrop
 
-const toolsSheet: CSSProperties = sheet
+const toolsSheet: CSSProperties = {
+  ...sheet,
+  maxHeight: 'min(84dvh, 760px)',
+  paddingBottom:
+    'calc(18px + env(safe-area-inset-bottom, 0px))',
+}
 
 const toolsHeader: CSSProperties = sheetHeader
 

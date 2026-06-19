@@ -1513,11 +1513,44 @@ const mapQuickCountPill: CSSProperties = {
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
 }
 
+function getMobileBrowserChromeLift(
+  mobile: boolean,
+): number {
+  if (
+    !mobile ||
+    typeof window === 'undefined'
+  ) {
+    return 0
+  }
+
+  const navigatorWithStandalone =
+    window.navigator as Navigator & {
+      standalone?: boolean
+    }
+
+  const standalone =
+    window.matchMedia?.(
+      '(display-mode: standalone)'
+    ).matches === true ||
+    navigatorWithStandalone.standalone === true
+
+  // La PWA instalada ya respeta correctamente
+  // el safe area. En Safari/Chrome normal se
+  // eleva sobre la barra inferior del navegador.
+  return standalone ? 0 : 22
+}
+
+
 function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
+  const browserChromeLift =
+    getMobileBrowserChromeLift(mobile)
+
   return {
     position: 'fixed',
     left: '50%',
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 138px)' : 148,
+    bottom: mobile
+      ? `calc(env(safe-area-inset-bottom, 0px) + ${138 + browserChromeLift}px)`
+      : 148,
     transform: 'translateX(-50%)',
     zIndex: 1600,
     display: 'inline-flex',
