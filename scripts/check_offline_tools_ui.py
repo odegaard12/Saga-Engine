@@ -35,13 +35,15 @@ sw = read(
 )
 
 required_panel = [
-    "Preparar esta misión",
-    "Descargar para usar sin conexión",
+    "Preparar para jugar",
+    "Preparar juego offline",
     "Guardar progreso",
     "Sincronizar",
     "syncPendingOfflineEvents",
     "flushOfflineEvents",
     "cacheMissionMapTiles",
+    "cacheFieldProofAssets",
+    "fetchFieldProofs",
 ]
 
 for item in required_panel:
@@ -62,10 +64,10 @@ if "OfflineSyncPanel" in hud:
         "ERROR: PlayerHud usa la tarjeta antigua"
     )
 
-if "maxHeight: 'min(88dvh, 820px)'" not in hud:
+if "maxHeight: 'min(76dvh, 680px)'" not in hud:
     raise SystemExit(
         "ERROR: Herramientas perdió "
-        "su altura ampliada"
+        "su altura compacta"
     )
 
 required_browser = [

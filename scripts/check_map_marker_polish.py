@@ -12,8 +12,8 @@ for token in ["index < activeIndex","index === activeIndex","const halo = state 
     if token not in map_surface: raise SystemExit(f'falta {token}')
 for token in ['saga-mission-node-state-badge','const ghostRadius',"icon: '\\u{1F512}"]:
     if token in map_surface: raise SystemExit(f'permanece {token}')
-if 'CENTRO DE CAMPO' not in hud or 'Juego offline, GPS' in hud: raise SystemExit('cabecera herramientas')
-if 'Preparar esta misión' not in offline or 'Descargar para usar sin conexión' not in offline: raise SystemExit('offline')
-cache='saga-player-shell-v516-road-guide-tools'
+if 'Offline, fotos y ayuda' not in hud or 'CENTRO DE CAMPO' in hud: raise SystemExit('cabecera herramientas')
+if 'Preparar para jugar' not in offline or 'Preparar juego offline' not in offline or 'cacheFieldProofAssets' not in offline: raise SystemExit('offline')
+cache='saga-player-shell-v517-tools-qr-studio'
 if cache not in pwa or cache not in sw: raise SystemExit('cache')
 print('Bottom bar, node states, routing and tools guard passed.')

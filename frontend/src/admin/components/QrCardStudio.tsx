@@ -292,18 +292,27 @@ export default function QrCardStudio({
 
     try {
       const width = 1200
-      const height = 1600
+      const height = 1750
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
       const context = canvas.getContext('2d')
       if (!context) throw new Error('No se pudo preparar la tarjeta')
 
-      const dark = design.preset === 'dark'
-      context.fillStyle = dark ? '#0f172a' : '#ffffff'
+      const dark =
+        design.preset === 'dark'
+
+      const photoEnabled =
+        design.preset === 'photo' &&
+        Boolean(design.imageDataUrl)
+
+      context.fillStyle =
+        dark || photoEnabled
+          ? '#0f172a'
+          : '#ffffff'
       context.fillRect(0, 0, width, height)
 
-      if (design.preset === 'photo' && design.imageDataUrl) {
+      if (photoEnabled) {
         const photo = await new Promise<HTMLImageElement>((resolve, reject) => {
           const image = new Image()
           image.onload = () => resolve(image)
@@ -336,13 +345,17 @@ export default function QrCardStudio({
 
       const qrBox = 820
       const qrX = (width - qrBox) / 2
-      const qrY = design.preset === 'photo' && design.imageDataUrl ? 470 : 180
+      const qrY =
+        photoEnabled ? 470 : 180
       context.fillStyle = '#ffffff'
       context.fillRect(qrX - 36, qrY - 36, qrBox + 72, qrBox + 72)
       context.drawImage(qrImage, qrX, qrY, qrBox, qrBox)
       URL.revokeObjectURL(qrUrl)
 
-      const textColor = dark || design.preset === 'photo' ? '#ffffff' : '#0f172a'
+      const textColor =
+        dark || photoEnabled
+          ? '#ffffff'
+          : '#0f172a'
       context.fillStyle = textColor
       context.textAlign = 'center'
       context.font = '900 64px system-ui, sans-serif'
@@ -510,7 +523,7 @@ const description: CSSProperties = { margin: '6px 0 0', color: 'rgba(226,232,240
 const badgeBase: CSSProperties = { minHeight: 26, display: 'inline-flex', alignItems: 'center', padding: '0 9px', borderRadius: 999, fontSize: 9, fontWeight: 950 }
 const validBadge: CSSProperties = { ...badgeBase, color: '#dcfce7', background: 'rgba(34,197,94,.15)', border: '1px solid rgba(74,222,128,.22)' }
 const pendingBadge: CSSProperties = { ...badgeBase, color: '#fef3c7', background: 'rgba(245,158,11,.14)', border: '1px solid rgba(251,191,36,.20)' }
-const workspace: CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(240px,.9fr) minmax(260px,1.1fr)', gap: 14, alignItems: 'stretch' }
+const workspace: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14, alignItems: 'stretch' }
 const previewCard: CSSProperties = { position: 'relative', minHeight: 390, display: 'grid', placeItems: 'center', alignContent: 'center', gap: 8, padding: 18, overflow: 'hidden', textAlign: 'center', boxShadow: '0 18px 42px rgba(2,6,23,.24)' }
 const photoShade: CSSProperties = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(15,23,42,.08),rgba(15,23,42,.80))' }
 const qrPanel: CSSProperties = { position: 'relative', zIndex: 1, width: 204, height: 204, display: 'grid', placeItems: 'center', background: '#fff', borderRadius: 18, boxShadow: '0 10px 28px rgba(2,6,23,.26)' }
@@ -518,7 +531,7 @@ const previewTitle: CSSProperties = { position: 'relative', zIndex: 1, fontSize:
 const previewType: CSSProperties = { position: 'relative', zIndex: 1, fontSize: 12, fontWeight: 850, opacity: .82 }
 const previewId: CSSProperties = { position: 'relative', zIndex: 1, fontFamily: 'ui-monospace,monospace', opacity: .68 }
 const controls: CSSProperties = { display: 'grid', gap: 10, alignContent: 'start' }
-const presetGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }
+const presetGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(100px,1fr))', gap: 8 }
 const presetButton: CSSProperties = { minHeight: 68, display: 'grid', gap: 4, padding: 10, borderRadius: 16, border: '1px solid rgba(148,163,184,.15)', background: 'rgba(30,41,59,.62)', color: '#e2e8f0', textAlign: 'left' }
 const presetActive: CSSProperties = { ...presetButton, border: '1px solid rgba(96,165,250,.38)', background: 'rgba(37,99,235,.22)', color: '#fff' }
 const controlRow: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }
@@ -531,7 +544,7 @@ const secondaryButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(
 const validateButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(96,165,250,.30)', background: 'rgba(37,99,235,.24)', color: '#dbeafe' }
 const downloadButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(74,222,128,.28)', background: 'linear-gradient(180deg,#22c55e,#16a34a)', color: '#fff' }
 const disabledButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(148,163,184,.12)', background: 'rgba(71,85,105,.48)', color: 'rgba(226,232,240,.48)' }
-const actionGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }
+const actionGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }
 const validationHelp: CSSProperties = { margin: 0, color: 'rgba(148,163,184,.80)', fontSize: 11, lineHeight: 1.4 }
 const noticeStyle: CSSProperties = { padding: '9px 11px', borderRadius: 13, background: 'rgba(59,130,246,.13)', color: '#dbeafe', fontSize: 11, fontWeight: 850 }
 const scannerOverlay: CSSProperties = { position: 'fixed', inset: 0, zIndex: 7200, display: 'grid', placeItems: 'center', padding: 16 }

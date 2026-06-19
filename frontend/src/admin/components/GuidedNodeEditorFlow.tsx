@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import { useEffect, useMemo, useState } from 'react'
+import QrCardStudio, {
+  getQrDesignSignature,
+  type QrCardDesign,
+} from './QrCardStudio'
 import {
   adminGameCatalog,
   getAdminGame,
@@ -786,6 +789,42 @@ function qrPayload(stage: StageLike) {
   return String(stage.qr_payload || `SAGA1:ITEM:${qrItemId(stage)}:${qrLabel(stage)}`)
 }
 
+function qrDesignFromConfig(
+  config: Record<string, unknown>,
+): QrCardDesign {
+  const preset = String(
+    config.qr_card_preset || 'clean',
+  )
+
+  const shape = String(
+    config.qr_card_shape || 'rounded',
+  )
+
+  const accent = String(
+    config.qr_card_accent || '#2563eb',
+  )
+
+  const imageDataUrl = String(
+    config.qr_card_image_data_url || '',
+  )
+
+  return {
+    preset:
+      preset === 'dark' || preset === 'photo'
+        ? preset
+        : 'clean',
+    shape:
+      shape === 'square'
+        ? 'square'
+        : 'rounded',
+    accent:
+      /^#[0-9a-f]{6}$/i.test(accent)
+        ? accent
+        : '#2563eb',
+    imageDataUrl,
+  }
+}
+
 function formatConfigValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
   if (value === undefined || value === null) return ''
@@ -816,7 +855,6 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   const [notice, setNotice] = useState<string | null>(null)
   const [showExperimentalGames, setShowExperimentalGames] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>(() => isQrStage(stage) ? 'qr' : 'game')
-  const qrWrapRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setEditorMode(isQrStage(stage) ? 'qr' : 'game')
@@ -834,6 +872,18 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
   const step = STEPS[stepIndex]?.key || 'type'
   const title = displayTitle(stage)
   const config = configOf(stage)
+  const qrDesign = qrDesignFromConfig(config)
+
+  const qrDesignSignature =
+    getQrDesignSignature(
+      qrPayload(stage),
+      qrDesign,
+    )
+
+  const qrValidated =
+    String(
+      config.qr_validation_signature || '',
+    ) === qrDesignSignature
 
   const customGameEditor =
     mode === 'game' &&
@@ -1064,6 +1114,7 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     const base = getDefaultAdminStagePatchForGame(game.id)
     const nextConfig = {
       ...(base.config || {}),
+      ...config,
       game_id: game.id,
       game_title: game.title,
       completion_method: game.completionMethod,
@@ -1114,63 +1165,6 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
     }
     onPatch(buildQrPatch(selectedQr, card))
     showNotice('QR aplicado al nodo. Pulsa Guardar para persistir.')
-  }
-
-  function downloadQrPng() {
-    const svg = qrWrapRef.current?.querySelector('svg')
-    if (!svg) {
-      showNotice('No se encontró el QR para descargar')
-      return
-    }
-
-    const serializer = new XMLSerializer()
-    const source = serializer.serializeToString(svg)
-    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const image = new Image()
-
-    image.onload = () => {
-      const size = 1024
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        URL.revokeObjectURL(url)
-        showNotice('No se pudo preparar la imagen')
-        return
-      }
-
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, size, size)
-      ctx.drawImage(image, 0, 0, size, size)
-      URL.revokeObjectURL(url)
-
-      canvas.toBlob((pngBlob) => {
-        if (!pngBlob) {
-          showNotice('No se pudo generar PNG')
-          return
-        }
-
-        const pngUrl = URL.createObjectURL(pngBlob)
-        const link = document.createElement('a')
-        link.href = pngUrl
-        link.download = `saga-qr-${qrItemId(stage)}.png`
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        URL.revokeObjectURL(pngUrl)
-        showNotice('QR descargado como PNG')
-      }, 'image/png')
-    }
-
-    image.onerror = () => {
-      URL.revokeObjectURL(url)
-      showNotice('No se pudo generar PNG')
-    }
-
-    image.src = url
   }
 
   function patchNumber(key: string, value: string) {
@@ -1463,7 +1457,20 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
 
                 <label>
                   <span>Payload QR</span>
-                  <input value={qrPayload(stage)} onChange={(event) => onPatch({ qr_payload: event.target.value })} />
+                  <input
+                    value={qrPayload(stage)}
+                    onChange={(event) =>
+                      onPatch({
+                        qr_payload:
+                          event.target.value,
+                        config: {
+                          ...config,
+                          qr_validation_signature: '',
+                          qr_validated_at: '',
+                        },
+                      })
+                    }
+                  />
                 </label>
               </div>
             )}
@@ -1479,35 +1486,48 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
             </div>
 
             {mode === 'qr' ? (
-              <div className="saga-guided-v4-qrpanel">
-                <div className="saga-guided-v4-qrcard">
-                  <div ref={qrWrapRef} className="saga-guided-v4-qrimage">
-                    <QRCodeSVG value={qrPayload(stage)} size={138} level="M" includeMargin />
-                  </div>
-                  <strong>{selectedQr.icon} {qrLabel(stage)}</strong>
-                  <small>{qrItemId(stage)}</small>
-                </div>
-
-                <div className="saga-guided-v4-qrside">
-                  <label>
-                    <span>Nombre visible</span>
-                    <input value={qrLabel(stage)} onChange={(event) => onPatch({ physical_item_label: event.target.value, title: event.target.value })} />
-                  </label>
-
-                  <label>
-                    <span>Payload</span>
-                    <input value={qrPayload(stage)} onChange={(event) => onPatch({ qr_payload: event.target.value })} />
-                  </label>
-
-                  <div className="saga-guided-v4-qractions">
-                    <button type="button" className="primary" onClick={saveQrCard}>Aplicar QR</button>
-                    <button type="button" onClick={() => copyText(qrPayload(stage), showNotice)}>Copiar</button>
-                    <button type="button" onClick={downloadQrPng}>Descargar PNG</button>
-                  </div>
-
-                  {notice ? <small className="saga-guided-v4-notice">{notice}</small> : null}
-                </div>
-              </div>
+              <QrCardStudio
+                payload={qrPayload(stage)}
+                label={qrLabel(stage)}
+                itemId={qrItemId(stage)}
+                typeLabel={selectedQr.title}
+                design={qrDesign}
+                validationSignature={
+                  String(
+                    config.qr_validation_signature ||
+                    '',
+                  )
+                }
+                onDesignChange={(design) =>
+                  onPatch({
+                    config: {
+                      ...config,
+                      qr_card_preset:
+                        design.preset,
+                      qr_card_shape:
+                        design.shape,
+                      qr_card_accent:
+                        design.accent,
+                      qr_card_image_data_url:
+                        design.imageDataUrl,
+                      qr_validation_signature: '',
+                      qr_validated_at: '',
+                    },
+                  })
+                }
+                onValidated={(signature) =>
+                  onPatch({
+                    config: {
+                      ...config,
+                      qr_validation_signature:
+                        signature,
+                      qr_validated_at:
+                        new Date().toISOString(),
+                    },
+                  })
+                }
+                onApply={saveQrCard}
+              />
             ) : (
               <div className="saga-guided-v4-formgrid">
                 <label>
@@ -1632,6 +1652,16 @@ export default function GuidedNodeEditorFlow({ stage, onPatch, onClose, onDelete
               <article><b>Offline</b><span>{offlineLabel(mode === 'qr' ? selectedQr : selectedGame)}</span></article>
               <article><b>Completa por</b><span>{String(config.completion_method || (mode === 'qr' ? selectedQr.completionMethod : selectedGame.completionMethod))}</span></article>
               <article><b>Fallback</b><span>{fallbackCode(stage)}</span></article>
+              {mode === 'qr' ? (
+                <article>
+                  <b>Validación QR</b>
+                  <span>
+                    {qrValidated
+                      ? 'Validado para este diseño'
+                      : 'Pendiente de validar'}
+                  </span>
+                </article>
+              ) : null}
             </div>
           </section>
         ) : null}

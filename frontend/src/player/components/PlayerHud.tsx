@@ -349,7 +349,7 @@ export function PlayerHud({
           <aside
             style={{
               ...toolsSheet,
-              width: compact ? '100%' : 'min(100%, 520px)',
+              width: compact ? '100%' : 'min(100%, 460px)',
             }}
             aria-modal="true"
             role="dialog"
@@ -357,11 +357,8 @@ export function PlayerHud({
           >
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
-                <div style={toolsEyebrow}>CENTRO DE CAMPO</div>
                 <div style={toolsTitle}>Herramientas</div>
-                <div style={toolsSubtitle}>
-                  Mapa sin conexión, ubicación, fotos e idioma
-                </div>
+                <div style={toolsSubtitle}>Offline, fotos y ayuda</div>
               </div>
 
               <button
@@ -380,35 +377,38 @@ export function PlayerHud({
 
             <MissionPackPanel user={user} payload={missionPayload} />
 
-            <div style={toolsSectionLabel}>IDIOMA</div>
-            <div className="saga-tools-language-row">
-              <span>{t('common.language', locale)}</span>
+            <div style={toolsUtilityGrid}>
+              {onDownloadFieldProofs ? (
+                <button
+                  type="button"
+                  style={fieldPhotoCount > 0 ? toolsButton : { ...toolsButton, opacity: 0.55, cursor: 'not-allowed' }}
+                  disabled={fieldPhotoCount <= 0}
+                  onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
+                >
+                  {fieldPhotoCount > 0 ? `Descargar fotos (${fieldPhotoCount})` : 'Sin fotos para descargar'}
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                className={locale === 'en' ? 'active' : ''}
-                onClick={() => chooseLocale('en')}
+                style={toolsButton}
+                onClick={() => {
+                  onRequestGps()
+                  onCloseTools()
+                }}
               >
-                EN
-              </button>
-              <button
-                type="button"
-                className={locale === 'es' ? 'active' : ''}
-                onClick={() => chooseLocale('es')}
-              >
-                ES
+                Centrar ubicación
               </button>
             </div>
-            <div style={toolsSectionLabel}>CONTENIDO DE CAMPO</div>
-            {onDownloadFieldProofs ? (
-              <button
-                type="button"
-                style={fieldPhotoCount > 0 ? toolsButton : { ...toolsButton, opacity: 0.55, cursor: 'not-allowed' }}
-                disabled={fieldPhotoCount <= 0}
-                onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
-              >
-                {fieldPhotoCount > 0 ? `Descargar fotos (${fieldPhotoCount})` : 'Sin fotos'}
-              </button>
-            ) : null}
+
+            <div style={toolsCompactRow}>
+              <div className="saga-tools-language-row">
+                <span>{t('common.language', locale)}</span>
+                <button type="button" className={locale === 'en' ? 'active' : ''} onClick={() => chooseLocale('en')}>EN</button>
+                <button type="button" className={locale === 'es' ? 'active' : ''} onClick={() => chooseLocale('es')}>ES</button>
+              </div>
+              <a href={loginHref} style={toolsLoginLink} onClick={onCloseTools}>Entrar</a>
+            </div>
 
             {onSubmitCode && currentStage && !finished ? (
               <section style={fallbackToolPanel}>
@@ -450,40 +450,21 @@ export function PlayerHud({
               </section>
             ) : null}
 
-            <div style={toolsSectionLabel}>UBICACIÓN Y DIAGNÓSTICO</div>
-            <button
-              type="button"
-              style={toolsButton}
-              onClick={() => {
-                onRequestGps()
-                onCloseTools()
-              }}
-            >
-              Reactivar / centrar GPS
-            </button>
-
-            <button
-              type="button"
-              style={debugEnabled ? toolsButtonDangerActive : toolsButton}
-              onClick={() => {
-                onToggleDebug()
-                onCloseTools()
-              }}
-            >
-              {debugEnabled ? 'Desactivar debug GPS' : 'Activar debug GPS'}
-            </button>
-
-            <a
-              href={loginHref}
-              style={toolsLink}
-              onClick={onCloseTools}
-            >
-              Login
-            </a>
-
+            <div style={toolsSecondaryRow}>
+              <button
+                type="button"
+                style={debugEnabled ? toolsButtonDangerActive : toolsQuietButton}
+                onClick={() => {
+                  onToggleDebug()
+                  onCloseTools()
+                }}
+              >
+                {debugEnabled ? 'Salir de prueba GPS' : 'Modo prueba GPS'}
+              </button>
               <div style={toolsBuildInfo}>
                 <BuildInfoBadge mode="inline" />
               </div>
+            </div>
           </aside>
         </div>
       ) : null}
@@ -794,9 +775,9 @@ const toolsBackdrop: CSSProperties = sheetBackdrop
 
 const toolsSheet: CSSProperties = {
   ...sheet,
-  maxHeight: 'min(88dvh, 820px)',
-  gap: 12,
-  padding: 14,
+  maxHeight: 'min(76dvh, 680px)',
+  gap: 10,
+  padding: 12,
   paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
   borderRadius: 28,
   border: '1px solid rgba(148,163,184,.22)',
@@ -807,18 +788,19 @@ const toolsSheet: CSSProperties = {
 const toolsHeader: CSSProperties = {
   ...sheetHeader,
   alignItems: 'center',
-  margin: '-14px -14px 2px',
-  padding: '16px 16px 14px',
+  margin: '-12px -12px 0',
+  padding: '13px 14px 11px',
   borderRadius: '28px 28px 20px 20px',
   background: 'linear-gradient(135deg, rgba(30,64,175,.94), rgba(15,23,42,.96) 72%)',
   borderBottom: '1px solid rgba(147,197,253,.20)',
 }
 
 const toolsHeaderCopy: CSSProperties = { display: 'grid', gap: 3, minWidth: 0 }
-const toolsEyebrow: CSSProperties = { color: '#bfdbfe', fontSize: 9, fontWeight: 950, letterSpacing: '0.16em' }
-const toolsTitle: CSSProperties = { ...sheetTitle, marginTop: 0, fontSize: 22 }
-const toolsSubtitle: CSSProperties = { color: 'rgba(219,234,254,.76)', fontSize: 12, lineHeight: 1.35, marginTop: 2 }
-const toolsSectionLabel: CSSProperties = { marginTop: 3, color: 'rgba(191,219,254,.74)', fontSize: 9, fontWeight: 950, letterSpacing: '0.14em' }
+const toolsTitle: CSSProperties = { ...sheetTitle, marginTop: 0, fontSize: 20 }
+const toolsSubtitle: CSSProperties = { color: 'rgba(219,234,254,.72)', fontSize: 11, lineHeight: 1.3, marginTop: 2 }
+const toolsUtilityGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }
+const toolsCompactRow: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }
+const toolsSecondaryRow: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 2 }
 
 const closeButton: CSSProperties = {
   position: 'relative',
@@ -839,8 +821,8 @@ const closeButton: CSSProperties = {
 }
 
 const toolsButton: CSSProperties = {
-  minHeight: 46,
-  borderRadius: 18,
+  minHeight: 40,
+  borderRadius: 14,
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.08)',
   color: '#f8fafc',
@@ -855,7 +837,7 @@ const toolsButtonDangerActive: CSSProperties = {
   color: '#fee2e2',
 }
 
-const toolsLink: CSSProperties = {
+const toolsLoginLink: CSSProperties = {
   minHeight: 46,
   display: 'inline-flex',
   alignItems: 'center',
@@ -869,6 +851,15 @@ const toolsLink: CSSProperties = {
   textDecoration: 'none',
 }
 
+
+const toolsQuietButton: CSSProperties = {
+  ...toolsButton,
+  minHeight: 34,
+  padding: '0 10px',
+  background: 'rgba(255,255,255,.04)',
+  color: 'rgba(226,232,240,.72)',
+  fontSize: 10,
+}
 
 const toolsBuildInfo: CSSProperties = {
   display: 'grid',
