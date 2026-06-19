@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.4 — Tools and QR Studio release
+2026-06-19
+
+- Redesigns player Tools to match the established SAGA mobile visual system.
+- Removes duplicated copy while preserving GPS, language, login, fallback and diagnostics.
+- Adds one unified offline preparation action for mission data, map tiles, games and field photographs.
+- Keeps gallery-oriented photograph downloads as a separate action.
+- Preserves the existing bottom navigation and safe-area behaviour.
+- Adds QR card presets for clear, dark and photographic layouts.
+- Adds configurable card accent and square or rounded presentation.
+- Keeps the QR itself on a high-contrast white surface with error-correction level H.
+- Adds camera validation that compares the scanned payload exactly before enabling PNG export.
+- Invalidates QR validation whenever the payload or visual design changes.
+- Keeps QR validation isolated from player inventory, node completion and progress.
+- Coordinates the player service-worker cache as `saga-player-shell-v518-tools-copy-cleanup`.
+- Adds and updates guards for Tools hierarchy, unified offline preparation, QR design and camera validation.
+- Validates runtime contracts in Docker, TypeScript/Vite, npm audit, candidate-first deployment and production smoke checks.
+
 ## v0.5.3 — Offline GPS and field map release
 2026-06-19
 
