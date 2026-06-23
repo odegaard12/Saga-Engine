@@ -1,0 +1,12 @@
+
+/* Fix UI Player */
+.admin-actions-menu, .player-tools-menu, .tools-menu, .menu-container { margin-top: auto !important; margin-bottom: 20px !important; }
+.node-card.completed { opacity: 0.5 !important; filter: grayscale(100%) !important; pointer-events: none !important; border: 2px solid #22c55e !important; }
+.node-card.active { border: 2px solid #eab308 !important; }
+
+
+/* Fix UI: Empujar botón Entrar abajo y atenuar nodos completados */
+.player-tools-menu > div:last-child, 
+.admin-actions-menu > div:last-child { margin-top: auto !important; padding-bottom: 10px !important; }
+.node-card.completed { opacity: 0.5 !important; filter: grayscale(100%) !important; pointer-events: none !important; }
+

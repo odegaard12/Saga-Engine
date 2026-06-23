@@ -107,7 +107,7 @@ if "fullscreen" not in manifest.get(
     )
 
 cache_name = (
-    "saga-player-shell-v518-tools-copy-cleanup"
+    "saga-player-shell-v550-rpg-viewfinder"
 )
 
 if (

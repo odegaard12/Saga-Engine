@@ -39,6 +39,19 @@ export function FieldPhotoViewer({
     if (proofs.length <= 1) close()
   }
 
+  function downloadPhoto() {
+    try {
+      const a = document.createElement('a')
+      a.href = imageUrl
+      a.download = `foto_campo_${proof.id || 'photo'}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (e) {
+      console.error('Error downloading photo', e)
+    }
+  }
+
   return (
     <div style={overlay} onClick={close}>
       <section style={sheet} onClick={(event) => event.stopPropagation()} aria-label="Fotos de campo">
@@ -48,9 +61,20 @@ export function FieldPhotoViewer({
             <span style={counter}>{safeIndex + 1}/{proofs.length}</span>
           </div>
 
-          <button type="button" style={closeButton} onClick={close} aria-label="Cerrar">
-            ×
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              style={downloadButton}
+              onClick={downloadPhoto}
+              title="Descargar esta foto"
+              aria-label="Descargar esta foto"
+            >
+              📥
+            </button>
+            <button type="button" style={closeButton} onClick={close} aria-label="Cerrar">
+              ×
+            </button>
+          </div>
         </div>
 
         <div style={imageFrame}>
@@ -199,3 +223,17 @@ const deleteButton: CSSProperties = {
   fontSize: 13,
   fontWeight: 950,
 }
+
+const downloadButton: CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 999,
+  border: '1px solid rgba(74,222,128,.30)',
+  background: 'rgba(34,197,94,.16)',
+  color: '#4ade80',
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 16,
+  cursor: 'pointer',
+}
+

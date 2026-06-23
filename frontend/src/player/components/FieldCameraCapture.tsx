@@ -20,6 +20,58 @@ export function FieldCameraCapture({
   const [note, setNote] = useState('')
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!document.getElementById('saga-camera-grid-style')) {
+      const style = document.createElement('style')
+      style.id = 'saga-camera-grid-style'
+      style.textContent = `
+        .saga-camera-grid {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 5;
+        }
+        .saga-camera-line-h {
+          position: absolute;
+          left: 0; right: 0;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.18);
+        }
+        .saga-camera-line-h--1 { top: 33.33%; }
+        .saga-camera-line-h--2 { top: 66.66%; }
+        .saga-camera-line-v {
+          position: absolute;
+          top: 0; bottom: 0;
+          width: 1px;
+          background: rgba(255, 255, 255, 0.18);
+        }
+        .saga-camera-line-v--1 { left: 33.33%; }
+        .saga-camera-line-v--2 { left: 66.66%; }
+        .saga-camera-corner {
+          position: absolute;
+          width: 14px;
+          height: 14px;
+          border: 2px solid rgba(14, 165, 233, 0.7);
+        }
+        .saga-camera-corner--tl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+        .saga-camera-corner--tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+        .saga-camera-corner--bl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+        .saga-camera-corner--br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+        .saga-camera-center-dot {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 6px; height: 6px;
+          margin-top: -3px; margin-left: -3px;
+          border-radius: 50%;
+          background: rgba(14, 165, 233, 0.5);
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
 
     async function startCamera() {
@@ -118,13 +170,26 @@ export function FieldCameraCapture({
           {preview ? (
             <img src={preview} alt="Vista previa" style={previewImage} />
           ) : (
-            <video
-              ref={videoRef}
-              style={video}
-              autoPlay
-              muted
-              playsInline
-            />
+            <>
+              <video
+                ref={videoRef}
+                style={video}
+                autoPlay
+                muted
+                playsInline
+              />
+              <div className="saga-camera-grid">
+                <div className="saga-camera-line-h saga-camera-line-h--1" />
+                <div className="saga-camera-line-h saga-camera-line-h--2" />
+                <div className="saga-camera-line-v saga-camera-line-v--1" />
+                <div className="saga-camera-line-v saga-camera-line-v--2" />
+                <div className="saga-camera-corner saga-camera-corner--tl" />
+                <div className="saga-camera-corner saga-camera-corner--tr" />
+                <div className="saga-camera-corner saga-camera-corner--bl" />
+                <div className="saga-camera-corner saga-camera-corner--br" />
+                <div className="saga-camera-center-dot" />
+              </div>
+            </>
           )}
 
           {error ? <div style={errorBox}>{error}</div> : null}
@@ -183,9 +248,9 @@ const sheet: CSSProperties = {
   padding: 14,
   paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
   borderRadius: '24px 24px 0 0',
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.94), rgba(30,41,59,.96))',
-  boxShadow: '0 -18px 48px rgba(0,0,0,.28)',
+  border: '2px solid rgba(255,255,255,.12)',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.99))',
+  boxShadow: '0 -18px 48px rgba(0,0,0,.58)',
   color: '#fff',
   display: 'grid',
   gap: 12,
@@ -215,7 +280,8 @@ const cameraFrame: CSSProperties = {
   overflow: 'hidden',
   borderRadius: 20,
   background: '#020617',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '2px solid rgba(14,165,233,.40)',
+  boxShadow: 'inset 0 0 24px rgba(0,0,0,.80)',
 }
 
 const video: CSSProperties = {

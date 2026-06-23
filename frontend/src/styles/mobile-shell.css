@@ -83,11 +83,11 @@ body {
 .saga-tools-language-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .saga-tools-language-row span {
@@ -99,20 +99,25 @@ body {
 }
 
 .saga-tools-language-row button {
+  flex: 1;
+  text-align: center;
   border: 0;
-  border-radius: 999px;
-  padding: 7px 12px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.88);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
   font: inherit;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .saga-tools-language-row button.active {
-  background: #22c55e;
-  color: #052e16;
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
 }
 
 /* i18n adjustment: player language selector lives inside Tools only */
@@ -172,11 +177,11 @@ html.saga-route-player .saga-tools-language-row {
 .saga-tools-language-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .saga-tools-language-row span {
@@ -188,20 +193,25 @@ html.saga-route-player .saga-tools-language-row {
 }
 
 .saga-tools-language-row button {
+  flex: 1;
+  text-align: center;
   border: 0;
-  border-radius: 999px;
-  padding: 7px 12px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.88);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
   font: inherit;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .saga-tools-language-row button.active {
-  background: #22c55e;
-  color: #052e16;
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
 }
 
 .saga-admin-settings-language-menu {

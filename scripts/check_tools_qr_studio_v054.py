@@ -68,7 +68,7 @@ for token in [
     if token not in guided:
         raise SystemExit(f'ERROR integración QR: falta {token}')
 
-cache = 'saga-player-shell-v518-tools-copy-cleanup'
+cache = 'saga-player-shell-v550-rpg-viewfinder'
 if cache not in pwa or cache not in sw:
     raise SystemExit('ERROR caché PWA no coordinada')
 

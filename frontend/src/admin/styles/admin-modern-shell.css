@@ -7175,9 +7175,14 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   .saga-node-editor-host .admin-game-guide-inline-body {
     grid-template-columns: 1fr !important;
   }
-
   .saga-build-info--floating {
     display: none !important;
+  }
+
+  .saga-node-editor-host input,
+  .saga-node-editor-host select,
+  .saga-node-editor-host textarea {
+    font-size: 16px !important;
   }
 }
 

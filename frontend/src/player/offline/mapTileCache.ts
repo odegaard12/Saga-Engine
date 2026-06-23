@@ -1,6 +1,6 @@
 import type { PlayerStage } from '../../types/player'
 
-const TILE_CACHE_NAME = 'saga-player-shell-v224-route-tile-coverage'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v550'
 const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v1'
 const ESRI_TILE_BASE = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
 

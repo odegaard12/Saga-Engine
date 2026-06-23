@@ -44,32 +44,45 @@ function howToPlay(stage: PlayerStage | null): string[] {
 
   if (family.includes('signal')) {
     return [
-      'Acercate al punto marcado en el mapa.',
-      'Entra dentro del radio del nodo.',
-      'Mantente estable hasta capturar la senal.',
+      'Juego de Señal GPS',
+      '1. Acércate físicamente al punto marcado en el mapa.',
+      '2. Entra dentro del radio de captura del nodo.',
+      '3. Mantente estable sin salirte del círculo hasta capturar la señal completa.',
     ]
   }
 
   if (family.includes('bearing')) {
     return [
-      'Permite la brujula si el movil lo pide.',
-      'Gira despacio hasta encontrar el rumbo correcto.',
-      'Si el sensor falla, reintenta al aire libre o usa la prueba manual.',
+      'Juego de Orientación (Brújula)',
+      '1. Acepta los permisos de brújula/sensores si el móvil lo pide.',
+      '2. Gira sobre ti mismo despacio hasta alinear tu móvil con el rumbo correcto.',
+      '3. Si el sensor falla repetidamente, sal a un espacio abierto o usa el código manual de emergencia.',
     ]
   }
 
   if (family.includes('circuit')) {
     return [
-      'Lee la pista y resuelve el patron.',
-      'Prueba la combinacion correcta.',
-      'Si el circuito pide un objeto, primero debe estar en Objetos.',
+      'Juego de Circuito / Lógica',
+      '1. Lee detenidamente la pista o información del nodo.',
+      '2. Resuelve el patrón visual o introduce la combinación correcta.',
+      '3. Si el panel está bloqueado, asegúrate de tener el objeto físico requerido guardado en tu Mochila.',
+    ]
+  }
+
+  if (family.includes('inventory_only')) {
+    return [
+      'Búsqueda de Objeto Físico (QR)',
+      '1. Busca un código QR o etiqueta escondida en tu zona actual.',
+      '2. Abre la opción de "Escanear" desde tu interfaz.',
+      '3. Escanea el código para guardarlo automáticamente en tu Mochila y desbloquear este paso.',
     ]
   }
 
   return [
-    'Lee la pista del nodo actual.',
-    'Comprueba distancia, objetos y prueba fisica.',
-    'Cuando cumplas todo, podras avanzar.',
+    'Instrucciones del Nodo',
+    '1. Lee la pista actual para descubrir qué hacer.',
+    '2. Comprueba en la parte superior si este nodo requiere distancia GPS o algún objeto específico.',
+    '3. Cuando cumplas los requisitos, se habilitará la siguiente fase.',
   ]
 }
 

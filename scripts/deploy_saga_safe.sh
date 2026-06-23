@@ -12,7 +12,7 @@ BUILD_IMAGE=0
 PROMOTE=0
 IMAGE=""
 SAGA_COMMIT="${SAGA_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
-SAGA_BUILD_TIME="${SAGA_BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+SAGA_BUILD_TIME="${SAGA_BUILD_TIME:-$(date +%Y-%m-%dT%H:%M:%S%z)}"
 
 SAGA_VERSION="${SAGA_VERSION:-}"
 
