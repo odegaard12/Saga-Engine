@@ -1,346 +1,271 @@
-# SAGA Engine
+# SAGA Engine — Field Mission Platform
 
-**Self-hosted engine for real-world, geolocated games and interactive routes.**
+<div align="center">
 
-![release](https://img.shields.io/badge/release-v0.5.4-0ea5e9)
-![license](https://img.shields.io/badge/license-MIT-22c55e)
-![backend](https://img.shields.io/badge/backend-FastAPI-111827)
-![frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-111827)
-![offline](https://img.shields.io/badge/design-offline--first-f97316)
+![SAGA Engine](frontend/public/saga-brand-final.svg)
 
-SAGA Engine lets you create missions where players move through real places, open map nodes, scan QR/NFC props, collect items, solve challenges and progress through a route managed from **Mission Control**.
+**Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
+Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-Current public release: **v0.5.4**.
+[![Version](https://img.shields.io/badge/version-1.0.0-34d399?style=flat-square)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
+[![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker)](Dockerfile)
+
+</div>
 
 ---
 
-## What can you build?
+## ¿Qué es SAGA Engine?
 
-| Game idea | Example |
+SAGA Engine es una plataforma completa para diseñar y ejecutar **misiones de campo gamificadas** en el mundo real. Los jugadores reciben una ruta de nodos GPS, escanean QRs físicos, completan minijuegos y acumulan logros — todo ello funciona tanto con conexión como sin ella.
+
+Pensado para **escape rooms urbanos, gymkhanas, formaciones corporativas, tours guiados** y cualquier experiencia donde quieras convertir el espacio real en un tablero de juego.
+
+---
+
+## Características principales
+
+### 🗺️ Mapa en tiempo real
+- Mapa interactivo basado en **Leaflet + OpenStreetMap** con nodos de misión geolocalizados
+- Indicador de posición GPS del jugador con seguimiento dinámico
+- Cálculo de distancia al nodo activo y radio de activación configurable
+- Vista de ruta completa y modo "overview" de toda la misión
+- Marcadores de equipo en tiempo real sobre el mapa
+
+### 📡 GPS y localización
+- Soporte completo de **GPS del navegador** con retroalimentación de precisión
+- Modo **debug de geolocalización** para pruebas desde escritorio (permite mover manualmente la posición)
+- Petición de GPS en el Login con flujo de permiso claro
+- Entrada sin GPS permitida, con solicitud de posición simulada en debug
+
+### 📦 Offline-first
+- **Service Worker PWA** con caché de assets y shell del jugador
+- **Mission Pack**: descarga completa de la misión para jugar sin conexión
+- **Caché de teselas de mapa** (tiles) con precarga configurable antes de salir al campo
+- Sincronización automática de progreso offline cuando vuelve la conexión
+- Pruebas de campo (fotos) almacenadas localmente y sincronizadas después
+
+### 🎮 Minijuegos (Game Families)
+Sistema extensible de familias de minijuegos. En v1.0.0 incluye:
+
+| Family | Descripción |
 |---|---|
-| Treasure hunt | Follow a route and collect QR objects. |
-| Urban escape | Unlock clues across real locations. |
-| Family gymkhana | Outdoor challenges with map nodes. |
-| Orientation route | GPS, compass and clue navigation. |
-| Education/tourism trail | Guided interactive stops. |
-| Team field mission | Move, scan, collect and sync progress. |
+| **Circuit Matrix** | Conecta circuitos en una cuadrícula para encender nodos |
+| **Sequence Code** | Descifra y replica una secuencia de colores / símbolos |
+| **Bearing Hunt** | Navega por azimut hacia la siguiente pista |
+| **Signal Hunt** | Localiza una señal oscilante en el espacio |
+| **Motion Challenge** | Reto físico basado en movimiento del dispositivo |
+| **Place Mosaic** | Reconstruye una imagen fragmentada del lugar |
+| **Tilt Maze** | Laberinto controlado por el acelerómetro |
+
+Cada familia tiene editor visual en el panel de administración y runtime propio en el cliente.
+
+### 🎒 Mochila del jugador
+- Inventario con objetos recolectables (coleccionables, pistas, ítems de misión)
+- Previsualización del siguiente nodo y su juego asociado
+- Descripción contextual de cómo se juega cada minijuego
+- Guía de herramientas integrada (asistente de campo)
+- Descarga de fotos de campo como ZIP
+
+### 👥 Multijugador y equipos
+- Perfiles de jugador y equipos configurables desde el admin
+- Presencia de equipo en tiempo real (posiciones en el mapa)
+- Soporte para modos solo y equipo
+
+### 🔑 Nodos físicos y QR
+- Generación de tarjetas QR físicas desde el admin (QR Studio)
+- Validación de QR con lógica de distancia — aviso centrado en pantalla si el jugador está demasiado lejos
+- Soporte para tipos de nodo físico: `collectible`, `requirement`, `clue`, `bonus`
+- Panel de preview de requisitos antes de activar un nodo
+
+### 📸 Pruebas de campo (Field Proofs)
+- Captura de fotos geolocalizadas desde el cliente jugador
+- Visor de fotos sobre el mapa con superposición de posición
+- Eliminación de fotos propias
+- **Descarga en ZIP** desde el panel de herramientas del jugador y desde el admin
+
+### 🛠️ Panel de administración
+- Constructor de misiones con nodos, etapas y rutas
+- Editor visual de minijuegos por familia
+- Gestión de jugadores y perfiles de equipo
+- Mapa de misión en admin con vista de posiciones en vivo
+- QR Studio para generar y gestionar tarjetas QR imprimibles
+- Configuración de la misión, idioma y parámetros globales
+- Offline Vault: resumen del estado de preparación offline de cada jugador
 
 ---
 
-## How it works
+## Arquitectura
 
-```text
-Admin creates mission
-        ↓
-Adds route nodes
-        ↓
-Chooses game preset
-        ↓
-Generates QR / physical props
-        ↓
-Players open the player app
-        ↓
-Move / scan / solve / collect
-        ↓
-Progress is saved
-        ↓
-Admin monitors and adjusts players
+```
+saga_engine/
+├── main.py                    # FastAPI app principal
+├── requirements.txt           # Dependencias Python
+├── Dockerfile                 # Imagen Docker (Python 3.13-slim)
+├── frontend/                  # App React (Vite + TypeScript)
+│   ├── src/
+│   │   ├── App.tsx            # Router raíz (Login / Player / Admin)
+│   │   ├── login/             # LoginApp — selección de jugador + GPS
+│   │   ├── player/            # PlayerApp — mapa, HUD, mochila, minijuegos
+│   │   │   ├── components/    # PlayerHud, PlayerShell, MapSurface…
+│   │   │   ├── minigames/     # Core + familias de minijuegos
+│   │   │   ├── offline/       # PWA, Mission Pack, GPS cache…
+│   │   │   └── utils/         # GPS, geo, stagePosition…
+│   │   ├── admin/             # AdminApp — panel de administración
+│   │   └── shared/            # API, tipos, identidad, offline vault…
+│   └── public/                # Assets estáticos, manifest PWA, SW
+├── scripts/                   # Scripts de despliegue y auditoría
+└── tests/                     # Tests de backend (pytest)
 ```
 
----
-
-## Main concepts
-
-| Concept | Meaning |
-|---|---|
-| **Mission** | The whole game route or experience. |
-| **Node** | A step on the route, usually linked to a map position. |
-| **Game family** | Reusable runtime that can support one or more playable game presets. |
-| **Game preset** | A playable configuration selected and edited in Mission Control. |
-| **Requirement** | Something needed before a node can be completed. |
-| **Inventory item** | QR/NFC/object collected by the player. |
-| **Progress** | Player state, current node, finished status and offline queue. |
+**Stack:**
+- **Backend**: Python 3.13 + FastAPI + SQLite (vía adaptadores)
+- **Frontend**: React 19 + TypeScript + Vite + Leaflet
+- **Deploy**: Docker (imagen única), desplegable en Raspberry Pi 4 o cualquier servidor Linux
+- **PWA**: Service Worker con estrategia offline-first
 
 ---
 
-## Player app
+## Inicio rápido
 
-Current player foundations:
+### Prerrequisitos
+- Docker
+- (Opcional) Node.js 20+ para desarrollo frontend local
 
-- map-first route view with state-aware mission markers;
-- fresh-GPS startup, stale-position rejection and radius-based node access;
-- compass overview/follow toggle and free map exploration;
-- road-following route guide with local geometry cache when routing is available;
-- QR inventory collection;
-- player and team identity markers;
-- local and offline-first progress;
-- mission pack, map-tile preload and connection-recovery foundations;
-- compact field Tools for unified offline preparation, progress save and synchronization;
-- separate downloads for photographs intended for the device gallery;
-- field photo pins;
-- route progression and node completion;
-- Circuit Matrix visual-memory puzzle;
-- Sequence Code physical-clue puzzle;
-- Place Mosaic image-reconstruction puzzle;
-- Tilt Maze gyroscope-and-touch maze challenge;
-- immersive native-game panels without duplicated outer headers;
-- node fallback codes kept exclusively in Tools;
-- fixed or per-game random circuit patterns;
-- offline QR objects, keys, clues and bonus cards.
-
-Player loop:
-
-```text
-Move -> Find -> Observe -> Scan -> Collect -> Solve -> Continue
-```
-
-## Mission Control admin
-
-Mission Control is the main authoring and control interface.
-
-| Area | Current capability |
-|---|---|
-| Mission editing | Map-first route editing and node ordering. |
-| Game authoring | Game catalog with runtime/offline status. |
-| QR props | QR card studio with safe presets, photographs and camera validation. |
-| Players | Profile management and progress controls. |
-| Live control | Reset, move back, move forward or finish a player run. |
-| Families | Overview of gameplay families. |
-
-The old classic admin has been retired. `/admin` redirects to `/admin-react`.
-
----
-
-## Runtime families and game presets
-
-SAGA separates reusable runtime families from the playable presets
-configured in Mission Control.
-
-### Runtime families
-
-| Runtime family | Current use |
-|---|---|
-| `circuit_matrix` | Hosts Circuit Matrix, Sequence Code, Place Mosaic and Tilt Maze. |
-| `signal_hunt` | Experimental GPS runtime pending field validation. |
-| `bearing_hunt` | Experimental direction runtime pending redesign and validation. |
-
-### Production game presets
-
-```text
-Circuit Matrix
-Sequence Code
-Place Mosaic
-Tilt Maze
-```
-
-Authoring model:
-
-```text
-Runtime family -> Game preset -> Configuration -> Requirement -> Reward
-```
-
----
-
-## Production-ready gameplay
-
-### Circuit Matrix
-
-The first complete reusable puzzle runtime:
-
-- visual memory route;
-- fixed or per-game random patterns;
-- visual pattern authoring in Mission Control;
-- configurable board, preview speed and allowed errors;
-- strict validation against jumps, duplicates and invalid cells;
-- offline completion and later synchronization.
-
-### Sequence Code
-
-The second production-ready reusable game:
-
-- configurable words, numbers or symbols;
-- visual authoring and ordering in Mission Control;
-- shuffled choices for every play session;
-- configurable attempts and optional hints;
-- physical-story and triptych gameplay model;
-- strict persistence verification after saving;
-- validated transition to the following mission node;
-- offline play and later synchronization.
-
-### Place Mosaic
-
-The third production-ready reusable game:
-
-- photograph upload and optimization in Mission Control;
-- 2×2, 3×3 and 4×4 puzzles;
-- configurable initial photograph preview;
-- shuffled pieces for every play session;
-- immediate two-tap piece exchange;
-- correctly positioned piece and movement feedback;
-- explicit completed-image confirmation;
-- optional real-world observation question;
-- normal offline completion and route advancement.
-
-Photographs and mission configuration remain in external runtime data
-and are not committed to the public repository.
-
-### Tilt Maze
-
-The fourth production-ready reusable game:
-
-- automatically generated mazes with no manual wall editing;
-- short 7×7, medium 9×9 and long 11×11 layouts;
-- fixed layouts shared by all players or a new layout per game;
-- mobile tilt control using orientation and motion sensor APIs;
-- screen-orientation-aware axis mapping and recalibration;
-- touch controls retained as an accessibility and compatibility fallback;
-- configurable time, lives, holes and required objects;
-- deterministic validation of generated routes;
-- offline play and standard node-completion synchronization;
-- normal transition to the following mission node.
-
-The player opens directly into the game interface. Duplicate outer titles,
-player labels and instructions are removed. Emergency node fallback remains
-available from **Tools**, rather than inside every game.
-
-### Physical QR nodes
-
-Mission Control can create and export QR cards for:
-
-- collectible objects;
-- keys used as later requirements;
-- clue cards;
-- optional bonus rewards.
-
-The QR Studio adds clear, dark and photographic card presets, configurable accents and card shapes, high-error-correction QR rendering, and camera validation before PNG export. Changing the payload or visual design invalidates the previous validation without changing node progression.
-
-QR inventory works locally and is compatible with offline player progress.
-
-## Current support level
-
-| Capability | Status |
-|---|---|
-| Circuit Matrix | Production-ready |
-| Sequence Code | Production-ready |
-| Place Mosaic | Production-ready |
-| Tilt Maze | Production-ready |
-| QR objects, keys, clues and bonuses | Production-ready |
-| QR card design and camera validation | Production-ready foundation |
-| Guided Mission Control editor | Production-ready |
-| Offline progress and event synchronization | Production-ready foundation |
-| GPS Signal Hunt | Experimental; field validation pending |
-| Bearing Hunt | Experimental; redesign and validation pending |
-| Motion Challenge | Parked experimental prototype |
-| Team games | Planned |
-
-## Offline-first direction
-
-SAGA is designed for field conditions where mobile coverage may be unreliable.
-
-Current foundations:
-
-- local player progress;
-- QR inventory cards;
-- physical event queue foundations;
-- unified mission, map-tile, game, field-photo and road-route cache foundations;
-- explicit offline preparation, connection recovery and later synchronization;
-- sync-oriented backend events;
-- runtime data separated from repository code.
-
----
-
-## Storage
-
-Runtime state is kept outside the public repository.
-
-JSON remains supported for simple/self-hosted setups. SQLite can be enabled for production-style runtime storage:
+### Producción (Docker)
 
 ```bash
-SAGA_STORAGE_BACKEND=sqlite
-SAGA_SQLITE_DB=/absolute/path/to/saga.sqlite3
+# Clonar
+git clone https://github.com/tu-usuario/saga_engine.git
+cd saga_engine
+
+# Configurar entorno
+cp prod.env.example prod.env
+# Editar prod.env con tus valores
+
+# Construir y arrancar
+docker build -t saga_engine:latest .
+docker run -d \
+  --name saga_engine_app \
+  -p 8096:5000 \
+  --env-file prod.env \
+  -v $(pwd)/data:/app/data \
+  saga_engine:latest
 ```
 
----
-
-## Deployment
-
-Production should run from a locally built Docker image with runtime data mounted separately.
-
-Useful docs:
-
-- `docs/operations/clean-docker-production-deploy.md`
-- `docs/operations/sqlite-runtime-only.md`
-- `docs/operations/docker-runtime.md`
-
----
-
-## Privacy and security
-
-Do not commit:
-
-- real `.env` files;
-- secrets or tokens;
-- private keys;
-- logs;
-- backups;
-- local databases;
-- runtime player state;
-- private operational paths or IPs;
-- live player data.
-
-Run guards:
+### Deploy seguro (con smoke test)
+El script `deploy_saga_safe.sh` levanta primero un candidato en puerto alternativo, hace smoke test, y solo promueve si todo va bien:
 
 ```bash
-python scripts/check_audit_guards.py --base origin/main
+bash scripts/deploy_saga_safe.sh saga_engine:latest --build --promote
+```
+
+### Desarrollo local (frontend)
+```bash
+cd frontend
+npm install
+npm run dev
+# → http://localhost:5173
 ```
 
 ---
 
-## Development validation
+## Variables de entorno
+
+| Variable | Descripción | Ejemplo |
+|---|---|---|
+| `SECRET_KEY` | Clave secreta para sesiones admin | `cambiar-en-produccion` |
+| `ADMIN_PASSWORD` | Contraseña del panel de admin | `mi-password` |
+| `SAGA_VERSION` | Versión mostrada en el cliente | `1.0.0` |
+| `SAGA_BUILD_TIME` | Timestamp de compilación | `2026-06-23T14:00:00+0200` |
+| `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
+
+---
+
+## Configuración de misión
+
+La misión se configura desde el **panel de administración** (`/admin-react`):
+
+1. **Settings** → Nombre de la misión, historia, idioma, jugadores
+2. **Mission Builder** → Crear nodos con coordenadas GPS y radio de activación
+3. **Node Editor** → Asignar familia de minijuego y configurar sus parámetros
+4. **Physical QR** → Generar y descargar tarjetas QR imprimibles
+5. **Players** → Gestionar perfiles de jugador y equipos
+6. **Offline Prep** → Verificar que todos los jugadores tienen la misión descargada
+
+---
+
+## GPS y modo debug
+
+En entornos sin GPS real (escritorio, pruebas):
+1. Entra al jugador desde `/player/TU-JUGADOR`
+2. En la barra inferior → botón de debug 🐛
+3. Pulsa en el mapa para simular tu posición
+
+Para pruebas de distancia a nodos, usa el modo debug para colocarte dentro del radio del nodo activo.
+
+---
+
+## Despliegue en Raspberry Pi
+
+El sistema está optimizado para correr en una **Raspberry Pi 4 (arm64)**:
 
 ```bash
-python scripts/check_audit_guards.py --base origin/main
-cd frontend && npm run build
-ADMIN_PASS='pytest_admin_password' PYTHONPATH=. ./.venv/bin/python -m pytest -q
+# En la Pi
+git clone https://github.com/tu-usuario/saga_engine.git
+cd saga_engine
+
+# Primera vez
+docker build -t saga_engine:latest .
+bash scripts/deploy_saga_safe.sh saga_engine:latest --promote
+
+# Actualizaciones
+# (desde el PC de desarrollo, subir los cambios a la Pi y re-ejecutar)
+bash scripts/deploy_saga_safe.sh saga_engine:latest --build --promote
+```
+
+El script gestiona automáticamente:
+- Construcción de imagen nueva
+- Prueba en puerto alternativo (18096)
+- Smoke test de las rutas principales
+- Promoción a producción (8096) solo si todo va bien
+- Limpieza del candidato
+
+---
+
+## Tests
+
+```bash
+# Instalar dependencias de test
+pip install -r requirements-dev.txt
+
+# Ejecutar todos los tests
+pytest tests/ -v
+
+# Tests específicos
+pytest tests/test_game_state_repository.py -v
+pytest tests/test_offline_progression_sync_api.py -v
 ```
 
 ---
 
-## Repository status
+## Changelog
 
-The repository began with **v0.0.1** as its public foundation.
+Ver [CHANGELOG.md](CHANGELOG.md) para el historial completo de versiones.
 
-**v0.5.4** completes the field Tools and QR authoring pass. The player now uses
-a compact Tools panel aligned with the rest of the mobile interface, with one
-unified offline preparation action for mission data, map tiles, games and field
-photographs. Gallery-oriented photograph downloads remain a separate action.
+---
 
-Mission Control now includes a QR card studio with safe visual presets,
-photographic headers, configurable accents and shapes, high-correction QR
-rendering and camera validation before PNG export. Validation compares the
-scanned payload exactly and is invalidated whenever the payload or card design
-changes, without altering player progress.
+## Licencia
 
-The field map, GPS tracking, road guide, node-state semantics, bottom navigation
-and the four production-ready reusable games remain unchanged. Earlier private
-history remains intentionally excluded.
+MIT — ver [LICENSE](LICENSE)
 
-## Roadmap
+---
 
-Near-term:
+<div align="center">
 
-- validate mobile sensor behaviour across different browsers and devices;
-- continue simplifying Mission Control and the node editor;
-- improve reusable game templates and real mission examples;
-- validate, redesign or replace experimental GPS and bearing games;
-- add more distinctive offline-ready game presets;
-- field-test QR cards on different phones, printers and lighting conditions;
-- add optional PDF/A4 batch export after the single-card workflow is proven;
-- field-test road routing in urban and rural missions and add selectable route profiles;
-- improve PWA installation, caching and offline recovery;
-- reduce frontend bundle size through code splitting;
-- continue backend and frontend modularization.
+Construido con ❤️ para misiones de campo reales.  
+**SAGA Engine v1.0.0** — 2026
 
-## License
-
-MIT.
+</div>

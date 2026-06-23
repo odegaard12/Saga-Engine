@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import AdminApp from './admin/AdminApp'
 import LoginApp from './login/LoginApp'
 import PlayerApp from './player/PlayerApp'
@@ -19,8 +20,23 @@ function ensurePlayerQueryParam(user: string): void {
 }
 
 export default function App() {
-  const path = window.location.pathname
-  const isAdmin = path === '/admin-react' || path.startsWith('/admin-react/')
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname)
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      setCurrentPath(window.location.pathname)
+    }
+
+    window.addEventListener('popstate', handleNavigation)
+    window.addEventListener('saga:navigate', handleNavigation)
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigation)
+      window.removeEventListener('saga:navigate', handleNavigation)
+    }
+  }, [])
+
+  const isAdmin = currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
   let content: ReactNode
   let showFloatingBuildInfo = true
 

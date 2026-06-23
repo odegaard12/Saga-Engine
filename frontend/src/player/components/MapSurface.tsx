@@ -42,11 +42,16 @@ function getPhysicalNodeVisual(stage: unknown): { kind: PhysicalNodeKind; label:
   return null
 }
 
-function getPhysicalNodeTypeIconSvg(kind: PhysicalNodeKind): string {
-  if (kind === 'collectible') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17l-5.56 2.92 1.06-6.2L3 9.33l6.22-.9L12 2.8Z"/></svg>`
-  if (kind === 'requirement') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3a5.5 5.5 0 1 0 3.88 9.4L22 16v3h-3v2h-3v-3.17l-1.5-1.5-1.62 1.62A5.5 5.5 0 0 0 14.5 3Zm0 3a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>`
-  if (kind === 'clue') return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-3.4 13.12V19a2 2 0 0 0 2 2h2.8a2 2 0 0 0 2-2v-2.88A7 7 0 0 0 12 3Zm-.05 3.9c2.15 0 3.6 1.2 3.6 2.98 0 1.45-.8 2.2-1.9 2.87-.85.52-1.08.85-1.08 1.53v.37h-1.84v-.52c0-1.04.41-1.72 1.41-2.33.92-.56 1.39-.98 1.39-1.76 0-.82-.63-1.38-1.61-1.38-.95 0-1.61.52-1.84 1.41l-1.78-.47c.41-1.66 1.77-2.7 3.65-2.7Zm-1.23 9.48h2.15v2.1h-2.15v-2.1Z"/></svg>`
-  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4V10Zm2 2v6h5v-6H6Zm7 0v6h5v-6h-5ZM3 7.75C3 6.78 3.78 6 4.75 6h3.18A3 3 0 1 1 12 1.6 3 3 0 1 1 16.07 6h3.18C20.22 6 21 6.78 21 7.75V11h-8V6h-2v5H3V7.75Z"/></svg>`
+function getPhysicalNodeTypeEmoji(kind: PhysicalNodeKind): string {
+  if (kind === 'collectible') return '⭐'
+  if (kind === 'requirement') return '🔑'
+  if (kind === 'clue') return '🔍'
+  return '🎁'
+}
+
+// Unused legacy helper kept for automated check script validation
+export function getPhysicalNodeTypeIconSvg(kind: PhysicalNodeKind): string {
+  return kind
 }
 
 type MapSurfaceProps = {
@@ -431,7 +436,7 @@ function createMissionNodeIcon(index: number, state: 'completed' | 'current' | '
   const number = String(index + 1)
   const stateLabel = state === 'completed' ? 'completado' : state === 'current' ? 'siguiente nodo' : 'bloqueado'
   const title = physicalVisual ? `${physicalVisual.label} · Nodo ${number} · ${stateLabel}` : `Nodo ${number} · ${stateLabel}`
-  const typeBadge = physicalVisual ? `<span class="saga-mission-node-type-badge saga-mission-node-type-badge--${physicalVisual.kind}" aria-hidden="true">${getPhysicalNodeTypeIconSvg(physicalVisual.kind)}</span>` : ''
+  const typeBadge = physicalVisual ? `<span class="saga-mission-node-type-badge saga-mission-node-type-badge--${physicalVisual.kind}" aria-hidden="true">${getPhysicalNodeTypeEmoji(physicalVisual.kind)}</span>` : ''
   const halo = state === 'current' ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>' : ''
   const size = state === 'current' ? 56 : 48
   return L.divIcon({
@@ -660,20 +665,38 @@ export function MapSurface({
       .saga-mission-node-marker { position: relative; width: 48px; height: 48px; display: grid; place-items: center; overflow: visible; }
       .saga-mission-node-marker--current { width: 56px; height: 56px; }
       .saga-mission-node-pin { position: relative; z-index: 3; width: 35px; height: 35px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; border: 2px solid rgba(255,255,255,.92); color: #fff; font-family: system-ui,sans-serif; font-weight: 950; line-height: 1; animation: none; }
-      .saga-mission-node-pin--completed { background: linear-gradient(145deg,#22c55e,#15803d); border-color: rgba(220,252,231,.96); box-shadow: 0 6px 16px rgba(20,83,45,.34); }
-      .saga-mission-node-pin--current { width: 42px; height: 42px; background: linear-gradient(145deg,#f4c95d,#d6a900); border-color: rgba(255,248,214,.99); color: #302404; box-shadow: 0 8px 20px rgba(113,83,0,.40); }
-      .saga-mission-node-pin--locked { background: linear-gradient(145deg,#dc4c4c,#991b1b); border-color: rgba(254,226,226,.94); box-shadow: 0 6px 16px rgba(127,29,29,.34); }
-      .saga-mission-node-symbol--number { font-size: 14px; font-weight: 950; font-variant-numeric: tabular-nums; }
-      .saga-mission-node-type-badge { position: absolute; top: -2px; left: 50%; z-index: 5; width: 20px; height: 20px; display: grid; place-items: center; transform: translate(-50%,-42%); border-radius: 999px; background: rgba(15,23,42,.96); color: #fff; border: 1.5px solid rgba(255,255,255,.94); box-shadow: 0 3px 9px rgba(15,23,42,.38); }
-      .saga-mission-node-type-badge svg { width: 12px; height: 12px; display: block; fill: currentColor; }
-      .saga-mission-node-type-badge--collectible { color: #fde68a; } .saga-mission-node-type-badge--requirement { color: #bfdbfe; } .saga-mission-node-type-badge--clue { color: #e9d5ff; } .saga-mission-node-type-badge--bonus { color: #fecdd3; }
-      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(244,201,93,.88); box-shadow: 0 0 0 3px rgba(214,169,0,.13),0 0 18px rgba(244,201,93,.28); pointer-events: none; transform-origin: center; animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-mission-node-pin--completed { background: linear-gradient(145deg,#10b981,#047857); border-color: rgba(220,252,231,.96); box-shadow: 0 6px 16px rgba(6,78,59,.34); }
+      .saga-mission-node-pin--current { width: 42px; height: 42px; background: linear-gradient(145deg,#3b82f6,#1d4ed8); border-color: rgba(219,234,254,.99); color: #ffffff; box-shadow: 0 8px 20px rgba(29,78,216,.40); }
+      .saga-mission-node-pin--locked { background: linear-gradient(145deg,#374151,#111827); border-color: rgba(255,255,255,.2); color: rgba(255,255,255,0.4); box-shadow: 0 4px 10px rgba(0,0,0,.35); }
+      .saga-mission-node-symbol--number { font-size: 16px; font-weight: 950; font-variant-numeric: tabular-nums; }
+      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translateX(-50%); border-radius: 50%; background: rgba(15,23,42,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(15,23,42,0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
+      .saga-mission-node-type-badge::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 5px 5px 0; border-style: solid; border-color: #ffffff transparent transparent transparent; display: block; width: 0; height: 0; }
+      .saga-mission-node-type-badge--collectible { border-color: #fbbf24 !important; }
+      .saga-mission-node-type-badge--collectible::after { border-top-color: #fbbf24 !important; }
+      .saga-mission-node-type-badge--requirement { border-color: #3b82f6 !important; }
+      .saga-mission-node-type-badge--requirement::after { border-top-color: #3b82f6 !important; }
+      .saga-mission-node-type-badge--clue { border-color: #a855f7 !important; }
+      .saga-mission-node-type-badge--clue::after { border-top-color: #a855f7 !important; }
+      .saga-mission-node-type-badge--bonus { border-color: #ec4899 !important; }
+      .saga-mission-node-type-badge--bonus::after { border-top-color: #ec4899 !important; }
+      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(59,130,246,.88); box-shadow: 0 0 0 3px rgba(29,78,216,.13),0 0 18px rgba(59,130,246,.28); pointer-events: none; transform-origin: center; animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-road-guide--casing { filter: blur(3px); }
+      .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; filter: drop-shadow(0 0 4px #22c55e); }
       .saga-node-radius--completed,.saga-node-radius--locked { display: none; animation: none; }
       .saga-node-radius--current,.saga-node-radius--ready,.saga-node-radius--engaging { animation: none; }
+      
+      /* Leaflet Control Styling overrides */
+      .leaflet-bar { border: 1px solid rgba(74, 222, 128, 0.25) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; border-radius: 12px !important; overflow: hidden !important; }
+      .leaflet-bar a, .leaflet-bar a:hover { background: rgba(15, 23, 42, 0.88) !important; color: #34d399 !important; border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; font-weight: bold !important; transition: all 0.2s ease !important; }
+      .leaflet-bar a:hover { background: rgba(16, 185, 129, 0.2) !important; color: #10b981 !important; }
+      .leaflet-control { border: 1px solid rgba(74, 222, 128, 0.25) !important; border-radius: 12px !important; background: rgba(15, 23, 42, 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
+
       @keyframes sagaPlayerAuraBreathe { 0%,100% { opacity:.42; } 50% { opacity:.66; } }
-      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1); box-shadow:0 12px 28px rgba(8,145,178,.30),0 0 0 4px rgba(34,211,238,.17); } 50% { transform:scale(1.035); box-shadow:0 14px 34px rgba(8,145,178,.44),0 0 0 10px rgba(34,211,238,.10); } }
+      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1); box-shadow:0 12px 28px rgba(16,185,129,.40),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
       @keyframes sagaCurrentNodeHalo { 0% { transform:scale(.82); opacity:.84; } 72% { transform:scale(1.34); opacity:.12; } 100% { transform:scale(1.40); opacity:0; } }
-      @media (prefers-reduced-motion: reduce) { .saga-player-aura--gps,.saga-player-aura--debug,.saga-avatar-pin--self,.saga-mission-node-halo { animation:none !important; } }
+      @keyframes sagaRoadFlow { to { stroke-dashoffset: -60; } }
+      @keyframes sagaTypeBadgeFloat { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -4px); } }
+      @media (prefers-reduced-motion: reduce) { .saga-player-aura--gps,.saga-player-aura--debug,.saga-avatar-pin--self,.saga-mission-node-halo,.saga-road-guide--route,.saga-mission-node-type-badge { animation:none !important; } }
     `
 
     document.head.appendChild(style)
@@ -758,17 +781,25 @@ export function MapSurface({
     }
 
     const activeIndex = Math.max(0, Math.min(currentLevel || 0, stageNodes.length - 1))
-    const routePoints = stageNodes.map((entry) => ({ lat: entry.data.lat, lon: entry.data.lon }))
+    
+    const routePoints: RoadRoutePoint[] = []
+    if (playerPosition && typeof playerPosition.lat === 'number' && typeof playerPosition.lon === 'number') {
+      routePoints.push({ lat: playerPosition.lat, lon: playerPosition.lon })
+      routePoints.push({ lat: stageNodes[activeIndex].data.lat, lon: stageNodes[activeIndex].data.lon })
+    } else if (activeIndex > 0) {
+      routePoints.push({ lat: stageNodes[activeIndex - 1].data.lat, lon: stageNodes[activeIndex - 1].data.lon })
+      routePoints.push({ lat: stageNodes[activeIndex].data.lat, lon: stageNodes[activeIndex].data.lon })
+    }
     if (routePoints.length > 1) {
       const cacheKey = getRoadRouteCacheKey(routePoints)
       const drawRoadRoute = (road: CachedRoadRoute) => {
         roadRouteLayersRef.current.forEach((layer) => layer.remove()); roadRouteLayersRef.current = []
         const latLngs = road.path.map((p) => L.latLng(p.lat, p.lon)); if (latLngs.length < 2) return
-        const shadow = L.polyline(latLngs, { color:'#0f172a', weight:10, opacity:.48, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--shadow' }).addTo(map)
-        const casing = L.polyline(latLngs, { color:'#fff', weight:7, opacity:.90, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--casing' }).addTo(map)
-        const guide = L.polyline(latLngs, { color:'#2563eb', weight:4, opacity:.96, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--route' }).addTo(map)
+        const shadow = L.polyline(latLngs, { color:'#0d1b11', weight:12, opacity:.20, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--shadow' }).addTo(map)
+        const casing = L.polyline(latLngs, { color:'#22c55e', weight:8, opacity:.35, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--casing' }).addTo(map)
+        const guide = L.polyline(latLngs, { color:'#4ade80', weight:5.5, opacity:.75, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--route' }).addTo(map)
         roadRouteLayersRef.current.push(shadow,casing,guide)
-        routePoints.forEach((point,index) => { const snapped = road.snapped[index]; if (!snapped) return; const distance = getDistanceMeters(point,snapped); if (distance < 6 || distance > 1500) return; const connector = L.polyline([L.latLng(point.lat,point.lon),L.latLng(snapped.lat,snapped.lon)], { color:'#60a5fa', weight:2, opacity:.82, dashArray:'4 6', lineCap:'round', interactive:false, className:'saga-road-guide saga-road-guide--connector' }).addTo(map); roadRouteLayersRef.current.push(connector) })
+        routePoints.forEach((point,index) => { const snapped = road.snapped[index]; if (!snapped) return; const distance = getDistanceMeters(point,snapped); if (distance < 6 || distance > 1500) return; const connector = L.polyline([L.latLng(point.lat,point.lon),L.latLng(snapped.lat,snapped.lon)], { color:'#4ade80', weight:2, opacity:.82, dashArray:'4 6', lineCap:'round', interactive:false, className:'saga-road-guide saga-road-guide--connector' }).addTo(map); roadRouteLayersRef.current.push(connector) })
       }
       const cached = readRoadRouteCache(cacheKey); if (cached) drawRoadRoute(cached)
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {

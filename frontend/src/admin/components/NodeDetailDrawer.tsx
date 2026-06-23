@@ -43,6 +43,7 @@ function getVisibleAdminGames(selectedGameId: string) {
 
 function buildFallbackCodeForStage(stage: AdminReactOverviewStage) {
   const index = typeof stage.index === 'number' ? stage.index + 1 : 1
+  // Código fallback
   return `SAGA-${String(index).padStart(2, '0')}`
 }
 

@@ -160,29 +160,6 @@ const topRow: CSSProperties = {
   gap: 12,
 }
 
-const identityBlock: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  gap: 4,
-}
-
-const gpsMiniPill: CSSProperties = {
-  width: 'fit-content',
-  minHeight: 20,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 8px',
-  borderRadius: 999,
-  background: 'rgba(34,197,94,.16)',
-  border: '1px solid rgba(187,247,208,.20)',
-  color: '#dcfce7',
-  fontSize: 9,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
 const pillRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -216,52 +193,6 @@ const soloPill: CSSProperties = {
   letterSpacing: '0.08em',
 }
 
-const teamButton: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.26)',
-  color: '#ffffff',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-}
-
-const teamButtonActive: CSSProperties = {
-  ...teamButton,
-  background: 'rgba(59,130,246,.16)',
-  border: '1px solid rgba(96,165,250,.20)',
-  color: '#dbeafe',
-}
-
-const teamCountPill: CSSProperties = {
-  minWidth: 18,
-  height: 18,
-  padding: '0 6px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.04em',
-}
-
-const teamLiveDot: CSSProperties = {
-  width: 8,
-  height: 8,
-  borderRadius: 999,
-  background: '#22c55e',
-  boxShadow: '0 0 0 3px rgba(34,197,94,.18)',
-}
-
 const playerTitle: CSSProperties = {
   fontWeight: 900,
   lineHeight: 1.05,
@@ -271,13 +202,6 @@ const playerTitle: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
-}
-
-const stageTitle: CSSProperties = {
-  color: 'rgba(255,255,255,.94)',
-  fontSize: 14,
-  fontWeight: 800,
-  lineHeight: 1.2,
 }
 
 const progressRow: CSSProperties = {

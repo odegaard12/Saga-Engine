@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v518-tools-copy-cleanup'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v550-rpg-viewfinder'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null

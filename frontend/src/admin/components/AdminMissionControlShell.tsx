@@ -14,7 +14,7 @@ import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'builder'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AdminMissionControlShellProps = {

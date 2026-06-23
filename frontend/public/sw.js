@@ -1,4 +1,7 @@
-const CACHE_NAME = 'saga-player-shell-v518-tools-copy-cleanup'
+const CACHE_NAME = 'saga-player-shell-v550-rpg-viewfinder'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v550'
+const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
+
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
 
@@ -40,6 +43,21 @@ async function cacheFirst(request) {
   if (cached) return cached
   const response = await fetch(request)
   await putCache(request, response)
+  return response
+}
+
+async function putCustomCache(cacheName, request, response) {
+  if (!response || (!response.ok && response.type !== 'opaque')) return response
+  const cache = await caches.open(cacheName)
+  await cache.put(request, response.clone())
+  return response
+}
+
+async function customCacheFirst(cacheName, request) {
+  const cached = await caches.match(request, { cacheName })
+  if (cached) return cached
+  const response = await fetch(request)
+  await putCustomCache(cacheName, request, response)
   return response
 }
 
@@ -136,7 +154,11 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('saga-player-shell-') && key !== CACHE_NAME)
+            .filter((key) => {
+              if (key.startsWith('saga-player-shell-') && key !== CACHE_NAME) return true
+              if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
+              return false
+            })
             .map((key) => caches.delete(key))
         )
       )
@@ -161,14 +183,14 @@ self.addEventListener('fetch', (event) => {
     url.hostname === 'server.arcgisonline.com' &&
     url.pathname.includes('/World_Imagery/MapServer/tile/')
   ) {
-    event.respondWith(cacheFirst(request))
+    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return
   }
 
   if (url.origin !== self.location.origin) return
 
   if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {
-    event.respondWith(cacheFirst(request))
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
     return
   }
 

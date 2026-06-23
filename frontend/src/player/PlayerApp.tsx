@@ -24,6 +24,21 @@ import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
 import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
+import {
+  CelebrationOverlay,
+  ScreenFrame,
+  StatusCard,
+  getBottomOverlayStyle,
+  getMapQuickControlsStyle,
+  getTopOverlayStyle,
+  getTopScrimStyle,
+  getToastOverlayStyle,
+  getViewportStyle,
+  finishOverlayStyle,
+  floatingTrophyButton,
+  type OverlayState
+} from './components/PlayerLayout'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -31,7 +46,6 @@ type LoadState =
   | { status: 'ready'; payload: PlayerGamePayload }
 
 type NoticeTone = 'info' | 'warn' | 'success'
-type OverlayState = 'activate' | 'node' | 'finish' | null
 type FocusRequest =
   | {
       target: 'player' | 'node' | 'route'
@@ -83,6 +97,7 @@ export default function PlayerApp() {
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [teamOpen, setTeamOpen] = useState(false)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
@@ -535,7 +550,7 @@ export default function PlayerApp() {
     noticeTimerRef.current = window.setTimeout(() => {
       setUiNotice(null)
       noticeTimerRef.current = null
-    }, 2200)
+    }, 3000)
   }
 
   function showOverlay(nextState: OverlayState) {
@@ -555,10 +570,7 @@ export default function PlayerApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard
-          title="Preparando jugador"
-          body="Cargando misión, mapa y datos guardados. En offline se usa la última descarga preparada."
-        />
+        <div style={{ position: 'absolute', inset: 0, background: '#020617' }} />
       </ScreenFrame>
     )
   }
@@ -718,20 +730,6 @@ export default function PlayerApp() {
     const nextProofs = await fetchFieldProofs(user)
     setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
     return nextProofs
-  }
-
-  function handleDownloadFieldProofs() {
-    if (fieldProofs.length <= 0) {
-      return
-    }
-
-    const link = document.createElement('a')
-    link.href = getFieldProofsDownloadUrl(payload.user)
-    link.download = ''
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    closeTools()
   }
 
 function handleOpenFieldCamera() {
@@ -1145,6 +1143,46 @@ function handleOpenFieldCamera() {
     }
   }
 
+  async function handleDownloadFieldProofs() {
+    if (!fieldProofs.length) return
+    showNotice('Preparando archivo ZIP...', 'info')
+    
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      
+      const promises = fieldProofs.map(async (proof, index) => {
+        const url = proof.image_url || proof.thumbnail_url
+        if (!url) return
+        
+        try {
+          const response = await fetch(url)
+          const blob = await response.blob()
+          const filename = `foto_${index + 1}_${proof.id}.jpg`
+          zip.file(filename, blob)
+        } catch (err) {
+          console.warn('Failed to fetch photo for zip', err)
+        }
+      })
+      
+      await Promise.all(promises)
+      
+      const content = await zip.generateAsync({ type: 'base64' })
+      const safeUserName = String(payload.user || 'jugador').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      const downloadUrl = `data:application/zip;base64,${content}`
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `fotos_saga_${safeUserName}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      
+      showNotice('Descarga de ZIP completada', 'success')
+    } catch (err) {
+      console.error(err)
+      showNotice('Error al crear ZIP', 'warn')
+    }
+  }
   function handlePrimaryAction() {
     if (gpsActionRequired) {
       void handleRequestLiveGps({ forceFocus: true })
@@ -1322,7 +1360,6 @@ function handleOpenFieldCamera() {
 
   return (
     <ScreenFrame mobile={isPhone}>
-      <div style={getViewportStyle(isPhone)}>
         <MapSurface
           currentStage={currentStage}
           missionStages={payload.stages || []}
@@ -1456,6 +1493,7 @@ function handleOpenFieldCamera() {
                 {routeOverviewActive ? '📍' : '🧭'}
               </span>
             </button>
+
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
 
@@ -1473,7 +1511,47 @@ function handleOpenFieldCamera() {
 
         {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
 
-        <div style={getBottomOverlayStyle(isPhone)}>
+        {payload.finished && !dismissedFinishScreen ? (
+          <div className="saga-finish-overlay" role="dialog" aria-modal="true">
+            <style>{finishOverlayStyle}</style>
+            <div className="saga-finish-card">
+              <div className="saga-finish-orb">🏆</div>
+              <h2 className="saga-finish-title">Misión Completada</h2>
+              <p className="saga-finish-subtitle">
+                ¡Excelente trabajo, agente <strong>{payload.display_name || payload.user}</strong>! Has completado con éxito todos los nodos de la ruta de campo.
+              </p>
+              
+              <div className="saga-finish-stats">
+                <div className="saga-finish-stat-box">
+                  <div className="saga-finish-stat-val">{payload.stages?.length || 0}</div>
+                  <div className="saga-finish-stat-lbl">Nodos</div>
+                </div>
+                <div className="saga-finish-stat-box">
+                  <div className="saga-finish-stat-val">{fieldProofs?.filter((p) => p.user === payload.user).length || 0}</div>
+                  <div className="saga-finish-stat-lbl">Fotos</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="saga-finish-btn-primary"
+                onClick={() => setDismissedFinishScreen(true)}
+              >
+                Ver mapa de ruta
+              </button>
+
+              <button
+                type="button"
+                className="saga-finish-btn-secondary"
+                onClick={() => window.location.assign('/')}
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+      <div style={getBottomOverlayStyle(isPhone)}>
         <PlayerHud
             user={payload.user}
             missionPayload={payload}
@@ -1507,7 +1585,6 @@ function handleOpenFieldCamera() {
              onSubmitCode={handleSubmitCode}
           />
         </div>
-      </div>
 
       <TeamSheet
         open={teamOpen}
@@ -1527,28 +1604,20 @@ function handleOpenFieldCamera() {
         }}
         onSubmitCode={handleSubmitCode}
       />
+
+      {payload.finished && dismissedFinishScreen ? (
+        <button
+          type="button"
+          style={floatingTrophyButton}
+          onClick={() => setDismissedFinishScreen(false)}
+          aria-label="Ver pantalla de finalización"
+          title="Ver pantalla de finalización"
+        >
+          🏆
+        </button>
+      ) : null}
     </ScreenFrame>
   )
-}
-
-const mapRouteToggleButton: CSSProperties = {
-  position: 'fixed',
-  right: 18,
-  bottom: 'calc(env(safe-area-inset-bottom, 0px) + 176px)',
-  zIndex: 4600,
-  width: 42,
-  height: 42,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.22)',
-  background: 'rgba(15,23,42,.62)',
-  color: '#f8fafc',
-  fontSize: 20,
-  fontWeight: 900,
-  boxShadow: '0 14px 34px rgba(15,23,42,.22)',
-  backdropFilter: 'blur(5px)',
-  WebkitBackdropFilter: 'blur(14px)',
-  pointerEvents: 'auto',
-  touchAction: 'manipulation',
 }
 
 const mapRouteToggleInlineButton: CSSProperties = {
@@ -1616,378 +1685,4 @@ const mapQuickCountPill: CSSProperties = {
   fontWeight: 950,
   lineHeight: 1,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
-}
-
-function getMobileBrowserChromeLift(
-  mobile: boolean,
-): number {
-  if (
-    !mobile ||
-    typeof window === 'undefined'
-  ) {
-    return 0
-  }
-
-  const navigatorWithStandalone =
-    window.navigator as Navigator & {
-      standalone?: boolean
-    }
-
-  const standalone =
-    window.matchMedia?.(
-      '(display-mode: standalone)'
-    ).matches === true ||
-    navigatorWithStandalone.standalone === true
-
-  // La PWA instalada ya respeta correctamente
-  // el safe area. En Safari/Chrome normal se
-  // eleva sobre la barra inferior del navegador.
-  return standalone ? 0 : 22
-}
-
-
-function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
-  const browserChromeLift =
-    getMobileBrowserChromeLift(mobile)
-
-  return {
-    position: 'fixed',
-    left: '50%',
-    bottom: mobile
-      ? `calc(env(safe-area-inset-bottom, 0px) + ${138 + browserChromeLift}px)`
-      : 148,
-    transform: 'translateX(-50%)',
-    zIndex: 1600,
-    display: 'inline-flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
-    gap: 2,
-    padding: 4,
-    borderRadius: 24,
-    border: '1px solid rgba(255,255,255,.20)',
-    background:
-      'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
-    boxShadow:
-      '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
-    backdropFilter: 'blur(8px) saturate(120%)',
-    WebkitBackdropFilter: 'blur(8px) saturate(120%)',
-    pointerEvents: 'auto',
-  }
-}
-
-
-const globalPlayerEdgeFix = `
-html,
-body,
-#root {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100%;
-  min-width: 100%;
-  min-height: 100%;
-  background: #020617 !important;
-  overflow: hidden;
-}
-
-body {
-  overscroll-behavior: none;
-}
-
-.leaflet-container {
-  background: #020617 !important;
-  outline: none !important;
-}
-
-.saga-player-edge-fix {
-  background: #020617 !important;
-}
-`
-
-function ScreenFrame({
-  children,
-  mobile,
-}: {
-  children: React.ReactNode
-  mobile: boolean
-}) {
-  return (
-    <>
-      <style>{globalPlayerEdgeFix}</style>
-      <main
-      style={{
-        position: mobile ? 'fixed' : 'relative',
-        inset: mobile ? '-1px -1px 0 -1px' : undefined,
-        width: mobile ? 'calc(100vw + 2px)' : '100vw',
-        minHeight: mobile ? '100dvh' : '100svh',
-        height: mobile ? '100dvh' : 'auto',
-        background: '#020617',
-        padding: mobile ? 0 : 12,
-        fontFamily: 'system-ui, sans-serif',
-        color: '#10231a',
-        overflow: 'hidden',
-        overscrollBehavior: 'none',
-        touchAction: 'manipulation',
-      }}
-    >
-      {children}
-      </main>
-    </>
-  )
-}
-
-function getLaunchingPlayerLabel() {
-  if (typeof window === 'undefined') return ''
-
-  try {
-    const raw = window.sessionStorage.getItem('saga:player-launching')
-    if (!raw) return ''
-
-    const parsed = JSON.parse(raw) as { label?: string; at?: string }
-    return parsed.label || ''
-  } catch {
-    return ''
-  }
-}
-
-function StatusCard({ title, body }: { title: string; body: string }) {
-  const playerLabel = getLaunchingPlayerLabel()
-
-  return (
-    <section style={statusCard}>
-      <style>{statusCardAnimations}</style>
-      <div style={statusLoader}>
-        <div style={statusLoaderRing} />
-      </div>
-      <div style={statusTitle}>{playerLabel ? `Entrando como ${playerLabel}` : title}</div>
-      <div style={statusBody}>{body}</div>
-    </section>
-  )
-}
-
-function CelebrationOverlay({ state }: { state: OverlayState }) {
-  if (!state) return null
-
-  const label =
-    state === 'activate'
-      ? 'Node ready'
-      : state === 'node'
-      ? 'Node cleared'
-      : 'Mission complete'
-
-  const toneStyle =
-    state === 'activate'
-      ? overlayInfo
-      : state === 'node'
-      ? overlaySuccess
-      : overlayFinish
-
-  return (
-    <>
-      <style>{overlayAnimations}</style>
-      <div style={overlayWrap}>
-        <div style={{ ...pulseRing, ...toneStyle }} />
-        <div style={{ ...overlayPill, ...toneStyle }}>{label}</div>
-      </div>
-    </>
-  )
-}
-
-function getViewportStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'relative',
-    width: '100%',
-    maxWidth: mobile ? '100%' : 1320,
-    height: mobile ? '100dvh' : 'calc(100svh - 24px)',
-    minHeight: mobile ? '100dvh' : 620,
-    maxHeight: mobile ? '100dvh' : 980,
-    margin: '0 auto',
-    overflow: 'hidden',
-    borderRadius: mobile ? 0 : 32,
-    background: '#0f172a',
-  }
-}
-
-function getTopScrimStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    inset: '0 0 auto 0',
-    height: 0,
-    zIndex: 1100,
-    pointerEvents: 'none',
-    background: 'transparent',
-  }
-}
-
-function getTopOverlayStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 12,
-    left: mobile ? 10 : 12,
-    right: mobile ? 10 : 12,
-    zIndex: 1200,
-    pointerEvents: 'auto',
-    transform: mobile ? 'translateY(10px)' : undefined,
-  }
-}
-
-function getToastOverlayStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    left: mobile ? 12 : 16,
-    right: mobile ? 12 : 16,
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 154px)' : 176,
-    zIndex: 1250,
-    pointerEvents: 'none',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  }
-}
-
-function getBottomOverlayStyle(mobile: boolean): CSSProperties {
-  return {
-    position: 'absolute',
-    left: mobile ? 10 : 12,
-    right: mobile ? 10 : 12,
-    bottom: mobile ? 0 : 12,
-    zIndex: 1200,
-    pointerEvents: 'auto',
-  }
-}
-
-const overlayWrap: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  zIndex: 1235,
-  pointerEvents: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const pulseRing: CSSProperties = {
-  position: 'absolute',
-  width: 190,
-  height: 190,
-  borderRadius: '50%',
-  opacity: 0.22,
-  animation: 'sagaPulseRing 720ms ease-out forwards',
-}
-
-const overlayPill: CSSProperties = {
-  minHeight: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 16px',
-  borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  boxShadow: '0 14px 30px rgba(15,23,42,.12)',
-  animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
-}
-
-const overlayInfo: CSSProperties = {
-  background: 'rgba(239,246,255,.96)',
-  border: '1px solid rgba(59,130,246,.16)',
-  color: '#1d4ed8',
-}
-
-const overlaySuccess: CSSProperties = {
-  background: 'rgba(220,252,231,.96)',
-  border: '1px solid rgba(22,163,74,.18)',
-  color: '#166534',
-}
-
-const overlayFinish: CSSProperties = {
-  background: 'rgba(250,245,255,.96)',
-  border: '1px solid rgba(168,85,247,.18)',
-  color: '#7e22ce',
-}
-
-const overlayAnimations = `
-@keyframes sagaPulseRing {
-  from {
-    transform: scale(.42);
-    opacity: .28;
-  }
-  to {
-    transform: scale(1.24);
-    opacity: 0;
-  }
-}
-
-@keyframes sagaOverlayPop {
-  from {
-    transform: scale(.94);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-`
-
-const statusCard: CSSProperties = {
-  position: 'fixed',
-  left: '50%',
-  top: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 'min(360px, calc(100vw - 32px))',
-  boxSizing: 'border-box',
-  display: 'grid',
-  justifyItems: 'center',
-  gap: 10,
-  borderRadius: 30,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.94), rgba(30,41,59,.86))',
-  boxShadow: '0 24px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: '22px 18px',
-  margin: 0,
-  color: '#f8fafc',
-  textAlign: 'center',
-}
-
-const statusLoader: CSSProperties = {
-  width: 42,
-  height: 42,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 999,
-  background: 'rgba(187,247,208,.10)',
-  boxShadow: '0 0 0 8px rgba(187,247,208,.045)',
-}
-
-const statusLoaderRing: CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  border: '3px solid rgba(255,255,255,.16)',
-  borderTopColor: '#bbf7d0',
-  animation: 'sagaPlayerSpin 760ms linear infinite',
-}
-
-const statusCardAnimations = `
-@keyframes sagaPlayerSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-`
-
-const statusTitle: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 800,
-  color: '#ffffff',
-}
-
-const statusBody: CSSProperties = {
-  fontSize: 14,
-  color: 'rgba(226,232,240,.78)',
-  marginTop: 8,
-  lineHeight: 1.5,
 }

@@ -42,6 +42,111 @@ function getUpdatedLabel(value?: string): string {
 export function InventoryPanel({ user }: InventoryPanelProps) {
   const [snapshot, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!document.getElementById('saga-inventory-style')) {
+      const style = document.createElement('style')
+      style.id = 'saga-inventory-style'
+      style.textContent = `
+        .saga-inventory-slot {
+          min-height: 116px;
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+          gap: 6px;
+          border-radius: 16px;
+          padding: 10px;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          background: rgba(15, 23, 42, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .saga-inventory-slot--usable {
+          border-color: rgba(34, 197, 94, 0.3);
+          background: linear-gradient(180deg, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.6));
+          position: relative;
+        }
+        .saga-inventory-slot--usable:hover {
+          transform: translateY(-2px);
+          border-color: rgba(74, 222, 128, 0.5);
+          box-shadow: 0 0 12px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .saga-inventory-slot--used {
+          opacity: 0.5;
+          border-color: rgba(148, 163, 184, 0.15);
+          background: rgba(15, 23, 42, 0.3);
+        }
+        .saga-inventory-slot--empty {
+          min-height: 116px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          border-radius: 16px;
+          border: 1px dashed rgba(255, 255, 255, 0.12);
+          background: rgba(15, 23, 42, 0.20);
+          color: rgba(255, 255, 255, 0.3);
+          transition: all 0.2s ease;
+        }
+        .saga-inventory-slot--empty:hover {
+          background: rgba(15, 23, 42, 0.30);
+          border-color: rgba(255, 255, 255, 0.2);
+          color: rgba(255, 255, 255, 0.45);
+        }
+        .saga-inventory-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.06);
+          font-size: 14px;
+          line-height: 1;
+        }
+        .saga-inventory-slot--usable .saga-inventory-icon {
+          background: rgba(34, 197, 94, 0.15);
+          color: #4ade80;
+          box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.2);
+        }
+        .saga-inventory-slot--used .saga-inventory-icon {
+          background: rgba(148, 163, 184, 0.1);
+          color: rgba(226, 232, 240, 0.4);
+        }
+        .saga-inventory-use-btn {
+          min-height: 28px;
+          padding: 0 12px;
+          border-radius: 12px;
+          border: none;
+          background: #22c55e;
+          color: #052e16;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .saga-inventory-use-btn:hover {
+          background: #4ade80;
+          transform: scale(1.02);
+        }
+        .saga-inventory-use-btn:active {
+          transform: scale(0.98);
+        }
+        .saga-inventory-use-btn:disabled {
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
   function useItem(item: InventoryItem) {
     const next = markInventoryItemUsed(user, item.item_id, 1)
     setSnapshot(next)
@@ -100,8 +205,8 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
             const usable = item.state !== 'used' && item.quantity > 0
 
             return (
-              <div key={item.item_id} style={usable ? slotCard : slotCardUsed}>
-                <div style={slotIcon}>{usable ? '◆' : '✓'}</div>
+              <div key={item.item_id} className={`saga-inventory-slot ${usable ? 'saga-inventory-slot--usable' : 'saga-inventory-slot--used'}`}>
+                <div className="saga-inventory-icon">{usable ? '◆' : '✓'}</div>
                 <div style={slotBody}>
                   <div style={itemLabel}>
                     {item.label}
@@ -111,7 +216,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
                 </div>
                 <button
                   type="button"
-                  style={usable ? useButton : useButtonDisabled}
+                  className="saga-inventory-use-btn"
                   disabled={!usable}
                   onClick={(event) => {
                     event.preventDefault()
@@ -126,7 +231,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           })}
 
           {Array.from({ length: Math.max(0, 4 - visibleItems.length) }).map((_, index) => (
-            <div key={`empty-${index}`} style={emptySlot}>
+            <div key={`empty-${index}`} className="saga-inventory-slot--empty">
               <div style={emptySlotIcon}>＋</div>
               <div style={emptySlotText}>Hueco libre</div>
             </div>
@@ -135,7 +240,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       ) : (
         <div style={emptyGrid}>
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} style={emptySlot}>
+            <div key={index} className="saga-inventory-slot--empty">
               <div style={emptySlotIcon}>＋</div>
               <div style={emptySlotText}>Hueco libre</div>
             </div>
@@ -189,6 +294,7 @@ const statusPill: CSSProperties = {
   border: '1px solid rgba(96,165,250,.22)',
   background: 'rgba(59,130,246,.14)',
   color: '#dbeafe',
+  padding: '0 10px',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.10em',
@@ -198,37 +304,6 @@ const slotGrid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
-}
-
-const slotCard: CSSProperties = {
-  minHeight: 112,
-  display: 'grid',
-  gridTemplateRows: 'auto 1fr auto',
-  gap: 7,
-  borderRadius: 16,
-  border: '1px solid rgba(187,247,208,.18)',
-  background: 'linear-gradient(180deg, rgba(34,197,94,.12), rgba(15,23,42,.24))',
-  padding: 10,
-}
-
-const slotCardUsed: CSSProperties = {
-  ...slotCard,
-  opacity: 0.62,
-  border: '1px solid rgba(148,163,184,.16)',
-  background: 'rgba(15,23,42,.22)',
-}
-
-const slotIcon: CSSProperties = {
-  width: 30,
-  height: 30,
-  borderRadius: 12,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(255,255,255,.10)',
-  color: '#bbf7d0',
-  fontSize: 14,
-  fontWeight: 900,
 }
 
 const slotBody: CSSProperties = {
@@ -263,42 +338,10 @@ const itemMeta: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-const useButton: CSSProperties = {
-  minHeight: 30,
-  padding: '0 10px',
-  borderRadius: 999,
-  border: '1px solid rgba(34,197,94,.22)',
-  background: 'rgba(34,197,94,.16)',
-  color: '#bbf7d0',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-}
-
-const useButtonDisabled: CSSProperties = {
-  ...useButton,
-  border: '1px solid rgba(148,163,184,.14)',
-  background: 'rgba(148,163,184,.10)',
-  color: 'rgba(226,232,240,.54)',
-}
-
 const emptyGrid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
-}
-
-const emptySlot: CSSProperties = {
-  minHeight: 92,
-  display: 'grid',
-  placeItems: 'center',
-  gap: 4,
-  borderRadius: 16,
-  border: '1px dashed rgba(226,232,240,.18)',
-  background: 'rgba(15,23,42,.16)',
-  color: 'rgba(226,232,240,.52)',
-  textAlign: 'center',
 }
 
 const emptySlotIcon: CSSProperties = {

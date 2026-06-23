@@ -126,6 +126,45 @@ export function QuickProofPanel({
           display: none !important;
           pointer-events: none !important;
         }
+        .saga-scanner-viewfinder {
+          position: absolute;
+          inset: 40px;
+          border: 1px dashed rgba(74, 222, 128, 0.25);
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .saga-scanner-viewfinder::after {
+          content: '';
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #4ade80;
+          opacity: 0.6;
+          animation: sagaScannerPulse 1.5s infinite ease-in-out;
+        }
+        .saga-scanner-corner {
+          position: absolute;
+          width: 16px;
+          height: 16px;
+          border: 3px solid #4ade80;
+          pointer-events: none;
+        }
+        .saga-scanner-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+        .saga-scanner-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 6px; }
+        .saga-scanner-corner--bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 6px; }
+        .saga-scanner-corner--br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
+        @keyframes sagaScannerPulse {
+          0%, 100% { transform: scale(1); opacity: 0.4; }
+          50% { transform: scale(1.3); opacity: 0.8; }
+        }
+        @keyframes sagaScanline {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(240px); opacity: 0; }
+        }
       `
       document.head.appendChild(style)
     }
@@ -332,6 +371,15 @@ export function QuickProofPanel({
           <div style={scannerBox}>
             <video ref={videoRef} style={videoStyle} playsInline muted />
             <canvas ref={canvasRef} style={canvasStyle} />
+            {scanning ? <div className="saga-scanner-line" /> : null}
+            {scanning ? (
+              <div className="saga-scanner-viewfinder">
+                <div className="saga-scanner-corner saga-scanner-corner--tl" />
+                <div className="saga-scanner-corner saga-scanner-corner--tr" />
+                <div className="saga-scanner-corner saga-scanner-corner--bl" />
+                <div className="saga-scanner-corner saga-scanner-corner--br" />
+              </div>
+            ) : null}
             <div style={scannerText}>
               {scanning
                 ? 'Apunta la cámara a la tarjeta QR de SAGA.'
@@ -421,11 +469,11 @@ const panel: CSSProperties = {
   display: 'grid',
   gap: 10,
   borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.18)',
+  border: '2px solid rgba(74,222,128,.30)',
   background:
-    'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
+    'linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.99))',
   color: '#f8fafc',
-  boxShadow: '0 28px 76px rgba(2,6,23,.38)',
+  boxShadow: '0 0 0 1px rgba(255,255,255,.05), 0 32px 84px rgba(0,0,0,.60)',
   backdropFilter: 'blur(26px) saturate(1.12)',
   WebkitBackdropFilter: 'blur(26px) saturate(1.12)',
   padding: 12,
@@ -473,9 +521,9 @@ const scannerBox: CSSProperties = {
   overflow: 'hidden',
   minHeight: 216,
   borderRadius: 22,
-  border: '1px solid rgba(187,247,208,.14)',
-  background: 'rgba(2,6,23,.66)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
+  border: '2px solid rgba(74,222,128,.40)',
+  background: 'rgba(2,6,23,.80)',
+  boxShadow: 'inset 0 0 20px rgba(0,0,0,.60)',
 }
 
 const videoStyle: CSSProperties = {
