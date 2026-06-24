@@ -1142,6 +1142,24 @@ function handleOpenFieldCamera() {
     }
   }
 
+  // Centrar y re-calibrar al volver al primer plano (app resume)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        gpsCenteredRef.current = false
+        setGpsLoaded(false)
+        void handleRequestLiveGps({ silent: true, forceFocus: true })
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [user])
+
   async function handlePrepareOfflinePack() {
     try {
       setOfflinePrepState('saving')
