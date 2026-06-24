@@ -77,11 +77,13 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         aria-modal="true"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
-        <div style={dragHandleWrapper}>
+        <div 
+          style={dragHandleWrapper}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <div style={dragHandle} />
         </div>
         {children}
