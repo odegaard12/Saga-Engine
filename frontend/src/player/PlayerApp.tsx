@@ -121,6 +121,7 @@ export default function PlayerApp() {
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
+  const prevTeamStatusRef = useRef<Record<string, string>>({})
   const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
   const isPhone =
@@ -328,7 +329,22 @@ export default function PlayerApp() {
         const team = await fetchTeamStatus(user)
         const profiles = Array.isArray(team.profiles) ? team.profiles : []
         cacheTeamProfiles(user, profiles)
+
         if (!cancelled) {
+          const prevStatuses = prevTeamStatusRef.current
+          profiles.forEach((p) => {
+            const oldStatus = prevStatuses[p.user]
+            if (oldStatus && oldStatus !== p.status && p.status && !p.is_self) {
+              setUiNotice({
+                id: Date.now() + Math.random(),
+                title: 'Progreso de Equipo',
+                message: `${p.display_name || p.user} » ${p.status}`,
+                tone: 'success',
+              })
+              vibrate([10, 30, 10])
+            }
+            prevStatuses[p.user] = p.status || ''
+          })
           setTeamProfiles(profiles)
         }
       } catch {

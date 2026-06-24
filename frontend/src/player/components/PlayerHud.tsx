@@ -4,8 +4,10 @@ import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
+import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
+import { useGyroParallax } from '../hooks/useGyroParallax'
 
 type BackpackTab = 'requirements' | 'inventory'
 
@@ -200,6 +202,8 @@ export function PlayerHud({
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
+  const { transform } = useGyroParallax(12)
+
   const gpsDisplay = getGpsDisplay(gpsState)
   const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
   const distanceLabel = distanceMeters !== null ? `${distanceMeters} m` : null
@@ -231,6 +235,8 @@ export function PlayerHud({
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
           padding: compact ? 12 : 14,
+          transform,
+          transition: 'transform 0.1s ease-out',
         }}
       >
 
@@ -266,19 +272,14 @@ export function PlayerHud({
         </div>
       </section>
 
-      {detailsOpen ? (
-        <div style={getOverlayStyle(compact)}>
-          <div style={sheetBackdrop} onClick={onToggleDetails} />
-
-          <aside
-            style={getSheetStyle(compact)}
-            aria-modal="true"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {compact ? (
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 8px', flexShrink: 0 }} />
-            ) : null}
+      <SwipeableSheet
+        open={detailsOpen}
+        onClose={onToggleDetails}
+        sheetStyle={getSheetStyle(compact)}
+      >
+        {compact ? (
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 8px', flexShrink: 0 }} />
+        ) : null}
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
@@ -326,23 +327,16 @@ export function PlayerHud({
                 <InventoryPanel user={user} />
               ) : null}
             </div>
-          </aside>
-        </div>
-      ) : null}
+          </SwipeableSheet>
 
-      {toolsOpen ? (
-        <div style={getOverlayStyle(compact)}>
-          <div style={sheetBackdrop} onClick={onCloseTools} />
-
-          <aside
-            style={getToolsSheetStyle(compact)}
-            aria-modal="true"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {compact ? (
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 4px', flexShrink: 0 }} />
-            ) : null}
+      <SwipeableSheet
+        open={toolsOpen}
+        onClose={onCloseTools}
+        sheetStyle={getToolsSheetStyle(compact)}
+      >
+        {compact ? (
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 4px', flexShrink: 0 }} />
+        ) : null}
 
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
@@ -516,9 +510,7 @@ export function PlayerHud({
             <div style={toolsBuildRow}>
               <BuildInfoBadge mode="inline" />
             </div>
-          </aside>
-        </div>
-      ) : null}
+      </SwipeableSheet>
     </>
   )
 }

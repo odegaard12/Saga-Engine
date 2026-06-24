@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
-
+import { SwipeableSheet } from './SwipeableSheet'
 interface TeamSheetProps {
   open: boolean
   players: TeamProfileLiveStatus[]
@@ -81,120 +81,74 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
   })
 
   return (
-    <div style={overlay}>
-      <div style={backdrop} onClick={onClose} />
-
-      <aside
-        style={sheet}
-        aria-modal="true"
-        role="dialog"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={header}>
-          <div>
-            <div style={eyebrow}>EQUIPO</div>
-            <div style={title}>Jugadores</div>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Cerrar jugadores"
-            style={closeButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onClose()
-            }}
-          >
-            ×
-          </button>
+    <SwipeableSheet open={open} onClose={onClose}>
+      <div style={header}>
+        <div>
+          <div style={eyebrow}>EQUIPO</div>
+          <div style={title}>Jugadores</div>
         </div>
 
-        {sorted.length === 0 ? (
-          <div style={emptyState}>Todavía no hay otros jugadores disponibles.</div>
-        ) : (
-          <div style={list}>
-            {sorted.map((player) => {
-              const distance = formatDistance(currentPosition, player)
-              const gps = String(player.gps_status || 'unknown').toUpperCase()
+        <button
+          type="button"
+          aria-label="Cerrar jugadores"
+          style={closeButton}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onClose()
+          }}
+        >
+          ×
+        </button>
+      </div>
 
-              return (
-                <article key={player.user} style={card}>
-                  <div
-                    style={{
-                      ...avatar,
-                      background: getPlayerColor(player),
-                      border: '1px solid rgba(255,255,255,.20)',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {getPlayerAvatarUrl(player) ? (
-                      <img src={getPlayerAvatarUrl(player)} alt="" style={avatarImage} />
-                    ) : (
-                      getPlayerAvatarInitials(player)
-                    )}
+      {sorted.length === 0 ? (
+        <div style={emptyState}>Todavía no hay otros jugadores disponibles.</div>
+      ) : (
+        <div style={list}>
+          {sorted.map((player) => {
+            const distance = formatDistance(currentPosition, player)
+            const gps = String(player.gps_status || 'unknown').toUpperCase()
+
+            return (
+              <article key={player.user} style={card}>
+                <div
+                  style={{
+                    ...avatar,
+                    background: getPlayerColor(player),
+                    border: '1px solid rgba(255,255,255,.20)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {getPlayerAvatarUrl(player) ? (
+                    <img src={getPlayerAvatarUrl(player)} alt="" style={avatarImage} />
+                  ) : (
+                    getPlayerAvatarInitials(player)
+                  )}
+                </div>
+
+                <div style={content}>
+                  <div style={rowTop}>
+                    <div style={name}>{player.display_name || player.user}</div>
+                    <span style={{ ...presencePill, ...getPresenceStyle(player.presence) }}>
+                      {getPresenceLabel(player.presence)}
+                    </span>
                   </div>
 
-                  <div style={content}>
-                    <div style={rowTop}>
-                      <div style={name}>{player.display_name || player.user}</div>
-                      <span style={{ ...presencePill, ...getPresenceStyle(player.presence) }}>
-                        {getPresenceLabel(player.presence)}
-                      </span>
-                    </div>
-
-                    <div style={metaRow}>
-                      <span style={metaChip}>{gps}</span>
-                      {distance ? <span style={metaChip}>{distance}</span> : null}
-                      {player.debug_enabled ? <span style={metaChipWarn}>DEBUG</span> : null}
-                    </div>
+                  <div style={metaRow}>
+                    <span style={metaChip}>{gps}</span>
+                    {distance ? <span style={metaChip}>{distance}</span> : null}
+                    {player.debug_enabled ? <span style={metaChipWarn}>DEBUG</span> : null}
                   </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </aside>
-    </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+    </SwipeableSheet>
   )
 }
-
-const overlay: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 4100,
-  display: 'flex',
-  alignItems: 'flex-end',
-  justifyContent: 'center',
-  padding: 12,
-}
-
-const backdrop: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-}
-
-const sheet: CSSProperties = {
-  position: 'relative',
-  zIndex: 2,
-  width: 'min(100%, 520px)',
-  borderRadius: 28,
-  border: '1px solid rgba(255,255,255,.14)',
-  background:
-    'linear-gradient(180deg, rgba(13,23,42,.88), rgba(20,32,58,.80))',
-  boxShadow:
-    '0 26px 60px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.08)',
-  padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
-  display: 'grid',
-  gap: 14,
-  color: '#f8fafc',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-}
-
 const header: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',

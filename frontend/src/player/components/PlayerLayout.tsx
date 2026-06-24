@@ -96,13 +96,17 @@ body {
 export function ScreenFrame({
   children,
   mobile,
+  themeColor = '#020617',
 }: {
   children: ReactNode
   mobile: boolean
+  themeColor?: string
 }) {
+  const dynamicFix = globalPlayerEdgeFix.replace(/#020617/g, themeColor)
+
   return (
     <>
-      <style>{globalPlayerEdgeFix}</style>
+      <style>{dynamicFix}</style>
       <div
         className="saga-app-fade-in"
         style={{
@@ -110,7 +114,7 @@ export function ScreenFrame({
           inset: mobile ? 0 : undefined,
           width: '100vw',
           height: '100dvh',
-          background: '#020617',
+          background: themeColor,
           overflow: 'hidden',
           fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
           color: '#ffffff',

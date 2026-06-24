@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import { useGyroParallax } from '../hooks/useGyroParallax'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -61,6 +62,7 @@ export function PlayerShell({
   const stageName = currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
   const gpsLabel = getGpsShellLabel(gpsState)
+  const { transform } = useGyroParallax(8)
 
   const nodes = Array.from({ length: progress.total })
 
@@ -72,6 +74,8 @@ export function PlayerShell({
           width: compact ? '100%' : 'min(100%, 760px)',
           padding: compact ? 12 : 16,
           borderRadius: compact ? 22 : 28,
+          transform,
+          transition: 'transform 0.1s ease-out',
         }}
       >
         <div style={topRow}>
