@@ -277,9 +277,6 @@ export function PlayerHud({
         onClose={onToggleDetails}
         sheetStyle={getSheetStyle(compact)}
       >
-        {compact ? (
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 8px', flexShrink: 0 }} />
-        ) : null}
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
@@ -334,10 +331,6 @@ export function PlayerHud({
         onClose={onCloseTools}
         sheetStyle={getToolsSheetStyle(compact)}
       >
-        {compact ? (
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 4px', flexShrink: 0 }} />
-        ) : null}
-
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
                 <div style={toolsTitle}>

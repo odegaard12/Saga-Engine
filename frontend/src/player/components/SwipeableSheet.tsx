@@ -10,6 +10,7 @@ interface SwipeableSheetProps {
 export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
   const [offsetY, setOffsetY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
   
   // Reset offset when opened
@@ -23,21 +24,20 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   if (!open && offsetY === 0) return null
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    // Only intercept if we touch the sheet directly (not scrolling a list inside ideally, 
-    // but for simple sheets this works well)
     setIsDragging(true)
+    startYRef.current = e.touches[0].clientY
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return
     const touchY = e.touches[0].clientY
-    const rect = sheetRef.current?.getBoundingClientRect()
-    if (!rect) return
+    const deltaY = touchY - startYRef.current
     
     // Only allow pulling downwards
-    const deltaY = touchY - rect.top
     if (deltaY > 0) {
       setOffsetY(deltaY)
+    } else {
+      setOffsetY(0)
     }
   }
 
@@ -86,7 +86,9 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         >
           <div style={dragHandle} />
         </div>
-        {children}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', WebkitOverflowScrolling: 'touch' }}>
+          {children}
+        </div>
       </aside>
     </div>
   )

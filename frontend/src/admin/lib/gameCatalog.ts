@@ -23,6 +23,7 @@ export type AdminGameId =
   | 'team_relay'
   | 'manual_password'
   | 'bonus_cache'
+  | 'audio_challenge'
 
 export type AdminGameRuntimeStatus = 'runtime_ready' | 'runtime_partial' | 'preset_only' | 'planned'
 export type AdminGameOfflineStatus = 'offline_ready' | 'offline_partial' | 'offline_planned'
@@ -395,6 +396,32 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'Hay algo extra cerca.',
       gps_unavailable: 'Acércate para registrar el bonus.',
       locked: 'El bonus aún no está a tu alcance.',
+    },
+  },
+  {
+    id: 'audio_challenge',
+    title: 'Desafío de audio',
+    icon: '🎤',
+    family: 'audio_challenge',
+    category: 'motion',
+    difficulty: 'Fácil',
+    duration: '2-4 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'motion',
+    offlineNote: 'El micrófono y la validación funcionan offline en local.',
+    summary: 'Hacer ruido o soplar en el micrófono para cargar una barra.',
+    playerGoal: 'Mantener un nivel de ruido o soplar para cargar la barra.',
+    editorHint: 'Asegúrate de que los jugadores puedan usar el micrófono en su dispositivo.',
+    config: {
+      objective: 'blow_charge',
+      game_id: 'audio_challenge',
+    },
+    content: 'Sopla o haz ruido cerca del micrófono para cargar la energía.',
+    messages: {
+      hint: 'Sopla suavemente de forma continua para llenar la barra.',
+      gps_unavailable: 'Este reto puede jugarse sin GPS si está desbloqueado.',
+      locked: 'Carga la barra completamente para continuar.',
     },
   },
 ]

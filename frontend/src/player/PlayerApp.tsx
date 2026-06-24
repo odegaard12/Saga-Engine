@@ -115,6 +115,15 @@ export default function PlayerApp() {
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
   const [mapRefreshToken, setMapRefreshToken] = useState(0)
+  const [gpsLoaded, setGpsLoaded] = useState(false)
+
+  // Fail-safe: if GPS hasn't locked after 7 seconds, let the user enter the app anyway.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setGpsLoaded(true)
+    }, 7000)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -151,10 +160,10 @@ export default function PlayerApp() {
 
     if (hasRememberedGpsReady(user)) {
       setOfflinePrepVisible(false)
-      window.setTimeout(() => {
-        void handleRequestLiveGps({ silent: true, forceFocus: true })
-      }, 300)
     }
+    window.setTimeout(() => {
+      void handleRequestLiveGps({ silent: true, forceFocus: true })
+    }, 300)
   }, [user])
 
   useEffect(() => {
@@ -586,7 +595,7 @@ export default function PlayerApp() {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <div style={{ position: 'absolute', inset: 0, background: '#020617' }} />
+        <StatusCard title="SAGA" body="Iniciando motor SAGA y cargando misión..." />
       </ScreenFrame>
     )
   }
@@ -594,7 +603,7 @@ export default function PlayerApp() {
   if (state.status === 'error') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Player app error" body={state.message} />
+        <StatusCard title="Error de SAGA" body={state.message} />
       </ScreenFrame>
     )
   }
@@ -602,7 +611,15 @@ export default function PlayerApp() {
   if (state.status !== 'ready') {
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Player app state" body="Unexpected player state." />
+        <StatusCard title="Estado inesperado" body="Estado interno de jugador no reconocido." />
+      </ScreenFrame>
+    )
+  }
+
+  if (!gpsLoaded) {
+    return (
+      <ScreenFrame mobile={isPhone}>
+        <StatusCard title="Calibrando GPS" body="Buscando señal de satélite y centrando tu posición..." />
       </ScreenFrame>
     )
   }
@@ -1079,6 +1096,7 @@ function handleOpenFieldCamera() {
           token: Date.now(),
         })
       }
+      setGpsLoaded(true)
 
       void sendHeartbeat({
         user,
@@ -1097,6 +1115,7 @@ function handleOpenFieldCamera() {
     const onError = (error: GeolocationPositionError) => {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
+      setGpsLoaded(true)
       const denied = error.code === error.PERMISSION_DENIED
       if (!options.silent) {
         showNotice(
