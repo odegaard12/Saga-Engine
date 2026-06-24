@@ -355,7 +355,7 @@ const overlayPill: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.08em',
   boxShadow: '0 14px 30px rgba(15,23,42,.12)',
-  will-change: transform, opacity;
+  willChange: 'transform, opacity',
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
