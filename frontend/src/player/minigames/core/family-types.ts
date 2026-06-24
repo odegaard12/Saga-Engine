@@ -145,8 +145,16 @@ export type SignalHuntConfig = {
   }>
 }
 
+export type AudioChallengeObjective = 'blow_charge'
+
+export type AudioChallengeConfig = {
+  objective: AudioChallengeObjective
+  game_id?: string
+}
+
 export type AnyMinigameConfig =
   | CircuitMatrixConfig
   | BearingHuntConfig
   | SignalHuntConfig
   | MotionChallengeConfig
+  | AudioChallengeConfig
