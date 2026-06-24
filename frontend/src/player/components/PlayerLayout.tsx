@@ -84,11 +84,12 @@ body {
 
 .saga-app-fade-in {
   animation: sagaAppFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
 }
 
 @keyframes sagaAppFadeIn {
-  from { opacity: 0; transform: scale(0.995); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale3d(0.995, 0.995, 1); }
+  to { opacity: 1; transform: scale3d(1, 1, 1); }
 }
 `
 
@@ -350,6 +351,7 @@ const overlayPill: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.08em',
   boxShadow: '0 14px 30px rgba(15,23,42,.12)',
+  will-change: transform, opacity;
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
@@ -374,22 +376,22 @@ const overlayFinish: CSSProperties = {
 const overlayAnimations = `
 @keyframes sagaPulseRing {
   from {
-    transform: scale(.42);
+    transform: scale3d(.42, .42, 1);
     opacity: .28;
   }
   to {
-    transform: scale(1.24);
+    transform: scale3d(1.24, 1.24, 1);
     opacity: 0;
   }
 }
 
 @keyframes sagaOverlayPop {
   from {
-    transform: scale(.94);
+    transform: scale3d(.94, .94, 1);
     opacity: 0;
   }
   to {
-    transform: scale(1);
+    transform: scale3d(1, 1, 1);
     opacity: 1;
   }
 }
@@ -427,6 +429,7 @@ export const finishOverlayStyle = `
   background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15), #020617 85%);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  will-change: opacity;
   animation: sagaFadeIn 0.4s ease-out forwards;
 }
 .saga-finish-card {
@@ -441,6 +444,7 @@ export const finishOverlayStyle = `
   gap: 16px;
   position: relative;
   overflow: hidden;
+  will-change: transform, opacity;
   animation: sagaFinishPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .saga-finish-orb {
@@ -453,6 +457,7 @@ export const finishOverlayStyle = `
   display: grid;
   place-items: center;
   font-size: 32px;
+  will-change: transform;
   animation: sagaFinishTrophy 1.5s infinite ease-in-out;
 }
 .saga-finish-title {
@@ -539,11 +544,11 @@ export const finishOverlayStyle = `
   to { opacity: 1; }
 }
 @keyframes sagaFinishPop {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: scale3d(0.95, 0.95, 1); opacity: 0; }
+  to { transform: scale3d(1, 1, 1); opacity: 1; }
 }
 @keyframes sagaFinishTrophy {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-4px) scale(1.05); }
+  0%, 100% { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+  50% { transform: translate3d(0, -4px, 0) scale3d(1.05, 1.05, 1); }
 }
 `

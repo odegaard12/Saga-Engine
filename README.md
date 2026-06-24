@@ -7,7 +7,7 @@
 **Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
 Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-[![Version](https://img.shields.io/badge/version-1.0.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -48,17 +48,14 @@ Pensado para **escape rooms urbanos, gymkhanas, formaciones corporativas, tours 
 - Pruebas de campo (fotos) almacenadas localmente y sincronizadas después
 
 ### 🎮 Minijuegos (Game Families)
-Sistema extensible de familias de minijuegos. En v1.0.0 incluye:
+Sistema extensible de familias de minijuegos. En v1.0.1 incluye:
 
 | Family | Descripción |
 |---|---|
-| **Circuit Matrix** | Conecta circuitos en una cuadrícula para encender nodos |
-| **Sequence Code** | Descifra y replica una secuencia de colores / símbolos |
-| **Bearing Hunt** | Navega por azimut hacia la siguiente pista |
-| **Signal Hunt** | Localiza una señal oscilante en el espacio |
-| **Motion Challenge** | Reto físico basado en movimiento del dispositivo |
-| **Place Mosaic** | Reconstruye una imagen fragmentada del lugar |
-| **Tilt Maze** | Laberinto controlado por el acelerómetro |
+| **Matriz de Circuitos** | Conecta circuitos en una cuadrícula para encender nodos |
+| **Código Secuencial** | Descifra y replica una secuencia de colores / símbolos |
+| **Mosaico de Lugar** | Reconstruye una imagen fragmentada del lugar |
+| **Laberinto de Equilibrio** | Laberinto controlado por el acelerómetro |
 
 Cada familia tiene editor visual en el panel de administración y runtime propio en el cliente.
 
@@ -77,7 +74,7 @@ Cada familia tiene editor visual en el panel de administración y runtime propio
 ### 🔑 Nodos físicos y QR
 - Generación de tarjetas QR físicas desde el admin (QR Studio)
 - Validación de QR con lógica de distancia — aviso centrado en pantalla si el jugador está demasiado lejos
-- Soporte para tipos de nodo físico: `collectible`, `requirement`, `clue`, `bonus`
+- Soporte para tipos de nodo físico: Objeto QR, Llave QR, Pista QR, Bonus Oculto
 - Panel de preview de requisitos antes de activar un nodo
 
 ### 📸 Pruebas de campo (Field Proofs)
@@ -178,7 +175,7 @@ npm run dev
 |---|---|---|
 | `SECRET_KEY` | Clave secreta para sesiones admin | `cambiar-en-produccion` |
 | `ADMIN_PASSWORD` | Contraseña del panel de admin | `mi-password` |
-| `SAGA_VERSION` | Versión mostrada en el cliente | `1.0.0` |
+| `SAGA_VERSION` | Versión mostrada en el cliente | `1.0.1` |
 | `SAGA_BUILD_TIME` | Timestamp de compilación | `2026-06-23T14:00:00+0200` |
 | `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
 
@@ -266,6 +263,6 @@ MIT — ver [LICENSE](LICENSE)
 <div align="center">
 
 Construido con ❤️ para misiones de campo reales.  
-**SAGA Engine v1.0.0** — 2026
+**SAGA Engine v1.0.1** — 2026
 
 </div>

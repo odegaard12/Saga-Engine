@@ -4,6 +4,19 @@ All notable changes to SAGA Engine are documented in this file.
 
 ---
 
+## [1.0.1] — 2026-06-24
+
+### 🔧 Improvements
+- **Hardware-accelerated Map Animations**: Upgraded `MapSurface.tsx` animations (`sagaTypeBadgeFloat`, `sagaCurrentNodeHalo`, `sagaRoadFlow`, `sagaPlayerLocator`) with `translate3d` and `will-change`. This fixes map layout thrashing and blinking on iOS/Safari.
+- **Smooth Global Transitions**: Applied 3D transforms (`scale3d`, `translate3d`) and `will-change` hints to `PlayerLayout.tsx` overlays, trophies, and status cards for buttery-smooth 60/120 FPS pop-ups.
+- **iPhone Safe Area Edge Fix**: Updated `mobile-shell.css` global `body` and `html` backgrounds from light `#e8efea` to `#020617` (Slate 900) to eliminate white edge borders in iPhone safe areas.
+
+### 📝 Documentation
+- **README updates**: Removed references to legacy "Tema de Juegos" concepts. Strictly aligned available game families to `Matriz de Circuitos`, `Código Secuencial`, `Mosaico de Lugar`, and `Laberinto de Equilibrio`.
+- **Physical QR definitions**: Unified physical QR type references in documentation to exactly `Objeto QR`, `Llave QR`, `Pista QR`, and `Bonus Oculto`.
+
+---
+
 ## [1.0.0] — 2026-06-23
 
 ### 🎉 First stable release
