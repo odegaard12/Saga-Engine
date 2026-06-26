@@ -575,7 +575,7 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
-    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
+    const mapboxToken = (import.meta as any).env.VITE_MAPBOX_TOKEN || ''
     const tileLayer = L.tileLayer(
       `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`,
       {
