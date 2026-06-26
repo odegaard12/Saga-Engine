@@ -6,6 +6,8 @@ type SettingsPanelProps = {
   onSaveSettings: () => void
 }
 
+import { useI18n } from '../../i18n/useI18n'
+
 export default function SettingsPanel({
   missionDraft,
   settingsSaveState,
@@ -13,30 +15,32 @@ export default function SettingsPanel({
   onUpdateMissionDraft,
   onSaveSettings,
 }: SettingsPanelProps) {
+  const { t } = useI18n()
+
   return (
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
       <div className="admin-panel-hero">
         <div>
-          <span className="admin-kicker">Settings</span>
-          <h2>Mission settings</h2>
-          <p>Configure admin copy, player intro text and map defaults.</p>
+          <span className="admin-kicker">{t('admin.settingsPanel.title')}</span>
+          <h2>{t('admin.settingsPanel.title')}</h2>
+          <p>{t('admin.settingsPanel.subtitle')}</p>
         </div>
 
         <div className="admin-panel-count">
           <strong>{missionDraft.player_theme || 'classic'}</strong>
-          <span>theme</span>
+          <span>{t('admin.settingsPanel.themeLabel')}</span>
         </div>
       </div>
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>Identity</strong>
-          <span>Visible names and admin labels</span>
+          <strong>{t('admin.settingsPanel.identity')}</strong>
+          <span>{t('admin.settingsPanel.identitySubtitle')}</span>
         </div>
 
         <div className="admin-settings-grid-modern">
           <label>
-            Site name
+            {t('admin.settingsPanel.siteName')}
             <input
               value={missionDraft.site_name || ''}
               placeholder="SAGA Engine"
@@ -45,7 +49,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Admin title
+            {t('admin.settingsPanel.adminTitle')}
             <input
               value={missionDraft.admin_title || ''}
               placeholder="Mission Control"
@@ -54,7 +58,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Admin subtitle
+            {t('admin.settingsPanel.adminSubtitle')}
             <input
               value={missionDraft.admin_subtitle || ''}
               placeholder="Map-first control panel"
@@ -63,7 +67,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Login subtitle
+            {t('admin.settingsPanel.loginSubtitle')}
             <input
               value={missionDraft.login_subtitle || ''}
               placeholder="Protected access"
@@ -75,13 +79,13 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>Map defaults</strong>
-          <span>Initial center and zoom</span>
+          <strong>{t('admin.settingsPanel.mapDefaults')}</strong>
+          <span>{t('admin.settingsPanel.mapDefaultsSubtitle')}</span>
         </div>
 
         <div className="admin-settings-map-grid">
           <label>
-            Latitude
+            {t('admin.settingsPanel.latitude')}
             <input
               value={missionDraft.map_center_lat || ''}
               onChange={(event) => onUpdateMissionDraft('map_center_lat', event.target.value)}
@@ -89,7 +93,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Longitude
+            {t('admin.settingsPanel.longitude')}
             <input
               value={missionDraft.map_center_lon || ''}
               onChange={(event) => onUpdateMissionDraft('map_center_lon', event.target.value)}
@@ -97,7 +101,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Zoom
+            {t('admin.settingsPanel.zoom')}
             <input
               value={missionDraft.map_zoom || ''}
               onChange={(event) => onUpdateMissionDraft('map_zoom', event.target.value)}
@@ -105,7 +109,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Player theme
+            {t('admin.settingsPanel.themeLabel')}
             <select
               value={missionDraft.player_theme || 'classic'}
               onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
@@ -119,18 +123,18 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>Mapbox Configuration</strong>
-          <span>Tiles and styling</span>
+          <strong>{t('admin.settingsPanel.mapboxTitle')}</strong>
+          <span>{t('admin.settingsPanel.mapboxSubtitle')}</span>
         </div>
 
         <div className="admin-settings-grid-modern" style={{ gridTemplateColumns: '1fr' }}>
           <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '8px', color: '#facc15', fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>
-            <strong>⚠️ Mapbox Quota Warning</strong><br />
-            The free tier limit is <strong>200,000 requests per month</strong>. If you configure a Mapbox token, please monitor your usage at console.mapbox.com to avoid unexpected charges. SAGA offline downloads rely on these requests.
+            <strong>{t('admin.settingsPanel.mapboxWarningTitle')}</strong><br />
+            {t('admin.settingsPanel.mapboxWarningText')}
           </div>
 
           <label className="admin-wide-field">
-            Mapbox Access Token
+            {t('admin.settingsPanel.mapboxToken')}
             <input
               value={missionDraft.mapbox_token || ''}
               placeholder="pk.ey..."
@@ -139,7 +143,7 @@ export default function SettingsPanel({
           </label>
 
           <label className="admin-wide-field">
-            Mapbox Style URL (Optional)
+            {t('admin.settingsPanel.mapboxStyle')}
             <input
               value={missionDraft.mapbox_style || ''}
               placeholder="mapbox://styles/mapbox/satellite-streets-v12"
@@ -151,13 +155,13 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>Story</strong>
-          <span>Player-facing mission narrative</span>
+          <strong>{t('admin.settingsPanel.story')}</strong>
+          <span>{t('admin.settingsPanel.storySubtitle')}</span>
         </div>
 
         <div className="admin-settings-grid-modern">
           <label>
-            Story title
+            {t('admin.settingsPanel.storyTitle')}
             <input
               value={missionDraft.story_title || ''}
               onChange={(event) => onUpdateMissionDraft('story_title', event.target.value)}
@@ -165,7 +169,7 @@ export default function SettingsPanel({
           </label>
 
           <label className="admin-wide-field">
-            Story text
+            {t('admin.settingsPanel.storyText')}
             <textarea
               value={missionDraft.story_text || ''}
               onChange={(event) => onUpdateMissionDraft('story_text', event.target.value)}
@@ -176,13 +180,13 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>Prologue</strong>
-          <span>Opening screen before gameplay</span>
+          <strong>{t('admin.settingsPanel.prologue')}</strong>
+          <span>{t('admin.settingsPanel.prologueSubtitle')}</span>
         </div>
 
         <div className="admin-settings-grid-modern">
           <label>
-            Prologue title
+            {t('admin.settingsPanel.prologueTitle')}
             <input
               value={missionDraft.prologue_title || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_title', event.target.value)}
@@ -190,7 +194,7 @@ export default function SettingsPanel({
           </label>
 
           <label>
-            Prologue subtitle
+            {t('admin.settingsPanel.prologueSubtitle2')}
             <input
               value={missionDraft.prologue_subtitle || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_subtitle', event.target.value)}
@@ -198,7 +202,7 @@ export default function SettingsPanel({
           </label>
 
           <label className="admin-wide-field">
-            Prologue body
+            {t('admin.settingsPanel.prologueBody')}
             <textarea
               value={missionDraft.prologue_body || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
@@ -209,7 +213,7 @@ export default function SettingsPanel({
 
       {settingsSaveState === 'error' && settingsSaveError ? (
         <div className="admin-save-error">
-          <strong>Settings save failed</strong>
+          <strong>{t('admin.settingsPanel.saveFailed')}</strong>
           <span>{settingsSaveError}</span>
         </div>
       ) : null}
@@ -222,10 +226,10 @@ export default function SettingsPanel({
           disabled={settingsSaveState === 'saving'}
         >
           {settingsSaveState === 'saving'
-            ? 'Saving settings…'
+            ? t('admin.settingsPanel.saving')
             : settingsSaveState === 'saved'
-              ? 'Settings saved'
-              : 'Save settings'}
+              ? t('admin.settingsPanel.saved')
+              : t('admin.settingsPanel.save')}
         </button>
       </div>
     </div>
