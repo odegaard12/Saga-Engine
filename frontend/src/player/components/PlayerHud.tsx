@@ -334,10 +334,10 @@ export function PlayerHud({
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
                 <div style={toolsTitle}>
-                  Herramientas
+                  {t('player.tools.title', locale)}
                 </div>
                 <div style={toolsSubtitle}>
-                  Offline, fotos y ayuda
+                  {t('player.tools.subtitle', locale)}
                 </div>
               </div>
 
@@ -357,7 +357,7 @@ export function PlayerHud({
 
             {/* CARD 1: OPERACIÓN OFFLINE */}
             <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>Operación Offline</div>
+              <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
               <MissionPackPanel
                 user={user}
                 payload={missionPayload}
@@ -366,7 +366,7 @@ export function PlayerHud({
 
             {/* CARD 2: ACCIONES DE CAMPO */}
             <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>Acciones de Campo</div>
+              <div style={toolsCardGroupLabel}>{t('player.tools.fieldActions', locale)}</div>
               
               <div style={toolsActionGrid}>
                 {onDownloadFieldProofs ? (
@@ -385,8 +385,8 @@ export function PlayerHud({
                     }
                   >
                     {fieldPhotoCount > 0
-                      ? `📥 Descargar fotos (${fieldPhotoCount})`
-                      : '📥 Sin fotos en ruta'}
+                      ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
+                      : `📥 ${t('player.tools.noPhotos', locale)}`}
                   </button>
                 ) : null}
 
@@ -396,8 +396,8 @@ export function PlayerHud({
                 <div style={{ marginTop: 12 }}>
                   {/* Fallback de nodo CÓDIGO FALLBACK */}
                   <div style={fallbackToolHead}>
-                    <strong style={{ color: '#fbbf24' }}>🔑 Código alternativo</strong>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Úsalo si no puedes escanear el QR.</span>
+                    <strong style={{ color: '#fbbf24' }}>🔑 {t('player.tools.altCode', locale)}</strong>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{t('player.tools.altCodeHelp', locale)}</span>
                   </div>
 
                   <button
@@ -406,7 +406,7 @@ export function PlayerHud({
                     onClick={() => setToolsFallbackOpen((value) => !value)}
                     disabled={submitting}
                   >
-                    {toolsFallbackOpen ? 'Ocultar formulario' : 'Introducir código manual'}
+                    {toolsFallbackOpen ? t('player.tools.hideForm', locale) : t('player.tools.manualCode', locale)}
                   </button>
 
                   {toolsFallbackOpen ? (
@@ -414,7 +414,7 @@ export function PlayerHud({
                       <input
                         value={toolsFallbackCode}
                         onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                        placeholder="INGRESA EL CÓDIGO"
+                        placeholder={t('player.tools.codePlaceholder', locale)}
                         style={fallbackToolInput}
                         disabled={submitting}
                       />
@@ -424,7 +424,7 @@ export function PlayerHud({
                         style={fallbackToolSubmit}
                         disabled={submitting || !toolsFallbackCode.trim()}
                       >
-                        {submitting ? 'Verificando...' : 'Completar nodo'}
+                        {submitting ? t('player.tools.verifying', locale) : t('player.tools.completeNode', locale)}
                       </button>
 
                       {errorMessage ? <div style={fallbackToolError}>{errorMessage}</div> : null}
@@ -436,11 +436,11 @@ export function PlayerHud({
 
             {/* CARD 3: AJUSTES Y DESARROLLO */}
             <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>Ajustes de Dispositivo</div>
+              <div style={toolsCardGroupLabel}>{t('player.tools.deviceSettings', locale)}</div>
 
               <div style={toolsLanguageBlock}>
                 <span style={toolsMiniLabel}>
-                  Idioma / Language
+                  {t('player.tools.language', locale)}
                 </span>
 
                 <div className="saga-tools-language-row">
@@ -468,7 +468,7 @@ export function PlayerHud({
                   style={toolsQuietLink}
                   onClick={onCloseTools}
                 >
-                  ⚙️ Panel Admin
+                  ⚙️ {t('player.tools.adminPanel', locale)}
                 </a>
 
                 <button
@@ -484,8 +484,8 @@ export function PlayerHud({
                   }}
                 >
                   {debugEnabled
-                    ? '🛑 Salir de Prueba GPS'
-                    : '🛠️ Modo Prueba GPS'}
+                    ? `🛑 ${t('player.tools.exitDebug', locale)}`
+                    : `🛠️ ${t('player.tools.debugMode', locale)}`}
                 </button>
               </div>
             </section>
