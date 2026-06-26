@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v1.1.0-rpg-viewfinder'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v1.2.0-rpg-viewfinder'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
