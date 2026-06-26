@@ -56,6 +56,7 @@ Sistema extensible de familias de minijuegos. En v1.1.0 incluye:
 | **Código Secuencial** | Descifra y replica una secuencia de colores / símbolos |
 | **Mosaico de Lugar** | Reconstruye una imagen fragmentada del lugar |
 | **Laberinto de Equilibrio** | Laberinto controlado por el acelerómetro |
+| **Desafío de Audio (Audio Challenge)** | Escucha, identifica patrones o resuelve acertijos sonoros |
 
 Cada familia tiene editor visual en el panel de administración y runtime propio en el cliente.
 
