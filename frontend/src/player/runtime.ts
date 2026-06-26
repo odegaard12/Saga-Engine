@@ -113,7 +113,7 @@ export function deriveStageRuntime(args: {
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'DEMASIADO LEJOS',
+    primaryLabel: 'ACÉRCATE MÁS',
     primaryTone: 'warn',
     helperText:
       currentStage.messages?.locked ||

@@ -575,12 +575,13 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
+    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
     const tileLayer = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`,
       {
         maxZoom: 20,
         maxNativeZoom: 19,
-        attribution: 'Tiles © Esri',
+        attribution: 'Map data &copy; <a href="https://www.mapbox.com/">Mapbox</a>',
       },
     )
 
@@ -911,7 +912,6 @@ export function MapSurface({
     currentStage,
     missionStages,
     currentLevel,
-    onNodeTap,
     nodeState,
     Boolean(playerPosition),
     debugSimulation,
@@ -1239,18 +1239,8 @@ export function MapSurface({
 
     for (const group of groups) {
       const center = { lat: group.lat, lon: group.lon }
-      const nearSelf = playerPosition && getDistanceMeters(center, playerPosition) <= 16
-      const nearOtherPlayer = otherPlayers.some((player) =>
-        typeof player.lat === 'number' &&
-        typeof player.lon === 'number' &&
-        getDistanceMeters(center, { lat: player.lat, lon: player.lon }) <= 16
-      )
-      const visualCenter =
-        nearSelf || nearOtherPlayer
-          ? offsetLatLon(center, mapZoom >= 18 ? 14 : 22, -35)
-          : center
 
-      const marker = L.marker([visualCenter.lat, visualCenter.lon], {
+      const marker = L.marker([center.lat, center.lon], {
         icon: createFieldProofIcon(group.proofs),
         keyboard: false,
         riseOnHover: true,
@@ -1273,9 +1263,6 @@ export function MapSurface({
     fieldProofs,
     mapReadyToken,
     mapZoom,
-    playerPosition?.lat,
-    playerPosition?.lon,
-    otherPlayers,
     onOpenFieldProofs,
   ])
 

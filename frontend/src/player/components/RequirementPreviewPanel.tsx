@@ -168,10 +168,7 @@ function Mini({ label, value }: { label: string; value: string }) {
 const panel: CSSProperties = {
   display: 'grid',
   gap: 10,
-  borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(15,23,42,.18)',
-  padding: 12,
+  padding: 8,
 }
 
 const header: CSSProperties = {
@@ -215,19 +212,14 @@ const statusGrid: CSSProperties = {
 const mini: CSSProperties = {
   display: 'grid',
   gap: 2,
-  borderRadius: 15,
-  background: 'rgba(255,255,255,.075)',
-  padding: 9,
+  padding: 4,
   textAlign: 'center',
 }
 
 const block: CSSProperties = {
   display: 'grid',
   gap: 6,
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(255,255,255,.055)',
-  padding: 10,
+  padding: 4,
 }
 
 const list: CSSProperties = {

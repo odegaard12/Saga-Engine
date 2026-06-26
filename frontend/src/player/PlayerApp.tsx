@@ -117,11 +117,11 @@ export default function PlayerApp() {
   const [mapRefreshToken, setMapRefreshToken] = useState(0)
   const [gpsLoaded, setGpsLoaded] = useState(false)
 
-  // Fail-safe: if GPS hasn't locked after 7 seconds, let the user enter the app anyway.
+  // Fail-safe: if GPS hasn't locked after 20 seconds, let the user enter the app anyway.
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setGpsLoaded(true)
-    }, 7000)
+    }, 20000)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -130,6 +130,7 @@ export default function PlayerApp() {
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
+  const handleRequestLiveGpsRef = useRef<((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null>(null)
   const prevTeamStatusRef = useRef<Record<string, string>>({})
   const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
@@ -592,6 +593,26 @@ export default function PlayerApp() {
     }, nextState === 'finish' ? 1800 : 900)
   }
 
+  // Centrar y re-calibrar al volver al primer plano (app resume)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        gpsCenteredRef.current = false
+        setGpsLoaded(false)
+        if (handleRequestLiveGpsRef.current) {
+          void handleRequestLiveGpsRef.current({ silent: true, forceFocus: true })
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <ScreenFrame mobile={isPhone}>
@@ -616,13 +637,7 @@ export default function PlayerApp() {
     )
   }
 
-  if (!gpsLoaded) {
-    return (
-      <ScreenFrame mobile={isPhone}>
-        <StatusCard title="Calibrando GPS" body="Buscando señal de satélite y centrando tu posición..." />
-      </ScreenFrame>
-    )
-  }
+
 
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
@@ -729,7 +744,7 @@ export default function PlayerApp() {
   const adminHref = '/admin'
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
-  const primaryLabel = currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
+  const primaryLabel = gpsActionRequired ? 'Activar GPS' : (!runtime.canEnter ? runtime.primaryLabel : (currentStageIsPhysicalQr ? 'Abrir QR' : runtime.primaryLabel))
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   async function refreshPayload() {
@@ -1128,9 +1143,9 @@ function handleOpenFieldCamera() {
     }
 
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 3000,
-      timeout: 15000,
+      enableHighAccuracy: false,
+      maximumAge: 10000,
+      timeout: 5000,
     })
 
     if (gpsWatchRef.current === null) {
@@ -1142,23 +1157,7 @@ function handleOpenFieldCamera() {
     }
   }
 
-  // Centrar y re-calibrar al volver al primer plano (app resume)
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        gpsCenteredRef.current = false
-        setGpsLoaded(false)
-        void handleRequestLiveGps({ silent: true, forceFocus: true })
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [user])
+  handleRequestLiveGpsRef.current = handleRequestLiveGps
 
   async function handlePrepareOfflinePack() {
     try {
@@ -1432,7 +1431,7 @@ function handleOpenFieldCamera() {
           fieldProofs={fieldProofs}
           viewerUser={payload.user}
           onDeleteFieldProof={handleDeleteFieldProof}
-          onOpenFieldProofs={(proofs) => setSelectedFieldProofs(proofs)}
+          onOpenFieldProofs={setSelectedFieldProofs}
           selfLabel={payload.display_name || payload.user || 'YO'}
           selfProfile={{
             ...(payload.profile || {}),
@@ -1603,6 +1602,31 @@ function handleOpenFieldCamera() {
             </div>
           </div>
         ) : null}
+
+      <div style={{ position: 'absolute', right: isPhone ? 16 : 24, bottom: isPhone ? 110 : 130, zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <button
+          type="button"
+          aria-label="Centrar en mi ubicación"
+          onClick={() => void handleRequestLiveGps({ forceFocus: true })}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 999,
+            background: gpsState === 'ready' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(15, 23, 42, 0.8)',
+            border: gpsState === 'ready' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            color: gpsState === 'ready' ? '#34d399' : '#f8fafc',
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: 22,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(12px)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {gpsState === 'searching' ? '⏱' : '📍'}
+        </button>
+      </div>
 
       <div style={getBottomOverlayStyle(isPhone)}>
         <PlayerHud

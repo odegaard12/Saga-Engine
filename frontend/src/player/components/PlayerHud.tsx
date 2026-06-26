@@ -390,16 +390,6 @@ export function PlayerHud({
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  style={toolsGreenButton}
-                  onClick={() => {
-                    onRequestGps()
-                    onCloseTools()
-                  }}
-                >
-                  📍 Centrar ubicación
-                </button>
               </div>
 
               {onSubmitCode && currentStage && !finished ? (
@@ -704,9 +694,9 @@ function getSheetStyle(compact: boolean): CSSProperties {
     overflowX: 'hidden',
     overscrollBehavior: 'contain',
     borderRadius: compact ? '24px 24px 0 0' : 30,
-    border: '1px solid rgba(255,255,255,.10)',
-    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.10)',
-    background: 'linear-gradient(180deg, rgba(30,41,59,.85) 0%, rgba(15,23,42,.92) 100%)',
+    border: '1px solid rgba(255,255,255,.22)',
+    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.22)',
+    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
     color: '#f8fafc',
     boxShadow: '0 -15px 35px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.6)',
     backdropFilter: 'blur(20px) saturate(1.2)',
@@ -727,13 +717,9 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  margin: '-14px -14px 4px',
-  padding: '14px 14px 10px',
-  borderRadius: '30px 30px 18px 18px',
-  background: 'rgba(71, 85, 105, 0.65)',
-  borderBottom: '1px solid rgba(255,255,255,.15)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  padding: '0 0 12px 0',
+  background: 'transparent',
+  borderBottom: '1px solid rgba(255,255,255,.10)',
 }
 
 const sheetEyebrow: CSSProperties = {
@@ -759,8 +745,8 @@ const tabs: CSSProperties = {
   gap: 6,
   padding: 4,
   borderRadius: 18,
-  background: 'rgba(15,23,42,.34)',
-  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(0,0,0,.2)',
+  border: '1px solid rgba(255,255,255,.05)',
 }
 
 const tabButton: CSSProperties = {
@@ -809,8 +795,8 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
     width: compact ? '100%' : 'min(100%, 460px)',
     maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
     gap: 14,
-    background: 'linear-gradient(180deg, rgba(30,41,59,.85) 0%, rgba(15,23,42,.92) 100%)',
-    border: '1px solid rgba(255, 255, 255, 0.10)',
+    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+    border: '1px solid rgba(255, 255, 255, 0.22)',
     boxShadow: '0 -15px 40px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.7)',
   }
 }
@@ -818,13 +804,6 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
 const toolsHeader: CSSProperties = {
   ...sheetHeader,
   alignItems: 'center',
-  margin: '-14px -14px 4px',
-  padding: '14px 14px 10px',
-  borderRadius: '30px 30px 18px 18px',
-  background: 'rgba(71, 85, 105, 0.65)',
-  borderBottom: '1px solid rgba(255,255,255,.15)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
 }
 
 const toolsHeaderCopy: CSSProperties = {
@@ -872,10 +851,8 @@ const toolsSettingsCard: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr',
   gap: 8,
-  padding: 10,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.22)',
+  padding: 0,
+  background: 'transparent',
 }
 
 const toolsLanguageBlock: CSSProperties = {
@@ -1061,10 +1038,8 @@ const fallbackToolError: CSSProperties = {
 const toolsCardGroup: CSSProperties = {
   display: 'grid',
   gap: 8,
-  padding: 14,
-  borderRadius: 20,
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  background: 'rgba(255, 255, 255, 0.02)',
+  padding: '14px 0',
+  borderBottom: '1px solid rgba(255,255,255,.05)',
 }
 
 const toolsCardGroupLabel: CSSProperties = {
@@ -1122,5 +1097,6 @@ const toolsBuildRow: CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   paddingTop: 8,
+  paddingBottom: 24,
   borderTop: '1px solid rgba(255, 255, 255, 0.05)',
 }

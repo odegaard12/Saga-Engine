@@ -13,10 +13,7 @@ type ErrorBoundaryState = {
 }
 
 function shouldShowTechnicalDetails(): boolean {
-  if (typeof window === 'undefined') return false
-  const params = new URLSearchParams(window.location.search)
-  const viteEnv = (import.meta as unknown as { env?: { DEV?: boolean } }).env
-  return params.get('debug') === '1' || Boolean(viteEnv?.DEV)
+  return true
 }
 
 async function clearRuntimeCaches(): Promise<void> {

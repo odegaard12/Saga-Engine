@@ -326,13 +326,7 @@ export function MissionPackPanel({
 const card: CSSProperties = {
   display: 'grid',
   gap: 10,
-  padding: 12,
-  borderRadius: 19,
-  border: '1px solid rgba(255,255,255,.11)',
-  background:
-    'radial-gradient(circle at top left, rgba(187,247,208,.09), transparent 42%), rgba(15,23,42,.24)',
-  boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,.04)',
+  padding: 8,
 }
 
 const topRow: CSSProperties = {

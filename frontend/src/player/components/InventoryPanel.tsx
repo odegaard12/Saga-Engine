@@ -50,49 +50,36 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       style.id = 'saga-inventory-style'
       style.textContent = `
         .saga-inventory-slot {
-          min-height: 116px;
           display: grid;
-          grid-template-rows: auto 1fr auto;
-          gap: 6px;
-          border-radius: 16px;
-          padding: 10px;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 4px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-          background: rgba(15, 23, 42, 0.45);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .saga-inventory-slot:last-child {
+          border-bottom: none;
         }
         .saga-inventory-slot--usable {
-          border-color: rgba(34, 197, 94, 0.3);
-          background: linear-gradient(180deg, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.6));
-          position: relative;
         }
         .saga-inventory-slot--usable:hover {
-          transform: translateY(-2px);
-          border-color: rgba(74, 222, 128, 0.5);
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          opacity: 0.8;
         }
         .saga-inventory-slot--used {
           opacity: 0.5;
-          border-color: rgba(148, 163, 184, 0.15);
-          background: rgba(15, 23, 42, 0.3);
         }
         .saga-inventory-slot--empty {
-          min-height: 116px;
           display: flex;
-          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          gap: 4px;
-          border-radius: 16px;
-          border: 1px dashed rgba(255, 255, 255, 0.12);
-          background: rgba(15, 23, 42, 0.20);
+          gap: 12px;
+          padding: 12px 4px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
           color: rgba(255, 255, 255, 0.3);
           transition: all 0.2s ease;
         }
-        .saga-inventory-slot--empty:hover {
-          background: rgba(15, 23, 42, 0.30);
-          border-color: rgba(255, 255, 255, 0.2);
-          color: rgba(255, 255, 255, 0.45);
+        .saga-inventory-slot--empty:last-child {
+          border-bottom: none;
         }
         .saga-inventory-icon {
           width: 32px;
@@ -256,11 +243,8 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
 const panel: CSSProperties = {
   display: 'grid',
-  gap: 10,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.06)',
-  padding: 12,
+  gap: 12,
+  padding: 8,
 }
 
 const headerRow: CSSProperties = {
@@ -302,20 +286,20 @@ const statusPill: CSSProperties = {
 
 const slotGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gridTemplateColumns: '1fr',
+  gap: 0,
 }
 
 const slotBody: CSSProperties = {
   minWidth: 0,
   display: 'grid',
-  alignContent: 'start',
+  alignContent: 'center',
   gap: 3,
 }
 
 const itemLabel: CSSProperties = {
   color: '#ffffff',
-  fontSize: 12,
+  fontSize: 14,
   fontWeight: 900,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -325,13 +309,13 @@ const itemLabel: CSSProperties = {
 const quantity: CSSProperties = {
   marginLeft: 6,
   color: '#bbf7d0',
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 900,
 }
 
 const itemMeta: CSSProperties = {
   color: 'rgba(226,232,240,.62)',
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 800,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -340,8 +324,8 @@ const itemMeta: CSSProperties = {
 
 const emptyGrid: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gridTemplateColumns: '1fr',
+  gap: 0,
 }
 
 const emptySlotIcon: CSSProperties = {
