@@ -121,6 +121,8 @@ export interface PublicConfig {
   prologue_body?: string
   map_center?: [number, number]
   map_zoom?: number
+  mapbox_token?: string
+  mapbox_style?: string
   players?: string[]
   player_profiles?: PlayerProfile[]
 }

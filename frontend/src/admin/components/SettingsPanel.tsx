@@ -119,6 +119,38 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
+          <strong>Mapbox Configuration</strong>
+          <span>Tiles and styling</span>
+        </div>
+
+        <div className="admin-settings-grid-modern" style={{ gridTemplateColumns: '1fr' }}>
+          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '8px', color: '#facc15', fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>
+            <strong>⚠️ Mapbox Quota Warning</strong><br />
+            The free tier limit is <strong>200,000 requests per month</strong>. If you configure a Mapbox token, please monitor your usage at console.mapbox.com to avoid unexpected charges. SAGA offline downloads rely on these requests.
+          </div>
+
+          <label className="admin-wide-field">
+            Mapbox Access Token
+            <input
+              value={missionDraft.mapbox_token || ''}
+              placeholder="pk.ey..."
+              onChange={(event) => onUpdateMissionDraft('mapbox_token', event.target.value)}
+            />
+          </label>
+
+          <label className="admin-wide-field">
+            Mapbox Style URL (Optional)
+            <input
+              value={missionDraft.mapbox_style || ''}
+              placeholder="mapbox://styles/mapbox/satellite-streets-v12"
+              onChange={(event) => onUpdateMissionDraft('mapbox_style', event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
           <strong>Story</strong>
           <span>Player-facing mission narrative</span>
         </div>

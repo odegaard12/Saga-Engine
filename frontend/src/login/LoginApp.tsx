@@ -550,6 +550,13 @@ export default function LoginApp() {
             )
           })}
         </section>
+
+        {state.config?.mapbox_token ? (
+          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '16px', color: '#facc15', fontSize: '11px', lineHeight: '1.4', textAlign: 'center' }}>
+            <strong>⚠️ Límite de Mapbox</strong><br />
+            Configurado mapa premium. Límite: 200.000 cargas/mes.
+          </div>
+        ) : null}
       </div>
 
     </main>

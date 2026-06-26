@@ -1148,6 +1148,8 @@ async def get_config():
         "prologue_body": cfg.get("prologue_body", ""),
         "map_center": cfg.get("map_center", [40.4168, -3.7038]),
         "map_zoom": cfg.get("map_zoom", 13),
+        "mapbox_token": cfg.get("mapbox_token", ""),
+        "mapbox_style": cfg.get("mapbox_style", ""),
         "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
         "player_profiles": get_player_profiles(cfg)
     }
@@ -1964,6 +1966,9 @@ async def save_config_endpoint(request: Request):
         cfg["map_zoom"] = int(incoming.get("map_zoom", cfg.get("map_zoom", 13)))
     except Exception:
         pass
+
+    cfg["mapbox_token"] = incoming.get("mapbox_token", cfg.get("mapbox_token", "")).strip()
+    cfg["mapbox_style"] = incoming.get("mapbox_style", cfg.get("mapbox_style", "")).strip()
 
     incoming_profiles = incoming.get("player_profiles")
     if isinstance(incoming_profiles, list) and incoming_profiles:
