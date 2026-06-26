@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
-import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, PublicConfig, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -265,7 +265,7 @@ export default function PlayerApp() {
           setState((prev) => ({
             status: 'ready',
             payload: nextPayload,
-            config: prev.status === 'ready' ? prev.config : config,
+            config: prev.status === 'ready' ? prev.config : nextConfig,
           }))
 
           setMapRefreshToken(
