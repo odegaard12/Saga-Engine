@@ -15,6 +15,7 @@ import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
 import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, syncPendingOfflineEvents, type OfflineMissionSummary } from './offline/missionPack'
+import { prefetchMissionMapTiles } from './offline/mapTileCache'
 import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import { flushOfflineEvents } from './offline/localFirst'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
@@ -41,7 +42,7 @@ import {
 } from './components/PlayerLayout'
 
 type LoadState =
-  | { status: 'idle' | 'loading' }
+  | { status: 'idle' | 'loading'; mapProgress?: { done: number; total: number; detail?: string } }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
@@ -92,7 +93,15 @@ export default function PlayerApp() {
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
   const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
-  const [followPlayer, setFollowPlayer] = useState(true)
+  const [followPlayer, setFollowPlayerState] = useState(true)
+  const followPlayerRef = useRef(true)
+  function setFollowPlayer(val: boolean | ((curr: boolean) => boolean)) {
+    setFollowPlayerState((current) => {
+      const next = typeof val === 'function' ? val(current) : val
+      followPlayerRef.current = next
+      return next
+    })
+  }
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
@@ -114,16 +123,10 @@ export default function PlayerApp() {
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
+  const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
+  const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
   const [mapRefreshToken, setMapRefreshToken] = useState(0)
-  const [gpsLoaded, setGpsLoaded] = useState(false)
-
-  // Fail-safe: if GPS hasn't locked after 20 seconds, let the user enter the app anyway.
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setGpsLoaded(true)
-    }, 20000)
-    return () => window.clearTimeout(timer)
-  }, [])
+  // Removed gpsLoaded state and 20s timeout
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
@@ -172,7 +175,7 @@ export default function PlayerApp() {
 
     async function run() {
       try {
-        setState({ status: 'loading' })
+        setState({ status: 'loading', mapProgress: { done: 0, total: 100, detail: 'Iniciando conexión...' } })
         const payload = await fetchPlayerGame(user, { offlinePack: true })
         const config = await fetchPublicConfig()
           .then((nextConfig) => {
@@ -181,11 +184,33 @@ export default function PlayerApp() {
           })
           .catch(() => buildFallbackPublicConfig(user))
 
-        void saveMissionPack({
+        await saveMissionPack({
           user: payload.user || user,
           config,
           payload,
         }).catch(() => undefined)
+
+        // Descarga de tiles offline automatizada al entrar (con pantalla de carga)
+        if (typeof window !== 'undefined' && window.navigator.onLine && Array.isArray(payload.stages) && payload.stages.length > 0) {
+          if (!cancelled) {
+            setState({
+              status: 'loading',
+              mapProgress: { done: 0, total: 100, detail: 'Calculando mapa offline...' }
+            })
+          }
+          try {
+            await prefetchMissionMapTiles(payload.stages, (progress) => {
+              if (!cancelled) {
+                setState({
+                  status: 'loading',
+                  mapProgress: { done: progress.done, total: progress.total, detail: progress.detail }
+                })
+              }
+            })
+          } catch (err) {
+            console.error('Failed to prefetch map tiles automatically', err)
+          }
+        }
 
         if (!cancelled) {
           setState({ status: 'ready', payload, config })
@@ -600,10 +625,8 @@ export default function PlayerApp() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        gpsCenteredRef.current = false
-        setGpsLoaded(false)
         if (handleRequestLiveGpsRef.current) {
-          void handleRequestLiveGpsRef.current({ silent: true, forceFocus: true })
+          void handleRequestLiveGpsRef.current({ silent: true, forceFocus: false })
         }
       }
     }
@@ -615,9 +638,19 @@ export default function PlayerApp() {
   }, [])
 
   if (state.status === 'idle' || state.status === 'loading') {
+    const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
+    const ratio = mapProgress
+      ? Math.max(0, Math.min(100, Math.round((mapProgress.done / (mapProgress.total || 1)) * 100)))
+      : undefined
+
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="SAGA" body="Iniciando motor SAGA y cargando misión..." />
+        <StatusCard
+          title="SAGA"
+          body={mapProgress ? 'Descargando mapa offline...' : 'Adquiriendo señal GPS...'}
+          progress={ratio}
+          progressDetail={mapProgress?.detail}
+        />
       </ScreenFrame>
     )
   }
@@ -1101,19 +1134,13 @@ function handleOpenFieldCamera() {
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
-      const shouldFocus =
-        options.forceFocus ||
-        !gpsCenteredRef.current
-
-      if (shouldFocus) {
+      if (options?.forceFocus && followPlayerRef.current) {
         gpsCenteredRef.current = true
-        setFollowPlayer(true)
         setFocusRequest({
           target: 'player',
           token: Date.now(),
         })
       }
-      setGpsLoaded(true)
 
       void sendHeartbeat({
         user,
@@ -1132,7 +1159,6 @@ function handleOpenFieldCamera() {
     const onError = (error: GeolocationPositionError) => {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
-      setGpsLoaded(true)
       const denied = error.code === error.PERMISSION_DENIED
       if (!options.silent) {
         showNotice(
@@ -1145,16 +1171,16 @@ function handleOpenFieldCamera() {
     }
 
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: false,
+      enableHighAccuracy: true,
       maximumAge: 10000,
-      timeout: 5000,
+      timeout: 4000,
     })
 
     if (gpsWatchRef.current === null) {
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
         enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 20000,
+        maximumAge: 10000,
+        timeout: 4000,
       })
     }
   }
@@ -1449,6 +1475,37 @@ function handleOpenFieldCamera() {
           onNodeTap={handleMapNodeTap}
         />
 
+        {!isSecure && !hideInsecureNotice ? (
+          <div style={insecureNoticeCardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+              <div style={insecureNoticeTitle}>⚠️ ENTORNO NO SEGURO (HTTP)</div>
+              <button
+                type="button"
+                onClick={() => setHideInsecureNotice(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: 16,
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  margin: '-4px -4px 0 0',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={insecureNoticeBody}>
+              El navegador bloquea el GPS y el mapa offline en conexiones HTTP. Para probar el modo offline:
+              <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                <li>Usa <strong>https://</strong> (con ngrok)</li>
+                <li>O en Chrome del móvil, entra en <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, añade esta URL y actívalo.</li>
+              </ul>
+            </div>
+          </div>
+        ) : null}
+
         <div style={getTopScrimStyle(isPhone)} />
 
         <div style={getTopOverlayStyle(isPhone)}>
@@ -1521,6 +1578,7 @@ function handleOpenFieldCamera() {
               <span style={mapQuickCountPill}>{teamVisibleCount}</span>
             </button>
 
+
             <button
               type="button"
               style={
@@ -1551,6 +1609,40 @@ function handleOpenFieldCamera() {
                 {routeOverviewActive ? '📍' : '🧭'}
               </span>
             </button>
+
+              <button
+                type="button"
+                style={{
+                  ...mapRouteToggleInlineButton,
+                  background: 'rgba(52, 211, 153, 0.2)',
+                  borderColor: 'rgba(52, 211, 153, 0.4)',
+                  color: '#34d399',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  transition: 'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, padding 0.3s ease',
+                  maxWidth: !followPlayer ? '100px' : '0px',
+                  minWidth: !followPlayer ? '44px' : '0px',
+                  width: !followPlayer ? 'auto' : '0px',
+                  opacity: !followPlayer ? 1 : 0,
+                  paddingLeft: !followPlayer ? 12 : 0,
+                  paddingRight: !followPlayer ? 12 : 0,
+                  borderWidth: !followPlayer ? 1 : 0,
+                  pointerEvents: !followPlayer ? 'auto' : 'none',
+                  marginLeft: 0,
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setFollowPlayer(true)
+                  void handleRequestLiveGps({ forceFocus: true })
+                }}
+                aria-label="Centrar en mi ubicación"
+              >
+                CENTRAR
+              </button>
 
           </div>
         ) : null}{/* saga-map-quick-controls-row-v1 */}
@@ -1609,30 +1701,6 @@ function handleOpenFieldCamera() {
           </div>
         ) : null}
 
-      <div style={{ position: 'absolute', right: isPhone ? 16 : 24, bottom: isPhone ? 110 : 130, zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button
-          type="button"
-          aria-label="Centrar en mi ubicación"
-          onClick={() => void handleRequestLiveGps({ forceFocus: true })}
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 999,
-            background: gpsState === 'ready' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(15, 23, 42, 0.8)',
-            border: gpsState === 'ready' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-            color: gpsState === 'ready' ? '#34d399' : '#f8fafc',
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 22,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(12px)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          {gpsState === 'searching' ? '⏱' : '📍'}
-        </button>
-      </div>
 
       <div style={getBottomOverlayStyle(isPhone)}>
         <PlayerHud
@@ -1768,4 +1836,35 @@ const mapQuickCountPill: CSSProperties = {
   fontWeight: 950,
   lineHeight: 1,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+}
+
+const insecureNoticeCardStyle: CSSProperties = {
+  position: 'absolute',
+  top: 140,
+  left: 12,
+  right: 12,
+  padding: 14,
+  borderRadius: 20,
+  background: 'rgba(220,38,38,.92)',
+  border: '1px solid rgba(255,255,255,.2)',
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 750,
+  lineHeight: 1.45,
+  zIndex: 1200,
+  boxShadow: '0 16px 36px rgba(0,0,0,.35)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+}
+
+const insecureNoticeTitle: CSSProperties = {
+  fontWeight: 900,
+  fontSize: 13,
+  letterSpacing: '-0.02em',
+}
+
+const insecureNoticeBody: CSSProperties = {
+  marginTop: 6,
+  opacity: 0.95,
+  fontWeight: 700,
 }

@@ -140,7 +140,17 @@ function getLaunchingPlayerLabel() {
   }
 }
 
-export function StatusCard({ title, body }: { title: string; body: string }) {
+export function StatusCard({
+  title,
+  body,
+  progress,
+  progressDetail,
+}: {
+  title: string
+  body: string
+  progress?: number
+  progressDetail?: string
+}) {
   const playerLabel = getLaunchingPlayerLabel()
 
   return (
@@ -151,6 +161,14 @@ export function StatusCard({ title, body }: { title: string; body: string }) {
       </div>
       <div style={statusTitle}>{playerLabel ? `Entrando como ${playerLabel}` : title}</div>
       <div style={statusBody}>{body}</div>
+      {progress !== undefined && (
+        <div style={progressContainer}>
+          <div style={progressWrapper}>
+            <div style={{ ...progressBar, width: `${progress}%` }} />
+          </div>
+          {progressDetail && <div style={progressText}>{progressDetail}</div>}
+        </div>
+      )}
     </section>
   )
 }
@@ -282,6 +300,38 @@ const statusCard: CSSProperties = {
   minWidth: 260,
   maxWidth: 320,
   animation: 'sagaStatusPulse 2s ease-in-out infinite',
+}
+
+const progressContainer: CSSProperties = {
+  width: '100%',
+  marginTop: 12,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 6,
+}
+
+const progressWrapper: CSSProperties = {
+  width: '100%',
+  height: 6,
+  background: 'rgba(255,255,255,0.08)',
+  borderRadius: 3,
+  overflow: 'hidden',
+  border: '1px solid rgba(255,255,255,0.04)',
+}
+
+const progressBar: CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, #10b981, #34d399)',
+  borderRadius: 3,
+  transition: 'width 0.2s ease-out',
+}
+
+const progressText: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.5)',
+  textAlign: 'center',
+  fontFamily: 'monospace',
 }
 
 const statusLoader: CSSProperties = {

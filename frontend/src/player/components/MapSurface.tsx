@@ -579,19 +579,15 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
-    const token = mapboxToken || (import.meta as any).env.VITE_MAPBOX_TOKEN || ''
-    // Extract mapbox style path from URL like 'mapbox://styles/odegaard12/cmqul96jp001a01ryafjg2adq'
-    let stylePath = 'mapbox/satellite-streets-v12'
-    if (mapboxStyle && mapboxStyle.startsWith('mapbox://styles/')) {
-      stylePath = mapboxStyle.replace('mapbox://styles/', '')
-    }
-    
     const tileLayer = L.tileLayer(
-      `https://api.mapbox.com/styles/v1/${stylePath}/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`,
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
         maxZoom: 20,
         maxNativeZoom: 19,
-        attribution: 'Map data &copy; <a href="https://www.mapbox.com/">Mapbox</a>',
+        keepBuffer: 32,
+        updateWhenZooming: true,
+        updateWhenIdle: false,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EAP, and the GIS User Community',
       },
     )
 
@@ -610,7 +606,10 @@ export function MapSurface({
     tileLayer.addTo(map)
     tileLayerRef.current = tileLayer
 
-    map.setView([42.4333, -8.65], 16)
+    // Start map where the player is, or on the node, to prevent massive initial flight and black screen.
+    const startLat = playerPosition?.lat || stageMapData?.lat || 42.4333
+    const startLon = playerPosition?.lon || stageMapData?.lon || -8.65
+    map.setView([startLat, startLon], 16)
     mapRef.current = map
 
     const updateZoom = () => setMapZoom(map.getZoom())
@@ -647,17 +646,19 @@ export function MapSurface({
   }, [])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
+    const container = mapRootRef.current
+    if (!container) return
 
     const handleManualMove = () => {
       onUserMapMoveRef.current?.()
     }
 
-    map.on('dragstart', handleManualMove)
+    container.addEventListener('pointerdown', handleManualMove, { passive: true })
+    container.addEventListener('wheel', handleManualMove, { passive: true })
 
     return () => {
-      map.off('dragstart', handleManualMove)
+      container.removeEventListener('pointerdown', handleManualMove)
+      container.removeEventListener('wheel', handleManualMove)
     }
   }, [mapReadyToken])
 
@@ -787,7 +788,6 @@ export function MapSurface({
       .filter((entry): entry is { stage: PlayerStage; index: number; data: NonNullable<ReturnType<typeof resolveStageMapData>> } => Boolean(entry.data))
 
     if (stageNodes.length === 0) {
-      map.invalidateSize({ pan: false })
       return
     }
 
@@ -815,7 +815,9 @@ export function MapSurface({
       const cached = readRoadRouteCache(cacheKey); if (cached) drawRoadRoute(cached)
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {
         const controller = new AbortController(); roadRouteAbortRef.current = controller
-        void fetchRoadRoute(routePoints,controller.signal).then((road) => { if (controller.signal.aborted || roadRouteAbortRef.current !== controller) return; writeRoadRouteCache(cacheKey,road); drawRoadRoute(road) }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) console.warn('SAGA road route unavailable',error) })
+        void fetchRoadRoute(routePoints,controller.signal).then((road) => { if (controller.signal.aborted || roadRouteAbortRef.current !== controller) return; writeRoadRouteCache(cacheKey,road); drawRoadRoute(road) }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) { console.warn('SAGA road route unavailable',error); if (!cached) drawRoadRoute({ path: routePoints, snapped: [], savedAt: Date.now() }); } })
+      } else if (!cached) {
+        drawRoadRoute({ path: routePoints, snapped: [], savedAt: Date.now() })
       }
     }
 
@@ -916,8 +918,6 @@ export function MapSurface({
         })
       }
     }
-
-    map.invalidateSize({ pan: false })
   }, [
     currentStage,
     missionStages,
@@ -937,7 +937,6 @@ export function MapSurface({
       playerAuraRef.current?.remove()
       playerAuraRef.current = null
       playerAuraModeRef.current = null
-      map.invalidateSize({ pan: false })
       return
     }
 
@@ -1086,21 +1085,27 @@ export function MapSurface({
         lastPlayerFrameRef.current !==
         playerFrameKey
       ) {
-        lastPlayerFrameRef.current =
-          playerFrameKey
+        lastPlayerFrameRef.current = playerFrameKey
+        window.requestAnimationFrame(() => {
+          if (!mapRef.current) return
+          const map = mapRef.current
+          
+          const distanceFromCenter =
+            map.distance(
+              map.getCenter(),
+              nextLatLng,
+            )
 
-        const distanceFromCenter =
-          map.distance(
-            map.getCenter(),
-            nextLatLng,
-          )
-
-        if (distanceFromCenter > 6) {
-          map.panTo(nextLatLng, {
-            animate: true,
-            duration: 0.32,
-          })
-        }
+          if (flyToEndTimeRef.current && Date.now() < flyToEndTimeRef.current) {
+            // Do nothing, we are currently flying
+          } else if (distanceFromCenter > 2000) {
+            map.setView(nextLatLng, map.getZoom(), {
+              animate: false,
+            })
+          } else if (distanceFromCenter > 6) {
+            map.panTo(nextLatLng, { animate: true, duration: 0.32 })
+          }
+        })
       }
     } else {
       lastPlayerFrameRef.current = null
@@ -1346,25 +1351,38 @@ export function MapSurface({
     refreshToken,
   ])
 
+  const flyToEndTimeRef = useRef<number>(0)
+
   useEffect(() => {
     const map = mapRef.current
     if (!map || !focusRequest) return
     if (lastFocusTokenRef.current === focusRequest.token) return
-    lastFocusTokenRef.current = focusRequest.token
 
-    map.invalidateSize({ pan: false })
+    let consumed = false
 
-    if (focusRequest.target === 'player' && playerPosition) {
-      map.stop()
-      map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
-        animate: true,
-        duration: 0.60,
-        easeLinearity: 0.22,
-      })
-      return
-    }
+    if (focusRequest.target === 'player') {
+      if (playerPosition) {
+        map.stop()
+        const currentCenter = map.getCenter()
+        const targetLatLng = L.latLng(playerPosition.lat, playerPosition.lon)
+        const distance = map.distance(currentCenter, targetLatLng)
 
-    if (focusRequest.target === 'route') {
+        flyToEndTimeRef.current = Date.now() + 1500
+
+        if (distance > 500) {
+          // Snap instantly if far away to prevent tile caching/rendering bugs
+          map.setView(targetLatLng, 18, { animate: false })
+        } else {
+          // Fly to if close
+          map.flyTo(targetLatLng, 18, {
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.22,
+          })
+        }
+        consumed = true
+      }
+    } else if (focusRequest.target === 'route') {
       const sourceStages =
         Array.isArray(missionStages) &&
         missionStages.length > 0
@@ -1403,15 +1421,14 @@ export function MapSurface({
 
       if (routePoints.length === 1) {
         map.stop()
+        flyToEndTimeRef.current = Date.now() + 1500
         map.flyTo(routePoints[0], 17, {
           animate: true,
-          duration: 0.55,
+          duration: 1.5,
           easeLinearity: 0.22,
         })
-        return
-      }
-
-      if (routePoints.length > 1) {
+        consumed = true
+      } else if (routePoints.length > 1) {
         const bounds =
           L.latLngBounds(routePoints)
 
@@ -1420,6 +1437,7 @@ export function MapSurface({
           pan: false,
         })
 
+        flyToEndTimeRef.current = Date.now() + 1500
         map.flyToBounds(
           bounds.pad(0.14),
           {
@@ -1427,39 +1445,38 @@ export function MapSurface({
             paddingBottomRight: [44, 190],
             maxZoom: 17,
             animate: true,
-            duration: 0.65,
+            duration: 1.5,
             easeLinearity: 0.22,
           },
         )
-
-        return
+        consumed = true
+      } else {
+        consumed = true
       }
-
-      if (playerPosition) {
+    } else if (focusRequest.target === 'node') {
+      if (stageMapData) {
         map.stop()
-        map.flyTo(
-          [
-            playerPosition.lat,
-            playerPosition.lon,
-          ],
-          18,
-          {
-            animate: true,
-            duration: 0.35,
-          },
-        )
-      }
+        const currentCenter = map.getCenter()
+        const targetLatLng = L.latLng(stageMapData.lat, stageMapData.lon)
+        const distance = map.distance(currentCenter, targetLatLng)
 
-      return
+        flyToEndTimeRef.current = Date.now() + 1500
+
+        if (distance > 500) {
+          map.setView(targetLatLng, 18, { animate: false })
+        } else {
+          map.flyTo(targetLatLng, 18, {
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.22,
+          })
+        }
+        consumed = true
+      }
     }
 
-    if (focusRequest.target === 'node' && stageMapData) {
-      map.stop()
-      map.flyTo([stageMapData.lat, stageMapData.lon], 18, {
-        animate: true,
-        duration: 0.60,
-        easeLinearity: 0.22,
-      })
+    if (consumed) {
+      lastFocusTokenRef.current = focusRequest.token
     }
   }, [
     focusRequest,

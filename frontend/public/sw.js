@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v1.2.0-rpg-viewfinder'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.0'
+const CACHE_NAME = 'saga-player-shell-v1.2.2-rpg-viewfinder'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.2'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'
@@ -38,8 +38,10 @@ async function putCache(request, response) {
   return response
 }
 
+const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true };
+
 async function cacheFirst(request) {
-  const cached = await caches.match(request)
+  const cached = await caches.match(request, MATCH_OPTIONS)
   if (cached) return cached
   const response = await fetch(request)
   await putCache(request, response)
@@ -54,8 +56,13 @@ async function putCustomCache(cacheName, request, response) {
 }
 
 async function customCacheFirst(cacheName, request) {
-  const cached = await caches.match(request, { cacheName })
-  if (cached) return cached
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request, MATCH_OPTIONS)
+  if (cached) {
+    console.log(`[SW] Cache HIT [${cacheName}]:`, request.url)
+    return cached
+  }
+  console.log(`[SW] Cache MISS [${cacheName}]:`, request.url)
   const response = await fetch(request)
   await putCustomCache(cacheName, request, response)
   return response
@@ -79,8 +86,8 @@ async function networkFirst(request) {
     return response
   } catch {
     return (
-      (await caches.match(request)) ||
-      (await caches.match(DEFAULT_SHELL_URL)) ||
+      (await caches.match(request, MATCH_OPTIONS)) ||
+      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
       new Response('SAGA offline shell is not cached yet. Open SAGA online once and press Prepare offline.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -100,8 +107,8 @@ async function navigationNetworkFirst(request) {
     return response
   } catch {
     return (
-      (await caches.match(request)) ||
-      (await caches.match(DEFAULT_SHELL_URL)) ||
+      (await caches.match(request, MATCH_OPTIONS)) ||
+      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
       new Response(
         'SAGA offline shell is not cached yet.',
         {

@@ -69,7 +69,15 @@ def load_config():
     })
     if not isinstance(cfg, dict):
         cfg = {}
+    
     cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "classic"))
+    
+    # Fallback to env if Mapbox token is missing
+    if not cfg.get("mapbox_token"):
+        env_token = os.getenv("VITE_MAPBOX_TOKEN") or os.getenv("MAPBOX_TOKEN")
+        if env_token:
+            cfg["mapbox_token"] = env_token
+
     return cfg
 
 def save_config(cfg):

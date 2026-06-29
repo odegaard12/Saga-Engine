@@ -162,24 +162,7 @@ async function warmOfflineProfiles(
         payload,
       })
 
-      if (!mapPrepared) {
-        mapPrepared = true
-
-        await prefetchMissionMapTiles(
-          Array.isArray(payload.stages) ? payload.stages : [],
-          (mapProgress: OfflineMapTileProgress) => {
-            const total = Math.max(1, mapProgress.total || 1)
-            const ratio = Math.max(0, Math.min(1, (mapProgress.done || 0) / total))
-
-            onProgress?.({
-              label: mapProgress.label || 'Mapa offline',
-              done: Math.round(30 + ratio * 52),
-              total: 100,
-              detail: mapProgress.detail || 'Bajando zona amplia de misión',
-            })
-          }
-        ).catch(() => undefined)
-      }
+      // Map prefetch has been moved to PlayerApp to run automatically on load!
 
       await fetchTeamStatus(profile.id)
         .then((team) => {
@@ -237,6 +220,8 @@ export default function LoginApp() {
   const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
   const [offlinePrepProgress, setOfflinePrepProgress] = useState<OfflinePrepProgress | null>(null)
   const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() => getOfflineVaultSummary())
+  const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
+  const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
   useEffect(() => {
     let cancelled = false
@@ -414,64 +399,19 @@ export default function LoginApp() {
           </div>
         </section>
 
-        <section style={offlineVaultCard}>
-          <div style={offlineVaultTop}>
-            <div>
-              <div style={offlineVaultEyebrow}>MODO OFFLINE</div>
-              <div style={offlineVaultTitle}>Preparar este teléfono</div>
-              <div style={offlineVaultText}>
-                Deja este teléfono listo para jugar sin cobertura.
+
+
+        {!isSecure ? (
+          <div style={insecureLoginBanner}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 12 }}>Entorno no seguro (HTTP en IP remota)</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2, lineHeight: 1.35 }}>
+                El GPS y las descargas de mapa offline están desactivados por el navegador. Para probar SAGA en tu móvil, entra en <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, añade esta URL y actívalo.
               </div>
             </div>
-
-            <button
-              type="button"
-              style={offlineVaultButton}
-              disabled={offlinePrepState === 'saving'}
-              onClick={handlePrepareOffline}
-            >
-              {offlinePrepState === 'saving' ? 'Descargando…' : 'Preparar offline'}
-            </button>
           </div>
-
-          <div style={offlineVaultStatus}>
-            <span style={offlineVault.ready_count > 0 ? offlineDotOk : offlineDotPending} />
-            <span>
-              {offlineVault.ready_count > 0
-                ? `${offlineVault.ready_count}/${offlineVault.profile_count} jugadores listos · ${formatOfflineVaultAge(offlineVault)}`
-                : 'Sin descarga offline completa en este teléfono.'}
-            </span>
-          </div>
-
-          {offlinePrepProgress ? (
-            <div style={offlineProgressWrap}>
-              <div style={offlineProgressTop}>
-                <span>{offlinePrepProgress.label}</span>
-                <span>{Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%</span>
-              </div>
-              <div style={offlineProgressTrack}>
-                <div
-                  style={{
-                    ...offlineProgressFill,
-                    width: `${Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%`,
-                  }}
-                />
-              </div>
-              {offlinePrepProgress.detail ? (
-                <details style={offlineProgressDetails}>
-                  <summary style={offlineProgressSummary}>Detalles</summary>
-                  <div style={offlineProgressDetailText}>{offlinePrepProgress.detail}</div>
-                </details>
-              ) : null}
-            </div>
-          ) : null}
-
-          {offlinePrepMessage ? (
-            <div style={offlinePrepState === 'error' ? offlineVaultError : offlineVaultSuccess}>
-              {offlinePrepMessage}
-            </div>
-          ) : null}
-        </section>
+        ) : null}
 
         <section style={listBlock}>
           {profiles.map((profile, index) => {
@@ -555,15 +495,9 @@ export default function LoginApp() {
           })}
         </section>
 
-        {state.config?.mapbox_token ? (
-          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '16px', color: '#facc15', fontSize: '11px', lineHeight: '1.4', textAlign: 'center' }}>
-            <strong>{copy.mapboxLimitTitle}</strong><br />
-            {copy.mapboxLimitText}
-          </div>
-        ) : null}
-      </div>
-
-    </main>
+      {/* Mapbox Warning Removed */}
+        </div>
+      </main>
   )
 }
 
@@ -626,7 +560,7 @@ const heroCard: CSSProperties = {
   boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
   backdropFilter: 'blur(18px) saturate(135%)',
   WebkitBackdropFilter: 'blur(18px) saturate(135%)',
-  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaFadeIn 260ms ease-out',
 }
 
 const heroTopSpacer: CSSProperties = {
@@ -878,7 +812,7 @@ const launchCard: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.99))',
   boxShadow: '0 0 35px rgba(52, 211, 153, 0.12), 0 24px 54px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
   color: '#ffffff',
-  animation: 'sagaFinishPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+  animation: 'sagaFadeIn 0.4s ease-out forwards',
 }
 
 const launchSpinner: CSSProperties = {
@@ -922,6 +856,18 @@ const launchProgressFill: CSSProperties = {
   transition: 'width 80ms ease-out',
 }
 
+const insecureLoginBanner: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'start',
+  padding: 12,
+  borderRadius: 16,
+  background: 'rgba(239, 68, 68, 0.15)',
+  border: '1px solid rgba(239, 68, 68, 0.3)',
+  color: '#fca5a5',
+  marginBottom: 16,
+}
+
 const listBlock: CSSProperties = {
   display: 'grid',
   gap: 8,
@@ -939,7 +885,7 @@ const playerCard: CSSProperties = {
   boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
   backdropFilter: 'blur(18px) saturate(130%)',
   WebkitBackdropFilter: 'blur(18px) saturate(130%)',
-  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaFadeIn 260ms ease-out',
   animationFillMode: 'both',
 }
 
@@ -1037,21 +983,13 @@ const enterButton: CSSProperties = {
 }
 
 const loginAnimations = `
-@keyframes sagaSpin {
-  to {
-    transform: rotate(360deg);
+  @keyframes sagaSpin {
+    to {
+      transform: rotate(360deg);
+    }
   }
-}
-
-
-@keyframes sagaLoginRise {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(.99);
+  @keyframes sagaFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 `

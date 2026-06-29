@@ -936,7 +936,7 @@ export default function AdminApp() {
 
   if (!overviewReady) {
     return (
-      <main className="admin-root admin-root-login-only">
+      <div className="admin-root">
         <style>{styles}</style>
 
         <section className="admin-login-minimal" aria-label="Admin login">

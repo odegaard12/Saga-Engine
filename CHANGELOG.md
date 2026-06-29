@@ -4,6 +4,16 @@ All notable changes to SAGA Engine are documented in this file.
 
 ---
 
+## [1.3.0] — 2026-06-29
+
+### 🚀 Mejoras y correcciones (Offline y Rendimiento)
+- **Map rendering (100% offline & sin parpadeos)**: Configurado `TileLayer` con `updateWhenZooming: true` y `keepBuffer: 32` para forzar que las teselas del mapa se descarguen durante la animación de zoom (en móviles) y permanezcan en RAM al desampliar, eliminando por completo los "cuadrados negros" o "flashes grises" causados por la recarga.
+- **Ampliación radical de caché regional (Offline Prep)**: El radio de precarga de teselas de nivel general (zoom 5-11) se ha aumentado drásticamente a 400-800km alrededor de la misión. De esta forma, al desampliar offline, los niveles superiores (Galicia/España entera) siempre estarán descargados, logrando una experiencia 100% inmersiva donde el mapa nunca falla fuera de cobertura.
+- **Ruta offline segura (Fallback visual)**: Corregido un bug donde entrar al modo avión hacía desaparecer la línea de ruta al fallar la petición de tráfico (OSRM). Ahora se detecta automáticamente la pérdida de conexión y se dibuja instantáneamente una ruta "a vuelo de pájaro" (línea recta punteada verde) hacia el nodo activo, para que el jugador nunca se quede sin orientación visual.
+- **Aviso UI de Entorno Seguro HTTP**: Incorporada una tarjeta de alerta persistente y muy visible si el juego detecta que se accede por IP local (HTTP). Advierte proactivamente al jugador de que el motor del navegador (Chrome/Safari) **bloqueará el GPS y los Service Workers** por seguridad, detallando exactamente cómo resolverlo activando las *flags* inseguras de Chrome o usando HTTPS.
+- **Carga de mapas superpuesta ("Centrar")**: Eliminado el autofoco forzoso no deseado que se disparaba cada vez que el usuario regresaba de otra app o sacaba el móvil del reposo, el cual obligaba al jugador a volver a orientarse después de mover la pantalla manualmente.
+
+---
 ## [1.0.1] — 2026-06-24
 
 ### 🔧 Improvements
