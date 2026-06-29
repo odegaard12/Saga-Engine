@@ -227,6 +227,8 @@ export default function AdminApp() {
       prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
       player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || 'classic'),
+      mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
+      mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
       map_center_lat: String(centerLat ?? 40.4168),
       map_center_lon: String(centerLon ?? -3.7038),
       map_zoom: getConfigTextValue(source, 'map_zoom', String(config?.map_zoom || 13)),
@@ -281,6 +283,8 @@ export default function AdminApp() {
       prologue_subtitle: missionDraft.prologue_subtitle || '',
       prologue_body: missionDraft.prologue_body || '',
       player_theme: missionDraft.player_theme || 'classic',
+      mapbox_token: missionDraft.mapbox_token || '',
+      mapbox_style: missionDraft.mapbox_style || '',
       map_center: [
         Number.isFinite(lat) ? lat : 40.4168,
         Number.isFinite(lon) ? lon : -3.7038,

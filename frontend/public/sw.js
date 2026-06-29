@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v1.1.0-rpg-viewfinder'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.1.0'
+const CACHE_NAME = 'saga-player-shell-v1.2.0-rpg-viewfinder'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.0'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'

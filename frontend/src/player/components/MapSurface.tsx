@@ -76,6 +76,8 @@ type MapSurfaceProps = {
   selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus>
   onDebugSetPosition?: (position: { lat: number; lon: number }) => void
   onNodeTap?: () => void
+  mapboxToken?: string
+  mapboxStyle?: string
 }
 
 function getPhysicalNodeTooltipPrefix(stage: unknown): string {
@@ -514,6 +516,8 @@ export function MapSurface({
   selfProfile,
   onDebugSetPosition,
   onNodeTap,
+  mapboxToken,
+  mapboxStyle,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const [mapReadyToken, setMapReadyToken] = useState(0)
@@ -575,9 +579,15 @@ export function MapSurface({
     })
     offlineGridLayer.addTo(map)
 
-    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
+    const token = mapboxToken || (import.meta as any).env.VITE_MAPBOX_TOKEN || ''
+    // Extract mapbox style path from URL like 'mapbox://styles/odegaard12/cmqul96jp001a01ryafjg2adq'
+    let stylePath = 'mapbox/satellite-streets-v12'
+    if (mapboxStyle && mapboxStyle.startsWith('mapbox://styles/')) {
+      stylePath = mapboxStyle.replace('mapbox://styles/', '')
+    }
+    
     const tileLayer = L.tileLayer(
-      `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`,
+      `https://api.mapbox.com/styles/v1/${stylePath}/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`,
       {
         maxZoom: 20,
         maxNativeZoom: 19,

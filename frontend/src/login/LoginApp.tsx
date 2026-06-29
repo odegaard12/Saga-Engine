@@ -48,6 +48,8 @@ function loginText(locale: LoginLocale) {
       team: 'TEAM',
       brandKicker: 'FIELD MISSION',
       configError: 'Configuration error',
+      mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
+      mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
     }
   }
 
@@ -59,6 +61,8 @@ function loginText(locale: LoginLocale) {
     team: 'EQUIPO',
     brandKicker: 'MISIÓN DE CAMPO',
     configError: 'Error de configuración',
+    mapboxLimitTitle: '⚠️ Límite de Mapbox',
+    mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
   }
 }
 
@@ -550,6 +554,13 @@ export default function LoginApp() {
             )
           })}
         </section>
+
+        {state.config?.mapbox_token ? (
+          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '16px', color: '#facc15', fontSize: '11px', lineHeight: '1.4', textAlign: 'center' }}>
+            <strong>{copy.mapboxLimitTitle}</strong><br />
+            {copy.mapboxLimitText}
+          </div>
+        ) : null}
       </div>
 
     </main>

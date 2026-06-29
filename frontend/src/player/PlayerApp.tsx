@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
-import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, PublicConfig, TeamProfileLiveStatus } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -43,7 +43,7 @@ import {
 type LoadState =
   | { status: 'idle' | 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; payload: PlayerGamePayload }
+  | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
 type NoticeTone = 'info' | 'warn' | 'success'
 type FocusRequest =
@@ -188,13 +188,13 @@ export default function PlayerApp() {
         }).catch(() => undefined)
 
         if (!cancelled) {
-          setState({ status: 'ready', payload })
+          setState({ status: 'ready', payload, config })
         }
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
 
-        if (!cancelled && offlinePack?.payload) {
-          setState({ status: 'ready', payload: offlinePack.payload })
+        if (!cancelled && offlinePack?.payload && offlinePack?.config) {
+          setState({ status: 'ready', payload: offlinePack.payload, config: offlinePack.config })
           return
         }
 
@@ -262,10 +262,11 @@ export default function PlayerApp() {
         }).catch(() => undefined)
 
         if (!cancelled) {
-          setState({
+          setState((prev) => ({
             status: 'ready',
             payload: nextPayload,
-          })
+            config: prev.status === 'ready' ? prev.config : nextConfig,
+          }))
 
           setMapRefreshToken(
             (value) => value + 1
@@ -762,10 +763,11 @@ export default function PlayerApp() {
       payload: nextPayload,
     }).catch(() => undefined)
 
-    setState({
+    setState((prev) => ({
       status: 'ready',
       payload: nextPayload,
-    })
+      config: prev.status === 'ready' ? prev.config : config,
+    }))
 
     setMapRefreshToken(
       (value) => value + 1
@@ -1173,10 +1175,11 @@ function handleOpenFieldCamera() {
         payload: offlinePayload,
       })
 
-      setState({
+      setState((prev) => ({
         status: 'ready',
         payload: offlinePayload,
-      })
+        config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
+      }))
 
       setMapRefreshToken(
         (value) => value + 1
@@ -1358,10 +1361,11 @@ function handleOpenFieldCamera() {
 
         if (localResult.ok) {
           setInteractionOpen(false)
-          setState({
+          setState((prev) => ({
             status: 'ready',
             payload: localResult.payload,
-          })
+            config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
+          }))
 
           setMapRefreshToken(
             (value) => value + 1
@@ -1422,6 +1426,8 @@ function handleOpenFieldCamera() {
           followPlayer={followPlayer}
           focusRequest={focusRequest}
           refreshToken={mapRefreshToken}
+          mapboxToken={state.config?.mapbox_token}
+          mapboxStyle={state.config?.mapbox_style}
           onUserMapMove={() => {
             setFollowPlayer(false)
             setRouteOverviewActive(false)
