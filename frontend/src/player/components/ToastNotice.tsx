@@ -3,6 +3,8 @@ import { tokens } from '../ui/tokens'
 
 export type UiNoticeTone = 'info' | 'warn' | 'success'
 export type UiNotice = {
+  id?: number
+  title?: string
   message: string
   tone: UiNoticeTone
 } | null

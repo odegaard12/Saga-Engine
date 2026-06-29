@@ -11,6 +11,7 @@ SUPPORTED_MINIGAME_TYPES = {
     "bearing_hunt",
     "signal_hunt",
     "motion_challenge",
+    "audio_challenge",
 }
 
 def _as_str(value, default=""):
@@ -57,6 +58,7 @@ MINIGAME_SPECS = {
     "bearing_hunt": {"label": "Bearing Hunt"},
     "signal_hunt": {"label": "Signal Hunt"},
     "motion_challenge": {"label": "Motion Challenge"},
+    "audio_challenge": {"label": "Audio Challenge"},
 }
 
 def _clamp_int(value, default, minimum=None, maximum=None):
@@ -270,6 +272,12 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     normalized_type = _as_str(minigame_type).strip().lower()
     if normalized_type not in SUPPORTED_MINIGAME_TYPES:
         normalized_type = "signal_hunt"
+
+    if normalized_type == "audio_challenge":
+        return {
+            "objective": _as_str(raw.get("objective") or "blow_charge").strip().lower() or "blow_charge",
+            "game_id": _as_str(raw.get("game_id") or "audio_challenge").strip() or "audio_challenge",
+        }
 
     if normalized_type == "circuit_matrix":
         game_id = (
@@ -830,6 +838,9 @@ def build_stage_minigame_runtime(node):
         and config.get("game_id") == "place_mosaic"
     ):
         label = "Mosaico del lugar"
+
+    if minigame_type == "audio_challenge":
+        label = "Desafío de audio"
 
     return {
         "type": minigame_type,

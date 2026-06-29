@@ -161,11 +161,7 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 const panel: CSSProperties = {
   display: 'grid',
   gap: 12,
-  borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.12)',
-  background:
-    'radial-gradient(circle at top right, rgba(125,211,252,.12), transparent 36%), linear-gradient(180deg, rgba(100,116,139,.34), rgba(51,65,85,.28))',
-  padding: 12,
+  padding: 8,
 }
 
 const eyebrow: CSSProperties = {

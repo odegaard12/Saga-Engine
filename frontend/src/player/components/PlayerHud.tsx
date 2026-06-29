@@ -4,8 +4,10 @@ import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
+import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
+import { useGyroParallax } from '../hooks/useGyroParallax'
 
 type BackpackTab = 'requirements' | 'inventory'
 
@@ -200,6 +202,8 @@ export function PlayerHud({
   const compact =
     typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
+  const { transform } = useGyroParallax(12)
+
   const gpsDisplay = getGpsDisplay(gpsState)
   const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
   const distanceLabel = distanceMeters !== null ? `${distanceMeters} m` : null
@@ -231,6 +235,8 @@ export function PlayerHud({
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
           padding: compact ? 12 : 14,
+          transform,
+          transition: 'transform 0.1s ease-out',
         }}
       >
 
@@ -266,19 +272,11 @@ export function PlayerHud({
         </div>
       </section>
 
-      {detailsOpen ? (
-        <div style={getOverlayStyle(compact)}>
-          <div style={sheetBackdrop} onClick={onToggleDetails} />
-
-          <aside
-            style={getSheetStyle(compact)}
-            aria-modal="true"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {compact ? (
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 8px', flexShrink: 0 }} />
-            ) : null}
+      <SwipeableSheet
+        open={detailsOpen}
+        onClose={onToggleDetails}
+        sheetStyle={getSheetStyle(compact)}
+      >
             <div style={sheetHeader}>
               <div>
                 <div style={sheetEyebrow}>MOCHILA</div>
@@ -326,24 +324,13 @@ export function PlayerHud({
                 <InventoryPanel user={user} />
               ) : null}
             </div>
-          </aside>
-        </div>
-      ) : null}
+          </SwipeableSheet>
 
-      {toolsOpen ? (
-        <div style={getOverlayStyle(compact)}>
-          <div style={sheetBackdrop} onClick={onCloseTools} />
-
-          <aside
-            style={getToolsSheetStyle(compact)}
-            aria-modal="true"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {compact ? (
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.16)', margin: '0 auto 4px', flexShrink: 0 }} />
-            ) : null}
-
+      <SwipeableSheet
+        open={toolsOpen}
+        onClose={onCloseTools}
+        sheetStyle={getToolsSheetStyle(compact)}
+      >
             <div style={toolsHeader}>
               <div style={toolsHeaderCopy}>
                 <div style={toolsTitle}>
@@ -403,16 +390,6 @@ export function PlayerHud({
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  style={toolsGreenButton}
-                  onClick={() => {
-                    onRequestGps()
-                    onCloseTools()
-                  }}
-                >
-                  📍 Centrar ubicación
-                </button>
               </div>
 
               {onSubmitCode && currentStage && !finished ? (
@@ -516,9 +493,7 @@ export function PlayerHud({
             <div style={toolsBuildRow}>
               <BuildInfoBadge mode="inline" />
             </div>
-          </aside>
-        </div>
-      ) : null}
+      </SwipeableSheet>
     </>
   )
 }
@@ -719,9 +694,9 @@ function getSheetStyle(compact: boolean): CSSProperties {
     overflowX: 'hidden',
     overscrollBehavior: 'contain',
     borderRadius: compact ? '24px 24px 0 0' : 30,
-    border: '1px solid rgba(255,255,255,.10)',
-    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.10)',
-    background: 'linear-gradient(180deg, rgba(30,41,59,.85) 0%, rgba(15,23,42,.92) 100%)',
+    border: '1px solid rgba(255,255,255,.22)',
+    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.22)',
+    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
     color: '#f8fafc',
     boxShadow: '0 -15px 35px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.6)',
     backdropFilter: 'blur(20px) saturate(1.2)',
@@ -742,13 +717,9 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  margin: '-14px -14px 4px',
-  padding: '14px 14px 10px',
-  borderRadius: '30px 30px 18px 18px',
-  background: 'rgba(71, 85, 105, 0.65)',
-  borderBottom: '1px solid rgba(255,255,255,.15)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  padding: '0 0 12px 0',
+  background: 'transparent',
+  borderBottom: '1px solid rgba(255,255,255,.10)',
 }
 
 const sheetEyebrow: CSSProperties = {
@@ -774,8 +745,8 @@ const tabs: CSSProperties = {
   gap: 6,
   padding: 4,
   borderRadius: 18,
-  background: 'rgba(15,23,42,.34)',
-  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(0,0,0,.2)',
+  border: '1px solid rgba(255,255,255,.05)',
 }
 
 const tabButton: CSSProperties = {
@@ -824,8 +795,8 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
     width: compact ? '100%' : 'min(100%, 460px)',
     maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
     gap: 14,
-    background: 'linear-gradient(180deg, rgba(30,41,59,.85) 0%, rgba(15,23,42,.92) 100%)',
-    border: '1px solid rgba(255, 255, 255, 0.10)',
+    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+    border: '1px solid rgba(255, 255, 255, 0.22)',
     boxShadow: '0 -15px 40px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.7)',
   }
 }
@@ -833,13 +804,6 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
 const toolsHeader: CSSProperties = {
   ...sheetHeader,
   alignItems: 'center',
-  margin: '-14px -14px 4px',
-  padding: '14px 14px 10px',
-  borderRadius: '30px 30px 18px 18px',
-  background: 'rgba(71, 85, 105, 0.65)',
-  borderBottom: '1px solid rgba(255,255,255,.15)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
 }
 
 const toolsHeaderCopy: CSSProperties = {
@@ -887,10 +851,8 @@ const toolsSettingsCard: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr',
   gap: 8,
-  padding: 10,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.22)',
+  padding: 0,
+  background: 'transparent',
 }
 
 const toolsLanguageBlock: CSSProperties = {
@@ -1076,10 +1038,8 @@ const fallbackToolError: CSSProperties = {
 const toolsCardGroup: CSSProperties = {
   display: 'grid',
   gap: 8,
-  padding: 14,
-  borderRadius: 20,
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  background: 'rgba(255, 255, 255, 0.02)',
+  padding: '14px 0',
+  borderBottom: '1px solid rgba(255,255,255,.05)',
 }
 
 const toolsCardGroupLabel: CSSProperties = {
@@ -1137,5 +1097,6 @@ const toolsBuildRow: CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   paddingTop: 8,
+  paddingBottom: 24,
   borderTop: '1px solid rgba(255, 255, 255, 0.05)',
 }

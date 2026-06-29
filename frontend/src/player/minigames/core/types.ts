@@ -3,6 +3,7 @@ export type MinigameFamily =
   | 'bearing_hunt'
   | 'signal_hunt'
   | 'motion_challenge'
+  | 'audio_challenge'
 
 export type MinigameVersion = 'v1'
 

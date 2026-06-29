@@ -96,13 +96,17 @@ body {
 export function ScreenFrame({
   children,
   mobile,
+  themeColor = '#020617',
 }: {
   children: ReactNode
   mobile: boolean
+  themeColor?: string
 }) {
+  const dynamicFix = globalPlayerEdgeFix.replace(/#020617/g, themeColor)
+
   return (
     <>
-      <style>{globalPlayerEdgeFix}</style>
+      <style>{dynamicFix}</style>
       <div
         className="saga-app-fade-in"
         style={{
@@ -110,7 +114,7 @@ export function ScreenFrame({
           inset: mobile ? 0 : undefined,
           width: '100vw',
           height: '100dvh',
-          background: '#020617',
+          background: themeColor,
           overflow: 'hidden',
           fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
           color: '#ffffff',
@@ -351,7 +355,7 @@ const overlayPill: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.08em',
   boxShadow: '0 14px 30px rgba(15,23,42,.12)',
-  will-change: transform, opacity;
+  willChange: 'transform, opacity',
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 

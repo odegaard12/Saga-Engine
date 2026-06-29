@@ -7,6 +7,7 @@ import { PlaceMosaicRuntimeScreen } from '../families/placeMosaic/RuntimeScreen'
 import { TiltMazeRuntimeScreen } from '../families/tiltMaze/RuntimeScreen'
 import { SignalHuntRuntimeScreen } from '../families/signalHunt/RuntimeScreen'
 import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
+import { AudioChallengeRuntime } from '../families/audioChallenge/AudioChallengeRuntime'
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame
@@ -99,6 +100,14 @@ export function FamilyRuntimeHost({
         stage={stage}
         helperText={helperText}
         submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
+  if (resolved.family === 'audio_challenge') {
+    return (
+      <AudioChallengeRuntime
         onWin={onWin}
       />
     )

@@ -475,6 +475,40 @@ export const FAMILY_SCHEMA_CONTRACTS: Record<FamilyId, FamilySchemaContract> = {
       },
     ],
   },
+
+  audio_challenge: {
+    id: 'audio_challenge',
+    label: 'Audio Challenge',
+    icon: '🎤',
+    description: 'Blow or make noise into the microphone to charge the energy bar.',
+    defaultPreset: 'audio_challenge',
+    defaultConfig: {
+      objective: 'blow_charge',
+      game_id: 'audio_challenge',
+    },
+    fields: [
+      {
+        key: 'objective',
+        label: 'Objective',
+        kind: 'select',
+        required: true,
+        defaultValue: 'blow_charge',
+        allowedValues: ['blow_charge'],
+        description: 'Main mechanic used by the node.',
+      },
+    ],
+    presets: [
+      {
+        id: 'audio_challenge',
+        label: 'Audio Challenge',
+        description: 'Blow or make noise into the microphone to charge the energy bar.',
+        config: {
+          objective: 'blow_charge',
+          game_id: 'audio_challenge',
+        },
+      },
+    ],
+  },
 }
 
 export const FAMILY_SCHEMA_ORDER: FamilyId[] = [
@@ -482,6 +516,7 @@ export const FAMILY_SCHEMA_ORDER: FamilyId[] = [
   'bearing_hunt',
   'motion_challenge',
   'circuit_matrix',
+  'audio_challenge',
 ]
 
 export function isFamilySchemaId(value: string): value is FamilyId {

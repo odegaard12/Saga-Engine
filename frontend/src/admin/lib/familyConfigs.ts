@@ -1,6 +1,6 @@
 import type { AdminReactOverviewStage } from './adminApi'
 
-export type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'motion_challenge'
+export type FamilyId = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'motion_challenge' | 'audio_challenge'
 
 export type EditableAdminStage = AdminReactOverviewStage & {
   config?: Record<string, unknown>
@@ -36,12 +36,19 @@ export const familyCards: Array<{
     title: 'Circuit Matrix',
     detail: 'Logic grids, route repair and lock-style board puzzles.',
   },
+  {
+    id: 'audio_challenge',
+    icon: '🎤',
+    title: 'Audio Challenge',
+    detail: 'Micrófono del dispositivo, soplado o volumen de sonido.',
+  },
 ]
 
 export function getAdminFamilyLabel(type: string) {
   if (type === 'motion_challenge') return 'Motion Challenge'
   if (type === 'bearing_hunt') return 'Bearing Hunt'
   if (type === 'circuit_matrix') return 'Matriz de circuitos'
+  if (type === 'audio_challenge') return 'Desafío de audio'
   return 'Signal Hunt'
 }
 
@@ -49,6 +56,7 @@ export function getAdminFamilyIcon(type: string) {
   if (type === 'motion_challenge') return '⚡'
   if (type === 'bearing_hunt') return '🧭'
   if (type === 'circuit_matrix') return '🧩'
+  if (type === 'audio_challenge') return '🎤'
   return '📡'
 }
 
@@ -152,6 +160,13 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
     }
   }
 
+  if (type === 'audio_challenge') {
+    return {
+      objective: 'blow_charge',
+      game_id: 'audio_challenge',
+    }
+  }
+
   return {
     objective: 'proximity_lock',
     source_radius_m: 75,
@@ -165,6 +180,13 @@ export function normalizeAdminConfigForFamily(
   input: Record<string, unknown>
 ) {
   const raw = input || {}
+
+  if (type === 'audio_challenge') {
+    return {
+      objective: String(raw.objective || 'blow_charge'),
+      game_id: String(raw.game_id || 'audio_challenge'),
+    }
+  }
 
   if (type === 'motion_challenge') {
     return {

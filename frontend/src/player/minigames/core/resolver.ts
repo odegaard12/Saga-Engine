@@ -10,6 +10,8 @@ import { bearingHuntDefinition } from '../families/bearingHunt/definition'
 import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
 import { motionChallengeDefinition } from '../families/motionChallenge/definition'
+import { audioChallengeDefinition } from '../families/audioChallenge/definition'
+import type { AudioChallengeConfig } from './family-types'
 
 // React player policy: family-native runtimes are the normal path.
 // Compatibility helpers may normalize older stage shapes, but the React player resolver only executes family-native runtimes.
@@ -63,11 +65,22 @@ export type ResolvedMotionChallengeMinigame = {
   config: MotionChallengeConfig
 }
 
+export type ResolvedAudioChallengeMinigame = {
+  family: 'audio_challenge'
+  type: 'audio_challenge'
+  version: 'v1'
+  compatibility: MinigameCompatibility
+  label: string
+  definition: typeof audioChallengeDefinition
+  config: AudioChallengeConfig
+}
+
 export type ResolvedMinigame =
   | ResolvedCircuitMatrixMinigame
   | ResolvedBearingHuntMinigame
   | ResolvedSignalHuntMinigame
   | ResolvedMotionChallengeMinigame
+  | ResolvedAudioChallengeMinigame
 
 function asObject<T>(value: unknown): Partial<T> {
   return value && typeof value === 'object' ? (value as Partial<T>) : {}
@@ -82,7 +95,8 @@ export function isNativeMinigameFamily(value: string): value is MinigameFamily {
     value === 'circuit_matrix' ||
     value === 'bearing_hunt' ||
     value === 'signal_hunt' ||
-    value === 'motion_challenge'
+    value === 'motion_challenge' ||
+    value === 'audio_challenge'
   )
 }
 
@@ -163,6 +177,23 @@ function resolveMotionChallengeNative(
   }
 }
 
+function resolveAudioChallengeNative(
+  input: ResolveMinigameInput
+): ResolvedAudioChallengeMinigame {
+  return {
+    family: 'audio_challenge',
+    type: 'audio_challenge',
+    version: normalizeVersion(input.version),
+    compatibility: 'native',
+    label: audioChallengeDefinition.label,
+    definition: audioChallengeDefinition,
+    config: {
+      ...audioChallengeDefinition.default_config,
+      ...asObject<AudioChallengeConfig>(input.config),
+    },
+  }
+}
+
 function resolveNativeMinigame(
   input: ResolveMinigameInput & { type: MinigameFamily }
 ): ResolvedMinigame {
@@ -176,6 +207,10 @@ function resolveNativeMinigame(
 
   if (input.type === 'motion_challenge') {
     return resolveMotionChallengeNative(input)
+  }
+
+  if (input.type === 'audio_challenge') {
+    return resolveAudioChallengeNative(input)
   }
 
   return resolveSignalHuntNative(input)
@@ -208,5 +243,5 @@ export function getResolvedMinigameLabel(input: ResolveMinigameInput): string | 
 }
 
 export function listSupportedRuntimeTypes(): string[] {
-  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix', 'motion_challenge']
+  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix', 'motion_challenge', 'audio_challenge']
 }

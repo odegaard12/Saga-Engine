@@ -5,7 +5,7 @@ import type {
   PlayerMinigameProps,
 } from './types'
 
-export type RegisteredMinigameType = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+export type RegisteredMinigameType = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
 
 export type RegisteredMinigame = PlayerMinigameDefinition & {
   id: RegisteredMinigameType
@@ -87,6 +87,22 @@ export const MINIGAME_REGISTRY: Record<RegisteredMinigameType, RegisteredMinigam
     component: FamilyNativeRuntimeNotice,
     emoji: '🧩',
     icon: '🧩',
+  },
+  audio_challenge: {
+    type: 'audio_challenge',
+    id: 'audio_challenge',
+    family: 'audio_challenge',
+    label: 'Audio Challenge',
+    title: 'Audio Challenge',
+    name: 'Audio Challenge',
+    description: 'Mic volume based mini-game.',
+    version: 'v1',
+    status: 'native',
+    runtime: 'family-native',
+    supportsManualFallback: false,
+    component: FamilyNativeRuntimeNotice,
+    emoji: '🎤',
+    icon: '🎤',
   },
 }
 

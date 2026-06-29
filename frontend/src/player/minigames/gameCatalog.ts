@@ -1,4 +1,4 @@
-export type GameCatalogFamily = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix'
+export type GameCatalogFamily = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
 
 export type GameCatalogItem = {
   id: GameCatalogFamily
@@ -53,6 +53,19 @@ export const FAMILY_NATIVE_GAME_CATALOG: GameCatalogItem[] = [
     runtime: 'family-native',
     emoji: '🧩',
     tags: ['logic', 'grid', 'circuit', 'puzzle'],
+  },
+  {
+    id: 'audio_challenge',
+    type: 'audio_challenge',
+    family: 'audio_challenge',
+    label: 'Audio Challenge',
+    title: 'Audio Challenge',
+    name: 'Audio Challenge',
+    description: 'Mic volume based mini-game where the user has to make noise or blow.',
+    status: 'native',
+    runtime: 'family-native',
+    emoji: '🎤',
+    tags: ['audio', 'microphone', 'noise'],
   },
 ]
 
