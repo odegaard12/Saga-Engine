@@ -1,0 +1,1688 @@
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
+import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, TeamProfileLiveStatus } from '../types/player'
+import { PlayerShell } from './components/PlayerShell'
+import { PlayerHud } from './components/PlayerHud'
+import { QuickProofPanel } from './components/QuickProofPanel'
+import { MapSurface } from './components/MapSurface'
+import { InteractionSheet } from './components/InteractionSheet'
+import { TeamSheet } from './components/TeamSheet'
+import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { FieldPhotoViewer } from './components/FieldPhotoViewer'
+import { FieldCameraCapture } from './components/FieldCameraCapture'
+import { deriveStageRuntime, type PlayerPanel } from './runtime'
+import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
+import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, syncPendingOfflineEvents, type OfflineMissionSummary } from './offline/missionPack'
+import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
+import { flushOfflineEvents } from './offline/localFirst'
+import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
+import { cacheFieldProofAssets, cacheFieldProofs, getCachedFieldProofs } from './offline/fieldProofCache'
+import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
+import { queueManualCode } from './offline/physicalEvents'
+import { getDistanceMeters } from './utils/geo'
+import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
+import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
+import {
+  CelebrationOverlay,
+  ScreenFrame,
+  StatusCard,
+  getBottomOverlayStyle,
+  getMapQuickControlsStyle,
+  getTopOverlayStyle,
+  getTopScrimStyle,
+  getToastOverlayStyle,
+  getViewportStyle,
+  finishOverlayStyle,
+  floatingTrophyButton,
+  type OverlayState
+} from './components/PlayerLayout'
+
+type LoadState =
+  | { status: 'idle' | 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; payload: PlayerGamePayload }
+
+type NoticeTone = 'info' | 'warn' | 'success'
+type FocusRequest =
+  | {
+      target: 'player' | 'node' | 'route'
+      token: number
+    }
+  | null
+
+function vibrate(pattern: number | number[]) {
+  if (typeof window === 'undefined') return
+  if (!('navigator' in window)) return
+  if (typeof window.navigator.vibrate !== 'function') return
+  window.navigator.vibrate(pattern)
+}
+
+function getUserFromUrl(): string {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('user') || 'PLAYER 1'
+}
+
+function isPhysicalQrStage(stage: PlayerStage | null): boolean {
+  if (!stage || typeof stage !== 'object') return false
+
+  const record = stage as unknown as Record<string, unknown>
+  const flatKind = record.physical_node_kind || record.physical_item_kind
+
+  if (flatKind === 'collectible' || flatKind === 'requirement' || flatKind === 'clue' || flatKind === 'bonus') {
+    return true
+  }
+
+  const physicalQr = record.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    const kind = (physicalQr as Record<string, unknown>).kind
+    return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
+  }
+
+  return false
+}
+
+export default function PlayerApp() {
+  const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
+  const [interactionOpen, setInteractionOpen] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
+  const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [followPlayer, setFollowPlayer] = useState(true)
+  const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
+  const [routeOverviewActive, setRouteOverviewActive] = useState(false)
+  const [uiNotice, setUiNotice] = useState<UiNotice>(null)
+  const [overlayState, setOverlayState] = useState<OverlayState>(null)
+  const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [teamOpen, setTeamOpen] = useState(false)
+  const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
+  const [offlinePrepVisible, setOfflinePrepVisible] = useState(true)
+  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
+  const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
+  const [browserGpsFresh, setBrowserGpsFresh] = useState(false)
+  const [browserGpsAccuracy, setBrowserGpsAccuracy] = useState<number | null>(null)
+  const [browserGpsCapturedAt, setBrowserGpsCapturedAt] = useState<number | null>(null)
+  const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
+  const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
+  const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
+  const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
+  const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
+  const [mapRefreshToken, setMapRefreshToken] = useState(0)
+
+  const noticeTimerRef = useRef<number | null>(null)
+  const overlayTimerRef = useRef<number | null>(null)
+  const gpsWatchRef = useRef<number | null>(null)
+  const gpsCenteredRef = useRef(false)
+  const gpsNoticeShownRef = useRef(false)
+  const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
+
+  const isPhone =
+    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  useEffect(() => {
+    const playerUrl = `/player/${encodeURIComponent(user)}`
+    void registerPlayerServiceWorker()
+    void cachePlayerShell(playerUrl)
+
+    const storedGps = readStoredGpsPosition(user)
+    if (storedGps) {
+      setBrowserGpsPosition(storedGps)
+      setBrowserGpsStatus('stale')
+      setBrowserGpsFresh(false)
+      setBrowserGpsAccuracy(
+        typeof storedGps.accuracy === 'number'
+          ? storedGps.accuracy
+          : null
+      )
+      setBrowserGpsCapturedAt(null)
+      // La ubicación almacenada sirve como respaldo,
+      // pero nunca debe centrar el mapa al arrancar.
+      setFollowPlayer(true)
+      gpsCenteredRef.current = false
+    }
+
+    if (hasRememberedGpsReady(user)) {
+      setOfflinePrepVisible(false)
+      window.setTimeout(() => {
+        void handleRequestLiveGps({ silent: true, forceFocus: true })
+      }, 300)
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function run() {
+      try {
+        setState({ status: 'loading' })
+        const payload = await fetchPlayerGame(user, { offlinePack: true })
+        const config = await fetchPublicConfig()
+          .then((nextConfig) => {
+            cachePublicConfig(nextConfig)
+            return nextConfig
+          })
+          .catch(() => buildFallbackPublicConfig(user))
+
+        void saveMissionPack({
+          user: payload.user || user,
+          config,
+          payload,
+        }).catch(() => undefined)
+
+        if (!cancelled) {
+          setState({ status: 'ready', payload })
+        }
+      } catch (error) {
+        const offlinePack = await getStoredMissionPack(user).catch(() => null)
+
+        if (!cancelled && offlinePack?.payload) {
+          setState({ status: 'ready', payload: offlinePack.payload })
+          return
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown load error'
+
+        if (!cancelled) {
+          setState({ status: 'error', message })
+        }
+      }
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let running = false
+
+    async function refreshMissionFromServer() {
+      if (running) return
+      if (interactionOpen || submitting) return
+
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState !== 'visible'
+      ) {
+        return
+      }
+
+      running = true
+
+      try {
+        if (
+          typeof navigator === 'undefined' ||
+          navigator.onLine !== false
+        ) {
+          await Promise.allSettled([
+            flushOfflineEvents(user),
+            syncPendingOfflineEvents(user),
+          ])
+        }
+
+        const nextPayload = await fetchPlayerGame(
+          user,
+          { offlinePack: true },
+        )
+
+        const nextConfig = await fetchPublicConfig()
+          .then((config) => {
+            cachePublicConfig(config)
+            return config
+          })
+          .catch(() =>
+            buildFallbackPublicConfig(user),
+          )
+
+        await saveMissionPack({
+          user: nextPayload.user || user,
+          config: nextConfig,
+          payload: nextPayload,
+        }).catch(() => undefined)
+
+        if (!cancelled) {
+          setState({
+            status: 'ready',
+            payload: nextPayload,
+          })
+
+          setMapRefreshToken(
+            (value) => value + 1
+          )
+        }
+      } catch {
+        // Keep the currently loaded mission while offline.
+      } finally {
+        running = false
+      }
+    }
+
+    const refresh = () => {
+      void refreshMissionFromServer()
+    }
+
+    const refreshAfterReconnect = () => {
+      void refreshMissionFromServer()
+
+      // Algunos móviles anuncian online antes de que
+      // la red esté realmente utilizable.
+      window.setTimeout(
+        refreshMissionFromServer,
+        1200,
+      )
+    }
+
+    window.addEventListener('focus', refresh)
+    window.addEventListener(
+      'online',
+      refreshAfterReconnect,
+    )
+    document.addEventListener(
+      'visibilitychange',
+      refresh,
+    )
+
+    const intervalId = window.setInterval(
+      refresh,
+      30000,
+    )
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(
+        'focus',
+        refresh,
+      )
+      window.removeEventListener(
+        'online',
+        refreshAfterReconnect,
+      )
+      document.removeEventListener(
+        'visibilitychange',
+        refresh,
+      )
+      window.clearInterval(intervalId)
+    }
+  }, [
+    user,
+    interactionOpen,
+    submitting,
+  ])
+
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadTeam() {
+      try {
+        const team = await fetchTeamStatus(user)
+        const profiles = Array.isArray(team.profiles) ? team.profiles : []
+        cacheTeamProfiles(user, profiles)
+        if (!cancelled) {
+          setTeamProfiles(profiles)
+        }
+      } catch {
+        const cachedTeam = getCachedTeamProfiles(user)
+        if (!cancelled) {
+          setTeamProfiles(cachedTeam.profiles)
+        }
+      }
+    }
+
+    loadTeam()
+    intervalId = window.setInterval(loadTeam, 5000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    let intervalId: number | null = null
+
+    async function loadFieldProofs() {
+      try {
+        const payload = await fetchFieldProofs(user)
+        const proofs = Array.isArray(payload.proofs) ? payload.proofs : []
+
+        cacheFieldProofs(user, proofs)
+        void cacheFieldProofAssets(proofs)
+
+        if (!cancelled) {
+          setFieldProofs(proofs)
+        }
+      } catch {
+        const cached = getCachedFieldProofs(user)
+
+        if (!cancelled) {
+          setFieldProofs(cached.proofs)
+        }
+      }
+    }
+
+    void loadFieldProofs()
+    intervalId = window.setInterval(loadFieldProofs, 15000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    let cancelled = false
+
+    getOfflineMissionSummary(user)
+      .then((summary) => {
+        if (!cancelled) {
+          setOfflineSummary(summary)
+
+          if (summary?.hasPack && hasRememberedGpsReady(user)) {
+            setOfflinePrepVisible(false)
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOfflineSummary(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, state.status, offlinePrepState])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    let intervalId: number | null = null
+
+    async function publishHeartbeat() {
+      try {
+        const effectivePosition =
+          localDebugPosition ||
+          (browserGpsFresh ? browserGpsPosition : null)
+
+        await sendHeartbeat({
+          user,
+          ...(effectivePosition
+            ? {
+                lat: effectivePosition.lat,
+                lon: effectivePosition.lon,
+                gps_status: 'ok',
+              }
+            : {
+                gps_status: 'unavailable',
+              }),
+          source: localDebugPosition ? 'react' : browserGpsPosition ? 'browser_gps' : 'player',
+        })
+      } catch {
+        // ignore heartbeat errors in the UI loop
+      }
+    }
+
+    publishHeartbeat()
+    intervalId = window.setInterval(publishHeartbeat, 5000)
+
+    return () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [
+    user,
+    state.status,
+    state.status === 'ready' ? state.payload.live_status?.lat : null,
+    state.status === 'ready' ? state.payload.live_status?.lon : null,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+    browserGpsPosition?.lat,
+    browserGpsPosition?.lon,
+    browserGpsFresh,
+  ])
+
+
+
+  useEffect(() => {
+    if (!browserGpsFresh || browserGpsCapturedAt === null) {
+      return
+    }
+
+    const ageMs = Math.max(
+      0,
+      Date.now() - browserGpsCapturedAt
+    )
+
+    const remainingMs = Math.max(
+      1000,
+      45000 - ageMs
+    )
+
+    const timeoutId = window.setTimeout(() => {
+      setBrowserGpsFresh(false)
+      setBrowserGpsStatus('stale')
+    }, remainingMs)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [
+    browserGpsFresh,
+    browserGpsCapturedAt,
+  ])
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current)
+      }
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current)
+      }
+      if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+        window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+        gpsWatchRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+
+    function closeQrIfPhysicalScannerNoLongerReachable() {
+      const readyPayload = (state as { status: 'ready'; payload: PlayerGamePayload }).payload
+      const stage = getCurrentStage(readyPayload)
+
+      if (!isPhysicalQrStage(stage)) return
+
+      const position = browserGpsPosition || localDebugPosition
+      const target = getStagePosition(stage)
+      const radius = getStageRadius(stage)
+
+      if (!position || !target || radius === null) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+        return
+      }
+
+      const distance = getDistanceMeters(position, target)
+      if (distance > radius) {
+        window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+      }
+    }
+
+    closeQrIfPhysicalScannerNoLongerReachable()
+  }, [
+    state.status,
+    state.status === 'ready' ? state.payload.level : null,
+    state.status === 'ready' ? state.payload.current_stage?.id : null,
+    browserGpsPosition?.lat,
+    browserGpsPosition?.lon,
+    localDebugPosition?.lat,
+    localDebugPosition?.lon,
+  ])
+
+  function showNotice(message: string, tone: NoticeTone) {
+    const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
+    if (normalizedTone === 'info') return
+    setUiNotice({ message, tone: normalizedTone })
+
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+
+    noticeTimerRef.current = window.setTimeout(() => {
+      setUiNotice(null)
+      noticeTimerRef.current = null
+    }, 3000)
+  }
+
+  function showOverlay(nextState: OverlayState) {
+    if (nextState !== 'finish') return
+    setOverlayState(nextState)
+
+    if (overlayTimerRef.current !== null) {
+      window.clearTimeout(overlayTimerRef.current)
+    }
+
+    overlayTimerRef.current = window.setTimeout(() => {
+      setOverlayState(null)
+      overlayTimerRef.current = null
+    }, nextState === 'finish' ? 1800 : 900)
+  }
+
+  if (state.status === 'idle' || state.status === 'loading') {
+    return (
+      <ScreenFrame mobile={isPhone}>
+        <div style={{ position: 'absolute', inset: 0, background: '#020617' }} />
+      </ScreenFrame>
+    )
+  }
+
+  if (state.status === 'error') {
+    return (
+      <ScreenFrame mobile={isPhone}>
+        <StatusCard title="Player app error" body={state.message} />
+      </ScreenFrame>
+    )
+  }
+
+  if (state.status !== 'ready') {
+    return (
+      <ScreenFrame mobile={isPhone}>
+        <StatusCard title="Player app state" body="Unexpected player state." />
+      </ScreenFrame>
+    )
+  }
+
+  const payload = state.payload
+  const currentStage = getCurrentStage(payload)
+  const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
+
+  const stagePosition = getStagePosition(currentStage)
+  const stageRadius = getStageRadius(currentStage)
+
+  const gpsAccuracyLimit =
+    stageRadius !== null
+      ? Math.max(35, Math.min(80, stageRadius * 2))
+      : 60
+
+  const gpsAccuracyAcceptable =
+    browserGpsAccuracy === null ||
+    browserGpsAccuracy <= gpsAccuracyLimit
+
+  const hasFreshBrowserGps =
+    Boolean(browserGpsPosition) &&
+    browserGpsFresh &&
+    gpsAccuracyAcceptable
+
+  const gpsState: PlayerGpsStatus = localDebugPosition
+    ? 'ready'
+    : hasFreshBrowserGps
+    ? 'ready'
+    : browserGpsPosition && !browserGpsFresh
+    ? 'stale'
+    : browserGpsPosition && !gpsAccuracyAcceptable
+    ? 'searching'
+    : browserGpsStatus === 'searching'
+    ? 'searching'
+    : browserGpsStatus === 'error'
+    ? 'error'
+    : 'unavailable'
+
+  // A stale position may center the map, but never unlock a node.
+  // La posición antigua no se dibuja ni centra.
+  // Solo se usa GPS vivo o posición debug.
+  const playerPosition =
+    localDebugPosition ||
+    (browserGpsFresh
+      ? browserGpsPosition
+      : null)
+
+  const unlockPosition =
+    localDebugPosition ||
+    (hasFreshBrowserGps ? browserGpsPosition : null)
+
+  const distanceMeters =
+    stagePosition && unlockPosition
+      ? Math.round(
+          getDistanceMeters(unlockPosition, stagePosition)
+        )
+      : null
+
+  const inRange =
+    stageRadius !== null && distanceMeters !== null
+      ? distanceMeters <= stageRadius
+      : false
+
+  const effectiveDebugEnabled =
+    localDebugEnabled ||
+    Boolean(localDebugPosition)
+
+  const runtime = deriveStageRuntime({
+    currentStage,
+    finished: payload.finished,
+    distanceMeters,
+    gpsState,
+    debugEnabled: effectiveDebugEnabled,
+  })
+
+  const gpsActionRequired =
+    !payload.finished &&
+    Boolean(currentStage) &&
+    !unlockPosition
+
+  const gpsQualityWarning =
+    Boolean(browserGpsPosition) &&
+    browserGpsFresh &&
+    !gpsAccuracyAcceptable
+
+  const hudHelperText =
+    gpsQualityWarning
+      ? `GPS impreciso (${Math.round(browserGpsAccuracy || 0)} m). Esperando una lectura mejor para desbloquear el nodo.`
+      : gpsActionRequired
+      ? 'Activa GPS para obtener una posición actual y entrar en el nodo cuando estés dentro del radio.'
+      : runtime.helperText
+
+  const teamOtherProfiles = teamProfiles.filter(
+    (member) => !member.is_self && member.user !== payload.user
+  )
+  const teamMapMarkers = teamProfilesToMapMarkers(teamProfiles, {
+    includeSelf: false,
+    includeOfflineWithPosition: true,
+  })
+  const teamMarkerSummary = countVisibleTeamMarkers(teamMapMarkers)
+  const teamLiveCount = teamMarkerSummary.live
+  const teamVisibleCount = teamMarkerSummary.live + teamMarkerSummary.stale
+
+  const playerHref = `/player/${encodeURIComponent(payload.user)}`
+  const shellLoginHref = '/'
+  const adminHref = '/admin'
+  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  const hasBrowserGps = Boolean(hasFreshBrowserGps)
+  const primaryLabel = currentStageIsPhysicalQr ? 'Abrir QR' : gpsActionRequired ? 'Activar GPS' : runtime.primaryLabel
+  const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
+
+  async function refreshPayload() {
+    const nextPayload = await fetchPlayerGame(user)
+    const config = await fetchPublicConfig()
+      .then((nextConfig) => {
+        cachePublicConfig(nextConfig)
+        return nextConfig
+      })
+      .catch(() => buildFallbackPublicConfig(user))
+
+    await saveMissionPack({
+      user: nextPayload.user || user,
+      config,
+      payload: nextPayload,
+    }).catch(() => undefined)
+
+    setState({
+      status: 'ready',
+      payload: nextPayload,
+    })
+
+    setMapRefreshToken(
+      (value) => value + 1
+    )
+
+    return nextPayload
+  }
+
+  async function refreshFieldProofs() {
+    const nextProofs = await fetchFieldProofs(user)
+    setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
+    return nextProofs
+  }
+
+function handleOpenFieldCamera() {
+    if (fieldPhotoUploading) {
+      showNotice('Subiendo foto…', 'info')
+      return
+    }
+
+    if (!playerPosition) {
+      showNotice('Activa GPS o usa modo debug para guardar la foto en el mapa.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFieldCameraOpen(true)
+    vibrate(8)
+  }
+
+  async function handleDeleteFieldProof(proofId: string) {
+    if (!proofId) return
+
+    const confirmed = window.confirm('¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.')
+    if (!confirmed) return
+
+    try {
+      await deleteFieldProof(payload.user, proofId)
+      setFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
+      void refreshFieldProofs().catch(() => {})
+      vibrate(8)
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo eliminar la foto.', 'warn')
+      vibrate(8)
+    }
+  }
+
+  async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
+    if (!playerPosition) {
+      showNotice('No hay posición para guardar la foto.', 'warn')
+      return
+    }
+
+    try {
+      setFieldPhotoUploading(true)
+
+      const saved = await uploadFieldProof({
+        user: payload.user,
+        image_data_url: imageDataUrl,
+        lat: playerPosition.lat,
+        lon: playerPosition.lon,
+        note,
+        stage_id: currentStage?.id ? String(currentStage.id) : undefined,
+        stage_title: currentStage?.title || undefined,
+      })
+
+      setFieldProofs((current) => [
+        saved.proof,
+        ...current.filter((item) => item.id !== saved.proof.id),
+      ])
+
+      void refreshFieldProofs().catch(() => {})
+      vibrate([10, 16, 10])
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'No se pudo subir la foto.', 'warn')
+      vibrate(8)
+    } finally {
+      setFieldPhotoUploading(false)
+    }
+  }
+
+
+  function togglePanel(panel: Exclude<PlayerPanel, null>) {
+    setToolsOpen(false)
+    setTeamOpen(false)
+    setActivePanel((current) => (current === panel ? null : panel))
+  }
+
+  function openTools() {
+    setActivePanel(null)
+    setTeamOpen(false)
+    setToolsOpen((current) => !current)
+  }
+
+  function closeTools() {
+    setToolsOpen(false)
+  }
+
+  function openTeam() {
+    setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen((current) => !current)
+  }
+
+  function closeTeam() {
+    setTeamOpen(false)
+  }
+
+  function handleOpenEntry() {
+    vibrate(10)
+    window.location.assign(shellLoginHref)
+  }
+
+  function handleToggleDebug() {
+    window.dispatchEvent(new CustomEvent('saga:close-qr-scanner'))
+    const currentlyActive = localDebugEnabled || Boolean(localDebugPosition)
+
+    if (currentlyActive) {
+      setLocalDebugEnabled(false)
+      setLocalDebugPosition(null)
+      setFollowPlayer(true)
+      setRouteOverviewActive(false)
+
+      const storedGps = readStoredGpsPosition(user)
+      if (storedGps) {
+        setBrowserGpsPosition(storedGps)
+        setBrowserGpsStatus('stale')
+        setBrowserGpsFresh(false)
+        setBrowserGpsAccuracy(
+          typeof storedGps.accuracy === 'number'
+            ? storedGps.accuracy
+            : null
+        )
+        setBrowserGpsCapturedAt(null)
+        gpsCenteredRef.current = false
+      }
+
+      showNotice('Debug desactivado. Recuperando GPS real…', 'info')
+
+      if (hasRememberedGpsReady(user)) {
+        void handleRequestLiveGps({ silent: true, forceFocus: true })
+        window.setTimeout(() => {
+          void handleRequestLiveGps({ silent: true, forceFocus: true })
+        }, 1500)
+      }
+
+      vibrate(8)
+      return
+    }
+
+    if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+      window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+      gpsWatchRef.current = null
+    }
+    setBrowserGpsPosition(null)
+    setBrowserGpsStatus('unavailable')
+    setBrowserGpsFresh(false)
+    setBrowserGpsAccuracy(null)
+    setBrowserGpsCapturedAt(null)
+    setLocalDebugEnabled(true)
+    showNotice('Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.', 'info')
+    vibrate([10, 16, 10])
+  }
+
+  function handleDebugSetPosition(position: { lat: number; lon: number }) {
+    setLocalDebugEnabled(true)
+    setLocalDebugPosition(position)
+    setFollowPlayer(true)
+    setFocusRequest({ target: 'player', token: Date.now() })
+    void sendHeartbeat({
+      user,
+      lat: position.lat,
+      lon: position.lon,
+      gps_status: 'ok',
+      source: 'react',
+    })
+    showNotice('Posición debug actualizada.', 'success')
+    vibrate([10, 12, 10])
+  }
+
+  function handleFocusPlayer() {
+    setRouteOverviewActive(false)
+
+    if (!playerPosition) {
+      void handleRequestLiveGps({
+        forceFocus: true,
+      })
+      return
+    }
+
+    setFollowPlayer(true)
+    setFocusRequest({
+      target: 'player',
+      token: Date.now(),
+    })
+
+    vibrate(8)
+  }
+
+  function handleFocusNode() {
+    if (!currentStage) {
+      showNotice('No active node is available right now.', 'warn')
+      vibrate(8)
+      return
+    }
+
+    setFocusRequest({ target: 'node', token: Date.now() })
+    showNotice('Centered on node.', 'info')
+    vibrate(8)
+  }
+
+  function handleToggleFollow() {
+    setFollowPlayer((current) => {
+      const next = !current
+      showNotice(next ? 'Player follow enabled.' : 'Free map enabled.', 'info')
+      vibrate(8)
+      return next
+    })
+  }
+
+  function handleToggleRouteOverview() {
+    if (!playerPosition) {
+      void handleRequestLiveGps({
+        forceFocus: true,
+      })
+      return
+    }
+
+    const stages =
+      Array.isArray(payload.stages)
+        ? payload.stages
+        : []
+
+    const hasRouteNodes =
+      stages.some(
+        (stage) =>
+          typeof stage.lat === 'number' &&
+          typeof stage.lon === 'number',
+      )
+
+    const nextToken = Date.now()
+
+    if (
+      routeOverviewActive ||
+      !hasRouteNodes
+    ) {
+      setRouteOverviewActive(false)
+      setFollowPlayer(true)
+      setFocusRequest({
+        target: 'player',
+        token: nextToken,
+      })
+      return
+    }
+
+    setRouteOverviewActive(true)
+    setFollowPlayer(false)
+    setFocusRequest({
+      target: 'route',
+      token: nextToken,
+    })
+  }
+
+  function openInteraction() {
+    setSubmitError(null)
+    setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen(false)
+    setInteractionOpen(true)
+  }
+
+  async function handleRequestLiveGps(options: { silent?: boolean; forceFocus?: boolean } = {}) {
+    if (typeof window === 'undefined' || !window.navigator.geolocation) {
+      setBrowserGpsStatus('unavailable')
+      if (!options.silent) showNotice('GPS no disponible en este dispositivo o navegador.', 'warn')
+      return
+    }
+
+    if (!window.isSecureContext) {
+      setBrowserGpsStatus('error')
+      setBrowserGpsFresh(false)
+      if (!options.silent) showNotice('El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.', 'warn')
+      return
+    }
+
+    // Reactivar GPS debe crear un watch nuevo, no reutilizar uno bloqueado.
+    if (gpsWatchRef.current !== null) {
+      window.navigator.geolocation.clearWatch(
+        gpsWatchRef.current
+      )
+      gpsWatchRef.current = null
+    }
+
+    setLocalDebugEnabled(false)
+    setLocalDebugPosition(null)
+    setBrowserGpsStatus('searching')
+    setBrowserGpsFresh(false)
+    setBrowserGpsCapturedAt(null)
+    if (!options.silent) showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
+
+    const onSuccess = (position: GeolocationPosition) => {
+      const next = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+      }
+
+      const nextAccuracy =
+        typeof position.coords.accuracy === 'number' &&
+        Number.isFinite(position.coords.accuracy)
+          ? Math.max(0, position.coords.accuracy)
+          : null
+
+      const capturedAt =
+        typeof position.timestamp === 'number' &&
+        Number.isFinite(position.timestamp)
+          ? position.timestamp
+          : Date.now()
+
+      setBrowserGpsPosition(next)
+      setBrowserGpsStatus('ready')
+      setBrowserGpsFresh(true)
+      setBrowserGpsAccuracy(nextAccuracy)
+      setBrowserGpsCapturedAt(capturedAt)
+      rememberGpsReady(user)
+      rememberGpsPosition(user, next, {
+        accuracy: nextAccuracy ?? undefined,
+        capturedAt,
+      })
+      if (hasOfflineMission) setOfflinePrepVisible(false)
+      setLocalDebugEnabled(false)
+      setLocalDebugPosition(null)
+
+      const shouldFocus =
+        options.forceFocus ||
+        !gpsCenteredRef.current
+
+      if (shouldFocus) {
+        gpsCenteredRef.current = true
+        setFollowPlayer(true)
+        setFocusRequest({
+          target: 'player',
+          token: Date.now(),
+        })
+      }
+
+      void sendHeartbeat({
+        user,
+        lat: next.lat,
+        lon: next.lon,
+        gps_status: 'ok',
+        source: 'browser_gps',
+      })
+
+      if (!options.silent && !gpsNoticeShownRef.current) {
+        gpsNoticeShownRef.current = true
+        showNotice('GPS real activado.', 'success')
+      }
+    }
+
+    const onError = (error: GeolocationPositionError) => {
+      setBrowserGpsStatus('error')
+      setBrowserGpsFresh(false)
+      const denied = error.code === error.PERMISSION_DENIED
+      if (!options.silent) {
+        showNotice(
+          denied
+            ? 'Permiso de ubicación denegado. En iPhone revisa Ajustes > Safari > Ubicación, o elimina y vuelve a añadir la PWA.'
+            : 'No se pudo obtener ubicación. Prueba al aire libre, activa Ubicación precisa y reintenta.',
+          'warn'
+        )
+      }
+    }
+
+    window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 15000,
+    })
+
+    if (gpsWatchRef.current === null) {
+      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 20000,
+      })
+    }
+  }
+
+  async function handlePrepareOfflinePack() {
+    try {
+      setOfflinePrepState('saving')
+      const [config, offlinePayload] = await Promise.all([
+        fetchPublicConfig(),
+        fetchPlayerGame(payload.user, { offlinePack: true }),
+      ])
+
+      const pack = await saveMissionPack({
+        user: payload.user,
+        config,
+        payload: offlinePayload,
+      })
+
+      setState({
+        status: 'ready',
+        payload: offlinePayload,
+      })
+
+      setMapRefreshToken(
+        (value) => value + 1
+      )
+
+      setOfflineSummary(await getOfflineMissionSummary(payload.user))
+      setOfflinePrepState('saved')
+      await cachePlayerShell(playerHref).catch(() => undefined)
+      setOfflinePrepVisible(true)
+      showNotice(`Mission downloaded for offline play (${pack.stage_count} nodes).`, 'success')
+      vibrate([10, 16, 10])
+    } catch (error) {
+      setOfflinePrepState('error')
+      showNotice(error instanceof Error ? error.message : 'Could not download offline mission.', 'warn')
+      vibrate(10)
+    }
+  }
+
+  async function handleDownloadFieldProofs() {
+    if (!fieldProofs.length) return
+    showNotice('Preparando archivo ZIP...', 'info')
+    
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      
+      const promises = fieldProofs.map(async (proof, index) => {
+        const url = proof.image_url || proof.thumbnail_url
+        if (!url) return
+        
+        try {
+          const response = await fetch(url)
+          const blob = await response.blob()
+          const filename = `foto_${index + 1}_${proof.id}.jpg`
+          zip.file(filename, blob)
+        } catch (err) {
+          console.warn('Failed to fetch photo for zip', err)
+        }
+      })
+      
+      await Promise.all(promises)
+      
+      const content = await zip.generateAsync({ type: 'base64' })
+      const safeUserName = String(payload.user || 'jugador').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      const downloadUrl = `data:application/zip;base64,${content}`
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `fotos_saga_${safeUserName}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      
+      showNotice('Descarga de ZIP completada', 'success')
+    } catch (err) {
+      console.error(err)
+      showNotice('Error al crear ZIP', 'warn')
+    }
+  }
+  function handlePrimaryAction() {
+    if (gpsActionRequired) {
+      void handleRequestLiveGps({ forceFocus: true })
+      return
+    }
+
+    if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        vibrate(8)
+        return
+      }
+
+      setFocusRequest({ target: 'node', token: Date.now() })
+      setQuickQrOpenSignal(Date.now())
+      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      vibrate([10, 16, 10])
+      return
+    }
+
+    if (!runtime.canEnter) return
+    setFocusRequest({ target: 'node', token: Date.now() })
+    vibrate([10, 16, 10])
+    showOverlay('activate')
+    openInteraction()
+  }
+
+  function handleMapNodeTap() {
+    if (payload.finished) return
+
+    vibrate(8)
+
+    if (!currentStage) {
+      showNotice('Complete the previous stage before interacting here.', 'warn')
+      return
+    }
+
+    setFocusRequest({ target: 'node', token: Date.now() })
+
+    if (currentStageIsPhysicalQr) {
+      if (!runtime.canEnter) {
+        showNotice(
+          runtime.reason === 'out_of_range'
+            ? 'Acércate al nodo físico para escanear su QR.'
+            : 'Activa GPS o usa modo debug para abrir este QR físico.',
+          'warn'
+        )
+        return
+      }
+
+      setQuickQrOpenSignal(Date.now())
+      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      return
+    }
+
+    if (runtime.canEnter) {
+      showNotice('Target in range. Use Open Interaction.', 'info')
+      return
+    }
+
+    if (runtime.reason === 'out_of_range') {
+      showNotice(
+        distanceMeters !== null
+          ? 'Too far away. Move closer to the node.'
+          : 'Too far from the node.',
+        'warn'
+      )
+      return
+    }
+
+    if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
+      showNotice('Position is not ready yet.', 'info')
+      return
+    }
+
+    if (runtime.reason === 'missing_stage') {
+      showNotice('Complete the previous stage first.', 'warn')
+      return
+    }
+
+    showNotice('Interaction is not available yet.', 'info')
+  }
+
+  async function handleSubmitCode(code: string) {
+    try {
+      setSubmitting(true)
+      setSubmitError(null)
+
+      const result = await advancePlayer(payload.user, code)
+      if (result.status !== 'ok') {
+        const missingItem = result.reason === 'missing_required_item'
+        setSubmitError(missingItem ? 'Missing required item for this node.' : 'Invalid code for the current stage.')
+        showNotice(missingItem ? 'Missing required item for this node.' : 'The code was not accepted for this stage.', 'warn')
+        return
+      }
+
+      setInteractionOpen(false)
+      const nextPayload = await refreshPayload()
+
+      if (nextPayload.finished) {
+        showOverlay('finish')
+        showNotice('Mission complete.', 'success')
+      } else {
+        showOverlay('node')
+        showNotice('Node cleared.', 'success')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown submit error'
+
+      try {
+        const localResult = await advanceLocalProgress({
+          payload,
+          currentStage,
+          code,
+        })
+
+        if (localResult.ok) {
+          setInteractionOpen(false)
+          setState({
+            status: 'ready',
+            payload: localResult.payload,
+          })
+
+          setMapRefreshToken(
+            (value) => value + 1
+          )
+
+          if (localResult.payload.finished) {
+            showOverlay('finish')
+            showNotice('Mission complete locally. Sync when connection returns.', 'success')
+          } else {
+            showOverlay('node')
+            showNotice('Node cleared locally. Progress queued for sync.', 'success')
+          }
+
+          return
+        }
+
+        if (localResult.reason === 'missing_required_item') {
+          setSubmitError('Missing required item for this node.')
+          showNotice('Missing required item for this node.', 'warn')
+          return
+        }
+
+        if (localResult.reason === 'invalid_code') {
+          setSubmitError('Invalid code for the downloaded offline mission.')
+          showNotice('The offline code was not accepted.', 'warn')
+          return
+        }
+
+        const snapshot = queueManualCode({
+          user: payload.user,
+          node_id: currentStage?.id ? String(currentStage.id) : undefined,
+          code,
+          payload: {
+            stage_title: currentStage?.title || '',
+            reason: 'advance_sync_failed',
+          },
+        })
+        setSubmitError(`${message}. Code saved locally and will sync when connection returns.`)
+        showNotice(`Code saved offline (${snapshot.queued_events.length} pending).`, 'warn')
+      } catch {
+        setSubmitError(message)
+        showNotice('Mission sync failed. Try again.', 'warn')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ScreenFrame mobile={isPhone}>
+        <MapSurface
+          currentStage={currentStage}
+          missionStages={payload.stages || []}
+          currentLevel={payload.level || 0}
+          playerPosition={playerPosition}
+          gpsState={gpsState}
+          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
+          followPlayer={followPlayer}
+          focusRequest={focusRequest}
+          refreshToken={mapRefreshToken}
+          onUserMapMove={() => {
+            setFollowPlayer(false)
+            setRouteOverviewActive(false)
+          }}
+          nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
+          otherPlayers={teamMapMarkers}
+          fieldProofs={fieldProofs}
+          viewerUser={payload.user}
+          onDeleteFieldProof={handleDeleteFieldProof}
+          onOpenFieldProofs={(proofs) => setSelectedFieldProofs(proofs)}
+          selfLabel={payload.display_name || payload.user || 'YO'}
+          selfProfile={{
+            ...(payload.profile || {}),
+            user: payload.user,
+            display_name: payload.display_name || payload.user,
+            gps_status: gpsState,
+          }}
+          onDebugSetPosition={handleDebugSetPosition}
+          onNodeTap={handleMapNodeTap}
+        />
+
+        <div style={getTopScrimStyle(isPhone)} />
+
+        <div style={getTopOverlayStyle(isPhone)}>
+          <PlayerShell
+            payload={payload}
+            currentStage={currentStage}
+            teamOpen={teamOpen}
+            teamCount={teamVisibleCount}
+            teamLiveCount={teamLiveCount}
+            gpsState={gpsState}
+            onOpenTeam={openTeam}
+          />
+        </div>
+
+        <div style={getToastOverlayStyle(isPhone)}>
+          <ToastNotice notice={uiNotice} />
+        </div>
+
+        <FieldPhotoViewer
+          open={selectedFieldProofs.length > 0}
+          proofs={selectedFieldProofs}
+          viewerUser={payload.user}
+          onClose={() => setSelectedFieldProofs([])}
+          onDelete={handleDeleteFieldProof}
+        />
+
+        <FieldCameraCapture
+          open={fieldCameraOpen}
+          busy={fieldPhotoUploading}
+          onClose={() => setFieldCameraOpen(false)}
+          onCapture={handleFieldCameraCapture}
+        />
+
+        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
+          <div style={getMapQuickControlsStyle(isPhone)}>
+            <QuickProofPanel
+              user={user}
+              mobile={isPhone}
+              hidden={false}
+              openSignal={quickQrOpenSignal}
+              showLauncher={false}
+            />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleOpenFieldCamera()
+              }}
+              aria-label="Hacer foto de campo"
+              title="Hacer foto de campo"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>{fieldPhotoUploading ? '⏳' : '📷'}</span>
+            </button>
+
+            <button
+              type="button"
+              style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                openTeam()
+              }}
+              aria-label="Jugadores"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>👥</span>
+              <span style={mapQuickCountPill}>{teamVisibleCount}</span>
+            </button>
+
+            <button
+              type="button"
+              style={
+                routeOverviewActive
+                  ? mapQuickButtonActive
+                  : mapRouteToggleInlineButton
+              }
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleToggleRouteOverview()
+              }}
+              aria-label={
+                routeOverviewActive
+                  ? 'Volver a mi ubicación y seguirme'
+                  : 'Ver todos los nodos'
+              }
+              title={
+                routeOverviewActive
+                  ? 'Volver a mi ubicación y seguirme'
+                  : 'Ver todos los nodos'
+              }
+            >
+              <span
+                aria-hidden="true"
+                style={mapQuickIcon}
+              >
+                {routeOverviewActive ? '📍' : '🧭'}
+              </span>
+            </button>
+
+          </div>
+        ) : null}{/* saga-map-quick-controls-row-v1 */}
+
+          <FieldPrepPanel
+            visible={offlinePrepVisible && !payload.finished}
+            mobile={isPhone}
+            hasOfflineMission={hasOfflineMission}
+            hasBrowserGps={hasBrowserGps}
+            offlinePrepState={offlinePrepState}
+            browserGpsStatus={browserGpsStatus}
+            onPrepareOfflinePack={handlePrepareOfflinePack}
+            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDismiss={() => setOfflinePrepVisible(false)}
+          />
+
+        {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
+
+        {payload.finished && !dismissedFinishScreen ? (
+          <div className="saga-finish-overlay" role="dialog" aria-modal="true">
+            <style>{finishOverlayStyle}</style>
+            <div className="saga-finish-card">
+              <div className="saga-finish-orb">🏆</div>
+              <h2 className="saga-finish-title">Misión Completada</h2>
+              <p className="saga-finish-subtitle">
+                ¡Excelente trabajo, agente <strong>{payload.display_name || payload.user}</strong>! Has completado con éxito todos los nodos de la ruta de campo.
+              </p>
+              
+              <div className="saga-finish-stats">
+                <div className="saga-finish-stat-box">
+                  <div className="saga-finish-stat-val">{payload.stages?.length || 0}</div>
+                  <div className="saga-finish-stat-lbl">Nodos</div>
+                </div>
+                <div className="saga-finish-stat-box">
+                  <div className="saga-finish-stat-val">{fieldProofs?.filter((p) => p.user === payload.user).length || 0}</div>
+                  <div className="saga-finish-stat-lbl">Fotos</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="saga-finish-btn-primary"
+                onClick={() => setDismissedFinishScreen(true)}
+              >
+                Ver mapa de ruta
+              </button>
+
+              <button
+                type="button"
+                className="saga-finish-btn-secondary"
+                onClick={() => window.location.assign('/')}
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+      <div style={getBottomOverlayStyle(isPhone)}>
+        <PlayerHud
+            user={payload.user}
+            missionPayload={payload}
+            currentStage={currentStage}
+            level={payload.level}
+            finished={payload.finished}
+            gpsState={gpsState}
+            distanceMeters={distanceMeters}
+            inRange={inRange}
+            debugEnabled={effectiveDebugEnabled}
+            followPlayer={followPlayer}
+            toolsOpen={toolsOpen}
+            playerHref={playerHref}
+            loginHref={shellLoginHref}
+            adminHref={adminHref}
+            primaryLabel={primaryLabel}
+            primaryTone={runtime.primaryTone}
+            primaryDisabled={primaryDisabled}
+            helperText={hudHelperText}
+            detailsOpen={activePanel === 'details'}
+            onPrimaryAction={handlePrimaryAction}
+            onToggleDetails={() => togglePanel('details')}
+            onOpenTools={openTools}
+            onCloseTools={closeTools}
+            onToggleDebug={handleToggleDebug}
+            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+            onDownloadFieldProofs={handleDownloadFieldProofs}
+            fieldPhotoCount={fieldProofs.length}
+             submitting={submitting}
+             errorMessage={submitError}
+             onSubmitCode={handleSubmitCode}
+          />
+        </div>
+
+      <TeamSheet
+        open={teamOpen}
+        players={teamOtherProfiles}
+        currentPosition={playerPosition}
+        onClose={closeTeam}
+      />
+
+      <InteractionSheet
+        open={interactionOpen}
+        user={payload.user}
+        currentStage={currentStage}
+        helperText={runtime.helperText}
+        submitting={submitting}
+        onClose={() => {
+          if (!submitting) setInteractionOpen(false)
+        }}
+        onSubmitCode={handleSubmitCode}
+      />
+
+      {payload.finished && dismissedFinishScreen ? (
+        <button
+          type="button"
+          style={floatingTrophyButton}
+          onClick={() => setDismissedFinishScreen(false)}
+          aria-label="Ver pantalla de finalización"
+          title="Ver pantalla de finalización"
+        >
+          🏆
+        </button>
+      ) : null}
+    </ScreenFrame>
+  )
+}
+
+const mapRouteToggleInlineButton: CSSProperties = {
+  width: 44,
+  height: 38,
+  minWidth: 44,
+  minHeight: 38,
+  padding: 0,
+  borderRadius: 18,
+  border: '1px solid transparent',
+  background: 'rgba(255,255,255,.03)',
+  color: '#f8fafc',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  fontSize: 16,
+  lineHeight: 1,
+  fontWeight: 900,
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  textShadow: '0 1px 6px rgba(15,23,42,.24)',
+  boxShadow: 'none',
+  position: 'relative',
+  overflow: 'hidden',
+  pointerEvents: 'auto',
+  touchAction: 'manipulation',
+  cursor: 'pointer',
+  userSelect: 'none',
+}
+
+const mapQuickButtonActive: CSSProperties = {
+  ...mapRouteToggleInlineButton,
+  background: 'rgba(255,255,255,.10)',
+  border: '1px solid rgba(224,242,254,.24)',
+  color: '#e0f2fe',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+}
+
+const mapQuickIcon: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 17,
+  lineHeight: 1,
+  filter: 'drop-shadow(0 1px 3px rgba(15,23,42,.24))',
+  transform: 'translateY(-0.5px)',
+}
+
+const mapQuickCountPill: CSSProperties = {
+  position: 'absolute',
+  top: 5,
+  right: 5,
+  minWidth: 14,
+  height: 14,
+  padding: '0 3px',
+  borderRadius: 999,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(15,23,42,.56)',
+  border: '1px solid rgba(255,255,255,.16)',
+  color: '#ffffff',
+  fontSize: 8,
+  fontWeight: 950,
+  lineHeight: 1,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+}

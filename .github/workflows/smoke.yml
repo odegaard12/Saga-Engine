@@ -1,0 +1,122 @@
+name: Smoke Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            main.py \
+            backend/app/runtime/minigames.py \
+            scripts/contract_check.py
+
+      - name: Build real React frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Audit guard checks
+        run: |
+          test -f LICENSE
+          ! grep -R "MIT recommended" README.md
+          ! grep -R "Pelochito13" main.py backend scripts frontend || true
+
+      - name: Contract checks
+        env:
+          ADMIN_PASS: contract_test_admin_password
+        run: python scripts/contract_check.py
+
+      - name: Run backend tests
+        env:
+          ADMIN_PASS: pytest_admin_password
+        run: PYTHONPATH=. pytest -q
+
+      - name: Start app with real frontend dist
+        env:
+          ADMIN_PASS: test_admin_password_for_ci
+        run: |
+          nohup python -m uvicorn main:app --host 127.0.0.1 --port 8097 >/tmp/saga_smoke.log 2>&1 &
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8097/docs >/dev/null; then
+              echo "App is ready"
+              exit 0
+            fi
+            echo "Waiting for app... attempt ${attempt}/30"
+            sleep 1
+          done
+
+          echo "App did not become ready"
+          cat /tmp/saga_smoke.log || true
+          exit 1
+
+      - name: Smoke public endpoints
+        run: |
+          curl -fsS http://127.0.0.1:8097/ >/dev/null
+          curl -fsSI http://127.0.0.1:8097/ >/dev/null
+          curl -fsS http://127.0.0.1:8097/player/PLAYER%201 >/dev/null
+          curl -fsSI http://127.0.0.1:8097/player/PLAYER%201 >/dev/null
+          curl -fsS http://127.0.0.1:8097/admin >/dev/null
+          curl -fsSI http://127.0.0.1:8097/admin >/dev/null
+          curl -fsS http://127.0.0.1:8097/admin-react >/dev/null
+          curl -fsS http://127.0.0.1:8097/api/config >/dev/null
+          curl -fsS http://127.0.0.1:8097/api/game/PLAYER%201 >/dev/null
+
+      - name: Smoke reset endpoint is not public
+        run: |
+          code="$(
+            curl -sS -o /tmp/reset_noauth.json -w "%{http_code}" \
+              -X POST http://127.0.0.1:8097/api/reset \
+              -H 'content-type: application/json' \
+              --data '{"user":"PLAYER 1"}'
+          )"
+
+          if [ "$code" = "200" ]; then
+            echo "/api/reset accepted unauthenticated mutation"
+            cat /tmp/reset_noauth.json || true
+            exit 1
+          fi
+
+          echo "/api/reset unauthenticated response: HTTP ${code}"

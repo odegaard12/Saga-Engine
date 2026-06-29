@@ -1,0 +1,54 @@
+name: CodeQL
+
+# Temporarily manual-only.
+# GitHub CodeQL initialization is currently failing in hosted runners with
+# "Requires authentication" while determining feature enablement, even with
+# security-events: write and contents: read.
+#
+# SAGA v0.1.0 is validated by local guards, frontend build and production smoke.
+# Re-enable push/pull_request after the GitHub CodeQL token/init issue is resolved.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  packages: read
+  checks: write
+  statuses: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

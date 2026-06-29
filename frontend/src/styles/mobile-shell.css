@@ -1,0 +1,257 @@
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  background: #e8efea;
+}
+
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font-family: system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
+
+@media (max-width: 560px) {
+  html,
+  body,
+  #root {
+    background: #e8efea;
+  }
+}
+
+:root {
+  --saga-safe-top: env(safe-area-inset-top, 0px);
+  --saga-safe-right: env(safe-area-inset-right, 0px);
+  --saga-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --saga-safe-left: env(safe-area-inset-left, 0px);
+}
+
+body {
+  min-height: 100dvh;
+  padding-top: var(--saga-safe-top);
+  padding-right: var(--saga-safe-right);
+  padding-bottom: var(--saga-safe-bottom);
+  padding-left: var(--saga-safe-left);
+  box-sizing: border-box;
+}
+
+/* i18n fast pass: keep global toggle out of player and avoid admin drawer overlap */
+.saga-admin-locale-toggle {
+  z-index: 5500;
+}
+
+.saga-admin-locale-toggle--entry {
+  top: auto !important;
+  right: max(10px, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.saga-admin-locale-toggle--admin {
+  top: auto !important;
+  right: max(10px, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+  transform: scale(0.92);
+  transform-origin: bottom right;
+}
+
+.saga-admin-locale-toggle--player-hidden {
+  display: none !important;
+}
+
+.saga-tools-language-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.saga-tools-language-row span {
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.saga-tools-language-row button {
+  flex: 1;
+  text-align: center;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saga-tools-language-row button.active {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+}
+
+/* i18n adjustment: player language selector lives inside Tools only */
+.saga-admin-locale-toggle--player-hidden {
+  display: none !important;
+}
+
+.saga-admin-locale-toggle--admin {
+  top: auto !important;
+  right: max(10px, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+  transform: scale(0.88);
+  transform-origin: bottom right;
+}
+
+.saga-admin-locale-toggle--entry {
+  top: auto !important;
+  right: max(10px, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Hard hide global language toggle on player routes; player language lives inside Tools. */
+.saga-admin-locale-toggle--player-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Hard block floating language selectors on player routes. Player language lives inside Tools only. */
+html.saga-route-player #saga-admin-locale-toggle,
+html.saga-route-player #saga-global-language-toggle,
+html.saga-route-player .saga-admin-locale-toggle,
+html.saga-route-player .saga-global-language-toggle {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html.saga-route-player .saga-tools-language-row {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* i18n final placement: no floating language selector outside login/admin settings/player tools */
+#saga-admin-locale-toggle,
+#saga-global-language-toggle,
+.saga-admin-locale-toggle,
+.saga-global-language-toggle {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.saga-tools-language-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.saga-tools-language-row span {
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.saga-tools-language-row button {
+  flex: 1;
+  text-align: center;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saga-tools-language-row button.active {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+}
+
+.saga-admin-settings-language-menu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.saga-admin-settings-language-menu span {
+  color: rgba(226, 232, 240, 0.84);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.saga-admin-settings-language-menu div {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.saga-admin-settings-language-menu button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.saga-admin-settings-language-menu button.active {
+  background: #22c55e;
+  color: #052e16;
+}
