@@ -1,47 +1,19 @@
-# SAGA Engine v0.5.4 — Tools and QR Studio release
+# SAGA Engine v1.0.1 — iOS Polish and Documentation update
 
-SAGA Engine v0.5.4 improves the field experience without adding another game.
-It consolidates offline preparation into a compact Tools panel and adds a safe,
-validated QR card workflow to Mission Control.
+SAGA Engine v1.0.1 addresses post-launch polish feedback, specifically targeting iOS Safari rendering artifacts and iPhone full-screen display issues, alongside documentation corrections.
 
-## Compact field Tools
+## iOS Map Flickering Fixes
+- Added `translate3d` and `translateZ(0)` hardware acceleration to Leaflet markers and overlays in `MapSurface.tsx`.
+- Removed layout-thrashing CSS filters (`drop-shadow`) from animated route guides, replacing them with GPU-friendly offset animations.
+- The map tile layer no longer repaints/blinks when CSS keyframes cycle.
 
-- Aligns Tools with the established SAGA player design.
-- Removes duplicated headings and explanatory copy.
-- Uses one action to prepare mission data, map tiles, games and field photographs for offline play.
-- Keeps photograph downloads for the device gallery as a separate action.
-- Preserves progress save, synchronization, GPS centring, language, fallback code and diagnostics.
-- Leaves the bottom navigation and mobile safe areas unchanged.
+## iPhone Display Edges
+- Set the root `html` and `body` background colors to Slate 900 (`#020617`). This perfectly hides the top and bottom swipe safe-areas on edge-to-edge mobile devices (like iPhones), maintaining the immersive app feel.
 
-## QR Studio
+## UI Transitions
+- Upgraded `PlayerLayout.tsx` overlays to use 3D scaling and hardware hints (`will-change: transform, opacity`), ensuring 120 FPS capable UI pops and fade-ins.
 
-- Adds clear, dark and photographic card presets.
-- Supports configurable accent colour and square or rounded cards.
-- Optimizes uploaded header photographs without placing them over QR modules.
-- Keeps QR codes on a white, high-contrast surface with error-correction level H.
-- Adds camera validation using exact payload comparison.
-- Blocks PNG export until the current payload and design have been validated.
-- Invalidates the previous validation after any payload, photograph, colour, shape or preset change.
-- Does not modify inventory, node completion or player progress during validation.
-
-## Offline preparation
-
-The preparation action now caches the player shell, mission configuration, map
-tiles and field-proof assets together. Successful preparation remains compatible
-with later progress saving and pending-event synchronization.
-
-## Validation
-
-- Dedicated Tools and QR Studio guard.
-- Offline/GPS hardening and recovery guards.
-- Marker, routing, privacy and protected-files guards.
-- Runtime contracts inside Docker.
-- TypeScript and Vite production build.
-- npm audit with zero known vulnerabilities.
-- Candidate-first Docker deployment and smoke checks for `/`, `/admin-react` and `/player/PLAYER%201`.
-
-## Follow-up work
-
-- Test QR scanning across more phones, cameras, screens, printers and lighting conditions.
-- Consider PDF/A4 batch export after the single-card workflow is proven.
-- Continue reducing the frontend bundle through game-level dynamic imports.
+## Documentation
+- Cleared legacy "Tema de Juegos" mentions from `README.md`.
+- Restricted the official Minigames list to the 4 confirmed stable families.
+- Restricted the physical QR types strictly to Objeto QR, Llave QR, Pista QR, and Bonus Oculto.

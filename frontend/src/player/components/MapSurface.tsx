@@ -657,9 +657,9 @@ export function MapSurface({
     const style = document.createElement('style')
     style.id = 'saga-player-aura-style'
     style.textContent = `
-      .saga-player-aura--gps { animation: sagaPlayerAuraBreathe 3.2s ease-in-out infinite; }
-      .saga-player-aura--debug { animation: sagaPlayerAuraBreathe 3s ease-in-out infinite; }
-      .saga-avatar-pin--self { animation: sagaPlayerLocator 2.3s ease-in-out infinite !important; opacity: 1 !important; transform-origin: center !important; }
+      .saga-player-aura--gps { animation: sagaPlayerAuraBreathe 3.2s ease-in-out infinite; will-change: opacity; }
+      .saga-player-aura--debug { animation: sagaPlayerAuraBreathe 3s ease-in-out infinite; will-change: opacity; }
+      .saga-avatar-pin--self { animation: sagaPlayerLocator 2.3s ease-in-out infinite !important; opacity: 1 !important; transform-origin: center !important; will-change: transform, box-shadow; transform: translateZ(0); }
       .saga-avatar-pin--self img { animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
       .saga-mission-node-icon-wrap { background: transparent !important; border: 0 !important; }
       .saga-mission-node-marker { position: relative; width: 48px; height: 48px; display: grid; place-items: center; overflow: visible; }
@@ -669,7 +669,7 @@ export function MapSurface({
       .saga-mission-node-pin--current { width: 42px; height: 42px; background: linear-gradient(145deg,#3b82f6,#1d4ed8); border-color: rgba(219,234,254,.99); color: #ffffff; box-shadow: 0 8px 20px rgba(29,78,216,.40); }
       .saga-mission-node-pin--locked { background: linear-gradient(145deg,#374151,#111827); border-color: rgba(255,255,255,.2); color: rgba(255,255,255,0.4); box-shadow: 0 4px 10px rgba(0,0,0,.35); }
       .saga-mission-node-symbol--number { font-size: 16px; font-weight: 950; font-variant-numeric: tabular-nums; }
-      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translateX(-50%); border-radius: 50%; background: rgba(15,23,42,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(15,23,42,0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
+      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translate3d(-50%, 0, 0); will-change: transform; border-radius: 50%; background: rgba(15,23,42,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(15,23,42,0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
       .saga-mission-node-type-badge::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 5px 5px 0; border-style: solid; border-color: #ffffff transparent transparent transparent; display: block; width: 0; height: 0; }
       .saga-mission-node-type-badge--collectible { border-color: #fbbf24 !important; }
       .saga-mission-node-type-badge--collectible::after { border-top-color: #fbbf24 !important; }
@@ -679,9 +679,9 @@ export function MapSurface({
       .saga-mission-node-type-badge--clue::after { border-top-color: #a855f7 !important; }
       .saga-mission-node-type-badge--bonus { border-color: #ec4899 !important; }
       .saga-mission-node-type-badge--bonus::after { border-top-color: #ec4899 !important; }
-      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(59,130,246,.88); box-shadow: 0 0 0 3px rgba(29,78,216,.13),0 0 18px rgba(59,130,246,.28); pointer-events: none; transform-origin: center; animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(59,130,246,.88); box-shadow: 0 0 0 3px rgba(29,78,216,.13),0 0 18px rgba(59,130,246,.28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
       .saga-road-guide--casing { filter: blur(3px); }
-      .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; filter: drop-shadow(0 0 4px #22c55e); }
+      .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; will-change: stroke-dashoffset; transform: translateZ(0); }
       .saga-node-radius--completed,.saga-node-radius--locked { display: none; animation: none; }
       .saga-node-radius--current,.saga-node-radius--ready,.saga-node-radius--engaging { animation: none; }
       
@@ -692,10 +692,10 @@ export function MapSurface({
       .leaflet-control { border: 1px solid rgba(74, 222, 128, 0.25) !important; border-radius: 12px !important; background: rgba(15, 23, 42, 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
 
       @keyframes sagaPlayerAuraBreathe { 0%,100% { opacity:.42; } 50% { opacity:.66; } }
-      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1); box-shadow:0 12px 28px rgba(16,185,129,.40),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
-      @keyframes sagaCurrentNodeHalo { 0% { transform:scale(.82); opacity:.84; } 72% { transform:scale(1.34); opacity:.12; } 100% { transform:scale(1.40); opacity:0; } }
+      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1) translateZ(0); box-shadow:0 12px 28px rgba(16,185,129,.40),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035) translateZ(0); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
+      @keyframes sagaCurrentNodeHalo { 0% { transform:scale(.82) translateZ(0); opacity:.84; } 72% { transform:scale(1.34) translateZ(0); opacity:.12; } 100% { transform:scale(1.40) translateZ(0); opacity:0; } }
       @keyframes sagaRoadFlow { to { stroke-dashoffset: -60; } }
-      @keyframes sagaTypeBadgeFloat { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -4px); } }
+      @keyframes sagaTypeBadgeFloat { 0%,100% { transform: translate3d(-50%, 0, 0); } 50% { transform: translate3d(-50%, -4px, 0); } }
       @media (prefers-reduced-motion: reduce) { .saga-player-aura--gps,.saga-player-aura--debug,.saga-avatar-pin--self,.saga-mission-node-halo,.saga-road-guide--route,.saga-mission-node-type-badge { animation:none !important; } }
     `
 
