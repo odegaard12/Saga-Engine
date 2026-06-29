@@ -53,9 +53,7 @@ function parseQrItem(value: string): ParsedQrItem | null {
 
   if (!clean) return null
 
-  const normalized = clean
-    .replace(/^saga\s*:/i, 'SAGA:')
-    .replace(/^saga1\s*:/i, 'SAGA1:')
+  const normalized = clean.replace(/^saga\s*:/i, 'SAGA:').replace(/^saga1\s*:/i, 'SAGA1:')
 
   const stripped = normalized.toUpperCase().startsWith('SAGA1:')
     ? normalized.slice('SAGA1:'.length)
@@ -63,7 +61,10 @@ function parseQrItem(value: string): ParsedQrItem | null {
       ? normalized.slice('SAGA:'.length)
       : normalized
 
-  const parts = stripped.split(':').map((part) => part.trim()).filter(Boolean)
+  const parts = stripped
+    .split(':')
+    .map((part) => part.trim())
+    .filter(Boolean)
   const kind = String(parts[0] || '').toUpperCase()
 
   if (kind === 'ITEM' && parts[1]) {
@@ -112,7 +113,9 @@ export function QuickProofPanel({
   showLauncher = true,
 }: QuickProofPanelProps) {
   const [mode, setMode] = useState<'idle' | 'qr'>('idle')
-  const [message, setMessage] = useState('Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.')
+  const [message, setMessage] = useState(
+    'Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.'
+  )
   const [notice, setNotice] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   useEffect(() => {
@@ -177,7 +180,6 @@ export function QuickProofPanel({
     }
   }, [mode])
 
-
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -212,7 +214,6 @@ export function QuickProofPanel({
     window.addEventListener('saga:close-qr-scanner', closeScanner)
     return () => window.removeEventListener('saga:close-qr-scanner', closeScanner)
   }, [])
-
 
   useEffect(() => {
     return () => stopCamera()
@@ -250,17 +251,21 @@ export function QuickProofPanel({
       })
 
       setNotice(`Guardado en Objetos: ${parsed.label}`)
-      setMessage(`Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`)
+      setMessage(
+        `Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`
+      )
       setMode('idle')
       stopCamera()
-      window.dispatchEvent(new CustomEvent('saga:inventory-updated', {
-        detail: {
-          user,
-          item_id: parsed.item_id,
-          label: parsed.label,
-          source: 'qr',
-        },
-      }))
+      window.dispatchEvent(
+        new CustomEvent('saga:inventory-updated', {
+          detail: {
+            user,
+            item_id: parsed.item_id,
+            label: parsed.label,
+            source: 'qr',
+          },
+        })
+      )
     } catch {
       setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
     }
@@ -424,8 +429,7 @@ const dock: CSSProperties = {
   padding: 6,
   borderRadius: 19,
   border: '1px solid rgba(255,255,255,.12)',
-  background:
-    'linear-gradient(180deg, rgba(148,163,184,.19), rgba(100,116,139,.16))',
+  background: 'linear-gradient(180deg, rgba(148,163,184,.19), rgba(100,116,139,.16))',
   boxShadow: '0 14px 30px rgba(15,23,42,.20)',
   backdropFilter: 'blur(20px) saturate(1.10)',
   WebkitBackdropFilter: 'blur(20px) saturate(1.10)',
@@ -470,8 +474,7 @@ const panel: CSSProperties = {
   gap: 10,
   borderRadius: 28,
   border: '2px solid rgba(74,222,128,.30)',
-  background:
-    'linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.99))',
+  background: 'linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.99))',
   color: '#f8fafc',
   boxShadow: '0 0 0 1px rgba(255,255,255,.05), 0 32px 84px rgba(0,0,0,.60)',
   backdropFilter: 'blur(26px) saturate(1.12)',
@@ -568,8 +571,7 @@ const noticeBox: CSSProperties = {
   width: 'min(calc(100vw - 28px), 340px)',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,.16)',
-  background:
-    'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
+  background: 'linear-gradient(180deg, rgba(100,116,139,.97), rgba(51,65,85,.95))',
   color: '#f8fafc',
   fontSize: 12,
   fontWeight: 900,

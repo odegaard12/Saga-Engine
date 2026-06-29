@@ -1,9 +1,5 @@
 export type MinigameFamily =
-  | 'circuit_matrix'
-  | 'bearing_hunt'
-  | 'signal_hunt'
-  | 'motion_challenge'
-  | 'audio_challenge'
+  'circuit_matrix' | 'bearing_hunt' | 'signal_hunt' | 'motion_challenge' | 'audio_challenge'
 
 export type MinigameVersion = 'v1'
 
@@ -17,11 +13,7 @@ export type CapabilityKey =
   | 'audio'
   | 'wake_lock'
 
-export type CapabilityRequirement =
-  | 'required'
-  | 'preferred'
-  | 'optional'
-  | 'forbidden'
+export type CapabilityRequirement = 'required' | 'preferred' | 'optional' | 'forbidden'
 
 export type ValidationMode = 'client' | 'server' | 'hybrid'
 
@@ -38,19 +30,11 @@ export type MinigameRuntimeState =
   | 'failed'
   | 'error'
 
-export type MinigameRunMode =
-  | 'normal'
-  | 'degraded'
-  | 'fallback'
-  | 'blocked'
+export type MinigameRunMode = 'normal' | 'degraded' | 'fallback' | 'blocked'
 
 export type MinigameResult = 'success' | 'failed'
 
-export type FallbackPolicy =
-  | 'none'
-  | 'manual_code'
-  | 'alternate_minigame'
-  | 'degraded_mode'
+export type FallbackPolicy = 'none' | 'manual_code' | 'alternate_minigame' | 'degraded_mode'
 
 export interface CapabilitySpec {
   key: CapabilityKey
@@ -125,9 +109,7 @@ export interface MinigameRuntimeBindings<TConfig extends Record<string, unknown>
 }
 
 export interface MinigameController<TConfig extends Record<string, unknown>> {
-  runPreflight: (
-    bindings: MinigameRuntimeBindings<TConfig>
-  ) => Promise<MinigamePreflightResult>
+  runPreflight: (bindings: MinigameRuntimeBindings<TConfig>) => Promise<MinigamePreflightResult>
   validateConfig: (
     config: unknown
   ) => { ok: true; value: TConfig } | { ok: false; errors: string[] }

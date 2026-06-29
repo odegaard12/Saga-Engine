@@ -1,7 +1,4 @@
-import {
-  useMemo,
-  useState,
-} from 'react'
+import { useMemo, useState } from 'react'
 import {
   generateTiltMaze,
   WALL_DOWN,
@@ -12,9 +9,7 @@ import {
 
 type Props = {
   config: Record<string, unknown>
-  onChange: (
-    values: Record<string, unknown>,
-  ) => void
+  onChange: (values: Record<string, unknown>) => void
 }
 
 const CSS = `
@@ -48,33 +43,17 @@ const CSS = `
 @media(max-width:860px){.tme-layout{grid-template-columns:1fr}.tme-board{max-width:430px}}
 `
 
-function clamp(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number,
-) {
+function clamp(value: unknown, fallback: number, minimum: number, maximum: number) {
   const parsed = Number(value)
 
   return Math.max(
     minimum,
-    Math.min(
-      maximum,
-      Number.isFinite(parsed)
-        ? Math.round(parsed)
-        : fallback,
-    ),
+    Math.min(maximum, Number.isFinite(parsed) ? Math.round(parsed) : fallback)
   )
 }
 
 function randomSeed() {
-  return [
-    'maze',
-    Date.now().toString(36),
-    Math.random()
-      .toString(36)
-      .slice(2, 9),
-  ].join('-')
+  return ['maze', Date.now().toString(36), Math.random().toString(36).slice(2, 9)].join('-')
 }
 
 const SIZE_OPTIONS = [
@@ -98,65 +77,24 @@ const SIZE_OPTIONS = [
   },
 ]
 
-export default function TiltMazeEditor({
-  config,
-  onChange,
-}: Props) {
-  const [message, setMessage] =
-    useState('')
+export default function TiltMazeEditor({ config, onChange }: Props) {
+  const [message, setMessage] = useState('')
 
-  const rows = clamp(
-    config.grid_rows,
-    9,
-    5,
-    13,
-  )
+  const rows = clamp(config.grid_rows, 9, 5, 13)
 
-  const cols = clamp(
-    config.grid_cols,
-    9,
-    5,
-    13,
-  )
+  const cols = clamp(config.grid_cols, 9, 5, 13)
 
-  const seed = String(
-    config.maze_seed ||
-    'saga-maze',
-  )
+  const seed = String(config.maze_seed || 'saga-maze')
 
-  const mode =
-    config.pattern_mode ===
-    'random_each_game'
-      ? 'random_each_game'
-      : 'fixed'
+  const mode = config.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed'
 
-  const holes = clamp(
-    config.hole_count,
-    4,
-    0,
-    18,
-  )
+  const holes = clamp(config.hole_count, 4, 0, 18)
 
-  const collectibles = clamp(
-    config.collectible_count,
-    2,
-    0,
-    6,
-  )
+  const collectibles = clamp(config.collectible_count, 2, 0, 6)
 
-  const lives = clamp(
-    config.lives,
-    3,
-    1,
-    5,
-  )
+  const lives = clamp(config.lives, 3, 1, 5)
 
-  const timeLimit = clamp(
-    config.time_limit_s,
-    75,
-    20,
-    180,
-  )
+  const timeLimit = clamp(config.time_limit_s, 75, 20, 180)
 
   const maze = useMemo(
     () =>
@@ -165,27 +103,16 @@ export default function TiltMazeEditor({
         cols,
         seed,
         holeCount: holes,
-        collectibleCount:
-          collectibles,
+        collectibleCount: collectibles,
       }),
-    [
-      rows,
-      cols,
-      seed,
-      holes,
-      collectibles,
-    ],
+    [rows, cols, seed, holes, collectibles]
   )
 
-  const holeSet =
-    new Set(maze.holes)
+  const holeSet = new Set(maze.holes)
 
-  const itemSet =
-    new Set(maze.collectibles)
+  const itemSet = new Set(maze.collectibles)
 
-  function patch(
-    values: Record<string, unknown>,
-  ) {
+  function patch(values: Record<string, unknown>) {
     onChange({
       objective: 'balance_maze',
       game_id: 'tilt_maze',
@@ -195,28 +122,19 @@ export default function TiltMazeEditor({
   }
 
   return (
-    <section
-      className="tme"
-      aria-label="Editor de Laberinto de equilibrio"
-    >
+    <section className="tme" aria-label="Editor de Laberinto de equilibrio">
       <style>{CSS}</style>
 
       <header className="tme-head">
         <div>
-          <h4>
-            Laberinto de equilibrio
-          </h4>
+          <h4>Laberinto de equilibrio</h4>
 
           <p>
-            El laberinto se genera
-            automáticamente. No es necesario
-            dibujar paredes manualmente.
+            El laberinto se genera automáticamente. No es necesario dibujar paredes manualmente.
           </p>
         </div>
 
-        <span className="tme-badge">
-          Listo para guardar
-        </span>
+        <span className="tme-badge">Listo para guardar</span>
       </header>
 
       <div className="tme-layout">
@@ -226,78 +144,47 @@ export default function TiltMazeEditor({
           <div
             className="tme-board"
             style={{
-              gridTemplateColumns:
-                `repeat(${cols},minmax(0,1fr))`,
-              gridTemplateRows:
-                `repeat(${rows},minmax(0,1fr))`,
+              gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`,
+              gridTemplateRows: `repeat(${rows},minmax(0,1fr))`,
             }}
           >
-            {maze.cells.map(
-              (cell, index) => {
-                const className = [
-                  'tme-cell',
-                  index === maze.start
-                    ? 'start'
-                    : '',
-                  index === maze.goal
-                    ? 'goal'
-                    : '',
-                  holeSet.has(index)
-                    ? 'hole'
-                    : '',
-                  itemSet.has(index)
-                    ? 'item'
-                    : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
+            {maze.cells.map((cell, index) => {
+              const className = [
+                'tme-cell',
+                index === maze.start ? 'start' : '',
+                index === maze.goal ? 'goal' : '',
+                holeSet.has(index) ? 'hole' : '',
+                itemSet.has(index) ? 'item' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
 
-                return (
-                  <div
-                    key={index}
-                    className={className}
-                    style={{
-                      borderTopWidth:
-                        cell.walls &
-                        WALL_UP
-                          ? 2
-                          : 0,
-                      borderRightWidth:
-                        cell.walls &
-                        WALL_RIGHT
-                          ? 2
-                          : 0,
-                      borderBottomWidth:
-                        cell.walls &
-                        WALL_DOWN
-                          ? 2
-                          : 0,
-                      borderLeftWidth:
-                        cell.walls &
-                        WALL_LEFT
-                          ? 2
-                          : 0,
-                    }}
-                  >
-                    {index === maze.start
-                      ? '●'
-                      : index === maze.goal
-                        ? '⚑'
-                        : itemSet.has(index)
-                          ? '◆'
-                          : holeSet.has(index)
-                            ? '×'
-                            : ''}
-                  </div>
-                )
-              },
-            )}
+              return (
+                <div
+                  key={index}
+                  className={className}
+                  style={{
+                    borderTopWidth: cell.walls & WALL_UP ? 2 : 0,
+                    borderRightWidth: cell.walls & WALL_RIGHT ? 2 : 0,
+                    borderBottomWidth: cell.walls & WALL_DOWN ? 2 : 0,
+                    borderLeftWidth: cell.walls & WALL_LEFT ? 2 : 0,
+                  }}
+                >
+                  {index === maze.start
+                    ? '●'
+                    : index === maze.goal
+                      ? '⚑'
+                      : itemSet.has(index)
+                        ? '◆'
+                        : holeSet.has(index)
+                          ? '×'
+                          : ''}
+                </div>
+              )
+            })}
           </div>
 
-          <div className="tme-note">
-            ● inicio · ⚑ meta · ◆ objeto
-            obligatorio · × agujero
-          </div>
+          <div className="tme-note">● inicio · ⚑ meta · ◆ objeto obligatorio · × agujero</div>
 
           <button
             type="button"
@@ -308,9 +195,7 @@ export default function TiltMazeEditor({
                 pattern_mode: 'fixed',
               })
 
-              setMessage(
-                'Nuevo laberinto generado y fijado.',
-              )
+              setMessage('Nuevo laberinto generado y fijado.')
             }}
           >
             Generar otro laberinto
@@ -324,37 +209,24 @@ export default function TiltMazeEditor({
             <label className="tme-wide">
               Tamaño
               <div className="tme-sizes">
-                {SIZE_OPTIONS.map(
-                  (option) => (
-                    <button
-                      key={option.label}
-                      type="button"
-                      className={
-                        rows ===
-                          option.rows &&
-                        cols ===
-                          option.cols
-                          ? 'active'
-                          : ''
-                      }
-                      onClick={() =>
-                        patch({
-                          grid_rows:
-                            option.rows,
-                          grid_cols:
-                            option.cols,
-                          difficulty:
-                            option.difficulty,
-                        })
-                      }
-                    >
-                      {option.label}
-                      <br />
-                      {option.cols}×
-                      {option.rows}
-                    </button>
-                  ),
-                )}
+                {SIZE_OPTIONS.map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    className={rows === option.rows && cols === option.cols ? 'active' : ''}
+                    onClick={() =>
+                      patch({
+                        grid_rows: option.rows,
+                        grid_cols: option.cols,
+                        difficulty: option.difficulty,
+                      })
+                    }
+                  >
+                    {option.label}
+                    <br />
+                    {option.cols}×{option.rows}
+                  </button>
+                ))}
               </div>
             </label>
 
@@ -363,15 +235,10 @@ export default function TiltMazeEditor({
               <div className="tme-modes">
                 <button
                   type="button"
-                  className={
-                    mode === 'fixed'
-                      ? 'active'
-                      : ''
-                  }
+                  className={mode === 'fixed' ? 'active' : ''}
                   onClick={() =>
                     patch({
-                      pattern_mode:
-                        'fixed',
+                      pattern_mode: 'fixed',
                     })
                   }
                 >
@@ -380,16 +247,10 @@ export default function TiltMazeEditor({
 
                 <button
                   type="button"
-                  className={
-                    mode ===
-                    'random_each_game'
-                      ? 'active'
-                      : ''
-                  }
+                  className={mode === 'random_each_game' ? 'active' : ''}
                   onClick={() =>
                     patch({
-                      pattern_mode:
-                        'random_each_game',
+                      pattern_mode: 'random_each_game',
                     })
                   }
                 >
@@ -407,13 +268,7 @@ export default function TiltMazeEditor({
                 value={timeLimit}
                 onChange={(event) =>
                   patch({
-                    time_limit_s:
-                      clamp(
-                        event.target.value,
-                        75,
-                        20,
-                        180,
-                      ),
+                    time_limit_s: clamp(event.target.value, 75, 20, 180),
                   })
                 }
               />
@@ -428,12 +283,7 @@ export default function TiltMazeEditor({
                 value={lives}
                 onChange={(event) =>
                   patch({
-                    lives: clamp(
-                      event.target.value,
-                      3,
-                      1,
-                      5,
-                    ),
+                    lives: clamp(event.target.value, 3, 1, 5),
                   })
                 }
               />
@@ -448,13 +298,7 @@ export default function TiltMazeEditor({
                 value={holes}
                 onChange={(event) =>
                   patch({
-                    hole_count:
-                      clamp(
-                        event.target.value,
-                        4,
-                        0,
-                        18,
-                      ),
+                    hole_count: clamp(event.target.value, 4, 0, 18),
                   })
                 }
               />
@@ -469,13 +313,7 @@ export default function TiltMazeEditor({
                 value={collectibles}
                 onChange={(event) =>
                   patch({
-                    collectible_count:
-                      clamp(
-                        event.target.value,
-                        2,
-                        0,
-                        6,
-                      ),
+                    collectible_count: clamp(event.target.value, 2, 0, 6),
                   })
                 }
               />
@@ -484,32 +322,23 @@ export default function TiltMazeEditor({
             <label className="tme-toggle">
               <input
                 type="checkbox"
-                checked={
-                  config.sensor_enabled !==
-                  false
-                }
+                checked={config.sensor_enabled !== false}
                 onChange={(event) =>
                   patch({
-                    sensor_enabled:
-                      event.target.checked,
+                    sensor_enabled: event.target.checked,
                   })
                 }
               />
-
               Usar inclinación del móvil
             </label>
           </div>
 
           <div className="tme-note">
-            Los botones táctiles siempre
-            estarán disponibles como respaldo.
-            El generador garantiza una ruta
-            válida entre inicio y meta.
+            Los botones táctiles siempre estarán disponibles como respaldo. El generador garantiza
+            una ruta válida entre inicio y meta.
           </div>
 
-          <div className="tme-message">
-            {message}
-          </div>
+          <div className="tme-message">{message}</div>
         </article>
       </div>
     </section>

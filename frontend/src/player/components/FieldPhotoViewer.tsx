@@ -54,11 +54,17 @@ export function FieldPhotoViewer({
 
   return (
     <div style={overlay} onClick={close}>
-      <section style={sheet} onClick={(event) => event.stopPropagation()} aria-label="Fotos de campo">
+      <section
+        style={sheet}
+        onClick={(event) => event.stopPropagation()}
+        aria-label="Fotos de campo"
+      >
         <div style={header}>
           <div>
             <strong style={title}>Fotos de campo</strong>
-            <span style={counter}>{safeIndex + 1}/{proofs.length}</span>
+            <span style={counter}>
+              {safeIndex + 1}/{proofs.length}
+            </span>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -89,10 +95,20 @@ export function FieldPhotoViewer({
 
         {proofs.length > 1 ? (
           <div style={nav}>
-            <button type="button" style={navButton} disabled={safeIndex === 0} onClick={() => setIndex((v) => Math.max(0, v - 1))}>
+            <button
+              type="button"
+              style={navButton}
+              disabled={safeIndex === 0}
+              onClick={() => setIndex((v) => Math.max(0, v - 1))}
+            >
               ← Anterior
             </button>
-            <button type="button" style={navButton} disabled={safeIndex >= proofs.length - 1} onClick={() => setIndex((v) => Math.min(proofs.length - 1, v + 1))}>
+            <button
+              type="button"
+              style={navButton}
+              disabled={safeIndex >= proofs.length - 1}
+              onClick={() => setIndex((v) => Math.min(proofs.length - 1, v + 1))}
+            >
               Siguiente →
             </button>
           </div>
@@ -234,4 +250,3 @@ const downloadButton: CSSProperties = {
   fontSize: 16,
   cursor: 'pointer',
 }
-

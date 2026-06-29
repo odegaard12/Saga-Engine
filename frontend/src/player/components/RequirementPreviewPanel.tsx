@@ -128,27 +128,42 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
       <div style={block}>
         <strong>Que necesitas</strong>
         <ul style={list}>
-          {needsGps ? <li>Activa GPS y acercate al punto del mapa.</li> : <li>Este nodo no depende de posicion especial.</li>}
+          {needsGps ? (
+            <li>Activa GPS y acercate al punto del mapa.</li>
+          ) : (
+            <li>Este nodo no depende de posicion especial.</li>
+          )}
           {radius !== null ? <li>Debes estar dentro del radio de {radius} m.</li> : null}
-          {needsItem ? <li>Necesitas tener este objeto en Objetos: {requiredItem}.</li> : <li>No hay objeto obligatorio detectado.</li>}
+          {needsItem ? (
+            <li>Necesitas tener este objeto en Objetos: {requiredItem}.</li>
+          ) : (
+            <li>No hay objeto obligatorio detectado.</li>
+          )}
         </ul>
       </div>
 
       <div style={block}>
         <strong>Como se juega</strong>
         <ul style={list}>
-          {howToPlay(stage).map((text) => <li key={text}>{text}</li>)}
+          {howToPlay(stage).map((text) => (
+            <li key={text}>{text}</li>
+          ))}
         </ul>
       </div>
 
       <div style={block}>
         <strong>Objetos y pruebas</strong>
         <p style={copy}>
-          Los objetos que guardas en Objetos pueden servir para abrir otros nodos. Si encuentras una tarjeta, palabra, QR, NFC, sobre o prop, registralo desde Prueba.
+          Los objetos que guardas en Objetos pueden servir para abrir otros nodos. Si encuentras una
+          tarjeta, palabra, QR, NFC, sobre o prop, registralo desde Prueba.
         </p>
-        {needsItem ? <p style={copy}>Este nodo comprueba si llevas el objeto requerido antes de avanzar.</p> : null}
+        {needsItem ? (
+          <p style={copy}>Este nodo comprueba si llevas el objeto requerido antes de avanzar.</p>
+        ) : null}
         {givesItem ? <p style={copy}>Este nodo puede darte una recompensa: {rewardItem}.</p> : null}
-        {!physical ? <p style={copy}>No hay prueba fisica especial detectada en este nodo.</p> : null}
+        {!physical ? (
+          <p style={copy}>No hay prueba fisica especial detectada en este nodo.</p>
+        ) : null}
       </div>
 
       <div style={footer}>Jugador local: {user}</div>

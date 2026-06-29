@@ -3,7 +3,6 @@ import type { AdminProfileAction } from '../lib/adminApi'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
-
 const AVATAR_CANVAS_SIZE = 160
 
 function shortAvatarValue(value: string): string {
@@ -125,7 +124,10 @@ export default function PlayersPanel({
       ) : (
         <div className="admin-player-editor-list admin-player-editor-list-modern">
           {playerDrafts.map((draft, index) => (
-            <section className="admin-player-editor-card admin-player-card-modern" key={`${draft.id}-${index}`}>
+            <section
+              className="admin-player-editor-card admin-player-card-modern"
+              key={`${draft.id}-${index}`}
+            >
               <div className="admin-player-editor-head admin-player-head-modern">
                 <div
                   className="admin-player-avatar"
@@ -137,11 +139,7 @@ export default function PlayersPanel({
                   }}
                 >
                   {draft.avatar_url ? (
-                    <img
-                      src={draft.avatar_url}
-                      alt=""
-                      className="admin-player-avatar-image"
-                    />
+                    <img src={draft.avatar_url} alt="" className="admin-player-avatar-image" />
                   ) : (
                     draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
                   )}
@@ -167,7 +165,9 @@ export default function PlayersPanel({
                     Nivel {profileProgress[draft.id]?.level ?? 0}
                     {profileProgress[draft.id]?.finished ? ' · finalizado' : ''}
                   </span>
-                  {profileActionError[draft.id] ? <small>{profileActionError[draft.id]}</small> : null}
+                  {profileActionError[draft.id] ? (
+                    <small>{profileActionError[draft.id]}</small>
+                  ) : null}
                 </div>
 
                 <div className="admin-player-progress-buttons">
@@ -243,7 +243,8 @@ export default function PlayersPanel({
                       width: 74,
                       height: 74,
                       fontSize: 20,
-                      background: draft.color || getStablePlayerColor(draft.id || draft.display_name),
+                      background:
+                        draft.color || getStablePlayerColor(draft.id || draft.display_name),
                       color: '#ffffff',
                       boxShadow: '0 14px 30px rgba(15,23,42,0.32)',
                       overflow: 'hidden',
@@ -251,11 +252,7 @@ export default function PlayersPanel({
                     }}
                   >
                     {draft.avatar_url ? (
-                      <img
-                        src={draft.avatar_url}
-                        alt=""
-                        className="admin-player-avatar-image"
-                      />
+                      <img src={draft.avatar_url} alt="" className="admin-player-avatar-image" />
                     ) : (
                       draft.avatar_initials || getPlayerInitials(draft.display_name || draft.id)
                     )}
@@ -276,7 +273,11 @@ export default function PlayersPanel({
                     Color
                     <input
                       type="color"
-                      value={/^#[0-9a-fA-F]{6}$/.test(draft.color) ? draft.color : getStablePlayerColor(draft.id || draft.display_name)}
+                      value={
+                        /^#[0-9a-fA-F]{6}$/.test(draft.color)
+                          ? draft.color
+                          : getStablePlayerColor(draft.id || draft.display_name)
+                      }
                       onChange={(event) => onUpdatePlayer(index, 'color', event.target.value)}
                     />
                   </label>
@@ -287,7 +288,13 @@ export default function PlayersPanel({
                       value={draft.avatar_initials}
                       maxLength={3}
                       placeholder={getPlayerInitials(draft.display_name || draft.id)}
-                      onChange={(event) => onUpdatePlayer(index, 'avatar_initials', event.target.value.toUpperCase().slice(0, 3))}
+                      onChange={(event) =>
+                        onUpdatePlayer(
+                          index,
+                          'avatar_initials',
+                          event.target.value.toUpperCase().slice(0, 3)
+                        )
+                      }
                     />
                   </label>
                 </div>
@@ -299,7 +306,9 @@ export default function PlayersPanel({
                     accept="image/png,image/jpeg,image/webp"
                     onChange={(event) => void handleAvatarFile(event, index)}
                   />
-                  <span>La imagen se comprime y se guarda en runtime al pulsar Guardar jugadores.</span>
+                  <span>
+                    La imagen se comprime y se guarda en runtime al pulsar Guardar jugadores.
+                  </span>
                 </label>
 
                 {draft.avatar_url ? (

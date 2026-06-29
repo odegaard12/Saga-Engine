@@ -422,9 +422,11 @@ function getMotionMagnitude(event: SagaDeviceMotionEvent): number | null {
 
 async function requestMotionPermission(): Promise<boolean> {
   if (typeof window === 'undefined') return false
-  const ctor = (window as unknown as {
-    DeviceMotionEvent?: { requestPermission?: () => Promise<'granted' | 'denied'> }
-  }).DeviceMotionEvent
+  const ctor = (
+    window as unknown as {
+      DeviceMotionEvent?: { requestPermission?: () => Promise<'granted' | 'denied'> }
+    }
+  ).DeviceMotionEvent
 
   if (typeof ctor?.requestPermission === 'function') {
     const result = await ctor.requestPermission()
@@ -499,7 +501,8 @@ export function MotionChallengeRuntimeScreen({
     setEnergy(100)
     setPhase('success')
     setMessage('Nodo completado. Pulsa continuar.')
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.([18, 24, 50])
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator)
+      navigator.vibrate?.([18, 24, 50])
   }, [])
 
   const continueRoute = useCallback(async () => {
@@ -507,34 +510,37 @@ export function MotionChallengeRuntimeScreen({
     await onWin()
   }, [onWin, submitting])
 
-  const registerPulse = useCallback((kind: 'good' | 'strong' | 'touch') => {
-    if (kind === 'strong') {
-      setEnergy((value) => clamp(value + 3, 0, 100))
-      setHeat((value) => {
-        const next = clamp(value + 16, 0, 100)
-        if (next >= 100) {
-          setPhase('failed')
-          setMessage('Sobrecarga. Pulsa más suave.')
-        }
-        return next
-      })
-      setMessage('Demasiado fuerte. Carga poco.')
-      return
-    }
+  const registerPulse = useCallback(
+    (kind: 'good' | 'strong' | 'touch') => {
+      if (kind === 'strong') {
+        setEnergy((value) => clamp(value + 3, 0, 100))
+        setHeat((value) => {
+          const next = clamp(value + 16, 0, 100)
+          if (next >= 100) {
+            setPhase('failed')
+            setMessage('Sobrecarga. Pulsa más suave.')
+          }
+          return next
+        })
+        setMessage('Demasiado fuerte. Carga poco.')
+        return
+      }
 
-    setValidPulses((value) => {
-      const nextPulses = value + 1
-      setEnergy((energyValue) => {
-        const nextEnergy = clamp(energyValue + (kind === 'touch' ? 6 : 8), 0, 100)
-        if (nextPulses >= targetPulses && nextEnergy >= 100) markComplete()
-        return nextEnergy
+      setValidPulses((value) => {
+        const nextPulses = value + 1
+        setEnergy((energyValue) => {
+          const nextEnergy = clamp(energyValue + (kind === 'touch' ? 6 : 8), 0, 100)
+          if (nextPulses >= targetPulses && nextEnergy >= 100) markComplete()
+          return nextEnergy
+        })
+        return nextPulses
       })
-      return nextPulses
-    })
 
-    setHeat((value) => clamp(value + (kind === 'touch' ? 1 : 2), 0, 100))
-    setMessage(kind === 'touch' ? 'Toque válido.' : 'Pulso válido.')
-  }, [markComplete])
+      setHeat((value) => clamp(value + (kind === 'touch' ? 1 : 2), 0, 100))
+      setMessage(kind === 'touch' ? 'Toque válido.' : 'Pulso válido.')
+    },
+    [markComplete]
+  )
 
   const startMotion = useCallback(async () => {
     reset()
@@ -635,10 +641,15 @@ export function MotionChallengeRuntimeScreen({
 
   const energyStyle = { '--fill': `${Math.round(clamp(energy, 0, 100))}%` } as CSSProperties
   const heatStyle = { '--fill': `${Math.round(clamp(heat, 0, 100))}%` } as CSSProperties
-  const coreStyle = { '--core-opacity': String(0.25 + clamp(energy / 100, 0, 1) * 0.75) } as CSSProperties
+  const coreStyle = {
+    '--core-opacity': String(0.25 + clamp(energy / 100, 0, 1) * 0.75),
+  } as CSSProperties
 
   const running = phase === 'active' || phase === 'fallback'
-  const actionClass = phase === 'success' || phase === 'ready' || phase === 'failed' ? 'motion-actions only' : 'motion-actions'
+  const actionClass =
+    phase === 'success' || phase === 'ready' || phase === 'failed'
+      ? 'motion-actions only'
+      : 'motion-actions'
 
   return (
     <section className="motion-shell" aria-label="Cargar antena">
@@ -646,7 +657,9 @@ export function MotionChallengeRuntimeScreen({
 
       <div className="motion-topbar">
         <span className="motion-chip">SAGA LINK</span>
-        <span className={phase === 'success' ? 'motion-chip ok' : 'motion-chip'}>{phase === 'success' ? 'OK' : `${secondsLeft}s`}</span>
+        <span className={phase === 'success' ? 'motion-chip ok' : 'motion-chip'}>
+          {phase === 'success' ? 'OK' : `${secondsLeft}s`}
+        </span>
       </div>
 
       <div className="motion-body">
@@ -661,7 +674,10 @@ export function MotionChallengeRuntimeScreen({
           <div className="motion-ping one" />
           <div className="motion-ping two" />
           <div className="motion-ping three" />
-          <div className={['motion-beacon', running ? 'is-running' : ''].filter(Boolean).join(' ')} style={coreStyle}>
+          <div
+            className={['motion-beacon', running ? 'is-running' : ''].filter(Boolean).join(' ')}
+            style={coreStyle}
+          >
             <strong>{phase === 'success' ? '✓' : '⚡'}</strong>
           </div>
         </div>
@@ -707,7 +723,9 @@ export function MotionChallengeRuntimeScreen({
 
         <div className="motion-pulsebox">
           <span>Pulsos válidos</span>
-          <b>{Math.min(validPulses, targetPulses)} / {targetPulses}</b>
+          <b>
+            {Math.min(validPulses, targetPulses)} / {targetPulses}
+          </b>
         </div>
 
         {phase !== 'success' ? (
@@ -729,9 +747,15 @@ export function MotionChallengeRuntimeScreen({
 
         {debug ? (
           <div className="motion-debug">
-            <button type="button" onClick={() => registerPulse('good')}>debug pulso</button>
-            <button type="button" onClick={() => registerPulse('strong')}>debug fuerte</button>
-            <button type="button" onClick={markComplete}>debug completar</button>
+            <button type="button" onClick={() => registerPulse('good')}>
+              debug pulso
+            </button>
+            <button type="button" onClick={() => registerPulse('strong')}>
+              debug fuerte
+            </button>
+            <button type="button" onClick={markComplete}>
+              debug completar
+            </button>
           </div>
         ) : null}
       </div>
@@ -739,15 +763,30 @@ export function MotionChallengeRuntimeScreen({
       <div className="motion-bottombar">
         <div className={actionClass}>
           {phase === 'success' ? (
-            <button type="button" className="motion-button success" onClick={() => void continueRoute()} disabled={submitting}>
+            <button
+              type="button"
+              className="motion-button success"
+              onClick={() => void continueRoute()}
+              disabled={submitting}
+            >
               {submitting ? 'Guardando…' : 'Continuar'}
             </button>
           ) : phase === 'ready' || phase === 'failed' ? (
-            <button type="button" className={phase === 'failed' ? 'motion-button danger' : 'motion-button'} onClick={() => void startMotion()} disabled={submitting}>
+            <button
+              type="button"
+              className={phase === 'failed' ? 'motion-button danger' : 'motion-button'}
+              onClick={() => void startMotion()}
+              disabled={submitting}
+            >
               {phase === 'failed' ? 'Reintentar' : 'Iniciar'}
             </button>
           ) : phase === 'active' ? (
-            <button type="button" className="motion-button secondary" onClick={reset} disabled={submitting}>
+            <button
+              type="button"
+              className="motion-button secondary"
+              onClick={reset}
+              disabled={submitting}
+            >
               Reiniciar
             </button>
           ) : null}

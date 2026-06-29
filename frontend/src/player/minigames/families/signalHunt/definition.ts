@@ -71,7 +71,11 @@ function validateSignalHuntConfig(
     errors.push('source_radius_m must be > 0')
   }
 
-  if (!Number.isFinite(value.lock_threshold) || value.lock_threshold < 1 || value.lock_threshold > 100) {
+  if (
+    !Number.isFinite(value.lock_threshold) ||
+    value.lock_threshold < 1 ||
+    value.lock_threshold > 100
+  ) {
     errors.push('lock_threshold must be between 1 and 100')
   }
 
@@ -106,8 +110,7 @@ async function runSignalHuntPreflight(
   const messages: string[] = []
 
   const hasGeo = typeof navigator !== 'undefined' && 'geolocation' in navigator
-  const hasVibration =
-    typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
+  const hasVibration = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
 
   if (!hasGeo) {
     missing_required.push('geolocation')
@@ -125,8 +128,8 @@ async function runSignalHuntPreflight(
       missing_required.length > 0
         ? 'blocked'
         : missing_preferred.length > 0
-        ? 'degraded'
-        : 'normal',
+          ? 'degraded'
+          : 'normal',
     missing_required: missing_required as never[],
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Signal hunt ready.'],

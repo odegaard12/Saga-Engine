@@ -100,9 +100,7 @@ export function isNativeMinigameFamily(value: string): value is MinigameFamily {
   )
 }
 
-function resolveCircuitMatrixNative(
-  input: ResolveMinigameInput
-): ResolvedCircuitMatrixMinigame {
+function resolveCircuitMatrixNative(input: ResolveMinigameInput): ResolvedCircuitMatrixMinigame {
   const config: CircuitMatrixConfig = {
     ...circuitMatrixDefinition.default_config,
     ...asObject<CircuitMatrixConfig>(input.config),
@@ -126,9 +124,7 @@ function resolveCircuitMatrixNative(
   }
 }
 
-function resolveBearingHuntNative(
-  input: ResolveMinigameInput
-): ResolvedBearingHuntMinigame {
+function resolveBearingHuntNative(input: ResolveMinigameInput): ResolvedBearingHuntMinigame {
   return {
     family: 'bearing_hunt',
     type: 'bearing_hunt',
@@ -143,9 +139,7 @@ function resolveBearingHuntNative(
   }
 }
 
-function resolveSignalHuntNative(
-  input: ResolveMinigameInput
-): ResolvedSignalHuntMinigame {
+function resolveSignalHuntNative(input: ResolveMinigameInput): ResolvedSignalHuntMinigame {
   return {
     family: 'signal_hunt',
     type: 'signal_hunt',
@@ -177,9 +171,7 @@ function resolveMotionChallengeNative(
   }
 }
 
-function resolveAudioChallengeNative(
-  input: ResolveMinigameInput
-): ResolvedAudioChallengeMinigame {
+function resolveAudioChallengeNative(input: ResolveMinigameInput): ResolvedAudioChallengeMinigame {
   return {
     family: 'audio_challenge',
     type: 'audio_challenge',
@@ -216,7 +208,9 @@ function resolveNativeMinigame(
   return resolveSignalHuntNative(input)
 }
 export function resolveMinigame(input: ResolveMinigameInput): ResolvedMinigame | null {
-  const type = String(input.type || '').trim().toLowerCase()
+  const type = String(input.type || '')
+    .trim()
+    .toLowerCase()
   if (!type) return null
 
   if (isNativeMinigameFamily(type)) {

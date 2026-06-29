@@ -162,7 +162,6 @@ function getAllRecords<T>(storeName: string): Promise<T[]> {
   )
 }
 
-
 function updateOfflineEvent(event: OfflineEvent) {
   return writeRecord(STORE_EVENT_QUEUE, event)
 }
@@ -228,7 +227,7 @@ export async function syncPendingOfflineEvents(user: string) {
       throw new Error(`Sync failed: HTTP ${response.status}`)
     }
 
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       status?: string
       events?: Array<{
         id?: string
@@ -255,18 +254,13 @@ export async function syncPendingOfflineEvents(user: string) {
 
     await Promise.all(
       syncing.map((event, index) => {
-        const backendEvent =
-          backendByClientId.get(event.id) ||
-          payload.events?.[index]
+        const backendEvent = backendByClientId.get(event.id) || payload.events?.[index]
 
-        const backendStatus =
-          String(backendEvent?.status || '').toLowerCase()
+        const backendStatus = String(backendEvent?.status || '').toLowerCase()
 
         const isSynced =
           backendEvent?.duplicate === true ||
-          ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(
-            backendStatus
-          )
+          ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(backendStatus)
 
         if (isSynced) syncedCount += 1
         else failedCount += 1
@@ -277,15 +271,13 @@ export async function syncPendingOfflineEvents(user: string) {
           backend_event_id: backendEvent?.id,
           last_error: isSynced
             ? undefined
-            : backendEvent?.error ||
-              backendStatus ||
-              'Backend did not accept this event.',
+            : backendEvent?.error || backendStatus || 'Backend did not accept this event.',
         })
       })
     )
 
     return {
-      status: failedCount ? 'error' as const : 'ok' as const,
+      status: failedCount ? ('error' as const) : ('ok' as const),
       attempted: syncing.length,
       synced: syncedCount,
       failed: failedCount,
@@ -418,14 +410,15 @@ export async function getOfflineMissionSummary(user: string): Promise<OfflineMis
   }
 }
 
-
 function cleanCode(value: unknown) {
-  return String(value || '').trim().toUpperCase()
+  return String(value || '')
+    .trim()
+    .toUpperCase()
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {}
 }
 
@@ -468,10 +461,17 @@ function readLocalRequirement(stage: PlayerStage | null) {
   const first = asRecord(items[0])
   const config = readStageConfig(stage)
 
-  const itemId = String(first.item_id || first.required_item_id || config.required_item_id || '').trim()
-  const label = String(first.label || first.required_item_label || config.required_item_label || itemId).trim()
-  const quantityRaw = first.quantity || first.required_item_quantity || config.required_item_quantity || 1
-  const quantity = Number.isFinite(Number(quantityRaw)) ? Math.max(1, Math.floor(Number(quantityRaw))) : 1
+  const itemId = String(
+    first.item_id || first.required_item_id || config.required_item_id || ''
+  ).trim()
+  const label = String(
+    first.label || first.required_item_label || config.required_item_label || itemId
+  ).trim()
+  const quantityRaw =
+    first.quantity || first.required_item_quantity || config.required_item_quantity || 1
+  const quantity = Number.isFinite(Number(quantityRaw))
+    ? Math.max(1, Math.floor(Number(quantityRaw)))
+    : 1
   const consumeRaw = first.consume ?? first.required_item_consume ?? config.required_item_consume
   const consume = consumeRaw === true || String(consumeRaw || '').toLowerCase() === 'true'
 
@@ -480,12 +480,15 @@ function readLocalRequirement(stage: PlayerStage | null) {
 }
 
 function countOwnedLocalItems(user: string, itemId: string) {
-  return loadInventorySnapshot(user).items
-    .filter((item) => item.item_id === itemId && item.state !== 'used')
+  return loadInventorySnapshot(user)
+    .items.filter((item) => item.item_id === itemId && item.state !== 'used')
     .reduce((total, item) => total + Math.max(0, item.quantity || 0), 0)
 }
 
-function buildPayloadWithLocalLevel(payload: PlayerGamePayload, nextLevel: number): PlayerGamePayload {
+function buildPayloadWithLocalLevel(
+  payload: PlayerGamePayload,
+  nextLevel: number
+): PlayerGamePayload {
   const stages = Array.isArray(payload.stages) ? payload.stages : []
   const finished = nextLevel >= stages.length
 
@@ -559,7 +562,9 @@ export async function advanceLocalProgress(args: {
       stage_title: stage.title,
       level_before: currentLevel,
       level_after: currentLevel + 1,
-      requirement: requirement ? { ...requirement, owned, ok: true } : { required: false, ok: true },
+      requirement: requirement
+        ? { ...requirement, owned, ok: true }
+        : { required: false, ok: true },
     },
   })
 

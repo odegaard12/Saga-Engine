@@ -223,7 +223,7 @@ html.saga-route-player .saga-tools-language-row {
   padding: 10px 12px;
   border-radius: 18px;
   background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .saga-admin-settings-language-menu span {

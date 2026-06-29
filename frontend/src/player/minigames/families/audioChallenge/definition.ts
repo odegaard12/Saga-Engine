@@ -12,9 +12,7 @@ export const audioChallengeDefinition: MinigameDefinitionBase<
   description: 'Blow or make noise into the microphone.',
   validation_mode: 'client',
   fallback_policy: 'none',
-  capabilities: [
-    { key: 'audio', requirement: 'required' },
-  ],
+  capabilities: [{ key: 'audio', requirement: 'required' }],
   ui: {
     fullscreen: true,
     briefing_required: false,

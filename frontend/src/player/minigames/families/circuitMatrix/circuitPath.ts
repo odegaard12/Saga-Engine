@@ -59,10 +59,7 @@ function neighbors(point: Point, rows: number, cols: number): Point[] {
     { row: point.row, col: point.col + 1 },
   ].filter(
     (candidate) =>
-      candidate.row >= 0 &&
-      candidate.row < rows &&
-      candidate.col >= 0 &&
-      candidate.col < cols,
+      candidate.row >= 0 && candidate.row < rows && candidate.col >= 0 && candidate.col < cols
   )
 }
 
@@ -89,15 +86,13 @@ function searchPath(
   cols: number,
   path: Point[],
   visited: Set<CellKey>,
-  random: () => number,
+  random: () => number
 ): boolean {
   if (path.length >= targetLength) return true
 
   const candidates = shuffle(
-    neighbors(current, rows, cols).filter(
-      (candidate) => !visited.has(keyOf(candidate)),
-    ),
-    random,
+    neighbors(current, rows, cols).filter((candidate) => !visited.has(keyOf(candidate))),
+    random
   )
 
   for (const candidate of candidates) {
@@ -106,17 +101,7 @@ function searchPath(
     visited.add(key)
     path.push(candidate)
 
-    if (
-      searchPath(
-        candidate,
-        targetLength,
-        rows,
-        cols,
-        path,
-        visited,
-        random,
-      )
-    ) {
+    if (searchPath(candidate, targetLength, rows, cols, path, visited, random)) {
       return true
     }
 
@@ -149,7 +134,7 @@ export function buildCircuitPath(
   rawRows: number,
   rawCols: number,
   rawLength: number,
-  seed: string,
+  seed: string
 ): CellKey[] {
   const rows = clamp(Math.round(rawRows), 4, 6)
   const cols = clamp(Math.round(rawCols), 4, 6)
@@ -163,17 +148,7 @@ export function buildCircuitPath(
     const path: Point[] = [start]
     const visited = new Set<CellKey>([keyOf(start)])
 
-    if (
-      searchPath(
-        start,
-        targetLength,
-        rows,
-        cols,
-        path,
-        visited,
-        random,
-      )
-    ) {
+    if (searchPath(start, targetLength, rows, cols, path, visited, random)) {
       return path.map(keyOf)
     }
   }
@@ -181,11 +156,7 @@ export function buildCircuitPath(
   return fallbackPath(rows, cols, targetLength)
 }
 
-export function isCircuitPathValid(
-  path: CellKey[],
-  rows: number,
-  cols: number,
-): boolean {
+export function isCircuitPathValid(path: CellKey[], rows: number, cols: number): boolean {
   if (path.length < 4) return false
 
   const seen = new Set<CellKey>()
@@ -208,13 +179,9 @@ export function isCircuitPathValid(
     seen.add(path[index])
 
     if (index > 0) {
-      const [previousRow, previousCol] = path[index - 1]
-        .split(':')
-        .map(Number)
+      const [previousRow, previousCol] = path[index - 1].split(':').map(Number)
 
-      if (
-        Math.abs(row - previousRow) + Math.abs(col - previousCol) !== 1
-      ) {
+      if (Math.abs(row - previousRow) + Math.abs(col - previousCol) !== 1) {
         return false
       }
     }

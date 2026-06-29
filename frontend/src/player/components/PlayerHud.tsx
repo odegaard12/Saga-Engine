@@ -199,8 +199,7 @@ export function PlayerHud({
     }
   }, [detailsOpen, toolsOpen]) // saga-panel-control-hider-v3
 
-  const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const { transform } = useGyroParallax(12)
 
@@ -209,12 +208,11 @@ export function PlayerHud({
   const distanceLabel = distanceMeters !== null ? `${distanceMeters} m` : null
   const radiusLabel =
     typeof currentStage?.radius === 'number' ? `Radio ${currentStage.radius} m.` : ''
-  const helperCopy =
-    finished
-      ? 'Nodo completado.'
-      : inRange
-        ? `${radiusLabel} Ya puedes abrir este nodo.`
-        : `${radiusLabel} Acércate para abrir este nodo.`
+  const helperCopy = finished
+    ? 'Nodo completado.'
+    : inRange
+      ? `${radiusLabel} Ya puedes abrir este nodo.`
+      : `${radiusLabel} Acércate para abrir este nodo.`
 
   async function handleToolsFallbackSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -239,7 +237,6 @@ export function PlayerHud({
           transition: 'transform 0.1s ease-out',
         }}
       >
-
         <button
           type="button"
           style={getPrimaryStyle(primaryTone, primaryDisabled)}
@@ -277,222 +274,212 @@ export function PlayerHud({
         onClose={onToggleDetails}
         sheetStyle={getSheetStyle(compact)}
       >
-            <div style={sheetHeader}>
-              <div>
-                <div style={sheetEyebrow}>MOCHILA</div>
-                <div style={sheetTitle}>Guia, objetos y respaldo</div>
-              </div>
+        <div style={sheetHeader}>
+          <div>
+            <div style={sheetEyebrow}>MOCHILA</div>
+            <div style={sheetTitle}>Guia, objetos y respaldo</div>
+          </div>
 
-              <button
-                type="button"
-                aria-label="Cerrar mochila"
-                style={closeButton}
-                onClick={onToggleDetails}
-              >
-                ×
-              </button>
-            </div>
+          <button
+            type="button"
+            aria-label="Cerrar mochila"
+            style={closeButton}
+            onClick={onToggleDetails}
+          >
+            ×
+          </button>
+        </div>
 
-            <div style={tabs}>
-              <button
-                type="button"
-                style={backpackTab === 'requirements' ? tabActive : tabButton}
-                onClick={() => setBackpackTab('requirements')}
-              >
-                Guia
-              </button>
-              <button
-                type="button"
-                style={backpackTab === 'inventory' ? tabActive : tabButton}
-                onClick={() => setBackpackTab('inventory')}
-              >
-                Objetos
-              </button>
-            </div>
+        <div style={tabs}>
+          <button
+            type="button"
+            style={backpackTab === 'requirements' ? tabActive : tabButton}
+            onClick={() => setBackpackTab('requirements')}
+          >
+            Guia
+          </button>
+          <button
+            type="button"
+            style={backpackTab === 'inventory' ? tabActive : tabButton}
+            onClick={() => setBackpackTab('inventory')}
+          >
+            Objetos
+          </button>
+        </div>
 
-            <div style={statusRow}>
-              <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
-              <span>{typeof currentStage?.radius === 'number' ? `Radio ${currentStage.radius} m` : 'Sin radio'}</span>
-            </div>
+        <div style={statusRow}>
+          <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
+          <span>
+            {typeof currentStage?.radius === 'number'
+              ? `Radio ${currentStage.radius} m`
+              : 'Sin radio'}
+          </span>
+        </div>
 
-            <div style={tabPanel}>
-              {backpackTab === 'requirements' ? (
-                <RequirementPreviewPanel user={user} stage={currentStage} />
-              ) : null}
+        <div style={tabPanel}>
+          {backpackTab === 'requirements' ? (
+            <RequirementPreviewPanel user={user} stage={currentStage} />
+          ) : null}
 
-              {backpackTab === 'inventory' ? (
-                <InventoryPanel user={user} />
-              ) : null}
-            </div>
-          </SwipeableSheet>
+          {backpackTab === 'inventory' ? <InventoryPanel user={user} /> : null}
+        </div>
+      </SwipeableSheet>
 
       <SwipeableSheet
         open={toolsOpen}
         onClose={onCloseTools}
         sheetStyle={getToolsSheetStyle(compact)}
       >
-            <div style={toolsHeader}>
-              <div style={toolsHeaderCopy}>
-                <div style={toolsTitle}>
-                  {t('player.tools.title', locale)}
-                </div>
-                <div style={toolsSubtitle}>
-                  {t('player.tools.subtitle', locale)}
-                </div>
+        <div style={toolsHeader}>
+          <div style={toolsHeaderCopy}>
+            <div style={toolsTitle}>{t('player.tools.title', locale)}</div>
+            <div style={toolsSubtitle}>{t('player.tools.subtitle', locale)}</div>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Cerrar herramientas"
+            style={closeButton}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onCloseTools()
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* CARD 1: OPERACIÓN OFFLINE */}
+        <section style={toolsCardGroup}>
+          <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
+          <MissionPackPanel user={user} payload={missionPayload} />
+        </section>
+
+        {/* CARD 2: ACCIONES DE CAMPO */}
+        <section style={toolsCardGroup}>
+          <div style={toolsCardGroupLabel}>{t('player.tools.fieldActions', locale)}</div>
+
+          <div style={toolsActionGrid}>
+            {onDownloadFieldProofs ? (
+              <button
+                type="button"
+                style={fieldPhotoCount > 0 ? toolsGreenActiveButton : toolsGreenDisabledButton}
+                disabled={fieldPhotoCount <= 0}
+                onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
+              >
+                {fieldPhotoCount > 0
+                  ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
+                  : `📥 ${t('player.tools.noPhotos', locale)}`}
+              </button>
+            ) : null}
+          </div>
+
+          {onSubmitCode && currentStage && !finished ? (
+            <div style={{ marginTop: 12 }}>
+              {/* Fallback de nodo CÓDIGO FALLBACK */}
+              <div style={fallbackToolHead}>
+                <strong style={{ color: '#fbbf24' }}>🔑 {t('player.tools.altCode', locale)}</strong>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                  {t('player.tools.altCodeHelp', locale)}
+                </span>
               </div>
 
               <button
                 type="button"
-                aria-label="Cerrar herramientas"
-                style={closeButton}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  onCloseTools()
-                }}
+                style={toolsFallbackOpen ? fallbackToolButtonActive : fallbackToolButton}
+                onClick={() => setToolsFallbackOpen((value) => !value)}
+                disabled={submitting}
               >
-                ×
+                {toolsFallbackOpen
+                  ? t('player.tools.hideForm', locale)
+                  : t('player.tools.manualCode', locale)}
+              </button>
+
+              {toolsFallbackOpen ? (
+                <form style={fallbackToolForm} onSubmit={handleToolsFallbackSubmit}>
+                  <input
+                    value={toolsFallbackCode}
+                    onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
+                    placeholder={t('player.tools.codePlaceholder', locale)}
+                    style={fallbackToolInput}
+                    disabled={submitting}
+                  />
+
+                  <button
+                    type="submit"
+                    style={fallbackToolSubmit}
+                    disabled={submitting || !toolsFallbackCode.trim()}
+                  >
+                    {submitting
+                      ? t('player.tools.verifying', locale)
+                      : t('player.tools.completeNode', locale)}
+                  </button>
+
+                  {errorMessage ? <div style={fallbackToolError}>{errorMessage}</div> : null}
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        {/* CARD 3: AJUSTES Y DESARROLLO */}
+        <section style={toolsCardGroup}>
+          <div style={toolsCardGroupLabel}>{t('player.tools.deviceSettings', locale)}</div>
+
+          <div style={toolsLanguageBlock}>
+            <span style={toolsMiniLabel}>{t('player.tools.language', locale)}</span>
+
+            <div className="saga-tools-language-row">
+              <button
+                type="button"
+                className={locale === 'en' ? 'active' : ''}
+                onClick={() => chooseLocale('en')}
+              >
+                ENGLISH
+              </button>
+
+              <button
+                type="button"
+                className={locale === 'es' ? 'active' : ''}
+                onClick={() => chooseLocale('es')}
+              >
+                ESPAÑOL
               </button>
             </div>
+          </div>
 
-            {/* CARD 1: OPERACIÓN OFFLINE */}
-            <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
-              <MissionPackPanel
-                user={user}
-                payload={missionPayload}
-              />
-            </section>
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              marginTop: 8,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <a href={loginHref} style={toolsQuietLink} onClick={onCloseTools}>
+              ⚙️ {t('player.tools.adminPanel', locale)}
+            </a>
 
-            {/* CARD 2: ACCIONES DE CAMPO */}
-            <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>{t('player.tools.fieldActions', locale)}</div>
-              
-              <div style={toolsActionGrid}>
-                {onDownloadFieldProofs ? (
-                  <button
-                    type="button"
-                    style={
-                      fieldPhotoCount > 0
-                        ? toolsGreenActiveButton
-                        : toolsGreenDisabledButton
-                    }
-                    disabled={fieldPhotoCount <= 0}
-                    onClick={
-                      fieldPhotoCount > 0
-                        ? onDownloadFieldProofs
-                        : undefined
-                    }
-                  >
-                    {fieldPhotoCount > 0
-                      ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
-                      : `📥 ${t('player.tools.noPhotos', locale)}`}
-                  </button>
-                ) : null}
+            <button
+              type="button"
+              style={debugEnabled ? toolsButtonDangerActive : toolsQuietButton}
+              onClick={() => {
+                onToggleDebug()
+                onCloseTools()
+              }}
+            >
+              {debugEnabled
+                ? `🛑 ${t('player.tools.exitDebug', locale)}`
+                : `🛠️ ${t('player.tools.debugMode', locale)}`}
+            </button>
+          </div>
+        </section>
 
-              </div>
-
-              {onSubmitCode && currentStage && !finished ? (
-                <div style={{ marginTop: 12 }}>
-                  {/* Fallback de nodo CÓDIGO FALLBACK */}
-                  <div style={fallbackToolHead}>
-                    <strong style={{ color: '#fbbf24' }}>🔑 {t('player.tools.altCode', locale)}</strong>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{t('player.tools.altCodeHelp', locale)}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    style={toolsFallbackOpen ? fallbackToolButtonActive : fallbackToolButton}
-                    onClick={() => setToolsFallbackOpen((value) => !value)}
-                    disabled={submitting}
-                  >
-                    {toolsFallbackOpen ? t('player.tools.hideForm', locale) : t('player.tools.manualCode', locale)}
-                  </button>
-
-                  {toolsFallbackOpen ? (
-                    <form style={fallbackToolForm} onSubmit={handleToolsFallbackSubmit}>
-                      <input
-                        value={toolsFallbackCode}
-                        onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                        placeholder={t('player.tools.codePlaceholder', locale)}
-                        style={fallbackToolInput}
-                        disabled={submitting}
-                      />
-
-                      <button
-                        type="submit"
-                        style={fallbackToolSubmit}
-                        disabled={submitting || !toolsFallbackCode.trim()}
-                      >
-                        {submitting ? t('player.tools.verifying', locale) : t('player.tools.completeNode', locale)}
-                      </button>
-
-                      {errorMessage ? <div style={fallbackToolError}>{errorMessage}</div> : null}
-                    </form>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
-
-            {/* CARD 3: AJUSTES Y DESARROLLO */}
-            <section style={toolsCardGroup}>
-              <div style={toolsCardGroupLabel}>{t('player.tools.deviceSettings', locale)}</div>
-
-              <div style={toolsLanguageBlock}>
-                <span style={toolsMiniLabel}>
-                  {t('player.tools.language', locale)}
-                </span>
-
-                <div className="saga-tools-language-row">
-                  <button
-                    type="button"
-                    className={locale === 'en' ? 'active' : ''}
-                    onClick={() => chooseLocale('en')}
-                  >
-                    ENGLISH
-                  </button>
-
-                  <button
-                    type="button"
-                    className={locale === 'es' ? 'active' : ''}
-                    onClick={() => chooseLocale('es')}
-                  >
-                    ESPAÑOL
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                <a
-                  href={loginHref}
-                  style={toolsQuietLink}
-                  onClick={onCloseTools}
-                >
-                  ⚙️ {t('player.tools.adminPanel', locale)}
-                </a>
-
-                <button
-                  type="button"
-                  style={
-                    debugEnabled
-                      ? toolsButtonDangerActive
-                      : toolsQuietButton
-                  }
-                  onClick={() => {
-                    onToggleDebug()
-                    onCloseTools()
-                  }}
-                >
-                  {debugEnabled
-                    ? `🛑 ${t('player.tools.exitDebug', locale)}`
-                    : `🛠️ ${t('player.tools.debugMode', locale)}`}
-                </button>
-              </div>
-            </section>
-
-            <div style={toolsBuildRow}>
-              <BuildInfoBadge mode="inline" />
-            </div>
+        <div style={toolsBuildRow}>
+          <BuildInfoBadge mode="inline" />
+        </div>
       </SwipeableSheet>
     </>
   )
@@ -551,8 +538,7 @@ const card: CSSProperties = {
   display: 'grid',
   gap: 10,
   borderRadius: 28,
-  background:
-    'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+  background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
   border: '1px solid rgba(255,255,255,.22)',
   boxShadow: '0 22px 60px rgba(15,23,42,.18)',
   backdropFilter: 'blur(24px) saturate(1.12)',

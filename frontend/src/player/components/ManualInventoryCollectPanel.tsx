@@ -33,12 +33,16 @@ function parseManualInput(value: string): ParsedManualInput | null {
     normalized = normalized.slice('SAGA:'.length)
   }
 
-  normalized = normalized
-    .replace(/^item\s*:/i, 'ITEM:')
-    .replace(/^proof\s*:/i, 'PROOF:')
+  normalized = normalized.replace(/^item\s*:/i, 'ITEM:').replace(/^proof\s*:/i, 'PROOF:')
 
-  if (normalized.toUpperCase().startsWith('ITEM:') || normalized.toUpperCase().startsWith('PROOF:')) {
-    const parts = normalized.split(':').map((part) => part.trim()).filter(Boolean)
+  if (
+    normalized.toUpperCase().startsWith('ITEM:') ||
+    normalized.toUpperCase().startsWith('PROOF:')
+  ) {
+    const parts = normalized
+      .split(':')
+      .map((part) => part.trim())
+      .filter(Boolean)
     const itemId = parts[1]
     const label = parts.slice(2).join(':') || itemId
 
@@ -63,7 +67,9 @@ function parseManualInput(value: string): ParsedManualInput | null {
 
 export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPanelProps) {
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState('Usa esto solo como respaldo si QR/NFC falla o si os perdeis en un nodo.')
+  const [message, setMessage] = useState(
+    'Usa esto solo como respaldo si QR/NFC falla o si os perdeis en un nodo.'
+  )
   const [saved, setSaved] = useState(false)
 
   const preview = useMemo(() => parseManualInput(value), [value])
@@ -95,7 +101,9 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
 
       setValue('')
       setSaved(true)
-      setMessage(`Guardado en Objetos: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`)
+      setMessage(
+        `Guardado en Objetos: ${parsed.label} ? ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} en mochila`
+      )
     } catch {
       setSaved(false)
       setMessage('No se pudo guardar. Prueba otra vez.')
@@ -110,7 +118,8 @@ export function ManualInventoryCollectPanel({ user }: ManualInventoryCollectPane
       </div>
 
       <div style={copy}>
-        Normalmente usa los botones rapidos del mapa: QR o NFC. Esta pantalla es el plan B para escribir una palabra, codigo o nombre si algo falla.
+        Normalmente usa los botones rapidos del mapa: QR o NFC. Esta pantalla es el plan B para
+        escribir una palabra, codigo o nombre si algo falla.
       </div>
 
       <label style={field}>

@@ -18,6 +18,6 @@ export function useI18n() {
 
   return {
     locale,
-    t: (key: TranslationKey) => t(key, locale)
+    t: (key: TranslationKey) => t(key, locale),
   }
 }

@@ -8,7 +8,10 @@ name: CodeQL
 # SAGA v0.1.0 is validated by local guards, frontend build and production smoke.
 # Re-enable push/pull_request after the GitHub CodeQL token/init issue is resolved.
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 permissions:
   contents: read

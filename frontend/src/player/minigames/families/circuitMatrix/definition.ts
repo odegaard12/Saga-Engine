@@ -11,8 +11,7 @@ export const circuitMatrixDefinition: CircuitMatrixDefinition = {
   version: 'v1',
   label: 'Matriz de circuitos',
   tagline: 'Memoriza y restaura la ruta',
-  description:
-    'Juego táctil de memoria para restaurar una ruta de energía en una matriz.',
+  description: 'Juego táctil de memoria para restaurar una ruta de energía en una matriz.',
 
   validation_mode: 'client',
   fallback_policy: 'manual_code',
@@ -63,32 +62,16 @@ function validateCircuitMatrixConfig(
 ): { ok: true; value: CircuitMatrixConfig } | { ok: false; errors: string[] } {
   const raw = (config && typeof config === 'object' ? config : {}) as Partial<CircuitMatrixConfig>
 
-  if (
-    raw.game_id === 'tilt_maze' ||
-    raw.objective === 'balance_maze'
-  ) {
+  if (raw.game_id === 'tilt_maze' || raw.objective === 'balance_maze') {
     const difficulty =
-      raw.difficulty === 'easy' ||
-      raw.difficulty === 'hard'
-        ? raw.difficulty
-        : 'normal'
+      raw.difficulty === 'easy' || raw.difficulty === 'hard' ? raw.difficulty : 'normal'
 
-    const fallbackSize =
-      difficulty === 'easy'
-        ? 7
-        : difficulty === 'hard'
-          ? 11
-          : 9
+    const fallbackSize = difficulty === 'easy' ? 7 : difficulty === 'hard' ? 11 : 9
 
-    const numberValue = (
-      value: unknown,
-      fallback: number,
-    ) => {
+    const numberValue = (value: unknown, fallback: number) => {
       const parsed = Number(value)
 
-      return Number.isFinite(parsed)
-        ? Math.round(parsed)
-        : fallback
+      return Number.isFinite(parsed) ? Math.round(parsed) : fallback
     }
 
     const value: CircuitMatrixConfig = {
@@ -98,51 +81,17 @@ function validateCircuitMatrixConfig(
       game_id: 'tilt_maze',
       completion_method: 'motion',
       difficulty,
-      grid_rows: numberValue(
-        raw.grid_rows,
-        fallbackSize,
-      ),
-      grid_cols: numberValue(
-        raw.grid_cols,
-        fallbackSize,
-      ),
-      pattern_mode:
-        raw.pattern_mode ===
-        'random_each_game'
-          ? 'random_each_game'
-          : 'fixed',
-      maze_seed:
-        String(
-          raw.maze_seed ||
-          'saga-maze',
-        ).trim() ||
-        'saga-maze',
-      time_limit_s: numberValue(
-        raw.time_limit_s,
-        75,
-      ),
-      lives: numberValue(
-        raw.lives,
-        3,
-      ),
-      hole_count: numberValue(
-        raw.hole_count,
-        4,
-      ),
-      collectible_count: numberValue(
-        raw.collectible_count,
-        2,
-      ),
-      sensor_enabled:
-        raw.sensor_enabled !== false,
-      tilt_threshold: numberValue(
-        raw.tilt_threshold,
-        12,
-      ),
-      step_cooldown_ms: numberValue(
-        raw.step_cooldown_ms,
-        360,
-      ),
+      grid_rows: numberValue(raw.grid_rows, fallbackSize),
+      grid_cols: numberValue(raw.grid_cols, fallbackSize),
+      pattern_mode: raw.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed',
+      maze_seed: String(raw.maze_seed || 'saga-maze').trim() || 'saga-maze',
+      time_limit_s: numberValue(raw.time_limit_s, 75),
+      lives: numberValue(raw.lives, 3),
+      hole_count: numberValue(raw.hole_count, 4),
+      collectible_count: numberValue(raw.collectible_count, 2),
+      sensor_enabled: raw.sensor_enabled !== false,
+      tilt_threshold: numberValue(raw.tilt_threshold, 12),
+      step_cooldown_ms: numberValue(raw.step_cooldown_ms, 360),
     }
 
     const errors: string[] = []
@@ -153,45 +102,23 @@ function validateCircuitMatrixConfig(
       value.grid_cols < 5 ||
       value.grid_cols > 13
     ) {
-      errors.push(
-        'maze grid must be between 5 and 13 cells',
-      )
+      errors.push('maze grid must be between 5 and 13 cells')
     }
 
-    if (
-      (value.time_limit_s || 0) < 20 ||
-      (value.time_limit_s || 0) > 180
-    ) {
-      errors.push(
-        'time_limit_s must be between 20 and 180',
-      )
+    if ((value.time_limit_s || 0) < 20 || (value.time_limit_s || 0) > 180) {
+      errors.push('time_limit_s must be between 20 and 180')
     }
 
-    if (
-      (value.lives || 0) < 1 ||
-      (value.lives || 0) > 5
-    ) {
-      errors.push(
-        'lives must be between 1 and 5',
-      )
+    if ((value.lives || 0) < 1 || (value.lives || 0) > 5) {
+      errors.push('lives must be between 1 and 5')
     }
 
-    if (
-      (value.hole_count || 0) < 0 ||
-      (value.hole_count || 0) > 18
-    ) {
-      errors.push(
-        'hole_count must be between 0 and 18',
-      )
+    if ((value.hole_count || 0) < 0 || (value.hole_count || 0) > 18) {
+      errors.push('hole_count must be between 0 and 18')
     }
 
-    if (
-      (value.collectible_count || 0) < 0 ||
-      (value.collectible_count || 0) > 6
-    ) {
-      errors.push(
-        'collectible_count must be between 0 and 6',
-      )
+    if ((value.collectible_count || 0) < 0 || (value.collectible_count || 0) > 6) {
+      errors.push('collectible_count must be between 0 and 6')
     }
 
     if (errors.length > 0) {
@@ -207,42 +134,23 @@ function validateCircuitMatrixConfig(
     }
   }
 
-  if (
-    raw.game_id === 'place_mosaic' ||
-    raw.objective === 'image_mosaic'
-  ) {
-    const imageDataUrl = String(
-      raw.image_data_url ?? '',
-    ).trim()
+  if (raw.game_id === 'place_mosaic' || raw.objective === 'image_mosaic') {
+    const imageDataUrl = String(raw.image_data_url ?? '').trim()
 
-    const gridSize = Number(
-      raw.grid_size ??
-      raw.grid_cols ??
-      raw.grid_rows ??
-      3,
-    )
+    const gridSize = Number(raw.grid_size ?? raw.grid_cols ?? raw.grid_rows ?? 3)
 
-    const previewMs = Number(
-      raw.preview_ms ?? 2500,
-    )
+    const previewMs = Number(raw.preview_ms ?? 2500)
 
-    const maxMoves = Number(
-      raw.max_moves ?? 0,
-    )
+    const maxMoves = Number(raw.max_moves ?? 0)
 
-    const finalChoices =
-      Array.isArray(raw.final_choices)
-        ? raw.final_choices
-            .map((item) =>
-              String(item).trim(),
-            )
-            .filter(Boolean)
-            .slice(0, 4)
-        : []
+    const finalChoices = Array.isArray(raw.final_choices)
+      ? raw.final_choices
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .slice(0, 4)
+      : []
 
-    const finalCorrectIndex = Number(
-      raw.final_correct_index ?? 0,
-    )
+    const finalCorrectIndex = Number(raw.final_correct_index ?? 0)
 
     const value: CircuitMatrixConfig = {
       ...circuitMatrixDefinition.default_config,
@@ -251,22 +159,16 @@ function validateCircuitMatrixConfig(
       game_id: 'place_mosaic',
       completion_method: 'puzzle',
       image_data_url: imageDataUrl,
-      image_alt: String(
-        raw.image_alt ?? '',
-      ).trim(),
+      image_alt: String(raw.image_alt ?? '').trim(),
       grid_size: gridSize,
       grid_cols: gridSize,
       grid_rows: gridSize,
       preview_ms: previewMs,
       max_moves: maxMoves,
-      require_final_question:
-        raw.require_final_question === true,
-      final_question: String(
-        raw.final_question ?? '',
-      ).trim(),
+      require_final_question: raw.require_final_question === true,
+      final_question: String(raw.final_question ?? '').trim(),
       final_choices: finalChoices,
-      final_correct_index:
-        finalCorrectIndex,
+      final_correct_index: finalCorrectIndex,
     }
 
     const errors: string[] = []
@@ -274,84 +176,41 @@ function validateCircuitMatrixConfig(
     if (
       imageDataUrl.length > 600000 ||
       !(
-        imageDataUrl.startsWith(
-          'data:image/jpeg;base64,',
-        ) ||
-        imageDataUrl.startsWith(
-          'data:image/png;base64,',
-        ) ||
-        imageDataUrl.startsWith(
-          'data:image/webp;base64,',
-        )
+        imageDataUrl.startsWith('data:image/jpeg;base64,') ||
+        imageDataUrl.startsWith('data:image/png;base64,') ||
+        imageDataUrl.startsWith('data:image/webp;base64,')
       )
     ) {
-      errors.push(
-        'image_data_url must contain a supported compressed image',
-      )
+      errors.push('image_data_url must contain a supported compressed image')
     }
 
-    if (
-      !Number.isInteger(gridSize) ||
-      gridSize < 2 ||
-      gridSize > 4
-    ) {
-      errors.push(
-        'grid_size must be an integer between 2 and 4',
-      )
+    if (!Number.isInteger(gridSize) || gridSize < 2 || gridSize > 4) {
+      errors.push('grid_size must be an integer between 2 and 4')
     }
 
-    if (
-      !Number.isInteger(previewMs) ||
-      previewMs < 0 ||
-      previewMs > 6000
-    ) {
-      errors.push(
-        'preview_ms must be an integer between 0 and 6000',
-      )
+    if (!Number.isInteger(previewMs) || previewMs < 0 || previewMs > 6000) {
+      errors.push('preview_ms must be an integer between 0 and 6000')
     }
 
-    if (
-      !Number.isInteger(maxMoves) ||
-      maxMoves < 0 ||
-      maxMoves > 500
-    ) {
-      errors.push(
-        'max_moves must be an integer between 0 and 500',
-      )
+    if (!Number.isInteger(maxMoves) || maxMoves < 0 || maxMoves > 500) {
+      errors.push('max_moves must be an integer between 0 and 500')
     }
 
-    if (
-      value.require_final_question === true
-    ) {
-      if (
-        String(value.final_question || '')
-          .trim().length < 3
-      ) {
-        errors.push(
-          'final_question must contain at least 3 characters',
-        )
+    if (value.require_final_question === true) {
+      if (String(value.final_question || '').trim().length < 3) {
+        errors.push('final_question must contain at least 3 characters')
+      }
+
+      if (finalChoices.length < 2 || finalChoices.length > 4) {
+        errors.push('final_choices must contain between 2 and 4 answers')
       }
 
       if (
-        finalChoices.length < 2 ||
-        finalChoices.length > 4
-      ) {
-        errors.push(
-          'final_choices must contain between 2 and 4 answers',
-        )
-      }
-
-      if (
-        !Number.isInteger(
-          finalCorrectIndex,
-        ) ||
+        !Number.isInteger(finalCorrectIndex) ||
         finalCorrectIndex < 0 ||
-        finalCorrectIndex >=
-          finalChoices.length
+        finalCorrectIndex >= finalChoices.length
       ) {
-        errors.push(
-          'final_correct_index is outside final_choices',
-        )
+        errors.push('final_correct_index is outside final_choices')
       }
     }
 
@@ -368,17 +227,12 @@ function validateCircuitMatrixConfig(
     }
   }
 
-  if (
-    raw.game_id === 'sequence_code' ||
-    raw.objective === 'sequence_order'
-  ) {
+  if (raw.game_id === 'sequence_code' || raw.objective === 'sequence_order') {
     const sequence = Array.isArray(raw.sequence)
       ? raw.sequence.map((item) => String(item).trim())
       : []
 
-    const maxAttempts = Number(
-      raw.max_attempts ?? 3,
-    )
+    const maxAttempts = Number(raw.max_attempts ?? 3)
 
     const value: CircuitMatrixConfig = {
       ...circuitMatrixDefinition.default_config,
@@ -394,53 +248,26 @@ function validateCircuitMatrixConfig(
 
     const errors: string[] = []
 
-    if (
-      sequence.length < 3 ||
-      sequence.length > 10
-    ) {
-      errors.push(
-        'sequence must contain between 3 and 10 tokens',
-      )
+    if (sequence.length < 3 || sequence.length > 10) {
+      errors.push('sequence must contain between 3 and 10 tokens')
     }
 
-    if (
-      sequence.some(
-        (item) => !item || item.length > 32,
-      )
-    ) {
-      errors.push(
-        'sequence tokens must contain 1-32 characters',
-      )
+    if (sequence.some((item) => !item || item.length > 32)) {
+      errors.push('sequence tokens must contain 1-32 characters')
     }
 
-    const unique = new Set(
-      sequence.map((item) =>
-        item.toLocaleLowerCase(),
-      ),
-    )
+    const unique = new Set(sequence.map((item) => item.toLocaleLowerCase()))
 
     if (unique.size !== sequence.length) {
-      errors.push(
-        'sequence tokens must be unique',
-      )
+      errors.push('sequence tokens must be unique')
     }
 
-    if (
-      !Number.isInteger(maxAttempts) ||
-      maxAttempts < 1 ||
-      maxAttempts > 8
-    ) {
-      errors.push(
-        'max_attempts must be an integer between 1 and 8',
-      )
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 8) {
+      errors.push('max_attempts must be an integer between 1 and 8')
     }
 
-    if (
-      String(value.hint_text || '').length > 240
-    ) {
-      errors.push(
-        'hint_text must contain at most 240 characters',
-      )
+    if (String(value.hint_text || '').length > 240) {
+      errors.push('hint_text must contain at most 240 characters')
     }
 
     if (errors.length > 0) {
@@ -485,16 +312,12 @@ function validateCircuitMatrixConfig(
       difficulty === 'hard'
     )
   ) {
-    errors.push(
-      'difficulty must be 1-5 or easy/normal/hard',
-    )
+    errors.push('difficulty must be 1-5 or easy/normal/hard')
   }
 
   if (
     value.max_errors !== undefined &&
-    (!Number.isInteger(value.max_errors) ||
-      value.max_errors < 1 ||
-      value.max_errors > 6)
+    (!Number.isInteger(value.max_errors) || value.max_errors < 1 || value.max_errors > 6)
   ) {
     errors.push('max_errors must be an integer between 1 and 6')
   }
@@ -520,15 +343,10 @@ function validateCircuitMatrixConfig(
     value.pattern_mode !== 'random_each_game' &&
     value.pattern_mode !== 'fixed'
   ) {
-    errors.push(
-      'pattern_mode must be random_each_game or fixed'
-    )
+    errors.push('pattern_mode must be random_each_game or fixed')
   }
 
-  if (
-    value.path_cells !== undefined &&
-    !Array.isArray(value.path_cells)
-  ) {
+  if (value.path_cells !== undefined && !Array.isArray(value.path_cells)) {
     errors.push('path_cells must be an array')
   }
 

@@ -17,10 +17,9 @@ import {
   type AdminGameId,
 } from '../lib/gameCatalog'
 
-
-
 const LEGACY_NODE_COPY_ES: Record<string, string> = {
-  'GPS unavailable message.': 'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
+  'GPS unavailable message.':
+    'No se pudo obtener la posición GPS. Revisa permisos o usa el código de emergencia.',
   'Move closer to unlock this node.': 'Acércate al nodo para desbloquearlo.',
 }
 
@@ -29,7 +28,6 @@ function normalizeLegacyNodeCopy(value?: unknown) {
   if (!clean) return ''
   return LEGACY_NODE_COPY_ES[clean] ?? clean
 }
-
 
 type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
 
@@ -108,7 +106,9 @@ function slugifyRequirementItemId(value: string): string {
     .slice(0, 80)
 }
 
-function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalRequirementOption | null {
+function getPhysicalRequirementOption(
+  stage: AdminReactOverviewStage
+): PhysicalRequirementOption | null {
   const record = stage as AdminReactOverviewStage & {
     physical_node_kind?: string
     physical_item_kind?: string
@@ -121,14 +121,17 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
   }
 
   const config =
-    typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+    typeof (stage as EditableAdminStage).config === 'object' &&
+    (stage as EditableAdminStage).config !== null
       ? (((stage as EditableAdminStage).config || {}) as Record<string, unknown>)
       : {}
 
   const gameId = typeof config.game_id === 'string' ? config.game_id : ''
   const labelText = String(record.label || stage.title || '').toLowerCase()
   const titleText = String(stage.title || '').toLowerCase()
-  const payloadText = String(record.qr_payload || record.physical_qr?.item_id || record.physical_qr?.label || '').toLowerCase()
+  const payloadText = String(
+    record.qr_payload || record.physical_qr?.item_id || record.physical_qr?.label || ''
+  ).toLowerCase()
   const gameText = String(gameId || config.game_title || config.objective || '').toLowerCase()
   const allText = `${labelText} ${titleText} ${payloadText} ${gameText}`
 
@@ -143,44 +146,47 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
             ? 'bonus'
             : ''
 
-  const inferredKind =
-    /llave|key|qr_key|requirement/.test(allText)
-      ? 'requirement'
-      : /pista|clue/.test(allText)
-        ? 'clue'
-        : /bonus|regalo|cache/.test(allText)
-          ? 'bonus'
-          : /objeto|coleccionable|collectible|qr/.test(allText)
-            ? 'collectible'
-            : ''
+  const inferredKind = /llave|key|qr_key|requirement/.test(allText)
+    ? 'requirement'
+    : /pista|clue/.test(allText)
+      ? 'clue'
+      : /bonus|regalo|cache/.test(allText)
+        ? 'bonus'
+        : /objeto|coleccionable|collectible|qr/.test(allText)
+          ? 'collectible'
+          : ''
 
-  const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind || catalogKind || inferredKind
-  if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus') return null
+  const kind =
+    record.physical_node_kind ||
+    record.physical_item_kind ||
+    record.physical_qr?.kind ||
+    catalogKind ||
+    inferredKind
+  if (kind !== 'collectible' && kind !== 'requirement' && kind !== 'clue' && kind !== 'bonus')
+    return null
 
   const title = String(stage.title || `Nodo ${stage.index + 1}`).trim()
   const typeLabel = String(
     record.physical_item_label ||
-    record.physical_qr?.label ||
-    config.physical_item_label ||
-    config.game_title ||
-    record.label ||
-    (
-      kind === 'requirement'
+      record.physical_qr?.label ||
+      config.physical_item_label ||
+      config.game_title ||
+      record.label ||
+      (kind === 'requirement'
         ? 'Llave QR'
         : kind === 'clue'
           ? 'Pista QR'
           : kind === 'bonus'
             ? 'Bonus QR'
-            : 'Objeto QR'
-    )
+            : 'Objeto QR')
   ).trim()
 
   const itemId = String(
     record.physical_item_id ||
-    record.physical_qr?.item_id ||
-    config.physical_item_id ||
-    slugifyRequirementItemId(typeLabel || title) ||
-    `node_${stage.index + 1}`
+      record.physical_qr?.item_id ||
+      config.physical_item_id ||
+      slugifyRequirementItemId(typeLabel || title) ||
+      `node_${stage.index + 1}`
   ).trim()
 
   return {
@@ -189,13 +195,7 @@ function getPhysicalRequirementOption(stage: AdminReactOverviewStage): PhysicalR
     title: typeLabel && typeLabel !== title ? `${title} · ${typeLabel}` : title,
     kind,
     icon:
-      kind === 'collectible'
-        ? '⭐'
-        : kind === 'requirement'
-          ? '🔑'
-          : kind === 'clue'
-            ? '🧩'
-            : '🎁',
+      kind === 'collectible' ? '⭐' : kind === 'requirement' ? '🔑' : kind === 'clue' ? '🧩' : '🎁',
   }
 }
 
@@ -218,14 +218,12 @@ export default function NodeDetailDrawer({
     onApplyLocal(nextDraft)
   }
 
-
   function patchGuidedV2Stage(patch: Record<string, any>) {
     setDraft((current: any) => ({
       ...current,
       ...patch,
     }))
   }
-
 
   function patchGuidedStage(patch: Record<string, any>) {
     setDraft((current: any) => ({
@@ -250,7 +248,8 @@ export default function NodeDetailDrawer({
   const isLocalNew = typeof draft.id === 'string' && draft.id.startsWith('local-')
 
   const draftConfig =
-    typeof (draft as EditableAdminStage).config === 'object' && (draft as EditableAdminStage).config !== null
+    typeof (draft as EditableAdminStage).config === 'object' &&
+    (draft as EditableAdminStage).config !== null
       ? (((draft as EditableAdminStage).config || {}) as Record<string, unknown>)
       : {}
 
@@ -268,7 +267,8 @@ export default function NodeDetailDrawer({
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
     if (Array.isArray(value)) return value.join(', ')
-    if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return String(value)
+    if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean')
+      return String(value)
     return fallback
   }
 
@@ -292,10 +292,7 @@ export default function NodeDetailDrawer({
     }))
   }
 
-  function setDraftMessage(
-    key: 'hint' | 'gps_unavailable' | 'locked',
-    value: string
-  ) {
+  function setDraftMessage(key: 'hint' | 'gps_unavailable' | 'locked', value: string) {
     updateDraftLocal((current) => ({
       ...current,
       messages: {
@@ -340,7 +337,8 @@ export default function NodeDetailDrawer({
 
     updateDraftLocal((current) => {
       const currentConfig =
-        typeof (current as EditableAdminStage).config === 'object' && (current as EditableAdminStage).config !== null
+        typeof (current as EditableAdminStage).config === 'object' &&
+        (current as EditableAdminStage).config !== null
           ? (((current as EditableAdminStage).config || {}) as Record<string, unknown>)
           : {}
 
@@ -350,7 +348,11 @@ export default function NodeDetailDrawer({
         ...carryOverConfig,
         game_id: nextGameId,
         game_title: patch.label,
-        success_code: String(carryOverConfig.success_code || carryOverConfig.fallback_code || buildFallbackCodeForStage(current)),
+        success_code: String(
+          carryOverConfig.success_code ||
+            carryOverConfig.fallback_code ||
+            buildFallbackCodeForStage(current)
+        ),
       }
 
       return {
@@ -395,21 +397,19 @@ export default function NodeDetailDrawer({
     }))
   }
 
-
   function renderActivationPanel() {
     const rawDraft = draft as Record<string, unknown>
-    const rawRadius =
-      rawDraft.radius_m ??
-      rawDraft.radius ??
-      rawDraft.activation_radius_m ??
-      50
+    const rawRadius = rawDraft.radius_m ?? rawDraft.radius ?? rawDraft.activation_radius_m ?? 50
     const radiusValue = String(rawRadius)
     const interactionValue = String(
       rawDraft.input_mode ??
         rawDraft.inputMode ??
-        (rawDraft.require_proximity === false || rawDraft.requireProximity === false ? 'manual' : 'gps'),
+        (rawDraft.require_proximity === false || rawDraft.requireProximity === false
+          ? 'manual'
+          : 'gps')
     )
-    const requireProximity = rawDraft.require_proximity !== false && rawDraft.requireProximity !== false
+    const requireProximity =
+      rawDraft.require_proximity !== false && rawDraft.requireProximity !== false
 
     return (
       <section className="admin-node-activation-panel">
@@ -461,8 +461,12 @@ export default function NodeDetailDrawer({
               checked={requireProximity}
               onChange={(event) => {
                 patchActivationStage({
-                  ...({ require_proximity: event.target.checked } as Partial<AdminReactOverviewStage>),
-                  ...({ requireProximity: event.target.checked } as Partial<AdminReactOverviewStage>),
+                  ...({
+                    require_proximity: event.target.checked,
+                  } as Partial<AdminReactOverviewStage>),
+                  ...({
+                    requireProximity: event.target.checked,
+                  } as Partial<AdminReactOverviewStage>),
                 })
               }}
             />
@@ -471,19 +475,19 @@ export default function NodeDetailDrawer({
         </div>
 
         <p className="admin-node-activation-note">
-          La posición se cambia arrastrando el nodo en el mapa. Aquí configuras el radio y cómo se activa.
+          La posición se cambia arrastrando el nodo en el mapa. Aquí configuras el radio y cómo se
+          activa.
         </p>
       </section>
     )
   }
-
 
   return (
     <div className="admin-drawer-overlay admin-drawer-overlay--nonblocking" role="region">
       <aside
         className="admin-drawer admin-drawer-editable admin-node-editor-redesign admin-node-editor-large-modal admin-guided-v4-shell"
         role="dialog"
-        
+
         aria-label={`Node editor: ${draft.title}`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -503,23 +507,25 @@ export default function NodeDetailDrawer({
         </div>
         <div className="admin-drawer-head admin-drawer-head--modern admin-node-editor-topbar">
           <div className="admin-node-editor-kicker-row">
-            <span className="admin-kicker">{isLocalNew ? 'Añadir nodo' : 'Editor guiado de nodo'}</span>
+            <span className="admin-kicker">
+              {isLocalNew ? 'Añadir nodo' : 'Editor guiado de nodo'}
+            </span>
 
-            <button
-              type="button"
-              className="admin-node-editor-close"
-              onClick={onClose}
-            >
+            <button type="button" className="admin-node-editor-close" onClick={onClose}>
               Cerrar ×
             </button>
           </div>
 
           <div className="admin-node-editor-title-row">
             <div className="admin-node-editor-title-copy">
-              <h2>{draft.index + 1}. {draft.title || 'Nodo sin título'}</h2>
+              <h2>
+                {draft.index + 1}. {draft.title || 'Nodo sin título'}
+              </h2>
 
               <div className="admin-drawer-meta admin-node-editor-meta">
-                <span>{family?.icon || '◇'} {draft.label || draft.type}</span>
+                <span>
+                  {family?.icon || '◇'} {draft.label || draft.type}
+                </span>
                 <span>{formatCoords(draft.lat, draft.lon)}</span>
                 <span>{typeof draft.radius === 'number' ? `${draft.radius} m` : 'Sin radio'}</span>
               </div>
@@ -533,7 +539,11 @@ export default function NodeDetailDrawer({
                 type="button"
                 className="admin-node-delete-visible"
                 onClick={() => {
-                  if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                  if (
+                    window.confirm(
+                      `Eliminar nodo "${draft.title || 'Sin título'}"? Guarda después para persistir.`
+                    )
+                  ) {
                     onDeleteLocal(draft)
                   }
                 }}
@@ -549,7 +559,11 @@ export default function NodeDetailDrawer({
             onPatch={patchGuidedV3Stage}
             onClose={onClose}
             onDelete={() => {
-              if (window.confirm(`Eliminar nodo "${draft.title || 'Sin título'}"? Pulsa Guardar después para persistir.`)) {
+              if (
+                window.confirm(
+                  `Eliminar nodo "${draft.title || 'Sin título'}"? Pulsa Guardar después para persistir.`
+                )
+              ) {
                 onDeleteLocal(draft)
               }
             }}
@@ -557,7 +571,6 @@ export default function NodeDetailDrawer({
         </div>
 
         <div className="admin-drawer-footer">
-
           <div className="admin-drawer-footer-actions">
             <button type="button" className="admin-cms-side-action" onClick={onClose}>
               Close

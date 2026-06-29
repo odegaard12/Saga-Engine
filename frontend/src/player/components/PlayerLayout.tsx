@@ -2,25 +2,17 @@ import type { CSSProperties, ReactNode } from 'react'
 
 export type OverlayState = 'activate' | 'node' | 'finish' | null
 
-export function getMobileBrowserChromeLift(
-  mobile: boolean,
-): number {
-  if (
-    !mobile ||
-    typeof window === 'undefined'
-  ) {
+export function getMobileBrowserChromeLift(mobile: boolean): number {
+  if (!mobile || typeof window === 'undefined') {
     return 0
   }
 
-  const navigatorWithStandalone =
-    window.navigator as Navigator & {
-      standalone?: boolean
-    }
+  const navigatorWithStandalone = window.navigator as Navigator & {
+    standalone?: boolean
+  }
 
   const standalone =
-    window.matchMedia?.(
-      '(display-mode: standalone)'
-    ).matches === true ||
+    window.matchMedia?.('(display-mode: standalone)').matches === true ||
     navigatorWithStandalone.standalone === true
 
   return standalone ? 0 : 22
@@ -32,9 +24,7 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
   return {
     position: 'fixed',
     left: '50%',
-    bottom: mobile
-      ? `calc(env(safe-area-inset-bottom, 0px) + ${138 + browserChromeLift}px)`
-      : 148,
+    bottom: mobile ? `calc(env(safe-area-inset-bottom, 0px) + ${138 + browserChromeLift}px)` : 148,
     transform: 'translateX(-50%)',
     zIndex: 1600,
     display: 'inline-flex',
@@ -46,10 +36,8 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     padding: 4,
     borderRadius: 24,
     border: '1px solid rgba(255,255,255,.20)',
-    background:
-      'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
-    boxShadow:
-      '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
+    background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
+    boxShadow: '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
     backdropFilter: 'blur(8px) saturate(120%)',
     WebkitBackdropFilter: 'blur(8px) saturate(120%)',
     pointerEvents: 'auto',
@@ -140,7 +128,17 @@ function getLaunchingPlayerLabel() {
   }
 }
 
-export function StatusCard({ title, body }: { title: string; body: string }) {
+export function StatusCard({
+  title,
+  body,
+  progress,
+  progressDetail,
+}: {
+  title: string
+  body: string
+  progress?: number
+  progressDetail?: string
+}) {
   const playerLabel = getLaunchingPlayerLabel()
 
   return (
@@ -151,6 +149,14 @@ export function StatusCard({ title, body }: { title: string; body: string }) {
       </div>
       <div style={statusTitle}>{playerLabel ? `Entrando como ${playerLabel}` : title}</div>
       <div style={statusBody}>{body}</div>
+      {progress !== undefined && (
+        <div style={progressContainer}>
+          <div style={progressWrapper}>
+            <div style={{ ...progressBar, width: `${progress}%` }} />
+          </div>
+          {progressDetail && <div style={progressText}>{progressDetail}</div>}
+        </div>
+      )}
     </section>
   )
 }
@@ -159,18 +165,10 @@ export function CelebrationOverlay({ state }: { state: OverlayState }) {
   if (!state) return null
 
   const label =
-    state === 'activate'
-      ? 'Node ready'
-      : state === 'node'
-      ? 'Node cleared'
-      : 'Mission complete'
+    state === 'activate' ? 'Node ready' : state === 'node' ? 'Node cleared' : 'Mission complete'
 
   const toneStyle =
-    state === 'activate'
-      ? overlayInfo
-      : state === 'node'
-      ? overlaySuccess
-      : overlayFinish
+    state === 'activate' ? overlayInfo : state === 'node' ? overlaySuccess : overlayFinish
 
   return (
     <>
@@ -282,6 +280,38 @@ const statusCard: CSSProperties = {
   minWidth: 260,
   maxWidth: 320,
   animation: 'sagaStatusPulse 2s ease-in-out infinite',
+}
+
+const progressContainer: CSSProperties = {
+  width: '100%',
+  marginTop: 12,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 6,
+}
+
+const progressWrapper: CSSProperties = {
+  width: '100%',
+  height: 6,
+  background: 'rgba(255,255,255,0.08)',
+  borderRadius: 3,
+  overflow: 'hidden',
+  border: '1px solid rgba(255,255,255,0.04)',
+}
+
+const progressBar: CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, #10b981, #34d399)',
+  borderRadius: 3,
+  transition: 'width 0.2s ease-out',
+}
+
+const progressText: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.5)',
+  textAlign: 'center',
+  fontFamily: 'monospace',
 }
 
 const statusLoader: CSSProperties = {

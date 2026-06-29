@@ -1,6 +1,10 @@
 import type { CSSProperties } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
-import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
+import {
+  getPlayerAvatarInitials,
+  getPlayerAvatarUrl,
+  getPlayerColor,
+} from '../../shared/playerIdentity'
 import { SwipeableSheet } from './SwipeableSheet'
 interface TeamSheetProps {
   open: boolean
@@ -21,9 +25,7 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   const sinLat = Math.sin(dLat / 2)
   const sinLon = Math.sin(dLon / 2)
 
-  const h =
-    sinLat * sinLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
 
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }

@@ -42,7 +42,6 @@ export interface StageMinigameRuntime {
   config?: StageConfig
 }
 
-
 export interface StageMinigameRuntime {
   type: string
   label?: string
@@ -126,7 +125,6 @@ export interface PublicConfig {
   players?: string[]
   player_profiles?: PlayerProfile[]
 }
-
 
 export interface FieldProof {
   id: string

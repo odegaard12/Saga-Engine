@@ -6,7 +6,11 @@ import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
-import type { AdminProfileAction, AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
+import type {
+  AdminProfileAction,
+  AdminReactOverviewProfile,
+  AdminReactOverviewStage,
+} from '../lib/adminApi'
 import { familyCards } from '../lib/familyConfigs'
 import { getAdminGameForStage } from '../lib/gameCatalog'
 import type { MissionTemplateId } from '../lib/gameCatalog'
@@ -109,7 +113,12 @@ export default function AdminMissionControlShell({
 }: AdminMissionControlShellProps) {
   const { t } = useI18n()
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
-  const [pendingCreateLocation, setPendingCreateLocation] = useState<{ lat: number; lon: number; clientX: number; clientY: number } | null>(null)
+  const [pendingCreateLocation, setPendingCreateLocation] = useState<{
+    lat: number
+    lon: number
+    clientX: number
+    clientY: number
+  } | null>(null)
 
   const liveSelectedStage = selectedStage
     ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
@@ -124,14 +133,10 @@ export default function AdminMissionControlShell({
   const selectedKey = selectedStageKey(liveSelectedStage)
   const shouldShowTypeChooser = Boolean(
     liveSelectedStage &&
-    (
-      typeChooserStageKey === selectedKey ||
-      (
-        typeof liveSelectedStage.id === 'string' &&
+    (typeChooserStageKey === selectedKey ||
+      (typeof liveSelectedStage.id === 'string' &&
         liveSelectedStage.id.startsWith('local-') &&
-        !getUiBoolean(liveSelectedStage, '_type_choice_done')
-      )
-    )
+        !getUiBoolean(liveSelectedStage, '_type_choice_done')))
   )
 
   useEffect(() => {
@@ -184,7 +189,6 @@ export default function AdminMissionControlShell({
     setPendingCreateLocation(null)
   }
 
-
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
 
@@ -208,14 +212,24 @@ export default function AdminMissionControlShell({
           <p>{displaySubtitle}</p>
 
           <div className="saga-mini-stats">
-            <span><b>{stages.length}</b> {t('admin.nodes')}</span>
-            <span><b>{profiles.length}</b> {t('admin.profiles')}</span>
-            <span><b>{mappedCount}</b> {t('admin.mapped')}</span>
+            <span>
+              <b>{stages.length}</b> {t('admin.nodes')}
+            </span>
+            <span>
+              <b>{profiles.length}</b> {t('admin.profiles')}
+            </span>
+            <span>
+              <b>{mappedCount}</b> {t('admin.mapped')}
+            </span>
           </div>
         </section>
 
         <nav className="saga-rail-actions" aria-label="Primary admin actions">
-          <button type="button" className="saga-primary-action saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
+          <button
+            type="button"
+            className="saga-primary-action saga-admin-add-node-action"
+            onClick={() => togglePanel('builder')}
+          >
             + {t('admin.addNode')}
           </button>
 
@@ -226,14 +240,20 @@ export default function AdminMissionControlShell({
             disabled={saveState === 'saving'}
             onClick={onSaveStages}
           >
-            {saveState === 'saving' ? t('admin.saving') : saveState === 'saved' ? t('admin.saved') : t('common.save')}
+            {saveState === 'saving'
+              ? t('admin.saving')
+              : saveState === 'saved'
+                ? t('admin.saved')
+                : t('common.save')}
           </button>
 
-          <button type="button" onClick={onRefresh}>{t('admin.refresh')}</button>
+          <button type="button" onClick={onRefresh}>
+            {t('admin.refresh')}
+          </button>
         </nav>
 
         <div className="saga-panel-switcher">
-<button
+          <button
             type="button"
             className={cmsPanel === 'players' ? 'active' : ''}
             onClick={() => togglePanel('players')}
@@ -268,7 +288,7 @@ export default function AdminMissionControlShell({
               const stageConfig =
                 typeof (stage as unknown as { config?: unknown }).config === 'object' &&
                 (stage as unknown as { config?: unknown }).config !== null
-                  ? ((stage as unknown as { config?: Record<string, unknown> }).config || {})
+                  ? (stage as unknown as { config?: Record<string, unknown> }).config || {}
                   : {}
               const displayGame = getAdminGameForStage(stage.type, stageConfig)
               const selected = selectedStage?.index === stage.index
@@ -295,10 +315,14 @@ export default function AdminMissionControlShell({
                             {physicalVisual.icon}
                           </span>
                         ) : null}
-                        <span className="saga-node-title-text">{stage.title || t('admin.untitledNode')}</span>
+                        <span className="saga-node-title-text">
+                          {stage.title || t('admin.untitledNode')}
+                        </span>
                       </strong>
                       <small>
-                        {physicalVisual ? physicalVisual.label : (displayGame.title || stage.label || stage.type)}
+                        {physicalVisual
+                          ? physicalVisual.label
+                          : displayGame.title || stage.label || stage.type}
                         {' · '}
                         {formatCoords(stage.lat, stage.lon)}
                       </small>
@@ -310,7 +334,11 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Subir nodo"
                       disabled={routeIndex === 0}
-                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'up') }}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onReorderStage(stage, 'up')
+                      }}
                     >
                       ↑
                     </button>
@@ -318,7 +346,11 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Bajar nodo"
                       disabled={routeIndex >= stages.length - 1}
-                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReorderStage(stage, 'down') }}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onReorderStage(stage, 'down')
+                      }}
                     >
                       ↓
                     </button>
@@ -337,13 +369,19 @@ export default function AdminMissionControlShell({
       <section className="saga-map-workspace" aria-label="Map workspace">
         <div className="saga-command-bar">
           <div className="saga-command-main">
-            <button type="button" className="saga-command-primary saga-admin-add-node-action" onClick={() => togglePanel('builder')}>
+            <button
+              type="button"
+              className="saga-command-primary saga-admin-add-node-action"
+              onClick={() => togglePanel('builder')}
+            >
               {t('admin.addNode')}
             </button>
             <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
               {saveState === 'saving' ? t('admin.saving') : t('common.save')}
             </button>
-            <button type="button" onClick={onRefresh}>{t('admin.refresh')}</button>
+            <button type="button" onClick={onRefresh}>
+              {t('admin.refresh')}
+            </button>
           </div>
 
           <div className="saga-family-chips" aria-label="Family counts">
@@ -366,40 +404,41 @@ export default function AdminMissionControlShell({
             onMoveStage={onMoveStage}
           />
         </div>
-          {pendingCreateLocation ? (
-            <>
-              <button
-                type="button"
-                className="saga-map-create-scrim"
-                aria-label="Descartar creación de nodo"
-                onClick={cancelPendingCreateNode}
-              />
-              <section
-                className="saga-map-create-mini"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Crear nodo aquí"
-                style={{ left: pendingCreateLocation.clientX, top: pendingCreateLocation.clientY }}
-              >
-                <strong>Crear nodo aquí?</strong>
-                <small>
-                  {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
-                </small>
-                <div>
-                  <button type="button" onClick={confirmPendingCreateNode}>
-                    Crear
-                  </button>
-                  <button type="button" onClick={cancelPendingCreateNode}>
-                    Descartar
-                  </button>
-                </div>
-              </section>
-            </>
-          ) : null}
-
+        {pendingCreateLocation ? (
+          <>
+            <button
+              type="button"
+              className="saga-map-create-scrim"
+              aria-label="Descartar creación de nodo"
+              onClick={cancelPendingCreateNode}
+            />
+            <section
+              className="saga-map-create-mini"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Crear nodo aquí"
+              style={{ left: pendingCreateLocation.clientX, top: pendingCreateLocation.clientY }}
+            >
+              <strong>Crear nodo aquí?</strong>
+              <small>
+                {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
+              </small>
+              <div>
+                <button type="button" onClick={confirmPendingCreateNode}>
+                  Crear
+                </button>
+                <button type="button" onClick={cancelPendingCreateNode}>
+                  Descartar
+                </button>
+              </div>
+            </section>
+          </>
+        ) : null}
 
         {localNotice ? (
-          <div className="saga-toast" role="status">{localNotice}</div>
+          <div className="saga-toast" role="status">
+            {localNotice}
+          </div>
         ) : null}
       </section>
 
@@ -422,11 +461,16 @@ export default function AdminMissionControlShell({
             </div>
           ) : isPhysicalNode(liveSelectedStage) ? (
             <>
-              <div className="saga-node-physical-type" data-saga-node-physical-type="saga-node-physical-editor-v1">
+              <div
+                className="saga-node-physical-type"
+                data-saga-node-physical-type="saga-node-physical-editor-v1"
+              >
                 <NodePhysicalTypePanel
                   stage={liveSelectedStage}
                   onApplyLocal={onApplyStage}
-                  onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+                  onRequestChangeType={() =>
+                    setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
+                  }
                   onClose={() => onSelectStage(null)}
                   onDeleteLocal={onDeleteStage}
                 />
@@ -439,7 +483,9 @@ export default function AdminMissionControlShell({
               onClose={() => onSelectStage(null)}
               onApplyLocal={onApplyStage}
               onDeleteLocal={onDeleteStage}
-              onRequestChangeType={() => setTypeChooserStageKey(selectedStageKey(liveSelectedStage))}
+              onRequestChangeType={() =>
+                setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
+              }
             />
           )}
         </aside>
@@ -448,8 +494,18 @@ export default function AdminMissionControlShell({
       {cmsPanel !== 'none' ? (
         <aside className="saga-floating-panel" aria-label="CMS panel">
           <div className="saga-floating-head">
-            <strong>{cmsPanel === 'players' ? t('admin.players') : cmsPanel === 'labels' ? t('admin.families') : cmsPanel === 'builder' ? t('admin.builder') : t('admin.settings')}</strong>
-            <button type="button" onClick={() => onSetCmsPanel('none')}>{t('common.close')}</button>
+            <strong>
+              {cmsPanel === 'players'
+                ? t('admin.players')
+                : cmsPanel === 'labels'
+                  ? t('admin.families')
+                  : cmsPanel === 'builder'
+                    ? t('admin.builder')
+                    : t('admin.settings')}
+            </strong>
+            <button type="button" onClick={() => onSetCmsPanel('none')}>
+              {t('common.close')}
+            </button>
           </div>
 
           <div className="saga-floating-body">
@@ -496,15 +552,22 @@ export default function AdminMissionControlShell({
       ) : null}
 
       <nav className="saga-mobile-actions" aria-label="Mobile actions">
-        <button type="button" onClick={onSaveStages}>{t('common.save')}</button>
-        <button type="button" onClick={() => togglePanel('builder')}>{t('admin.builder')}</button>
-        <button type="button" onClick={() => togglePanel('players')}>{t('admin.players')}</button>
-        <button type="button" onClick={() => togglePanel('mission')}>{t('admin.settings')}</button>
+        <button type="button" onClick={onSaveStages}>
+          {t('common.save')}
+        </button>
+        <button type="button" onClick={() => togglePanel('builder')}>
+          {t('admin.builder')}
+        </button>
+        <button type="button" onClick={() => togglePanel('players')}>
+          {t('admin.players')}
+        </button>
+        <button type="button" onClick={() => togglePanel('mission')}>
+          {t('admin.settings')}
+        </button>
       </nav>
     </main>
   )
 }
-
 
 function isPhysicalNode(stage: AdminReactOverviewStage | null) {
   if (!stage) return false

@@ -34,7 +34,6 @@ export type AdminReactOverviewStage = {
     card_text?: string
     updated_at?: string
   }
-
 }
 
 export type AdminRawStage = Record<string, unknown>
@@ -242,16 +241,15 @@ function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResp
   const rawStatus = typeof obj.status === 'string' ? obj.status : 'ok'
   const message = typeof obj.message === 'string' ? obj.message : undefined
 
-  const stages =
-    Array.isArray(obj.stages)
-      ? obj.stages
-      : Array.isArray(obj.data)
-        ? obj.data
-        : Array.isArray(obj.items)
-          ? obj.items
-          : Array.isArray(obj.nodes)
-            ? obj.nodes
-            : undefined
+  const stages = Array.isArray(obj.stages)
+    ? obj.stages
+    : Array.isArray(obj.data)
+      ? obj.data
+      : Array.isArray(obj.items)
+        ? obj.items
+        : Array.isArray(obj.nodes)
+          ? obj.nodes
+          : undefined
 
   if (rawStatus === 'fail') {
     return { status: 'fail', message: message || 'Admin stages endpoint returned fail.' }
@@ -273,10 +271,7 @@ function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse
   }
 
   const obj = payload as Record<string, unknown>
-  const rawStatus =
-    typeof obj.status === 'string'
-      ? obj.status.toLowerCase()
-      : ''
+  const rawStatus = typeof obj.status === 'string' ? obj.status.toLowerCase() : ''
 
   const message =
     typeof obj.message === 'string'
@@ -285,15 +280,10 @@ function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse
         ? obj.detail
         : undefined
 
-  if (
-    rawStatus !== 'ok' &&
-    rawStatus !== 'success'
-  ) {
+  if (rawStatus !== 'ok' && rawStatus !== 'success') {
     return {
       status: 'fail',
-      message:
-        message ||
-        `Admin save returned status ${rawStatus || 'missing'}.`,
+      message: message || `Admin save returned status ${rawStatus || 'missing'}.`,
     }
   }
 
@@ -384,10 +374,7 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   }
 
   const obj = payload as Record<string, unknown>
-  const rawStatus =
-    typeof obj.status === 'string'
-      ? obj.status.toLowerCase()
-      : ''
+  const rawStatus = typeof obj.status === 'string' ? obj.status.toLowerCase() : ''
 
   const message =
     typeof obj.message === 'string'
@@ -396,15 +383,10 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
         ? obj.detail
         : undefined
 
-  if (
-    rawStatus !== 'ok' &&
-    rawStatus !== 'success'
-  ) {
+  if (rawStatus !== 'ok' && rawStatus !== 'success') {
     return {
       status: 'fail',
-      message:
-        message ||
-        `Admin config save returned status ${rawStatus || 'missing'}.`,
+      message: message || `Admin config save returned status ${rawStatus || 'missing'}.`,
     }
   }
 
@@ -416,11 +398,7 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
 
 function adminConfigPayloadVariants(password: string | undefined, config: Record<string, unknown>) {
   if (!password) {
-    return [
-      { config },
-      { data: config },
-      { ...config },
-    ]
+    return [{ config }, { data: config }, { ...config }]
   }
 
   return [
@@ -487,7 +465,6 @@ export async function saveAdminConfig(
     message: errors.filter(Boolean).join(' | ') || 'Could not save admin config.',
   }
 }
-
 
 export function runAdminProfileAction(profileId: string, action: AdminProfileAction) {
   return adminPostJson<AdminProfileActionResponse>('/api/admin/profile-action', {

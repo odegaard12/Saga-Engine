@@ -1,14 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
-import type {
-  ResolvedCircuitMatrixMinigame,
-} from '../../core/resolver'
+import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -401,36 +393,21 @@ function clampAttempts(value: unknown) {
 
   if (!Number.isFinite(parsed)) return 3
 
-  return Math.max(
-    1,
-    Math.min(8, Math.round(parsed)),
-  )
+  return Math.max(1, Math.min(8, Math.round(parsed)))
 }
 
 function shuffleTokens(tokens: string[]) {
   const shuffled = [...tokens]
 
-  for (
-    let index = shuffled.length - 1;
-    index > 0;
-    index -= 1
-  ) {
-    const target = Math.floor(
-      Math.random() * (index + 1),
-    )
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1))
 
     const current = shuffled[index]
     shuffled[index] = shuffled[target]
     shuffled[target] = current
   }
 
-  if (
-    shuffled.length > 1 &&
-    shuffled.every(
-      (token, index) =>
-        token === tokens[index],
-    )
-  ) {
+  if (shuffled.length > 1 && shuffled.every((token, index) => token === tokens[index])) {
     const first = shuffled[0]
     shuffled[0] = shuffled[1]
     shuffled[1] = first
@@ -446,55 +423,31 @@ export function SequenceCodeRuntimeScreen({
   submitting,
   onWin,
 }: Props) {
-  const sourceSequence =
-    resolved.config.sequence
+  const sourceSequence = resolved.config.sequence
 
-  const tokens = useMemo(
-    () => normalizeTokens(sourceSequence),
-    [sourceSequence],
-  )
+  const tokens = useMemo(() => normalizeTokens(sourceSequence), [sourceSequence])
 
   const tokensKey = tokens.join('\u0001')
 
-  const maxAttempts = clampAttempts(
-    resolved.config.max_attempts,
-  )
+  const maxAttempts = clampAttempts(resolved.config.max_attempts)
 
-  const hintText = String(
-    resolved.config.hint_text ||
-      stage.messages?.hint ||
-      '',
-  ).trim()
+  const hintText = String(resolved.config.hint_text || stage.messages?.hint || '').trim()
 
-  const unique = new Set(
-    tokens.map((token) =>
-      token.toLocaleLowerCase(),
-    ),
-  )
+  const unique = new Set(tokens.map((token) => token.toLocaleLowerCase()))
 
-  const invalidConfig =
-    tokens.length < 3 ||
-    unique.size !== tokens.length
+  const invalidConfig = tokens.length < 3 || unique.size !== tokens.length
 
-  const [phase, setPhase] =
-    useState<Phase>('playing')
+  const [phase, setPhase] = useState<Phase>('playing')
 
-  const [available, setAvailable] =
-    useState<string[]>(() =>
-      shuffleTokens(tokens),
-    )
+  const [available, setAvailable] = useState<string[]>(() => shuffleTokens(tokens))
 
-  const [answer, setAnswer] =
-    useState<string[]>([])
+  const [answer, setAnswer] = useState<string[]>([])
 
-  const [attemptsUsed, setAttemptsUsed] =
-    useState(0)
+  const [attemptsUsed, setAttemptsUsed] = useState(0)
 
-  const [message, setMessage] =
-    useState('')
+  const [message, setMessage] = useState('')
 
-  const [continuing, setContinuing] =
-    useState(false)
+  const [continuing, setContinuing] = useState(false)
 
   const continueLockRef = useRef(false)
 
@@ -511,7 +464,7 @@ export function SequenceCodeRuntimeScreen({
         setAttemptsUsed(0)
       }
     },
-    [tokens, tokensKey],
+    [tokens, tokensKey]
   )
 
   useEffect(() => {
@@ -530,47 +483,27 @@ export function SequenceCodeRuntimeScreen({
       return next
     })
 
-    setAnswer((current) => [
-      ...current,
-      token,
-    ])
+    setAnswer((current) => [...current, token])
 
     setMessage('')
   }
 
-  const returnToken = (
-    token: string,
-    answerIndex: number,
-  ) => {
+  const returnToken = (token: string, answerIndex: number) => {
     if (phase !== 'playing') return
 
-    setAnswer((current) =>
-      current.filter(
-        (_, index) =>
-          index !== answerIndex,
-      ),
-    )
+    setAnswer((current) => current.filter((_, index) => index !== answerIndex))
 
-    setAvailable((current) => [
-      ...current,
-      token,
-    ])
+    setAvailable((current) => [...current, token])
 
     setMessage('')
   }
 
   const checkAnswer = () => {
-    if (
-      phase !== 'playing' ||
-      answer.length !== tokens.length
-    ) {
+    if (phase !== 'playing' || answer.length !== tokens.length) {
       return
     }
 
-    const correct = answer.every(
-      (token, index) =>
-        token === tokens[index],
-    )
+    const correct = answer.every((token, index) => token === tokens[index])
 
     if (correct) {
       setMessage('')
@@ -587,68 +520,44 @@ export function SequenceCodeRuntimeScreen({
     }
 
     setMessage(
-      'El orden no coincide con la historia. '
-        + 'Revisa las pistas y vuelve a intentarlo.',
+      'El orden no coincide con la historia. ' + 'Revisa las pistas y vuelve a intentarlo.'
     )
 
     setAnswer([])
     setAvailable(shuffleTokens(tokens))
   }
 
-  const continueRoute =
-    useCallback(async () => {
-      if (
-        phase !== 'success' ||
-        submitting ||
-        continuing ||
-        continueLockRef.current
-      ) {
-        return
-      }
+  const continueRoute = useCallback(async () => {
+    if (phase !== 'success' || submitting || continuing || continueLockRef.current) {
+      return
+    }
 
-      continueLockRef.current = true
-      setContinuing(true)
+    continueLockRef.current = true
+    setContinuing(true)
 
-      try {
-        await onWin()
-      } catch (error) {
-        continueLockRef.current = false
-        setContinuing(false)
-        throw error
-      }
-    }, [
-      continuing,
-      onWin,
-      phase,
-      submitting,
-    ])
+    try {
+      await onWin()
+    } catch (error) {
+      continueLockRef.current = false
+      setContinuing(false)
+      throw error
+    }
+  }, [continuing, onWin, phase, submitting])
 
   if (invalidConfig) {
     return (
-      <section
-        className="sequence-shell"
-        aria-label="Código secuencial"
-      >
+      <section className="sequence-shell" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result failed">
           <div className="sequence-result-inner">
-            <div className="sequence-result-icon">
-              !
-            </div>
+            <div className="sequence-result-icon">!</div>
 
-            <span className="sequence-result-kicker">
-              Configuración incompleta
-            </span>
+            <span className="sequence-result-kicker">Configuración incompleta</span>
 
-            <strong>
-              Secuencia no disponible
-            </strong>
+            <strong>Secuencia no disponible</strong>
 
-            <p>
-              El administrador debe guardar al
-              menos tres fichas distintas.
-            </p>
+            <p>El administrador debe guardar al menos tres fichas distintas.</p>
           </div>
         </div>
       </section>
@@ -657,45 +566,28 @@ export function SequenceCodeRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section
-        className="sequence-shell"
-        aria-label="Código secuencial"
-      >
+      <section className="sequence-shell" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result success">
           <div className="sequence-result-inner">
-            <div className="sequence-result-icon">
-              ✓
-            </div>
+            <div className="sequence-result-icon">✓</div>
 
-            <span className="sequence-result-kicker">
-              Secuencia validada
-            </span>
+            <span className="sequence-result-kicker">Secuencia validada</span>
 
-            <strong>
-              Ruta reconstruida
-            </strong>
+            <strong>Ruta reconstruida</strong>
 
             <p>
-              Las pistas encajan. Guarda el
-              resultado y continúa hacia el
-              siguiente nodo de la misión.
+              Las pistas encajan. Guarda el resultado y continúa hacia el siguiente nodo de la
+              misión.
             </p>
 
             <button
               type="button"
-              disabled={
-                submitting ||
-                continuing
-              }
-              onClick={() =>
-                void continueRoute()
-              }
+              disabled={submitting || continuing}
+              onClick={() => void continueRoute()}
             >
-              {submitting || continuing
-                ? 'Avanzando…'
-                : 'Continuar al siguiente nodo'}
+              {submitting || continuing ? 'Avanzando…' : 'Continuar al siguiente nodo'}
             </button>
           </div>
         </div>
@@ -705,38 +597,20 @@ export function SequenceCodeRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section
-        className="sequence-shell"
-        aria-label="Código secuencial"
-      >
+      <section className="sequence-shell" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result failed">
           <div className="sequence-result-inner">
-            <div className="sequence-result-icon">
-              !
-            </div>
+            <div className="sequence-result-icon">!</div>
 
-            <span className="sequence-result-kicker">
-              Intentos agotados
-            </span>
+            <span className="sequence-result-kicker">Intentos agotados</span>
 
-            <strong>
-              Revisa la historia
-            </strong>
+            <strong>Revisa la historia</strong>
 
-            <p>
-              Busca qué sucedió primero, qué
-              ocurrió después y cuál fue el
-              último lugar.
-            </p>
+            <p>Busca qué sucedió primero, qué ocurrió después y cuál fue el último lugar.</p>
 
-            <button
-              type="button"
-              onClick={() =>
-                resetRound(true)
-              }
-            >
+            <button type="button" onClick={() => resetRound(true)}>
               Intentarlo de nuevo
             </button>
           </div>
@@ -745,72 +619,39 @@ export function SequenceCodeRuntimeScreen({
     )
   }
 
-  const attemptsLeft = Math.max(
-    0,
-    maxAttempts - attemptsUsed,
-  )
+  const attemptsLeft = Math.max(0, maxAttempts - attemptsUsed)
 
-  const rawDescription = String(
-    stage.content ||
-      helperText ||
-      '',
-  ).trim()
+  const rawDescription = String(stage.content || helperText || '').trim()
 
-  const normalizedDescription =
-    rawDescription.toLocaleLowerCase()
+  const normalizedDescription = rawDescription.toLocaleLowerCase()
 
   const legacyDescription =
-    normalizedDescription.includes(
-      'memoriza la secuencia',
-    ) ||
-    normalizedDescription.includes(
-      'memoriza la ruta de energía',
-    ) ||
-    normalizedDescription.includes(
-      'busca el punto marcado',
-    )
+    normalizedDescription.includes('memoriza la secuencia') ||
+    normalizedDescription.includes('memoriza la ruta de energía') ||
+    normalizedDescription.includes('busca el punto marcado')
 
   const description =
     !rawDescription || legacyDescription
-      ? 'Usa la historia de tu tríptico '
-        + 'para ordenar las fichas.'
+      ? 'Usa la historia de tu tríptico ' + 'para ordenar las fichas.'
       : rawDescription
 
   return (
-    <section
-      className="sequence-shell"
-      aria-label="Código secuencial"
-    >
+    <section className="sequence-shell" aria-label="Código secuencial">
       <style>{STYLES}</style>
 
       <div className="sequence-body">
         <header className="sequence-heading">
           <div>
-            <span className="sequence-kicker">
-              Reto de historia
-            </span>
+            <span className="sequence-kicker">Reto de historia</span>
 
-            <h2>
-              Reconstruye el orden
-            </h2>
+            <h2>Reconstruye el orden</h2>
 
-            <p className="sequence-intro">
-              {description}
-            </p>
+            <p className="sequence-intro">{description}</p>
           </div>
 
-          <div
-            className="sequence-attempts"
-            aria-label={
-              `${attemptsLeft} intentos restantes`
-            }
-          >
+          <div className="sequence-attempts" aria-label={`${attemptsLeft} intentos restantes`}>
             <strong>{attemptsLeft}</strong>
-            <span>
-              {attemptsLeft === 1
-                ? 'intento'
-                : 'intentos'}
-            </span>
+            <span>{attemptsLeft === 1 ? 'intento' : 'intentos'}</span>
           </div>
         </header>
 
@@ -823,68 +664,44 @@ export function SequenceCodeRuntimeScreen({
           </div>
 
           <div className="sequence-order-list">
-            {Array.from(
-              { length: tokens.length },
-              (_, index) => {
-                const token = answer[index]
+            {Array.from({ length: tokens.length }, (_, index) => {
+              const token = answer[index]
 
-                if (!token) {
-                  return (
-                    <div
-                      key={`slot-${index}`}
-                      className="sequence-order-row"
-                    >
-                      <span className="sequence-order-number">
-                        {index + 1}
-                      </span>
-
-                      <span>
-                        Selecciona una ficha
-                      </span>
-
-                      <span />
-                    </div>
-                  )
-                }
-
+              if (!token) {
                 return (
-                  <button
-                    key={`slot-${index}`}
-                    type="button"
-                    className="sequence-order-row"
-                    aria-label={
-                      `Quitar ${token} de la `
-                      + `posición ${index + 1}`
-                    }
-                    onClick={() =>
-                      returnToken(
-                        token,
-                        index,
-                      )
-                    }
-                  >
-                    <span className="sequence-order-number">
-                      {index + 1}
-                    </span>
+                  <div key={`slot-${index}`} className="sequence-order-row">
+                    <span className="sequence-order-number">{index + 1}</span>
 
-                    <strong>{token}</strong>
+                    <span>Selecciona una ficha</span>
 
-                    <span className="sequence-order-remove">
-                      Quitar
-                    </span>
-                  </button>
+                    <span />
+                  </div>
                 )
-              },
-            )}
+              }
+
+              return (
+                <button
+                  key={`slot-${index}`}
+                  type="button"
+                  className="sequence-order-row"
+                  aria-label={`Quitar ${token} de la ` + `posición ${index + 1}`}
+                  onClick={() => returnToken(token, index)}
+                >
+                  <span className="sequence-order-number">{index + 1}</span>
+
+                  <strong>{token}</strong>
+
+                  <span className="sequence-order-remove">Quitar</span>
+                </button>
+              )
+            })}
           </div>
         </section>
 
         <section className="sequence-card">
           <div className="sequence-section-head">
             <b>Fichas disponibles</b>
-            <span>
-              Toca para añadir
-            </span>
+            <span>Toca para añadir</span>
           </div>
 
           <div className="sequence-choice-grid">
@@ -893,9 +710,7 @@ export function SequenceCodeRuntimeScreen({
                 key={token}
                 type="button"
                 className="sequence-choice"
-                onClick={() =>
-                  chooseToken(token)
-                }
+                onClick={() => chooseToken(token)}
               >
                 {token}
               </button>
@@ -903,10 +718,7 @@ export function SequenceCodeRuntimeScreen({
           </div>
         </section>
 
-        <div
-          className="sequence-message"
-          aria-live="polite"
-        >
+        <div className="sequence-message" aria-live="polite">
           {message}
         </div>
 
@@ -917,22 +729,14 @@ export function SequenceCodeRuntimeScreen({
         ) : null}
 
         <div className="sequence-actions">
-          <button
-            type="button"
-            disabled={!answer.length}
-            onClick={() =>
-              resetRound(false)
-            }
-          >
+          <button type="button" disabled={!answer.length} onClick={() => resetRound(false)}>
             Borrar selección
           </button>
 
           <button
             type="button"
             className="primary"
-            disabled={
-              answer.length !== tokens.length
-            }
+            disabled={answer.length !== tokens.length}
             onClick={checkAnswer}
           >
             Validar secuencia

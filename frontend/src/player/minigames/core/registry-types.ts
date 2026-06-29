@@ -1,7 +1,4 @@
-import type {
-  MinigameController,
-  MinigameDefinitionBase,
-} from './types'
+import type { MinigameController, MinigameDefinitionBase } from './types'
 
 import type {
   BearingHuntConfig,
@@ -10,20 +7,11 @@ import type {
   MotionChallengeConfig,
 } from './family-types'
 
-export type CircuitMatrixDefinition = MinigameDefinitionBase<
-  'circuit_matrix',
-  CircuitMatrixConfig
->
+export type CircuitMatrixDefinition = MinigameDefinitionBase<'circuit_matrix', CircuitMatrixConfig>
 
-export type BearingHuntDefinition = MinigameDefinitionBase<
-  'bearing_hunt',
-  BearingHuntConfig
->
+export type BearingHuntDefinition = MinigameDefinitionBase<'bearing_hunt', BearingHuntConfig>
 
-export type SignalHuntDefinition = MinigameDefinitionBase<
-  'signal_hunt',
-  SignalHuntConfig
->
+export type SignalHuntDefinition = MinigameDefinitionBase<'signal_hunt', SignalHuntConfig>
 
 export type MotionChallengeDefinition = MinigameDefinitionBase<
   'motion_challenge',

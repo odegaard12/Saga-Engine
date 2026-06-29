@@ -34,9 +34,7 @@ function getProgress(payload: PlayerGamePayload) {
   }
 
   const activeIndex =
-    typeof payload.level === 'number'
-      ? Math.max(0, Math.min(payload.level, total - 1))
-      : 0
+    typeof payload.level === 'number' ? Math.max(0, Math.min(payload.level, total - 1)) : 0
 
   return {
     total,
@@ -54,12 +52,12 @@ export function PlayerShell({
   gpsState,
   onOpenTeam,
 }: PlayerShellProps) {
-  const compact =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
-  const stageName = currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
+  const stageName =
+    currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
   const gpsLabel = getGpsShellLabel(gpsState)
   const { transform } = useGyroParallax(8)
@@ -109,7 +107,11 @@ export function PlayerShell({
                     <span
                       style={{
                         ...routeNode,
-                        ...(nodeActive ? routeNodeActive : nodeDone ? routeNodeDone : routeNodeIdle),
+                        ...(nodeActive
+                          ? routeNodeActive
+                          : nodeDone
+                            ? routeNodeDone
+                            : routeNodeIdle),
                       }}
                     />
 
@@ -146,8 +148,7 @@ const wrap: CSSProperties = {
 }
 
 const card: CSSProperties = {
-  background:
-    'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
+  background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
   border: '1px solid rgba(255,255,255,.22)',
   boxShadow: '0 20px 48px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.12)',
   backdropFilter: 'blur(20px) saturate(135%)',

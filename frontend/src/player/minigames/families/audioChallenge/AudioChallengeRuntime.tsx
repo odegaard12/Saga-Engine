@@ -95,15 +95,45 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
             border: 'none',
             borderRadius: 8,
             fontWeight: 800,
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           Activar Micrófono
         </button>
       ) : (
-        <div style={{ width: '100%', height: 24, background: 'rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-          <div style={{ width: `${level}%`, height: '100%', background: '#22c55e', transition: 'width 0.1s linear' }} />
-          <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff' }}>
+        <div
+          style={{
+            width: '100%',
+            height: 24,
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              width: `${level}%`,
+              height: '100%',
+              background: '#22c55e',
+              transition: 'width 0.1s linear',
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              fontWeight: 900,
+              color: '#fff',
+            }}
+          >
             {Math.round(level)}%
           </span>
         </div>

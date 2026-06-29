@@ -192,7 +192,10 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
             const usable = item.state !== 'used' && item.quantity > 0
 
             return (
-              <div key={item.item_id} className={`saga-inventory-slot ${usable ? 'saga-inventory-slot--usable' : 'saga-inventory-slot--used'}`}>
+              <div
+                key={item.item_id}
+                className={`saga-inventory-slot ${usable ? 'saga-inventory-slot--usable' : 'saga-inventory-slot--used'}`}
+              >
                 <div className="saga-inventory-icon">{usable ? '◆' : '✓'}</div>
                 <div style={slotBody}>
                   <div style={itemLabel}>
@@ -232,7 +235,9 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               <div style={emptySlotText}>Hueco libre</div>
             </div>
           ))}
-          <div style={emptyText}>Aún no hay objetos. Usa QR, NFC o recogida manual para llenar la mochila.</div>
+          <div style={emptyText}>
+            Aún no hay objetos. Usa QR, NFC o recogida manual para llenar la mochila.
+          </div>
         </div>
       )}
 

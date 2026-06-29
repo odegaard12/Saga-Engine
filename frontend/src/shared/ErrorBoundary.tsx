@@ -84,7 +84,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <h1>{surface} no pudo cargarse correctamente</h1>
           <p className="saga-error-boundary__message">
             La aplicación encontró un error de interfaz. Tus datos del servidor no se han borrado.
-            Puedes recargar o limpiar la caché de la app si el fallo viene de una versión antigua guardada offline.
+            Puedes recargar o limpiar la caché de la app si el fallo viene de una versión antigua
+            guardada offline.
           </p>
 
           <div className="saga-error-boundary__actions">
@@ -102,7 +103,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           {showDetails ? (
             <details className="saga-error-boundary__details">
               <summary>Detalles técnicos</summary>
-              <pre>{this.state.message}{this.state.stack ? `\n\n${this.state.stack}` : ''}</pre>
+              <pre>
+                {this.state.message}
+                {this.state.stack ? `\n\n${this.state.stack}` : ''}
+              </pre>
             </details>
           ) : null}
         </section>

@@ -145,7 +145,7 @@ export function FieldCameraCapture({
     }
 
     ctx.drawImage(video, 0, 0, width, height)
-    setPreview(canvas.toDataURL('image/jpeg', 0.90))
+    setPreview(canvas.toDataURL('image/jpeg', 0.9))
   }
 
   async function submitPhoto() {
@@ -171,13 +171,7 @@ export function FieldCameraCapture({
             <img src={preview} alt="Vista previa" style={previewImage} />
           ) : (
             <>
-              <video
-                ref={videoRef}
-                style={video}
-                autoPlay
-                muted
-                playsInline
-              />
+              <video ref={videoRef} style={video} autoPlay muted playsInline />
               <div className="saga-camera-grid">
                 <div className="saga-camera-line-h saga-camera-line-h--1" />
                 <div className="saga-camera-line-h saga-camera-line-h--2" />
@@ -210,15 +204,30 @@ export function FieldCameraCapture({
         <div style={actions}>
           {preview ? (
             <>
-              <button type="button" style={secondaryButton} onClick={() => setPreview('')} disabled={busy}>
+              <button
+                type="button"
+                style={secondaryButton}
+                onClick={() => setPreview('')}
+                disabled={busy}
+              >
                 Repetir
               </button>
-              <button type="button" style={primaryButton} onClick={() => void submitPhoto()} disabled={busy}>
+              <button
+                type="button"
+                style={primaryButton}
+                onClick={() => void submitPhoto()}
+                disabled={busy}
+              >
                 {busy ? 'Subiendo…' : 'Subir al mapa'}
               </button>
             </>
           ) : (
-            <button type="button" style={primaryButton} onClick={captureFrame} disabled={busy || Boolean(error)}>
+            <button
+              type="button"
+              style={primaryButton}
+              onClick={captureFrame}
+              disabled={busy || Boolean(error)}
+            >
               Hacer foto
             </button>
           )}

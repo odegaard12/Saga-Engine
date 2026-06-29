@@ -4,14 +4,8 @@ import {
   circuitMatrixController,
   circuitMatrixDefinition,
 } from '../families/circuitMatrix/definition'
-import {
-  bearingHuntController,
-  bearingHuntDefinition,
-} from '../families/bearingHunt/definition'
-import {
-  signalHuntController,
-  signalHuntDefinition,
-} from '../families/signalHunt/definition'
+import { bearingHuntController, bearingHuntDefinition } from '../families/bearingHunt/definition'
+import { signalHuntController, signalHuntDefinition } from '../families/signalHunt/definition'
 import {
   motionChallengeController,
   motionChallengeDefinition,

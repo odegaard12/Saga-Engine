@@ -1,14 +1,33 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
+import {
+  fetchFieldProofs,
+  fetchPlayerGame,
+  fetchPublicConfig,
+  fetchTeamStatus,
+} from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
-import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
+import {
+  getPlayerAvatarInitials,
+  getPlayerAvatarUrl,
+  getPlayerColor,
+} from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
-import { prefetchMissionMapTiles, type OfflineMapTileProgress } from '../player/offline/mapTileCache'
+import {
+  prefetchMissionMapTiles,
+  type OfflineMapTileProgress,
+} from '../player/offline/mapTileCache'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
-import { formatOfflineVaultAge, getOfflineVaultSummary, makeOfflineVaultPlayer, saveOfflineVaultSummary, type OfflineVaultPlayer, type OfflineVaultSummary } from '../shared/offlineVault'
+import {
+  formatOfflineVaultAge,
+  getOfflineVaultSummary,
+  makeOfflineVaultPlayer,
+  saveOfflineVaultSummary,
+  type OfflineVaultPlayer,
+  type OfflineVaultSummary,
+} from '../shared/offlineVault'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -23,7 +42,6 @@ type OfflinePrepProgress = {
   total: number
   detail?: string
 }
-
 
 function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
@@ -121,7 +139,6 @@ function buildConfigFromOfflineVault(summary: OfflineVaultSummary): PublicConfig
   }
 }
 
-
 async function warmOfflineProfiles(
   config: PublicConfig,
   onProgress?: (progress: OfflinePrepProgress) => void
@@ -162,24 +179,7 @@ async function warmOfflineProfiles(
         payload,
       })
 
-      if (!mapPrepared) {
-        mapPrepared = true
-
-        await prefetchMissionMapTiles(
-          Array.isArray(payload.stages) ? payload.stages : [],
-          (mapProgress: OfflineMapTileProgress) => {
-            const total = Math.max(1, mapProgress.total || 1)
-            const ratio = Math.max(0, Math.min(1, (mapProgress.done || 0) / total))
-
-            onProgress?.({
-              label: mapProgress.label || 'Mapa offline',
-              done: Math.round(30 + ratio * 52),
-              total: 100,
-              detail: mapProgress.detail || 'Bajando zona amplia de misión',
-            })
-          }
-        ).catch(() => undefined)
-      }
+      // Map prefetch has been moved to PlayerApp to run automatically on load!
 
       await fetchTeamStatus(profile.id)
         .then((team) => {
@@ -197,17 +197,21 @@ async function warmOfflineProfiles(
 
       await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
 
-      players.push(makeOfflineVaultPlayer(profile, {
-        ok: true,
-        stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
-        level: payload.level || 0,
-        finished: Boolean(payload.finished),
-      }))
+      players.push(
+        makeOfflineVaultPlayer(profile, {
+          ok: true,
+          stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
+          level: payload.level || 0,
+          finished: Boolean(payload.finished),
+        })
+      )
     } catch (error) {
-      players.push(makeOfflineVaultPlayer(profile, {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown offline preparation error',
-      }))
+      players.push(
+        makeOfflineVaultPlayer(profile, {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Unknown offline preparation error',
+        })
+      )
     }
   }
 
@@ -230,13 +234,18 @@ async function warmOfflineProfiles(
   return summary
 }
 
-
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
-  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  )
   const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
   const [offlinePrepProgress, setOfflinePrepProgress] = useState<OfflinePrepProgress | null>(null)
-  const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() => getOfflineVaultSummary())
+  const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() =>
+    getOfflineVaultSummary()
+  )
+  const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
+  const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
   useEffect(() => {
     let cancelled = false
@@ -250,7 +259,9 @@ export default function LoginApp() {
       setOfflineVault(vaultSummary)
 
       const cachedConfig = getCachedPublicConfig()
-      const cachedProfiles = cachedConfig ? normalizeProfiles(cachedConfig).filter((profile) => profile.status !== 'disabled') : []
+      const cachedProfiles = cachedConfig
+        ? normalizeProfiles(cachedConfig).filter((profile) => profile.status !== 'disabled')
+        : []
       const vaultConfig = buildConfigFromOfflineVault(vaultSummary)
       const firstConfig = cachedProfiles.length > 0 ? cachedConfig : vaultConfig
 
@@ -272,7 +283,10 @@ export default function LoginApp() {
       } catch (error) {
         if (firstConfig) return
 
-        const message = error instanceof Error ? error.message : 'Sin conexión y sin jugadores preparados offline.'
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Sin conexión y sin jugadores preparados offline.'
 
         if (!cancelled) {
           setState({ status: 'error', message })
@@ -298,7 +312,12 @@ export default function LoginApp() {
     try {
       setOfflinePrepState('saving')
       setOfflinePrepMessage('Descargando datos offline…')
-      setOfflinePrepProgress({ label: 'Conectando', done: 2, total: 100, detail: 'Preparando descarga' })
+      setOfflinePrepProgress({
+        label: 'Conectando',
+        done: 2,
+        total: 100,
+        detail: 'Preparando descarga',
+      })
 
       const onlineConfig = await fetchPublicConfig()
         .then((nextConfig) => {
@@ -311,7 +330,12 @@ export default function LoginApp() {
 
       setOfflineVault(summary)
       setOfflinePrepState(summary.failed_count > 0 ? 'error' : 'saved')
-      setOfflinePrepProgress({ label: summary.failed_count > 0 ? 'Parcial' : 'Listo', done: 100, total: 100, detail: `${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados` })
+      setOfflinePrepProgress({
+        label: summary.failed_count > 0 ? 'Parcial' : 'Listo',
+        done: 100,
+        total: 100,
+        detail: `${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados`,
+      })
       setOfflinePrepMessage(
         summary.failed_count > 0
           ? `Preparado parcialmente: ${summary.ready_count}/${summary.profile_count} jugadores.`
@@ -319,8 +343,15 @@ export default function LoginApp() {
       )
     } catch (error) {
       setOfflinePrepState('error')
-      setOfflinePrepProgress({ label: 'Error', done: 100, total: 100, detail: error instanceof Error ? error.message : 'No se pudo preparar el modo offline.' })
-      setOfflinePrepMessage(error instanceof Error ? error.message : 'No se pudo preparar el modo offline.')
+      setOfflinePrepProgress({
+        label: 'Error',
+        done: 100,
+        total: 100,
+        detail: error instanceof Error ? error.message : 'No se pudo preparar el modo offline.',
+      })
+      setOfflinePrepMessage(
+        error instanceof Error ? error.message : 'No se pudo preparar el modo offline.'
+      )
     }
   }
 
@@ -414,64 +445,26 @@ export default function LoginApp() {
           </div>
         </section>
 
-        <section style={offlineVaultCard}>
-          <div style={offlineVaultTop}>
-            <div>
-              <div style={offlineVaultEyebrow}>MODO OFFLINE</div>
-              <div style={offlineVaultTitle}>Preparar este teléfono</div>
-              <div style={offlineVaultText}>
-                Deja este teléfono listo para jugar sin cobertura.
+        {!isSecure ? (
+          <div style={insecureLoginBanner}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 12 }}>
+                Entorno no seguro (HTTP en IP remota)
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2, lineHeight: 1.35 }}>
+                El GPS y las descargas de mapa offline están desactivados por el navegador. Para
+                probar SAGA en tu móvil, entra en{' '}
+                <code
+                  style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}
+                >
+                  chrome://flags/#unsafely-treat-insecure-origin-as-secure
+                </code>
+                , añade esta URL y actívalo.
               </div>
             </div>
-
-            <button
-              type="button"
-              style={offlineVaultButton}
-              disabled={offlinePrepState === 'saving'}
-              onClick={handlePrepareOffline}
-            >
-              {offlinePrepState === 'saving' ? 'Descargando…' : 'Preparar offline'}
-            </button>
           </div>
-
-          <div style={offlineVaultStatus}>
-            <span style={offlineVault.ready_count > 0 ? offlineDotOk : offlineDotPending} />
-            <span>
-              {offlineVault.ready_count > 0
-                ? `${offlineVault.ready_count}/${offlineVault.profile_count} jugadores listos · ${formatOfflineVaultAge(offlineVault)}`
-                : 'Sin descarga offline completa en este teléfono.'}
-            </span>
-          </div>
-
-          {offlinePrepProgress ? (
-            <div style={offlineProgressWrap}>
-              <div style={offlineProgressTop}>
-                <span>{offlinePrepProgress.label}</span>
-                <span>{Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%</span>
-              </div>
-              <div style={offlineProgressTrack}>
-                <div
-                  style={{
-                    ...offlineProgressFill,
-                    width: `${Math.round(Math.max(0, Math.min(100, (offlinePrepProgress.done / Math.max(1, offlinePrepProgress.total)) * 100)))}%`,
-                  }}
-                />
-              </div>
-              {offlinePrepProgress.detail ? (
-                <details style={offlineProgressDetails}>
-                  <summary style={offlineProgressSummary}>Detalles</summary>
-                  <div style={offlineProgressDetailText}>{offlinePrepProgress.detail}</div>
-                </details>
-              ) : null}
-            </div>
-          ) : null}
-
-          {offlinePrepMessage ? (
-            <div style={offlinePrepState === 'error' ? offlineVaultError : offlineVaultSuccess}>
-              {offlinePrepMessage}
-            </div>
-          ) : null}
-        </section>
+        ) : null}
 
         <section style={listBlock}>
           {profiles.map((profile, index) => {
@@ -536,12 +529,15 @@ export default function LoginApp() {
                         window.history.pushState(null, '', href)
                         window.dispatchEvent(new CustomEvent('saga:navigate'))
                       }
-                      
+
                       window.navigator.geolocation.getCurrentPosition(
                         () => proceed(),
                         (err) => {
-                           console.warn('GPS request at login failed or denied, proceeding anyway.', err)
-                           proceed()
+                          console.warn(
+                            'GPS request at login failed or denied, proceeding anyway.',
+                            err
+                          )
+                          proceed()
                         },
                         { enableHighAccuracy: true, timeout: 5000 }
                       )
@@ -555,14 +551,8 @@ export default function LoginApp() {
           })}
         </section>
 
-        {state.config?.mapbox_token ? (
-          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '16px', color: '#facc15', fontSize: '11px', lineHeight: '1.4', textAlign: 'center' }}>
-            <strong>{copy.mapboxLimitTitle}</strong><br />
-            {copy.mapboxLimitText}
-          </div>
-        ) : null}
+        {/* Mapbox Warning Removed */}
       </div>
-
     </main>
   )
 }
@@ -614,7 +604,8 @@ const backGlowBottom: CSSProperties = {
 const backVignette: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'linear-gradient(90deg, rgba(2,6,23,.12), transparent 22%, transparent 78%, rgba(2,6,23,.12))',
+  background:
+    'linear-gradient(90deg, rgba(2,6,23,.12), transparent 22%, transparent 78%, rgba(2,6,23,.12))',
   pointerEvents: 'none',
 }
 
@@ -626,7 +617,7 @@ const heroCard: CSSProperties = {
   boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
   backdropFilter: 'blur(18px) saturate(135%)',
   WebkitBackdropFilter: 'blur(18px) saturate(135%)',
-  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaFadeIn 260ms ease-out',
 }
 
 const heroTopSpacer: CSSProperties = {
@@ -819,7 +810,8 @@ const offlineProgressTrack: CSSProperties = {
 const offlineProgressFill: CSSProperties = {
   height: '100%',
   borderRadius: 999,
-  background: 'linear-gradient(90deg, rgba(34,197,94,.98), rgba(132,204,22,.98), rgba(187,247,208,.98))',
+  background:
+    'linear-gradient(90deg, rgba(34,197,94,.98), rgba(132,204,22,.98), rgba(187,247,208,.98))',
   transition: 'width 180ms ease',
 }
 
@@ -876,9 +868,10 @@ const launchCard: CSSProperties = {
   borderRadius: 28,
   border: '1px solid rgba(52, 211, 153, 0.25)',
   background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.99))',
-  boxShadow: '0 0 35px rgba(52, 211, 153, 0.12), 0 24px 54px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+  boxShadow:
+    '0 0 35px rgba(52, 211, 153, 0.12), 0 24px 54px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
   color: '#ffffff',
-  animation: 'sagaFinishPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+  animation: 'sagaFadeIn 0.4s ease-out forwards',
 }
 
 const launchSpinner: CSSProperties = {
@@ -922,6 +915,18 @@ const launchProgressFill: CSSProperties = {
   transition: 'width 80ms ease-out',
 }
 
+const insecureLoginBanner: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'start',
+  padding: 12,
+  borderRadius: 16,
+  background: 'rgba(239, 68, 68, 0.15)',
+  border: '1px solid rgba(239, 68, 68, 0.3)',
+  color: '#fca5a5',
+  marginBottom: 16,
+}
+
 const listBlock: CSSProperties = {
   display: 'grid',
   gap: 8,
@@ -939,7 +944,7 @@ const playerCard: CSSProperties = {
   boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
   backdropFilter: 'blur(18px) saturate(130%)',
   WebkitBackdropFilter: 'blur(18px) saturate(130%)',
-  animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaFadeIn 260ms ease-out',
   animationFillMode: 'both',
 }
 
@@ -1037,21 +1042,13 @@ const enterButton: CSSProperties = {
 }
 
 const loginAnimations = `
-@keyframes sagaSpin {
-  to {
-    transform: rotate(360deg);
+  @keyframes sagaSpin {
+    to {
+      transform: rotate(360deg);
+    }
   }
-}
-
-
-@keyframes sagaLoginRise {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(.99);
+  @keyframes sagaFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 `

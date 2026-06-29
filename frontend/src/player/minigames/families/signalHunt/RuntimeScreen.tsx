@@ -11,13 +11,7 @@ interface Props {
 }
 
 type GpsState =
-  | 'idle'
-  | 'requesting'
-  | 'tracking'
-  | 'denied'
-  | 'unsupported'
-  | 'missing_source'
-  | 'locked'
+  'idle' | 'requesting' | 'tracking' | 'denied' | 'unsupported' | 'missing_source' | 'locked'
 
 type LatLon = {
   lat: number
@@ -500,9 +494,7 @@ function haversineMeters(a: LatLon, b: LatLon): number {
   const lat1 = toRad(a.lat)
   const lat2 = toRad(b.lat)
 
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
 
   return earthRadius * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
 }
@@ -529,8 +521,14 @@ function getStageCoordinate(stage: PlayerStage): LatLon | null {
     { lat: raw.lat, lon: raw.lon },
     { lat: raw.latitude, lon: raw.longitude },
     { lat: raw.gps_lat, lon: raw.gps_lon },
-    { lat: (raw.location as Record<string, unknown> | undefined)?.lat, lon: (raw.location as Record<string, unknown> | undefined)?.lon },
-    { lat: (raw.location as Record<string, unknown> | undefined)?.latitude, lon: (raw.location as Record<string, unknown> | undefined)?.longitude },
+    {
+      lat: (raw.location as Record<string, unknown> | undefined)?.lat,
+      lon: (raw.location as Record<string, unknown> | undefined)?.lon,
+    },
+    {
+      lat: (raw.location as Record<string, unknown> | undefined)?.latitude,
+      lon: (raw.location as Record<string, unknown> | undefined)?.longitude,
+    },
   ]
 
   for (const item of candidates) {
@@ -560,19 +558,15 @@ function getConfigSource(resolved: ResolvedSignalHuntMinigame, stage: PlayerStag
 function getGpsCopy(state: GpsState, hasSource: boolean): string {
   if (!hasSource) return 'Faltan coordenadas del nodo. Revisa la posición en el mapa.'
   if (state === 'requesting') return 'Solicitando posición GPS.'
-  if (state === 'tracking') return 'GPS activo. Busca el pico de señal y mantén posición en la zona de captura.'
+  if (state === 'tracking')
+    return 'GPS activo. Busca el pico de señal y mantén posición en la zona de captura.'
   if (state === 'denied') return 'Permiso de ubicación denegado. Revisa permisos del navegador.'
   if (state === 'unsupported') return 'Este navegador no permite usar geolocalización.'
   if (state === 'locked') return 'Señal capturada.'
   return 'Preparando búsqueda de señal.'
 }
 
-export function SignalHuntRuntimeScreen({
-  resolved,
-  stage,
-  submitting,
-  onWin,
-}: Props) {
+export function SignalHuntRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
   const cfg = resolved.config
 
   const source = useMemo(() => getConfigSource(resolved, stage), [resolved, stage])
@@ -583,13 +577,16 @@ export function SignalHuntRuntimeScreen({
   const sourceRadius = clamp(Number(cfg.source_radius_m ?? stageRadius ?? 55), 1, 10000)
   const easyCheckpoint = cfg.easy_checkpoint === true
   const rawLockThreshold = clamp(Number(cfg.lock_threshold ?? 88), 1, 100)
-  const lockThreshold = easyCheckpoint ? rawLockThreshold : clamp(Math.max(rawLockThreshold, 82), 1, 100)
+  const lockThreshold = easyCheckpoint
+    ? rawLockThreshold
+    : clamp(Math.max(rawLockThreshold, 82), 1, 100)
   const rawHoldMs = clamp(Number(cfg.hold_ms ?? 3500), 100, 10000)
   const holdMs = easyCheckpoint ? rawHoldMs : clamp(Math.max(rawHoldMs, 3000), 100, 10000)
   const configuredLockRadius = toNumber(cfg.lock_radius_m)
-  const lockRadius = configuredLockRadius !== null
-    ? clamp(configuredLockRadius, 2, sourceRadius)
-    : clamp(sourceRadius * 0.32, 8, Math.min(35, sourceRadius))
+  const lockRadius =
+    configuredLockRadius !== null
+      ? clamp(configuredLockRadius, 2, sourceRadius)
+      : clamp(sourceRadius * 0.32, 8, Math.min(35, sourceRadius))
   const maxSignal = clamp(Number(cfg.max_signal ?? 100), 1, 100)
   const noiseFloor = clamp(Number(cfg.noise_floor ?? 4), 0, 35)
   const jitter = clamp(Number(cfg.jitter ?? 1), 0, 20)
@@ -667,7 +664,12 @@ export function SignalHuntRuntimeScreen({
 
   const normalizedSignal = clamp((signal / maxSignal) * 100, 0, 100)
   const inLockRadius = distance !== null && distance <= lockRadius
-  const inWindow = !locked && hasSource && gpsState === 'tracking' && normalizedSignal >= lockThreshold && inLockRadius
+  const inWindow =
+    !locked &&
+    hasSource &&
+    gpsState === 'tracking' &&
+    normalizedSignal >= lockThreshold &&
+    inLockRadius
   const rising = !locked && hasSource && normalizedSignal >= Math.max(15, lockThreshold * 0.62)
 
   const completeLock = useCallback(async () => {
@@ -696,7 +698,12 @@ export function SignalHuntRuntimeScreen({
         if (holdStartRef.current === null) {
           holdStartRef.current = now
 
-          if (!windowPulseRef.current && typeof navigator !== 'undefined' && cfg.use_vibration !== false && 'vibrate' in navigator) {
+          if (
+            !windowPulseRef.current &&
+            typeof navigator !== 'undefined' &&
+            cfg.use_vibration !== false &&
+            'vibrate' in navigator
+          ) {
             windowPulseRef.current = true
             navigator.vibrate?.(10)
           }
@@ -728,11 +735,17 @@ export function SignalHuntRuntimeScreen({
     if (submitting) return { main: 'GUARDAR', sub: 'Guardando captura', small: true }
     if (locked) return { main: 'CAPTURA', sub: 'Señal capturada', small: true }
     if (!hasSource) return { main: 'SIN PUNTO', sub: 'Configura el nodo en el mapa', small: true }
-    if (gpsState === 'requesting' || gpsState === 'idle') return { main: 'GPS', sub: 'Buscando posición', small: false }
+    if (gpsState === 'requesting' || gpsState === 'idle')
+      return { main: 'GPS', sub: 'Buscando posición', small: false }
     if (gpsState === 'denied') return { main: 'GPS', sub: 'Permiso bloqueado', small: false }
     if (gpsState === 'unsupported') return { main: 'GPS', sub: 'No disponible', small: false }
     if (inWindow) return { main: 'MANTÉN', sub: 'Mantén posición', small: true }
-    if (rising) return { main: 'CERCA', sub: inLockRadius ? 'Afina la señal' : 'Busca la zona de captura', small: false }
+    if (rising)
+      return {
+        main: 'CERCA',
+        sub: inLockRadius ? 'Afina la señal' : 'Busca la zona de captura',
+        small: false,
+      }
     return { main: 'DÉBIL', sub: 'Busca más intensidad', small: false }
   }, [gpsState, hasSource, inWindow, locked, rising, submitting])
 
@@ -753,7 +766,9 @@ export function SignalHuntRuntimeScreen({
     rising ? 'is-rising' : '',
     inWindow ? 'is-window' : '',
     locked ? 'is-locked' : '',
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const captureDeg = Math.round(holdProgress * 360)
   const displaySignal = position ? normalizedSignal : 0

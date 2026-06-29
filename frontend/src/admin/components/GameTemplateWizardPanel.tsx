@@ -80,13 +80,19 @@ export default function GameTemplateWizardPanel({
 
   return (
     <div className="admin-game-wizard-shell" role="presentation">
-      <section className="admin-game-wizard" role="dialog" aria-modal="true" aria-label="Asistente de configuración de juego">
+      <section
+        className="admin-game-wizard"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Asistente de configuración de juego"
+      >
         <header className="admin-game-wizard-head">
           <div>
             <span>Asistente de plantilla</span>
             <strong>Configura este juego paso a paso</strong>
             <p>
-              Juego actual: <b>{selectedGameTitle || 'plantilla seleccionada'}</b>. El asistente te guía; los cambios finales se guardan con el botón Guardar de Control de misión.
+              Juego actual: <b>{selectedGameTitle || 'plantilla seleccionada'}</b>. El asistente te
+              guía; los cambios finales se guardan con el botón Guardar de Control de misión.
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Cerrar asistente de juego">
@@ -115,16 +121,15 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-page-head">
                   <span>Paso 1</span>
                   <h3>Selecciona primero el tipo de juego</h3>
-                  <p>Elige una plantilla estable. Después el asistente te lleva a configurar lo mínimo necesario para que sea jugable en ruta y offline.</p>
+                  <p>
+                    Elige una plantilla estable. Después el asistente te lleva a configurar lo
+                    mínimo necesario para que sea jugable en ruta y offline.
+                  </p>
                 </div>
 
                 <div className="admin-game-wizard-game-grid">
                   {games.map((game) => (
-                    <button
-                      key={game.title}
-                      type="button"
-                      onClick={() => setStep('activation')}
-                    >
+                    <button key={game.title} type="button" onClick={() => setStep('activation')}>
                       <span>{game.icon}</span>
                       <strong>{game.title}</strong>
                       <small>{game.tag}</small>
@@ -135,8 +140,13 @@ export default function GameTemplateWizardPanel({
 
                 <div className="admin-game-wizard-callout">
                   <b>Cómo se aplica</b>
-                  <p>Selecciona la plantilla en la pestaña Juego. Después vuelve aquí o pulsa Siguiente para configurar radio, fallback y mensajes.</p>
-                  <button type="button" onClick={onGoToGame}>Ir a selección de juego</button>
+                  <p>
+                    Selecciona la plantilla en la pestaña Juego. Después vuelve aquí o pulsa
+                    Siguiente para configurar radio, fallback y mensajes.
+                  </p>
+                  <button type="button" onClick={onGoToGame}>
+                    Ir a selección de juego
+                  </button>
                 </div>
               </section>
             ) : null}
@@ -146,28 +156,41 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-page-head">
                   <span>Paso 2</span>
                   <h3>Configura cómo se activa el nodo</h3>
-                  <p>Define el radio, si requiere proximidad y cómo interactúa el jugador. La posición se mueve arrastrando el nodo en el mapa.</p>
+                  <p>
+                    Define el radio, si requiere proximidad y cómo interactúa el jugador. La
+                    posición se mueve arrastrando el nodo en el mapa.
+                  </p>
                 </div>
 
                 <div className="admin-game-wizard-cards">
                   <article>
                     <b>Radio</b>
-                    <p>Para exterior, empieza con 40–75 m. Si hay edificios o GPS flojo, usa más margen.</p>
+                    <p>
+                      Para exterior, empieza con 40–75 m. Si hay edificios o GPS flojo, usa más
+                      margen.
+                    </p>
                   </article>
                   <article>
                     <b>Interacción</b>
-                    <p>Por radio GPS es lo más estable. Rumbo o QR requieren pruebas específicas.</p>
+                    <p>
+                      Por radio GPS es lo más estable. Rumbo o QR requieren pruebas específicas.
+                    </p>
                   </article>
                   <article>
                     <b>Proximidad</b>
-                    <p>Actívala si el jugador debe estar físicamente cerca. Desactívala solo para nodos informativos.</p>
+                    <p>
+                      Actívala si el jugador debe estar físicamente cerca. Desactívala solo para
+                      nodos informativos.
+                    </p>
                   </article>
                 </div>
 
                 <div className="admin-game-wizard-callout">
                   <b>Configurar ahora</b>
                   <p>Estos campos están en Básico para no duplicar Ubicación.</p>
-                  <button type="button" onClick={onGoToBasics}>Ir a Básico</button>
+                  <button type="button" onClick={onGoToBasics}>
+                    Ir a Básico
+                  </button>
                 </div>
               </section>
             ) : null}
@@ -177,7 +200,10 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-page-head">
                   <span>Paso 3</span>
                   <h3>Prepara el modo emergencia</h3>
-                  <p>El fallback permite completar el nodo si falla GPS, cámara, QR, brújula o cobertura. Es para el monitor, no para enseñar al jugador.</p>
+                  <p>
+                    El fallback permite completar el nodo si falla GPS, cámara, QR, brújula o
+                    cobertura. Es para el monitor, no para enseñar al jugador.
+                  </p>
                 </div>
 
                 <div className="admin-game-wizard-cards">
@@ -187,11 +213,16 @@ export default function GameTemplateWizardPanel({
                   </article>
                   <article>
                     <b>Cuándo usarlo</b>
-                    <p>Solo si el jugador está en el sitio o ha hecho la prueba, pero el móvil falla.</p>
+                    <p>
+                      Solo si el jugador está en el sitio o ha hecho la prueba, pero el móvil falla.
+                    </p>
                   </article>
                   <article>
                     <b>Prueba offline</b>
-                    <p>Antes de jugar, abre el jugador con misión descargada y confirma que el fallback completa el nodo.</p>
+                    <p>
+                      Antes de jugar, abre el jugador con misión descargada y confirma que el
+                      fallback completa el nodo.
+                    </p>
                   </article>
                 </div>
               </section>
@@ -202,7 +233,10 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-page-head">
                   <span>Paso 4</span>
                   <h3>Escribe lo que verá el jugador</h3>
-                  <p>Los mensajes son clave para que el juego no dependa de que el monitor explique todo en persona.</p>
+                  <p>
+                    Los mensajes son clave para que el juego no dependa de que el monitor explique
+                    todo en persona.
+                  </p>
                 </div>
 
                 <div className="admin-game-wizard-cards">
@@ -223,7 +257,9 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-callout">
                   <b>Editar mensajes</b>
                   <p>Abre la pestaña Mensajes para ajustar los textos concretos.</p>
-                  <button type="button" onClick={onGoToMessages}>Ir a Mensajes</button>
+                  <button type="button" onClick={onGoToMessages}>
+                    Ir a Mensajes
+                  </button>
                 </div>
               </section>
             ) : null}
@@ -233,7 +269,10 @@ export default function GameTemplateWizardPanel({
                 <div className="admin-game-wizard-page-head">
                   <span>Paso 5</span>
                   <h3>Guarda y prueba como jugador</h3>
-                  <p>Guarda en Control de misión, abre el jugador y valida el flujo real: desbloqueo, offline, fallback y avance al siguiente nodo.</p>
+                  <p>
+                    Guarda en Control de misión, abre el jugador y valida el flujo real: desbloqueo,
+                    offline, fallback y avance al siguiente nodo.
+                  </p>
                 </div>
 
                 <div className="admin-game-wizard-cards">
@@ -247,7 +286,9 @@ export default function GameTemplateWizardPanel({
                   </article>
                   <article>
                     <b>Prueba secuencia</b>
-                    <p>Comprueba que al completar este nodo el siguiente queda en el estado correcto.</p>
+                    <p>
+                      Comprueba que al completar este nodo el siguiente queda en el estado correcto.
+                    </p>
                   </article>
                 </div>
               </section>
@@ -256,9 +297,15 @@ export default function GameTemplateWizardPanel({
         </div>
 
         <footer className="admin-game-wizard-footer">
-          <button type="button" onClick={goBack} disabled={!canBack}>Atrás</button>
-          <button type="button" onClick={goNext} disabled={!canNext}>Siguiente</button>
-          <button type="button" onClick={onClose}>Cerrar asistente</button>
+          <button type="button" onClick={goBack} disabled={!canBack}>
+            Atrás
+          </button>
+          <button type="button" onClick={goNext} disabled={!canNext}>
+            Siguiente
+          </button>
+          <button type="button" onClick={onClose}>
+            Cerrar asistente
+          </button>
         </footer>
       </section>
     </div>

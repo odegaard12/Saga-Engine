@@ -40,15 +40,9 @@ export function readStoredGpsPosition(user: string): StoredGpsPosition | null {
     return {
       lat,
       lon,
-      ...(accuracy !== null && accuracy >= 0
-        ? { accuracy }
-        : {}),
-      ...(savedAt !== null
-        ? { saved_at: savedAt }
-        : {}),
-      ...(capturedAt !== null
-        ? { captured_at: capturedAt }
-        : {}),
+      ...(accuracy !== null && accuracy >= 0 ? { accuracy } : {}),
+      ...(savedAt !== null ? { saved_at: savedAt } : {}),
+      ...(capturedAt !== null ? { captured_at: capturedAt } : {}),
     }
   } catch {
     return null
@@ -81,13 +75,11 @@ export function rememberGpsPosition(
       JSON.stringify({
         ...position,
         accuracy:
-          typeof metadata.accuracy === 'number' &&
-          Number.isFinite(metadata.accuracy)
+          typeof metadata.accuracy === 'number' && Number.isFinite(metadata.accuracy)
             ? Math.max(0, metadata.accuracy)
             : undefined,
         captured_at:
-          typeof metadata.capturedAt === 'number' &&
-          Number.isFinite(metadata.capturedAt)
+          typeof metadata.capturedAt === 'number' && Number.isFinite(metadata.capturedAt)
             ? metadata.capturedAt
             : Date.now(),
         saved_at: Date.now(),

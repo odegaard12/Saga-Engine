@@ -1,4 +1,5 @@
-export type GameCatalogFamily = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
+export type GameCatalogFamily =
+  'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
 
 export type GameCatalogItem = {
   id: GameCatalogFamily
@@ -22,7 +23,8 @@ export const FAMILY_NATIVE_GAME_CATALOG: GameCatalogItem[] = [
     label: 'Signal Hunt',
     title: 'Signal Hunt',
     name: 'Signal Hunt',
-    description: 'Proximity/search gameplay for source finding, hot/cold signal feedback and GPS lock.',
+    description:
+      'Proximity/search gameplay for source finding, hot/cold signal feedback and GPS lock.',
     status: 'native',
     runtime: 'family-native',
     emoji: '📡',
@@ -35,7 +37,8 @@ export const FAMILY_NATIVE_GAME_CATALOG: GameCatalogItem[] = [
     label: 'Bearing Hunt',
     title: 'Bearing Hunt',
     name: 'Bearing Hunt',
-    description: 'Compass/orientation gameplay for bearing lock, sector scan and heading challenges.',
+    description:
+      'Compass/orientation gameplay for bearing lock, sector scan and heading challenges.',
     status: 'native',
     runtime: 'family-native',
     emoji: '🧭',
@@ -48,7 +51,8 @@ export const FAMILY_NATIVE_GAME_CATALOG: GameCatalogItem[] = [
     label: 'Circuit Matrix',
     title: 'Circuit Matrix',
     name: 'Circuit Matrix',
-    description: 'Logic/grid gameplay for path restore, switch logic, route repair and power balance.',
+    description:
+      'Logic/grid gameplay for path restore, switch logic, route repair and power balance.',
     status: 'native',
     runtime: 'family-native',
     emoji: '🧩',
@@ -79,10 +83,14 @@ export function listGameCatalogItems(): GameCatalogItem[] {
 }
 
 export function getGameCatalogItem(type: string | null | undefined): GameCatalogItem | null {
-  const normalized = String(type || '').trim().toLowerCase()
+  const normalized = String(type || '')
+    .trim()
+    .toLowerCase()
   return FAMILY_NATIVE_GAME_CATALOG.find((item) => item.id === normalized) || null
 }
 
-export function isFamilyNativeCatalogType(type: string | null | undefined): type is GameCatalogFamily {
+export function isFamilyNativeCatalogType(
+  type: string | null | undefined
+): type is GameCatalogFamily {
   return Boolean(getGameCatalogItem(type))
 }

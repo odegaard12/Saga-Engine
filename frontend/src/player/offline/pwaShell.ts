@@ -1,56 +1,40 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v1.2.0-rpg-viewfinder'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v1.2.2-rpg-viewfinder'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null
   if (!('serviceWorker' in navigator)) return null
 
-  const hadController = Boolean(
-    navigator.serviceWorker.controller,
-  )
+  const hadController = Boolean(navigator.serviceWorker.controller)
 
-  const reloadKey =
-    `${PLAYER_SHELL_CACHE}:controller-reload`
+  const reloadKey = `${PLAYER_SHELL_CACHE}:controller-reload`
 
   if (hadController) {
     navigator.serviceWorker.addEventListener(
       'controllerchange',
       () => {
         try {
-          if (
-            window.sessionStorage.getItem(
-              reloadKey,
-            ) === '1'
-          ) {
+          if (window.sessionStorage.getItem(reloadKey) === '1') {
             return
           }
 
-          window.sessionStorage.setItem(
-            reloadKey,
-            '1',
-          )
+          window.sessionStorage.setItem(reloadKey, '1')
         } catch {
           // Reload still works when sessionStorage is unavailable.
         }
 
         window.location.reload()
       },
-      { once: true },
+      { once: true }
     )
   }
 
   try {
-    const registration =
-      await navigator.serviceWorker.register(
-        '/sw.js',
-        {
-          scope: '/',
-          updateViaCache: 'none',
-        },
-      )
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
 
-    await registration.update().catch(
-      () => undefined,
-    )
+    await registration.update().catch(() => undefined)
 
     return registration
   } catch {
@@ -133,93 +117,56 @@ export type OfflineMapTileResult = {
   failed: number
 }
 
-
 type OfflineMapStage = {
   lat?: unknown
   lon?: unknown
 }
 
-
-function tileX(
-  lon: number,
-  zoom: number,
-): number {
+function tileX(lon: number, zoom: number): number {
   const count = 2 ** zoom
 
-  return Math.floor(
-    ((lon + 180) / 360) * count
-  )
+  return Math.floor(((lon + 180) / 360) * count)
 }
 
+function tileY(lat: number, zoom: number): number {
+  const safeLat = Math.max(-85.0511, Math.min(85.0511, lat))
 
-function tileY(
-  lat: number,
-  zoom: number,
-): number {
-  const safeLat = Math.max(
-    -85.0511,
-    Math.min(85.0511, lat),
-  )
-
-  const radians =
-    (safeLat * Math.PI) / 180
+  const radians = (safeLat * Math.PI) / 180
 
   const count = 2 ** zoom
 
   return Math.floor(
-    (
-      1 -
-      Math.log(
-        Math.tan(radians) +
-        1 / Math.cos(radians),
-      ) / Math.PI
-    ) / 2 * count,
+    ((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2) * count
   )
 }
 
-
-function collectMissionTileUrls(
-  stages: OfflineMapStage[],
-): string[] {
+function collectMissionTileUrls(stages: OfflineMapStage[]): string[] {
   const urls = new Set<string>()
 
   for (const stage of stages) {
     const lat = Number(stage?.lat)
     const lon = Number(stage?.lon)
 
-    if (
-      !Number.isFinite(lat) ||
-      !Number.isFinite(lon)
-    ) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       continue
     }
 
-    for (
-      const zoom of [15, 16, 17, 18]
-    ) {
+    for (const zoom of [15, 16, 17, 18]) {
       const count = 2 ** zoom
       const centerX = tileX(lon, zoom)
       const centerY = tileY(lat, zoom)
 
       for (let dx = -1; dx <= 1; dx += 1) {
         for (let dy = -1; dy <= 1; dy += 1) {
-          const x =
-            ((centerX + dx) % count + count) %
-            count
+          const x = (((centerX + dx) % count) + count) % count
 
-          const y = Math.max(
-            0,
-            Math.min(
-              count - 1,
-              centerY + dy,
-            ),
-          )
+          const y = Math.max(0, Math.min(count - 1, centerY + dy))
 
           urls.add(
             'https://server.arcgisonline.com/' +
-            'ArcGIS/rest/services/' +
-            'World_Imagery/MapServer/tile/' +
-            `${zoom}/${y}/${x}`,
+              'ArcGIS/rest/services/' +
+              'World_Imagery/MapServer/tile/' +
+              `${zoom}/${y}/${x}`
           )
         }
       }
@@ -229,14 +176,10 @@ function collectMissionTileUrls(
   return Array.from(urls).slice(0, 240)
 }
 
-
 export async function cacheMissionMapTiles(
-  stages: OfflineMapStage[],
+  stages: OfflineMapStage[]
 ): Promise<OfflineMapTileResult> {
-  if (
-    typeof window === 'undefined' ||
-    !('caches' in window)
-  ) {
+  if (typeof window === 'undefined' || !('caches' in window)) {
     return {
       requested: 0,
       cached: 0,
@@ -244,11 +187,9 @@ export async function cacheMissionMapTiles(
     }
   }
 
-  const urls =
-    collectMissionTileUrls(stages)
+  const urls = collectMissionTileUrls(stages)
 
-  const cache =
-    await caches.open(PLAYER_SHELL_CACHE)
+  const cache = await caches.open(PLAYER_SHELL_CACHE)
 
   let cursor = 0
   let cached = 0
@@ -269,17 +210,10 @@ export async function cacheMissionMapTiles(
           cache: 'reload',
         })
 
-        const response =
-          await fetch(request)
+        const response = await fetch(request)
 
-        if (
-          response.ok ||
-          response.type === 'opaque'
-        ) {
-          await cache.put(
-            request,
-            response.clone(),
-          )
+        if (response.ok || response.type === 'opaque') {
+          await cache.put(request, response.clone())
 
           cached += 1
         } else {
@@ -291,17 +225,9 @@ export async function cacheMissionMapTiles(
     }
   }
 
-  const workers = Math.min(
-    6,
-    Math.max(1, urls.length),
-  )
+  const workers = Math.min(6, Math.max(1, urls.length))
 
-  await Promise.all(
-    Array.from(
-      { length: workers },
-      () => worker(),
-    ),
-  )
+  await Promise.all(Array.from({ length: workers }, () => worker()))
 
   return {
     requested: urls.length,
@@ -309,7 +235,6 @@ export async function cacheMissionMapTiles(
     failed,
   }
 }
-
 
 export async function cachePlayerShell(playerUrl: string): Promise<void> {
   if (typeof window === 'undefined') return
@@ -333,5 +258,7 @@ export async function isPlayerShellCached(playerUrl: string): Promise<boolean> {
   const path = sameOriginPath(playerUrl)
   if (!path) return false
 
-  return Boolean(await caches.match(path))
+  return Boolean(
+    await caches.match(path, { ignoreSearch: true, ignoreMethod: true, ignoreVary: true })
+  )
 }

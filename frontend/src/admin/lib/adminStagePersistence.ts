@@ -55,7 +55,8 @@ export function mergeStageForSave(
       ? (rawStage.config as Record<string, unknown>)
       : {}
   const localConfig =
-    typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+    typeof (stage as EditableAdminStage).config === 'object' &&
+    (stage as EditableAdminStage).config !== null
       ? ((stage as EditableAdminStage).config as Record<string, unknown>)
       : {}
 
@@ -79,8 +80,10 @@ export function mergeStageForSave(
   })
 
   const rawBase = shouldClearPhysicalStageFields(stage)
-    ? stripPhysicalStageFields(((rawStage || {}) as unknown as Record<string, unknown>)) as AdminRawStage
-    : (rawStage || {})
+    ? (stripPhysicalStageFields(
+        (rawStage || {}) as unknown as Record<string, unknown>
+      ) as AdminRawStage)
+    : rawStage || {}
 
   const physicalFields = shouldClearPhysicalStageFields(stage)
     ? {}
@@ -89,10 +92,7 @@ export function mergeStageForSave(
   return {
     ...rawBase,
     ...physicalFields,
-    id:
-      typeof stage.id === 'number'
-        ? stage.id
-        : rawStage?.id ?? stage.index,
+    id: typeof stage.id === 'number' ? stage.id : (rawStage?.id ?? stage.index),
     title: stage.title || 'Untitled node',
     type: saveType,
     label: getAdminFamilyLabel(saveType),
@@ -121,7 +121,8 @@ export function buildRawStageFromOverview(
   const saveType = stage.type || 'signal_hunt'
   const saveConfig = normalizeAdminConfigForFamily(
     saveType,
-    typeof (stage as EditableAdminStage).config === 'object' && (stage as EditableAdminStage).config !== null
+    typeof (stage as EditableAdminStage).config === 'object' &&
+      (stage as EditableAdminStage).config !== null
       ? ((stage as EditableAdminStage).config as Record<string, unknown>)
       : {}
   )
@@ -153,7 +154,9 @@ export function buildRawStageFromOverview(
 }
 
 export function buildRawStagesFromOverview(overviewStages: AdminReactOverviewStage[]) {
-  return overviewStages.map((stage, index) => withPhysicalStageFields(stage, buildRawStageFromOverview(stage, index)))
+  return overviewStages.map((stage, index) =>
+    withPhysicalStageFields(stage, buildRawStageFromOverview(stage, index))
+  )
 }
 
 export function mergeOverviewIntoRawStages(
@@ -176,73 +179,40 @@ export function mergeOverviewIntoRawStages(
   })
 }
 
-function persistenceRecord(
-  value: unknown,
-): Record<string, unknown> {
-  return value && typeof value === 'object'
-    ? value as Record<string, unknown>
-    : {}
+function persistenceRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
 
-function persistenceStageType(
-  stage: AdminRawStage,
-) {
-  const minigame = persistenceRecord(
-    stage.minigame,
-  )
+function persistenceStageType(stage: AdminRawStage) {
+  const minigame = persistenceRecord(stage.minigame)
 
-  return String(
-    minigame.type ||
-    stage.type ||
-    '',
-  )
+  return String(minigame.type || stage.type || '')
 }
 
-function persistenceStageConfig(
-  stage: AdminRawStage,
-) {
-  const minigame = persistenceRecord(
-    stage.minigame,
-  )
+function persistenceStageConfig(stage: AdminRawStage) {
+  const minigame = persistenceRecord(stage.minigame)
 
-  const minigameConfig = persistenceRecord(
-    minigame.config,
-  )
+  const minigameConfig = persistenceRecord(minigame.config)
 
-  if (
-    Object.keys(minigameConfig).length > 0
-  ) {
+  if (Object.keys(minigameConfig).length > 0) {
     return minigameConfig
   }
 
   return persistenceRecord(stage.config)
 }
 
-function stablePersistenceValue(
-  value: unknown,
-): unknown {
+function stablePersistenceValue(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(stablePersistenceValue)
   }
 
-  if (
-    value &&
-    typeof value === 'object'
-  ) {
-    const record = value as Record<
-      string,
-      unknown
-    >
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
 
     return Object.fromEntries(
       Object.keys(record)
         .sort()
-        .map((key) => [
-          key,
-          stablePersistenceValue(
-            record[key],
-          ),
-        ]),
+        .map((key) => [key, stablePersistenceValue(record[key])])
     )
   }
 
@@ -250,114 +220,66 @@ function stablePersistenceValue(
 }
 
 function persistenceJson(value: unknown) {
-  return JSON.stringify(
-    stablePersistenceValue(value),
-  )
+  return JSON.stringify(stablePersistenceValue(value))
 }
 
 export function verifyPersistedStages(
   expectedStages: AdminRawStage[],
-  actualStages: AdminRawStage[],
+  actualStages: AdminRawStage[]
 ) {
   const errors: string[] = []
 
-  if (
-    expectedStages.length !== actualStages.length
-  ) {
+  if (expectedStages.length !== actualStages.length) {
     errors.push(
-      `número de nodos esperado `
-      + `${expectedStages.length}, `
-      + `guardado ${actualStages.length}`,
+      `número de nodos esperado ` + `${expectedStages.length}, ` + `guardado ${actualStages.length}`
     )
   }
 
-  expectedStages.forEach(
-    (expected, index) => {
-      const actual = actualStages[index]
+  expectedStages.forEach((expected, index) => {
+    const actual = actualStages[index]
 
-      if (!actual) {
-        errors.push(
-          `falta el nodo ${index + 1}`,
-        )
-        return
+    if (!actual) {
+      errors.push(`falta el nodo ${index + 1}`)
+      return
+    }
+
+    const expectedType = persistenceStageType(expected)
+
+    const actualType = persistenceStageType(actual)
+
+    const expectedId = String(expected.id ?? index)
+
+    const actualId = String(actual.id ?? index)
+
+    if (expectedId !== actualId) {
+      errors.push(`orden/ID del nodo ${index + 1}: ` + `${expectedId} != ${actualId}`)
+    }
+
+    if (String(expected.title || '') !== String(actual.title || '')) {
+      errors.push(`título del nodo ${index + 1}`)
+    }
+
+    if (expectedType !== actualType) {
+      errors.push(`tipo del nodo ${index + 1}: ` + `${expectedType} != ${actualType}`)
+    }
+
+    for (const field of ['lat', 'lon', 'radius', 'entry_mode', 'require_proximity']) {
+      if (persistenceJson(expected[field]) !== persistenceJson(actual[field])) {
+        errors.push(`${field} del nodo ${index + 1}`)
       }
+    }
 
-      const expectedType =
-        persistenceStageType(expected)
+    const expectedConfig = normalizeAdminConfigForFamily(
+      expectedType,
+      persistenceStageConfig(expected)
+    )
 
-      const actualType =
-        persistenceStageType(actual)
+    const actualConfig = normalizeAdminConfigForFamily(actualType, persistenceStageConfig(actual))
 
-      const expectedId = String(
-        expected.id ?? index,
-      )
-
-      const actualId = String(
-        actual.id ?? index,
-      )
-
-      if (expectedId !== actualId) {
-        errors.push(
-          `orden/ID del nodo ${index + 1}: `
-          + `${expectedId} != ${actualId}`,
-        )
-      }
-
-      if (
-        String(expected.title || '') !==
-        String(actual.title || '')
-      ) {
-        errors.push(
-          `título del nodo ${index + 1}`,
-        )
-      }
-
-      if (expectedType !== actualType) {
-        errors.push(
-          `tipo del nodo ${index + 1}: `
-          + `${expectedType} != ${actualType}`,
-        )
-      }
-
-      for (const field of [
-        'lat',
-        'lon',
-        'radius',
-        'entry_mode',
-        'require_proximity',
-      ]) {
-        if (
-          persistenceJson(expected[field]) !==
-          persistenceJson(actual[field])
-        ) {
-          errors.push(
-            `${field} del nodo ${index + 1}`,
-          )
-        }
-      }
-
-      const expectedConfig =
-        normalizeAdminConfigForFamily(
-          expectedType,
-          persistenceStageConfig(expected),
-        )
-
-      const actualConfig =
-        normalizeAdminConfigForFamily(
-          actualType,
-          persistenceStageConfig(actual),
-        )
-
-      if (
-        persistenceJson(expectedConfig) !==
-        persistenceJson(actualConfig)
-      ) {
-        errors.push(
-          `configuración del nodo ${index + 1}`,
-        )
-      }
-    },
-  )
+    if (persistenceJson(expectedConfig) !== persistenceJson(actualConfig)) {
+      errors.push(`configuración del nodo ${index + 1}`)
+    }
+  })
 
   return errors
 }

@@ -1,13 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
-import type {
-  ResolvedCircuitMatrixMinigame,
-} from '../../core/resolver'
+import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -17,13 +10,7 @@ interface Props {
   onWin: () => Promise<void>
 }
 
-type Phase =
-  | 'preview'
-  | 'playing'
-  | 'completed'
-  | 'question'
-  | 'success'
-  | 'failed'
+type Phase = 'preview' | 'playing' | 'completed' | 'question' | 'success' | 'failed'
 
 const STYLES = `
 .mosaic-shell,
@@ -565,25 +552,14 @@ const STYLES = `
 }
 `
 
-function clampInteger(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number,
-) {
+function clampInteger(value: unknown, fallback: number, minimum: number, maximum: number) {
   const parsed = Number(value)
 
   if (!Number.isFinite(parsed)) {
     return fallback
   }
 
-  return Math.max(
-    minimum,
-    Math.min(
-      maximum,
-      Math.round(parsed),
-    ),
-  )
+  return Math.max(minimum, Math.min(maximum, Math.round(parsed)))
 }
 
 function validImage(value: unknown) {
@@ -591,110 +567,49 @@ function validImage(value: unknown) {
 
   return (
     image.length <= 600_000 &&
-    (
-      image.startsWith(
-        'data:image/jpeg;base64,',
-      ) ||
-      image.startsWith(
-        'data:image/png;base64,',
-      ) ||
-      image.startsWith(
-        'data:image/webp;base64,',
-      )
-    )
+    (image.startsWith('data:image/jpeg;base64,') ||
+      image.startsWith('data:image/png;base64,') ||
+      image.startsWith('data:image/webp;base64,'))
   )
 }
 
 function choicesOf(value: unknown) {
   return Array.isArray(value)
     ? value
-        .map((item) =>
-          String(item).trim(),
-        )
+        .map((item) => String(item).trim())
         .filter(Boolean)
         .slice(0, 4)
     : []
 }
 
 function shuffledOrder(count: number) {
-  const minimumMisplaced =
-    count <= 4
-      ? Math.min(3, count)
-      : Math.ceil(count * .62)
+  const minimumMisplaced = count <= 4 ? Math.min(3, count) : Math.ceil(count * 0.62)
 
-  for (
-    let attempt = 0;
-    attempt < 18;
-    attempt += 1
-  ) {
-    const values = Array.from(
-      { length: count },
-      (_, index) => index,
-    )
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    const values = Array.from({ length: count }, (_, index) => index)
 
-    for (
-      let index = values.length - 1;
-      index > 0;
-      index -= 1
-    ) {
-      const swapIndex =
-        Math.floor(
-          Math.random() * (index + 1),
-        )
+    for (let index = values.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1))
 
-      ;[
-        values[index],
-        values[swapIndex],
-      ] = [
-        values[swapIndex],
-        values[index],
-      ]
+      ;[values[index], values[swapIndex]] = [values[swapIndex], values[index]]
     }
 
-    const misplaced =
-      values.reduce(
-        (
-          total,
-          value,
-          index,
-        ) =>
-          total +
-          (
-            value === index
-              ? 0
-              : 1
-          ),
-        0,
-      )
+    const misplaced = values.reduce((total, value, index) => total + (value === index ? 0 : 1), 0)
 
-    if (
-      misplaced >= minimumMisplaced
-    ) {
+    if (misplaced >= minimumMisplaced) {
       return values
     }
   }
 
-  return Array.from(
-    { length: count },
-    (_, index) =>
-      (index + 1) % count,
-  )
+  return Array.from({ length: count }, (_, index) => (index + 1) % count)
 }
 
 function solvedOrder(order: number[]) {
-  return order.every(
-    (value, index) =>
-      value === index,
-  )
+  return order.every((value, index) => value === index)
 }
 
-function haptic(
-  pattern: number | number[],
-) {
-  if (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.vibrate === 'function'
-  ) {
+function haptic(pattern: number | number[]) {
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
     navigator.vibrate(pattern)
   }
 }
@@ -708,179 +623,91 @@ export function PlaceMosaicRuntimeScreen({
 }: Props) {
   const config = resolved.config
 
-  const imageData = String(
-    config.image_data_url || '',
-  )
+  const imageData = String(config.image_data_url || '')
 
-  const gridSize = clampInteger(
-    config.grid_size ??
-      config.grid_cols,
-    3,
-    2,
-    4,
-  )
+  const gridSize = clampInteger(config.grid_size ?? config.grid_cols, 3, 2, 4)
 
-  const totalPieces =
-    gridSize * gridSize
+  const totalPieces = gridSize * gridSize
 
-  const configuredPreviewMs = clampInteger(
-    config.preview_ms,
-    5000,
-    0,
-    6000,
-  )
+  const configuredPreviewMs = clampInteger(config.preview_ms, 5000, 0, 6000)
 
   const previewMs =
     configuredPreviewMs <= 0
       ? 0
       : configuredPreviewMs <= 2500
         ? 5000
-        : Math.max(
-            4000,
-            configuredPreviewMs,
-          )
+        : Math.max(4000, configuredPreviewMs)
 
-  const maxMoves = clampInteger(
-    config.max_moves,
-    0,
-    0,
-    500,
-  )
+  const maxMoves = clampInteger(config.max_moves, 0, 0, 500)
 
-  const requireQuestion =
-    config.require_final_question === true
+  const requireQuestion = config.require_final_question === true
 
-  const finalQuestion = String(
-    config.final_question || '',
-  ).trim()
+  const finalQuestion = String(config.final_question || '').trim()
 
-  const finalChoices =
-    choicesOf(config.final_choices)
+  const finalChoices = choicesOf(config.final_choices)
 
   const correctIndex = clampInteger(
     config.final_correct_index,
     0,
     0,
-    Math.max(
-      0,
-      finalChoices.length - 1,
-    ),
+    Math.max(0, finalChoices.length - 1)
   )
 
   const invalidConfig =
     !validImage(imageData) ||
-    (
-      requireQuestion &&
-      (
-        finalQuestion.length < 3 ||
-        finalChoices.length < 2
-      )
-    )
+    (requireQuestion && (finalQuestion.length < 3 || finalChoices.length < 2))
 
-  const [order, setOrder] =
-    useState<number[]>(
-      () =>
-        shuffledOrder(totalPieces),
-    )
+  const [order, setOrder] = useState<number[]>(() => shuffledOrder(totalPieces))
 
-  const [selected, setSelected] =
-    useState<number | null>(null)
+  const [selected, setSelected] = useState<number | null>(null)
 
-  const [moves, setMoves] =
-    useState(0)
+  const [moves, setMoves] = useState(0)
 
-  const [phase, setPhase] =
-    useState<Phase>(
-      previewMs > 0
-        ? 'preview'
-        : 'playing',
-    )
+  const [phase, setPhase] = useState<Phase>(previewMs > 0 ? 'preview' : 'playing')
 
-  const [answerIndex, setAnswerIndex] =
-    useState<number | null>(null)
+  const [answerIndex, setAnswerIndex] = useState<number | null>(null)
 
-  const [message, setMessage] =
-    useState('')
+  const [message, setMessage] = useState('')
 
-  const [continuing, setContinuing] =
-    useState(false)
+  const [continuing, setContinuing] = useState(false)
 
-  const [previewKind, setPreviewKind] =
-    useState<'intro' | 'peek'>('intro')
+  const [previewKind, setPreviewKind] = useState<'intro' | 'peek'>('intro')
 
-  const [
-    previewRemainingMs,
-    setPreviewRemainingMs,
-  ] = useState(previewMs)
+  const [previewRemainingMs, setPreviewRemainingMs] = useState(previewMs)
 
-  const continueLockRef =
-    useRef(false)
+  const continueLockRef = useRef(false)
 
-  const activePreviewDuration =
-    previewKind === 'peek'
-      ? 1400
-      : previewMs
+  const activePreviewDuration = previewKind === 'peek' ? 1400 : previewMs
 
-  const previewSeconds =
-    Math.max(
-      1,
-      Math.ceil(
-        previewRemainingMs / 1000,
-      ),
-    )
+  const previewSeconds = Math.max(1, Math.ceil(previewRemainingMs / 1000))
 
   const previewProgress =
     activePreviewDuration > 0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            (
-              previewRemainingMs /
-              activePreviewDuration
-            ) * 100,
-          ),
-        )
+      ? Math.max(0, Math.min(100, (previewRemainingMs / activePreviewDuration) * 100))
       : 0
 
   const reset = useCallback(
     (showPreview = true) => {
-      setOrder(
-        shuffledOrder(totalPieces),
-      )
+      setOrder(shuffledOrder(totalPieces))
       setSelected(null)
       setMoves(0)
       setAnswerIndex(null)
       setMessage('')
       setPreviewKind('intro')
       setPreviewRemainingMs(previewMs)
-      setPhase(
-        showPreview && previewMs > 0
-          ? 'preview'
-          : 'playing',
-      )
+      setPhase(showPreview && previewMs > 0 ? 'preview' : 'playing')
     },
-    [
-      previewMs,
-      totalPieces,
-    ],
+    [previewMs, totalPieces]
   )
 
   useEffect(() => {
     reset(true)
-  }, [
-    imageData,
-    gridSize,
-    reset,
-  ])
+  }, [imageData, gridSize, reset])
 
   useEffect(() => {
     if (phase !== 'preview') return
 
-    const duration =
-      previewKind === 'peek'
-        ? 1400
-        : previewMs
+    const duration = previewKind === 'peek' ? 1400 : previewMs
 
     if (duration <= 0) {
       setPhase('playing')
@@ -889,44 +716,24 @@ export function PlaceMosaicRuntimeScreen({
 
     setPreviewRemainingMs(duration)
 
-    const startedAt =
-      performance.now()
+    const startedAt = performance.now()
 
-    const interval =
-      window.setInterval(
-        () => {
-          const elapsed =
-            performance.now() -
-            startedAt
+    const interval = window.setInterval(() => {
+      const elapsed = performance.now() - startedAt
 
-          setPreviewRemainingMs(
-            Math.max(
-              0,
-              duration - elapsed,
-            ),
-          )
-        },
-        100,
-      )
+      setPreviewRemainingMs(Math.max(0, duration - elapsed))
+    }, 100)
 
-    const timer =
-      window.setTimeout(
-        () => {
-          setPreviewRemainingMs(0)
-          setPhase('playing')
-        },
-        duration,
-      )
+    const timer = window.setTimeout(() => {
+      setPreviewRemainingMs(0)
+      setPhase('playing')
+    }, duration)
 
     return () => {
       window.clearInterval(interval)
       window.clearTimeout(timer)
     }
-  }, [
-    phase,
-    previewKind,
-    previewMs,
-  ])
+  }, [phase, previewKind, previewMs])
 
   function enterSuccess() {
     haptic([20, 35, 75])
@@ -942,9 +749,7 @@ export function PlaceMosaicRuntimeScreen({
     if (selected === null) {
       haptic(10)
       setSelected(position)
-      setMessage(
-        'Pieza seleccionada. Toca otra para intercambiarlas.',
-      )
+      setMessage('Pieza seleccionada. Toca otra para intercambiarlas.')
       return
     }
 
@@ -956,13 +761,7 @@ export function PlaceMosaicRuntimeScreen({
 
     const nextOrder = [...order]
 
-    ;[
-      nextOrder[selected],
-      nextOrder[position],
-    ] = [
-      nextOrder[position],
-      nextOrder[selected],
-    ]
+    ;[nextOrder[selected], nextOrder[position]] = [nextOrder[position], nextOrder[selected]]
 
     const nextMoves = moves + 1
 
@@ -978,95 +777,58 @@ export function PlaceMosaicRuntimeScreen({
       return
     }
 
-    if (
-      maxMoves > 0 &&
-      nextMoves >= maxMoves
-    ) {
+    if (maxMoves > 0 && nextMoves >= maxMoves) {
       haptic([45, 55, 45])
       setPhase('failed')
     }
   }
 
   function checkQuestion() {
-    if (
-      phase !== 'question' ||
-      answerIndex === null
-    ) {
+    if (phase !== 'question' || answerIndex === null) {
       return
     }
 
-    if (
-      answerIndex === correctIndex
-    ) {
+    if (answerIndex === correctIndex) {
       enterSuccess()
       return
     }
 
     haptic([38, 45, 38])
     setAnswerIndex(null)
-    setMessage(
-      'No coincide. Observa el lugar real y prueba otra respuesta.',
-    )
+    setMessage('No coincide. Observa el lugar real y prueba otra respuesta.')
   }
 
-  const canContinue =
-    phase === 'success' ||
-    (
-      phase === 'completed' &&
-      !requireQuestion
-    )
+  const canContinue = phase === 'success' || (phase === 'completed' && !requireQuestion)
 
-  const continueRoute =
-    useCallback(async () => {
-      if (
-        !canContinue ||
-        submitting ||
-        continuing ||
-        continueLockRef.current
-      ) {
-        return
-      }
+  const continueRoute = useCallback(async () => {
+    if (!canContinue || submitting || continuing || continueLockRef.current) {
+      return
+    }
 
-      continueLockRef.current = true
-      setContinuing(true)
+    continueLockRef.current = true
+    setContinuing(true)
 
-      try {
-        await onWin()
-      } catch (error) {
-        continueLockRef.current = false
-        setContinuing(false)
-        throw error
-      }
-    }, [
-      canContinue,
-      continuing,
-      onWin,
-      submitting,
-    ])
+    try {
+      await onWin()
+    } catch (error) {
+      continueLockRef.current = false
+      setContinuing(false)
+      throw error
+    }
+  }, [canContinue, continuing, onWin, submitting])
 
   if (invalidConfig) {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Mosaico del lugar"
-      >
+      <section className="mosaic-shell" aria-label="Mosaico del lugar">
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
           <div className="mosaic-result-inner">
-            <div className="mosaic-result-icon">
-              !
-            </div>
+            <div className="mosaic-result-icon">!</div>
 
-            <strong>
-              Mosaico no configurado
-            </strong>
+            <strong>Mosaico no configurado</strong>
 
-            <p>
-              El administrador debe subir una
-              fotografía válida y revisar la
-              pregunta final.
-            </p>
+            <p>El administrador debe subir una fotografía válida y revisar la pregunta final.</p>
           </div>
         </div>
       </section>
@@ -1075,10 +837,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'preview') {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Vista previa del mosaico"
-      >
+      <section className="mosaic-shell" aria-label="Vista previa del mosaico">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1086,29 +845,16 @@ export function PlaceMosaicRuntimeScreen({
             <div>
               <h2>Observa el lugar</h2>
 
-              <p>
-                Memoriza la fotografía antes
-                de que se convierta en piezas.
-              </p>
+              <p>Memoriza la fotografía antes de que se convierta en piezas.</p>
             </div>
           </header>
 
           <div className="mosaic-preview">
-            <img
-              src={imageData}
-              alt={String(
-                config.image_alt ||
-                'Fotografía del lugar',
-              )}
-            />
+            <img src={imageData} alt={String(config.image_alt || 'Fotografía del lugar')} />
 
             <div className="mosaic-preview-overlay">
               <div className="mosaic-preview-meta">
-                <b>
-                  {previewKind === 'peek'
-                    ? 'Referencia rápida'
-                    : 'Memoriza'}
-                </b>
+                <b>{previewKind === 'peek' ? 'Referencia rápida' : 'Memoriza'}</b>
 
                 <span>{previewSeconds}</span>
               </div>
@@ -1122,8 +868,7 @@ export function PlaceMosaicRuntimeScreen({
               <div className="mosaic-preview-progress">
                 <i
                   style={{
-                    width:
-                      `${previewProgress}%`,
+                    width: `${previewProgress}%`,
                   }}
                 />
               </div>
@@ -1138,9 +883,7 @@ export function PlaceMosaicRuntimeScreen({
               setPhase('playing')
             }}
           >
-            {previewKind === 'peek'
-              ? 'Volver al mosaico'
-              : 'Empezar ahora'}
+            {previewKind === 'peek' ? 'Volver al mosaico' : 'Empezar ahora'}
           </button>
         </div>
       </section>
@@ -1149,10 +892,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'completed') {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Imagen completada"
-      >
+      <section className="mosaic-shell" aria-label="Imagen completada">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1160,22 +900,13 @@ export function PlaceMosaicRuntimeScreen({
             <div>
               <h2>Imagen completada</h2>
 
-              <p>
-                Todas las piezas están
-                correctamente colocadas.
-              </p>
+              <p>Todas las piezas están correctamente colocadas.</p>
             </div>
           </header>
 
           <div className="mosaic-completed">
             <div className="mosaic-completed-photo">
-              <img
-                src={imageData}
-                alt={String(
-                  config.image_alt ||
-                  'Fotografía completada',
-                )}
-              />
+              <img src={imageData} alt={String(config.image_alt || 'Fotografía completada')} />
 
               <div className="mosaic-completed-badge">
                 <i>✓</i>
@@ -1185,38 +916,22 @@ export function PlaceMosaicRuntimeScreen({
 
             {requireQuestion ? (
               <div className="mosaic-next-step">
-                <strong>
-                  Queda una comprobación
-                </strong>
+                <strong>Queda una comprobación</strong>
 
-                <span>
-                  Observa ahora el elemento
-                  real antes de responder.
-                </span>
+                <span>Observa ahora el elemento real antes de responder.</span>
               </div>
             ) : (
               <div className="mosaic-next-step">
-                <strong>
-                  Reto completado
-                </strong>
+                <strong>Reto completado</strong>
 
-                <span>
-                  Ya puedes continuar al
-                  siguiente punto de la ruta.
-                </span>
+                <span>Ya puedes continuar al siguiente punto de la ruta.</span>
               </div>
             )}
 
             <button
               type="button"
               className="primary"
-              disabled={
-                !requireQuestion &&
-                (
-                  submitting ||
-                  continuing
-                )
-              }
+              disabled={!requireQuestion && (submitting || continuing)}
               onClick={() => {
                 if (requireQuestion) {
                   setAnswerIndex(null)
@@ -1242,42 +957,24 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Mosaico completado"
-      >
+      <section className="mosaic-shell" aria-label="Mosaico completado">
         <style>{STYLES}</style>
 
         <div className="mosaic-result success">
           <div className="mosaic-result-inner">
-            <div className="mosaic-result-icon">
-              ✓
-            </div>
+            <div className="mosaic-result-icon">✓</div>
 
-            <strong>
-              Lugar verificado
-            </strong>
+            <strong>Lugar verificado</strong>
 
-            <p>
-              La imagen y la comprobación
-              final son correctas.
-              Puedes continuar la ruta.
-            </p>
+            <p>La imagen y la comprobación final son correctas. Puedes continuar la ruta.</p>
 
             <button
               type="button"
               className="primary"
-              disabled={
-                submitting ||
-                continuing
-              }
-              onClick={() =>
-                void continueRoute()
-              }
+              disabled={submitting || continuing}
+              onClick={() => void continueRoute()}
             >
-              {submitting || continuing
-                ? 'Avanzando…'
-                : 'Continuar al siguiente nodo'}
+              {submitting || continuing ? 'Avanzando…' : 'Continuar al siguiente nodo'}
             </button>
           </div>
         </div>
@@ -1287,32 +984,18 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Mosaico no completado"
-      >
+      <section className="mosaic-shell" aria-label="Mosaico no completado">
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
           <div className="mosaic-result-inner">
-            <div className="mosaic-result-icon">
-              !
-            </div>
+            <div className="mosaic-result-icon">!</div>
 
-            <strong>
-              Sin movimientos
-            </strong>
+            <strong>Sin movimientos</strong>
 
-            <p>
-              Se agotó el límite configurado.
-              Observa de nuevo el lugar y
-              vuelve a intentarlo.
-            </p>
+            <p>Se agotó el límite configurado. Observa de nuevo el lugar y vuelve a intentarlo.</p>
 
-            <button
-              type="button"
-              onClick={() => reset(true)}
-            >
+            <button type="button" onClick={() => reset(true)}>
               Intentarlo de nuevo
             </button>
           </div>
@@ -1323,77 +1006,51 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'question') {
     return (
-      <section
-        className="mosaic-shell"
-        aria-label="Pregunta final del mosaico"
-      >
+      <section className="mosaic-shell" aria-label="Pregunta final del mosaico">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
           <header className="mosaic-head">
             <div>
-              <h2>
-                Ahora responde a esta pregunta
-              </h2>
+              <h2>Ahora responde a esta pregunta</h2>
 
-              <p>
-                Observa el elemento real y
-                elige la respuesta correcta.
-              </p>
+              <p>Observa el elemento real y elige la respuesta correcta.</p>
             </div>
           </header>
 
           <section className="mosaic-question">
             <h3>{finalQuestion}</h3>
 
-            <p>
-              Selecciona la respuesta que
-              puedas comprobar en el punto
-              donde estás.
-            </p>
+            <p>Selecciona la respuesta que puedas comprobar en el punto donde estás.</p>
 
             <div className="mosaic-choices">
-              {finalChoices.map(
-                (choice, index) => (
-                  <button
-                    key={`${choice}-${index}`}
-                    type="button"
-                    className={[
-                      'mosaic-choice',
-                      answerIndex === index
-                        ? 'active'
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => {
-                      setAnswerIndex(index)
-                      setMessage('')
-                    }}
-                  >
-                    <span className="mosaic-choice-index">
-                      {index + 1}
-                    </span>
+              {finalChoices.map((choice, index) => (
+                <button
+                  key={`${choice}-${index}`}
+                  type="button"
+                  className={['mosaic-choice', answerIndex === index ? 'active' : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => {
+                    setAnswerIndex(index)
+                    setMessage('')
+                  }}
+                >
+                  <span className="mosaic-choice-index">{index + 1}</span>
 
-                    <span>{choice}</span>
-                  </button>
-                ),
-              )}
+                  <span>{choice}</span>
+                </button>
+              ))}
             </div>
 
-            <div
-              className="mosaic-message"
-              aria-live="polite"
-            >
+            <div className="mosaic-message" aria-live="polite">
               {message}
             </div>
 
             <button
               type="button"
               className="primary"
-              disabled={
-                answerIndex === null
-              }
+              disabled={answerIndex === null}
               onClick={checkQuestion}
             >
               Comprobar respuesta
@@ -1404,53 +1061,21 @@ export function PlaceMosaicRuntimeScreen({
     )
   }
 
-  const rawDescription = String(
-    stage.content ||
-    helperText ||
-    '',
-  ).trim()
+  const rawDescription = String(stage.content || helperText || '').trim()
 
-  const description =
-    rawDescription ||
-    'Reconstruye la fotografía observando el lugar real.'
+  const description = rawDescription || 'Reconstruye la fotografía observando el lugar real.'
 
-  const movesLeft =
-    maxMoves > 0
-      ? Math.max(
-          0,
-          maxMoves - moves,
-        )
-      : null
+  const movesLeft = maxMoves > 0 ? Math.max(0, maxMoves - moves) : null
 
-  const correctPieces =
-    order.reduce(
-      (
-        total,
-        originalPiece,
-        position,
-      ) =>
-        total +
-        (
-          originalPiece === position
-            ? 1
-            : 0
-        ),
-      0,
-    )
+  const correctPieces = order.reduce(
+    (total, originalPiece, position) => total + (originalPiece === position ? 1 : 0),
+    0
+  )
 
-  const completionPercent =
-    Math.round(
-      (
-        correctPieces /
-        totalPieces
-      ) * 100,
-    )
+  const completionPercent = Math.round((correctPieces / totalPieces) * 100)
 
   return (
-    <section
-      className="mosaic-shell"
-      aria-label="Mosaico del lugar"
-    >
+    <section className="mosaic-shell" aria-label="Mosaico del lugar">
       <style>{STYLES}</style>
 
       <div className="mosaic-body">
@@ -1462,17 +1087,9 @@ export function PlaceMosaicRuntimeScreen({
           </div>
 
           <div className="mosaic-counter">
-            <strong>
-              {movesLeft === null
-                ? moves
-                : movesLeft}
-            </strong>
+            <strong>{movesLeft === null ? moves : movesLeft}</strong>
 
-            <span>
-              {movesLeft === null
-                ? 'movimientos'
-                : 'restantes'}
-            </span>
+            <span>{movesLeft === null ? 'movimientos' : 'restantes'}</span>
           </div>
         </header>
 
@@ -1480,86 +1097,45 @@ export function PlaceMosaicRuntimeScreen({
           <div
             className="mosaic-board"
             style={{
-              gridTemplateColumns:
-                `repeat(${gridSize}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
             }}
           >
-            {order.map(
-              (
-                originalPiece,
-                position,
-              ) => {
-                const row =
-                  Math.floor(
-                    originalPiece /
-                    gridSize,
-                  )
+            {order.map((originalPiece, position) => {
+              const row = Math.floor(originalPiece / gridSize)
 
-                const col =
-                  originalPiece %
-                  gridSize
+              const col = originalPiece % gridSize
 
-                const x =
-                  gridSize <= 1
-                    ? 0
-                    : (
-                        col /
-                        (gridSize - 1)
-                      ) * 100
+              const x = gridSize <= 1 ? 0 : (col / (gridSize - 1)) * 100
 
-                const y =
-                  gridSize <= 1
-                    ? 0
-                    : (
-                        row /
-                        (gridSize - 1)
-                      ) * 100
+              const y = gridSize <= 1 ? 0 : (row / (gridSize - 1)) * 100
 
-                return (
-                  <button
-                    key={`position-${position}`}
-                    type="button"
-                    className={[
-                      'mosaic-tile',
-                      selected === position
-                        ? 'selected'
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    aria-label={
-                      selected === position
-                        ? `Pieza ${position + 1} seleccionada`
-                        : `Seleccionar pieza ${position + 1}`
-                    }
-                    style={{
-                      backgroundImage:
-                        `url("${imageData}")`,
-                      backgroundSize:
-                        `${gridSize * 100}% ${gridSize * 100}%`,
-                      backgroundPosition:
-                        `${x}% ${y}%`,
-                    }}
-                    onClick={() =>
-                      pressTile(position)
-                    }
-                  />
-                )
-              },
-            )}
+              return (
+                <button
+                  key={`position-${position}`}
+                  type="button"
+                  className={['mosaic-tile', selected === position ? 'selected' : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-label={
+                    selected === position
+                      ? `Pieza ${position + 1} seleccionada`
+                      : `Seleccionar pieza ${position + 1}`
+                  }
+                  style={{
+                    backgroundImage: `url("${imageData}")`,
+                    backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
+                    backgroundPosition: `${x}% ${y}%`,
+                  }}
+                  onClick={() => pressTile(position)}
+                />
+              )
+            })}
           </div>
 
           <div className="mosaic-help">
             <span>
-              <b>
-                {selected === null
-                  ? 'Toca una pieza'
-                  : 'Ahora toca otra'}
-              </b>
-              {' '}
-              {selected === null
-                ? 'para seleccionarla.'
-                : 'para intercambiarlas.'}
+              <b>{selected === null ? 'Toca una pieza' : 'Ahora toca otra'}</b>{' '}
+              {selected === null ? 'para seleccionarla.' : 'para intercambiarlas.'}
             </span>
 
             <span>
@@ -1569,14 +1145,10 @@ export function PlaceMosaicRuntimeScreen({
 
           <div
             className="mosaic-progress"
-            aria-label={
-              `${correctPieces} de ${totalPieces} piezas bien colocadas`
-            }
+            aria-label={`${correctPieces} de ${totalPieces} piezas bien colocadas`}
           >
             <div className="mosaic-progress-head">
-              <span>
-                Piezas bien colocadas
-              </span>
+              <span>Piezas bien colocadas</span>
 
               <b>
                 {correctPieces}/{totalPieces}
@@ -1586,26 +1158,19 @@ export function PlaceMosaicRuntimeScreen({
             <div className="mosaic-progress-track">
               <i
                 style={{
-                  width:
-                    `${completionPercent}%`,
+                  width: `${completionPercent}%`,
                 }}
               />
             </div>
           </div>
         </section>
 
-        <div
-          className="mosaic-message"
-          aria-live="polite"
-        >
+        <div className="mosaic-message" aria-live="polite">
           {message}
         </div>
 
         <div className="mosaic-actions">
-          <button
-            type="button"
-            onClick={() => reset(false)}
-          >
+          <button type="button" onClick={() => reset(false)}>
             Mezclar de nuevo
           </button>
 

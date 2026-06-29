@@ -63,7 +63,8 @@ async function backendDebugTarget(user: string): Promise<DebugCoords | null> {
 
     if (!debugEnabled && !clientDebugEnabled()) return null
 
-    const stage = payload?.current_stage ?? (Array.isArray(payload?.stages) ? payload.stages[0] : null)
+    const stage =
+      payload?.current_stage ?? (Array.isArray(payload?.stages) ? payload.stages[0] : null)
     const lat = stage?.lat
     const lon = stage?.lon
 
@@ -91,7 +92,7 @@ function storeLastGps(coords: DebugCoords) {
         accuracy: coords.accuracy ?? 3,
         at: Date.now(),
         source: coords.source ?? 'debug_stage',
-      }),
+      })
     )
   } catch {
     // ignore localStorage failures
@@ -145,13 +146,14 @@ export function installDebugGeolocationShim() {
   const debugWatchTimers = new Map<number, number>()
   let nextWatchId = 900000
 
-  const makeUnavailableError = (message: string) => ({
-    code: 2,
-    message,
-    PERMISSION_DENIED: 1,
-    POSITION_UNAVAILABLE: 2,
-    TIMEOUT: 3,
-  }) as GeolocationPositionError
+  const makeUnavailableError = (message: string) =>
+    ({
+      code: 2,
+      message,
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+    }) as GeolocationPositionError
 
   const shim: Geolocation = {
     getCurrentPosition(success, error, options) {
@@ -167,7 +169,11 @@ export function installDebugGeolocationShim() {
             return
           }
 
-          error?.(makeUnavailableError('SAGA debug GPS: no hay coordenadas debug ni geolocalización real disponible.'))
+          error?.(
+            makeUnavailableError(
+              'SAGA debug GPS: no hay coordenadas debug ni geolocalización real disponible.'
+            )
+          )
         })
         .catch(() => {
           if (originalGetCurrentPosition) {
@@ -175,7 +181,11 @@ export function installDebugGeolocationShim() {
             return
           }
 
-          error?.(makeUnavailableError('SAGA debug GPS: fallo al obtener coordenadas debug y no hay geolocalización real.'))
+          error?.(
+            makeUnavailableError(
+              'SAGA debug GPS: fallo al obtener coordenadas debug y no hay geolocalización real.'
+            )
+          )
         })
     },
 
@@ -191,7 +201,11 @@ export function installDebugGeolocationShim() {
               return
             }
 
-            error?.(makeUnavailableError('SAGA debug GPS: no hay coordenadas debug ni geolocalización real disponible.'))
+            error?.(
+              makeUnavailableError(
+                'SAGA debug GPS: no hay coordenadas debug ni geolocalización real disponible.'
+              )
+            )
             return
           }
 
@@ -211,7 +225,11 @@ export function installDebugGeolocationShim() {
             return
           }
 
-          error?.(makeUnavailableError('SAGA debug GPS: fallo al obtener coordenadas debug y no hay geolocalización real.'))
+          error?.(
+            makeUnavailableError(
+              'SAGA debug GPS: fallo al obtener coordenadas debug y no hay geolocalización real.'
+            )
+          )
         })
 
       return watchId

@@ -21,11 +21,7 @@ import {
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
 } from './lib/adminApi'
-import {
-  familyCards,
-  type EditableAdminStage,
-  type FamilyId,
-} from './lib/familyConfigs'
+import { familyCards, type EditableAdminStage, type FamilyId } from './lib/familyConfigs'
 import {
   getDefaultAdminStagePatchForGame,
   getMissionTemplateById,
@@ -49,7 +45,6 @@ type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
 
-
 function slugifyMissionItemId(value: string): string {
   return value
     .normalize('NFD')
@@ -60,7 +55,10 @@ function slugifyMissionItemId(value: string): string {
     .slice(0, 80)
 }
 
-function buildTemplatePhysicalFields(kind: 'collectible' | 'requirement' | 'clue' | 'bonus', label: string) {
+function buildTemplatePhysicalFields(
+  kind: 'collectible' | 'requirement' | 'clue' | 'bonus',
+  label: string
+) {
   const itemId = slugifyMissionItemId(label) || 'objeto_qr'
   const payload = `saga:item:${itemId}`
 
@@ -128,11 +126,15 @@ export default function AdminApp() {
   const [localNotice, setLocalNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  )
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   const [missionDraft, setMissionDraft] = useState<Record<string, string>>({})
   const [playerDrafts, setPlayerDrafts] = useState<PlayerDraft[]>([])
-  const [playerSaveState, setPlayerSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [playerSaveState, setPlayerSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  )
   const [playerSaveError, setPlayerSaveError] = useState<string | null>(null)
   const [profileActionState, setProfileActionState] = useState<Record<string, string>>({})
   const [profileActionError, setProfileActionError] = useState<Record<string, string>>({})
@@ -163,9 +165,9 @@ export default function AdminApp() {
   const familyCounts = overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
 
-  const title = overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
+  const title =
+    overview?.config?.admin_title || config?.admin_title || config?.site_name || 'SAGA Admin'
   const subtitle = overview?.config?.admin_subtitle || config?.admin_subtitle || 'Mission Control'
-
 
   useEffect(() => {
     if (!overviewReady) return
@@ -182,7 +184,9 @@ export default function AdminApp() {
     const counts = overview?.counts
     const cfg = overview?.config || config
     const players = counts?.players ?? (Array.isArray(config?.players) ? config.players.length : 0)
-    const profileCount = counts?.profiles ?? (Array.isArray(config?.player_profiles) ? config.player_profiles.length : 0)
+    const profileCount =
+      counts?.profiles ??
+      (Array.isArray(config?.player_profiles) ? config.player_profiles.length : 0)
     const stageCount = counts?.stages ?? 0
     const finished = counts?.finished_profiles ?? 0
     const mapCenter = Array.isArray(cfg?.map_center) ? cfg.map_center.join(', ') : 'Not configured'
@@ -251,19 +255,17 @@ export default function AdminApp() {
       ...overviewConfig,
     }
 
-    const existingPlayers =
-      Array.isArray(currentConfig.players)
-        ? currentConfig.players
-        : Array.isArray(base.players)
-          ? base.players
-          : []
+    const existingPlayers = Array.isArray(currentConfig.players)
+      ? currentConfig.players
+      : Array.isArray(base.players)
+        ? base.players
+        : []
 
-    const existingProfiles =
-      Array.isArray(currentConfig.player_profiles)
-        ? currentConfig.player_profiles
-        : Array.isArray(base.player_profiles)
-          ? base.player_profiles
-          : []
+    const existingProfiles = Array.isArray(currentConfig.player_profiles)
+      ? currentConfig.player_profiles
+      : Array.isArray(base.player_profiles)
+        ? base.player_profiles
+        : []
 
     const lat = Number(missionDraft.map_center_lat)
     const lon = Number(missionDraft.map_center_lon)
@@ -285,14 +287,10 @@ export default function AdminApp() {
       player_theme: missionDraft.player_theme || 'classic',
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
-      map_center: [
-        Number.isFinite(lat) ? lat : 40.4168,
-        Number.isFinite(lon) ? lon : -3.7038,
-      ],
+      map_center: [Number.isFinite(lat) ? lat : 40.4168, Number.isFinite(lon) ? lon : -3.7038],
       map_zoom: Number.isFinite(zoom) ? zoom : 13,
     }
   }
-
 
   async function saveMissionSettings() {
     setSettingsSaveState('saving')
@@ -315,7 +313,9 @@ export default function AdminApp() {
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
         setMissionDraft(buildMissionDraft((refreshed.config || payload) as Record<string, unknown>))
-        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
+        setPlayerDrafts(
+          buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig)
+        )
       }
 
       setSettingsSaveState('saved')
@@ -325,9 +325,6 @@ export default function AdminApp() {
       setSettingsSaveError(err instanceof Error ? err.message : 'Unknown settings save error')
     }
   }
-
-
-
 
   function updatePlayerDraft(index: number, key: keyof PlayerDraft, value: string) {
     setPlayerDrafts((current) =>
@@ -394,7 +391,9 @@ export default function AdminApp() {
         status: draft.status.trim() || 'active',
         color: draft.color || getStablePlayerColor(id || displayName),
         avatar_url: draft.avatar_url.trim(),
-        avatar_initials: (draft.avatar_initials.trim() || getPlayerInitials(displayName)).slice(0, 3).toUpperCase(),
+        avatar_initials: (draft.avatar_initials.trim() || getPlayerInitials(displayName))
+          .slice(0, 3)
+          .toUpperCase(),
       }
     })
 
@@ -413,7 +412,6 @@ export default function AdminApp() {
       })),
     }
   }
-
 
   async function runPlayerProfileAction(profileId: string, action: AdminProfileAction) {
     const cleanId = profileId.trim()
@@ -449,14 +447,18 @@ export default function AdminApp() {
       const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
-        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], {
-          ...((config || {}) as unknown as Record<string, unknown>),
-          ...((refreshed.config || {}) as unknown as Record<string, unknown>),
-        } as PublicConfig))
+        setPlayerDrafts(
+          buildPlayerDrafts(refreshed.profiles || [], {
+            ...((config || {}) as unknown as Record<string, unknown>),
+            ...((refreshed.config || {}) as unknown as Record<string, unknown>),
+          } as PublicConfig)
+        )
       }
 
       setProfileActionState((current) => ({ ...current, [cleanId]: 'saved' }))
-      setLocalNotice(`${cleanId}: ${actionLabel} aplicado. Nivel ${result.previous_level ?? '—'} → ${result.level ?? '—'}.`)
+      setLocalNotice(
+        `${cleanId}: ${actionLabel} aplicado. Nivel ${result.previous_level ?? '—'} → ${result.level ?? '—'}.`
+      )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido.'
       setProfileActionState((current) => ({ ...current, [cleanId]: 'error' }))
@@ -464,7 +466,6 @@ export default function AdminApp() {
       setLocalNotice(`${cleanId}: no se pudo cambiar progreso.`)
     }
   }
-
 
   async function savePlayerProfiles() {
     setPlayerSaveState('saving')
@@ -481,7 +482,9 @@ export default function AdminApp() {
       const refreshed = await fetchAdminReactOverview()
       if (refreshed.status === 'ok') {
         setOverview(refreshed)
-        setPlayerDrafts(buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig))
+        setPlayerDrafts(
+          buildPlayerDrafts(refreshed.profiles || [], payload as unknown as PublicConfig)
+        )
       }
 
       setConfig((current) => ({
@@ -496,7 +499,6 @@ export default function AdminApp() {
       setPlayerSaveError(err instanceof Error ? err.message : 'Unknown player save error')
     }
   }
-
 
   async function loadOverview() {
     const typedPassword = password.trim()
@@ -536,10 +538,12 @@ export default function AdminApp() {
       }
 
       setOverview(payload)
-      setPlayerDrafts(buildPlayerDrafts(payload.profiles || [], {
-        ...((config || {}) as unknown as Record<string, unknown>),
-        ...((payload.config || {}) as unknown as Record<string, unknown>),
-      } as PublicConfig))
+      setPlayerDrafts(
+        buildPlayerDrafts(payload.profiles || [], {
+          ...((config || {}) as unknown as Record<string, unknown>),
+          ...((payload.config || {}) as unknown as Record<string, unknown>),
+        } as PublicConfig)
+      )
       setSelectedStage(null)
       setOverviewState('ready')
     } catch (err) {
@@ -549,7 +553,6 @@ export default function AdminApp() {
       setOverviewState('error')
     }
   }
-
 
   async function saveLocalStages() {
     if (!overview) {
@@ -574,43 +577,25 @@ export default function AdminApp() {
         persistedStages = buildRawStagesFromOverview(overview.stages || [])
       }
 
-      const saved = await saveAdminStages(
-        undefined,
-        persistedStages,
-      )
+      const saved = await saveAdminStages(undefined, persistedStages)
 
       if (saved.status !== 'ok') {
-        throw new Error(
-          saved.message ||
-          'Could not save admin stages.',
-        )
+        throw new Error(saved.message || 'Could not save admin stages.')
       }
 
-      const verifiedRaw =
-        await fetchAdminStages()
+      const verifiedRaw = await fetchAdminStages()
 
-      if (
-        verifiedRaw.status !== 'ok'
-      ) {
-        throw new Error(
-          verifiedRaw.message ||
-          'No se pudo verificar el guardado.',
-        )
+      if (verifiedRaw.status !== 'ok') {
+        throw new Error(verifiedRaw.message || 'No se pudo verificar el guardado.')
       }
 
-      const persistenceErrors =
-        verifyPersistedStages(
-          persistedStages,
-          verifiedRaw.stages || [],
-        )
+      const persistenceErrors = verifyPersistedStages(persistedStages, verifiedRaw.stages || [])
 
       if (persistenceErrors.length > 0) {
         throw new Error(
-          'El backend no guardó exactamente '
-          + 'lo enviado: '
-          + persistenceErrors
-              .slice(0, 6)
-              .join(', '),
+          'El backend no guardó exactamente ' +
+            'lo enviado: ' +
+            persistenceErrors.slice(0, 6).join(', ')
         )
       }
 
@@ -631,7 +616,6 @@ export default function AdminApp() {
       setSaveError(err instanceof Error ? err.message : 'Error de guardado desconocido')
     }
   }
-
 
   function deleteLocalStage(stageToDelete: AdminReactOverviewStage) {
     const deleteIdentity = stageSaveIdentity(stageToDelete)
@@ -670,10 +654,7 @@ export default function AdminApp() {
     setLocalNotice('Node removed locally. Pulsa Guardar para persistir el borrado.')
   }
 
-  function reorderLocalStage(
-    stageToMove: AdminReactOverviewStage,
-    direction: 'up' | 'down'
-  ) {
+  function reorderLocalStage(stageToMove: AdminReactOverviewStage, direction: 'up' | 'down') {
     const moveIdentity = stageSaveIdentity(stageToMove)
     let movedStage: AdminReactOverviewStage | null = null
 
@@ -681,7 +662,9 @@ export default function AdminApp() {
       if (!current) return current
 
       const currentStages = current.stages || []
-      const fromIndex = currentStages.findIndex((stage) => stageSaveIdentity(stage) === moveIdentity)
+      const fromIndex = currentStages.findIndex(
+        (stage) => stageSaveIdentity(stage) === moveIdentity
+      )
       if (fromIndex < 0) return current
 
       const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
@@ -717,7 +700,6 @@ export default function AdminApp() {
     }
   }
 
-
   function syncLocalStage(
     nextStage: AdminReactOverviewStage,
     options: { select?: boolean; notice?: string | false } = {}
@@ -728,7 +710,14 @@ export default function AdminApp() {
       const currentStages = current.stages || []
       const exists = currentStages.some((stage) => stage.index === nextStage.index)
       const nextStages = exists
-        ? currentStages.map((stage) => (stage.index === nextStage.index ? preservePhysicalStageFields(stage as unknown as Record<string, unknown>, nextStage as unknown as Record<string, unknown>) as typeof stage : stage))
+        ? currentStages.map((stage) =>
+            stage.index === nextStage.index
+              ? (preservePhysicalStageFields(
+                  stage as unknown as Record<string, unknown>,
+                  nextStage as unknown as Record<string, unknown>
+                ) as typeof stage)
+              : stage
+          )
         : [...currentStages, nextStage]
 
       const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
@@ -765,14 +754,14 @@ export default function AdminApp() {
     const template = getMissionTemplateById(templateId)
     const shouldReplace =
       stages.length === 0 ||
-      window.confirm(`Reemplazar la ruta local actual por la plantilla "${template.title}"? Guarda después para persistir.`)
+      window.confirm(
+        `Reemplazar la ruta local actual por la plantilla "${template.title}"? Guarda después para persistir.`
+      )
 
     if (!shouldReplace) return
 
     const mapCenter =
-      overview?.config?.map_center ||
-      config?.map_center ||
-      ([40.4168, -3.7038] as [number, number])
+      overview?.config?.map_center || config?.map_center || ([40.4168, -3.7038] as [number, number])
 
     const centerLat = Number(mapCenter[0] || 40.4168)
     const centerLon = Number(mapCenter[1] || -3.7038)
@@ -824,7 +813,9 @@ export default function AdminApp() {
           ...patch.config,
           ...requirementConfig,
         },
-        config_summary: Array.from(new Set([...patch.config_summary, ...Object.keys(requirementConfig)])),
+        config_summary: Array.from(
+          new Set([...patch.config_summary, ...Object.keys(requirementConfig)])
+        ),
         messages: patch.messages,
         ...physicalFields,
       } as EditableAdminStage
@@ -836,43 +827,47 @@ export default function AdminApp() {
       return acc
     }, {})
 
-    setOverview((current) => current
-      ? {
-          ...current,
-          stages: nextStages,
-          counts: current.counts
-            ? {
-                ...current.counts,
-                stages: nextStages.length,
-                family_counts: familyCounts,
-              }
-            : current.counts,
-        }
-      : current
+    setOverview((current) =>
+      current
+        ? {
+            ...current,
+            stages: nextStages,
+            counts: current.counts
+              ? {
+                  ...current.counts,
+                  stages: nextStages.length,
+                  family_counts: familyCounts,
+                }
+              : current.counts,
+          }
+        : current
     )
 
     setSelectedStage(nextStages[0] || null)
     setCmsPanel('none')
     setSaveState('idle')
-    setLocalNotice(`Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`)
+    setLocalNotice(
+      `Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`
+    )
   }
 
   function createLocalNodeAt(lat?: number, lon?: number) {
     const mapCenter =
-      overview?.config?.map_center ||
-      config?.map_center ||
-      ([40.4168, -3.7038] as [number, number])
+      overview?.config?.map_center || config?.map_center || ([40.4168, -3.7038] as [number, number])
 
     const mappedStagesForCenter = stages.filter(
       (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
     )
 
-    const routeCenter: [number, number] = mappedStagesForCenter.length > 0
-      ? [
-          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lat), 0) / mappedStagesForCenter.length,
-          mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lon), 0) / mappedStagesForCenter.length,
-        ]
-      : mapCenter
+    const routeCenter: [number, number] =
+      mappedStagesForCenter.length > 0
+        ? [
+            mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lat), 0) /
+              mappedStagesForCenter.length,
+            mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lon), 0) /
+              mappedStagesForCenter.length,
+          ]
+        : mapCenter
 
     const nextIndex = stages.length
     const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
@@ -910,11 +905,7 @@ export default function AdminApp() {
     )
   }
 
-  function moveLocalStage(
-    stageToMove: AdminReactOverviewStage,
-    lat: number,
-    lon: number
-  ) {
+  function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number) {
     const movedStage: AdminReactOverviewStage = {
       ...stageToMove,
       lat,
@@ -928,7 +919,6 @@ export default function AdminApp() {
     setLocalNotice('Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.')
   }
 
-
   function handleOverviewSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     loadOverview()
@@ -936,14 +926,17 @@ export default function AdminApp() {
 
   if (!overviewReady) {
     return (
-      <main className="admin-root admin-root-login-only">
+      <div className="admin-root">
         <style>{styles}</style>
 
         <section className="admin-login-minimal" aria-label="Admin login">
           <div className="admin-login-orb admin-login-orb-a" aria-hidden="true" />
           <div className="admin-login-orb admin-login-orb-b" aria-hidden="true" />
 
-          <form onSubmit={handleOverviewSubmit} className="admin-login-card admin-login-card-minimal">
+          <form
+            onSubmit={handleOverviewSubmit}
+            className="admin-login-card admin-login-card-minimal"
+          >
             <div className="admin-brand">SAGA ENGINE · ADMIN</div>
 
             <div className="admin-login-copy">
@@ -988,7 +981,7 @@ export default function AdminApp() {
             </div>
           </form>
         </section>
-      </main>
+      </div>
     )
   }
 
@@ -1009,16 +1002,18 @@ export default function AdminApp() {
         playerDrafts={playerDrafts}
         playerSaveState={playerSaveState}
         playerSaveError={playerSaveError}
-      profileProgress={Object.fromEntries((profiles || []).map((profile) => [
-        profile.id,
-        {
-          level: profile.level ?? 0,
-          finished: Boolean(profile.finished),
-        },
-      ]))}
-      profileActionState={profileActionState}
-      profileActionError={profileActionError}
-      onProfileAction={runPlayerProfileAction}
+        profileProgress={Object.fromEntries(
+          (profiles || []).map((profile) => [
+            profile.id,
+            {
+              level: profile.level ?? 0,
+              finished: Boolean(profile.finished),
+            },
+          ])
+        )}
+        profileActionState={profileActionState}
+        profileActionError={profileActionError}
+        onProfileAction={runPlayerProfileAction}
         missionDraft={missionDraft}
         settingsSaveState={settingsSaveState}
         settingsSaveError={settingsSaveError}
@@ -1042,7 +1037,6 @@ export default function AdminApp() {
       />
     </>
   )
-
 }
 
 function StatCard({
@@ -1079,7 +1073,9 @@ function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
     <article className="admin-profile-card">
       <div>
         <strong>{profile.display_name || profile.id}</strong>
-        <small>{profile.mode || 'solo'} · {profile.status || 'active'}</small>
+        <small>
+          {profile.mode || 'solo'} · {profile.status || 'active'}
+        </small>
       </div>
 
       <div className="admin-badge-row">
@@ -1109,12 +1105,18 @@ function NodeCard({
   const coords = formatCoords(stage.lat, stage.lon)
 
   return (
-    <button type="button" className={selected ? 'admin-node-card selected' : 'admin-node-card'} onClick={onOpen}>
+    <button
+      type="button"
+      className={selected ? 'admin-node-card selected' : 'admin-node-card'}
+      onClick={onOpen}
+    >
       <div className="admin-node-top">
         <span>{stage.index + 1}</span>
         <div>
           <strong>{stage.title || 'Nodo sin título'}</strong>
-          <small>{family?.icon || '◇'} {stage.label || stage.type}</small>
+          <small>
+            {family?.icon || '◇'} {stage.label || stage.type}
+          </small>
         </div>
       </div>
 
@@ -1126,7 +1128,6 @@ function NodeCard({
     </button>
   )
 }
-
 
 function formatCoords(lat?: number | null, lon?: number | null) {
   if (typeof lat !== 'number' || typeof lon !== 'number') return '—'

@@ -176,20 +176,12 @@ const STYLES = `
 }
 `
 
-function clamp(
-  value: unknown,
-  minimum: number,
-  maximum: number,
-  fallback: number,
-) {
+function clamp(value: unknown, minimum: number, maximum: number, fallback: number) {
   const parsed = Number(value)
 
   if (!Number.isFinite(parsed)) return fallback
 
-  return Math.max(
-    minimum,
-    Math.min(maximum, Math.round(parsed)),
-  )
+  return Math.max(minimum, Math.min(maximum, Math.round(parsed)))
 }
 
 function sequenceOf(value: unknown) {
@@ -197,9 +189,7 @@ function sequenceOf(value: unknown) {
     return ['ROBLE', 'CAMPANA', 'PUENTE', 'TORRE']
   }
 
-  return value
-    .slice(0, 10)
-    .map((item) => String(item))
+  return value.slice(0, 10).map((item) => String(item))
 }
 
 function validationMessage(sequence: string[]) {
@@ -221,9 +211,7 @@ function validationMessage(sequence: string[]) {
     return 'Cada ficha puede tener un máximo de 32 caracteres.'
   }
 
-  const unique = new Set(
-    normalized.map((item) => item.toLocaleLowerCase()),
-  )
+  const unique = new Set(normalized.map((item) => item.toLocaleLowerCase()))
 
   if (unique.size !== normalized.length) {
     return 'Las fichas deben ser diferentes.'
@@ -232,28 +220,16 @@ function validationMessage(sequence: string[]) {
   return ''
 }
 
-export default function SequenceCodeEditor({
-  config,
-  onChange,
-}: Props) {
+export default function SequenceCodeEditor({ config, onChange }: Props) {
   const sequence = sequenceOf(config.sequence)
 
-  const maxAttempts = clamp(
-    config.max_attempts,
-    1,
-    8,
-    3,
-  )
+  const maxAttempts = clamp(config.max_attempts, 1, 8, 3)
 
-  const hintText = String(
-    config.hint_text ?? '',
-  )
+  const hintText = String(config.hint_text ?? '')
 
   const error = validationMessage(sequence)
 
-  const patch = (
-    values: Record<string, unknown>,
-  ) => {
+  const patch = (values: Record<string, unknown>) => {
     onChange({
       game_id: 'sequence_code',
       objective: 'sequence_order',
@@ -263,10 +239,7 @@ export default function SequenceCodeEditor({
     })
   }
 
-  const updateToken = (
-    index: number,
-    value: string,
-  ) => {
+  const updateToken = (index: number, value: string) => {
     const next = [...sequence]
     next[index] = value
 
@@ -275,16 +248,10 @@ export default function SequenceCodeEditor({
     })
   }
 
-  const moveToken = (
-    index: number,
-    direction: -1 | 1,
-  ) => {
+  const moveToken = (index: number, direction: -1 | 1) => {
     const target = index + direction
 
-    if (
-      target < 0 ||
-      target >= sequence.length
-    ) {
+    if (target < 0 || target >= sequence.length) {
       return
     }
 
@@ -301,9 +268,7 @@ export default function SequenceCodeEditor({
 
   const removeToken = (index: number) => {
     patch({
-      sequence: sequence.filter(
-        (_, tokenIndex) => tokenIndex !== index,
-      ),
+      sequence: sequence.filter((_, tokenIndex) => tokenIndex !== index),
     })
   }
 
@@ -315,41 +280,26 @@ export default function SequenceCodeEditor({
         <div>
           <h4>Solución del tríptico</h4>
           <p>
-            Escribe las fichas en el orden correcto.
-            El jugador las verá barajadas y deberá deducirlo
-            consultando su tríptico o material de misión.
+            Escribe las fichas en el orden correcto. El jugador las verá barajadas y deberá
+            deducirlo consultando su tríptico o material de misión.
           </p>
         </div>
 
-        <span
-          className={[
-            'sce-status',
-            error ? 'bad' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
+        <span className={['sce-status', error ? 'bad' : ''].filter(Boolean).join(' ')}>
           {error || `${sequence.length} fichas · válido`}
         </span>
       </div>
 
       <div className="sce-list">
         {sequence.map((token, index) => (
-          <div
-            className="sce-row"
-            key={`sequence-token-${index}`}
-          >
-            <span className="sce-order">
-              {index + 1}
-            </span>
+          <div className="sce-row" key={`sequence-token-${index}`}>
+            <span className="sce-order">{index + 1}</span>
 
             <input
               value={token}
               maxLength={32}
               placeholder={`Ficha ${index + 1}`}
-              onChange={(event) =>
-                updateToken(index, event.target.value)
-              }
+              onChange={(event) => updateToken(index, event.target.value)}
             />
 
             <div className="sce-row-actions">
@@ -364,9 +314,7 @@ export default function SequenceCodeEditor({
 
               <button
                 type="button"
-                disabled={
-                  index === sequence.length - 1
-                }
+                disabled={index === sequence.length - 1}
                 onClick={() => moveToken(index, 1)}
                 aria-label="Bajar ficha"
               >
@@ -393,10 +341,7 @@ export default function SequenceCodeEditor({
           disabled={sequence.length >= 10}
           onClick={() =>
             patch({
-              sequence: [
-                ...sequence,
-                `FICHA ${sequence.length + 1}`,
-              ],
+              sequence: [...sequence, `FICHA ${sequence.length + 1}`],
             })
           }
         >
@@ -425,12 +370,7 @@ export default function SequenceCodeEditor({
             value={maxAttempts}
             onChange={(event) =>
               patch({
-                max_attempts: clamp(
-                  event.target.value,
-                  1,
-                  8,
-                  3,
-                ),
+                max_attempts: clamp(event.target.value, 1, 8, 3),
               })
             }
           />
@@ -452,10 +392,8 @@ export default function SequenceCodeEditor({
       </div>
 
       <div className="sce-help">
-        Este reto conecta la historia física con el móvil.
-        El tríptico contiene las relaciones entre las pistas;
-        la pantalla solamente muestra las fichas barajadas y
-        comprueba el orden elegido.
+        Este reto conecta la historia física con el móvil. El tríptico contiene las relaciones entre
+        las pistas; la pantalla solamente muestra las fichas barajadas y comprueba el orden elegido.
       </div>
     </section>
   )

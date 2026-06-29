@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import jsQR from 'jsqr'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -51,10 +45,7 @@ function hashText(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-export function getQrDesignSignature(
-  payload: string,
-  design: QrCardDesign,
-): string {
+export function getQrDesignSignature(payload: string, design: QrCardDesign): string {
   return hashText(JSON.stringify({ payload, design }))
 }
 
@@ -102,7 +93,7 @@ function drawWrappedText(
   y: number,
   maxWidth: number,
   lineHeight: number,
-  maxLines: number,
+  maxLines: number
 ) {
   const words = text.trim().split(/\s+/).filter(Boolean)
   const lines: string[] = []
@@ -148,7 +139,7 @@ export default function QrCardStudio({
   const accent = safeAccent(design.accent)
   const signature = useMemo(
     () => getQrDesignSignature(payload, { ...design, accent }),
-    [payload, design, accent],
+    [payload, design, accent]
   )
   const validated = Boolean(validationSignature && validationSignature === signature)
 
@@ -299,17 +290,11 @@ export default function QrCardStudio({
       const context = canvas.getContext('2d')
       if (!context) throw new Error('No se pudo preparar la tarjeta')
 
-      const dark =
-        design.preset === 'dark'
+      const dark = design.preset === 'dark'
 
-      const photoEnabled =
-        design.preset === 'photo' &&
-        Boolean(design.imageDataUrl)
+      const photoEnabled = design.preset === 'photo' && Boolean(design.imageDataUrl)
 
-      context.fillStyle =
-        dark || photoEnabled
-          ? '#0f172a'
-          : '#ffffff'
+      context.fillStyle = dark || photoEnabled ? '#0f172a' : '#ffffff'
       context.fillRect(0, 0, width, height)
 
       if (photoEnabled) {
@@ -322,7 +307,13 @@ export default function QrCardStudio({
         const scale = Math.max(width / photo.width, 460 / photo.height)
         const drawWidth = photo.width * scale
         const drawHeight = photo.height * scale
-        context.drawImage(photo, (width - drawWidth) / 2, (460 - drawHeight) / 2, drawWidth, drawHeight)
+        context.drawImage(
+          photo,
+          (width - drawWidth) / 2,
+          (460 - drawHeight) / 2,
+          drawWidth,
+          drawHeight
+        )
         const gradient = context.createLinearGradient(0, 0, 0, 500)
         gradient.addColorStop(0, 'rgba(15,23,42,.08)')
         gradient.addColorStop(1, 'rgba(15,23,42,.94)')
@@ -345,17 +336,13 @@ export default function QrCardStudio({
 
       const qrBox = 820
       const qrX = (width - qrBox) / 2
-      const qrY =
-        photoEnabled ? 470 : 180
+      const qrY = photoEnabled ? 470 : 180
       context.fillStyle = '#ffffff'
       context.fillRect(qrX - 36, qrY - 36, qrBox + 72, qrBox + 72)
       context.drawImage(qrImage, qrX, qrY, qrBox, qrBox)
       URL.revokeObjectURL(qrUrl)
 
-      const textColor =
-        dark || photoEnabled
-          ? '#ffffff'
-          : '#0f172a'
+      const textColor = dark || photoEnabled ? '#ffffff' : '#0f172a'
       context.fillStyle = textColor
       context.textAlign = 'center'
       context.font = '900 64px system-ui, sans-serif'
@@ -366,7 +353,9 @@ export default function QrCardStudio({
       context.font = '700 25px ui-monospace, monospace'
       context.fillText(itemId, width / 2, qrY + qrBox + 335)
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 0.96))
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png', 0.96)
+      )
       if (!blob) throw new Error('No se pudo crear el PNG')
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -388,7 +377,9 @@ export default function QrCardStudio({
         <div>
           <span style={eyebrow}>DISEÑO Y PRUEBA</span>
           <h3 style={heading}>Tarjeta QR</h3>
-          <p style={description}>El diseño rodea al QR; el código mantiene fondo blanco y alto contraste.</p>
+          <p style={description}>
+            El diseño rodea al QR; el código mantiene fondo blanco y alto contraste.
+          </p>
         </div>
         <span style={validated ? validBadge : pendingBadge}>
           {validated ? 'VALIDADO' : 'SIN VALIDAR'}
@@ -462,7 +453,11 @@ export default function QrCardStudio({
           </label>
 
           {design.imageDataUrl ? (
-            <button type="button" style={secondaryButton} onClick={() => updateDesign({ imageDataUrl: '', preset: 'clean' })}>
+            <button
+              type="button"
+              style={secondaryButton}
+              onClick={() => updateDesign({ imageDataUrl: '', preset: 'clean' })}
+            >
               Quitar fotografía
             </button>
           ) : null}
@@ -470,8 +465,12 @@ export default function QrCardStudio({
       </div>
 
       <div style={actionGrid}>
-        <button type="button" style={secondaryButton} onClick={onApply}>Aplicar al nodo</button>
-        <button type="button" style={validateButton} onClick={() => void openScanner()}>Validar con cámara</button>
+        <button type="button" style={secondaryButton} onClick={onApply}>
+          Aplicar al nodo
+        </button>
+        <button type="button" style={validateButton} onClick={() => void openScanner()}>
+          Validar con cámara
+        </button>
         <button
           type="button"
           style={validated ? downloadButton : disabledButton}
@@ -483,13 +482,19 @@ export default function QrCardStudio({
       </div>
 
       <p style={validationHelp}>
-        Abre la cámara en el móvil o en un equipo con webcam y escanea la vista previa desde otra pantalla o desde una prueba impresa.
+        Abre la cámara en el móvil o en un equipo con webcam y escanea la vista previa desde otra
+        pantalla o desde una prueba impresa.
       </p>
 
       {notice ? <div style={noticeStyle}>{notice}</div> : null}
 
       {scannerOpen ? (
-        <div style={scannerOverlay} role="dialog" aria-modal="true" aria-label="Validar QR con cámara">
+        <div
+          style={scannerOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Validar QR con cámara"
+        >
           <div style={scannerBackdrop} onClick={closeScanner} />
           <section style={scannerCard}>
             <div style={scannerHeader}>
@@ -497,13 +502,17 @@ export default function QrCardStudio({
                 <span style={eyebrow}>VALIDACIÓN</span>
                 <strong>Escanea esta tarjeta</strong>
               </div>
-              <button type="button" style={closeButton} onClick={closeScanner}>×</button>
+              <button type="button" style={closeButton} onClick={closeScanner}>
+                ×
+              </button>
             </div>
             <video ref={videoRef} muted playsInline style={videoStyle} />
             <canvas ref={scanCanvasRef} hidden />
             <div style={scanState === 'valid' ? scanValid : scanInfo}>{scanMessage}</div>
             {scanState === 'valid' ? (
-              <button type="button" style={downloadButton} onClick={closeScanner}>Cerrar</button>
+              <button type="button" style={downloadButton} onClick={closeScanner}>
+                Cerrar
+              </button>
             ) : null}
           </section>
         </div>
@@ -513,45 +522,272 @@ export default function QrCardStudio({
 }
 
 const studio: CSSProperties = {
-  display: 'grid', gap: 14, padding: 16, borderRadius: 24,
-  border: '1px solid rgba(148,163,184,.18)', background: 'rgba(15,23,42,.34)',
+  display: 'grid',
+  gap: 14,
+  padding: 16,
+  borderRadius: 24,
+  border: '1px solid rgba(148,163,184,.18)',
+  background: 'rgba(15,23,42,.34)',
 }
-const studioHeader: CSSProperties = { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }
-const eyebrow: CSSProperties = { color: '#93c5fd', fontSize: 9, fontWeight: 950, letterSpacing: '.16em' }
+const studioHeader: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+const eyebrow: CSSProperties = {
+  color: '#93c5fd',
+  fontSize: 9,
+  fontWeight: 950,
+  letterSpacing: '.16em',
+}
 const heading: CSSProperties = { margin: '4px 0 0', color: '#fff', fontSize: 20, fontWeight: 950 }
-const description: CSSProperties = { margin: '6px 0 0', color: 'rgba(226,232,240,.72)', fontSize: 12, lineHeight: 1.4 }
-const badgeBase: CSSProperties = { minHeight: 26, display: 'inline-flex', alignItems: 'center', padding: '0 9px', borderRadius: 999, fontSize: 9, fontWeight: 950 }
-const validBadge: CSSProperties = { ...badgeBase, color: '#dcfce7', background: 'rgba(34,197,94,.15)', border: '1px solid rgba(74,222,128,.22)' }
-const pendingBadge: CSSProperties = { ...badgeBase, color: '#fef3c7', background: 'rgba(245,158,11,.14)', border: '1px solid rgba(251,191,36,.20)' }
-const workspace: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14, alignItems: 'stretch' }
-const previewCard: CSSProperties = { position: 'relative', minHeight: 390, display: 'grid', placeItems: 'center', alignContent: 'center', gap: 8, padding: 18, overflow: 'hidden', textAlign: 'center', boxShadow: '0 18px 42px rgba(2,6,23,.24)' }
-const photoShade: CSSProperties = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(15,23,42,.08),rgba(15,23,42,.80))' }
-const qrPanel: CSSProperties = { position: 'relative', zIndex: 1, width: 204, height: 204, display: 'grid', placeItems: 'center', background: '#fff', borderRadius: 18, boxShadow: '0 10px 28px rgba(2,6,23,.26)' }
-const previewTitle: CSSProperties = { position: 'relative', zIndex: 1, fontSize: 19, fontWeight: 950 }
-const previewType: CSSProperties = { position: 'relative', zIndex: 1, fontSize: 12, fontWeight: 850, opacity: .82 }
-const previewId: CSSProperties = { position: 'relative', zIndex: 1, fontFamily: 'ui-monospace,monospace', opacity: .68 }
+const description: CSSProperties = {
+  margin: '6px 0 0',
+  color: 'rgba(226,232,240,.72)',
+  fontSize: 12,
+  lineHeight: 1.4,
+}
+const badgeBase: CSSProperties = {
+  minHeight: 26,
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0 9px',
+  borderRadius: 999,
+  fontSize: 9,
+  fontWeight: 950,
+}
+const validBadge: CSSProperties = {
+  ...badgeBase,
+  color: '#dcfce7',
+  background: 'rgba(34,197,94,.15)',
+  border: '1px solid rgba(74,222,128,.22)',
+}
+const pendingBadge: CSSProperties = {
+  ...badgeBase,
+  color: '#fef3c7',
+  background: 'rgba(245,158,11,.14)',
+  border: '1px solid rgba(251,191,36,.20)',
+}
+const workspace: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+  gap: 14,
+  alignItems: 'stretch',
+}
+const previewCard: CSSProperties = {
+  position: 'relative',
+  minHeight: 390,
+  display: 'grid',
+  placeItems: 'center',
+  alignContent: 'center',
+  gap: 8,
+  padding: 18,
+  overflow: 'hidden',
+  textAlign: 'center',
+  boxShadow: '0 18px 42px rgba(2,6,23,.24)',
+}
+const photoShade: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'linear-gradient(180deg,rgba(15,23,42,.08),rgba(15,23,42,.80))',
+}
+const qrPanel: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  width: 204,
+  height: 204,
+  display: 'grid',
+  placeItems: 'center',
+  background: '#fff',
+  borderRadius: 18,
+  boxShadow: '0 10px 28px rgba(2,6,23,.26)',
+}
+const previewTitle: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  fontSize: 19,
+  fontWeight: 950,
+}
+const previewType: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  fontSize: 12,
+  fontWeight: 850,
+  opacity: 0.82,
+}
+const previewId: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  fontFamily: 'ui-monospace,monospace',
+  opacity: 0.68,
+}
 const controls: CSSProperties = { display: 'grid', gap: 10, alignContent: 'start' }
-const presetGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(100px,1fr))', gap: 8 }
-const presetButton: CSSProperties = { minHeight: 68, display: 'grid', gap: 4, padding: 10, borderRadius: 16, border: '1px solid rgba(148,163,184,.15)', background: 'rgba(30,41,59,.62)', color: '#e2e8f0', textAlign: 'left' }
-const presetActive: CSSProperties = { ...presetButton, border: '1px solid rgba(96,165,250,.38)', background: 'rgba(37,99,235,.22)', color: '#fff' }
-const controlRow: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }
-const field: CSSProperties = { display: 'grid', gap: 6, color: 'rgba(226,232,240,.78)', fontSize: 10, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }
-const colorInput: CSSProperties = { width: '100%', minHeight: 42, padding: 4, borderRadius: 14, border: '1px solid rgba(148,163,184,.18)', background: 'rgba(15,23,42,.56)' }
-const selectInput: CSSProperties = { width: '100%', minHeight: 42, padding: '0 10px', borderRadius: 14, border: '1px solid rgba(148,163,184,.18)', background: 'rgba(15,23,42,.56)', color: '#fff' }
+const presetGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit,minmax(100px,1fr))',
+  gap: 8,
+}
+const presetButton: CSSProperties = {
+  minHeight: 68,
+  display: 'grid',
+  gap: 4,
+  padding: 10,
+  borderRadius: 16,
+  border: '1px solid rgba(148,163,184,.15)',
+  background: 'rgba(30,41,59,.62)',
+  color: '#e2e8f0',
+  textAlign: 'left',
+}
+const presetActive: CSSProperties = {
+  ...presetButton,
+  border: '1px solid rgba(96,165,250,.38)',
+  background: 'rgba(37,99,235,.22)',
+  color: '#fff',
+}
+const controlRow: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2,minmax(0,1fr))',
+  gap: 8,
+}
+const field: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  color: 'rgba(226,232,240,.78)',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+}
+const colorInput: CSSProperties = {
+  width: '100%',
+  minHeight: 42,
+  padding: 4,
+  borderRadius: 14,
+  border: '1px solid rgba(148,163,184,.18)',
+  background: 'rgba(15,23,42,.56)',
+}
+const selectInput: CSSProperties = {
+  width: '100%',
+  minHeight: 42,
+  padding: '0 10px',
+  borderRadius: 14,
+  border: '1px solid rgba(148,163,184,.18)',
+  background: 'rgba(15,23,42,.56)',
+  color: '#fff',
+}
 const buttonBase: CSSProperties = { minHeight: 42, borderRadius: 15, fontSize: 11, fontWeight: 950 }
-const uploadButton: CSSProperties = { ...buttonBase, display: 'grid', placeItems: 'center', border: '1px dashed rgba(147,197,253,.34)', background: 'rgba(37,99,235,.12)', color: '#dbeafe', cursor: 'pointer' }
-const secondaryButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(148,163,184,.18)', background: 'rgba(51,65,85,.70)', color: '#f8fafc' }
-const validateButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(96,165,250,.30)', background: 'rgba(37,99,235,.24)', color: '#dbeafe' }
-const downloadButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(74,222,128,.28)', background: 'linear-gradient(180deg,#22c55e,#16a34a)', color: '#fff' }
-const disabledButton: CSSProperties = { ...buttonBase, border: '1px solid rgba(148,163,184,.12)', background: 'rgba(71,85,105,.48)', color: 'rgba(226,232,240,.48)' }
-const actionGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }
-const validationHelp: CSSProperties = { margin: 0, color: 'rgba(148,163,184,.80)', fontSize: 11, lineHeight: 1.4 }
-const noticeStyle: CSSProperties = { padding: '9px 11px', borderRadius: 13, background: 'rgba(59,130,246,.13)', color: '#dbeafe', fontSize: 11, fontWeight: 850 }
-const scannerOverlay: CSSProperties = { position: 'fixed', inset: 0, zIndex: 7200, display: 'grid', placeItems: 'center', padding: 16 }
-const scannerBackdrop: CSSProperties = { position: 'absolute', inset: 0, background: 'rgba(2,6,23,.76)', backdropFilter: 'blur(8px)' }
-const scannerCard: CSSProperties = { position: 'relative', zIndex: 1, width: 'min(100%,520px)', display: 'grid', gap: 12, padding: 14, borderRadius: 24, border: '1px solid rgba(148,163,184,.22)', background: '#0f172a', boxShadow: '0 30px 90px rgba(2,6,23,.65)' }
-const scannerHeader: CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, color: '#fff' }
-const closeButton: CSSProperties = { width: 40, height: 40, borderRadius: 999, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(30,41,59,.82)', color: '#fff', fontSize: 22 }
-const videoStyle: CSSProperties = { width: '100%', maxHeight: '58vh', objectFit: 'cover', borderRadius: 18, background: '#020617' }
-const scanInfo: CSSProperties = { padding: 10, borderRadius: 14, background: 'rgba(59,130,246,.13)', color: '#dbeafe', fontSize: 12, fontWeight: 850 }
-const scanValid: CSSProperties = { ...scanInfo, background: 'rgba(34,197,94,.14)', color: '#dcfce7' }
+const uploadButton: CSSProperties = {
+  ...buttonBase,
+  display: 'grid',
+  placeItems: 'center',
+  border: '1px dashed rgba(147,197,253,.34)',
+  background: 'rgba(37,99,235,.12)',
+  color: '#dbeafe',
+  cursor: 'pointer',
+}
+const secondaryButton: CSSProperties = {
+  ...buttonBase,
+  border: '1px solid rgba(148,163,184,.18)',
+  background: 'rgba(51,65,85,.70)',
+  color: '#f8fafc',
+}
+const validateButton: CSSProperties = {
+  ...buttonBase,
+  border: '1px solid rgba(96,165,250,.30)',
+  background: 'rgba(37,99,235,.24)',
+  color: '#dbeafe',
+}
+const downloadButton: CSSProperties = {
+  ...buttonBase,
+  border: '1px solid rgba(74,222,128,.28)',
+  background: 'linear-gradient(180deg,#22c55e,#16a34a)',
+  color: '#fff',
+}
+const disabledButton: CSSProperties = {
+  ...buttonBase,
+  border: '1px solid rgba(148,163,184,.12)',
+  background: 'rgba(71,85,105,.48)',
+  color: 'rgba(226,232,240,.48)',
+}
+const actionGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
+  gap: 8,
+}
+const validationHelp: CSSProperties = {
+  margin: 0,
+  color: 'rgba(148,163,184,.80)',
+  fontSize: 11,
+  lineHeight: 1.4,
+}
+const noticeStyle: CSSProperties = {
+  padding: '9px 11px',
+  borderRadius: 13,
+  background: 'rgba(59,130,246,.13)',
+  color: '#dbeafe',
+  fontSize: 11,
+  fontWeight: 850,
+}
+const scannerOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 7200,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 16,
+}
+const scannerBackdrop: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'rgba(2,6,23,.76)',
+  backdropFilter: 'blur(8px)',
+}
+const scannerCard: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  width: 'min(100%,520px)',
+  display: 'grid',
+  gap: 12,
+  padding: 14,
+  borderRadius: 24,
+  border: '1px solid rgba(148,163,184,.22)',
+  background: '#0f172a',
+  boxShadow: '0 30px 90px rgba(2,6,23,.65)',
+}
+const scannerHeader: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 10,
+  color: '#fff',
+}
+const closeButton: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.16)',
+  background: 'rgba(30,41,59,.82)',
+  color: '#fff',
+  fontSize: 22,
+}
+const videoStyle: CSSProperties = {
+  width: '100%',
+  maxHeight: '58vh',
+  objectFit: 'cover',
+  borderRadius: 18,
+  background: '#020617',
+}
+const scanInfo: CSSProperties = {
+  padding: 10,
+  borderRadius: 14,
+  background: 'rgba(59,130,246,.13)',
+  color: '#dbeafe',
+  fontSize: 12,
+  fontWeight: 850,
+}
+const scanValid: CSSProperties = {
+  ...scanInfo,
+  background: 'rgba(34,197,94,.14)',
+  color: '#dcfce7',
+}

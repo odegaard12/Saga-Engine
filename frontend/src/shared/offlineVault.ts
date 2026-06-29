@@ -33,13 +33,16 @@ export function emptyOfflineVaultSummary(): OfflineVaultSummary {
   }
 }
 
-export function makeOfflineVaultPlayer(profile: PlayerProfile, args: {
-  ok: boolean
-  stage_count?: number
-  level?: number
-  finished?: boolean
-  error?: string
-}): OfflineVaultPlayer {
+export function makeOfflineVaultPlayer(
+  profile: PlayerProfile,
+  args: {
+    ok: boolean
+    stage_count?: number
+    level?: number
+    finished?: boolean
+    error?: string
+  }
+): OfflineVaultPlayer {
   return {
     id: profile.id,
     display_name: String(profile.display_name || profile.id),

@@ -44,11 +44,7 @@ export function getPlayerColor(profile?: PlayerIdentitySource | null): string {
   if (/^#[0-9a-fA-F]{6}$/.test(explicit)) return explicit
 
   return getStablePlayerColor(
-    profile?.id ||
-      profile?.user ||
-      profile?.display_name ||
-      profile?.members?.join(',') ||
-      'player'
+    profile?.id || profile?.user || profile?.display_name || profile?.members?.join(',') || 'player'
   )
 }
 

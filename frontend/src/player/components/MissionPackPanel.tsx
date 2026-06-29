@@ -1,14 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type CSSProperties,
-} from 'react'
-import {
-  fetchFieldProofs,
-  fetchPlayerGame,
-  fetchPublicConfig,
-} from '../../shared/api'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig } from '../../shared/api'
 import type { PlayerGamePayload } from '../../types/player'
 import {
   getOfflineMissionSummary,
@@ -22,78 +13,47 @@ import {
   loadOfflineSnapshot,
   type SagaOfflineSnapshot,
 } from '../offline/localFirst'
-import {
-  cacheMissionMapTiles,
-  cachePlayerShell,
-} from '../offline/pwaShell'
-import {
-  cacheFieldProofAssets,
-  cacheFieldProofs,
-} from '../offline/fieldProofCache'
+import { cacheMissionMapTiles, cachePlayerShell } from '../offline/pwaShell'
+import { cacheFieldProofAssets, cacheFieldProofs } from '../offline/fieldProofCache'
 
 type Props = {
   user: string
   payload: PlayerGamePayload
 }
 
-type Action =
-  | 'download'
-  | 'save'
-  | 'sync'
-  | null
+type Action = 'download' | 'save' | 'sync' | null
 
-export function MissionPackPanel({
-  user,
-  payload,
-}: Props) {
-  const [summary, setSummary] =
-    useState<OfflineMissionSummary | null>(null)
+export function MissionPackPanel({ user, payload }: Props) {
+  const [summary, setSummary] = useState<OfflineMissionSummary | null>(null)
 
-  const [queue, setQueue] =
-    useState<SagaOfflineSnapshot>(() =>
-      loadOfflineSnapshot(user)
-    )
+  const [queue, setQueue] = useState<SagaOfflineSnapshot>(() => loadOfflineSnapshot(user))
 
-  const [action, setAction] =
-    useState<Action>(null)
+  const [action, setAction] = useState<Action>(null)
 
-  const [message, setMessage] =
-    useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  const [error, setError] =
-    useState(false)
+  const [error, setError] = useState(false)
 
-  const [online, setOnline] =
-    useState(
-      typeof navigator === 'undefined'
-        ? true
-        : navigator.onLine !== false
-    )
+  const [online, setOnline] = useState(
+    typeof navigator === 'undefined' ? true : navigator.onLine !== false
+  )
 
-  const refresh =
-    useCallback(async () => {
-      setOnline(
-        typeof navigator === 'undefined'
-          ? true
-          : navigator.onLine !== false
-      )
+  const refresh = useCallback(async () => {
+    setOnline(typeof navigator === 'undefined' ? true : navigator.onLine !== false)
 
-      setQueue(loadOfflineSnapshot(user))
+    setQueue(loadOfflineSnapshot(user))
 
-      try {
-        setSummary(
-          await getOfflineMissionSummary(user)
-        )
-      } catch {
-        setSummary(null)
-      }
-    }, [user])
+    try {
+      setSummary(await getOfflineMissionSummary(user))
+    } catch {
+      setSummary(null)
+    }
+  }, [user])
 
   useEffect(() => {
     void refresh()
 
-    const timer =
-      window.setInterval(refresh, 5000)
+    const timer = window.setInterval(refresh, 5000)
 
     window.addEventListener('online', refresh)
     window.addEventListener('offline', refresh)
@@ -101,27 +61,15 @@ export function MissionPackPanel({
 
     return () => {
       window.clearInterval(timer)
-      window.removeEventListener(
-        'online',
-        refresh,
-      )
-      window.removeEventListener(
-        'offline',
-        refresh,
-      )
-      window.removeEventListener(
-        'storage',
-        refresh,
-      )
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('offline', refresh)
+      window.removeEventListener('storage', refresh)
     }
   }, [refresh])
 
-  const pending =
-    (summary?.pendingEvents || 0) +
-    queue.queued_events.length
+  const pending = (summary?.pendingEvents || 0) + queue.queued_events.length
 
-  const downloaded =
-    Boolean(summary?.hasPack)
+  const downloaded = Boolean(summary?.hasPack)
 
   const busy = action !== null
 
@@ -133,19 +81,13 @@ export function MissionPackPanel({
     setError(false)
 
     try {
-      const [config, game, fieldProofPayload] =
-        await Promise.all([
-          fetchPublicConfig(),
-          fetchPlayerGame(
-            user,
-            { offlinePack: true },
-          ),
-          fetchFieldProofs(user).catch(() => ({ proofs: [] })),
-        ])
+      const [config, game, fieldProofPayload] = await Promise.all([
+        fetchPublicConfig(),
+        fetchPlayerGame(user, { offlinePack: true }),
+        fetchFieldProofs(user).catch(() => ({ proofs: [] })),
+      ])
 
-      const fieldProofs = Array.isArray(fieldProofPayload.proofs)
-        ? fieldProofPayload.proofs
-        : []
+      const fieldProofs = Array.isArray(fieldProofPayload.proofs) ? fieldProofPayload.proofs : []
 
       const pack = await saveMissionPack({
         user,
@@ -156,27 +98,17 @@ export function MissionPackPanel({
       cacheFieldProofs(user, fieldProofs)
 
       await Promise.all([
-        cachePlayerShell(
-          `/player/${encodeURIComponent(user)}`
-        ),
-        cacheMissionMapTiles(
-          game.stages || [],
-        ),
+        cachePlayerShell(`/player/${encodeURIComponent(user)}`),
+        cacheMissionMapTiles(game.stages || []),
         cacheFieldProofAssets(fieldProofs),
       ])
 
-      setMessage(
-        `Juego offline preparado · ${pack.stage_count} nodos`,
-      )
+      setMessage(`Juego offline preparado · ${pack.stage_count} nodos`)
 
       await refresh()
     } catch (nextError) {
       setError(true)
-      setMessage(
-        nextError instanceof Error
-          ? nextError.message
-          : 'No se pudo preparar.',
-      )
+      setMessage(nextError instanceof Error ? nextError.message : 'No se pudo preparar.')
     } finally {
       setAction(null)
     }
@@ -214,18 +146,12 @@ export function MissionPackPanel({
       await refresh()
 
       const remaining =
-        ((
-          await getOfflineMissionSummary(user)
-        )?.pendingEvents || 0) +
-        loadOfflineSnapshot(user)
-          .queued_events.length
+        ((await getOfflineMissionSummary(user))?.pendingEvents || 0) +
+        loadOfflineSnapshot(user).queued_events.length
 
       if (remaining > 0) {
         setError(true)
-        setMessage(
-          `${remaining} pendiente` +
-          `${remaining === 1 ? '' : 's'}`,
-        )
+        setMessage(`${remaining} pendiente` + `${remaining === 1 ? '' : 's'}`)
       } else {
         setMessage('Progreso sincronizado')
       }
@@ -248,29 +174,14 @@ export function MissionPackPanel({
   return (
     <section style={card}>
       <div style={topRow}>
-        <strong style={title}>
-          Juego offline
-        </strong>
+        <strong style={title}>Juego offline</strong>
 
-        <span
-          style={
-            downloaded
-              ? readyBadge
-              : online
-                ? pendingBadge
-                : offlineBadge
-          }
-        >
+        <span style={downloaded ? readyBadge : online ? pendingBadge : offlineBadge}>
           {statusLabel}
         </span>
       </div>
 
-      <button
-        type="button"
-        style={primary}
-        disabled={busy || !online}
-        onClick={download}
-      >
+      <button type="button" style={primary} disabled={busy || !online} onClick={download}>
         {action === 'download'
           ? 'Preparando todo…'
           : downloaded
@@ -279,25 +190,14 @@ export function MissionPackPanel({
       </button>
 
       <div style={actions}>
-        <button
-          type="button"
-          style={secondary}
-          disabled={busy}
-          onClick={save}
-        >
-          {action === 'save'
-            ? 'Guardando…'
-            : 'Guardar progreso'}
+        <button type="button" style={secondary} disabled={busy} onClick={save}>
+          {action === 'save' ? 'Guardando…' : 'Guardar progreso'}
         </button>
 
         <button
           type="button"
           style={secondary}
-          disabled={
-            busy ||
-            !online ||
-            pending === 0
-          }
+          disabled={busy || !online || pending === 0}
           onClick={sync}
         >
           {action === 'sync'
@@ -308,17 +208,7 @@ export function MissionPackPanel({
         </button>
       </div>
 
-      {message ? (
-        <div
-          style={
-            error
-              ? messageError
-              : messageOk
-          }
-        >
-          {message}
-        </div>
-      ) : null}
+      {message ? <div style={error ? messageError : messageOk}>{message}</div> : null}
     </section>
   )
 }
@@ -385,17 +275,14 @@ const button: CSSProperties = {
 const primary: CSSProperties = {
   ...button,
   border: '1px solid rgba(187,247,208,.22)',
-  background:
-    'linear-gradient(180deg, #22c55e, #16a34a)',
+  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
   color: '#ffffff',
-  boxShadow:
-    '0 12px 26px rgba(22,163,74,.18)',
+  boxShadow: '0 12px 26px rgba(22,163,74,.18)',
 }
 
 const actions: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns:
-    'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 7,
 }
 

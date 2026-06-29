@@ -41,9 +41,7 @@ export function buildPlayerDrafts(
   const configProfiles = Array.isArray(sourceConfig?.player_profiles)
     ? sourceConfig.player_profiles
     : []
-  const simplePlayers = Array.isArray(sourceConfig?.players)
-    ? sourceConfig.players
-    : []
+  const simplePlayers = Array.isArray(sourceConfig?.players) ? sourceConfig.players : []
 
   const fromOverview: PlayerDraft[] = nextProfiles.map((profile) => {
     const configProfile = configProfiles.find((item) => item.id === profile.id)

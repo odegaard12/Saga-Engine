@@ -11,8 +11,7 @@ export const motionChallengeDefinition: MotionChallengeDefinition = {
   version: 'v1',
   label: 'Motion Challenge',
   tagline: 'Physical mobile skill challenge',
-  description:
-    'Sensor-based minigames using device motion, haptics and tactile fallback.',
+  description: 'Sensor-based minigames using device motion, haptics and tactile fallback.',
 
   validation_mode: 'client',
   fallback_policy: 'degraded_mode',
@@ -73,18 +72,20 @@ function validateMotionChallengeConfig(
 
   const value: MotionChallengeConfig = {
     ...merged,
-    objective: merged.objective === 'figure_eight' || merged.objective === 'rotary_safe'
-      ? merged.objective
-      : 'shake_charge',
-    difficulty: merged.difficulty === 'easy' || merged.difficulty === 'hard'
-      ? merged.difficulty
-      : 'normal',
-    duration_mode: merged.duration_mode === 'short' || merged.duration_mode === 'long'
-      ? merged.duration_mode
-      : 'normal',
-    penalty_mode: merged.penalty_mode === 'soft' || merged.penalty_mode === 'hard'
-      ? merged.penalty_mode
-      : 'normal',
+    objective:
+      merged.objective === 'figure_eight' || merged.objective === 'rotary_safe'
+        ? merged.objective
+        : 'shake_charge',
+    difficulty:
+      merged.difficulty === 'easy' || merged.difficulty === 'hard' ? merged.difficulty : 'normal',
+    duration_mode:
+      merged.duration_mode === 'short' || merged.duration_mode === 'long'
+        ? merged.duration_mode
+        : 'normal',
+    penalty_mode:
+      merged.penalty_mode === 'soft' || merged.penalty_mode === 'hard'
+        ? merged.penalty_mode
+        : 'normal',
     allow_touch_fallback: merged.allow_touch_fallback !== false,
     energy_target: clamp(asNumber(merged.energy_target, 100), 40, 300),
     time_limit_ms: clamp(asNumber(merged.time_limit_ms, 35000), 12000, 120000),
@@ -120,8 +121,7 @@ async function runMotionChallengePreflight(
   const messages: string[] = []
 
   const hasMotionApi =
-    typeof window !== 'undefined' &&
-    ('DeviceMotionEvent' in window || 'ondevicemotion' in window)
+    typeof window !== 'undefined' && ('DeviceMotionEvent' in window || 'ondevicemotion' in window)
 
   const allowFallback = bindings.config.allow_touch_fallback !== false
 
@@ -137,9 +137,7 @@ async function runMotionChallengePreflight(
 
   return {
     can_start: missing_required.length === 0,
-    mode: missing_required.length === 0
-      ? (hasMotionApi ? 'normal' : 'fallback')
-      : 'blocked',
+    mode: missing_required.length === 0 ? (hasMotionApi ? 'normal' : 'fallback') : 'blocked',
     missing_required: missing_required as never[],
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Reto de movimiento listo.'],

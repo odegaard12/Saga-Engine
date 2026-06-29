@@ -2,12 +2,7 @@ import type { FamilyId } from './familyConfigs'
 
 export const FAMILY_SCHEMA_VERSION = 'v1'
 
-export type FamilyConfigFieldKind =
-  | 'text'
-  | 'number'
-  | 'boolean'
-  | 'select'
-  | 'sequence'
+export type FamilyConfigFieldKind = 'text' | 'number' | 'boolean' | 'select' | 'sequence'
 
 export type FamilyConfigField = {
   key: string

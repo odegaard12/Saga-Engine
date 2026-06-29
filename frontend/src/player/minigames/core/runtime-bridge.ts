@@ -49,7 +49,9 @@ function normalizeConfigDrivenStageSource(stage: PlayerStage): StageMinigameSour
 function normalizeRuntimeSource(runtime?: StageMinigameRuntime | null): StageMinigameSource | null {
   if (!runtime) return null
 
-  const type = String(runtime.type || '').trim().toLowerCase()
+  const type = String(runtime.type || '')
+    .trim()
+    .toLowerCase()
   if (!type) return null
 
   return {
@@ -61,7 +63,9 @@ function normalizeRuntimeSource(runtime?: StageMinigameRuntime | null): StageMin
 }
 
 function normalizeCompatibleStageSource(stage: PlayerStage): StageMinigameSource | null {
-  const type = String(stage.type || '').trim().toLowerCase()
+  const type = String(stage.type || '')
+    .trim()
+    .toLowerCase()
   if (!type) return null
 
   return {
@@ -72,7 +76,9 @@ function normalizeCompatibleStageSource(stage: PlayerStage): StageMinigameSource
   }
 }
 
-export function getStageMinigameSource(stage: PlayerStage | null | undefined): StageMinigameSource | null {
+export function getStageMinigameSource(
+  stage: PlayerStage | null | undefined
+): StageMinigameSource | null {
   if (!stage) return null
 
   const configDrivenSource = normalizeConfigDrivenStageSource(stage)
@@ -97,7 +103,9 @@ export function buildResolveMinigameInput(
   }
 }
 
-export function resolveStageMinigame(stage: PlayerStage | null | undefined): StageResolvedMinigame | null {
+export function resolveStageMinigame(
+  stage: PlayerStage | null | undefined
+): StageResolvedMinigame | null {
   const source = getStageMinigameSource(stage)
   if (!source) return null
 
@@ -111,7 +119,9 @@ export function resolveStageMinigame(stage: PlayerStage | null | undefined): Sta
   }
 }
 
-export function resolveStageMinigameOrThrow(stage: PlayerStage | null | undefined): ResolvedMinigame {
+export function resolveStageMinigameOrThrow(
+  stage: PlayerStage | null | undefined
+): ResolvedMinigame {
   const input = buildResolveMinigameInput(stage)
 
   if (!input) {
@@ -130,4 +140,3 @@ export function getStageResolvedLabel(stage: PlayerStage | null | undefined): st
   if (!resolved?.resolved) return resolved?.source.label || null
   return resolved.resolved.label || resolved.source.label || null
 }
-

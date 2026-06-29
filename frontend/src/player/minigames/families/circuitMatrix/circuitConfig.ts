@@ -1,7 +1,4 @@
-import {
-  isCircuitPathValid,
-  type CellKey,
-} from './circuitPath'
+import { isCircuitPathValid, type CellKey } from './circuitPath'
 export type CircuitDifficulty = 'easy' | 'normal' | 'hard'
 
 export interface CircuitRuntimeConfig {
@@ -18,10 +15,7 @@ export interface CircuitRuntimeConfig {
 
 const PROFILES: Record<
   CircuitDifficulty,
-  Omit<
-    CircuitRuntimeConfig,
-    'difficulty' | 'seed' | 'patternMode' | 'fixedPath'
-  >
+  Omit<CircuitRuntimeConfig, 'difficulty' | 'seed' | 'patternMode' | 'fixedPath'>
 > = {
   easy: {
     rows: 4,
@@ -56,14 +50,11 @@ function integerValue(value: unknown, fallback: number): number {
 }
 
 function normalizeDifficulty(value: unknown): CircuitDifficulty {
-  const text = String(value ?? '').trim().toLowerCase()
+  const text = String(value ?? '')
+    .trim()
+    .toLowerCase()
 
-  if (
-    text === 'easy' ||
-    text === 'facil' ||
-    text === 'fácil' ||
-    text === '1'
-  ) {
+  if (text === 'easy' || text === 'facil' || text === 'fácil' || text === '1') {
     return 'easy'
   }
 
@@ -83,66 +74,37 @@ function normalizeDifficulty(value: unknown): CircuitDifficulty {
 
 export function normalizeCircuitConfig(
   raw: Record<string, unknown>,
-  fallbackSeed: string,
+  fallbackSeed: string
 ): CircuitRuntimeConfig {
   const difficulty = normalizeDifficulty(raw.difficulty)
   const profile = PROFILES[difficulty]
 
-  const rows = clamp(
-    integerValue(raw.grid_rows ?? raw.grid_size, profile.rows),
-    4,
-    6,
-  )
+  const rows = clamp(integerValue(raw.grid_rows ?? raw.grid_size, profile.rows), 4, 6)
 
-  const cols = clamp(
-    integerValue(raw.grid_cols ?? raw.grid_size, profile.cols),
-    4,
-    6,
-  )
+  const cols = clamp(integerValue(raw.grid_cols ?? raw.grid_size, profile.cols), 4, 6)
 
   const maxCells = rows * cols
 
   const pathLength = clamp(
     integerValue(raw.path_length, profile.pathLength),
     Math.min(4, maxCells),
-    maxCells,
+    maxCells
   )
 
-  const previewCellMs = clamp(
-    integerValue(raw.preview_cell_ms, profile.previewCellMs),
-    220,
-    900,
-  )
+  const previewCellMs = clamp(integerValue(raw.preview_cell_ms, profile.previewCellMs), 220, 900)
 
-  const maxErrors = clamp(
-    integerValue(raw.max_errors, profile.maxErrors),
-    1,
-    6,
-  )
+  const maxErrors = clamp(integerValue(raw.max_errors, profile.maxErrors), 1, 6)
 
   const configuredSeed = String(raw.seed ?? '').trim()
 
   const candidate = Array.isArray(raw.path_cells)
-    ? raw.path_cells
-        .map(String)
-        .filter(
-          (item): item is CellKey => /^\d+:\d+$/.test(item),
-        )
+    ? raw.path_cells.map(String).filter((item): item is CellKey => /^\d+:\d+$/.test(item))
     : []
 
   const patternMode =
-    raw.pattern_mode === 'fixed' ||
-    candidate.length >= 4
-      ? 'fixed'
-      : 'random_each_game'
+    raw.pattern_mode === 'fixed' || candidate.length >= 4 ? 'fixed' : 'random_each_game'
 
-  const fixedPath = isCircuitPathValid(
-    candidate,
-    rows,
-    cols,
-  )
-    ? candidate
-    : []
+  const fixedPath = isCircuitPathValid(candidate, rows, cols) ? candidate : []
 
   return {
     rows,

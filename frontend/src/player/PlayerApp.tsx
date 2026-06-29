@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { advancePlayer, deleteFieldProof, fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus, getFieldProofsDownloadUrl, sendHeartbeat, uploadFieldProof } from '../shared/api'
-import type { FieldProof, PlayerGamePayload, PlayerGpsStatus, PlayerStage, PublicConfig, TeamProfileLiveStatus } from '../types/player'
+import {
+  advancePlayer,
+  deleteFieldProof,
+  fetchFieldProofs,
+  fetchPlayerGame,
+  fetchPublicConfig,
+  fetchTeamStatus,
+  getFieldProofsDownloadUrl,
+  sendHeartbeat,
+  uploadFieldProof,
+} from '../shared/api'
+import type {
+  FieldProof,
+  PlayerGamePayload,
+  PlayerGpsStatus,
+  PlayerStage,
+  PublicConfig,
+  TeamProfileLiveStatus,
+} from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { QuickProofPanel } from './components/QuickProofPanel'
@@ -14,17 +31,38 @@ import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
-import { advanceLocalProgress, getOfflineMissionSummary, getStoredMissionPack, saveMissionPack, syncPendingOfflineEvents, type OfflineMissionSummary } from './offline/missionPack'
+import {
+  advanceLocalProgress,
+  getOfflineMissionSummary,
+  getStoredMissionPack,
+  saveMissionPack,
+  syncPendingOfflineEvents,
+  type OfflineMissionSummary,
+} from './offline/missionPack'
+import { prefetchMissionMapTiles } from './offline/mapTileCache'
 import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import { flushOfflineEvents } from './offline/localFirst'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
-import { cacheFieldProofAssets, cacheFieldProofs, getCachedFieldProofs } from './offline/fieldProofCache'
+import {
+  cacheFieldProofAssets,
+  cacheFieldProofs,
+  getCachedFieldProofs,
+} from './offline/fieldProofCache'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
-import { readStoredGpsPosition, rememberGpsPosition, rememberGpsReady, hasRememberedGpsReady } from './utils/gpsStorage'
+import {
+  readStoredGpsPosition,
+  rememberGpsPosition,
+  rememberGpsReady,
+  hasRememberedGpsReady,
+} from './utils/gpsStorage'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
-import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
+import {
+  getPlayerAvatarInitials,
+  getPlayerAvatarUrl,
+  getPlayerColor,
+} from '../shared/playerIdentity'
 import {
   CelebrationOverlay,
   ScreenFrame,
@@ -37,21 +75,19 @@ import {
   getViewportStyle,
   finishOverlayStyle,
   floatingTrophyButton,
-  type OverlayState
+  type OverlayState,
 } from './components/PlayerLayout'
 
 type LoadState =
-  | { status: 'idle' | 'loading' }
+  | { status: 'idle' | 'loading'; mapProgress?: { done: number; total: number; detail?: string } }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
 type NoticeTone = 'info' | 'warn' | 'success'
-type FocusRequest =
-  | {
-      target: 'player' | 'node' | 'route'
-      token: number
-    }
-  | null
+type FocusRequest = {
+  target: 'player' | 'node' | 'route'
+  token: number
+} | null
 
 function vibrate(pattern: number | number[]) {
   if (typeof window === 'undefined') return
@@ -71,7 +107,12 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
   const record = stage as unknown as Record<string, unknown>
   const flatKind = record.physical_node_kind || record.physical_item_kind
 
-  if (flatKind === 'collectible' || flatKind === 'requirement' || flatKind === 'clue' || flatKind === 'bonus') {
+  if (
+    flatKind === 'collectible' ||
+    flatKind === 'requirement' ||
+    flatKind === 'clue' ||
+    flatKind === 'bonus'
+  ) {
     return true
   }
 
@@ -91,8 +132,18 @@ export default function PlayerApp() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false)
-  const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(null)
-  const [followPlayer, setFollowPlayer] = useState(true)
+  const [localDebugPosition, setLocalDebugPosition] = useState<{ lat: number; lon: number } | null>(
+    null
+  )
+  const [followPlayer, setFollowPlayerState] = useState(true)
+  const followPlayerRef = useRef(true)
+  function setFollowPlayer(val: boolean | ((curr: boolean) => boolean)) {
+    setFollowPlayerState((current) => {
+      const next = typeof val === 'function' ? val(current) : val
+      followPlayerRef.current = next
+      return next
+    })
+  }
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
@@ -102,9 +153,13 @@ export default function PlayerApp() {
   const [teamOpen, setTeamOpen] = useState(false)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
   const [offlinePrepVisible, setOfflinePrepVisible] = useState(true)
-  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  )
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
-  const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(null)
+  const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(
+    null
+  )
   const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
   const [browserGpsFresh, setBrowserGpsFresh] = useState(false)
   const [browserGpsAccuracy, setBrowserGpsAccuracy] = useState<number | null>(null)
@@ -114,28 +169,23 @@ export default function PlayerApp() {
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
+  const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
+  const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
   const [mapRefreshToken, setMapRefreshToken] = useState(0)
-  const [gpsLoaded, setGpsLoaded] = useState(false)
-
-  // Fail-safe: if GPS hasn't locked after 20 seconds, let the user enter the app anyway.
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setGpsLoaded(true)
-    }, 20000)
-    return () => window.clearTimeout(timer)
-  }, [])
+  // Removed gpsLoaded state and 20s timeout
 
   const noticeTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
-  const handleRequestLiveGpsRef = useRef<((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null>(null)
+  const handleRequestLiveGpsRef = useRef<
+    ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
+  >(null)
   const prevTeamStatusRef = useRef<Record<string, string>>({})
   const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
-  const isPhone =
-    typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+  const isPhone = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -147,11 +197,7 @@ export default function PlayerApp() {
       setBrowserGpsPosition(storedGps)
       setBrowserGpsStatus('stale')
       setBrowserGpsFresh(false)
-      setBrowserGpsAccuracy(
-        typeof storedGps.accuracy === 'number'
-          ? storedGps.accuracy
-          : null
-      )
+      setBrowserGpsAccuracy(typeof storedGps.accuracy === 'number' ? storedGps.accuracy : null)
       setBrowserGpsCapturedAt(null)
       // La ubicación almacenada sirve como respaldo,
       // pero nunca debe centrar el mapa al arrancar.
@@ -172,7 +218,10 @@ export default function PlayerApp() {
 
     async function run() {
       try {
-        setState({ status: 'loading' })
+        setState({
+          status: 'loading',
+          mapProgress: { done: 0, total: 100, detail: 'Iniciando conexión...' },
+        })
         const payload = await fetchPlayerGame(user, { offlinePack: true })
         const config = await fetchPublicConfig()
           .then((nextConfig) => {
@@ -181,11 +230,42 @@ export default function PlayerApp() {
           })
           .catch(() => buildFallbackPublicConfig(user))
 
-        void saveMissionPack({
+        await saveMissionPack({
           user: payload.user || user,
           config,
           payload,
         }).catch(() => undefined)
+
+        // Descarga de tiles offline automatizada al entrar (con pantalla de carga)
+        if (
+          typeof window !== 'undefined' &&
+          window.navigator.onLine &&
+          Array.isArray(payload.stages) &&
+          payload.stages.length > 0
+        ) {
+          if (!cancelled) {
+            setState({
+              status: 'loading',
+              mapProgress: { done: 0, total: 100, detail: 'Calculando mapa offline...' },
+            })
+          }
+          try {
+            await prefetchMissionMapTiles(payload.stages, (progress) => {
+              if (!cancelled) {
+                setState({
+                  status: 'loading',
+                  mapProgress: {
+                    done: progress.done,
+                    total: progress.total,
+                    detail: progress.detail,
+                  },
+                })
+              }
+            })
+          } catch (err) {
+            console.error('Failed to prefetch map tiles automatically', err)
+          }
+        }
 
         if (!cancelled) {
           setState({ status: 'ready', payload, config })
@@ -221,39 +301,25 @@ export default function PlayerApp() {
       if (running) return
       if (interactionOpen || submitting) return
 
-      if (
-        typeof document !== 'undefined' &&
-        document.visibilityState !== 'visible'
-      ) {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return
       }
 
       running = true
 
       try {
-        if (
-          typeof navigator === 'undefined' ||
-          navigator.onLine !== false
-        ) {
-          await Promise.allSettled([
-            flushOfflineEvents(user),
-            syncPendingOfflineEvents(user),
-          ])
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          await Promise.allSettled([flushOfflineEvents(user), syncPendingOfflineEvents(user)])
         }
 
-        const nextPayload = await fetchPlayerGame(
-          user,
-          { offlinePack: true },
-        )
+        const nextPayload = await fetchPlayerGame(user, { offlinePack: true })
 
         const nextConfig = await fetchPublicConfig()
           .then((config) => {
             cachePublicConfig(config)
             return config
           })
-          .catch(() =>
-            buildFallbackPublicConfig(user),
-          )
+          .catch(() => buildFallbackPublicConfig(user))
 
         await saveMissionPack({
           user: nextPayload.user || user,
@@ -268,9 +334,7 @@ export default function PlayerApp() {
             config: prev.status === 'ready' ? prev.config : nextConfig,
           }))
 
-          setMapRefreshToken(
-            (value) => value + 1
-          )
+          setMapRefreshToken((value) => value + 1)
         }
       } catch {
         // Keep the currently loaded mission while offline.
@@ -288,48 +352,23 @@ export default function PlayerApp() {
 
       // Algunos móviles anuncian online antes de que
       // la red esté realmente utilizable.
-      window.setTimeout(
-        refreshMissionFromServer,
-        1200,
-      )
+      window.setTimeout(refreshMissionFromServer, 1200)
     }
 
     window.addEventListener('focus', refresh)
-    window.addEventListener(
-      'online',
-      refreshAfterReconnect,
-    )
-    document.addEventListener(
-      'visibilitychange',
-      refresh,
-    )
+    window.addEventListener('online', refreshAfterReconnect)
+    document.addEventListener('visibilitychange', refresh)
 
-    const intervalId = window.setInterval(
-      refresh,
-      30000,
-    )
+    const intervalId = window.setInterval(refresh, 30000)
 
     return () => {
       cancelled = true
-      window.removeEventListener(
-        'focus',
-        refresh,
-      )
-      window.removeEventListener(
-        'online',
-        refreshAfterReconnect,
-      )
-      document.removeEventListener(
-        'visibilitychange',
-        refresh,
-      )
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refreshAfterReconnect)
+      document.removeEventListener('visibilitychange', refresh)
       window.clearInterval(intervalId)
     }
-  }, [
-    user,
-    interactionOpen,
-    submitting,
-  ])
+  }, [user, interactionOpen, submitting])
 
   useEffect(() => {
     let cancelled = false
@@ -444,8 +483,7 @@ export default function PlayerApp() {
     async function publishHeartbeat() {
       try {
         const effectivePosition =
-          localDebugPosition ||
-          (browserGpsFresh ? browserGpsPosition : null)
+          localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
 
         await sendHeartbeat({
           user,
@@ -485,22 +523,14 @@ export default function PlayerApp() {
     browserGpsFresh,
   ])
 
-
-
   useEffect(() => {
     if (!browserGpsFresh || browserGpsCapturedAt === null) {
       return
     }
 
-    const ageMs = Math.max(
-      0,
-      Date.now() - browserGpsCapturedAt
-    )
+    const ageMs = Math.max(0, Date.now() - browserGpsCapturedAt)
 
-    const remainingMs = Math.max(
-      1000,
-      45000 - ageMs
-    )
+    const remainingMs = Math.max(1000, 45000 - ageMs)
 
     const timeoutId = window.setTimeout(() => {
       setBrowserGpsFresh(false)
@@ -510,10 +540,7 @@ export default function PlayerApp() {
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [
-    browserGpsFresh,
-    browserGpsCapturedAt,
-  ])
+  }, [browserGpsFresh, browserGpsCapturedAt])
 
   useEffect(() => {
     return () => {
@@ -523,7 +550,11 @@ export default function PlayerApp() {
       if (overlayTimerRef.current !== null) {
         window.clearTimeout(overlayTimerRef.current)
       }
-      if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+      if (
+        gpsWatchRef.current !== null &&
+        typeof window !== 'undefined' &&
+        window.navigator.geolocation
+      ) {
         window.navigator.geolocation.clearWatch(gpsWatchRef.current)
         gpsWatchRef.current = null
       }
@@ -588,10 +619,13 @@ export default function PlayerApp() {
       window.clearTimeout(overlayTimerRef.current)
     }
 
-    overlayTimerRef.current = window.setTimeout(() => {
-      setOverlayState(null)
-      overlayTimerRef.current = null
-    }, nextState === 'finish' ? 1800 : 900)
+    overlayTimerRef.current = window.setTimeout(
+      () => {
+        setOverlayState(null)
+        overlayTimerRef.current = null
+      },
+      nextState === 'finish' ? 1800 : 900
+    )
   }
 
   // Centrar y re-calibrar al volver al primer plano (app resume)
@@ -600,10 +634,8 @@ export default function PlayerApp() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        gpsCenteredRef.current = false
-        setGpsLoaded(false)
         if (handleRequestLiveGpsRef.current) {
-          void handleRequestLiveGpsRef.current({ silent: true, forceFocus: true })
+          void handleRequestLiveGpsRef.current({ silent: true, forceFocus: false })
         }
       }
     }
@@ -615,9 +647,19 @@ export default function PlayerApp() {
   }, [])
 
   if (state.status === 'idle' || state.status === 'loading') {
+    const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
+    const ratio = mapProgress
+      ? Math.max(0, Math.min(100, Math.round((mapProgress.done / (mapProgress.total || 1)) * 100)))
+      : undefined
+
     return (
       <ScreenFrame mobile={isPhone}>
-        <StatusCard title="SAGA" body="Iniciando motor SAGA y cargando misión..." />
+        <StatusCard
+          title="SAGA"
+          body={mapProgress ? 'Descargando mapa offline...' : 'Adquiriendo señal GPS...'}
+          progress={ratio}
+          progressDetail={mapProgress?.detail}
+        />
       </ScreenFrame>
     )
   }
@@ -638,8 +680,6 @@ export default function PlayerApp() {
     )
   }
 
-
-
   const payload = state.payload
   const currentStage = getCurrentStage(payload)
   const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
@@ -647,62 +687,43 @@ export default function PlayerApp() {
   const stagePosition = getStagePosition(currentStage)
   const stageRadius = getStageRadius(currentStage)
 
-  const gpsAccuracyLimit =
-    stageRadius !== null
-      ? Math.max(35, Math.min(80, stageRadius * 2))
-      : 60
+  const gpsAccuracyLimit = stageRadius !== null ? Math.max(35, Math.min(80, stageRadius * 2)) : 60
 
   const gpsAccuracyAcceptable =
-    browserGpsAccuracy === null ||
-    browserGpsAccuracy <= gpsAccuracyLimit
+    browserGpsAccuracy === null || browserGpsAccuracy <= gpsAccuracyLimit
 
-  const hasFreshBrowserGps =
-    Boolean(browserGpsPosition) &&
-    browserGpsFresh &&
-    gpsAccuracyAcceptable
+  const hasFreshBrowserGps = Boolean(browserGpsPosition) && browserGpsFresh && gpsAccuracyAcceptable
 
   const gpsState: PlayerGpsStatus = localDebugPosition
     ? 'ready'
     : hasFreshBrowserGps
-    ? 'ready'
-    : browserGpsPosition && !browserGpsFresh
-    ? 'stale'
-    : browserGpsPosition && !gpsAccuracyAcceptable
-    ? 'searching'
-    : browserGpsStatus === 'searching'
-    ? 'searching'
-    : browserGpsStatus === 'error'
-    ? 'error'
-    : 'unavailable'
+      ? 'ready'
+      : browserGpsPosition && !browserGpsFresh
+        ? 'stale'
+        : browserGpsPosition && !gpsAccuracyAcceptable
+          ? 'searching'
+          : browserGpsStatus === 'searching'
+            ? 'searching'
+            : browserGpsStatus === 'error'
+              ? 'error'
+              : 'unavailable'
 
   // A stale position may center the map, but never unlock a node.
   // La posición antigua no se dibuja ni centra.
   // Solo se usa GPS vivo o posición debug.
-  const playerPosition =
-    localDebugPosition ||
-    (browserGpsFresh
-      ? browserGpsPosition
-      : null)
+  const playerPosition = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
 
-  const unlockPosition =
-    localDebugPosition ||
-    (hasFreshBrowserGps ? browserGpsPosition : null)
+  const unlockPosition = localDebugPosition || (hasFreshBrowserGps ? browserGpsPosition : null)
 
   const distanceMeters =
     stagePosition && unlockPosition
-      ? Math.round(
-          getDistanceMeters(unlockPosition, stagePosition)
-        )
+      ? Math.round(getDistanceMeters(unlockPosition, stagePosition))
       : null
 
   const inRange =
-    stageRadius !== null && distanceMeters !== null
-      ? distanceMeters <= stageRadius
-      : false
+    stageRadius !== null && distanceMeters !== null ? distanceMeters <= stageRadius : false
 
-  const effectiveDebugEnabled =
-    localDebugEnabled ||
-    Boolean(localDebugPosition)
+  const effectiveDebugEnabled = localDebugEnabled || Boolean(localDebugPosition)
 
   const runtime = deriveStageRuntime({
     currentStage,
@@ -712,20 +733,13 @@ export default function PlayerApp() {
     debugEnabled: effectiveDebugEnabled,
   })
 
-  const gpsActionRequired =
-    !payload.finished &&
-    Boolean(currentStage) &&
-    !unlockPosition
+  const gpsActionRequired = !payload.finished && Boolean(currentStage) && !unlockPosition
 
-  const gpsQualityWarning =
-    Boolean(browserGpsPosition) &&
-    browserGpsFresh &&
-    !gpsAccuracyAcceptable
+  const gpsQualityWarning = Boolean(browserGpsPosition) && browserGpsFresh && !gpsAccuracyAcceptable
 
-  const hudHelperText =
-    gpsQualityWarning
-      ? `GPS impreciso (${Math.round(browserGpsAccuracy || 0)} m). Esperando una lectura mejor para desbloquear el nodo.`
-      : gpsActionRequired
+  const hudHelperText = gpsQualityWarning
+    ? `GPS impreciso (${Math.round(browserGpsAccuracy || 0)} m). Esperando una lectura mejor para desbloquear el nodo.`
+    : gpsActionRequired
       ? 'Activa GPS para obtener una posición actual y entrar en el nodo cuando estés dentro del radio.'
       : runtime.helperText
 
@@ -745,7 +759,13 @@ export default function PlayerApp() {
   const adminHref = '/admin'
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
-  const primaryLabel = gpsActionRequired ? 'Activar GPS' : (!runtime.canEnter ? runtime.primaryLabel : (currentStageIsPhysicalQr ? 'Abrir QR' : runtime.primaryLabel))
+  const primaryLabel = gpsActionRequired
+    ? 'Activar GPS'
+    : !runtime.canEnter
+      ? runtime.primaryLabel
+      : currentStageIsPhysicalQr
+        ? 'Abrir QR'
+        : runtime.primaryLabel
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   async function refreshPayload() {
@@ -769,9 +789,7 @@ export default function PlayerApp() {
       config: prev.status === 'ready' ? prev.config : config,
     }))
 
-    setMapRefreshToken(
-      (value) => value + 1
-    )
+    setMapRefreshToken((value) => value + 1)
 
     return nextPayload
   }
@@ -782,7 +800,7 @@ export default function PlayerApp() {
     return nextProofs
   }
 
-function handleOpenFieldCamera() {
+  function handleOpenFieldCamera() {
     if (fieldPhotoUploading) {
       showNotice('Subiendo foto…', 'info')
       return
@@ -801,7 +819,9 @@ function handleOpenFieldCamera() {
   async function handleDeleteFieldProof(proofId: string) {
     if (!proofId) return
 
-    const confirmed = window.confirm('¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.')
+    const confirmed = window.confirm(
+      '¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.'
+    )
     if (!confirmed) return
 
     try {
@@ -850,7 +870,6 @@ function handleOpenFieldCamera() {
     }
   }
 
-
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
     setTeamOpen(false)
@@ -897,11 +916,7 @@ function handleOpenFieldCamera() {
         setBrowserGpsPosition(storedGps)
         setBrowserGpsStatus('stale')
         setBrowserGpsFresh(false)
-        setBrowserGpsAccuracy(
-          typeof storedGps.accuracy === 'number'
-            ? storedGps.accuracy
-            : null
-        )
+        setBrowserGpsAccuracy(typeof storedGps.accuracy === 'number' ? storedGps.accuracy : null)
         setBrowserGpsCapturedAt(null)
         gpsCenteredRef.current = false
       }
@@ -919,7 +934,11 @@ function handleOpenFieldCamera() {
       return
     }
 
-    if (gpsWatchRef.current !== null && typeof window !== 'undefined' && window.navigator.geolocation) {
+    if (
+      gpsWatchRef.current !== null &&
+      typeof window !== 'undefined' &&
+      window.navigator.geolocation
+    ) {
       window.navigator.geolocation.clearWatch(gpsWatchRef.current)
       gpsWatchRef.current = null
     }
@@ -929,7 +948,10 @@ function handleOpenFieldCamera() {
     setBrowserGpsAccuracy(null)
     setBrowserGpsCapturedAt(null)
     setLocalDebugEnabled(true)
-    showNotice('Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.', 'info')
+    showNotice(
+      'Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.',
+      'info'
+    )
     vibrate([10, 16, 10])
   }
 
@@ -997,24 +1019,15 @@ function handleOpenFieldCamera() {
       return
     }
 
-    const stages =
-      Array.isArray(payload.stages)
-        ? payload.stages
-        : []
+    const stages = Array.isArray(payload.stages) ? payload.stages : []
 
-    const hasRouteNodes =
-      stages.some(
-        (stage) =>
-          typeof stage.lat === 'number' &&
-          typeof stage.lon === 'number',
-      )
+    const hasRouteNodes = stages.some(
+      (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
+    )
 
     const nextToken = Date.now()
 
-    if (
-      routeOverviewActive ||
-      !hasRouteNodes
-    ) {
+    if (routeOverviewActive || !hasRouteNodes) {
       setRouteOverviewActive(false)
       setFollowPlayer(true)
       setFocusRequest({
@@ -1050,15 +1063,17 @@ function handleOpenFieldCamera() {
     if (!window.isSecureContext) {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
-      if (!options.silent) showNotice('El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.', 'warn')
+      if (!options.silent)
+        showNotice(
+          'El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.',
+          'warn'
+        )
       return
     }
 
     // Reactivar GPS debe crear un watch nuevo, no reutilizar uno bloqueado.
     if (gpsWatchRef.current !== null) {
-      window.navigator.geolocation.clearWatch(
-        gpsWatchRef.current
-      )
+      window.navigator.geolocation.clearWatch(gpsWatchRef.current)
       gpsWatchRef.current = null
     }
 
@@ -1067,7 +1082,8 @@ function handleOpenFieldCamera() {
     setBrowserGpsStatus('searching')
     setBrowserGpsFresh(false)
     setBrowserGpsCapturedAt(null)
-    if (!options.silent) showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
+    if (!options.silent)
+      showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
     const onSuccess = (position: GeolocationPosition) => {
       const next = {
@@ -1076,14 +1092,12 @@ function handleOpenFieldCamera() {
       }
 
       const nextAccuracy =
-        typeof position.coords.accuracy === 'number' &&
-        Number.isFinite(position.coords.accuracy)
+        typeof position.coords.accuracy === 'number' && Number.isFinite(position.coords.accuracy)
           ? Math.max(0, position.coords.accuracy)
           : null
 
       const capturedAt =
-        typeof position.timestamp === 'number' &&
-        Number.isFinite(position.timestamp)
+        typeof position.timestamp === 'number' && Number.isFinite(position.timestamp)
           ? position.timestamp
           : Date.now()
 
@@ -1101,19 +1115,13 @@ function handleOpenFieldCamera() {
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
-      const shouldFocus =
-        options.forceFocus ||
-        !gpsCenteredRef.current
-
-      if (shouldFocus) {
+      if (options?.forceFocus && followPlayerRef.current) {
         gpsCenteredRef.current = true
-        setFollowPlayer(true)
         setFocusRequest({
           target: 'player',
           token: Date.now(),
         })
       }
-      setGpsLoaded(true)
 
       void sendHeartbeat({
         user,
@@ -1132,7 +1140,6 @@ function handleOpenFieldCamera() {
     const onError = (error: GeolocationPositionError) => {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
-      setGpsLoaded(true)
       const denied = error.code === error.PERMISSION_DENIED
       if (!options.silent) {
         showNotice(
@@ -1145,16 +1152,16 @@ function handleOpenFieldCamera() {
     }
 
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: false,
+      enableHighAccuracy: true,
       maximumAge: 10000,
-      timeout: 5000,
+      timeout: 4000,
     })
 
     if (gpsWatchRef.current === null) {
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
         enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 20000,
+        maximumAge: 10000,
+        timeout: 4000,
       })
     }
   }
@@ -1181,9 +1188,7 @@ function handleOpenFieldCamera() {
         config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
       }))
 
-      setMapRefreshToken(
-        (value) => value + 1
-      )
+      setMapRefreshToken((value) => value + 1)
 
       setOfflineSummary(await getOfflineMissionSummary(payload.user))
       setOfflinePrepState('saved')
@@ -1193,7 +1198,10 @@ function handleOpenFieldCamera() {
       vibrate([10, 16, 10])
     } catch (error) {
       setOfflinePrepState('error')
-      showNotice(error instanceof Error ? error.message : 'Could not download offline mission.', 'warn')
+      showNotice(
+        error instanceof Error ? error.message : 'Could not download offline mission.',
+        'warn'
+      )
       vibrate(10)
     }
   }
@@ -1201,15 +1209,15 @@ function handleOpenFieldCamera() {
   async function handleDownloadFieldProofs() {
     if (!fieldProofs.length) return
     showNotice('Preparando archivo ZIP...', 'info')
-    
+
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      
+
       const promises = fieldProofs.map(async (proof, index) => {
         const url = proof.image_url || proof.thumbnail_url
         if (!url) return
-        
+
         try {
           const response = await fetch(url)
           const blob = await response.blob()
@@ -1219,11 +1227,13 @@ function handleOpenFieldCamera() {
           console.warn('Failed to fetch photo for zip', err)
         }
       })
-      
+
       await Promise.all(promises)
-      
+
       const content = await zip.generateAsync({ type: 'base64' })
-      const safeUserName = String(payload.user || 'jugador').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      const safeUserName = String(payload.user || 'jugador')
+        .replace(/[^a-z0-9]/gi, '_')
+        .toLowerCase()
       const downloadUrl = `data:application/zip;base64,${content}`
       const a = document.createElement('a')
       a.href = downloadUrl
@@ -1231,7 +1241,7 @@ function handleOpenFieldCamera() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      
+
       showNotice('Descarga de ZIP completada', 'success')
     } catch (err) {
       console.error(err)
@@ -1334,8 +1344,17 @@ function handleOpenFieldCamera() {
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
         const missingItem = result.reason === 'missing_required_item'
-        setSubmitError(missingItem ? 'Missing required item for this node.' : 'Invalid code for the current stage.')
-        showNotice(missingItem ? 'Missing required item for this node.' : 'The code was not accepted for this stage.', 'warn')
+        setSubmitError(
+          missingItem
+            ? 'Missing required item for this node.'
+            : 'Invalid code for the current stage.'
+        )
+        showNotice(
+          missingItem
+            ? 'Missing required item for this node.'
+            : 'The code was not accepted for this stage.',
+          'warn'
+        )
         return
       }
 
@@ -1367,9 +1386,7 @@ function handleOpenFieldCamera() {
             config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
           }))
 
-          setMapRefreshToken(
-            (value) => value + 1
-          )
+          setMapRefreshToken((value) => value + 1)
 
           if (localResult.payload.finished) {
             showOverlay('finish')
@@ -1416,258 +1433,304 @@ function handleOpenFieldCamera() {
 
   return (
     <ScreenFrame mobile={isPhone}>
-        <MapSurface
+      <MapSurface
+        currentStage={currentStage}
+        missionStages={payload.stages || []}
+        currentLevel={payload.level || 0}
+        playerPosition={playerPosition}
+        gpsState={gpsState}
+        debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
+        followPlayer={followPlayer}
+        focusRequest={focusRequest}
+        refreshToken={mapRefreshToken}
+        mapboxToken={state.config?.mapbox_token}
+        mapboxStyle={state.config?.mapbox_style}
+        onUserMapMove={() => {
+          setFollowPlayer(false)
+          setRouteOverviewActive(false)
+        }}
+        nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
+        otherPlayers={teamMapMarkers}
+        fieldProofs={fieldProofs}
+        viewerUser={payload.user}
+        onDeleteFieldProof={handleDeleteFieldProof}
+        onOpenFieldProofs={setSelectedFieldProofs}
+        selfLabel={payload.display_name || payload.user || 'YO'}
+        selfProfile={{
+          ...(payload.profile || {}),
+          user: payload.user,
+          display_name: payload.display_name || payload.user,
+          gps_status: gpsState,
+        }}
+        onDebugSetPosition={handleDebugSetPosition}
+        onNodeTap={handleMapNodeTap}
+      />
+
+      {!isSecure && !hideInsecureNotice ? (
+        <div style={insecureNoticeCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div style={insecureNoticeTitle}>⚠️ ENTORNO NO SEGURO (HTTP)</div>
+            <button
+              type="button"
+              onClick={() => setHideInsecureNotice(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: 16,
+                fontWeight: 900,
+                cursor: 'pointer',
+                padding: '0 4px',
+                margin: '-4px -4px 0 0',
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={insecureNoticeBody}>
+            El navegador bloquea el GPS y el mapa offline en conexiones HTTP. Para probar el modo
+            offline:
+            <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+              <li>
+                Usa <strong>https://</strong> (con ngrok)
+              </li>
+              <li>
+                O en Chrome del móvil, entra en{' '}
+                <code
+                  style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}
+                >
+                  chrome://flags/#unsafely-treat-insecure-origin-as-secure
+                </code>
+                , añade esta URL y actívalo.
+              </li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
+      <div style={getTopScrimStyle(isPhone)} />
+
+      <div style={getTopOverlayStyle(isPhone)}>
+        <PlayerShell
+          payload={payload}
           currentStage={currentStage}
-          missionStages={payload.stages || []}
-          currentLevel={payload.level || 0}
-          playerPosition={playerPosition}
+          teamOpen={teamOpen}
+          teamCount={teamVisibleCount}
+          teamLiveCount={teamLiveCount}
           gpsState={gpsState}
-          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-          followPlayer={followPlayer}
-          focusRequest={focusRequest}
-          refreshToken={mapRefreshToken}
-          mapboxToken={state.config?.mapbox_token}
-          mapboxStyle={state.config?.mapbox_style}
-          onUserMapMove={() => {
-            setFollowPlayer(false)
-            setRouteOverviewActive(false)
-          }}
-          nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
-          otherPlayers={teamMapMarkers}
-          fieldProofs={fieldProofs}
-          viewerUser={payload.user}
-          onDeleteFieldProof={handleDeleteFieldProof}
-          onOpenFieldProofs={setSelectedFieldProofs}
-          selfLabel={payload.display_name || payload.user || 'YO'}
-          selfProfile={{
-            ...(payload.profile || {}),
-            user: payload.user,
-            display_name: payload.display_name || payload.user,
-            gps_status: gpsState,
-          }}
-          onDebugSetPosition={handleDebugSetPosition}
-          onNodeTap={handleMapNodeTap}
+          onOpenTeam={openTeam}
         />
-
-        <div style={getTopScrimStyle(isPhone)} />
-
-        <div style={getTopOverlayStyle(isPhone)}>
-          <PlayerShell
-            payload={payload}
-            currentStage={currentStage}
-            teamOpen={teamOpen}
-            teamCount={teamVisibleCount}
-            teamLiveCount={teamLiveCount}
-            gpsState={gpsState}
-            onOpenTeam={openTeam}
-          />
-        </div>
-
-        <div style={getToastOverlayStyle(isPhone)}>
-          <ToastNotice notice={uiNotice} />
-        </div>
-
-        <FieldPhotoViewer
-          open={selectedFieldProofs.length > 0}
-          proofs={selectedFieldProofs}
-          viewerUser={payload.user}
-          onClose={() => setSelectedFieldProofs([])}
-          onDelete={handleDeleteFieldProof}
-        />
-
-        <FieldCameraCapture
-          open={fieldCameraOpen}
-          busy={fieldPhotoUploading}
-          onClose={() => setFieldCameraOpen(false)}
-          onCapture={handleFieldCameraCapture}
-        />
-
-        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
-          <div style={getMapQuickControlsStyle(isPhone)}>
-            <QuickProofPanel
-              user={user}
-              mobile={isPhone}
-              hidden={false}
-              openSignal={quickQrOpenSignal}
-              showLauncher={false}
-            />
-
-            <button
-              type="button"
-              style={mapRouteToggleInlineButton}
-              disabled={fieldPhotoUploading}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                handleOpenFieldCamera()
-              }}
-              aria-label="Hacer foto de campo"
-              title="Hacer foto de campo"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>{fieldPhotoUploading ? '⏳' : '📷'}</span>
-            </button>
-
-            <button
-              type="button"
-              style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                openTeam()
-              }}
-              aria-label="Jugadores"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>👥</span>
-              <span style={mapQuickCountPill}>{teamVisibleCount}</span>
-            </button>
-
-            <button
-              type="button"
-              style={
-                routeOverviewActive
-                  ? mapQuickButtonActive
-                  : mapRouteToggleInlineButton
-              }
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                handleToggleRouteOverview()
-              }}
-              aria-label={
-                routeOverviewActive
-                  ? 'Volver a mi ubicación y seguirme'
-                  : 'Ver todos los nodos'
-              }
-              title={
-                routeOverviewActive
-                  ? 'Volver a mi ubicación y seguirme'
-                  : 'Ver todos los nodos'
-              }
-            >
-              <span
-                aria-hidden="true"
-                style={mapQuickIcon}
-              >
-                {routeOverviewActive ? '📍' : '🧭'}
-              </span>
-            </button>
-
-          </div>
-        ) : null}{/* saga-map-quick-controls-row-v1 */}
-
-          <FieldPrepPanel
-            visible={offlinePrepVisible && !payload.finished}
-            mobile={isPhone}
-            hasOfflineMission={hasOfflineMission}
-            hasBrowserGps={hasBrowserGps}
-            offlinePrepState={offlinePrepState}
-            browserGpsStatus={browserGpsStatus}
-            onPrepareOfflinePack={handlePrepareOfflinePack}
-            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-            onDismiss={() => setOfflinePrepVisible(false)}
-          />
-
-        {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
-
-        {payload.finished && !dismissedFinishScreen ? (
-          <div className="saga-finish-overlay" role="dialog" aria-modal="true">
-            <style>{finishOverlayStyle}</style>
-            <div className="saga-finish-card">
-              <div className="saga-finish-orb">🏆</div>
-              <h2 className="saga-finish-title">Misión Completada</h2>
-              <p className="saga-finish-subtitle">
-                ¡Excelente trabajo, agente <strong>{payload.display_name || payload.user}</strong>! Has completado con éxito todos los nodos de la ruta de campo.
-              </p>
-              
-              <div className="saga-finish-stats">
-                <div className="saga-finish-stat-box">
-                  <div className="saga-finish-stat-val">{payload.stages?.length || 0}</div>
-                  <div className="saga-finish-stat-lbl">Nodos</div>
-                </div>
-                <div className="saga-finish-stat-box">
-                  <div className="saga-finish-stat-val">{fieldProofs?.filter((p) => p.user === payload.user).length || 0}</div>
-                  <div className="saga-finish-stat-lbl">Fotos</div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="saga-finish-btn-primary"
-                onClick={() => setDismissedFinishScreen(true)}
-              >
-                Ver mapa de ruta
-              </button>
-
-              <button
-                type="button"
-                className="saga-finish-btn-secondary"
-                onClick={() => window.location.assign('/')}
-              >
-                Salir
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-      <div style={{ position: 'absolute', right: isPhone ? 16 : 24, bottom: isPhone ? 110 : 130, zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button
-          type="button"
-          aria-label="Centrar en mi ubicación"
-          onClick={() => void handleRequestLiveGps({ forceFocus: true })}
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 999,
-            background: gpsState === 'ready' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(15, 23, 42, 0.8)',
-            border: gpsState === 'ready' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-            color: gpsState === 'ready' ? '#34d399' : '#f8fafc',
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 22,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(12px)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          {gpsState === 'searching' ? '⏱' : '📍'}
-        </button>
       </div>
+
+      <div style={getToastOverlayStyle(isPhone)}>
+        <ToastNotice notice={uiNotice} />
+      </div>
+
+      <FieldPhotoViewer
+        open={selectedFieldProofs.length > 0}
+        proofs={selectedFieldProofs}
+        viewerUser={payload.user}
+        onClose={() => setSelectedFieldProofs([])}
+        onDelete={handleDeleteFieldProof}
+      />
+
+      <FieldCameraCapture
+        open={fieldCameraOpen}
+        busy={fieldPhotoUploading}
+        onClose={() => setFieldCameraOpen(false)}
+        onCapture={handleFieldCameraCapture}
+      />
+
+      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
+        <div style={getMapQuickControlsStyle(isPhone)}>
+          <QuickProofPanel
+            user={user}
+            mobile={isPhone}
+            hidden={false}
+            openSignal={quickQrOpenSignal}
+            showLauncher={false}
+          />
+
+          <button
+            type="button"
+            style={mapRouteToggleInlineButton}
+            disabled={fieldPhotoUploading}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              handleOpenFieldCamera()
+            }}
+            aria-label="Hacer foto de campo"
+            title="Hacer foto de campo"
+          >
+            <span aria-hidden="true" style={mapQuickIcon}>
+              {fieldPhotoUploading ? '⏳' : '📷'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              openTeam()
+            }}
+            aria-label="Jugadores"
+          >
+            <span aria-hidden="true" style={mapQuickIcon}>
+              👥
+            </span>
+            <span style={mapQuickCountPill}>{teamVisibleCount}</span>
+          </button>
+
+          <button
+            type="button"
+            style={routeOverviewActive ? mapQuickButtonActive : mapRouteToggleInlineButton}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              handleToggleRouteOverview()
+            }}
+            aria-label={
+              routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
+            }
+            title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
+          >
+            <span aria-hidden="true" style={mapQuickIcon}>
+              {routeOverviewActive ? '📍' : '🧭'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            style={{
+              ...mapRouteToggleInlineButton,
+              background: 'rgba(52, 211, 153, 0.2)',
+              borderColor: 'rgba(52, 211, 153, 0.4)',
+              color: '#34d399',
+              fontWeight: 800,
+              fontSize: 13,
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              transition:
+                'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, padding 0.3s ease',
+              maxWidth: !followPlayer ? '100px' : '0px',
+              minWidth: !followPlayer ? '44px' : '0px',
+              width: !followPlayer ? 'auto' : '0px',
+              opacity: !followPlayer ? 1 : 0,
+              paddingLeft: !followPlayer ? 12 : 0,
+              paddingRight: !followPlayer ? 12 : 0,
+              borderWidth: !followPlayer ? 1 : 0,
+              pointerEvents: !followPlayer ? 'auto' : 'none',
+              marginLeft: 0,
+            }}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setFollowPlayer(true)
+              void handleRequestLiveGps({ forceFocus: true })
+            }}
+            aria-label="Centrar en mi ubicación"
+          >
+            CENTRAR
+          </button>
+        </div>
+      ) : null}
+      {/* saga-map-quick-controls-row-v1 */}
+
+      <FieldPrepPanel
+        visible={offlinePrepVisible && !payload.finished}
+        mobile={isPhone}
+        hasOfflineMission={hasOfflineMission}
+        hasBrowserGps={hasBrowserGps}
+        offlinePrepState={offlinePrepState}
+        browserGpsStatus={browserGpsStatus}
+        onPrepareOfflinePack={handlePrepareOfflinePack}
+        onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+        onDismiss={() => setOfflinePrepVisible(false)}
+      />
+
+      {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
+
+      {payload.finished && !dismissedFinishScreen ? (
+        <div className="saga-finish-overlay" role="dialog" aria-modal="true">
+          <style>{finishOverlayStyle}</style>
+          <div className="saga-finish-card">
+            <div className="saga-finish-orb">🏆</div>
+            <h2 className="saga-finish-title">Misión Completada</h2>
+            <p className="saga-finish-subtitle">
+              ¡Excelente trabajo, agente <strong>{payload.display_name || payload.user}</strong>!
+              Has completado con éxito todos los nodos de la ruta de campo.
+            </p>
+
+            <div className="saga-finish-stats">
+              <div className="saga-finish-stat-box">
+                <div className="saga-finish-stat-val">{payload.stages?.length || 0}</div>
+                <div className="saga-finish-stat-lbl">Nodos</div>
+              </div>
+              <div className="saga-finish-stat-box">
+                <div className="saga-finish-stat-val">
+                  {fieldProofs?.filter((p) => p.user === payload.user).length || 0}
+                </div>
+                <div className="saga-finish-stat-lbl">Fotos</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="saga-finish-btn-primary"
+              onClick={() => setDismissedFinishScreen(true)}
+            >
+              Ver mapa de ruta
+            </button>
+
+            <button
+              type="button"
+              className="saga-finish-btn-secondary"
+              onClick={() => window.location.assign('/')}
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div style={getBottomOverlayStyle(isPhone)}>
         <PlayerHud
-            user={payload.user}
-            missionPayload={payload}
-            currentStage={currentStage}
-            level={payload.level}
-            finished={payload.finished}
-            gpsState={gpsState}
-            distanceMeters={distanceMeters}
-            inRange={inRange}
-            debugEnabled={effectiveDebugEnabled}
-            followPlayer={followPlayer}
-            toolsOpen={toolsOpen}
-            playerHref={playerHref}
-            loginHref={shellLoginHref}
-            adminHref={adminHref}
-            primaryLabel={primaryLabel}
-            primaryTone={runtime.primaryTone}
-            primaryDisabled={primaryDisabled}
-            helperText={hudHelperText}
-            detailsOpen={activePanel === 'details'}
-            onPrimaryAction={handlePrimaryAction}
-            onToggleDetails={() => togglePanel('details')}
-            onOpenTools={openTools}
-            onCloseTools={closeTools}
-            onToggleDebug={handleToggleDebug}
-            onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
-            onDownloadFieldProofs={handleDownloadFieldProofs}
-            fieldPhotoCount={fieldProofs.length}
-             submitting={submitting}
-             errorMessage={submitError}
-             onSubmitCode={handleSubmitCode}
-          />
-        </div>
+          user={payload.user}
+          missionPayload={payload}
+          currentStage={currentStage}
+          level={payload.level}
+          finished={payload.finished}
+          gpsState={gpsState}
+          distanceMeters={distanceMeters}
+          inRange={inRange}
+          debugEnabled={effectiveDebugEnabled}
+          followPlayer={followPlayer}
+          toolsOpen={toolsOpen}
+          playerHref={playerHref}
+          loginHref={shellLoginHref}
+          adminHref={adminHref}
+          primaryLabel={primaryLabel}
+          primaryTone={runtime.primaryTone}
+          primaryDisabled={primaryDisabled}
+          helperText={hudHelperText}
+          detailsOpen={activePanel === 'details'}
+          onPrimaryAction={handlePrimaryAction}
+          onToggleDetails={() => togglePanel('details')}
+          onOpenTools={openTools}
+          onCloseTools={closeTools}
+          onToggleDebug={handleToggleDebug}
+          onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+          onDownloadFieldProofs={handleDownloadFieldProofs}
+          fieldPhotoCount={fieldProofs.length}
+          submitting={submitting}
+          errorMessage={submitError}
+          onSubmitCode={handleSubmitCode}
+        />
+      </div>
 
       <TeamSheet
         open={teamOpen}
@@ -1768,4 +1831,35 @@ const mapQuickCountPill: CSSProperties = {
   fontWeight: 950,
   lineHeight: 1,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+}
+
+const insecureNoticeCardStyle: CSSProperties = {
+  position: 'absolute',
+  top: 140,
+  left: 12,
+  right: 12,
+  padding: 14,
+  borderRadius: 20,
+  background: 'rgba(220,38,38,.92)',
+  border: '1px solid rgba(255,255,255,.2)',
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 750,
+  lineHeight: 1.45,
+  zIndex: 1200,
+  boxShadow: '0 16px 36px rgba(0,0,0,.35)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+}
+
+const insecureNoticeTitle: CSSProperties = {
+  fontWeight: 900,
+  fontSize: 13,
+  letterSpacing: '-0.02em',
+}
+
+const insecureNoticeBody: CSSProperties = {
+  marginTop: 6,
+  opacity: 0.95,
+  fontWeight: 700,
 }

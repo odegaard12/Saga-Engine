@@ -49,7 +49,6 @@ function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
   }
 }
 
-
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -59,7 +58,12 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;')
 }
 
-function buildPinHtml(stage: AdminReactOverviewStage, selected: boolean, color: string, fill: string) {
+function buildPinHtml(
+  stage: AdminReactOverviewStage,
+  selected: boolean,
+  color: string,
+  fill: string
+) {
   const title = escapeHtml(stage.title || 'Untitled node')
   const family = escapeHtml(getFamilyLabel(stage))
   const label = `${stage.index + 1}`
@@ -99,10 +103,7 @@ export default function AdminMissionMap({
   const layersRef = useRef<L.Layer[]>([])
   const dragClickSuppressUntilRef = useRef(0)
 
-  const mappedStages = useMemo(
-    () => stages.filter(hasCoords),
-    [stages]
-  )
+  const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
   useEffect(() => {
     if (!mapRootRef.current || mapRef.current) return
@@ -139,7 +140,8 @@ export default function AdminMissionMap({
       if (
         map.getContainer().classList.contains('admin-map-dragging-node') ||
         Date.now() < dragClickSuppressUntilRef.current
-      ) return
+      )
+        return
 
       onCreateStageAt(event.latlng.lat, event.latlng.lng, {
         x: event.originalEvent.clientX,
@@ -197,7 +199,9 @@ export default function AdminMissionMap({
       }).addTo(map)
 
       const physicalLabel = getPhysicalNodeMapLabel(stage)
-      const stageTitle = physicalLabel ? `${physicalLabel} · ${stage.title || 'Nodo'}` : (stage.title || 'Untitled node')
+      const stageTitle = physicalLabel
+        ? `${physicalLabel} · ${stage.title || 'Nodo'}`
+        : stage.title || 'Untitled node'
       const tooltip = `${stage.index + 1}. ${stageTitle} · ${getFamilyLabel(stage)} · ${radius}m`
 
       marker.bindTooltip(tooltip, {
@@ -298,12 +302,20 @@ export default function AdminMissionMap({
         <div>
           <div style={kicker}>Mission map</div>
           <div style={title}>{mappedStages.length} mapped nodes</div>
-          <div style={helper}>Click en mapa para crear · arrastra pines para mover · click en pin para editar</div>
+          <div style={helper}>
+            Click en mapa para crear · arrastra pines para mover · click en pin para editar
+          </div>
         </div>
         <div style={legend}>
-          <span><i style={{ background: '#34d399' }} /> Signal</span>
-          <span><i style={{ background: '#38bdf8' }} /> Bearing</span>
-          <span><i style={{ background: '#a78bfa' }} /> Circuit</span>
+          <span>
+            <i style={{ background: '#34d399' }} /> Signal
+          </span>
+          <span>
+            <i style={{ background: '#38bdf8' }} /> Bearing
+          </span>
+          <span>
+            <i style={{ background: '#a78bfa' }} /> Circuit
+          </span>
         </div>
       </div>
 

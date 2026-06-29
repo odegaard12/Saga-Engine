@@ -1,14 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
-import type {
-  ResolvedCircuitMatrixMinigame,
-} from '../../core/resolver'
+import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import {
   generateTiltMaze,
   nextTiltMazeCell,
@@ -27,11 +19,7 @@ type Props = {
   onWin: () => Promise<void>
 }
 
-type Phase =
-  | 'ready'
-  | 'playing'
-  | 'success'
-  | 'failed'
+type Phase = 'ready' | 'playing' | 'success' | 'failed'
 
 const CSS = `
 .tilt-shell,.tilt-shell *{box-sizing:border-box}
@@ -67,28 +55,16 @@ const CSS = `
 @media(max-width:430px){.tilt-body{padding:12px}.tilt-pad{grid-template-columns:repeat(3,54px)}}
 `
 
-function clamp(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number,
-) {
+function clamp(value: unknown, fallback: number, minimum: number, maximum: number) {
   const parsed = Number(value)
 
   return Math.max(
     minimum,
-    Math.min(
-      maximum,
-      Number.isFinite(parsed)
-        ? Math.round(parsed)
-        : fallback,
-    ),
+    Math.min(maximum, Number.isFinite(parsed) ? Math.round(parsed) : fallback)
   )
 }
 
-function haptic(
-  pattern: number | number[],
-) {
+function haptic(pattern: number | number[]) {
   try {
     navigator.vibrate?.(pattern)
   } catch {
@@ -96,81 +72,30 @@ function haptic(
   }
 }
 
-export function TiltMazeRuntimeScreen({
-  resolved,
-  stage,
-  helperText,
-  submitting,
-  onWin,
-}: Props) {
+export function TiltMazeRuntimeScreen({ resolved, stage, helperText, submitting, onWin }: Props) {
   const config = resolved.config
 
-  const rows = clamp(
-    config.grid_rows,
-    9,
-    5,
-    13,
+  const rows = clamp(config.grid_rows, 9, 5, 13)
+
+  const cols = clamp(config.grid_cols, 9, 5, 13)
+
+  const initialLives = clamp(config.lives, 3, 1, 5)
+
+  const timeLimit = clamp(config.time_limit_s, 75, 20, 180)
+
+  const threshold = clamp(config.tilt_threshold, 12, 6, 30)
+
+  const cooldown = clamp(config.step_cooldown_ms, 360, 180, 800)
+
+  const baseSeed = String(config.maze_seed || 'saga-maze')
+
+  const patternMode = config.pattern_mode === 'random_each_game' ? 'random_each_game' : 'fixed'
+
+  const [sessionSeed] = useState(() =>
+    patternMode === 'random_each_game'
+      ? [baseSeed, Date.now().toString(36), Math.random().toString(36).slice(2)].join('-')
+      : baseSeed
   )
-
-  const cols = clamp(
-    config.grid_cols,
-    9,
-    5,
-    13,
-  )
-
-  const initialLives = clamp(
-    config.lives,
-    3,
-    1,
-    5,
-  )
-
-  const timeLimit = clamp(
-    config.time_limit_s,
-    75,
-    20,
-    180,
-  )
-
-  const threshold = clamp(
-    config.tilt_threshold,
-    12,
-    6,
-    30,
-  )
-
-  const cooldown = clamp(
-    config.step_cooldown_ms,
-    360,
-    180,
-    800,
-  )
-
-  const baseSeed = String(
-    config.maze_seed ||
-    'saga-maze',
-  )
-
-  const patternMode =
-    config.pattern_mode ===
-    'random_each_game'
-      ? 'random_each_game'
-      : 'fixed'
-
-  const [sessionSeed] =
-    useState(() =>
-      patternMode ===
-      'random_each_game'
-        ? [
-            baseSeed,
-            Date.now().toString(36),
-            Math.random()
-              .toString(36)
-              .slice(2),
-          ].join('-')
-        : baseSeed,
-    )
 
   const maze = useMemo(
     () =>
@@ -178,106 +103,54 @@ export function TiltMazeRuntimeScreen({
         rows,
         cols,
         seed: sessionSeed,
-        holeCount: clamp(
-          config.hole_count,
-          4,
-          0,
-          18,
-        ),
-        collectibleCount:
-          clamp(
-            config.collectible_count,
-            2,
-            0,
-            6,
-          ),
+        holeCount: clamp(config.hole_count, 4, 0, 18),
+        collectibleCount: clamp(config.collectible_count, 2, 0, 6),
       }),
-    [
-      rows,
-      cols,
-      sessionSeed,
-      config.hole_count,
-      config.collectible_count,
-    ],
+    [rows, cols, sessionSeed, config.hole_count, config.collectible_count]
   )
 
-  const [phase, setPhase] =
-    useState<Phase>('ready')
+  const [phase, setPhase] = useState<Phase>('ready')
 
-  const [position, setPosition] =
-    useState(maze.start)
+  const [position, setPosition] = useState(maze.start)
 
-  const [lives, setLives] =
-    useState(initialLives)
+  const [lives, setLives] = useState(initialLives)
 
-  const [remaining, setRemaining] =
-    useState(timeLimit)
+  const [remaining, setRemaining] = useState(timeLimit)
 
-  const [collected, setCollected] =
-    useState<Set<number>>(
-      () => new Set(),
-    )
+  const [collected, setCollected] = useState<Set<number>>(() => new Set())
 
-  const [message, setMessage] =
-    useState('')
+  const [message, setMessage] = useState('')
 
-  const [failure, setFailure] =
-    useState('')
+  const [failure, setFailure] = useState('')
 
-  const [sensorActive, setSensorActive] =
-    useState(false)
+  const [sensorActive, setSensorActive] = useState(false)
 
-  const [sensorText, setSensorText] =
-    useState(
-      'Botones táctiles disponibles',
-    )
+  const [sensorText, setSensorText] = useState('Botones táctiles disponibles')
 
-  const [continuing, setContinuing] =
-    useState(false)
+  const [continuing, setContinuing] = useState(false)
 
-  const baselineRef =
-    useRef<{
-      beta: number
-      gamma: number
-    } | null>(null)
+  const baselineRef = useRef<{
+    beta: number
+    gamma: number
+  } | null>(null)
 
   const lastStepRef = useRef(0)
-  const continueLockRef =
-    useRef(false)
+  const continueLockRef = useRef(false)
 
-  const moveRef =
-    useRef<
-      (direction: TiltDirection) =>
-        void
-    >(() => undefined)
+  const moveRef = useRef<(direction: TiltDirection) => void>(() => undefined)
 
-  const holeSet =
-    useMemo(
-      () => new Set(maze.holes),
-      [maze.holes],
-    )
+  const holeSet = useMemo(() => new Set(maze.holes), [maze.holes])
 
-  const itemSet =
-    useMemo(
-      () =>
-        new Set(maze.collectibles),
-      [maze.collectibles],
-    )
+  const itemSet = useMemo(() => new Set(maze.collectibles), [maze.collectibles])
 
-  const allCollected =
-    collected.size >=
-    maze.collectibles.length
+  const allCollected = collected.size >= maze.collectibles.length
 
   useEffect(() => {
     setPosition(maze.start)
     setLives(initialLives)
     setRemaining(timeLimit)
     setCollected(new Set())
-  }, [
-    maze,
-    initialLives,
-    timeLimit,
-  ])
+  }, [maze, initialLives, timeLimit])
 
   const move = useCallback(
     (direction: TiltDirection) => {
@@ -285,31 +158,21 @@ export function TiltMazeRuntimeScreen({
         return
       }
 
-      const next =
-        nextTiltMazeCell(
-          maze,
-          position,
-          direction,
-        )
+      const next = nextTiltMazeCell(maze, position, direction)
 
       if (next === null) {
         haptic(10)
-        setMessage(
-          'Pared. Busca otra dirección.',
-        )
+        setMessage('Pared. Busca otra dirección.')
         return
       }
 
-      const nextCollected =
-        new Set(collected)
+      const nextCollected = new Set(collected)
 
       if (itemSet.has(next)) {
         nextCollected.add(next)
         setCollected(nextCollected)
         haptic([12, 20, 22])
-        setMessage(
-          'Objeto recogido.',
-        )
+        setMessage('Objeto recogido.')
       } else {
         setMessage('')
       }
@@ -321,46 +184,29 @@ export function TiltMazeRuntimeScreen({
         setLives(nextLives)
 
         if (nextLives <= 0) {
-          setFailure(
-            'Has perdido todas las vidas.',
-          )
+          setFailure('Has perdido todas las vidas.')
           setPhase('failed')
           return
         }
 
         setPosition(maze.start)
-        setMessage(
-          'Caíste en un agujero. Vuelves al inicio.',
-        )
+        setMessage('Caíste en un agujero. Vuelves al inicio.')
         return
       }
 
       setPosition(next)
 
       if (next === maze.goal) {
-        if (
-          nextCollected.size >=
-          maze.collectibles.length
-        ) {
+        if (nextCollected.size >= maze.collectibles.length) {
           haptic([20, 35, 80])
           setPhase('success')
           return
         }
 
-        setMessage(
-          'La salida está cerrada. Recoge todos los objetos.',
-        )
+        setMessage('La salida está cerrada. Recoge todos los objetos.')
       }
     },
-    [
-      phase,
-      maze,
-      position,
-      collected,
-      itemSet,
-      holeSet,
-      lives,
-    ],
+    [phase, maze, position, collected, itemSet, holeSet, lives]
   )
 
   useEffect(() => {
@@ -372,41 +218,29 @@ export function TiltMazeRuntimeScreen({
       return
     }
 
-    const timer =
-      window.setInterval(() => {
-        setRemaining((value) => {
-          if (value <= 1) {
-            window.clearInterval(timer)
-            setFailure(
-              'Se terminó el tiempo.',
-            )
-            setPhase('failed')
-            return 0
-          }
+    const timer = window.setInterval(() => {
+      setRemaining((value) => {
+        if (value <= 1) {
+          window.clearInterval(timer)
+          setFailure('Se terminó el tiempo.')
+          setPhase('failed')
+          return 0
+        }
 
-          return value - 1
-        })
-      }, 1000)
+        return value - 1
+      })
+    }, 1000)
 
-    return () =>
-      window.clearInterval(timer)
+    return () => window.clearInterval(timer)
   }, [phase])
 
   useEffect(() => {
-    if (
-      phase !== 'playing' ||
-      !sensorActive
-    ) {
+    if (phase !== 'playing' || !sensorActive) {
       return
     }
 
-    const handler = (
-      event: DeviceOrientationEvent,
-    ) => {
-      if (
-        event.beta === null ||
-        event.gamma === null
-      ) {
+    const handler = (event: DeviceOrientationEvent) => {
+      if (event.beta === null || event.gamma === null) {
         return
       }
 
@@ -416,127 +250,64 @@ export function TiltMazeRuntimeScreen({
           gamma: event.gamma,
         }
 
-        setSensorText(
-          'Sensor calibrado',
-        )
+        setSensorText('Sensor calibrado')
         return
       }
 
       const now = Date.now()
 
-      if (
-        now - lastStepRef.current <
-        cooldown
-      ) {
+      if (now - lastStepRef.current < cooldown) {
         return
       }
 
-      const deltaBeta =
-        event.beta -
-        baselineRef.current.beta
+      const deltaBeta = event.beta - baselineRef.current.beta
 
-      const deltaGamma =
-        event.gamma -
-        baselineRef.current.gamma
+      const deltaGamma = event.gamma - baselineRef.current.gamma
 
-      if (
-        Math.max(
-          Math.abs(deltaBeta),
-          Math.abs(deltaGamma),
-        ) < threshold
-      ) {
+      if (Math.max(Math.abs(deltaBeta), Math.abs(deltaGamma)) < threshold) {
         return
       }
 
       lastStepRef.current = now
 
-      if (
-        Math.abs(deltaGamma) >
-        Math.abs(deltaBeta)
-      ) {
-        moveRef.current(
-          deltaGamma > 0
-            ? 'right'
-            : 'left',
-        )
+      if (Math.abs(deltaGamma) > Math.abs(deltaBeta)) {
+        moveRef.current(deltaGamma > 0 ? 'right' : 'left')
       } else {
-        moveRef.current(
-          deltaBeta > 0
-            ? 'down'
-            : 'up',
-        )
+        moveRef.current(deltaBeta > 0 ? 'down' : 'up')
       }
     }
 
-    window.addEventListener(
-      'deviceorientation',
-      handler,
-    )
+    window.addEventListener('deviceorientation', handler)
 
-    return () =>
-      window.removeEventListener(
-        'deviceorientation',
-        handler,
-      )
-  }, [
-    phase,
-    sensorActive,
-    cooldown,
-    threshold,
-  ])
+    return () => window.removeEventListener('deviceorientation', handler)
+  }, [phase, sensorActive, cooldown, threshold])
 
   async function enableSensor() {
-    if (
-      config.sensor_enabled === false ||
-      !(
-        'DeviceOrientationEvent'
-        in window
-      )
-    ) {
+    if (config.sensor_enabled === false || !('DeviceOrientationEvent' in window)) {
       setSensorActive(false)
-      setSensorText(
-        'Modo táctil activo',
-      )
+      setSensorText('Modo táctil activo')
       return
     }
 
     try {
-      const Orientation =
-        window.DeviceOrientationEvent as
-          typeof DeviceOrientationEvent & {
-            requestPermission?: () =>
-              Promise<
-                'granted' |
-                'denied'
-              >
-          }
+      const Orientation = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+        requestPermission?: () => Promise<'granted' | 'denied'>
+      }
 
-      if (
-        typeof Orientation
-          .requestPermission ===
-        'function'
-      ) {
-        const permission =
-          await Orientation
-            .requestPermission()
+      if (typeof Orientation.requestPermission === 'function') {
+        const permission = await Orientation.requestPermission()
 
         if (permission !== 'granted') {
-          throw new Error(
-            'Permiso rechazado',
-          )
+          throw new Error('Permiso rechazado')
         }
       }
 
       baselineRef.current = null
       setSensorActive(true)
-      setSensorText(
-        'Mantén el móvil cómodo para calibrar',
-      )
+      setSensorText('Mantén el móvil cómodo para calibrar')
     } catch {
       setSensorActive(false)
-      setSensorText(
-        'Sensor no disponible · usa botones',
-      )
+      setSensorText('Sensor no disponible · usa botones')
     }
   }
 
@@ -554,44 +325,27 @@ export function TiltMazeRuntimeScreen({
     await enableSensor()
   }
 
-  const continueRoute =
-    useCallback(async () => {
-      if (
-        phase !== 'success' ||
-        submitting ||
-        continuing ||
-        continueLockRef.current
-      ) {
-        return
-      }
+  const continueRoute = useCallback(async () => {
+    if (phase !== 'success' || submitting || continuing || continueLockRef.current) {
+      return
+    }
 
-      continueLockRef.current = true
-      setContinuing(true)
+    continueLockRef.current = true
+    setContinuing(true)
 
-      try {
-        await onWin()
-      } catch (error) {
-        continueLockRef.current = false
-        setContinuing(false)
-        throw error
-      }
-    }, [
-      phase,
-      submitting,
-      continuing,
-      onWin,
-    ])
+    try {
+      await onWin()
+    } catch (error) {
+      continueLockRef.current = false
+      setContinuing(false)
+      throw error
+    }
+  }, [phase, submitting, continuing, onWin])
 
-  const title =
-    stage.title ||
-    'Laberinto de equilibrio'
+  const title = stage.title || 'Laberinto de equilibrio'
 
   const instructions =
-    String(
-      stage.content ||
-      helperText ||
-      '',
-    ).trim() ||
+    String(stage.content || helperText || '').trim() ||
     'Inclina el móvil o usa los botones para alcanzar la salida.'
 
   if (phase === 'ready') {
@@ -600,26 +354,15 @@ export function TiltMazeRuntimeScreen({
         <style>{CSS}</style>
 
         <div className="tilt-result">
-          <div className="tilt-result-icon">
-            ●
-          </div>
+          <div className="tilt-result-icon">●</div>
 
           <h2>{title}</h2>
 
           <p>{instructions}</p>
 
-          <p>
-            Recoge los objetos ◆, evita los
-            agujeros × y llega a la bandera ⚑.
-          </p>
+          <p>Recoge los objetos ◆, evita los agujeros × y llega a la bandera ⚑.</p>
 
-          <button
-            type="button"
-            className="tilt-primary"
-            onClick={() =>
-              void start()
-            }
-          >
+          <button type="button" className="tilt-primary" onClick={() => void start()}>
             Iniciar laberinto
           </button>
         </div>
@@ -633,31 +376,19 @@ export function TiltMazeRuntimeScreen({
         <style>{CSS}</style>
 
         <div className="tilt-result">
-          <div className="tilt-result-icon">
-            ✓
-          </div>
+          <div className="tilt-result-icon">✓</div>
 
           <h2>Laberinto superado</h2>
 
-          <p>
-            Has recogido todos los objetos
-            y alcanzado la salida.
-          </p>
+          <p>Has recogido todos los objetos y alcanzado la salida.</p>
 
           <button
             type="button"
             className="tilt-primary"
-            disabled={
-              submitting ||
-              continuing
-            }
-            onClick={() =>
-              void continueRoute()
-            }
+            disabled={submitting || continuing}
+            onClick={() => void continueRoute()}
           >
-            {submitting || continuing
-              ? 'Avanzando…'
-              : 'Continuar al siguiente nodo'}
+            {submitting || continuing ? 'Avanzando…' : 'Continuar al siguiente nodo'}
           </button>
         </div>
       </section>
@@ -670,9 +401,7 @@ export function TiltMazeRuntimeScreen({
         <style>{CSS}</style>
 
         <div className="tilt-result fail">
-          <div className="tilt-result-icon">
-            !
-          </div>
+          <div className="tilt-result-icon">!</div>
 
           <h2>Intento terminado</h2>
 
@@ -718,8 +447,7 @@ export function TiltMazeRuntimeScreen({
 
           <div className="tilt-stat">
             <strong>
-              {collected.size}/
-              {maze.collectibles.length}
+              {collected.size}/{maze.collectibles.length}
             </strong>
             <span>objetos</span>
           </div>
@@ -729,100 +457,61 @@ export function TiltMazeRuntimeScreen({
           <div
             className="tilt-board"
             style={{
-              gridTemplateColumns:
-                `repeat(${maze.cols},minmax(0,1fr))`,
-              gridTemplateRows:
-                `repeat(${maze.rows},minmax(0,1fr))`,
+              gridTemplateColumns: `repeat(${maze.cols},minmax(0,1fr))`,
+              gridTemplateRows: `repeat(${maze.rows},minmax(0,1fr))`,
             }}
           >
-            {maze.cells.map(
-              (cell, index) => {
-                const itemVisible =
-                  itemSet.has(index) &&
-                  !collected.has(index)
+            {maze.cells.map((cell, index) => {
+              const itemVisible = itemSet.has(index) && !collected.has(index)
 
-                return (
-                  <div
-                    key={index}
-                    className={[
-                      'tilt-cell',
-                      index === maze.goal
-                        ? 'goal'
-                        : '',
-                      holeSet.has(index)
-                        ? 'hole'
-                        : '',
-                      itemVisible
-                        ? 'item'
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    style={{
-                      borderTopWidth:
-                        cell.walls &
-                        WALL_UP
-                          ? 2
-                          : 0,
-                      borderRightWidth:
-                        cell.walls &
-                        WALL_RIGHT
-                          ? 2
-                          : 0,
-                      borderBottomWidth:
-                        cell.walls &
-                        WALL_DOWN
-                          ? 2
-                          : 0,
-                      borderLeftWidth:
-                        cell.walls &
-                        WALL_LEFT
-                          ? 2
-                          : 0,
-                    }}
-                  >
-                    {index === position ? (
-                      <div className="tilt-ball" />
-                    ) : (
-                      <span className="tilt-mark">
-                        {index === maze.goal
-                          ? '⚑'
-                          : itemVisible
-                            ? '◆'
-                            : holeSet.has(index)
-                              ? '×'
-                              : ''}
-                      </span>
-                    )}
-                  </div>
-                )
-              },
-            )}
+              return (
+                <div
+                  key={index}
+                  className={[
+                    'tilt-cell',
+                    index === maze.goal ? 'goal' : '',
+                    holeSet.has(index) ? 'hole' : '',
+                    itemVisible ? 'item' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  style={{
+                    borderTopWidth: cell.walls & WALL_UP ? 2 : 0,
+                    borderRightWidth: cell.walls & WALL_RIGHT ? 2 : 0,
+                    borderBottomWidth: cell.walls & WALL_DOWN ? 2 : 0,
+                    borderLeftWidth: cell.walls & WALL_LEFT ? 2 : 0,
+                  }}
+                >
+                  {index === position ? (
+                    <div className="tilt-ball" />
+                  ) : (
+                    <span className="tilt-mark">
+                      {index === maze.goal
+                        ? '⚑'
+                        : itemVisible
+                          ? '◆'
+                          : holeSet.has(index)
+                            ? '×'
+                            : ''}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
         <div className="tilt-help">
           {message ||
-            (
-              allCollected
-                ? 'Todos los objetos recogidos. Busca la salida.'
-                : 'Inclina suavemente el móvil o usa los botones.'
-            )}
+            (allCollected
+              ? 'Todos los objetos recogidos. Busca la salida.'
+              : 'Inclina suavemente el móvil o usa los botones.')}
         </div>
 
-        <div className="tilt-sensor">
-          {sensorText}
-        </div>
+        <div className="tilt-sensor">{sensorText}</div>
 
         <div className="tilt-pad">
-          <button
-            type="button"
-            className="up"
-            aria-label="Arriba"
-            onClick={() =>
-              move('up')
-            }
-          >
+          <button type="button" className="up" aria-label="Arriba" onClick={() => move('up')}>
             ↑
           </button>
 
@@ -830,21 +519,12 @@ export function TiltMazeRuntimeScreen({
             type="button"
             className="left"
             aria-label="Izquierda"
-            onClick={() =>
-              move('left')
-            }
+            onClick={() => move('left')}
           >
             ←
           </button>
 
-          <button
-            type="button"
-            className="down"
-            aria-label="Abajo"
-            onClick={() =>
-              move('down')
-            }
-          >
+          <button type="button" className="down" aria-label="Abajo" onClick={() => move('down')}>
             ↓
           </button>
 
@@ -852,9 +532,7 @@ export function TiltMazeRuntimeScreen({
             type="button"
             className="right"
             aria-label="Derecha"
-            onClick={() =>
-              move('right')
-            }
+            onClick={() => move('right')}
           >
             →
           </button>
@@ -865,9 +543,7 @@ export function TiltMazeRuntimeScreen({
             type="button"
             onClick={() => {
               baselineRef.current = null
-              setSensorText(
-                'Mantén el móvil cómodo para recalibrar',
-              )
+              setSensorText('Mantén el móvil cómodo para recalibrar')
             }}
           >
             Recalibrar
@@ -877,9 +553,7 @@ export function TiltMazeRuntimeScreen({
             type="button"
             onClick={() => {
               setPosition(maze.start)
-              setMessage(
-                'Bola devuelta al inicio.',
-              )
+              setMessage('Bola devuelta al inicio.')
             }}
           >
             Volver al inicio

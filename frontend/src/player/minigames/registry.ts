@@ -1,11 +1,9 @@
 import { createElement } from 'react'
 
-import type {
-  PlayerMinigameDefinition,
-  PlayerMinigameProps,
-} from './types'
+import type { PlayerMinigameDefinition, PlayerMinigameProps } from './types'
 
-export type RegisteredMinigameType = 'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
+export type RegisteredMinigameType =
+  'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'audio_challenge'
 
 export type RegisteredMinigame = PlayerMinigameDefinition & {
   id: RegisteredMinigameType
@@ -23,19 +21,18 @@ function FamilyNativeRuntimeNotice(_props: PlayerMinigameProps) {
   return createElement(
     'div',
     {
-      className:
-        'rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-200',
+      className: 'rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-200',
     },
     createElement(
       'div',
       { className: 'mb-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-200' },
-      'Family-native runtime',
+      'Family-native runtime'
     ),
     createElement(
       'p',
       { className: 'text-zinc-300' },
-      'This minigame is resolved through the family-native runtime host.',
-    ),
+      'This minigame is resolved through the family-native runtime host.'
+    )
   )
 }
 
@@ -115,15 +112,21 @@ export function listRegisteredMinigames(): RegisteredMinigame[] {
 }
 
 export function getRegisteredMinigame(type: string | null | undefined): RegisteredMinigame | null {
-  const normalized = String(type || '').trim().toLowerCase() as RegisteredMinigameType
+  const normalized = String(type || '')
+    .trim()
+    .toLowerCase() as RegisteredMinigameType
   return MINIGAME_REGISTRY[normalized] || null
 }
 
-export function isRegisteredMinigame(type: string | null | undefined): type is RegisteredMinigameType {
+export function isRegisteredMinigame(
+  type: string | null | undefined
+): type is RegisteredMinigameType {
   return Boolean(getRegisteredMinigame(type))
 }
 
-export function resolveMinigameDefinition(type: string | null | undefined): PlayerMinigameDefinition | null {
+export function resolveMinigameDefinition(
+  type: string | null | undefined
+): PlayerMinigameDefinition | null {
   return getRegisteredMinigame(type)
 }
 
@@ -131,6 +134,8 @@ export function listMinigameDefinitions(): PlayerMinigameDefinition[] {
   return listRegisteredMinigames()
 }
 
-export function isSupportedMinigame(type: string | null | undefined): type is RegisteredMinigameType {
+export function isSupportedMinigame(
+  type: string | null | undefined
+): type is RegisteredMinigameType {
   return isRegisteredMinigame(type)
 }

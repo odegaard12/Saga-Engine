@@ -35,9 +35,7 @@ export function getStageRequiredCollectibles(stage: PlayerStage | null): Collect
     if (!itemId) continue
 
     const quantity =
-      typeof record.quantity === 'number' && record.quantity > 0
-        ? Math.floor(record.quantity)
-        : 1
+      typeof record.quantity === 'number' && record.quantity > 0 ? Math.floor(record.quantity) : 1
 
     requirements.push({ item_id: itemId, quantity })
   }
@@ -59,6 +57,10 @@ export function explainCollectibleUse(stage: PlayerStage | null, itemId: string)
   return 'No usable aquí: este objeto solo se puede usar cuando el nodo/actividad lo requiere.'
 }
 
-export function midpointRewardId(fromStage: PlayerStage, toStage: PlayerStage, itemId: string): string {
+export function midpointRewardId(
+  fromStage: PlayerStage,
+  toStage: PlayerStage,
+  itemId: string
+): string {
   return `mid:${String(fromStage.id ?? fromStage.title)}:${String(toStage.id ?? toStage.title)}:${itemId}`
 }

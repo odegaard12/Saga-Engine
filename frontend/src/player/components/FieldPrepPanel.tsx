@@ -39,7 +39,8 @@ export function FieldPrepPanel({
             {ready ? 'Listo para salir' : 'Preparar antes de salir'}
           </div>
           <div style={offlinePrepCopy}>
-            Deja la misión preparada antes de moverte: datos offline, GPS y entrada en nodos cercanos.
+            Deja la misión preparada antes de moverte: datos offline, GPS y entrada en nodos
+            cercanos.
           </div>
         </div>
 
@@ -97,14 +98,19 @@ export function FieldPrepPanel({
         </button>
 
         {offlinePrepState === 'error' ? (
-          <div style={offlinePrepError}>No se pudo descargar. Prueba otra vez desde Herramientas.</div>
+          <div style={offlinePrepError}>
+            No se pudo descargar. Prueba otra vez desde Herramientas.
+          </div>
         ) : null}
       </section>
     </div>
   )
 }
 
-function getMissionCopy(hasOfflineMission: boolean, offlinePrepState: FieldPrepPanelProps['offlinePrepState']): string {
+function getMissionCopy(
+  hasOfflineMission: boolean,
+  offlinePrepState: FieldPrepPanelProps['offlinePrepState']
+): string {
   if (offlinePrepState === 'saving') return 'Guardando nodos, reglas y requisitos…'
   if (offlinePrepState === 'error') return 'Error al preparar la misión.'
   if (hasOfflineMission) return 'Lista en este teléfono.'

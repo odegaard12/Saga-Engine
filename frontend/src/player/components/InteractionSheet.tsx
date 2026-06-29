@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type TouchEvent,
-} from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
 import { resolveMinigameDefinition } from '../minigames/registry'
@@ -30,9 +24,18 @@ function vibrate(pattern: number | number[]) {
 function isMotionStage(stage: PlayerStage | null) {
   if (!stage) return false
   const config = stage.config && typeof stage.config === 'object' ? stage.config : {}
-  const runtimeConfig = stage.minigame?.config && typeof stage.minigame.config === 'object' ? stage.minigame.config : {}
-  const gameId = String((config as Record<string, unknown>).game_id || (runtimeConfig as Record<string, unknown>).game_id || '')
-  return stage.minigame?.type === 'motion_challenge' || stage.type === 'motion_challenge' || gameId === 'shake_antenna_charge'
+  const runtimeConfig =
+    stage.minigame?.config && typeof stage.minigame.config === 'object' ? stage.minigame.config : {}
+  const gameId = String(
+    (config as Record<string, unknown>).game_id ||
+      (runtimeConfig as Record<string, unknown>).game_id ||
+      ''
+  )
+  return (
+    stage.minigame?.type === 'motion_challenge' ||
+    stage.type === 'motion_challenge' ||
+    gameId === 'shake_antenna_charge'
+  )
 }
 
 function getCompactLine(stage: PlayerStage | null) {
@@ -80,9 +83,7 @@ export function InteractionSheet({
   // Cualquier minijuego ya contiene su propio título,
   // instrucciones, estado y botones. El contenedor exterior
   // no debe repetir esa información.
-  const compactGameMode =
-    shouldRenderFamilyRuntime ||
-    Boolean(minigameDefinition)
+  const compactGameMode = shouldRenderFamilyRuntime || Boolean(minigameDefinition)
 
   const compactLine = getCompactLine(currentStage)
 
@@ -153,25 +154,14 @@ export function InteractionSheet({
     <>
       <style>{sheetAnimations}</style>
 
-      <div
-        style={
-          compactGameMode
-            ? compactGameOverlay
-            : overlay
-        }
-      >
+      <div style={compactGameMode ? compactGameOverlay : overlay}>
         <div style={backdrop} onClick={submitting ? undefined : handleClose} />
 
         <section
           style={{
-            ...(compactGameMode
-              ? compactGameSheet
-              : sheet),
+            ...(compactGameMode ? compactGameSheet : sheet),
             transform: `translateY(${dragOffset}px)`,
-            transition:
-              dragOffset === 0
-                ? 'transform 180ms ease, opacity 160ms ease'
-                : 'none',
+            transition: dragOffset === 0 ? 'transform 180ms ease, opacity 160ms ease' : 'none',
           }}
           aria-modal="true"
           role="dialog"
@@ -189,44 +179,44 @@ export function InteractionSheet({
             </button>
           ) : (
             <>
-          <div
-            style={dragHandleWrap}
-            onTouchStart={(event) => {
-              beginDrag()
-              handleTouchStart(event)
-            }}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div style={dragHandle} />
-          </div>
-
-          <div style={headerRow}>
-            <div style={headerCopy}>
-              <div style={title}>{currentStage.title}</div>
-
-              <div style={subRow}>
-                {resolvedRuntime ? (
-                  <span style={miniBadge}>{resolvedRuntime.label}</span>
-                ) : minigameDefinition ? (
-                  <span style={miniBadge}>{minigameDefinition.label}</span>
-                ) : null}
-
-                <span style={userText}>{user}</span>
+              <div
+                style={dragHandleWrap}
+                onTouchStart={(event) => {
+                  beginDrag()
+                  handleTouchStart(event)
+                }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <div style={dragHandle} />
               </div>
 
-              {compactLine ? <div style={compactLineText}>{compactLine}</div> : null}
-            </div>
+              <div style={headerRow}>
+                <div style={headerCopy}>
+                  <div style={title}>{currentStage.title}</div>
 
-            <button
-              type="button"
-              style={closeButton}
-              onClick={handleClose}
-              disabled={submitting}
-            >
-              CLOSE
-            </button>
-          </div>
+                  <div style={subRow}>
+                    {resolvedRuntime ? (
+                      <span style={miniBadge}>{resolvedRuntime.label}</span>
+                    ) : minigameDefinition ? (
+                      <span style={miniBadge}>{minigameDefinition.label}</span>
+                    ) : null}
+
+                    <span style={userText}>{user}</span>
+                  </div>
+
+                  {compactLine ? <div style={compactLineText}>{compactLine}</div> : null}
+                </div>
+
+                <button
+                  type="button"
+                  style={closeButton}
+                  onClick={handleClose}
+                  disabled={submitting}
+                >
+                  CLOSE
+                </button>
+              </div>
             </>
           )}
 
@@ -253,7 +243,6 @@ export function InteractionSheet({
               </div>
             </section>
           )}
-
         </section>
       </div>
     </>
@@ -274,7 +263,6 @@ const compactGameOverlay: CSSProperties = {
   ...overlay,
   padding: 2,
 }
-
 
 const backdrop: CSSProperties = {
   position: 'absolute',
@@ -317,7 +305,6 @@ const compactGameSheet: CSSProperties = {
   boxShadow: 'none',
 }
 
-
 const compactGameCloseButton: CSSProperties = {
   position: 'absolute',
   top: 7,
@@ -340,7 +327,6 @@ const compactGameCloseButton: CSSProperties = {
   lineHeight: 1,
   cursor: 'pointer',
 }
-
 
 const dragHandleWrap: CSSProperties = {
   display: 'flex',

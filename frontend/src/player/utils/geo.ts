@@ -26,9 +26,7 @@ export function getDistanceMeters(a: LatLon, b: LatLon): number {
   const sinLat = Math.sin(dLat / 2)
   const sinLon = Math.sin(dLon / 2)
 
-  const h =
-    sinLat * sinLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
 
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }

@@ -21,8 +21,8 @@ export function ToastNotice({ notice }: { notice: UiNotice }) {
           ...(notice.tone === 'success'
             ? toastSuccess
             : notice.tone === 'warn'
-            ? toastWarn
-            : toastInfo),
+              ? toastWarn
+              : toastInfo),
         }}
       >
         {notice.message}

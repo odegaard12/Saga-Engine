@@ -1,7 +1,4 @@
-export type MotionChallengeObjective =
-  | 'shake_charge'
-  | 'figure_eight'
-  | 'rotary_safe'
+export type MotionChallengeObjective = 'shake_charge' | 'figure_eight' | 'rotary_safe'
 
 export type MotionChallengeConfig = {
   objective: MotionChallengeObjective
@@ -32,17 +29,10 @@ export type CircuitMatrixObjective =
   | 'image_mosaic'
   | 'balance_maze'
 
-export type BearingHuntObjective =
-  | 'single_lock'
-  | 'multi_lock'
-  | 'sector_scan'
-  | 'bearing_sequence'
+export type BearingHuntObjective = 'single_lock' | 'multi_lock' | 'sector_scan' | 'bearing_sequence'
 
 export type SignalHuntObjective =
-  | 'proximity_lock'
-  | 'directional_lock'
-  | 'hybrid_trace'
-  | 'stability_capture'
+  'proximity_lock' | 'directional_lock' | 'hybrid_trace' | 'stability_capture'
 
 export type CircuitMatrixConfig = {
   objective: CircuitMatrixObjective

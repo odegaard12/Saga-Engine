@@ -72,7 +72,11 @@ function validateBearingHuntConfig(
     errors.push('target_bearing_deg must be a number between 0 and 359.999')
   }
 
-  if (!Number.isFinite(value.tolerance_deg) || value.tolerance_deg <= 0 || value.tolerance_deg > 90) {
+  if (
+    !Number.isFinite(value.tolerance_deg) ||
+    value.tolerance_deg <= 0 ||
+    value.tolerance_deg > 90
+  ) {
     errors.push('tolerance_deg must be > 0 and <= 90')
   }
 
@@ -80,7 +84,10 @@ function validateBearingHuntConfig(
     errors.push('hold_ms must be an integer >= 100')
   }
 
-  if (value.phases !== undefined && (!Number.isInteger(value.phases) || value.phases < 1 || value.phases > 10)) {
+  if (
+    value.phases !== undefined &&
+    (!Number.isInteger(value.phases) || value.phases < 1 || value.phases > 10)
+  ) {
     errors.push('phases must be an integer between 1 and 10')
   }
 

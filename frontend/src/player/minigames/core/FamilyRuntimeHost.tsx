@@ -24,10 +24,7 @@ export function FamilyRuntimeHost({
   submitting,
   onWin,
 }: FamilyRuntimeHostProps) {
-  if (
-    resolved.family === 'circuit_matrix' &&
-    resolved.config.game_id === 'tilt_maze'
-  ) {
+  if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'tilt_maze') {
     return (
       <TiltMazeRuntimeScreen
         resolved={resolved}
@@ -39,10 +36,7 @@ export function FamilyRuntimeHost({
     )
   }
 
-  if (
-    resolved.family === 'circuit_matrix' &&
-    resolved.config.game_id === 'place_mosaic'
-  ) {
+  if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'place_mosaic') {
     return (
       <PlaceMosaicRuntimeScreen
         resolved={resolved}
@@ -54,10 +48,7 @@ export function FamilyRuntimeHost({
     )
   }
 
-  if (
-    resolved.family === 'circuit_matrix' &&
-    resolved.config.game_id === 'sequence_code'
-  ) {
+  if (resolved.family === 'circuit_matrix' && resolved.config.game_id === 'sequence_code') {
     return (
       <SequenceCodeRuntimeScreen
         resolved={resolved}
@@ -106,11 +97,7 @@ export function FamilyRuntimeHost({
   }
 
   if (resolved.family === 'audio_challenge') {
-    return (
-      <AudioChallengeRuntime
-        onWin={onWin}
-      />
-    )
+    return <AudioChallengeRuntime onWin={onWin} />
   }
 
   return (

@@ -1,4 +1,10 @@
-import type { FieldProofsPayload, FieldProofUploadResponse, PlayerGamePayload, PublicConfig, TeamStatusPayload } from '../types/player'
+import type {
+  FieldProofsPayload,
+  FieldProofUploadResponse,
+  PlayerGamePayload,
+  PublicConfig,
+  TeamStatusPayload,
+} from '../types/player'
 
 function withTimeoutSignal(timeoutMs: number) {
   const controller = new AbortController()
@@ -45,17 +51,14 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
   const timeout = withTimeoutSignal(2000)
 
   try {
-    const res = await fetch(
-      `/api/version?_=${Date.now()}`,
-      {
-        signal: timeout.signal,
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache',
-        },
+    const res = await fetch(`/api/version?_=${Date.now()}`, {
+      signal: timeout.signal,
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
       },
-    )
+    })
 
     if (!res.ok) {
       throw new Error(`Failed to load version: HTTP ${res.status}`)
@@ -67,10 +70,9 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
   }
 }
 
-
 export async function fetchPlayerGame(
   user: string,
-  options: { offlinePack?: boolean } = {},
+  options: { offlinePack?: boolean } = {}
 ): Promise<PlayerGamePayload> {
   const params = new URLSearchParams()
   if (options.offlinePack) params.set('offline_pack', 'true')
@@ -103,18 +105,15 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   const timeout = withTimeoutSignal(3500)
 
   try {
-    const res = await fetch(
-      `/api/config?_=${Date.now()}`,
-      {
-        signal: timeout.signal,
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-        },
+    const res = await fetch(`/api/config?_=${Date.now()}`, {
+      signal: timeout.signal,
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
       },
-    )
+    })
 
     if (!res.ok) {
       throw new Error(`Failed to load config: HTTP ${res.status}`)
@@ -161,7 +160,6 @@ export function sendHeartbeat(args: {
   return postJson('/api/heartbeat', args)
 }
 
-
 export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {
   const timeout = withTimeoutSignal(3000)
 
@@ -195,14 +193,19 @@ export function uploadFieldProof(args: {
   return postJson<FieldProofUploadResponse>('/api/field-proofs', args)
 }
 
-
-export async function deleteFieldProof(user: string, proofId: string): Promise<{ status: 'ok'; id: string }> {
-  const res = await fetch(`/api/field-proofs/${encodeURIComponent(proofId)}?user=${encodeURIComponent(user)}`, {
-    method: 'DELETE',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+export async function deleteFieldProof(
+  user: string,
+  proofId: string
+): Promise<{ status: 'ok'; id: string }> {
+  const res = await fetch(
+    `/api/field-proofs/${encodeURIComponent(proofId)}?user=${encodeURIComponent(user)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+      },
+    }
+  )
 
   if (!res.ok) {
     throw new Error(`Failed to delete field proof: HTTP ${res.status}`)
@@ -210,7 +213,6 @@ export async function deleteFieldProof(user: string, proofId: string): Promise<{
 
   return res.json() as Promise<{ status: 'ok'; id: string }>
 }
-
 
 export function getFieldProofsDownloadUrl(user: string): string {
   return `/api/field-proofs/download?user=${encodeURIComponent(user)}`

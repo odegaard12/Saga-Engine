@@ -132,11 +132,11 @@ export default function PhysicalQrCardsPanel({
         <div>
           <div style={eyebrow}>TARJETA QR</div>
           <h2 style={compact ? compactTitle : title}>QR imprimible</h2>
-          <p style={copy}>
-            Escanéalo para guardar este objeto físico en la mochila del jugador.
-          </p>
+          <p style={copy}>Escanéalo para guardar este objeto físico en la mochila del jugador.</p>
         </div>
-        <span style={badge}>{kindIcons[kind]} {kindLabels[kind]}</span>
+        <span style={badge}>
+          {kindIcons[kind]} {kindLabels[kind]}
+        </span>
       </div>
 
       <div style={layout}>

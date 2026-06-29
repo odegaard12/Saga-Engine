@@ -1,45 +1,45 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-type AnyRecord = Record<string, any>;
+type AnyRecord = Record<string, any>
 
 export type BearingHuntRuntimeScreenProps = {
-  resolved?: AnyRecord;
-  stage?: AnyRecord;
-  helperText?: string;
-  submitting?: boolean;
-  onWin?: (result?: AnyRecord) => void | Promise<void>;
+  resolved?: AnyRecord
+  stage?: AnyRecord
+  helperText?: string
+  submitting?: boolean
+  onWin?: (result?: AnyRecord) => void | Promise<void>
 
-  minigame?: AnyRecord;
-  interaction?: AnyRecord;
-  payload?: AnyRecord;
-  node?: AnyRecord;
-  onComplete?: (result?: AnyRecord) => void | Promise<void>;
-  onSolved?: (result?: AnyRecord) => void | Promise<void>;
-  onSuccess?: (result?: AnyRecord) => void | Promise<void>;
-  complete?: (result?: AnyRecord) => void | Promise<void>;
-  resolveInteraction?: (result?: AnyRecord) => void | Promise<void>;
-  onClose?: () => void;
-};
+  minigame?: AnyRecord
+  interaction?: AnyRecord
+  payload?: AnyRecord
+  node?: AnyRecord
+  onComplete?: (result?: AnyRecord) => void | Promise<void>
+  onSolved?: (result?: AnyRecord) => void | Promise<void>
+  onSuccess?: (result?: AnyRecord) => void | Promise<void>
+  complete?: (result?: AnyRecord) => void | Promise<void>
+  resolveInteraction?: (result?: AnyRecord) => void | Promise<void>
+  onClose?: () => void
+}
 
 type SensorState =
-  | "idle"
-  | "needs_permission"
-  | "requesting"
-  | "searching"
-  | "tracking"
-  | "silent"
-  | "denied"
-  | "unsupported"
-  | "blocked_https";
+  | 'idle'
+  | 'needs_permission'
+  | 'requesting'
+  | 'searching'
+  | 'tracking'
+  | 'silent'
+  | 'denied'
+  | 'unsupported'
+  | 'blocked_https'
 
 type CompassEvent = DeviceOrientationEvent & {
-  webkitCompassHeading?: number;
-  webkitCompassAccuracy?: number;
-};
+  webkitCompassHeading?: number
+  webkitCompassAccuracy?: number
+}
 
 type PermissionableDeviceOrientationEvent = typeof DeviceOrientationEvent & {
-  requestPermission?: () => Promise<"granted" | "denied">;
-};
+  requestPermission?: () => Promise<'granted' | 'denied'>
+}
 
 const STYLES = `
 .bh-root {
@@ -510,47 +510,50 @@ const STYLES = `
     margin-bottom: 10px;
   }
 }
-`;
+`
 
 function normalizeDegrees(value: number): number {
-  return ((value % 360) + 360) % 360;
+  return ((value % 360) + 360) % 360
 }
 
 function signedDelta(from: number, to: number): number {
-  return ((to - from + 540) % 360) - 180;
+  return ((to - from + 540) % 360) - 180
 }
 
 function formatDeg(value: number | null | undefined): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return String(Math.round(normalizeDegrees(value))).padStart(3, "0");
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  return String(Math.round(normalizeDegrees(value))).padStart(3, '0')
 }
 
 function pickNumber(...values: any[]): number | undefined {
   for (const value of values) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
-      return Number(value);
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+      return Number(value)
     }
   }
-  return undefined;
+  return undefined
 }
 
 function getHeadingFromEvent(event: CompassEvent): number | null {
-  if (typeof event.webkitCompassHeading === "number" && Number.isFinite(event.webkitCompassHeading)) {
-    return normalizeDegrees(event.webkitCompassHeading);
+  if (
+    typeof event.webkitCompassHeading === 'number' &&
+    Number.isFinite(event.webkitCompassHeading)
+  ) {
+    return normalizeDegrees(event.webkitCompassHeading)
   }
 
-  if (typeof event.alpha === "number" && Number.isFinite(event.alpha)) {
-    return normalizeDegrees(360 - event.alpha);
+  if (typeof event.alpha === 'number' && Number.isFinite(event.alpha)) {
+    return normalizeDegrees(360 - event.alpha)
   }
 
-  return null;
+  return null
 }
 
 function getDeviceOrientationConstructor(): PermissionableDeviceOrientationEvent | null {
-  if (typeof window === "undefined") return null;
-  const ctor = window.DeviceOrientationEvent as PermissionableDeviceOrientationEvent | undefined;
-  return ctor ?? null;
+  if (typeof window === 'undefined') return null
+  const ctor = window.DeviceOrientationEvent as PermissionableDeviceOrientationEvent | undefined
+  return ctor ?? null
 }
 
 function getConfig(props: BearingHuntRuntimeScreenProps) {
@@ -581,56 +584,67 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
     props.payload?.params,
     props.node,
     props.node?.minigame,
-  ].filter(Boolean);
+  ].filter(Boolean)
 
   const read = (...keys: string[]) => {
     for (const source of sources) {
       for (const key of keys) {
-        if (source && source[key] !== undefined && source[key] !== null) return source[key];
+        if (source && source[key] !== undefined && source[key] !== null) return source[key]
       }
     }
-    return undefined;
-  };
+    return undefined
+  }
 
   const targetBearing = normalizeDegrees(
-    pickNumber(read("targetBearing", "target_bearing", "target", "bearing", "azimuth", "targetAzimuth"), 90) ?? 90
-  );
+    pickNumber(
+      read('targetBearing', 'target_bearing', 'target', 'bearing', 'azimuth', 'targetAzimuth'),
+      90
+    ) ?? 90
+  )
 
   const tolerance = Math.max(
     1,
-    Math.min(90, pickNumber(read("tolerance", "toleranceDeg", "tolerance_degrees", "window", "windowDeg"), 18) ?? 18)
-  );
+    Math.min(
+      90,
+      pickNumber(
+        read('tolerance', 'toleranceDeg', 'tolerance_degrees', 'window', 'windowDeg'),
+        18
+      ) ?? 18
+    )
+  )
 
   const holdMs = Math.max(
     250,
-    pickNumber(read("holdMs", "hold_ms", "holdTime", "hold_time", "holdDurationMs"), 1200) ?? 1200
-  );
+    pickNumber(read('holdMs', 'hold_ms', 'holdTime', 'hold_time', 'holdDurationMs'), 1200) ?? 1200
+  )
 
-  const title = String(read("title", "name", "label") ?? props.node?.title ?? props.node?.name ?? "Bearing Hunt");
+  const title = String(
+    read('title', 'name', 'label') ?? props.node?.title ?? props.node?.name ?? 'Bearing Hunt'
+  )
 
   return {
     targetBearing,
     tolerance,
     holdMs,
     title,
-  };
+  }
 }
 
 export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
-  const { targetBearing, tolerance, holdMs, title } = useMemo(() => getConfig(props), [props]);
+  const { targetBearing, tolerance, holdMs, title } = useMemo(() => getConfig(props), [props])
 
-  const [sensorState, setSensorState] = useState<SensorState>("idle");
-  const [heading, setHeading] = useState<number | null>(null);
-  const [rawHeading, setRawHeading] = useState<number | null>(null);
-  const [holdProgress, setHoldProgress] = useState(0);
-  const [locked, setLocked] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
+  const [sensorState, setSensorState] = useState<SensorState>('idle')
+  const [heading, setHeading] = useState<number | null>(null)
+  const [rawHeading, setRawHeading] = useState<number | null>(null)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const [locked, setLocked] = useState(false)
+  const [manualMode, setManualMode] = useState(false)
 
-  const headingRef = useRef<number | null>(null);
-  const listenerRef = useRef<((event: DeviceOrientationEvent) => void) | null>(null);
-  const captureStartRef = useRef<number | null>(null);
-  const completeSentRef = useRef(false);
-  const windowPulseRef = useRef(false);
+  const headingRef = useRef<number | null>(null)
+  const listenerRef = useRef<((event: DeviceOrientationEvent) => void) | null>(null)
+  const captureStartRef = useRef<number | null>(null)
+  const completeSentRef = useRef(false)
+  const windowPulseRef = useRef(false)
 
   const completionCallback =
     props.onWin ??
@@ -638,265 +652,285 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     props.onSolved ??
     props.onSuccess ??
     props.complete ??
-    props.resolveInteraction;
+    props.resolveInteraction
 
   const updateHeading = useCallback((nextRaw: number) => {
-    const normalized = normalizeDegrees(nextRaw);
-    setRawHeading(normalized);
+    const normalized = normalizeDegrees(nextRaw)
+    setRawHeading(normalized)
 
     setHeading((previous) => {
       const next =
         previous === null
           ? normalized
-          : normalizeDegrees(previous + signedDelta(previous, normalized) * 0.16);
+          : normalizeDegrees(previous + signedDelta(previous, normalized) * 0.16)
 
-      headingRef.current = next;
-      return next;
-    });
-  }, []);
+      headingRef.current = next
+      return next
+    })
+  }, [])
 
   const delta = useMemo(() => {
-    if (heading === null) return null;
-    return signedDelta(heading, targetBearing);
-  }, [heading, targetBearing]);
+    if (heading === null) return null
+    return signedDelta(heading, targetBearing)
+  }, [heading, targetBearing])
 
-  const absDelta = Math.abs(delta ?? 999);
-  const inWindow = !locked && heading !== null && absDelta <= tolerance;
-  const nearWindow = !locked && heading !== null && absDelta <= tolerance * 2.35;
+  const absDelta = Math.abs(delta ?? 999)
+  const inWindow = !locked && heading !== null && absDelta <= tolerance
+  const nearWindow = !locked && heading !== null && absDelta <= tolerance * 2.35
 
   const completeLock = useCallback(async () => {
-    if (completeSentRef.current) return;
-    completeSentRef.current = true;
-    setLocked(true);
-    setHoldProgress(1);
+    if (completeSentRef.current) return
+    completeSentRef.current = true
+    setLocked(true)
+    setHoldProgress(1)
 
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.([18, 34, 26]);
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate?.([18, 34, 26])
     }
 
-    const finalHeading = headingRef.current;
+    const finalHeading = headingRef.current
 
     await completionCallback?.({
-      type: "bearing_hunt",
-      status: "locked",
+      type: 'bearing_hunt',
+      status: 'locked',
       targetBearing,
       tolerance,
       holdMs,
       heading: finalHeading,
       delta: finalHeading === null ? null : signedDelta(finalHeading, targetBearing),
       completedAt: new Date().toISOString(),
-    });
-  }, [completionCallback, holdMs, targetBearing, tolerance]);
+    })
+  }, [completionCallback, holdMs, targetBearing, tolerance])
 
   useEffect(() => {
-    if (locked) return;
+    if (locked) return
 
-    let raf = 0;
+    let raf = 0
 
     const tick = () => {
       if (inWindow) {
-        const now = performance.now();
+        const now = performance.now()
 
         if (captureStartRef.current === null) {
-          captureStartRef.current = now;
+          captureStartRef.current = now
 
-          if (!windowPulseRef.current && typeof navigator !== "undefined" && "vibrate" in navigator) {
-            windowPulseRef.current = true;
-            navigator.vibrate?.(10);
+          if (
+            !windowPulseRef.current &&
+            typeof navigator !== 'undefined' &&
+            'vibrate' in navigator
+          ) {
+            windowPulseRef.current = true
+            navigator.vibrate?.(10)
           }
         }
 
-        const elapsed = now - captureStartRef.current;
-        const progress = Math.min(1, elapsed / holdMs);
+        const elapsed = now - captureStartRef.current
+        const progress = Math.min(1, elapsed / holdMs)
 
-        setHoldProgress(progress);
+        setHoldProgress(progress)
 
         if (progress >= 1) {
-          void completeLock();
-          return;
+          void completeLock()
+          return
         }
       } else {
-        captureStartRef.current = null;
-        windowPulseRef.current = false;
-        setHoldProgress((previous) => (previous <= 0 ? 0 : Math.max(0, previous - 0.08)));
+        captureStartRef.current = null
+        windowPulseRef.current = false
+        setHoldProgress((previous) => (previous <= 0 ? 0 : Math.max(0, previous - 0.08)))
       }
 
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [completeLock, holdMs, inWindow, locked]);
-
-  const startSensors = useCallback(async () => {
-    if (typeof window === "undefined") return;
-
-    if (!window.isSecureContext) {
-      setSensorState("blocked_https");
-      return;
+      raf = requestAnimationFrame(tick)
     }
 
-    const OrientationCtor = getDeviceOrientationConstructor();
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [completeLock, holdMs, inWindow, locked])
+
+  const startSensors = useCallback(async () => {
+    if (typeof window === 'undefined') return
+
+    if (!window.isSecureContext) {
+      setSensorState('blocked_https')
+      return
+    }
+
+    const OrientationCtor = getDeviceOrientationConstructor()
 
     if (!OrientationCtor) {
-      setSensorState("unsupported");
-      return;
+      setSensorState('unsupported')
+      return
     }
 
     try {
-      setSensorState("requesting");
+      setSensorState('requesting')
 
-      if (typeof OrientationCtor.requestPermission === "function") {
-        const result = await OrientationCtor.requestPermission();
+      if (typeof OrientationCtor.requestPermission === 'function') {
+        const result = await OrientationCtor.requestPermission()
 
-        if (result !== "granted") {
-          setSensorState("denied");
-          return;
+        if (result !== 'granted') {
+          setSensorState('denied')
+          return
         }
       }
 
       if (listenerRef.current) {
-        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
-        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+        window.removeEventListener('deviceorientation', listenerRef.current as EventListener, true)
+        window.removeEventListener(
+          'deviceorientationabsolute',
+          listenerRef.current as EventListener,
+          true
+        )
       }
 
       const handler = (event: DeviceOrientationEvent) => {
-        const next = getHeadingFromEvent(event as CompassEvent);
-        if (next === null) return;
+        const next = getHeadingFromEvent(event as CompassEvent)
+        if (next === null) return
 
-        updateHeading(next);
-        setSensorState("tracking");
-      };
+        updateHeading(next)
+        setSensorState('tracking')
+      }
 
-      listenerRef.current = handler;
+      listenerRef.current = handler
 
-      window.addEventListener("deviceorientation", handler as EventListener, true);
-      window.addEventListener("deviceorientationabsolute", handler as EventListener, true);
+      window.addEventListener('deviceorientation', handler as EventListener, true)
+      window.addEventListener('deviceorientationabsolute', handler as EventListener, true)
 
-      setSensorState("searching");
+      setSensorState('searching')
 
       window.setTimeout(() => {
         if (headingRef.current === null) {
-          setSensorState((current) => (current === "searching" ? "silent" : current));
+          setSensorState((current) => (current === 'searching' ? 'silent' : current))
         }
-      }, 1800);
+      }, 1800)
     } catch {
-      setSensorState("denied");
+      setSensorState('denied')
     }
-  }, [updateHeading]);
+  }, [updateHeading])
 
   useEffect(() => {
-    const OrientationCtor = getDeviceOrientationConstructor();
+    const OrientationCtor = getDeviceOrientationConstructor()
 
     if (!OrientationCtor) {
-      setSensorState("unsupported");
-      return;
+      setSensorState('unsupported')
+      return
     }
 
-    if (typeof OrientationCtor.requestPermission === "function") {
-      setSensorState("needs_permission");
-      return;
+    if (typeof OrientationCtor.requestPermission === 'function') {
+      setSensorState('needs_permission')
+      return
     }
 
-    void startSensors();
+    void startSensors()
 
     return () => {
-      if (listenerRef.current && typeof window !== "undefined") {
-        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
-        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+      if (listenerRef.current && typeof window !== 'undefined') {
+        window.removeEventListener('deviceorientation', listenerRef.current as EventListener, true)
+        window.removeEventListener(
+          'deviceorientationabsolute',
+          listenerRef.current as EventListener,
+          true
+        )
       }
-    };
-  }, [startSensors]);
+    }
+  }, [startSensors])
 
   useEffect(() => {
     return () => {
-      if (listenerRef.current && typeof window !== "undefined") {
-        window.removeEventListener("deviceorientation", listenerRef.current as EventListener, true);
-        window.removeEventListener("deviceorientationabsolute", listenerRef.current as EventListener, true);
+      if (listenerRef.current && typeof window !== 'undefined') {
+        window.removeEventListener('deviceorientation', listenerRef.current as EventListener, true)
+        window.removeEventListener(
+          'deviceorientationabsolute',
+          listenerRef.current as EventListener,
+          true
+        )
       }
-    };
-  }, []);
+    }
+  }, [])
 
   const command = useMemo(() => {
     if (locked) {
-      return { main: "LOCKED", sub: "Rumbo capturado", small: false };
+      return { main: 'LOCKED', sub: 'Rumbo capturado', small: false }
     }
 
     if (heading === null) {
-      if (sensorState === "needs_permission") return { main: "READY", sub: "Activa orientación", small: false };
-      if (sensorState === "blocked_https") return { main: "HTTPS", sub: "Sensor bloqueado", small: false };
-      return { main: "SCAN", sub: "Buscando heading", small: false };
+      if (sensorState === 'needs_permission')
+        return { main: 'READY', sub: 'Activa orientación', small: false }
+      if (sensorState === 'blocked_https')
+        return { main: 'HTTPS', sub: 'Sensor bloqueado', small: false }
+      return { main: 'SCAN', sub: 'Buscando heading', small: false }
     }
 
     if (inWindow) {
-      return { main: "HOLD", sub: "Mantén estable", small: false };
+      return { main: 'HOLD', sub: 'Mantén estable', small: false }
     }
 
-    const amount = Math.round(absDelta);
-    const direction = (delta ?? 0) >= 0 ? "RIGHT" : "LEFT";
+    const amount = Math.round(absDelta)
+    const direction = (delta ?? 0) >= 0 ? 'RIGHT' : 'LEFT'
 
     return {
       main: `${direction} ${amount}°`,
-      sub: nearWindow ? "Cerca del vector" : "Gira hacia el vector",
+      sub: nearWindow ? 'Cerca del vector' : 'Gira hacia el vector',
       small: amount >= 100,
-    };
-  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState]);
+    }
+  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState])
 
   const sensorCopy = useMemo(() => {
     switch (sensorState) {
-      case "needs_permission":
-        return "Safari iPhone necesita un toque para activar orientación real.";
-      case "requesting":
-        return "Solicitando acceso al sensor.";
-      case "searching":
-        return "Sensor activo. Esperando primera lectura estable.";
-      case "tracking":
-        return "Orientación real activa.";
-      case "silent":
-        return "No llega heading. Puedes usar prueba manual discreta.";
-      case "denied":
-        return "Permiso denegado. Revisa movimiento/orientación en Safari.";
-      case "unsupported":
-        return "Este navegador no expone DeviceOrientation.";
-      case "blocked_https":
-        return "Abre el runtime desde HTTPS para usar sensores reales.";
+      case 'needs_permission':
+        return 'Safari iPhone necesita un toque para activar orientación real.'
+      case 'requesting':
+        return 'Solicitando acceso al sensor.'
+      case 'searching':
+        return 'Sensor activo. Esperando primera lectura estable.'
+      case 'tracking':
+        return 'Orientación real activa.'
+      case 'silent':
+        return 'No llega heading. Puedes usar prueba manual discreta.'
+      case 'denied':
+        return 'Permiso denegado. Revisa movimiento/orientación en Safari.'
+      case 'unsupported':
+        return 'Este navegador no expone DeviceOrientation.'
+      case 'blocked_https':
+        return 'Abre el runtime desde HTTPS para usar sensores reales.'
       default:
-        return "Preparando instrumento.";
+        return 'Preparando instrumento.'
     }
-  }, [sensorState]);
+  }, [sensorState])
 
   const statusLabel = props.submitting
-    ? "SYNC"
+    ? 'SYNC'
     : locked
-      ? "LOCK"
+      ? 'LOCK'
       : inWindow
-        ? "HOLD"
+        ? 'HOLD'
         : nearWindow
-          ? "NEAR"
-          : sensorState === "tracking"
-            ? "LIVE"
-            : sensorState === "needs_permission"
-              ? "ARM"
-              : "SCAN";
+          ? 'NEAR'
+          : sensorState === 'tracking'
+            ? 'LIVE'
+            : sensorState === 'needs_permission'
+              ? 'ARM'
+              : 'SCAN'
 
   const rootClassName = [
-    "bh-root",
-    nearWindow ? "is-near" : "",
-    inWindow ? "is-window" : "",
-    locked ? "is-locked" : "",
-  ].filter(Boolean).join(" ");
+    'bh-root',
+    nearWindow ? 'is-near' : '',
+    inWindow ? 'is-window' : '',
+    locked ? 'is-locked' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
-  const targetOffset = delta ?? 0;
-  const captureDeg = Math.round(holdProgress * 360);
-  const capturePct = `${Math.round(holdProgress * 100)}%`;
+  const targetOffset = delta ?? 0
+  const captureDeg = Math.round(holdProgress * 360)
+  const capturePct = `${Math.round(holdProgress * 100)}%`
 
   const styleVars = {
-    "--target-offset": `${targetOffset}deg`,
-    "--capture-deg": `${captureDeg}deg`,
-    "--capture-pct": capturePct,
-  } as React.CSSProperties;
+    '--target-offset': `${targetOffset}deg`,
+    '--capture-deg': `${captureDeg}deg`,
+    '--capture-pct': capturePct,
+  } as React.CSSProperties
 
-  const showSensorPanel = sensorState !== "tracking" && !locked;
+  const showSensorPanel = sensorState !== 'tracking' && !locked
 
   return (
     <section className={rootClassName} style={styleVars} aria-label="Bearing hunt runtime">
@@ -919,7 +953,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
         </header>
 
         <div className="bh-command" aria-live="polite">
-          <div className={`bh-command-main ${command.small ? "is-small" : ""}`}>{command.main}</div>
+          <div className={`bh-command-main ${command.small ? 'is-small' : ''}`}>{command.main}</div>
           <div className="bh-command-sub">{command.sub}</div>
         </div>
 
@@ -950,7 +984,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
         <div className="bh-metrics">
           <div className="bh-readout">
             <span>Δ</span>
-            <strong>{heading === null ? "—" : `${Math.round(absDelta)}°`}</strong>
+            <strong>{heading === null ? '—' : `${Math.round(absDelta)}°`}</strong>
             <i aria-hidden="true" />
             <span>ventana</span>
             <strong>±{Math.round(tolerance)}°</strong>
@@ -969,23 +1003,25 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
             <p>{sensorCopy}</p>
 
             <div className="bh-actions">
-              {(sensorState === "needs_permission" ||
-                sensorState === "denied" ||
-                sensorState === "silent" ||
-                sensorState === "blocked_https" ||
-                sensorState === "unsupported") && (
+              {(sensorState === 'needs_permission' ||
+                sensorState === 'denied' ||
+                sensorState === 'silent' ||
+                sensorState === 'blocked_https' ||
+                sensorState === 'unsupported') && (
                 <button className="bh-button" type="button" onClick={() => void startSensors()}>
                   Activar sensor
                 </button>
               )}
 
-              {(sensorState === "silent" || sensorState === "unsupported" || sensorState === "denied") && (
+              {(sensorState === 'silent' ||
+                sensorState === 'unsupported' ||
+                sensorState === 'denied') && (
                 <button
                   className="bh-button bh-ghost"
                   type="button"
                   onClick={() => {
-                    setManualMode((value) => !value);
-                    if (headingRef.current === null) updateHeading(targetBearing + 72);
+                    setManualMode((value) => !value)
+                    if (headingRef.current === null) updateHeading(targetBearing + 72)
                   }}
                 >
                   Prueba manual
@@ -1007,8 +1043,8 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
         ) : null}
       </div>
     </section>
-  );
+  )
 }
 
-export const BearingHuntRuntimeScreen = RuntimeScreen;
-export default RuntimeScreen;
+export const BearingHuntRuntimeScreen = RuntimeScreen
+export default RuntimeScreen

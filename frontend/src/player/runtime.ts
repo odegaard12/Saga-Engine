@@ -55,9 +55,7 @@ export function deriveStageRuntime(args: {
     currentStage.radius > 0
 
   const explicitFreeEntry =
-    entry.mode === 'free' &&
-    entry.require_proximity === false &&
-    !mappedStage
+    entry.mode === 'free' && entry.require_proximity === false && !mappedStage
 
   const gpsAvailable = gpsState === 'ready' || debugEnabled
 
@@ -67,10 +65,7 @@ export function deriveStageRuntime(args: {
       reason: 'free_entry',
       primaryLabel: 'OPEN INTERACTION',
       primaryTone: 'ready',
-      helperText:
-        currentStage.messages?.hint ||
-        currentStage.content ||
-        'Interaction available.',
+      helperText: currentStage.messages?.hint || currentStage.content || 'Interaction available.',
     }
   }
 
@@ -82,8 +77,7 @@ export function deriveStageRuntime(args: {
       primaryTone: 'gps',
       helperText: debugEnabled
         ? 'Tap the map to place a simulated GPS position.'
-        : currentStage.messages?.gps_unavailable ||
-          'GPS is unavailable for this stage.',
+        : currentStage.messages?.gps_unavailable || 'GPS is unavailable for this stage.',
     }
   }
 
@@ -103,10 +97,7 @@ export function deriveStageRuntime(args: {
       reason: 'within_radius',
       primaryLabel: 'OPEN INTERACTION',
       primaryTone: 'ready',
-      helperText:
-        currentStage.messages?.hint ||
-        currentStage.content ||
-        'Target in range.',
+      helperText: currentStage.messages?.hint || currentStage.content || 'Target in range.',
     }
   }
 

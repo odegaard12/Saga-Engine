@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { FieldProof, PlayerGpsStatus, PlayerProfile, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
-import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
+import type {
+  FieldProof,
+  PlayerGpsStatus,
+  PlayerProfile,
+  PlayerStage,
+  TeamProfileLiveStatus,
+} from '../../types/player'
+import {
+  getPlayerAvatarInitials,
+  getPlayerAvatarUrl,
+  getPlayerColor,
+} from '../../shared/playerIdentity'
 
-type FocusRequest =
-  | {
-      target: 'player' | 'node' | 'route'
-      token: number
-    }
-  | null
+type FocusRequest = {
+  target: 'player' | 'node' | 'route'
+  token: number
+} | null
 
 type NodeVisualState = 'locked' | 'ready' | 'engaging'
 type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
@@ -114,15 +122,16 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   const sinLat = Math.sin(dLat / 2)
   const sinLon = Math.sin(dLon / 2)
 
-  const h =
-    sinLat * sinLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
 
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
-
-function offsetLatLon(point: { lat: number; lon: number }, distanceMeters: number, angleDeg: number) {
+function offsetLatLon(
+  point: { lat: number; lon: number },
+  distanceMeters: number,
+  angleDeg: number
+) {
   const angle = (angleDeg * Math.PI) / 180
   const dx = Math.cos(angle) * distanceMeters
   const dy = Math.sin(angle) * distanceMeters
@@ -165,22 +174,26 @@ type PlayerMarkerGroup = {
   players: TeamProfileLiveStatus[]
 }
 
-function groupPlayerMarkers(players: TeamProfileLiveStatus[], radiusMeters: number): PlayerMarkerGroup[] {
+function groupPlayerMarkers(
+  players: TeamProfileLiveStatus[],
+  radiusMeters: number
+): PlayerMarkerGroup[] {
   const groups: PlayerMarkerGroup[] = []
 
   for (const player of players) {
     if (typeof player.lat !== 'number' || typeof player.lon !== 'number') continue
 
     const point = { lat: player.lat, lon: player.lon }
-    const group = groups.find((candidate) =>
-      getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
+    const group = groups.find(
+      (candidate) =>
+        getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
     )
 
     if (group) {
       group.players.push(player)
       const count = group.players.length
-      group.lat = ((group.lat * (count - 1)) + player.lat) / count
-      group.lon = ((group.lon * (count - 1)) + player.lon) / count
+      group.lat = (group.lat * (count - 1) + player.lat) / count
+      group.lon = (group.lon * (count - 1) + player.lon) / count
     } else {
       groups.push({
         lat: player.lat,
@@ -219,7 +232,6 @@ function buildPlayerClusterPopup(players: TeamProfileLiveStatus[]): string {
   `
 }
 
-
 type FieldProofGroup = {
   lat: number
   lon: number
@@ -239,15 +251,16 @@ function groupFieldProofs(proofs: FieldProof[], radiusMeters = 100): FieldProofG
 
   for (const proof of sorted) {
     const point = { lat: proof.lat, lon: proof.lon }
-    const group = groups.find((candidate) =>
-      getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
+    const group = groups.find(
+      (candidate) =>
+        getDistanceMeters(point, { lat: candidate.lat, lon: candidate.lon }) <= radiusMeters
     )
 
     if (group) {
       group.proofs.push(proof)
       const count = group.proofs.length
-      group.lat = ((group.lat * (count - 1)) + proof.lat) / count
-      group.lon = ((group.lon * (count - 1)) + proof.lon) / count
+      group.lat = (group.lat * (count - 1) + proof.lat) / count
+      group.lon = (group.lon * (count - 1) + proof.lon) / count
     } else {
       groups.push({
         lat: proof.lat,
@@ -277,7 +290,6 @@ function createFieldProofIcon(proofs: FieldProof[]) {
     iconAnchor: [26, 26],
   })
 }
-
 
 function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string {
   const safeViewer = String(viewerUser || '').trim()
@@ -318,14 +330,11 @@ function buildFieldProofPopup(proofs: FieldProof[], viewerUser: string): string 
   `
 }
 
-
 function getFieldProofTooltip(proofs: FieldProof[]) {
   return proofs.length > 1 ? `📷 ${proofs.length} fotos cerca` : '📷 Foto de campo'
 }
 
-function getNodeVisualConfig(
-  nodeState: NodeVisualState,
-) {
+function getNodeVisualConfig(nodeState: NodeVisualState) {
   if (nodeState === 'engaging') {
     return {
       ringColor: '#d6a900',
@@ -341,7 +350,7 @@ function getNodeVisualConfig(
       ringColor: '#d6a900',
       ringFillColor: '#f4c95d',
       ringWeight: 2,
-      ringOpacity: 0.50,
+      ringOpacity: 0.5,
       ringFillOpacity: 0.055,
     }
   }
@@ -412,13 +421,14 @@ function buildPlayerPopup(
   kind: 'self' | 'live' | 'recent' | 'offline'
 ): string {
   const identity = getMarkerIdentity(profile, kind)
-  const presence = kind === 'self'
-    ? 'MI UBICACIÓN'
-    : kind === 'live'
-      ? 'EN LÍNEA'
-      : kind === 'recent'
-        ? 'RECIENTE'
-        : 'SIN CONEXIÓN'
+  const presence =
+    kind === 'self'
+      ? 'MI UBICACIÓN'
+      : kind === 'live'
+        ? 'EN LÍNEA'
+        : kind === 'recent'
+          ? 'RECIENTE'
+          : 'SIN CONEXIÓN'
 
   const title = kind === 'self' ? 'Tú' : identity.label
 
@@ -432,19 +442,29 @@ function buildPlayerPopup(
   `
 }
 
-
-function createMissionNodeIcon(index: number, state: 'completed' | 'current' | 'locked', stage?: PlayerStage) {
+function createMissionNodeIcon(
+  index: number,
+  state: 'completed' | 'current' | 'locked',
+  stage?: PlayerStage
+) {
   const physicalVisual = getPhysicalNodeVisual(stage)
   const number = String(index + 1)
-  const stateLabel = state === 'completed' ? 'completado' : state === 'current' ? 'siguiente nodo' : 'bloqueado'
-  const title = physicalVisual ? `${physicalVisual.label} · Nodo ${number} · ${stateLabel}` : `Nodo ${number} · ${stateLabel}`
-  const typeBadge = physicalVisual ? `<span class="saga-mission-node-type-badge saga-mission-node-type-badge--${physicalVisual.kind}" aria-hidden="true">${getPhysicalNodeTypeEmoji(physicalVisual.kind)}</span>` : ''
-  const halo = state === 'current' ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>' : ''
+  const stateLabel =
+    state === 'completed' ? 'completado' : state === 'current' ? 'siguiente nodo' : 'bloqueado'
+  const title = physicalVisual
+    ? `${physicalVisual.label} · Nodo ${number} · ${stateLabel}`
+    : `Nodo ${number} · ${stateLabel}`
+  const typeBadge = physicalVisual
+    ? `<span class="saga-mission-node-type-badge saga-mission-node-type-badge--${physicalVisual.kind}" aria-hidden="true">${getPhysicalNodeTypeEmoji(physicalVisual.kind)}</span>`
+    : ''
+  const halo =
+    state === 'current' ? '<span class="saga-mission-node-halo" aria-hidden="true"></span>' : ''
   const size = state === 'current' ? 56 : 48
   return L.divIcon({
     className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
     html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div></div>`,
-    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -455,31 +475,65 @@ const ROAD_ROUTE_CACHE_PREFIX = 'saga-road-route-v1:'
 function getRoadRouteCacheKey(points: RoadRoutePoint[]): string {
   const signature = points.map((p) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`).join('|')
   let hash = 2166136261
-  for (let i = 0; i < signature.length; i += 1) { hash ^= signature.charCodeAt(i); hash = Math.imul(hash, 16777619) }
+  for (let i = 0; i < signature.length; i += 1) {
+    hash ^= signature.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
   return `${ROAD_ROUTE_CACHE_PREFIX}${(hash >>> 0).toString(16)}`
 }
 
 function readRoadRouteCache(key: string): CachedRoadRoute | null {
-  try { const value = JSON.parse(window.localStorage.getItem(key) || 'null') as CachedRoadRoute | null; return value && Array.isArray(value.path) && value.path.length > 1 ? value : null } catch { return null }
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) || 'null') as CachedRoadRoute | null
+    return value && Array.isArray(value.path) && value.path.length > 1 ? value : null
+  } catch {
+    return null
+  }
 }
-function writeRoadRouteCache(key: string, route: CachedRoadRoute) { try { window.localStorage.setItem(key, JSON.stringify(route)) } catch {} }
+function writeRoadRouteCache(key: string, route: CachedRoadRoute) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(route))
+  } catch {}
+}
 
-async function fetchRoadRoute(points: RoadRoutePoint[], signal: AbortSignal): Promise<CachedRoadRoute> {
-  const path: RoadRoutePoint[] = []; const snapped: RoadRoutePoint[] = []
+async function fetchRoadRoute(
+  points: RoadRoutePoint[],
+  signal: AbortSignal
+): Promise<CachedRoadRoute> {
+  const path: RoadRoutePoint[] = []
+  const snapped: RoadRoutePoint[] = []
   for (let start = 0; start < points.length - 1; start += 24) {
-    const chunk = points.slice(start, Math.min(points.length, start + 25)); if (chunk.length < 2) break
+    const chunk = points.slice(start, Math.min(points.length, start + 25))
+    if (chunk.length < 2) break
     const coords = chunk.map((p) => `${p.lon},${p.lat}`).join(';')
     const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false&continue_straight=false`
     const response = await fetch(url, { signal, headers: { Accept: 'application/json' } })
     if (!response.ok) throw new Error(`Road route HTTP ${response.status}`)
-    const payload = await response.json() as { code?: string; routes?: Array<{ geometry?: { coordinates?: unknown[] } }>; waypoints?: Array<{ location?: unknown[] }> }
+    const payload = (await response.json()) as {
+      code?: string
+      routes?: Array<{ geometry?: { coordinates?: unknown[] } }>
+      waypoints?: Array<{ location?: unknown[] }>
+    }
     if (payload.code !== 'Ok') throw new Error(`Road route ${payload.code || 'invalid'}`)
     const geometry = payload.routes?.[0]?.geometry?.coordinates
     if (!Array.isArray(geometry)) throw new Error('Road route without geometry')
-    const segment = geometry.filter((v): v is [number, number] => Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number').map(([lon, lat]) => ({ lat, lon }))
-    if (path.length && segment.length) segment.shift(); path.push(...segment)
-    const snappedSegment = (payload.waypoints || []).map((w) => w.location).filter((v): v is [number, number] => Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number').map(([lon, lat]) => ({ lat, lon }))
-    if (snapped.length && snappedSegment.length) snappedSegment.shift(); snapped.push(...snappedSegment)
+    const segment = geometry
+      .filter(
+        (v): v is [number, number] =>
+          Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number'
+      )
+      .map(([lon, lat]) => ({ lat, lon }))
+    if (path.length && segment.length) segment.shift()
+    path.push(...segment)
+    const snappedSegment = (payload.waypoints || [])
+      .map((w) => w.location)
+      .filter(
+        (v): v is [number, number] =>
+          Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number'
+      )
+      .map(([lon, lat]) => ({ lat, lon }))
+    if (snapped.length && snappedSegment.length) snappedSegment.shift()
+    snapped.push(...snappedSegment)
   }
   if (path.length < 2) throw new Error('Road route unavailable')
   return { path, snapped, savedAt: Date.now() }
@@ -523,18 +577,14 @@ export function MapSurface({
   const [mapReadyToken, setMapReadyToken] = useState(0)
   const [mapZoom, setMapZoom] = useState(16)
   const mapRef = useRef<L.Map | null>(null)
-  const tileLayerRef =
-    useRef<L.TileLayer | null>(null)
+  const tileLayerRef = useRef<L.TileLayer | null>(null)
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
-  const playerMarkerRef =
-    useRef<L.Marker | null>(null)
+  const playerMarkerRef = useRef<L.Marker | null>(null)
 
-  const playerMarkerIconKeyRef =
-    useRef<string | null>(null)
+  const playerMarkerIconKeyRef = useRef<string | null>(null)
 
-  const playerAuraRef =
-    useRef<L.CircleMarker | null>(null)
+  const playerAuraRef = useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
   const otherPlayerMarkerStateRef = useRef<Map<string, string>>(new Map())
@@ -543,8 +593,7 @@ export function MapSurface({
   const roadRouteLayersRef = useRef<L.Layer[]>([])
   const roadRouteAbortRef = useRef<AbortController | null>(null)
   const onNodeTapRef = useRef(onNodeTap)
-  const onUserMapMoveRef =
-    useRef(onUserMapMove)
+  const onUserMapMoveRef = useRef(onUserMapMove)
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
@@ -554,13 +603,18 @@ export function MapSurface({
   }, [onNodeTap])
 
   useEffect(() => {
-    onUserMapMoveRef.current =
-      onUserMapMove
+    onUserMapMoveRef.current = onUserMapMove
   }, [onUserMapMove])
 
   const stageMapData = useMemo(
     () => resolveStageMapData(currentStage),
-    [currentStage?.id, currentStage?.lat, currentStage?.lon, currentStage?.radius, currentStage?.title]
+    [
+      currentStage?.id,
+      currentStage?.lat,
+      currentStage?.lon,
+      currentStage?.radius,
+      currentStage?.title,
+    ]
   )
 
   useEffect(() => {
@@ -571,46 +625,44 @@ export function MapSurface({
       attributionControl: false,
     })
 
-    const offlineGridLayer = new (OfflineGridLayer as unknown as {
-      new(options?: L.GridLayerOptions): L.GridLayer
-    })({
+    const offlineGridLayer = new (
+      OfflineGridLayer as unknown as {
+        new (options?: L.GridLayerOptions): L.GridLayer
+      }
+    )({
       tileSize: 256,
       attribution: 'SAGA offline map',
     })
     offlineGridLayer.addTo(map)
 
-    const token = mapboxToken || (import.meta as any).env.VITE_MAPBOX_TOKEN || ''
-    // Extract mapbox style path from URL like 'mapbox://styles/odegaard12/cmqul96jp001a01ryafjg2adq'
-    let stylePath = 'mapbox/satellite-streets-v12'
-    if (mapboxStyle && mapboxStyle.startsWith('mapbox://styles/')) {
-      stylePath = mapboxStyle.replace('mapbox://styles/', '')
-    }
-    
     const tileLayer = L.tileLayer(
-      `https://api.mapbox.com/styles/v1/${stylePath}/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`,
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
         maxZoom: 20,
         maxNativeZoom: 19,
-        attribution: 'Map data &copy; <a href="https://www.mapbox.com/">Mapbox</a>',
-      },
+        keepBuffer: 32,
+        updateWhenZooming: true,
+        updateWhenIdle: false,
+        attribution:
+          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EAP, and the GIS User Community',
+      }
     )
 
     tileLayer
       .on('tileerror', () => {
-        mapRootRef.current?.classList.add(
-          'saga-map-offline-tiles',
-        )
+        mapRootRef.current?.classList.add('saga-map-offline-tiles')
       })
       .on('load', () => {
-        mapRootRef.current?.classList.remove(
-          'saga-map-offline-tiles',
-        )
+        mapRootRef.current?.classList.remove('saga-map-offline-tiles')
       })
 
     tileLayer.addTo(map)
     tileLayerRef.current = tileLayer
 
-    map.setView([42.4333, -8.65], 16)
+    // Start map where the player is, or on the node, to prevent massive initial flight and black screen.
+    const startLat = playerPosition?.lat || stageMapData?.lat || 42.4333
+    const startLon = playerPosition?.lon || stageMapData?.lon || -8.65
+    map.setView([startLat, startLon], 16)
     mapRef.current = map
 
     const updateZoom = () => setMapZoom(map.getZoom())
@@ -647,17 +699,19 @@ export function MapSurface({
   }, [])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
+    const container = mapRootRef.current
+    if (!container) return
 
     const handleManualMove = () => {
       onUserMapMoveRef.current?.()
     }
 
-    map.on('dragstart', handleManualMove)
+    container.addEventListener('pointerdown', handleManualMove, { passive: true })
+    container.addEventListener('wheel', handleManualMove, { passive: true })
 
     return () => {
-      map.off('dragstart', handleManualMove)
+      container.removeEventListener('pointerdown', handleManualMove)
+      container.removeEventListener('wheel', handleManualMove)
     }
   }, [mapReadyToken])
 
@@ -772,11 +826,12 @@ export function MapSurface({
     nodeMarkerRef.current = null
     nodeRadiusRef.current = null
 
-    const stages = Array.isArray(missionStages) && missionStages.length > 0
-      ? missionStages
-      : currentStage
-      ? [currentStage]
-      : []
+    const stages =
+      Array.isArray(missionStages) && missionStages.length > 0
+        ? missionStages
+        : currentStage
+          ? [currentStage]
+          : []
 
     const stageNodes = stages
       .map((stage, index) => ({
@@ -784,38 +839,117 @@ export function MapSurface({
         index,
         data: resolveStageMapData(stage),
       }))
-      .filter((entry): entry is { stage: PlayerStage; index: number; data: NonNullable<ReturnType<typeof resolveStageMapData>> } => Boolean(entry.data))
+      .filter(
+        (
+          entry
+        ): entry is {
+          stage: PlayerStage
+          index: number
+          data: NonNullable<ReturnType<typeof resolveStageMapData>>
+        } => Boolean(entry.data)
+      )
 
     if (stageNodes.length === 0) {
-      map.invalidateSize({ pan: false })
       return
     }
 
     const activeIndex = Math.max(0, Math.min(currentLevel || 0, stageNodes.length - 1))
-    
+
     const routePoints: RoadRoutePoint[] = []
-    if (playerPosition && typeof playerPosition.lat === 'number' && typeof playerPosition.lon === 'number') {
+    if (
+      playerPosition &&
+      typeof playerPosition.lat === 'number' &&
+      typeof playerPosition.lon === 'number'
+    ) {
       routePoints.push({ lat: playerPosition.lat, lon: playerPosition.lon })
-      routePoints.push({ lat: stageNodes[activeIndex].data.lat, lon: stageNodes[activeIndex].data.lon })
+      routePoints.push({
+        lat: stageNodes[activeIndex].data.lat,
+        lon: stageNodes[activeIndex].data.lon,
+      })
     } else if (activeIndex > 0) {
-      routePoints.push({ lat: stageNodes[activeIndex - 1].data.lat, lon: stageNodes[activeIndex - 1].data.lon })
-      routePoints.push({ lat: stageNodes[activeIndex].data.lat, lon: stageNodes[activeIndex].data.lon })
+      routePoints.push({
+        lat: stageNodes[activeIndex - 1].data.lat,
+        lon: stageNodes[activeIndex - 1].data.lon,
+      })
+      routePoints.push({
+        lat: stageNodes[activeIndex].data.lat,
+        lon: stageNodes[activeIndex].data.lon,
+      })
     }
     if (routePoints.length > 1) {
       const cacheKey = getRoadRouteCacheKey(routePoints)
       const drawRoadRoute = (road: CachedRoadRoute) => {
-        roadRouteLayersRef.current.forEach((layer) => layer.remove()); roadRouteLayersRef.current = []
-        const latLngs = road.path.map((p) => L.latLng(p.lat, p.lon)); if (latLngs.length < 2) return
-        const shadow = L.polyline(latLngs, { color:'#0d1b11', weight:12, opacity:.20, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--shadow' }).addTo(map)
-        const casing = L.polyline(latLngs, { color:'#22c55e', weight:8, opacity:.35, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--casing' }).addTo(map)
-        const guide = L.polyline(latLngs, { color:'#4ade80', weight:5.5, opacity:.75, lineCap:'round', lineJoin:'round', interactive:false, className:'saga-road-guide saga-road-guide--route' }).addTo(map)
-        roadRouteLayersRef.current.push(shadow,casing,guide)
-        routePoints.forEach((point,index) => { const snapped = road.snapped[index]; if (!snapped) return; const distance = getDistanceMeters(point,snapped); if (distance < 6 || distance > 1500) return; const connector = L.polyline([L.latLng(point.lat,point.lon),L.latLng(snapped.lat,snapped.lon)], { color:'#4ade80', weight:2, opacity:.82, dashArray:'4 6', lineCap:'round', interactive:false, className:'saga-road-guide saga-road-guide--connector' }).addTo(map); roadRouteLayersRef.current.push(connector) })
+        roadRouteLayersRef.current.forEach((layer) => layer.remove())
+        roadRouteLayersRef.current = []
+        const latLngs = road.path.map((p) => L.latLng(p.lat, p.lon))
+        if (latLngs.length < 2) return
+        const shadow = L.polyline(latLngs, {
+          color: '#0d1b11',
+          weight: 12,
+          opacity: 0.2,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false,
+          className: 'saga-road-guide saga-road-guide--shadow',
+        }).addTo(map)
+        const casing = L.polyline(latLngs, {
+          color: '#22c55e',
+          weight: 8,
+          opacity: 0.35,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false,
+          className: 'saga-road-guide saga-road-guide--casing',
+        }).addTo(map)
+        const guide = L.polyline(latLngs, {
+          color: '#4ade80',
+          weight: 5.5,
+          opacity: 0.75,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false,
+          className: 'saga-road-guide saga-road-guide--route',
+        }).addTo(map)
+        roadRouteLayersRef.current.push(shadow, casing, guide)
+        routePoints.forEach((point, index) => {
+          const snapped = road.snapped[index]
+          if (!snapped) return
+          const distance = getDistanceMeters(point, snapped)
+          if (distance < 6 || distance > 1500) return
+          const connector = L.polyline(
+            [L.latLng(point.lat, point.lon), L.latLng(snapped.lat, snapped.lon)],
+            {
+              color: '#4ade80',
+              weight: 2,
+              opacity: 0.82,
+              dashArray: '4 6',
+              lineCap: 'round',
+              interactive: false,
+              className: 'saga-road-guide saga-road-guide--connector',
+            }
+          ).addTo(map)
+          roadRouteLayersRef.current.push(connector)
+        })
       }
-      const cached = readRoadRouteCache(cacheKey); if (cached) drawRoadRoute(cached)
+      const cached = readRoadRouteCache(cacheKey)
+      if (cached) drawRoadRoute(cached)
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-        const controller = new AbortController(); roadRouteAbortRef.current = controller
-        void fetchRoadRoute(routePoints,controller.signal).then((road) => { if (controller.signal.aborted || roadRouteAbortRef.current !== controller) return; writeRoadRouteCache(cacheKey,road); drawRoadRoute(road) }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) console.warn('SAGA road route unavailable',error) })
+        const controller = new AbortController()
+        roadRouteAbortRef.current = controller
+        void fetchRoadRoute(routePoints, controller.signal)
+          .then((road) => {
+            if (controller.signal.aborted || roadRouteAbortRef.current !== controller) return
+            writeRoadRouteCache(cacheKey, road)
+            drawRoadRoute(road)
+          })
+          .catch((error) => {
+            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+              console.warn('SAGA road route unavailable', error)
+              if (!cached) drawRoadRoute({ path: routePoints, snapped: [], savedAt: Date.now() })
+            }
+          })
+      } else if (!cached) {
+        drawRoadRoute({ path: routePoints, snapped: [], savedAt: Date.now() })
       }
     }
 
@@ -823,30 +957,27 @@ export function MapSurface({
 
     for (const entry of stageNodes) {
       const { data, index } = entry
-      const state =
-        index < activeIndex
-          ? 'completed'
-          : index === activeIndex
-          ? 'current'
-          : 'locked'
+      const state = index < activeIndex ? 'completed' : index === activeIndex ? 'current' : 'locked'
 
       const center: L.LatLngExpression = [data.lat, data.lon]
-      const coincident = stageNodes.filter((candidate) =>
-        getDistanceMeters(
-          { lat: data.lat, lon: data.lon },
-          { lat: candidate.data.lat, lon: candidate.data.lon },
-        ) <= 8
+      const coincident = stageNodes.filter(
+        (candidate) =>
+          getDistanceMeters(
+            { lat: data.lat, lon: data.lon },
+            { lat: candidate.data.lat, lon: candidate.data.lon }
+          ) <= 8
       )
       const coincidentIndex = coincident.findIndex((candidate) => candidate.index === index)
-      const markerPoint = coincident.length > 1
-        ? spreadAround(
-            { lat: data.lat, lon: data.lon },
-            Math.max(0, coincidentIndex),
-            coincident.length,
-            mapZoom >= 18 ? 9 : 13,
-            -90,
-          )
-        : { lat: data.lat, lon: data.lon }
+      const markerPoint =
+        coincident.length > 1
+          ? spreadAround(
+              { lat: data.lat, lon: data.lon },
+              Math.max(0, coincidentIndex),
+              coincident.length,
+              mapZoom >= 18 ? 9 : 13,
+              -90
+            )
+          : { lat: data.lat, lon: data.lon }
       const markerCenter: L.LatLngExpression = [markerPoint.lat, markerPoint.lon]
       if (state === 'current') {
         const visual = getNodeVisualConfig(nodeState)
@@ -885,17 +1016,23 @@ export function MapSurface({
       }
 
       const ghostMarker = L.marker(markerCenter, {
-        icon: createMissionNodeIcon(index, state, entry.stage), keyboard: false,
+        icon: createMissionNodeIcon(index, state, entry.stage),
+        keyboard: false,
         zIndexOffset: state === 'locked' ? 540 : 560,
       }).addTo(map)
-      ghostMarker.bindTooltip(state === 'locked' ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}` : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, { direction: 'top', opacity: .88 })
+      ghostMarker.bindTooltip(
+        state === 'locked'
+          ? `Bloqueado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`
+          : `Completado · ${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`,
+        { direction: 'top', opacity: 0.88 }
+      )
       routeNodeLayersRef.current.push(ghostMarker)
-
     }
 
-    const nodeFrameKey = stageNodes
-      .map((entry) => `${entry.index}:${entry.data.lat}:${entry.data.lon}:${entry.data.radius}`)
-      .join('|') + `:active:${activeIndex}`
+    const nodeFrameKey =
+      stageNodes
+        .map((entry) => `${entry.index}:${entry.data.lat}:${entry.data.lon}:${entry.data.radius}`)
+        .join('|') + `:active:${activeIndex}`
 
     if (lastNodeFrameRef.current !== nodeFrameKey && !playerPosition && !debugSimulation) {
       lastNodeFrameRef.current = nodeFrameKey
@@ -916,8 +1053,6 @@ export function MapSurface({
         })
       }
     }
-
-    map.invalidateSize({ pan: false })
   }, [
     currentStage,
     missionStages,
@@ -937,14 +1072,16 @@ export function MapSurface({
       playerAuraRef.current?.remove()
       playerAuraRef.current = null
       playerAuraModeRef.current = null
-      map.invalidateSize({ pan: false })
       return
     }
 
     const nextLatLng = L.latLng(playerPosition.lat, playerPosition.lon)
 
-    const auraMode =
-      debugSimulation ? 'debug' : gpsState === 'ready' || gpsState === 'stale' ? 'gps' : null
+    const auraMode = debugSimulation
+      ? 'debug'
+      : gpsState === 'ready' || gpsState === 'stale'
+        ? 'gps'
+        : null
 
     if (!auraMode) {
       playerAuraRef.current?.remove()
@@ -986,126 +1123,91 @@ export function MapSurface({
 
     const selfMarkerIconKey = [
       getPlayerAvatarUrl(selfMarkerProfile),
-      getPlayerAvatarInitials(
-        selfMarkerProfile,
-      ),
+      getPlayerAvatarInitials(selfMarkerProfile),
       getPlayerColor(selfMarkerProfile),
     ].join('|')
 
     if (!playerMarkerRef.current) {
-      playerMarkerRef.current = L.marker(
-        nextLatLng,
-        {
-          icon: createAvatarIcon(
-            selfMarkerProfile,
-            'self',
-          ),
-          keyboard: false,
-        },
-      ).addTo(map)
+      playerMarkerRef.current = L.marker(nextLatLng, {
+        icon: createAvatarIcon(selfMarkerProfile, 'self'),
+        keyboard: false,
+      }).addTo(map)
 
-      playerMarkerIconKeyRef.current =
-        selfMarkerIconKey
+      playerMarkerIconKeyRef.current = selfMarkerIconKey
 
-      playerMarkerRef.current.bindTooltip(
-        selfMarkerProfile.display_name || 'YO',
-        {
-          direction: 'top',
-          opacity: 0.92,
-        },
-      )
+      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
+        direction: 'top',
+        opacity: 0.92,
+      })
 
-      playerMarkerRef.current.bindPopup(
-        buildPlayerPopup(
-          selfMarkerProfile,
-          'self',
-        ),
-        {
-          closeButton: true,
-          autoPan: true,
-          keepInView: true,
-        },
-      )
+      playerMarkerRef.current.bindPopup(buildPlayerPopup(selfMarkerProfile, 'self'), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+      })
 
       playerMarkerRef.current.off('click')
 
-      playerMarkerRef.current.on(
-        'click',
-        () =>
-          playerMarkerRef.current?.openPopup(),
-      )
+      playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
     } else {
-      playerMarkerRef.current.setLatLng(
-        nextLatLng,
-      )
+      playerMarkerRef.current.setLatLng(nextLatLng)
 
-      if (
-        playerMarkerIconKeyRef.current !==
-        selfMarkerIconKey
-      ) {
-        playerMarkerRef.current.setIcon(
-          createAvatarIcon(
-            selfMarkerProfile,
-            'self',
-          ),
-        )
+      if (playerMarkerIconKeyRef.current !== selfMarkerIconKey) {
+        playerMarkerRef.current.setIcon(createAvatarIcon(selfMarkerProfile, 'self'))
 
-        playerMarkerIconKeyRef.current =
-          selfMarkerIconKey
+        playerMarkerIconKeyRef.current = selfMarkerIconKey
       }
 
-      playerMarkerRef.current.bindTooltip(
-        selfMarkerProfile.display_name || 'YO',
-        {
-          direction: 'top',
-          opacity: 0.92,
-        },
-      )
+      playerMarkerRef.current.bindTooltip(selfMarkerProfile.display_name || 'YO', {
+        direction: 'top',
+        opacity: 0.92,
+      })
 
-      playerMarkerRef.current.bindPopup(
-        buildPlayerPopup(
-          selfMarkerProfile,
-          'self',
-        ),
-        {
-          closeButton: true,
-          autoPan: true,
-          keepInView: true,
-        },
-      )
+      playerMarkerRef.current.bindPopup(buildPlayerPopup(selfMarkerProfile, 'self'), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+      })
     }
 
     playerMarkerRef.current.setZIndexOffset(1000)
 
     if (followPlayer) {
       const playerFrameKey =
-        `${playerPosition.lat.toFixed(6)}:` +
-        `${playerPosition.lon.toFixed(6)}`
+        `${playerPosition.lat.toFixed(6)}:` + `${playerPosition.lon.toFixed(6)}`
 
-      if (
-        lastPlayerFrameRef.current !==
-        playerFrameKey
-      ) {
-        lastPlayerFrameRef.current =
-          playerFrameKey
+      if (lastPlayerFrameRef.current !== playerFrameKey) {
+        lastPlayerFrameRef.current = playerFrameKey
+        window.requestAnimationFrame(() => {
+          if (!mapRef.current) return
+          const map = mapRef.current
 
-        const distanceFromCenter =
-          map.distance(
-            map.getCenter(),
-            nextLatLng,
-          )
+          const distanceFromCenter = map.distance(map.getCenter(), nextLatLng)
 
-        if (distanceFromCenter > 6) {
-          map.panTo(nextLatLng, {
-            animate: true,
-            duration: 0.32,
-          })
-        }
+          if (flyToEndTimeRef.current && Date.now() < flyToEndTimeRef.current) {
+            // Do nothing, we are currently flying
+          } else if (distanceFromCenter > 2000) {
+            map.setView(nextLatLng, map.getZoom(), {
+              animate: false,
+            })
+          } else if (distanceFromCenter > 6) {
+            map.panTo(nextLatLng, { animate: true, duration: 0.32 })
+          }
+        })
       }
     } else {
       lastPlayerFrameRef.current = null
     }
-  }, [playerPosition?.lat, playerPosition?.lon, stageMapData, followPlayer, selfLabel, selfProfile, gpsState, debugSimulation])
+  }, [
+    playerPosition?.lat,
+    playerPosition?.lon,
+    stageMapData,
+    followPlayer,
+    selfLabel,
+    selfProfile,
+    gpsState,
+    debugSimulation,
+  ])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1114,7 +1216,8 @@ export function MapSurface({
     const seen = new Set<string>()
     const radius = getClusterRadiusForZoom(mapZoom)
     const visiblePlayers = otherPlayers.filter(
-      (player) => !player.is_self && typeof player.lat === 'number' && typeof player.lon === 'number'
+      (player) =>
+        !player.is_self && typeof player.lat === 'number' && typeof player.lon === 'number'
     )
     const groups = groupPlayerMarkers(visiblePlayers, radius)
 
@@ -1170,12 +1273,7 @@ export function MapSurface({
         seen.add(key)
 
         const presence = String(player.presence || 'offline').toLowerCase()
-        const kind =
-          presence === 'offline'
-            ? 'offline'
-            : presence === 'stale'
-            ? 'recent'
-            : 'live'
+        const kind = presence === 'offline' ? 'offline' : presence === 'stale' ? 'recent' : 'live'
 
         const basePoint =
           group.players.length > 1
@@ -1236,8 +1334,6 @@ export function MapSurface({
     }
   }, [otherPlayers, mapZoom, playerPosition?.lat, playerPosition?.lon])
 
-
-
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -1269,15 +1365,7 @@ export function MapSurface({
 
       fieldProofLayersRef.current.push(marker)
     }
-  }, [
-    fieldProofs,
-    mapReadyToken,
-    mapZoom,
-    onOpenFieldProofs,
-  ])
-
-
-
+  }, [fieldProofs, mapReadyToken, mapZoom, onOpenFieldProofs])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1287,13 +1375,8 @@ export function MapSurface({
       window.requestAnimationFrame(() => {
         map.invalidateSize({ pan: false })
 
-        if (
-          typeof navigator === 'undefined' ||
-          navigator.onLine !== false
-        ) {
-          mapRootRef.current?.classList.remove(
-            'saga-map-offline-tiles',
-          )
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          mapRootRef.current?.classList.remove('saga-map-offline-tiles')
 
           tileLayerRef.current?.redraw()
         }
@@ -1302,164 +1385,132 @@ export function MapSurface({
 
     refreshMap()
 
-    window.addEventListener(
-      'online',
-      refreshMap,
-    )
+    window.addEventListener('online', refreshMap)
 
-    window.addEventListener(
-      'pageshow',
-      refreshMap,
-    )
+    window.addEventListener('pageshow', refreshMap)
 
     const visibilityHandler = () => {
-      if (
-        document.visibilityState === 'visible'
-      ) {
+      if (document.visibilityState === 'visible') {
         refreshMap()
       }
     }
 
-    document.addEventListener(
-      'visibilitychange',
-      visibilityHandler,
-    )
+    document.addEventListener('visibilitychange', visibilityHandler)
 
     return () => {
-      window.removeEventListener(
-        'online',
-        refreshMap,
-      )
+      window.removeEventListener('online', refreshMap)
 
-      window.removeEventListener(
-        'pageshow',
-        refreshMap,
-      )
+      window.removeEventListener('pageshow', refreshMap)
 
-      document.removeEventListener(
-        'visibilitychange',
-        visibilityHandler,
-      )
+      document.removeEventListener('visibilitychange', visibilityHandler)
     }
-  }, [
-    mapReadyToken,
-    refreshToken,
-  ])
+  }, [mapReadyToken, refreshToken])
+
+  const flyToEndTimeRef = useRef<number>(0)
 
   useEffect(() => {
     const map = mapRef.current
     if (!map || !focusRequest) return
     if (lastFocusTokenRef.current === focusRequest.token) return
-    lastFocusTokenRef.current = focusRequest.token
 
-    map.invalidateSize({ pan: false })
+    let consumed = false
 
-    if (focusRequest.target === 'player' && playerPosition) {
-      map.stop()
-      map.flyTo([playerPosition.lat, playerPosition.lon], 18, {
-        animate: true,
-        duration: 0.60,
-        easeLinearity: 0.22,
-      })
-      return
-    }
+    if (focusRequest.target === 'player') {
+      if (playerPosition) {
+        map.stop()
+        const currentCenter = map.getCenter()
+        const targetLatLng = L.latLng(playerPosition.lat, playerPosition.lon)
+        const distance = map.distance(currentCenter, targetLatLng)
 
-    if (focusRequest.target === 'route') {
+        // eslint-disable-next-line
+        flyToEndTimeRef.current = Date.now() + 1500
+
+        if (distance > 500) {
+          // Snap instantly if far away to prevent tile caching/rendering bugs
+          map.setView(targetLatLng, 18, { animate: false })
+        } else {
+          // Fly to if close
+          map.flyTo(targetLatLng, 18, {
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.22,
+          })
+        }
+        consumed = true
+      }
+    } else if (focusRequest.target === 'route') {
       const sourceStages =
-        Array.isArray(missionStages) &&
-        missionStages.length > 0
+        Array.isArray(missionStages) && missionStages.length > 0
           ? missionStages
           : currentStage
             ? [currentStage]
             : []
 
-      const routePoints =
-        sourceStages
-          .map(resolveStageMapData)
-          .filter(
-            (
-              value,
-            ): value is NonNullable<
-              ReturnType<
-                typeof resolveStageMapData
-              >
-            > => Boolean(value),
-          )
-          .map((value) =>
-            L.latLng(
-              value.lat,
-              value.lon,
-            ),
-          )
+      const routePoints = sourceStages
+        .map(resolveStageMapData)
+        .filter((value): value is NonNullable<ReturnType<typeof resolveStageMapData>> =>
+          Boolean(value)
+        )
+        .map((value) => L.latLng(value.lat, value.lon))
 
       if (playerPosition) {
-        routePoints.push(
-          L.latLng(
-            playerPosition.lat,
-            playerPosition.lon,
-          ),
-        )
+        routePoints.push(L.latLng(playerPosition.lat, playerPosition.lon))
       }
 
       if (routePoints.length === 1) {
         map.stop()
+        flyToEndTimeRef.current = Date.now() + 1500
         map.flyTo(routePoints[0], 17, {
           animate: true,
-          duration: 0.55,
+          duration: 1.5,
           easeLinearity: 0.22,
         })
-        return
-      }
-
-      if (routePoints.length > 1) {
-        const bounds =
-          L.latLngBounds(routePoints)
+        consumed = true
+      } else if (routePoints.length > 1) {
+        const bounds = L.latLngBounds(routePoints)
 
         map.stop()
         map.invalidateSize({
           pan: false,
         })
 
-        map.flyToBounds(
-          bounds.pad(0.14),
-          {
-            paddingTopLeft: [44, 130],
-            paddingBottomRight: [44, 190],
-            maxZoom: 17,
-            animate: true,
-            duration: 0.65,
-            easeLinearity: 0.22,
-          },
-        )
-
-        return
+        flyToEndTimeRef.current = Date.now() + 1500
+        map.flyToBounds(bounds.pad(0.14), {
+          paddingTopLeft: [44, 130],
+          paddingBottomRight: [44, 190],
+          maxZoom: 17,
+          animate: true,
+          duration: 1.5,
+          easeLinearity: 0.22,
+        })
+        consumed = true
+      } else {
+        consumed = true
       }
-
-      if (playerPosition) {
+    } else if (focusRequest.target === 'node') {
+      if (stageMapData) {
         map.stop()
-        map.flyTo(
-          [
-            playerPosition.lat,
-            playerPosition.lon,
-          ],
-          18,
-          {
-            animate: true,
-            duration: 0.35,
-          },
-        )
-      }
+        const currentCenter = map.getCenter()
+        const targetLatLng = L.latLng(stageMapData.lat, stageMapData.lon)
+        const distance = map.distance(currentCenter, targetLatLng)
 
-      return
+        flyToEndTimeRef.current = Date.now() + 1500
+
+        if (distance > 500) {
+          map.setView(targetLatLng, 18, { animate: false })
+        } else {
+          map.flyTo(targetLatLng, 18, {
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.22,
+          })
+        }
+        consumed = true
+      }
     }
 
-    if (focusRequest.target === 'node' && stageMapData) {
-      map.stop()
-      map.flyTo([stageMapData.lat, stageMapData.lon], 18, {
-        animate: true,
-        duration: 0.60,
-        easeLinearity: 0.22,
-      })
+    if (consumed) {
+      lastFocusTokenRef.current = focusRequest.token
     }
   }, [
     focusRequest,
@@ -1476,10 +1527,7 @@ export function MapSurface({
     <>
       <style>{mapAnimations}</style>
 
-      <section
-        className={['map-surface', className].filter(Boolean).join(' ')}
-        style={surface}
-      >
+      <section className={['map-surface', className].filter(Boolean).join(' ')} style={surface}>
         <div
           ref={mapRootRef}
           aria-label="Current node map"

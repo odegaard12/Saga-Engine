@@ -12,7 +12,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const [isDragging, setIsDragging] = useState(false)
   const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
-  
+
   // Reset offset when opened
   useEffect(() => {
     if (open) {
@@ -32,7 +32,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (!isDragging) return
     const touchY = e.touches[0].clientY
     const deltaY = touchY - startYRef.current
-    
+
     // Only allow pulling downwards
     if (deltaY > 0) {
       setOffsetY(deltaY)
@@ -47,7 +47,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (offsetY > 100) {
       onClose()
       // Wait for animation to finish before resetting
-      setTimeout(() => setOffsetY(0), 300) 
+      setTimeout(() => setOffsetY(0), 300)
     } else {
       // Snap back
       setOffsetY(0)
@@ -63,14 +63,14 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
 
   return (
     <div style={overlay}>
-      <div 
+      <div
         style={{
-          ...backdrop, 
-          opacity: open ? Math.max(0, 1 - (offsetY / 300)) : 0 
-        }} 
-        onClick={onClose} 
+          ...backdrop,
+          opacity: open ? Math.max(0, 1 - offsetY / 300) : 0,
+        }}
+        onClick={onClose}
       />
-      
+
       <aside
         ref={sheetRef}
         style={dynamicSheetStyle}
@@ -78,7 +78,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <div 
+        <div
           style={dragHandleWrapper}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -86,7 +86,15 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         >
           <div style={dragHandle} />
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', WebkitOverflowScrolling: 'touch' }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {children}
         </div>
       </aside>

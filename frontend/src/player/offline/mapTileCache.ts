@@ -1,16 +1,17 @@
 import type { PlayerStage } from '../../types/player'
 
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v550'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.2'
 const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v1'
-const ESRI_TILE_BASE = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
+const ESRI_TILE_BASE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
-const MAX_TILE_URLS = 1400
+const MAX_TILE_URLS = 3500
 
-const REGIONAL_RADIUS_KM = 120       // contexto amplio, zoom bajo
-const MISSION_AREA_RADIUS_KM = 35    // zona jugable amplia, zoom medio
-const ROUTE_CORRIDOR_KM = 6          // ancho alrededor de la ruta
-const NODE_DETAIL_RADIUS_KM = 1.2    // detalle alto alrededor de nodos
+const REGIONAL_RADIUS_KM = 120 // contexto amplio, zoom bajo
+const MISSION_AREA_RADIUS_KM = 35 // zona jugable amplia, zoom medio
+const ROUTE_CORRIDOR_KM = 6 // ancho alrededor de la ruta
+const NODE_DETAIL_RADIUS_KM = 1.2 // detalle alto alrededor de nodos
 
 export type OfflineMapTileProgress = {
   label: string
@@ -52,7 +53,7 @@ function tileUrl(zoom: number, x: number, y: number) {
 }
 
 function metersPerTile(lat: number, zoom: number) {
-  return (156543.03392 * Math.cos((lat * Math.PI) / 180)) / (2 ** zoom) * 256
+  return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
 }
 
 function getDistanceMeters(a: Point, b: Point) {
@@ -62,9 +63,7 @@ function getDistanceMeters(a: Point, b: Point) {
   const lat1 = (a.lat * Math.PI) / 180
   const lat2 = (b.lat * Math.PI) / 180
 
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
 
   return 2 * radius * Math.asin(Math.sqrt(h))
 }
@@ -305,21 +304,47 @@ export async function prefetchMissionMapTiles(
   })
 
   if (routePoints.length > 0 && center) {
-    // Contexto grande, barato.
-    addSquareAroundPointWithBudget(urls, center, 8, REGIONAL_RADIUS_KM, 36, 'regional-z8')
-    addSquareAroundPointWithBudget(urls, center, 9, REGIONAL_RADIUS_KM, 64, 'regional-z9')
-    addSquareAroundPointWithBudget(urls, center, 10, REGIONAL_RADIUS_KM, 100, 'regional-z10')
-    addSquareAroundPointWithBudget(urls, center, 11, Math.min(REGIONAL_RADIUS_KM, 80), 140, 'regional-z11')
+    // Contexto regional grande (Galicia/España completa para evitar cuadros negros al desampliar)
+    addSquareAroundPointWithBudget(urls, center, 5, 800, 16, 'regional-z5')
+    addSquareAroundPointWithBudget(urls, center, 6, 800, 25, 'regional-z6')
+    addSquareAroundPointWithBudget(urls, center, 7, 600, 36, 'regional-z7')
+    addSquareAroundPointWithBudget(urls, center, 8, 400, 49, 'regional-z8')
+    addSquareAroundPointWithBudget(urls, center, 9, 300, 81, 'regional-z9')
+    addSquareAroundPointWithBudget(urls, center, 10, 200, 121, 'regional-z10')
+    addSquareAroundPointWithBudget(urls, center, 11, 120, 169, 'regional-z11')
 
     // Zona amplia de misión.
-    addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 180, 'mission-z12')
-    addBBoxTilesWithBudget(urls, routePoints, 13, MISSION_AREA_RADIUS_KM, 240, 'mission-z13')
-    addBBoxTilesWithBudget(urls, routePoints, 14, Math.min(MISSION_AREA_RADIUS_KM, 22), 260, 'mission-z14')
+    addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 200, 'mission-z12')
+    addBBoxTilesWithBudget(urls, routePoints, 13, MISSION_AREA_RADIUS_KM, 260, 'mission-z13')
+    addBBoxTilesWithBudget(
+      urls,
+      routePoints,
+      14,
+      Math.min(MISSION_AREA_RADIUS_KM, 25),
+      280,
+      'mission-z14'
+    )
 
     // Corredor ancho, no línea fina.
-    addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 260, 'corridor-z15')
-    addRouteCorridor(urls, routePoints, 16, Math.min(ROUTE_CORRIDOR_KM, 4), 1100, 320, 'corridor-z16')
-    addRouteCorridor(urls, routePoints, 17, Math.min(ROUTE_CORRIDOR_KM, 2.2), 850, 320, 'corridor-z17')
+    addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
+    addRouteCorridor(
+      urls,
+      routePoints,
+      16,
+      Math.min(ROUTE_CORRIDOR_KM, 4),
+      1100,
+      340,
+      'corridor-z16'
+    )
+    addRouteCorridor(
+      urls,
+      routePoints,
+      17,
+      Math.min(ROUTE_CORRIDOR_KM, 2.2),
+      850,
+      340,
+      'corridor-z17'
+    )
 
     // Detalle alto solo cerca de nodos.
     for (const point of routePoints) {
@@ -334,7 +359,7 @@ export async function prefetchMissionMapTiles(
     cached_at: new Date().toISOString(),
     requested: orderedUrls.length,
     saved,
-    zooms: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
     route_points: routePoints.length,
     regional_radius_km: REGIONAL_RADIUS_KM,
     mission_area_radius_km: MISSION_AREA_RADIUS_KM,

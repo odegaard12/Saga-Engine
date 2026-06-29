@@ -128,8 +128,20 @@ export default function SettingsPanel({
         </div>
 
         <div className="admin-settings-grid-modern" style={{ gridTemplateColumns: '1fr' }}>
-          <div style={{ padding: '12px 16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '8px', color: '#facc15', fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>
-            <strong>{t('admin.settingsPanel.mapboxWarningTitle')}</strong><br />
+          <div
+            style={{
+              padding: '12px 16px',
+              background: 'rgba(234, 179, 8, 0.1)',
+              border: '1px solid rgba(234, 179, 8, 0.3)',
+              borderRadius: '8px',
+              color: '#facc15',
+              fontSize: '13px',
+              lineHeight: '1.5',
+              marginBottom: '8px',
+            }}
+          >
+            <strong>{t('admin.settingsPanel.mapboxWarningTitle')}</strong>
+            <br />
             {t('admin.settingsPanel.mapboxWarningText')}
           </div>
 

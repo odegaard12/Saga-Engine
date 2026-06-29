@@ -48,7 +48,8 @@ export const messages = {
         mapboxTitle: 'Mapbox Configuration',
         mapboxSubtitle: 'Tiles and styling',
         mapboxWarningTitle: '⚠️ Mapbox Quota Warning',
-        mapboxWarningText: 'The free tier limit is 200,000 requests per month. If you configure a Mapbox token, please monitor your usage at console.mapbox.com to avoid unexpected charges. SAGA offline downloads rely on these requests.',
+        mapboxWarningText:
+          'The free tier limit is 200,000 requests per month. If you configure a Mapbox token, please monitor your usage at console.mapbox.com to avoid unexpected charges. SAGA offline downloads rely on these requests.',
         mapboxToken: 'Mapbox Access Token',
         mapboxStyle: 'Mapbox Style URL (Optional)',
         story: 'Story',
@@ -63,15 +64,16 @@ export const messages = {
         saveFailed: 'Settings save failed',
         saving: 'Saving settings…',
         saved: 'Settings saved',
-        save: 'Save settings'
-      }
+        save: 'Save settings',
+      },
     },
     editor: {
       gameAuthoring: {
         title: 'Game authoring',
         subtitle: 'Define how this node plays.',
         completionTitle: 'How players complete this node',
-        completionHelp: 'Offline plan: saved with the node; runtime-ready games already apply their own completion.',
+        completionHelp:
+          'Offline plan: saved with the node; runtime-ready games already apply their own completion.',
         completionMethod: 'Completion method',
         methodProximity: 'Reach the place',
         methodManualCode: 'Enter a code',
@@ -178,7 +180,8 @@ export const messages = {
         mapboxTitle: 'Configuración de Mapbox',
         mapboxSubtitle: 'Mapas y diseño premium',
         mapboxWarningTitle: '⚠️ Aviso de Cuota Mapbox',
-        mapboxWarningText: 'El límite gratuito es de 200.000 peticiones al mes. Si configuras un token, vigila tu consumo en console.mapbox.com para evitar cargos sorpresa. Las descargas offline de SAGA consumen estas peticiones.',
+        mapboxWarningText:
+          'El límite gratuito es de 200.000 peticiones al mes. Si configuras un token, vigila tu consumo en console.mapbox.com para evitar cargos sorpresa. Las descargas offline de SAGA consumen estas peticiones.',
         mapboxToken: 'Token de Mapbox',
         mapboxStyle: 'URL del Estilo (Opcional)',
         story: 'Historia',
@@ -193,15 +196,16 @@ export const messages = {
         saveFailed: 'Error al guardar ajustes',
         saving: 'Guardando ajustes…',
         saved: 'Ajustes guardados',
-        save: 'Guardar ajustes'
-      }
+        save: 'Guardar ajustes',
+      },
     },
     editor: {
       gameAuthoring: {
         title: 'Autoría de juego',
         subtitle: 'Define cómo se juega este nodo.',
         completionTitle: 'Cómo se completa este nodo',
-        completionHelp: 'Plan offline: se guarda con el nodo; los juegos marcados como jugables ya aplican su finalización.',
+        completionHelp:
+          'Plan offline: se guarda con el nodo; los juegos marcados como jugables ya aplican su finalización.',
         completionMethod: 'Método de completado',
         methodProximity: 'Llegar al sitio',
         methodManualCode: 'Introducir código',
@@ -268,11 +272,7 @@ export const messages = {
 
 type Messages = typeof messages.en
 
-type Join<K, P> = K extends string
-  ? P extends string
-    ? `${K}.${P}`
-    : never
-  : never
+type Join<K, P> = K extends string ? (P extends string ? `${K}.${P}` : never) : never
 
 type Leaves<T> = T extends string
   ? never

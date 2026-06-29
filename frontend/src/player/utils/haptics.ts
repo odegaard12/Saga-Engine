@@ -47,5 +47,5 @@ export const haptics = {
    */
   tick() {
     this.vibrate(10)
-  }
+  },
 }

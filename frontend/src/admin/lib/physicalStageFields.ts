@@ -11,7 +11,7 @@ export const physicalStageFieldNames = [
 
 export function withPhysicalStageFields<T extends Record<string, unknown>>(
   source: AdminReactOverviewStage,
-  target: T,
+  target: T
 ): T {
   const sourceRecord = source as unknown as Record<string, unknown>
   const next = { ...target } as Record<string, unknown>

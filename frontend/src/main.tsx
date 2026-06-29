@@ -7,7 +7,6 @@ import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { setupAdminSettingsLanguageMenu } from './i18n/adminSettingsLanguageMenu'
 
-
 setupLegacySpanishBridge()
 setupAdminSettingsLanguageMenu()
 

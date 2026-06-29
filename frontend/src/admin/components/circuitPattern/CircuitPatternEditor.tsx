@@ -271,9 +271,7 @@ function numberOf(value: unknown, fallback: number) {
 function pathOf(value: unknown): CellKey[] {
   if (!Array.isArray(value)) return []
 
-  return value
-    .map(String)
-    .filter((item): item is CellKey => /^\d+:\d+$/.test(item))
+  return value.map(String).filter((item): item is CellKey => /^\d+:\d+$/.test(item))
 }
 
 function adjacent(a: CellKey, b: CellKey) {
@@ -287,45 +285,25 @@ function randomSeed() {
   return `admin:${Date.now()}:${Math.random()}`
 }
 
-export default function CircuitPatternEditor({
-  config,
-  onChange,
-}: Props) {
+export default function CircuitPatternEditor({ config, onChange }: Props) {
   const [message, setMessage] = useState('')
 
   const rows = clamp(numberOf(config.grid_rows, 5), 4, 6)
   const cols = clamp(numberOf(config.grid_cols, 5), 4, 6)
-  const length = clamp(
-    numberOf(config.path_length, 11),
-    4,
-    rows * cols,
-  )
+  const length = clamp(numberOf(config.path_length, 11), 4, rows * cols)
 
-  const mode =
-    config.pattern_mode === 'fixed'
-      ? 'fixed'
-      : 'random_each_game'
+  const mode = config.pattern_mode === 'fixed' ? 'fixed' : 'random_each_game'
 
-  const path = useMemo(
-    () => pathOf(config.path_cells),
-    [config.path_cells],
-  )
+  const path = useMemo(() => pathOf(config.path_cells), [config.path_cells])
 
-  const valid =
-    path.length >= 4 &&
-    isCircuitPathValid(path, rows, cols)
+  const valid = path.length >= 4 && isCircuitPathValid(path, rows, cols)
 
   const boardStyle = {
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
   } as CSSProperties
 
   const generate = () => {
-    const next = buildCircuitPath(
-      rows,
-      cols,
-      length,
-      randomSeed(),
-    )
+    const next = buildCircuitPath(rows, cols, length, randomSeed())
 
     onChange({
       game_id: 'logic_circuit',
@@ -335,14 +313,10 @@ export default function CircuitPatternEditor({
       path_length: next.length,
     })
 
-    setMessage(
-      'Patrón generado. Será igual para todos los jugadores.',
-    )
+    setMessage('Patrón generado. Será igual para todos los jugadores.')
   }
 
-  const chooseMode = (
-    next: 'random_each_game' | 'fixed',
-  ) => {
+  const chooseMode = (next: 'random_each_game' | 'fixed') => {
     if (next === 'random_each_game') {
       onChange({
         game_id: 'logic_circuit',
@@ -351,9 +325,7 @@ export default function CircuitPatternEditor({
         path_cells: [],
       })
 
-      setMessage(
-        'Se generará una ruta distinta al pulsar Iniciar.',
-      )
+      setMessage('Se generará una ruta distinta al pulsar Iniciar.')
 
       return
     }
@@ -365,9 +337,7 @@ export default function CircuitPatternEditor({
         pattern_mode: 'fixed',
       })
 
-      setMessage(
-        'Este patrón fijo será igual para todos.',
-      )
+      setMessage('Este patrón fijo será igual para todos.')
 
       return
     }
@@ -384,9 +354,7 @@ export default function CircuitPatternEditor({
     const last = path[path.length - 1]
 
     if (last && !adjacent(last, key)) {
-      setMessage(
-        'La celda debe estar junto a la anterior.',
-      )
+      setMessage('La celda debe estar junto a la anterior.')
       return
     }
 
@@ -403,7 +371,7 @@ export default function CircuitPatternEditor({
     setMessage(
       next.length >= 4
         ? 'Patrón válido. Guarda el nodo para persistirlo.'
-        : 'Añade al menos cuatro celdas.',
+        : 'Añade al menos cuatro celdas.'
     )
   }
 
@@ -413,59 +381,39 @@ export default function CircuitPatternEditor({
 
       <div>
         <h4>Patrón del circuito</h4>
-        <p>
-          Elige si cambia en cada partida o si todos juegan
-          el mismo.
-        </p>
+        <p>Elige si cambia en cada partida o si todos juegan el mismo.</p>
       </div>
 
       <div className="cpe-modes">
         <button
           type="button"
-          className={[
-            'cpe-mode',
-            mode === 'random_each_game' ? 'active' : '',
-          ]
+          className={['cpe-mode', mode === 'random_each_game' ? 'active' : '']
             .filter(Boolean)
             .join(' ')}
           onClick={() => chooseMode('random_each_game')}
         >
           <b>Aleatorio en cada partida</b>
-          <small>
-            Cambia cada vez que el jugador pulsa Iniciar.
-          </small>
+          <small>Cambia cada vez que el jugador pulsa Iniciar.</small>
         </button>
 
         <button
           type="button"
-          className={[
-            'cpe-mode',
-            mode === 'fixed' ? 'active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
+          className={['cpe-mode', mode === 'fixed' ? 'active' : ''].filter(Boolean).join(' ')}
           onClick={() => chooseMode('fixed')}
         >
           <b>Patrón fijo</b>
-          <small>
-            Lo generas o dibujas aquí y será igual para todos.
-          </small>
+          <small>Lo generas o dibujas aquí y será igual para todos.</small>
         </button>
       </div>
 
       {mode === 'random_each_game' ? (
         <div className="cpe-note">
-          Cada inicio crea una ruta nueva. La ruta no cambia
-          mientras se memoriza o resuelve.
+          Cada inicio crea una ruta nueva. La ruta no cambia mientras se memoriza o resuelve.
         </div>
       ) : (
         <>
           <div className="cpe-tools">
-            <button
-              type="button"
-              className="primary"
-              onClick={generate}
-            >
+            <button type="button" className="primary" onClick={generate}>
               Generar otro patrón
             </button>
 
@@ -501,9 +449,7 @@ export default function CircuitPatternEditor({
                   path_length: length,
                 })
 
-                setMessage(
-                  'Tablero limpio. Pulsa una celda para empezar.',
-                )
+                setMessage('Tablero limpio. Pulsa una celda para empezar.')
               }}
             >
               Limpiar y dibujar
@@ -512,40 +458,38 @@ export default function CircuitPatternEditor({
 
           <div className="cpe-board-shell">
             <div className="cpe-board" style={boardStyle}>
-              {Array.from(
-                { length: rows * cols },
-                (_, index) => {
-                  const row = Math.floor(index / cols)
-                  const col = index % cols
-                  const key = `${row}:${col}` as CellKey
-                  const order = path.indexOf(key)
+              {Array.from({ length: rows * cols }, (_, index) => {
+                const row = Math.floor(index / cols)
+                const col = index % cols
+                const key = `${row}:${col}` as CellKey
+                const order = path.indexOf(key)
 
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={[
-                        'cpe-cell',
-                        order >= 0 ? 'on' : '',
-                        order === path.length - 1
-                          ? 'last'
-                          : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      onClick={() => press(key)}
-                    >
-                      {order >= 0 ? order + 1 : ''}
-                    </button>
-                  )
-                },
-              )}
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={[
+                      'cpe-cell',
+                      order >= 0 ? 'on' : '',
+                      order === path.length - 1 ? 'last' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => press(key)}
+                  >
+                    {order >= 0 ? order + 1 : ''}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           <div className="cpe-info">
             <span>
-              Tablero: <b>{rows} × {cols}</b>
+              Tablero:{' '}
+              <b>
+                {rows} × {cols}
+              </b>
             </span>
 
             <span>

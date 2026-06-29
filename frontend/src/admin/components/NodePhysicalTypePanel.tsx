@@ -20,7 +20,12 @@ type NodePhysicalTypePanelProps = {
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
   { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico que se recoge', icon: '⭐' },
-  { id: 'requirement', label: 'Llave QR', help: 'Objeto que puede desbloquear otro nodo', icon: '🔑' },
+  {
+    id: 'requirement',
+    label: 'Llave QR',
+    help: 'Objeto que puede desbloquear otro nodo',
+    icon: '🔑',
+  },
   { id: 'clue', label: 'Pista QR', help: 'Tarjeta física con pista', icon: '🧩' },
   { id: 'bonus', label: 'Bonus QR', help: 'Extra o recompensa física', icon: '🎁' },
 ]
@@ -29,12 +34,18 @@ function getPhysicalMode(stage: AdminReactOverviewStage): NodePhysicalMode {
   const record = stage as unknown as Record<string, unknown>
   const raw = record.physical_node_kind || record.physical_item_kind
 
-  if (raw === 'collectible' || raw === 'requirement' || raw === 'clue' || raw === 'bonus') return raw
+  if (raw === 'collectible' || raw === 'requirement' || raw === 'clue' || raw === 'bonus')
+    return raw
 
   const physicalQr = record.physical_qr
   if (physicalQr && typeof physicalQr === 'object') {
     const qrKind = (physicalQr as Record<string, unknown>).kind
-    if (qrKind === 'collectible' || qrKind === 'requirement' || qrKind === 'clue' || qrKind === 'bonus') {
+    if (
+      qrKind === 'collectible' ||
+      qrKind === 'requirement' ||
+      qrKind === 'clue' ||
+      qrKind === 'bonus'
+    ) {
       return qrKind
     }
   }
@@ -63,13 +74,15 @@ function getStageText(stage: AdminReactOverviewStage, key: string): string {
 function getStageConfig(stage: AdminReactOverviewStage): Record<string, unknown> {
   const record = stage as unknown as Record<string, unknown>
   return record.config && typeof record.config === 'object' && !Array.isArray(record.config)
-    ? record.config as Record<string, unknown>
+    ? (record.config as Record<string, unknown>)
     : {}
 }
 
 function buildFallbackCodeForPhysicalStage(stage: AdminReactOverviewStage) {
   const config = getStageConfig(stage)
-  const existing = String(config.success_code || config.fallback_code || '').trim().toUpperCase()
+  const existing = String(config.success_code || config.fallback_code || '')
+    .trim()
+    .toUpperCase()
   if (existing) return existing
 
   const index = typeof stage.index === 'number' ? stage.index + 1 : 1
@@ -92,27 +105,21 @@ function slugifyPhysicalValue(value: string): string {
 
 function buildDefaultPhysicalQrCard(
   stage: AdminReactOverviewStage,
-  kind: PhysicalQrKind,
+  kind: PhysicalQrKind
 ): SavedPhysicalQrCard {
   const record = stage as unknown as Record<string, unknown>
   const physicalQr =
     record.physical_qr && typeof record.physical_qr === 'object'
-      ? record.physical_qr as Partial<SavedPhysicalQrCard>
+      ? (record.physical_qr as Partial<SavedPhysicalQrCard>)
       : {}
 
   const mode = physicalModes.find((item) => item.id === kind)
   const label = String(
-    record.physical_item_label ||
-    physicalQr.label ||
-    stage.title ||
-    'Objeto SAGA'
+    record.physical_item_label || physicalQr.label || stage.title || 'Objeto SAGA'
   ).trim()
 
   const itemId = String(
-    record.physical_item_id ||
-    physicalQr.item_id ||
-    slugifyPhysicalValue(label) ||
-    'objeto_saga'
+    record.physical_item_id || physicalQr.item_id || slugifyPhysicalValue(label) || 'objeto_saga'
   ).trim()
 
   const payload = physicalQr.payload || `SAGA1:ITEM:${itemId}:${label}`
@@ -122,7 +129,9 @@ function buildDefaultPhysicalQrCard(
     label,
     kind,
     payload,
-    card_text: physicalQr.card_text || `${mode?.icon || '⭐'} ${label}\n${mode?.label || 'Objeto QR'}\nEscanea esta tarjeta en SAGA.`,
+    card_text:
+      physicalQr.card_text ||
+      `${mode?.icon || '⭐'} ${label}\n${mode?.label || 'Objeto QR'}\nEscanea esta tarjeta en SAGA.`,
     updated_at: physicalQr.updated_at || new Date().toISOString(),
   }
 }
@@ -140,15 +149,13 @@ export default function NodePhysicalTypePanel({
   const isPhysical = mode !== 'none'
   const isLocalNewPhysicalStage = typeof stage.id === 'string' && stage.id.startsWith('local-')
 
-    const isLocalNew = typeof stage.id === 'string' && stage.id.startsWith('local-')
+  const isLocalNew = typeof stage.id === 'string' && stage.id.startsWith('local-')
 
   function requestDeleteLocal() {
     if (!onDeleteLocal) return
 
     const action = isLocalNew ? 'Descartar' : 'Eliminar'
-    const suffix = isLocalNew
-      ? 'Se quitará de la edición local.'
-      : 'Guarda después para persistir.'
+    const suffix = isLocalNew ? 'Se quitará de la edición local.' : 'Guarda después para persistir.'
     const title = stage.title || 'Sin título'
 
     if (window.confirm(`${action} nodo "${title}"? ${suffix}`)) {
@@ -156,7 +163,7 @@ export default function NodePhysicalTypePanel({
     }
   }
 
-function patchStage(patch: Record<string, unknown>) {
+  function patchStage(patch: Record<string, unknown>) {
     onApplyLocal({
       ...(stage as unknown as Record<string, unknown>),
       ...patch,
@@ -194,7 +201,9 @@ function patchStage(patch: Record<string, unknown>) {
       physical_item_kind: card.kind,
       config: {
         ...config,
-        success_code: String(config.success_code || config.fallback_code || buildFallbackCodeForPhysicalStage(stage)),
+        success_code: String(
+          config.success_code || config.fallback_code || buildFallbackCodeForPhysicalStage(stage)
+        ),
       },
     })
   }
@@ -209,10 +218,13 @@ function patchStage(patch: Record<string, unknown>) {
     })
   }
 
-
   if (!chooserOnly && isPhysical) {
     return (
-      <section className="saga-node-physical-type-panel saga-physical-guided-v4-shell" style={panel} aria-label="Editor guiado de QR físico">
+      <section
+        className="saga-node-physical-type-panel saga-physical-guided-v4-shell"
+        style={panel}
+        aria-label="Editor guiado de QR físico"
+      >
         <GuidedNodeEditorFlow
           stage={stage as unknown as Record<string, any>}
           onPatch={(patch) => patchStage(patch)}
@@ -285,12 +297,18 @@ function patchStage(patch: Record<string, unknown>) {
                 className="saga-physical-editor-topbar__delete"
                 onClick={() => {
                   const action = isLocalNewPhysicalStage ? 'Descartar nodo local' : 'Eliminar nodo'
-                  if (window.confirm(`${action} "${stage.title || 'Sin título'}"? Guarda después para persistir.`)) {
+                  if (
+                    window.confirm(
+                      `${action} "${stage.title || 'Sin título'}"? Guarda después para persistir.`
+                    )
+                  ) {
                     onDeleteLocal(stage)
                     onClose?.()
                   }
                 }}
-                aria-label={isLocalNewPhysicalStage ? 'Descartar nodo local' : 'Eliminar nodo físico'}
+                aria-label={
+                  isLocalNewPhysicalStage ? 'Descartar nodo local' : 'Eliminar nodo físico'
+                }
               >
                 {isLocalNewPhysicalStage ? 'Descartar' : 'Eliminar'}
               </button>
@@ -306,7 +324,7 @@ function patchStage(patch: Record<string, unknown>) {
           </div>
         </div>
       ) : null}
-        {chooserOnly ? (
+      {chooserOnly ? (
         <div style={head}>
           <div>
             <div style={eyebrow}>TIPO DE NODO</div>
@@ -317,10 +335,11 @@ function patchStage(patch: Record<string, unknown>) {
                 : 'Usa este modo para ruta, GPS, minijuego y reglas normales.'}
             </p>
           </div>
-          <span style={isPhysical ? activeBadge : badge}>{isPhysical ? 'QR FÍSICO' : 'NORMAL'}</span>
+          <span style={isPhysical ? activeBadge : badge}>
+            {isPhysical ? 'QR FÍSICO' : 'NORMAL'}
+          </span>
         </div>
-  
-        ) : null}
+      ) : null}
       {chooserOnly ? (
         <div style={modeLayout}>
           <button
@@ -404,7 +423,10 @@ function patchStage(patch: Record<string, unknown>) {
           <div style={fallbackPanel}>
             <div style={sectionTitle}>
               <span>Código fallback</span>
-              <small>Emergencia offline para completar este QR si falla la cámara, el escaneo o la cobertura.</small>
+              <small>
+                Emergencia offline para completar este QR si falla la cámara, el escaneo o la
+                cobertura.
+              </small>
             </div>
 
             <label style={field}>
@@ -420,7 +442,9 @@ function patchStage(patch: Record<string, unknown>) {
             <button
               type="button"
               style={changeTypeButton}
-              onClick={() => updatePhysicalFallbackCode(`SAGA-${String(stage.index + 1).padStart(2, '0')}`)}
+              onClick={() =>
+                updatePhysicalFallbackCode(`SAGA-${String(stage.index + 1).padStart(2, '0')}`)
+              }
             >
               Generar fallback
             </button>
@@ -428,7 +452,8 @@ function patchStage(patch: Record<string, unknown>) {
 
           <PhysicalQrCardsPanel
             initialLabel={
-              ((stage as AdminReactOverviewStage & { physical_item_label?: string }).physical_item_label) ||
+              (stage as AdminReactOverviewStage & { physical_item_label?: string })
+                .physical_item_label ||
               stage.title ||
               'Buscar a tu enemigo'
             }
@@ -659,7 +684,6 @@ const emptyBox: CSSProperties = {
   lineHeight: 1.35,
 }
 
-
 const changeTypeBar: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -684,7 +708,6 @@ const changeTypeButton: CSSProperties = {
   fontSize: 11,
   fontWeight: 950,
 }
-
 
 const fallbackPanel: CSSProperties = {
   display: 'grid',

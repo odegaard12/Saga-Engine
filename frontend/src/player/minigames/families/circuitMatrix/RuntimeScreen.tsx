@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { normalizeCircuitConfig } from './circuitConfig'
-import {
-  buildCircuitPath,
-  isCircuitPathValid,
-  type CellKey,
-} from './circuitPath'
+import { buildCircuitPath, isCircuitPathValid, type CellKey } from './circuitPath'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -537,54 +533,25 @@ export function CircuitMatrixRuntimeScreen({
   ].join(':')
 
   const runtimeConfig = normalizeCircuitConfig(cfg, stageSeed)
-  const {
-    rows,
-    cols,
-    pathLength,
-    previewCellMs,
-    maxErrors,
-    seed,
-    patternMode,
-    fixedPath,
-  } = runtimeConfig
+  const { rows, cols, pathLength, previewCellMs, maxErrors, seed, patternMode, fixedPath } =
+    runtimeConfig
 
-  const [runSeed, setRunSeed] = useState(
-    () => `${seed}:${Date.now()}:${Math.random()}`,
-  )
+  const [runSeed, setRunSeed] = useState(() => `${seed}:${Date.now()}:${Math.random()}`)
 
   const randomPath = useMemo(
-    () =>
-      buildCircuitPath(
-        rows,
-        cols,
-        pathLength,
-        runSeed,
-      ),
-    [cols, pathLength, rows, runSeed],
+    () => buildCircuitPath(rows, cols, pathLength, runSeed),
+    [cols, pathLength, rows, runSeed]
   )
 
   const fixedPathKey = fixedPath.join('|')
 
-  const fixedPatternValid =
-    fixedPath.length >= 4 &&
-    isCircuitPathValid(fixedPath, rows, cols)
+  const fixedPatternValid = fixedPath.length >= 4 && isCircuitPathValid(fixedPath, rows, cols)
 
-  const fixedPatternInvalid =
-    patternMode === 'fixed' &&
-    !fixedPatternValid
+  const fixedPatternInvalid = patternMode === 'fixed' && !fixedPatternValid
 
   const path = useMemo(
-    () =>
-      patternMode === 'fixed' &&
-      fixedPatternValid
-        ? fixedPath
-        : randomPath,
-    [
-      fixedPathKey,
-      fixedPatternValid,
-      patternMode,
-      randomPath,
-    ],
+    () => (patternMode === 'fixed' && fixedPatternValid ? fixedPath : randomPath),
+    [fixedPathKey, fixedPatternValid, patternMode, randomPath]
   )
 
   const [phase, setPhase] = useState<Phase>('ready')
@@ -608,10 +575,15 @@ export function CircuitMatrixRuntimeScreen({
     path.forEach((_, index) => {
       timers.push(window.setTimeout(() => setPreviewIndex(index), previewCellMs * index))
     })
-    timers.push(window.setTimeout(() => {
-      setPreviewIndex(-1)
-      setPhase('playing')
-    }, previewCellMs * path.length + 220))
+    timers.push(
+      window.setTimeout(
+        () => {
+          setPreviewIndex(-1)
+          setPhase('playing')
+        },
+        previewCellMs * path.length + 220
+      )
+    )
 
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [path, phase, previewCellMs])
@@ -633,9 +605,7 @@ export function CircuitMatrixRuntimeScreen({
     setContinuing(false)
 
     if (patternMode === 'random_each_game') {
-      setRunSeed(
-        `${seed}:${Date.now()}:${Math.random()}`,
-      )
+      setRunSeed(`${seed}:${Date.now()}:${Math.random()}`)
     }
 
     setPhase('preview')
@@ -645,44 +615,42 @@ export function CircuitMatrixRuntimeScreen({
     setPreviewIndex(-1)
   }, [patternMode, seed])
 
-  const pressCell = useCallback((key: CellKey) => {
-    if (!canTapBoard) return
+  const pressCell = useCallback(
+    (key: CellKey) => {
+      if (!canTapBoard) return
 
-    const now = window.performance.now()
-    if (now - lastTapAtRef.current < 160) return
-    lastTapAtRef.current = now
+      const now = window.performance.now()
+      if (now - lastTapAtRef.current < 160) return
+      lastTapAtRef.current = now
 
-    if (selected.includes(key)) return
+      if (selected.includes(key)) return
 
-    if (key !== nextKey) {
-      setWrongKey(key)
-      window.setTimeout(() => setWrongKey(null), 280)
+      if (key !== nextKey) {
+        setWrongKey(key)
+        window.setTimeout(() => setWrongKey(null), 280)
 
-      setErrors((value) => {
-        const next = Math.min(maxErrors, value + 1)
-        if (next >= maxErrors) setPhase('failed')
-        return next
-      })
-      return
-    }
+        setErrors((value) => {
+          const next = Math.min(maxErrors, value + 1)
+          if (next >= maxErrors) setPhase('failed')
+          return next
+        })
+        return
+      }
 
-    const nextSelected = [...selected, key]
-    setSelected(nextSelected)
+      const nextSelected = [...selected, key]
+      setSelected(nextSelected)
 
-    if (nextSelected.length === path.length) {
-      continueLockRef.current = false
-      setContinuing(false)
-      setPhase('success')
-    }
-  }, [canTapBoard, maxErrors, nextKey, path.length, selected])
+      if (nextSelected.length === path.length) {
+        continueLockRef.current = false
+        setContinuing(false)
+        setPhase('success')
+      }
+    },
+    [canTapBoard, maxErrors, nextKey, path.length, selected]
+  )
 
   const continueRoute = useCallback(async () => {
-    if (
-      phase !== 'success' ||
-      submitting ||
-      continuing ||
-      continueLockRef.current
-    ) {
+    if (phase !== 'success' || submitting || continuing || continueLockRef.current) {
       return
     }
 
@@ -700,10 +668,7 @@ export function CircuitMatrixRuntimeScreen({
 
   if (fixedPatternInvalid) {
     return (
-      <section
-        className="circuit-shell"
-        aria-label="Matriz de circuitos"
-      >
+      <section className="circuit-shell" aria-label="Matriz de circuitos">
         <style>{STYLES}</style>
 
         <div className="circuit-body">
@@ -712,8 +677,7 @@ export function CircuitMatrixRuntimeScreen({
               <div className="circuit-final-icon">!</div>
               <strong>Patrón fijo no disponible</strong>
               <span>
-                El patrón guardado está incompleto o contiene
-                saltos. Corrígelo en el administrador.
+                El patrón guardado está incompleto o contiene saltos. Corrígelo en el administrador.
               </span>
             </div>
           </div>
@@ -750,11 +714,7 @@ export function CircuitMatrixRuntimeScreen({
           <>
             <div className="circuit-status">
               <strong>
-                {phase === 'preview'
-                  ? 'Memoriza'
-                  : phase === 'playing'
-                    ? 'Tu turno'
-                    : 'Preparado'}
+                {phase === 'preview' ? 'Memoriza' : phase === 'playing' ? 'Tu turno' : 'Preparado'}
               </strong>
               <span>
                 {phase === 'preview'
@@ -774,7 +734,10 @@ export function CircuitMatrixRuntimeScreen({
                   const active = selected.includes(key)
                   const isWrong = key === wrongKey
                   const isPreview = phase === 'preview' && key === path[previewIndex]
-                  const isLast = phase === 'playing' && selected.length > 0 && key === selected[selected.length - 1]
+                  const isLast =
+                    phase === 'playing' &&
+                    selected.length > 0 &&
+                    key === selected[selected.length - 1]
 
                   return (
                     <button
@@ -786,23 +749,18 @@ export function CircuitMatrixRuntimeScreen({
                         isPreview ? 'preview' : '',
                         isLast ? 'last' : '',
                         isWrong ? 'wrong' : '',
-                      ].filter(Boolean).join(' ')}
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       onClick={() => pressCell(key)}
                       aria-label={`Celda ${row + 1}, ${col + 1}`}
                     >
-                      <span>
-                        {active
-                          ? '•'
-                          : isPreview
-                            ? '◆'
-                            : ''}
-                      </span>
+                      <span>{active ? '•' : isPreview ? '◆' : ''}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
-
           </>
         )}
       </div>
@@ -819,11 +777,21 @@ export function CircuitMatrixRuntimeScreen({
               {submitting || continuing ? 'Guardando…' : 'Continuar'}
             </button>
           ) : phase === 'failed' ? (
-            <button type="button" className="circuit-button danger" onClick={start} disabled={submitting}>
+            <button
+              type="button"
+              className="circuit-button danger"
+              onClick={start}
+              disabled={submitting}
+            >
               Reintentar
             </button>
           ) : phase === 'playing' || phase === 'preview' ? (
-            <button type="button" className="circuit-button secondary" onClick={reset} disabled={submitting}>
+            <button
+              type="button"
+              className="circuit-button secondary"
+              onClick={reset}
+              disabled={submitting}
+            >
               Reiniciar
             </button>
           ) : (

@@ -144,7 +144,8 @@ export function OfflineSyncPanel({ user }: OfflineSyncPanelProps) {
         </button>
       </div>
       <div style={body}>
-        Las acciones pendientes se intentan enviar automáticamente cada {AUTO_SYNC_INTERVAL_MS / 1000}s cuando hay conexión. {lastSyncLabel}.
+        Las acciones pendientes se intentan enviar automáticamente cada{' '}
+        {AUTO_SYNC_INTERVAL_MS / 1000}s cuando hay conexión. {lastSyncLabel}.
       </div>
     </section>
   )
