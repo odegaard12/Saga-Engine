@@ -1,0 +1,374 @@
+import { useEffect, useState, type CSSProperties } from 'react'
+import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
+import { RECIPES, checkCraftingPossible, craftRecipe, type Recipe } from '../offline/recipes'
+
+interface CraftingPanelProps {
+  user: string
+}
+
+// ─── Icon resolver (shared with inventory) ────────────────────────────────────
+const ICON_MAP: [RegExp, string, string][] = [
+  [/llave|key/i,          '🔑', '#f59e0b'],
+  [/emp|electr|bateria|pila/i, '⚡', '#3b82f6'],
+  [/cable|wire/i,         '〰️', '#64748b'],
+  [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
+  [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
+  [/herramienta|tool/i,   '🔧', '#f97316'],
+  [/arma|pistol|rifle/i,  '🔫', '#ef4444'],
+  [/escudo|shield/i,      '🛡️', '#06b6d4'],
+  [/map|mapa/i,           '🗺️', '#10b981'],
+  [/radio|señal|signal/i, '📡', '#a855f7'],
+  [/linterna|luz/i,       '🔦', '#fbbf24'],
+  [/nota|papel|doc/i,     '📄', '#e2e8f0'],
+  [/medic|pastilla/i,     '💊', '#fb7185'],
+  [/bomb|explosiv/i,      '💣', '#ef4444'],
+]
+
+function getIcon(label: string): { glyph: string; color: string } {
+  for (const [p, g, c] of ICON_MAP) {
+    if (p.test(label)) return { glyph: g, color: c }
+  }
+  return { glyph: '⚙️', color: '#8b5cf6' }
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function RecipeCard({
+  recipe,
+  user,
+  onCrafted,
+}: {
+  recipe: Recipe
+  user: string
+  onCrafted: (msg: string) => void
+}) {
+  const canCraft = checkCraftingPossible(user, recipe)
+  const outputIcon = getIcon(recipe.outputs[0]?.label || recipe.label)
+  const [pressed, setPressed] = useState(false)
+
+  return (
+    <div
+      style={{
+        ...recipeCard,
+        ...(canCraft ? recipeCardReady : recipeCardLocked),
+        transform: pressed && canCraft ? 'scale(0.97)' : 'scale(1)',
+      }}
+    >
+      {/* Output preview */}
+      <div style={recipeOutputRow}>
+        <span style={{ ...recipeOutputIcon, background: `${outputIcon.color}1a`, color: outputIcon.color }}>
+          {outputIcon.glyph}
+        </span>
+        <div style={recipeOutputBody}>
+          <div style={recipeTitle}>{recipe.label}</div>
+          <div style={recipeOutputMeta}>
+            → {recipe.outputs.map(o => `${o.quantity}× ${o.label}`).join(', ')}
+          </div>
+        </div>
+        <span style={canCraft ? availablePill : lockedPill}>
+          {canCraft ? 'LISTO' : 'FALTAN'}
+        </span>
+      </div>
+
+      {/* Inputs needed */}
+      <div style={inputsRow}>
+        {recipe.inputs.map((inp) => {
+          const ic = getIcon(inp.item_id)
+          return (
+            <div key={inp.item_id} style={inputChip}>
+              <span style={{ fontSize: 14 }}>{ic.glyph}</span>
+              <span style={inputChipLabel}>{inp.quantity}× {inp.item_id.replace(/_/g, ' ')}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Craft button */}
+      {canCraft && (
+        <button
+          type="button"
+          style={craftBtn}
+          onPointerDown={() => setPressed(true)}
+          onPointerUp={() => setPressed(false)}
+          onPointerLeave={() => setPressed(false)}
+          onClick={() => {
+            if (craftRecipe(user, recipe.recipe_id)) {
+              onCrafted(`✅ ${recipe.outputs[0]?.label || 'Objeto'} creado con éxito`)
+            } else {
+              onCrafted('❌ No hay materiales suficientes')
+            }
+          }}
+        >
+          <span>⚒</span> Ensamblar
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Panel ───────────────────────────────────────────────────────────────
+export function CraftingPanel({ user }: CraftingPanelProps) {
+  const [, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
+  const [feedback, setFeedback] = useState<{ msg: string; ts: number } | null>(null)
+
+  useEffect(() => {
+    function refresh() { setSnapshot(loadInventorySnapshot(user)) }
+    refresh()
+    const id = window.setInterval(refresh, 2_000)
+    window.addEventListener('storage', refresh)
+    return () => { window.clearInterval(id); window.removeEventListener('storage', refresh) }
+  }, [user])
+
+  function handleCrafted(msg: string) {
+    setSnapshot(loadInventorySnapshot(user))
+    setFeedback({ msg, ts: Date.now() })
+    setTimeout(() => setFeedback(null), 3_000)
+  }
+
+  const readyCount = RECIPES.filter(r => checkCraftingPossible(user, r)).length
+
+  return (
+    <section style={panel}>
+      {/* Header */}
+      <div style={headerRow}>
+        <div style={headerLeft}>
+          <span style={headerLabel}>MESA DE TRABAJO</span>
+          <span style={headerCount}>{RECIPES.length} recetas</span>
+        </div>
+        {readyCount > 0 && (
+          <span style={readyBadge}>
+            {readyCount} disponible{readyCount !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {/* Feedback toast */}
+      {feedback && (
+        <div style={toastBanner}>
+          {feedback.msg}
+        </div>
+      )}
+
+      {/* Recipe list */}
+      <div style={recipeList}>
+        {RECIPES.map((recipe) => (
+          <RecipeCard
+            key={recipe.recipe_id}
+            recipe={recipe}
+            user={user}
+            onCrafted={handleCrafted}
+          />
+        ))}
+      </div>
+
+      {RECIPES.length === 0 && (
+        <div style={emptyMsg}>
+          <span style={{ fontSize: 32 }}>⚒</span>
+          <div>No hay recetas disponibles</div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const panel: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  padding: '10px 4px',
+}
+
+const headerRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '0 2px',
+}
+
+const headerLeft: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 8,
+}
+
+const headerLabel: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase',
+  color: '#fde68a',
+}
+
+const headerCount: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,0.4)',
+}
+
+const readyBadge: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  color: '#4ade80',
+  background: 'rgba(34,197,94,0.15)',
+  border: '1px solid rgba(34,197,94,0.3)',
+  borderRadius: 999,
+  padding: '3px 10px',
+}
+
+const toastBanner: CSSProperties = {
+  background: 'rgba(34,197,94,0.15)',
+  border: '1px solid rgba(34,197,94,0.3)',
+  color: '#bbf7d0',
+  padding: '9px 14px',
+  borderRadius: 12,
+  fontSize: 13,
+  fontWeight: 800,
+  textAlign: 'center',
+  letterSpacing: '0.02em',
+}
+
+const recipeList: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+}
+
+const recipeCard: CSSProperties = {
+  borderRadius: 16,
+  padding: '14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+}
+
+const recipeCardReady: CSSProperties = {
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.14)',
+}
+
+const recipeCardLocked: CSSProperties = {
+  background: 'rgba(255,255,255,0.025)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  opacity: 0.65,
+}
+
+const recipeOutputRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+}
+
+const recipeOutputIcon: CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 22,
+  flexShrink: 0,
+}
+
+const recipeOutputBody: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+}
+
+const recipeTitle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 900,
+  color: '#ffffff',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const recipeOutputMeta: CSSProperties = {
+  marginTop: 2,
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'rgba(226,232,240,0.55)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const availablePill: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+  color: '#4ade80',
+  background: 'rgba(34,197,94,0.15)',
+  border: '1px solid rgba(34,197,94,0.3)',
+  borderRadius: 999,
+  padding: '3px 8px',
+  flexShrink: 0,
+}
+
+const lockedPill: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+  color: '#94a3b8',
+  background: 'rgba(148,163,184,0.1)',
+  border: '1px solid rgba(148,163,184,0.2)',
+  borderRadius: 999,
+  padding: '3px 8px',
+  flexShrink: 0,
+}
+
+const inputsRow: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+}
+
+const inputChip: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+  padding: '4px 9px',
+}
+
+const inputChipLabel: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'rgba(226,232,240,0.7)',
+}
+
+const craftBtn: CSSProperties = {
+  width: '100%',
+  padding: '11px 0',
+  borderRadius: 12,
+  border: 'none',
+  background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+  color: '#fff',
+  fontWeight: 900,
+  fontSize: 14,
+  letterSpacing: '0.05em',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  boxShadow: '0 4px 18px rgba(124,58,237,0.4)',
+  transition: 'transform 0.15s, box-shadow 0.15s',
+}
+
+const emptyMsg: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 6,
+  padding: '28px 0',
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 13,
+  fontWeight: 700,
+  textAlign: 'center',
+}

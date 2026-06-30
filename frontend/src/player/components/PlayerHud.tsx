@@ -3,13 +3,14 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import type { PrimaryActionTone } from '../runtime'
 import { MissionPackPanel } from './MissionPackPanel'
 import { InventoryPanel } from './InventoryPanel'
+import { CraftingPanel } from './CraftingPanel'
 import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { useGyroParallax } from '../hooks/useGyroParallax'
 
-type BackpackTab = 'requirements' | 'inventory'
+type BackpackTab = 'requirements' | 'inventory' | 'crafting'
 
 interface PlayerHudProps {
   user: string
@@ -305,6 +306,13 @@ export function PlayerHud({
           >
             Objetos
           </button>
+          <button
+            type="button"
+            style={backpackTab === 'crafting' ? tabActive : tabButton}
+            onClick={() => setBackpackTab('crafting')}
+          >
+            Mesa
+          </button>
         </div>
 
         <div style={statusRow}>
@@ -322,6 +330,8 @@ export function PlayerHud({
           ) : null}
 
           {backpackTab === 'inventory' ? <InventoryPanel user={user} /> : null}
+
+          {backpackTab === 'crafting' ? <CraftingPanel user={user} /> : null}
         </div>
       </SwipeableSheet>
 
@@ -727,7 +737,7 @@ const sheetTitle: CSSProperties = {
 
 const tabs: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 6,
   padding: 4,
   borderRadius: 18,

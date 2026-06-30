@@ -12,131 +12,74 @@ interface InventoryPanelProps {
   user: string
 }
 
-function itemSubtitle(item: InventoryItem): string {
-  const parts = [
-    item.source ? String(item.source).toUpperCase() : '',
-    item.node_id ? `Nodo ${item.node_id}` : '',
-    item.physical_id ? `ID ${item.physical_id}` : '',
-  ].filter(Boolean)
+// ─── Icon resolver ────────────────────────────────────────────────────────────
+const ICON_MAP: [RegExp, string, string][] = [
+  [/llave|key/i,          '🔑', '#f59e0b'],
+  [/emp|electr|bateria|pila|cable/i, '⚡', '#3b82f6'],
+  [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
+  [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
+  [/arma|pistol|rifle/i,  '🔫', '#ef4444'],
+  [/escudo|shield/i,      '🛡️', '#06b6d4'],
+  [/map|mapa/i,           '🗺️', '#10b981'],
+  [/radio|señal|signal/i, '📡', '#a855f7'],
+  [/herramienta|tool|alicate|pinza/i, '🔧', '#f97316'],
+  [/linterna|luz|flashlight/i, '🔦', '#fbbf24'],
+  [/comida|agua|food|water/i, '🍶', '#34d399'],
+  [/nota|papel|doc|informe/i, '📄', '#e2e8f0'],
+  [/medic|pastilla|jeringa/i, '💊', '#fb7185'],
+  [/bomb|explosiv/i,      '💣', '#ef4444'],
+  [/cerrojo|candado|lock/i,'🔒', '#94a3b8'],
+  [/flecha|arrow/i,       '➡️', '#38bdf8'],
+  [/cristal|glass/i,      '💎', '#22d3ee'],
+  [/moneda|coin|dinero/i, '🪙', '#facc15'],
+  [/hueso|bone/i,         '🦴', '#e2e8f0'],
+]
 
-  return parts.length ? parts.join(' · ') : 'Objeto local'
+function getItemIcon(label: string): { glyph: string; color: string } {
+  for (const [pattern, glyph, color] of ICON_MAP) {
+    if (pattern.test(label)) return { glyph, color }
+  }
+  return { glyph: '◈', color: '#60a5fa' }
+}
+
+function getSourceBadge(source?: string): string {
+  if (source === 'qr') return 'QR'
+  if (source === 'nfc') return 'NFC'
+  if (source === 'manual') return 'MAN'
+  return 'SYS'
 }
 
 function getUpdatedLabel(value?: string): string {
   if (!value) return 'sin sincronizar'
-
-  const timestamp = Date.parse(value)
-  if (!Number.isFinite(timestamp)) return 'actualizado'
-
-  const ageSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
-  if (ageSeconds < 10) return 'actualizado ahora'
-  if (ageSeconds < 60) return `actualizado hace ${ageSeconds}s`
-
-  const ageMinutes = Math.round(ageSeconds / 60)
-  if (ageMinutes < 60) return `actualizado hace ${ageMinutes}m`
-
-  const ageHours = Math.round(ageMinutes / 60)
-  return `actualizado hace ${ageHours}h`
+  const ts = Date.parse(value)
+  if (!Number.isFinite(ts)) return 'actualizado'
+  const age = Math.max(0, Math.round((Date.now() - ts) / 1000))
+  if (age < 10) return 'ahora'
+  if (age < 60) return `${age}s`
+  const m = Math.round(age / 60)
+  if (m < 60) return `${m}m`
+  return `${Math.round(m / 60)}h`
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export function InventoryPanel({ user }: InventoryPanelProps) {
   const [snapshot, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
+  const [selected, setSelected] = useState<InventoryItem | null>(null)
+  const [feedbackId, setFeedbackId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (typeof document === 'undefined') return
+    function refresh() { setSnapshot(loadInventorySnapshot(user)) }
+    refresh()
+    const id = window.setInterval(refresh, 2_000)
+    window.addEventListener('storage', refresh)
+    return () => { window.clearInterval(id); window.removeEventListener('storage', refresh) }
+  }, [user])
 
-    if (!document.getElementById('saga-inventory-style')) {
-      const style = document.createElement('style')
-      style.id = 'saga-inventory-style'
-      style.textContent = `
-        .saga-inventory-slot {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 4px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .saga-inventory-slot:last-child {
-          border-bottom: none;
-        }
-        .saga-inventory-slot--usable {
-        }
-        .saga-inventory-slot--usable:hover {
-          opacity: 0.8;
-        }
-        .saga-inventory-slot--used {
-          opacity: 0.5;
-        }
-        .saga-inventory-slot--empty {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 4px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-          color: rgba(255, 255, 255, 0.3);
-          transition: all 0.2s ease;
-        }
-        .saga-inventory-slot--empty:last-child {
-          border-bottom: none;
-        }
-        .saga-inventory-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 10px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.06);
-          font-size: 14px;
-          line-height: 1;
-        }
-        .saga-inventory-slot--usable .saga-inventory-icon {
-          background: rgba(34, 197, 94, 0.15);
-          color: #4ade80;
-          box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.2);
-        }
-        .saga-inventory-slot--used .saga-inventory-icon {
-          background: rgba(148, 163, 184, 0.1);
-          color: rgba(226, 232, 240, 0.4);
-        }
-        .saga-inventory-use-btn {
-          min-height: 28px;
-          padding: 0 12px;
-          border-radius: 12px;
-          border: none;
-          background: #22c55e;
-          color: #052e16;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-        .saga-inventory-use-btn:hover {
-          background: #4ade80;
-          transform: scale(1.02);
-        }
-        .saga-inventory-use-btn:active {
-          transform: scale(0.98);
-        }
-        .saga-inventory-use-btn:disabled {
-          background: rgba(255, 255, 255, 0.08);
-          color: rgba(255, 255, 255, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.04);
-          cursor: not-allowed;
-          pointer-events: none;
-        }
-      `
-      document.head.appendChild(style)
-    }
-  }, [])
-
-  function useItem(item: InventoryItem) {
+  function handleUseItem(item: InventoryItem) {
     const next = markInventoryItemUsed(user, item.item_id, 1)
     setSnapshot(next)
+    setFeedbackId(item.item_id)
+    setTimeout(() => setFeedbackId(null), 1500)
 
     queuePhysicalEvent({
       user,
@@ -148,213 +91,336 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
         inventory_label: item.label,
         inventory_action: 'used',
         inventory_quantity_after_use:
-          next.items.find((nextItem) => nextItem.item_id === item.item_id)?.quantity || 0,
+          next.items.find((n) => n.item_id === item.item_id)?.quantity || 0,
       },
     })
   }
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    function refresh() {
-      setSnapshot(loadInventorySnapshot(user))
-    }
-
-    refresh()
-    const intervalId = window.setInterval(refresh, 2_000)
-
-    window.addEventListener('storage', refresh)
-
-    return () => {
-      window.clearInterval(intervalId)
-      window.removeEventListener('storage', refresh)
-    }
-  }, [user])
-
   const totalItems = countInventoryItems(user)
-  const visibleItems = snapshot.items.slice(0, 4)
+  const visibleItems = snapshot.items.slice(0, 12)
+
+  // How many empty cells to fill grid
+  const gridSize = Math.max(8, Math.ceil(visibleItems.length / 4) * 4)
+  const emptyCells = gridSize - visibleItems.length
 
   return (
     <section style={panel}>
+      {/* Header */}
       <div style={headerRow}>
-        <div>
-          <div style={eyebrow}>Objetos</div>
-          <div style={title}>
-            {totalItems} objeto{totalItems === 1 ? '' : 's'}
-          </div>
+        <div style={headerLeft}>
+          <span style={headerLabel}>MOCHILA</span>
+          <span style={headerCount}>{totalItems} obj.</span>
         </div>
-        <div style={statusPill}>{snapshot.items.length ? 'MOCHILA' : 'VACÍO'}</div>
+        <span style={syncBadge}>⏱ {getUpdatedLabel(snapshot.updated_at)}</span>
       </div>
 
-      {visibleItems.length ? (
-        <div style={slotGrid}>
-          {visibleItems.map((item) => {
-            const usable = item.state !== 'used' && item.quantity > 0
+      {/* Grid */}
+      <div style={grid}>
+        {visibleItems.map((item) => {
+          const usable = item.state !== 'used' && item.quantity > 0
+          const isSelected = selected?.item_id === item.item_id
+          const isFeedback = feedbackId === item.item_id
+          const { glyph, color } = getItemIcon(item.label)
 
-            return (
-              <div
-                key={item.item_id}
-                className={`saga-inventory-slot ${usable ? 'saga-inventory-slot--usable' : 'saga-inventory-slot--used'}`}
-              >
-                <div className="saga-inventory-icon">{usable ? '◆' : '✓'}</div>
-                <div style={slotBody}>
-                  <div style={itemLabel}>
-                    {item.label}
-                    {item.quantity > 1 ? <span style={quantity}>×{item.quantity}</span> : null}
-                  </div>
-                  <div style={itemMeta}>{itemSubtitle(item)}</div>
-                </div>
-                <button
-                  type="button"
-                  className="saga-inventory-use-btn"
-                  disabled={!usable}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    if (usable) useItem(item)
-                  }}
-                >
-                  {usable ? 'Usar' : 'Usado'}
-                </button>
+          return (
+            <button
+              key={item.item_id}
+              type="button"
+              style={{
+                ...cell,
+                ...(isSelected ? cellSelected : {}),
+                ...(isFeedback ? cellFeedback : {}),
+                ...(!usable ? cellUsed : {}),
+                borderColor: isSelected ? color : undefined,
+                boxShadow: isSelected ? `0 0 0 1px ${color}44, 0 4px 20px ${color}22` : undefined,
+              }}
+              onClick={() => setSelected(isSelected ? null : item)}
+            >
+              <span style={{ ...cellIcon, background: usable ? `${color}22` : 'rgba(255,255,255,0.04)', color: usable ? color : 'rgba(255,255,255,0.25)' }}>
+                {glyph}
+              </span>
+              {item.quantity > 1 && (
+                <span style={qtyBadge}>{item.quantity}</span>
+              )}
+              {!usable && <span style={usedOverlay}>✓</span>}
+              <span style={cellName}>{item.label.slice(0, 12)}</span>
+            </button>
+          )
+        })}
+        {Array.from({ length: emptyCells }).map((_, i) => (
+          <div key={`e-${i}`} style={emptyCell} />
+        ))}
+      </div>
+
+      {/* Selected detail */}
+      {selected && (
+        <div style={detailCard} key={selected.item_id}>
+          <div style={detailHeader}>
+            <span style={{ fontSize: 28 }}>{getItemIcon(selected.label).glyph}</span>
+            <div>
+              <div style={detailTitle}>{selected.label}</div>
+              <div style={detailMeta}>
+                <span style={sourcePill}>{getSourceBadge(selected.source)}</span>
+                {selected.node_id && <span style={nodePill}>Nodo {selected.node_id}</span>}
+                <span style={qtyText}>×{selected.quantity}</span>
               </div>
-            )
-          })}
-
-          {Array.from({ length: Math.max(0, 4 - visibleItems.length) }).map((_, index) => (
-            <div key={`empty-${index}`} className="saga-inventory-slot--empty">
-              <div style={emptySlotIcon}>＋</div>
-              <div style={emptySlotText}>Hueco libre</div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div style={emptyGrid}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="saga-inventory-slot--empty">
-              <div style={emptySlotIcon}>＋</div>
-              <div style={emptySlotText}>Hueco libre</div>
-            </div>
-          ))}
-          <div style={emptyText}>
-            Aún no hay objetos. Usa QR, NFC o recogida manual para llenar la mochila.
           </div>
+          {selected.state !== 'used' && selected.quantity > 0 ? (
+            <button
+              type="button"
+              style={useBtn}
+              onClick={() => {
+                handleUseItem(selected)
+                setSelected(null)
+              }}
+            >
+              Usar objeto
+            </button>
+          ) : (
+            <div style={usedText}>Este objeto ya fue usado</div>
+          )}
         </div>
       )}
 
-      <div style={footerText}>{getUpdatedLabel(snapshot.updated_at)} · estado local del juego</div>
+      {snapshot.items.length === 0 && (
+        <div style={emptyMsg}>
+          <span style={{ fontSize: 32 }}>🎒</span>
+          <div>Mochila vacía</div>
+          <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
+            Escanea QR/NFC o recoge objetos para llenarla
+          </div>
+        </div>
+      )}
     </section>
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const panel: CSSProperties = {
-  display: 'grid',
+  display: 'flex',
+  flexDirection: 'column',
   gap: 12,
-  padding: 8,
+  padding: '10px 4px',
 }
 
 const headerRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+  padding: '0 2px',
+}
+
+const headerLeft: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 8,
+}
+
+const headerLabel: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase',
+  color: '#bfdbfe',
+}
+
+const headerCount: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,0.4)',
+}
+
+const syncBadge: CSSProperties = {
+  fontSize: 10,
+  color: 'rgba(255,255,255,0.3)',
+  fontWeight: 600,
+}
+
+const grid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: 8,
+}
+
+const cell: CSSProperties = {
+  position: 'relative',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 14,
+  padding: '10px 4px 8px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 5,
+  cursor: 'pointer',
+  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+  WebkitTapHighlightColor: 'transparent',
+  userSelect: 'none',
+  minHeight: 72,
+}
+
+const cellSelected: CSSProperties = {
+  background: 'rgba(255,255,255,0.08)',
+  transform: 'scale(0.96)',
+}
+
+const cellFeedback: CSSProperties = {
+  background: 'rgba(34,197,94,0.15)',
+  borderColor: 'rgba(34,197,94,0.4)',
+}
+
+const cellUsed: CSSProperties = {
+  opacity: 0.4,
+}
+
+const cellIcon: CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 10,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 20,
+  transition: 'background 0.2s',
+}
+
+const qtyBadge: CSSProperties = {
+  position: 'absolute',
+  top: 6,
+  right: 6,
+  background: 'rgba(251,191,36,0.9)',
+  color: '#1c1008',
+  fontSize: 9,
+  fontWeight: 900,
+  borderRadius: 999,
+  minWidth: 16,
+  height: 16,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 4px',
+  lineHeight: 1,
+}
+
+const usedOverlay: CSSProperties = {
+  position: 'absolute',
+  top: 5,
+  left: 6,
+  fontSize: 9,
+  color: '#4ade80',
+  fontWeight: 900,
+}
+
+const cellName: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  color: 'rgba(226,232,240,0.7)',
+  textAlign: 'center',
+  letterSpacing: '0.04em',
+  lineHeight: 1.2,
+  wordBreak: 'break-word',
+  maxWidth: '100%',
+  overflow: 'hidden',
+}
+
+const emptyCell: CSSProperties = {
+  background: 'rgba(255,255,255,0.02)',
+  border: '1px dashed rgba(255,255,255,0.05)',
+  borderRadius: 14,
+  minHeight: 72,
+}
+
+const detailCard: CSSProperties = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 16,
+  padding: 14,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  animation: 'fadeInUp 0.2s ease',
+}
+
+const detailHeader: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
   gap: 12,
 }
 
-const eyebrow: CSSProperties = {
-  color: '#bfdbfe',
-  fontSize: 10,
+const detailTitle: CSSProperties = {
+  fontSize: 15,
   fontWeight: 900,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-}
-
-const title: CSSProperties = {
-  marginTop: 4,
   color: '#ffffff',
-  fontSize: 13,
-  fontWeight: 900,
 }
 
-const statusPill: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
+const detailMeta: CSSProperties = {
+  display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
+  gap: 6,
+  marginTop: 4,
+  flexWrap: 'wrap',
+}
+
+const sourcePill: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
+  color: '#93c5fd',
+  background: 'rgba(59,130,246,0.15)',
+  border: '1px solid rgba(59,130,246,0.25)',
   borderRadius: 999,
-  border: '1px solid rgba(96,165,250,.22)',
-  background: 'rgba(59,130,246,.14)',
-  color: '#dbeafe',
-  padding: '0 10px',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
+  padding: '1px 7px',
 }
 
-const slotGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr',
-  gap: 0,
-}
-
-const slotBody: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  alignContent: 'center',
-  gap: 3,
-}
-
-const itemLabel: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 14,
-  fontWeight: 900,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const quantity: CSSProperties = {
-  marginLeft: 6,
-  color: '#bbf7d0',
-  fontSize: 12,
-  fontWeight: 900,
-}
-
-const itemMeta: CSSProperties = {
-  color: 'rgba(226,232,240,.62)',
-  fontSize: 11,
-  fontWeight: 800,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const emptyGrid: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr',
-  gap: 0,
-}
-
-const emptySlotIcon: CSSProperties = {
-  fontSize: 18,
-  fontWeight: 900,
-  opacity: 0.72,
-}
-
-const emptySlotText: CSSProperties = {
-  fontSize: 10,
+const nodePill: CSSProperties = {
+  fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  color: '#a5f3fc',
+  background: 'rgba(6,182,212,0.12)',
+  border: '1px solid rgba(6,182,212,0.2)',
+  borderRadius: 999,
+  padding: '1px 7px',
 }
 
-const emptyText: CSSProperties = {
-  gridColumn: '1 / -1',
-  color: 'rgba(226,232,240,.74)',
-  fontSize: 12,
-  lineHeight: 1.45,
+const qtyText: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: '#fde68a',
 }
 
-const footerText: CSSProperties = {
-  color: 'rgba(226,232,240,.56)',
-  fontSize: 10,
-  fontWeight: 800,
+const useBtn: CSSProperties = {
+  width: '100%',
+  padding: '10px 0',
+  borderRadius: 12,
+  border: 'none',
+  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+  color: '#fff',
+  fontWeight: 900,
+  fontSize: 13,
+  letterSpacing: '0.06em',
+  cursor: 'pointer',
+  boxShadow: '0 4px 14px rgba(34,197,94,0.35)',
+  transition: 'transform 0.15s, box-shadow 0.15s',
+}
+
+const usedText: CSSProperties = {
+  textAlign: 'center',
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.35)',
+  fontWeight: 700,
+  padding: '6px 0',
+}
+
+const emptyMsg: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 6,
+  padding: '28px 0',
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 13,
+  fontWeight: 700,
+  textAlign: 'center',
 }

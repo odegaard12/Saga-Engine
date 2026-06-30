@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -101,7 +101,9 @@ export default function AdminMissionMap({
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
+  const heatmapLayerRef = useRef<L.Polyline | null>(null)
   const dragClickSuppressUntilRef = useRef(0)
+  const [showHeatmap, setShowHeatmap] = useState(false)
 
   const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
@@ -285,6 +287,39 @@ export default function AdminMissionMap({
 
   useEffect(() => {
     const map = mapRef.current
+    if (!map) return
+
+    if (heatmapLayerRef.current) {
+      heatmapLayerRef.current.remove()
+      heatmapLayerRef.current = null
+    }
+
+    if (showHeatmap) {
+      try {
+        const raw = localStorage.getItem('saga-gps-tracker')
+        if (raw) {
+          const state = JSON.parse(raw)
+          const route = state.state?.route || []
+          
+          if (Array.isArray(route) && route.length > 0) {
+            const latlngs: L.LatLngExpression[] = route.map((pt: any) => [pt.lat, pt.lon])
+            heatmapLayerRef.current = L.polyline(latlngs, {
+              color: '#f43f5e',
+              weight: 4,
+              opacity: 0.8,
+              dashArray: '5, 10',
+              lineCap: 'round'
+            }).addTo(map)
+          }
+        }
+      } catch (err) {
+        console.error('Error loading tracker data', err)
+      }
+    }
+  }, [showHeatmap, mappedStages])
+
+  useEffect(() => {
+    const map = mapRef.current
     const coords = selectedStage ? getStageCoords(selectedStage) : null
     if (!map || !coords) return
 
@@ -316,6 +351,13 @@ export default function AdminMissionMap({
           <span>
             <i style={{ background: '#a78bfa' }} /> Circuit
           </span>
+          <button 
+            type="button"
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            style={heatmapBtn}
+          >
+            {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros (Heatmap)'}
+          </button>
         </div>
       </div>
 
@@ -397,6 +439,17 @@ const legend: React.CSSProperties = {
   color: '#cbd5e1',
   fontSize: 11,
   fontWeight: 800,
+}
+
+const heatmapBtn: React.CSSProperties = {
+  background: 'rgba(244,63,94,0.15)',
+  border: '1px solid rgba(244,63,94,0.3)',
+  color: '#f43f5e',
+  borderRadius: 999,
+  padding: '2px 10px',
+  fontSize: 10,
+  cursor: 'pointer',
+  marginLeft: 8,
 }
 
 const emptyState: React.CSSProperties = {

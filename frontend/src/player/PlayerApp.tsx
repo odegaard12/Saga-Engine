@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { usePlayerStore } from './store/usePlayerStore'
+import { useGpsTracker } from './store/useGpsTracker'
 import {
   advancePlayer,
   deleteFieldProof,
@@ -149,21 +151,31 @@ export default function PlayerApp() {
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
-  const [toolsOpen, setToolsOpen] = useState(false)
-  const [teamOpen, setTeamOpen] = useState(false)
+  const toolsOpen = usePlayerStore(s => s.toolsOpen)
+  const setToolsOpen = usePlayerStore(s => s.setToolsOpen)
+  const teamOpen = usePlayerStore(s => s.teamOpen)
+  const setTeamOpen = usePlayerStore(s => s.setTeamOpen)
+  
+  const addTrackerPoint = useGpsTracker(s => s.addPoint)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
-  const [offlinePrepVisible, setOfflinePrepVisible] = useState(true)
+  
+  const offlinePrepVisible = usePlayerStore(s => s.offlinePrepVisible)
+  const setOfflinePrepVisible = usePlayerStore(s => s.setOfflinePrepVisible)
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   )
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
-  const [browserGpsPosition, setBrowserGpsPosition] = useState<{ lat: number; lon: number } | null>(
-    null
-  )
-  const [browserGpsStatus, setBrowserGpsStatus] = useState<PlayerGpsStatus>('unavailable')
-  const [browserGpsFresh, setBrowserGpsFresh] = useState(false)
-  const [browserGpsAccuracy, setBrowserGpsAccuracy] = useState<number | null>(null)
-  const [browserGpsCapturedAt, setBrowserGpsCapturedAt] = useState<number | null>(null)
+  
+  const browserGpsPosition = usePlayerStore(s => s.gpsPosition)
+  const setBrowserGpsPosition = usePlayerStore(s => s.setGpsPosition)
+  const browserGpsStatus = usePlayerStore(s => s.gpsStatus)
+  const setBrowserGpsStatus = usePlayerStore(s => s.setGpsStatus)
+  const browserGpsFresh = usePlayerStore(s => s.gpsFresh)
+  const setBrowserGpsFresh = usePlayerStore(s => s.setGpsFresh)
+  const browserGpsAccuracy = usePlayerStore(s => s.gpsAccuracy)
+  const setBrowserGpsAccuracy = usePlayerStore(s => s.setGpsAccuracy)
+  const browserGpsCapturedAt = usePlayerStore(s => s.gpsCapturedAt)
+  const setBrowserGpsCapturedAt = usePlayerStore(s => s.setGpsCapturedAt)
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
   const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
@@ -646,6 +658,18 @@ export default function PlayerApp() {
     }
   }, [])
 
+  // A stale position may center the map, but never unlock a node.
+  // La posición antigua no se dibuja ni centra.
+  // Solo se usa GPS vivo o posición debug.
+  const playerPosition = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
+
+  useEffect(() => {
+    if (playerPosition) {
+      addTrackerPoint(playerPosition.lat, playerPosition.lon)
+    }
+  }, [playerPosition?.lat, playerPosition?.lon, addTrackerPoint])
+
+
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
     const ratio = mapProgress
@@ -708,10 +732,6 @@ export default function PlayerApp() {
               ? 'error'
               : 'unavailable'
 
-  // A stale position may center the map, but never unlock a node.
-  // La posición antigua no se dibuja ni centra.
-  // Solo se usa GPS vivo o posición debug.
-  const playerPosition = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
 
   const unlockPosition = localDebugPosition || (hasFreshBrowserGps ? browserGpsPosition : null)
 
@@ -879,7 +899,7 @@ export default function PlayerApp() {
   function openTools() {
     setActivePanel(null)
     setTeamOpen(false)
-    setToolsOpen((current) => !current)
+    setToolsOpen(!toolsOpen)
   }
 
   function closeTools() {
@@ -889,7 +909,7 @@ export default function PlayerApp() {
   function openTeam() {
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen((current) => !current)
+    setTeamOpen(!teamOpen)
   }
 
   function closeTeam() {

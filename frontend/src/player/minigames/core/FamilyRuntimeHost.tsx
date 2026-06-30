@@ -8,6 +8,7 @@ import { TiltMazeRuntimeScreen } from '../families/tiltMaze/RuntimeScreen'
 import { SignalHuntRuntimeScreen } from '../families/signalHunt/RuntimeScreen'
 import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
 import { AudioChallengeRuntime } from '../families/audioChallenge/AudioChallengeRuntime'
+import { TeamRelayRuntimeScreen } from '../families/teamRelay/RuntimeScreen'
 
 export interface FamilyRuntimeHostProps {
   resolved: ResolvedMinigame
@@ -98,6 +99,18 @@ export function FamilyRuntimeHost({
 
   if (resolved.family === 'audio_challenge') {
     return <AudioChallengeRuntime onWin={onWin} />
+  }
+
+  if ((resolved.config as any)?.game_id === 'team_relay') {
+    return (
+      <TeamRelayRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
   }
 
   return (
