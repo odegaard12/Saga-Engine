@@ -1800,6 +1800,8 @@ def _admin_react_profile_summary(profile, gamestate, positions):
         "finished": finished,
         "presence": pos.get("presence") or state.get("presence") or "unknown",
         "gps_status": pos.get("gps_status") or state.get("gps_status") or "unknown",
+        "lat": pos.get("lat"),
+        "lon": pos.get("lon"),
         "last_seen": pos.get("last_seen") or pos.get("ts") or state.get("last_seen"),
     }
 

@@ -17,12 +17,14 @@ provider.on('synced', () => {
 // Mapa compartido para los nodos completados por el equipo
 const sharedNodes = ydoc.getMap<boolean>('completedNodes')
 // Mapa compartido para la ubicación de los miembros del equipo
-const sharedPositions = ydoc.getMap<{ lat: number; lon: number; timestamp: number }>('memberPositions')
+const sharedPositions = ydoc.getMap<{ lat: number; lon: number; timestamp: number }>(
+  'memberPositions'
+)
 
 interface TeamState {
   completedNodes: Record<string, boolean>
   memberPositions: Record<string, { lat: number; lon: number; timestamp: number }>
-  
+
   // Acciones
   markNodeCompleted: (nodeId: string) => void
   updateMemberPosition: (memberId: string, lat: number, lon: number) => void
@@ -35,19 +37,27 @@ export const useTeamStore = create<TeamState>((set) => {
   })
 
   sharedPositions.observe(() => {
-    set({ memberPositions: sharedPositions.toJSON() as Record<string, { lat: number; lon: number; timestamp: number }> })
+    set({
+      memberPositions: sharedPositions.toJSON() as Record<
+        string,
+        { lat: number; lon: number; timestamp: number }
+      >,
+    })
   })
 
   return {
     completedNodes: sharedNodes.toJSON() as Record<string, boolean>,
-    memberPositions: sharedPositions.toJSON() as Record<string, { lat: number; lon: number; timestamp: number }>,
+    memberPositions: sharedPositions.toJSON() as Record<
+      string,
+      { lat: number; lon: number; timestamp: number }
+    >,
 
     markNodeCompleted: (nodeId: string) => {
       sharedNodes.set(nodeId, true)
     },
-    
+
     updateMemberPosition: (memberId: string, lat: number, lon: number) => {
       sharedPositions.set(memberId, { lat, lon, timestamp: Date.now() })
-    }
+    },
   }
 })

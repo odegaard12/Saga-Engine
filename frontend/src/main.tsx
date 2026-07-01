@@ -6,10 +6,8 @@ import { ErrorBoundary } from './shared/ErrorBoundary'
 import './styles/mobile-shell.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
-import { setupAdminSettingsLanguageMenu } from './i18n/adminSettingsLanguageMenu'
 
 setupLegacySpanishBridge()
-setupAdminSettingsLanguageMenu()
 
 const queryClient = new QueryClient({
   defaultOptions: {

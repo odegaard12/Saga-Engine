@@ -192,34 +192,12 @@
 
 .saga-panel-switcher {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-
-.saga-panel-switcher button {
-  min-height: 36px !important;
-  font-size: 11px !important;
-  border-radius: 12px !important;
-  font-weight: 800 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 4px !important;
-  background: rgba(15, 23, 42, 0.45) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  transition: all 0.2s ease !important;
-}
-
-.saga-panel-switcher button:hover {
-  background: rgba(30, 41, 59, 0.7) !important;
-  border-color: rgba(125, 211, 252, 0.3) !important;
-  transform: translateY(-1px) !important;
 }
 
 .saga-rail-actions button,
+.saga-panel-switcher button,
 .saga-command-bar button,
 .saga-mobile-actions button,
 .saga-floating-head button,
@@ -286,11 +264,9 @@
 }
 
 .saga-panel-switcher button.active {
-  background: linear-gradient(135deg, #38bdf8, #818cf8) !important;
-  color: #020617 !important;
-  border-color: transparent !important;
-  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25) !important;
-  font-weight: 900 !important;
+  color: #020617;
+  background: #f8fafc;
+  border-color: transparent;
 }
 
 .saga-route-list {
@@ -10974,43 +10950,33 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   border-color: rgba(248, 113, 113, 0.38) !important;
   background: rgba(127, 29, 29, 0.34) !important;
 }
+
 .saga-guided-v4-stepper {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
-  justify-content: space-between !important;
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 7px !important;
   padding: 8px 18px !important;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08) !important;
 }
 
 .saga-guided-v4-stepper button {
-  flex: 1 1 0px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  min-width: 80px !important;
-  min-height: 32px !important;
+  min-height: 30px !important;
   border-radius: 999px !important;
   border: 1px solid rgba(148, 163, 184, 0.16) !important;
   background: rgba(15, 23, 42, 0.62) !important;
   color: rgba(226, 232, 240, 0.78) !important;
   font-weight: 950 !important;
   cursor: pointer !important;
-  padding: 0 10px !important;
-  transition: all 0.2s ease !important;
-}
-
-.saga-guided-v4-stepper button:hover {
-  border-color: rgba(125, 211, 252, 0.3) !important;
-  background: rgba(30, 41, 59, 0.7) !important;
+  padding: 0 8px !important;
 }
 
 .saga-guided-v4-stepper button.active {
-  background: linear-gradient(135deg, #38bdf8, #818cf8) !important;
+  background: rgba(224, 242, 254, 0.96) !important;
   color: #020617 !important;
-  border-color: transparent !important;
-  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2) !important;
 }
 
 .saga-guided-v4-stepper span {
@@ -12244,86 +12210,4 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   line-height: 1.4;
   font-style: italic;
   margin-top: 2px;
-}
-
-/* =========================================
-   ADMIN PLAYER POSITION DOTS — heatmap mode
-   ========================================= */
-
-.admin-player-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 0 0 3px rgba(0, 0, 0, 0.3),
-    0 0 10px currentColor;
-  pointer-events: none;
-  animation: playerPulse 2s ease-in-out infinite;
-}
-
-@keyframes playerPulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.2);
-  }
-}
-
-.saga-command-bar .saga-heatmap-toggle[data-status='loading'] {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.saga-command-bar .saga-heatmap-toggle[data-status='empty'] {
-  border-color: rgba(234, 179, 8, 0.4);
-  color: #fde047;
-}
-
-.saga-command-bar .saga-heatmap-toggle[data-status='error'] {
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #f87171;
-}
-
-.saga-save-validation-warning {
-  margin: 12px 16px;
-  padding: 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  color: #fca5a5;
-  font-size: 13px;
-  line-height: 1.4;
-  animation: slideDownWarning 0.3s ease-out;
-}
-
-.saga-save-validation-warning b {
-  display: block;
-  color: #f87171;
-  margin-bottom: 4px;
-}
-
-@keyframes slideDownWarning {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.saga-guided-v4-note.warning {
-  border-color: rgba(251, 146, 60, 0.4);
-  background: rgba(251, 146, 60, 0.08);
-  color: #fdba74;
-}
-
-.saga-guided-v4-note.warning b {
-  color: #fb923c;
 }

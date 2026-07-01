@@ -14,30 +14,37 @@ interface InventoryPanelProps {
 
 // ─── Icon resolver ────────────────────────────────────────────────────────────
 const ICON_MAP: [RegExp, string, string][] = [
-  [/llave|key/i,          '🔑', '#f59e0b'],
+  [/llave|key/i, '🔑', '#f59e0b'],
   [/emp|electr|bateria|pila|cable/i, '⚡', '#3b82f6'],
   [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
   [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
-  [/arma|pistol|rifle/i,  '🔫', '#ef4444'],
-  [/escudo|shield/i,      '🛡️', '#06b6d4'],
-  [/map|mapa/i,           '🗺️', '#10b981'],
+  [/arma|pistol|rifle/i, '🔫', '#ef4444'],
+  [/escudo|shield/i, '🛡️', '#06b6d4'],
+  [/map|mapa/i, '🗺️', '#10b981'],
   [/radio|señal|signal/i, '📡', '#a855f7'],
   [/herramienta|tool|alicate|pinza/i, '🔧', '#f97316'],
   [/linterna|luz|flashlight/i, '🔦', '#fbbf24'],
   [/comida|agua|food|water/i, '🍶', '#34d399'],
   [/nota|papel|doc|informe/i, '📄', '#e2e8f0'],
   [/medic|pastilla|jeringa/i, '💊', '#fb7185'],
-  [/bomb|explosiv/i,      '💣', '#ef4444'],
-  [/cerrojo|candado|lock/i,'🔒', '#94a3b8'],
-  [/flecha|arrow/i,       '➡️', '#38bdf8'],
-  [/cristal|glass/i,      '💎', '#22d3ee'],
+  [/bomb|explosiv/i, '💣', '#ef4444'],
+  [/cerrojo|candado|lock/i, '🔒', '#94a3b8'],
+  [/flecha|arrow/i, '➡️', '#38bdf8'],
+  [/cristal|glass/i, '💎', '#22d3ee'],
   [/moneda|coin|dinero/i, '🪙', '#facc15'],
-  [/hueso|bone/i,         '🦴', '#e2e8f0'],
+  [/hueso|bone/i, '🦴', '#e2e8f0'],
 ]
 
-function getItemIcon(label: string): { glyph: string; color: string } {
+function getItemIcon(itemOrLabel: string | InventoryItem): { glyph: string; color: string } {
+  if (typeof itemOrLabel !== 'string') {
+    const customIcon = itemOrLabel.metadata?.physical_icon || itemOrLabel.metadata?.icon
+    if (customIcon) {
+      return { glyph: String(customIcon), color: '#38bdf8' }
+    }
+    return getItemIcon(itemOrLabel.label || itemOrLabel.item_id)
+  }
   for (const [pattern, glyph, color] of ICON_MAP) {
-    if (pattern.test(label)) return { glyph, color }
+    if (pattern.test(itemOrLabel)) return { glyph, color }
   }
   return { glyph: '◈', color: '#60a5fa' }
 }
@@ -66,13 +73,19 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
   const [snapshot, setSnapshot] = useState<InventorySnapshot>(() => loadInventorySnapshot(user))
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
+  const [showGuide, setShowGuide] = useState(false)
 
   useEffect(() => {
-    function refresh() { setSnapshot(loadInventorySnapshot(user)) }
+    function refresh() {
+      setSnapshot(loadInventorySnapshot(user))
+    }
     refresh()
     const id = window.setInterval(refresh, 2_000)
     window.addEventListener('storage', refresh)
-    return () => { window.clearInterval(id); window.removeEventListener('storage', refresh) }
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('storage', refresh)
+    }
   }, [user])
 
   function handleUseItem(item: InventoryItem) {
@@ -111,8 +124,67 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           <span style={headerLabel}>MOCHILA</span>
           <span style={headerCount}>{totalItems} obj.</span>
         </div>
-        <span style={syncBadge}>⏱ {getUpdatedLabel(snapshot.updated_at)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={syncBadge}>⏱ {getUpdatedLabel(snapshot.updated_at)}</span>
+          <button
+            type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            style={guideToggleBtn}
+            title="Cómo funciona"
+          >
+            {showGuide ? '✕' : '❓'}
+          </button>
+        </div>
       </div>
+
+      {/* How to play guide */}
+      {showGuide && (
+        <div style={guideBox}>
+          <div style={guideTitle}>📖 Cómo funciona</div>
+          <div style={guideStep}>
+            <span style={guideNum}>1</span>
+            <span>
+              🌟 <strong>Recoge objetos</strong> — Al acercarte a un coleccionable en el mapa, se
+              abre un panel automáticamente. Pulsa <strong>OK / Recoger</strong> para guardarlo aquí
+              en la mochila.
+            </span>
+          </div>
+          <div style={guideStep}>
+            <span style={guideNum}>2</span>
+            <span>
+              ⚒️ <strong>Combínalos en la Mesa</strong> — Algunos objetos son ingredientes para
+              fabricar algo más potente. Ve a la pestaña <strong>Mesa</strong> y, si tienes todos
+              los ingredientes, pulsa <strong>Ensamblar</strong>.
+            </span>
+          </div>
+          <div style={guideStep}>
+            <span style={guideNum}>3</span>
+            <span>
+              🔑 <strong>Desbloquea nodos</strong> — Ciertos puntos del mapa sólo se abren si llevas
+              el objeto correcto en la mochila. Cuando llegues a ese punto con el objeto necesario,
+              el nodo se desbloqueará automáticamente.
+            </span>
+          </div>
+          <div style={guideTip}>
+            💡 El objeto permanece en tu mochila hasta que se usa o el admin lo configura para
+            consumirse al superar el nodo.
+          </div>
+          {selected!.state !== 'used' && selected!.quantity > 0 ? (
+            <button
+              type="button"
+              style={useBtn}
+              onClick={() => {
+                handleUseItem(selected!)
+                setSelected(null)
+              }}
+            >
+              Usar objeto
+            </button>
+          ) : (
+            <div style={usedText}>Este objeto ya fue usado</div>
+          )}
+        </div>
+      )}
 
       {/* Grid */}
       <div style={grid}>
@@ -120,7 +192,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           const usable = item.state !== 'used' && item.quantity > 0
           const isSelected = selected?.item_id === item.item_id
           const isFeedback = feedbackId === item.item_id
-          const { glyph, color } = getItemIcon(item.label)
+          const { glyph, color } = getItemIcon(item)
 
           return (
             <button
@@ -136,12 +208,16 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               }}
               onClick={() => setSelected(isSelected ? null : item)}
             >
-              <span style={{ ...cellIcon, background: usable ? `${color}22` : 'rgba(255,255,255,0.04)', color: usable ? color : 'rgba(255,255,255,0.25)' }}>
+              <span
+                style={{
+                  ...cellIcon,
+                  background: usable ? `${color}22` : 'rgba(255,255,255,0.04)',
+                  color: usable ? color : 'rgba(255,255,255,0.25)',
+                }}
+              >
                 {glyph}
               </span>
-              {item.quantity > 1 && (
-                <span style={qtyBadge}>{item.quantity}</span>
-              )}
+              {item.quantity > 1 && <span style={qtyBadge}>{item.quantity}</span>}
               {!usable && <span style={usedOverlay}>✓</span>}
               <span style={cellName}>{item.label.slice(0, 12)}</span>
             </button>
@@ -154,24 +230,24 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
       {/* Selected detail */}
       {selected && (
-        <div style={detailCard} key={selected.item_id}>
+        <div style={detailCard} key={selected!.item_id}>
           <div style={detailHeader}>
-            <span style={{ fontSize: 28 }}>{getItemIcon(selected.label).glyph}</span>
+            <span style={{ fontSize: 28 }}>{getItemIcon(selected).glyph}</span>
             <div>
-              <div style={detailTitle}>{selected.label}</div>
+              <div style={detailTitle}>{selected!.label}</div>
               <div style={detailMeta}>
-                <span style={sourcePill}>{getSourceBadge(selected.source)}</span>
-                {selected.node_id && <span style={nodePill}>Nodo {selected.node_id}</span>}
-                <span style={qtyText}>×{selected.quantity}</span>
+                <span style={sourcePill}>{getSourceBadge(selected!.source)}</span>
+                {selected!.node_id && <span style={nodePill}>Nodo {selected!.node_id}</span>}
+                <span style={qtyText}>×{selected!.quantity}</span>
               </div>
             </div>
           </div>
-          {selected.state !== 'used' && selected.quantity > 0 ? (
+          {selected!.state !== 'used' && selected!.quantity > 0 ? (
             <button
               type="button"
               style={useBtn}
               onClick={() => {
-                handleUseItem(selected)
+                handleUseItem(selected!)
                 setSelected(null)
               }}
             >
@@ -185,11 +261,24 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
       {snapshot.items.length === 0 && (
         <div style={emptyMsg}>
-          <span style={{ fontSize: 32 }}>🎒</span>
-          <div>Mochila vacía</div>
-          <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
-            Escanea QR/NFC o recoge objetos para llenarla
+          <span style={{ fontSize: 36 }}>🎒</span>
+          <div style={{ fontWeight: 900, color: 'rgba(255,255,255,0.7)' }}>Mochila vacía</div>
+          <div
+            style={{
+              fontSize: 11,
+              opacity: 0.55,
+              marginTop: 2,
+              lineHeight: 1.5,
+              maxWidth: 220,
+              textAlign: 'center',
+            }}
+          >
+            Acércate a un coleccionable en el mapa para recoger objetos. También puedes escanear
+            tarjetas QR físicas.
           </div>
+          <button type="button" style={guideToggleBtn} onClick={() => setShowGuide(true)}>
+            ❓ Ver cómo funciona
+          </button>
         </div>
       )}
     </section>
@@ -241,6 +330,69 @@ const grid: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(4, 1fr)',
   gap: 8,
+}
+
+const guideToggleBtn: CSSProperties = {
+  background: 'rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 999,
+  color: 'rgba(255,255,255,0.6)',
+  fontSize: 11,
+  fontWeight: 800,
+  padding: '2px 10px',
+  cursor: 'pointer',
+  lineHeight: 1.8,
+}
+
+const guideBox: CSSProperties = {
+  background: 'rgba(14, 165, 233, 0.07)',
+  border: '1px solid rgba(125,211,252,0.18)',
+  borderRadius: 14,
+  padding: '12px 14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+}
+
+const guideTitle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 900,
+  color: '#7dd3fc',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+}
+
+const guideStep: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'flex-start',
+  fontSize: 12,
+  color: 'rgba(226,232,240,0.82)',
+  lineHeight: 1.45,
+}
+
+const guideNum: CSSProperties = {
+  background: 'rgba(125,211,252,0.18)',
+  color: '#7dd3fc',
+  borderRadius: 999,
+  width: 20,
+  height: 20,
+  minWidth: 20,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 10,
+  fontWeight: 900,
+  marginTop: 1,
+}
+
+const guideTip: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(226,232,240,0.5)',
+  fontStyle: 'italic',
+  lineHeight: 1.4,
+  paddingTop: 4,
+  borderTop: '1px solid rgba(255,255,255,0.06)',
 }
 
 const cell: CSSProperties = {

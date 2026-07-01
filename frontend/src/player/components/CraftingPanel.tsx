@@ -8,20 +8,20 @@ interface CraftingPanelProps {
 
 // ─── Icon resolver (shared with inventory) ────────────────────────────────────
 const ICON_MAP: [RegExp, string, string][] = [
-  [/llave|key/i,          '🔑', '#f59e0b'],
+  [/llave|key/i, '🔑', '#f59e0b'],
   [/emp|electr|bateria|pila/i, '⚡', '#3b82f6'],
-  [/cable|wire/i,         '〰️', '#64748b'],
+  [/cable|wire/i, '〰️', '#64748b'],
   [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
   [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
-  [/herramienta|tool/i,   '🔧', '#f97316'],
-  [/arma|pistol|rifle/i,  '🔫', '#ef4444'],
-  [/escudo|shield/i,      '🛡️', '#06b6d4'],
-  [/map|mapa/i,           '🗺️', '#10b981'],
+  [/herramienta|tool/i, '🔧', '#f97316'],
+  [/arma|pistol|rifle/i, '🔫', '#ef4444'],
+  [/escudo|shield/i, '🛡️', '#06b6d4'],
+  [/map|mapa/i, '🗺️', '#10b981'],
   [/radio|señal|signal/i, '📡', '#a855f7'],
-  [/linterna|luz/i,       '🔦', '#fbbf24'],
-  [/nota|papel|doc/i,     '📄', '#e2e8f0'],
-  [/medic|pastilla/i,     '💊', '#fb7185'],
-  [/bomb|explosiv/i,      '💣', '#ef4444'],
+  [/linterna|luz/i, '🔦', '#fbbf24'],
+  [/nota|papel|doc/i, '📄', '#e2e8f0'],
+  [/medic|pastilla/i, '💊', '#fb7185'],
+  [/bomb|explosiv/i, '💣', '#ef4444'],
 ]
 
 function getIcon(label: string): { glyph: string; color: string } {
@@ -56,18 +56,22 @@ function RecipeCard({
     >
       {/* Output preview */}
       <div style={recipeOutputRow}>
-        <span style={{ ...recipeOutputIcon, background: `${outputIcon.color}1a`, color: outputIcon.color }}>
+        <span
+          style={{
+            ...recipeOutputIcon,
+            background: `${outputIcon.color}1a`,
+            color: outputIcon.color,
+          }}
+        >
           {outputIcon.glyph}
         </span>
         <div style={recipeOutputBody}>
           <div style={recipeTitle}>{recipe.label}</div>
           <div style={recipeOutputMeta}>
-            → {recipe.outputs.map(o => `${o.quantity}× ${o.label}`).join(', ')}
+            → {recipe.outputs.map((o) => `${o.quantity}× ${o.label}`).join(', ')}
           </div>
         </div>
-        <span style={canCraft ? availablePill : lockedPill}>
-          {canCraft ? 'LISTO' : 'FALTAN'}
-        </span>
+        <span style={canCraft ? availablePill : lockedPill}>{canCraft ? 'LISTO' : 'FALTAN'}</span>
       </div>
 
       {/* Inputs needed */}
@@ -77,7 +81,9 @@ function RecipeCard({
           return (
             <div key={inp.item_id} style={inputChip}>
               <span style={{ fontSize: 14 }}>{ic.glyph}</span>
-              <span style={inputChipLabel}>{inp.quantity}× {inp.item_id.replace(/_/g, ' ')}</span>
+              <span style={inputChipLabel}>
+                {inp.quantity}× {inp.item_id.replace(/_/g, ' ')}
+              </span>
             </div>
           )
         })}
@@ -112,11 +118,16 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
   const [feedback, setFeedback] = useState<{ msg: string; ts: number } | null>(null)
 
   useEffect(() => {
-    function refresh() { setSnapshot(loadInventorySnapshot(user)) }
+    function refresh() {
+      setSnapshot(loadInventorySnapshot(user))
+    }
     refresh()
     const id = window.setInterval(refresh, 2_000)
     window.addEventListener('storage', refresh)
-    return () => { window.clearInterval(id); window.removeEventListener('storage', refresh) }
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('storage', refresh)
+    }
   }, [user])
 
   function handleCrafted(msg: string) {
@@ -125,7 +136,7 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
     setTimeout(() => setFeedback(null), 3_000)
   }
 
-  const readyCount = RECIPES.filter(r => checkCraftingPossible(user, r)).length
+  const readyCount = RECIPES.filter((r) => checkCraftingPossible(user, r)).length
 
   return (
     <section style={panel}>
@@ -142,12 +153,17 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
         )}
       </div>
 
+      {/* Info box */}
+      <div style={infoBox}>
+        <span style={{ fontSize: 15 }}>⚒️</span>
+        <span style={infoText}>
+          Combina objetos de tu mochila para fabricar piezas más potentes que desbloquean nuevos
+          nodos. Si tienes todos los ingredientes, el botón <strong>Ensamblar</strong> se activará.
+        </span>
+      </div>
+
       {/* Feedback toast */}
-      {feedback && (
-        <div style={toastBanner}>
-          {feedback.msg}
-        </div>
-      )}
+      {feedback && <div style={toastBanner}>{feedback.msg}</div>}
 
       {/* Recipe list */}
       <div style={recipeList}>
@@ -177,6 +193,22 @@ const panel: CSSProperties = {
   flexDirection: 'column',
   gap: 12,
   padding: '10px 4px',
+}
+
+const infoBox: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  background: 'rgba(167,139,250,0.08)',
+  border: '1px solid rgba(167,139,250,0.18)',
+  borderRadius: 12,
+  padding: '10px 12px',
+}
+
+const infoText: CSSProperties = {
+  fontSize: 12,
+  color: 'rgba(226,232,240,0.75)',
+  lineHeight: 1.5,
 }
 
 const headerRow: CSSProperties = {

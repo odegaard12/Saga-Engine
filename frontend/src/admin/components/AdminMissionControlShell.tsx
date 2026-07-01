@@ -17,9 +17,10 @@ import type { MissionTemplateId } from '../lib/gameCatalog'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import { useI18n } from '../../i18n/useI18n'
+import ObjectsPanel from './ObjectsPanel'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AdminMissionControlShellProps = {
@@ -113,6 +114,8 @@ export default function AdminMissionControlShell({
 }: AdminMissionControlShellProps) {
   const { t } = useI18n()
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
+  const [showHeatmap, setShowHeatmap] = useState(false)
+  const [saveValidationWarning, setSaveValidationWarning] = useState<string | null>(null)
   const [pendingCreateLocation, setPendingCreateLocation] = useState<{
     lat: number
     lon: number
@@ -189,6 +192,70 @@ export default function AdminMissionControlShell({
     setPendingCreateLocation(null)
   }
 
+  function validateRouteDependencies(stages: AdminReactOverviewStage[]): string | null {
+    const providedItems = new Set<string>()
+
+    for (const stage of stages) {
+      if (stage.physical_item_id) {
+        providedItems.add(stage.physical_item_id)
+      }
+      const config =
+        typeof (stage as any).config === 'object' && (stage as any).config
+          ? ((stage as any).config as Record<string, unknown>)
+          : {}
+      if (config.reward_item_id && typeof config.reward_item_id === 'string') {
+        providedItems.add(config.reward_item_id)
+      }
+    }
+
+    if (providedItems.has('llave_rota') && !providedItems.has('cinta_aislante')) {
+      return 'Tienes un nodo que entrega "Llave rota", pero falta otro nodo que entregue "Cinta aislante" para que el jugador pueda fabricar la Llave Maestra. ¡Añádelo antes de guardar!'
+    }
+    if (providedItems.has('cinta_aislante') && !providedItems.has('llave_rota')) {
+      return 'Tienes un nodo que entrega "Cinta aislante", pero falta otro nodo que entregue "Llave rota" para que el jugador pueda fabricar la Llave Maestra. ¡Añádelo antes de guardar!'
+    }
+
+    const empParts = ['placa_base', 'bateria_litio', 'cables_cobre']
+    const empProvided = empParts.filter((p) => providedItems.has(p))
+    if (empProvided.length > 0 && empProvided.length < 3) {
+      const missing = empParts.filter((p) => !providedItems.has(p))
+      return `Para fabricar el Dispositivo EMP faltan nodos que entreguen los siguientes ingredientes: ${missing.join(', ')}. ¡Añádelos antes de guardar!`
+    }
+
+    for (const stage of stages) {
+      const reqId = (stage as any).required_item_id || ''
+      if (reqId) {
+        if (reqId === 'llave_maestra') {
+          if (!providedItems.has('llave_rota') || !providedItems.has('cinta_aislante')) {
+            return `El nodo "${stage.title || 'Nodo'}" requiere "Llave maestra", pero no has colocado los ingredientes (Llave rota y Cinta aislante) en la ruta.`
+          }
+        } else if (reqId === 'emp_device') {
+          if (
+            !providedItems.has('placa_base') ||
+            !providedItems.has('bateria_litio') ||
+            !providedItems.has('cables_cobre')
+          ) {
+            return `El nodo "${stage.title || 'Nodo'}" requiere "Dispositivo EMP", pero no has colocado todos sus ingredientes en la ruta.`
+          }
+        } else if (!providedItems.has(reqId)) {
+          return `El nodo "${stage.title || 'Nodo'}" requiere el objeto "${reqId}", pero ningún nodo de la misión lo entrega.`
+        }
+      }
+    }
+
+    return null
+  }
+
+  function handleSaveStages() {
+    const warning = validateRouteDependencies(stages)
+    if (warning) {
+      setSaveValidationWarning(warning)
+      setTimeout(() => setSaveValidationWarning(null), 8000)
+      return
+    }
+    onSaveStages()
+  }
+
   const displayTitle = cleanAdminCopy(title, 'SAGA Engine')
   const displaySubtitle = cleanAdminCopy(subtitle, 'Mission Control')
 
@@ -228,7 +295,7 @@ export default function AdminMissionControlShell({
           <button
             type="button"
             className="saga-primary-action saga-admin-add-node-action"
-            onClick={() => togglePanel('builder')}
+            onClick={onCreateNode}
           >
             + {t('admin.addNode')}
           </button>
@@ -238,7 +305,7 @@ export default function AdminMissionControlShell({
             className="saga-save-action"
             data-state={saveState}
             disabled={saveState === 'saving'}
-            onClick={onSaveStages}
+            onClick={handleSaveStages}
           >
             {saveState === 'saving'
               ? t('admin.saving')
@@ -251,6 +318,13 @@ export default function AdminMissionControlShell({
             {t('admin.refresh')}
           </button>
         </nav>
+
+        {saveValidationWarning ? (
+          <div className="saga-save-validation-warning">
+            <b>⚠️ Misión incompleta</b>
+            <p>{saveValidationWarning}</p>
+          </div>
+        ) : null}
 
         <div className="saga-panel-switcher">
           <button
@@ -266,6 +340,13 @@ export default function AdminMissionControlShell({
             onClick={() => togglePanel('labels')}
           >
             {t('admin.families')}
+          </button>
+          <button
+            type="button"
+            className={cmsPanel === 'objects' ? 'active' : ''}
+            onClick={() => togglePanel('objects')}
+          >
+            Objetos 🎒
           </button>
           <button
             type="button"
@@ -372,7 +453,7 @@ export default function AdminMissionControlShell({
             <button
               type="button"
               className="saga-command-primary saga-admin-add-node-action"
-              onClick={() => togglePanel('builder')}
+              onClick={onCreateNode}
             >
               {t('admin.addNode')}
             </button>
@@ -381,6 +462,15 @@ export default function AdminMissionControlShell({
             </button>
             <button type="button" onClick={onRefresh}>
               {t('admin.refresh')}
+            </button>
+            <button
+              type="button"
+              id="admin-heatmap-toggle"
+              className={showHeatmap ? 'saga-heatmap-toggle active' : 'saga-heatmap-toggle'}
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              title="Ver heatmap de rastros de jugadores en el mapa"
+            >
+              {showHeatmap ? '🔥 Ocultar Rastros' : '🔥 Ver Rastros'}
             </button>
           </div>
 
@@ -402,6 +492,8 @@ export default function AdminMissionControlShell({
             onSelectStage={onSelectStage}
             onCreateStageAt={requestCreateNodeAt}
             onMoveStage={onMoveStage}
+            showHeatmap={showHeatmap}
+            onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
           />
         </div>
         {pendingCreateLocation ? (
@@ -501,7 +593,9 @@ export default function AdminMissionControlShell({
                   ? t('admin.families')
                   : cmsPanel === 'builder'
                     ? t('admin.builder')
-                    : t('admin.settings')}
+                    : cmsPanel === 'objects'
+                      ? 'Objetos y Recetas'
+                      : t('admin.settings')}
             </strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>
               {t('common.close')}
@@ -537,6 +631,8 @@ export default function AdminMissionControlShell({
             ) : null}
 
             {cmsPanel === 'labels' ? <FamiliesPanel /> : null}
+
+            {cmsPanel === 'objects' ? <ObjectsPanel /> : null}
 
             {cmsPanel === 'mission' ? (
               <SettingsPanel

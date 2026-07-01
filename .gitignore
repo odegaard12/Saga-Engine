@@ -1,60 +1,71 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.venv/
-venv/
-env/
 
-# Logs
-*.log
-
-# Secrets / local environment
-.env
-.env.*
-!.env.example
-
-# Runtime data that must not be committed
-data/gamestate.json
-data/positions.json
-data/admin_auth.json
-data/*.bak
-
-# Frontend artifacts
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/tsconfig.tsbuildinfo
-frontend/vite.config.ts.timestamp-*.mjs
-
-# Local backups / temporary files
-*.bak
-*.bak.*
+*~
 *.backup
 *.backup.*
-*.broken_now
-*.tmp
-*.temp
-*.orig
-*.rej
-*.swp
-*.swo
-*~
-
-# Local/AI/generated backups
-.backup_chatgpt_*/
 **/.backup_chatgpt_*/
-_backups/
+.backup_chatgpt_*/
 **/_backups/
-
-# Sync / local import artifacts
-_SYNC_FROM_CONTAINER/
-
-# OS / editor
+_backups/
+*.bak
+*.bak.*
+*.broken_now
+data/admin_auth.json
+data/*.bak
+data/gamestate.json
+data/positions.json
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
+.env
+.env.*
+env/
+!.env.example
+eslint_report.json
+# Frontend artifacts
+frontend/dist/
+frontend/node_modules/
 frontend/src/*.bak.*
+frontend_src.zip
+frontend/tsconfig.tsbuildinfo
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*.mjs
+frontend.zip
+.husky/
+.idea/
+# Local/AI/generated backups
+# Local backups / temporary files
+# Local/dev
+*.log
+# Logs
+*.orig
+# OS / editor
+PR_DESCRIPTION.md
+*.pyc
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+# Python
+*.rej
+release_v*.md
+# Runtime data that must not be committed
+# Secrets / local environment
+*.swo
+*.swp
+_SYNC_FROM_CONTAINER/
+# Sync / local import artifacts
+*.temp
+Thumbs.db
+*.tmp
 *.tsbuildinfo
+.venv/
+venv/
+.vscode/
+*.zip
+
+# Protecciones extra de seguridad y basura
+data/*.sqlite3
+frontend/.env
+PR_DESCRIPTION.md
+*.zip
+*.pyc
+__pycache__/
+release_*.md

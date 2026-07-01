@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
+import { collectInventoryItem } from './offline/inventory'
 import {
   advancePlayer,
   deleteFieldProof,
@@ -107,6 +108,14 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
   if (!stage || typeof stage !== 'object') return false
 
   const record = stage as unknown as Record<string, unknown>
+  const config =
+    record.config && typeof record.config === 'object'
+      ? (record.config as Record<string, unknown>)
+      : {}
+  if (config.is_map_collectible || record.is_map_collectible) {
+    return false
+  }
+
   const flatKind = record.physical_node_kind || record.physical_item_kind
 
   if (
@@ -151,31 +160,31 @@ export default function PlayerApp() {
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
-  const toolsOpen = usePlayerStore(s => s.toolsOpen)
-  const setToolsOpen = usePlayerStore(s => s.setToolsOpen)
-  const teamOpen = usePlayerStore(s => s.teamOpen)
-  const setTeamOpen = usePlayerStore(s => s.setTeamOpen)
-  
-  const addTrackerPoint = useGpsTracker(s => s.addPoint)
+  const toolsOpen = usePlayerStore((s) => s.toolsOpen)
+  const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
+  const teamOpen = usePlayerStore((s) => s.teamOpen)
+  const setTeamOpen = usePlayerStore((s) => s.setTeamOpen)
+
+  const addTrackerPoint = useGpsTracker((s) => s.addPoint)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
-  
-  const offlinePrepVisible = usePlayerStore(s => s.offlinePrepVisible)
-  const setOfflinePrepVisible = usePlayerStore(s => s.setOfflinePrepVisible)
+
+  const offlinePrepVisible = usePlayerStore((s) => s.offlinePrepVisible)
+  const setOfflinePrepVisible = usePlayerStore((s) => s.setOfflinePrepVisible)
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   )
   const [offlineSummary, setOfflineSummary] = useState<OfflineMissionSummary | null>(null)
-  
-  const browserGpsPosition = usePlayerStore(s => s.gpsPosition)
-  const setBrowserGpsPosition = usePlayerStore(s => s.setGpsPosition)
-  const browserGpsStatus = usePlayerStore(s => s.gpsStatus)
-  const setBrowserGpsStatus = usePlayerStore(s => s.setGpsStatus)
-  const browserGpsFresh = usePlayerStore(s => s.gpsFresh)
-  const setBrowserGpsFresh = usePlayerStore(s => s.setGpsFresh)
-  const browserGpsAccuracy = usePlayerStore(s => s.gpsAccuracy)
-  const setBrowserGpsAccuracy = usePlayerStore(s => s.setGpsAccuracy)
-  const browserGpsCapturedAt = usePlayerStore(s => s.gpsCapturedAt)
-  const setBrowserGpsCapturedAt = usePlayerStore(s => s.setGpsCapturedAt)
+
+  const browserGpsPosition = usePlayerStore((s) => s.gpsPosition)
+  const setBrowserGpsPosition = usePlayerStore((s) => s.setGpsPosition)
+  const browserGpsStatus = usePlayerStore((s) => s.gpsStatus)
+  const setBrowserGpsStatus = usePlayerStore((s) => s.setGpsStatus)
+  const browserGpsFresh = usePlayerStore((s) => s.gpsFresh)
+  const setBrowserGpsFresh = usePlayerStore((s) => s.setGpsFresh)
+  const browserGpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
+  const setBrowserGpsAccuracy = usePlayerStore((s) => s.setGpsAccuracy)
+  const browserGpsCapturedAt = usePlayerStore((s) => s.gpsCapturedAt)
+  const setBrowserGpsCapturedAt = usePlayerStore((s) => s.setGpsCapturedAt)
   const [quickQrOpenSignal, setQuickQrOpenSignal] = useState(0)
   const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
@@ -669,7 +678,6 @@ export default function PlayerApp() {
     }
   }, [playerPosition?.lat, playerPosition?.lon, addTrackerPoint])
 
-
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
     const ratio = mapProgress
@@ -732,7 +740,6 @@ export default function PlayerApp() {
               ? 'error'
               : 'unavailable'
 
-
   const unlockPosition = localDebugPosition || (hasFreshBrowserGps ? browserGpsPosition : null)
 
   const distanceMeters =
@@ -774,18 +781,30 @@ export default function PlayerApp() {
   const teamLiveCount = teamMarkerSummary.live
   const teamVisibleCount = teamMarkerSummary.live + teamMarkerSummary.stale
 
-  const playerHref = `/player/${encodeURIComponent(payload.user)}`
-  const shellLoginHref = '/'
-  const adminHref = '/admin'
+  const isMapCollectible =
+    Boolean(currentStage) &&
+    (Boolean((currentStage as any).is_map_collectible) ||
+      Boolean((currentStage as any).config?.is_map_collectible) ||
+      (Boolean(
+        (currentStage as any).physical_node_kind || (currentStage as any).physical_item_kind
+      ) &&
+        !(currentStage as any).qr_payload &&
+        !(currentStage as any).physical_qr))
+
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
     ? 'Activar GPS'
     : !runtime.canEnter
       ? runtime.primaryLabel
-      : currentStageIsPhysicalQr
-        ? 'Abrir QR'
-        : runtime.primaryLabel
+      : isMapCollectible
+        ? `RECOGER ${String((currentStage as any).physical_item_label || currentStage!.title || 'OBJETO').toUpperCase()}`
+        : currentStageIsPhysicalQr
+          ? 'Abrir QR'
+          : runtime.primaryLabel
+  const playerHref = `/player/${encodeURIComponent(payload.user)}`
+  const shellLoginHref = '/'
+  const adminHref = '/admin'
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   async function refreshPayload() {
@@ -1294,6 +1313,31 @@ export default function PlayerApp() {
     }
 
     if (!runtime.canEnter) return
+
+    if (isMapCollectible && currentStage) {
+      const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
+      const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto'
+
+      collectInventoryItem({
+        user: payload.user,
+        item_id: itemId,
+        label: label,
+        quantity: 1,
+        source: 'manual',
+        node_id: String(currentStage.id),
+        metadata: {
+          physical_icon:
+            (currentStage as any).physical_icon || (currentStage as any).config?.physical_icon,
+        },
+        queue_event: true,
+      })
+
+      showNotice(`¡Recogido: ${label}!`, 'success')
+      vibrate([10, 40, 10])
+      void handleSubmitCode('OK')
+      return
+    }
+
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
     showOverlay('activate')
@@ -1329,7 +1373,11 @@ export default function PlayerApp() {
     }
 
     if (runtime.canEnter) {
-      showNotice('Target in range. Use Open Interaction.', 'info')
+      if (isMapCollectible) {
+        handlePrimaryAction()
+      } else {
+        showNotice('Target in range. Use Open Interaction.', 'info')
+      }
       return
     }
 

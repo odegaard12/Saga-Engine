@@ -6,7 +6,7 @@ import PhysicalQrCardsPanel, {
   type SavedPhysicalQrCard,
 } from './PhysicalQrCardsPanel'
 
-type NodePhysicalMode = 'none' | PhysicalQrKind
+type NodePhysicalMode = 'none' | PhysicalQrKind | 'map_collectible' | 'qr'
 
 type NodePhysicalTypePanelProps = {
   stage: AdminReactOverviewStage
@@ -32,6 +32,14 @@ const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; ic
 
 function getPhysicalMode(stage: AdminReactOverviewStage): NodePhysicalMode {
   const record = stage as unknown as Record<string, unknown>
+  const config =
+    record.config && typeof record.config === 'object'
+      ? (record.config as Record<string, unknown>)
+      : {}
+  if (config.is_map_collectible || record.is_map_collectible) {
+    return 'map_collectible'
+  }
+
   const raw = record.physical_node_kind || record.physical_item_kind
 
   if (raw === 'collectible' || raw === 'requirement' || raw === 'clue' || raw === 'bonus')
@@ -62,6 +70,30 @@ function clearPhysicalFields(stage: AdminReactOverviewStage): AdminReactOverview
   delete next.physical_item_id
   delete next.physical_item_label
   delete next.physical_item_kind
+  delete next.is_map_collectible
+
+  const config =
+    next.config && typeof next.config === 'object'
+      ? { ...(next.config as Record<string, unknown>) }
+      : {}
+  delete config.is_map_collectible
+  delete config.physical_item_id
+  delete config.physical_item_label
+  delete config.game_id
+  delete config.game_title
+  delete config.success_code
+  delete config.fallback_code
+
+  next.config = config
+  next.type = 'shake_antenna_charge' // Default simple game template
+  next.game_family = 'signal_hunt'
+  next.game_type = 'shake_antenna_charge'
+  next.game_template_id = 'shake_antenna_charge'
+  next.entry_mode = 'free'
+  next.completion_method = 'free'
+  next.requires_proximity = false
+  next._type_choice_done = true
+  next._clear_physical_fields = true
 
   return next as unknown as AdminReactOverviewStage
 }
@@ -177,7 +209,78 @@ export default function NodePhysicalTypePanel({
       return
     }
 
-    const card = buildDefaultPhysicalQrCard(stage, nextMode)
+    if (nextMode === 'map_collectible') {
+      onApplyLocal({
+        ...(stage as unknown as Record<string, unknown>),
+        type: 'signal_hunt',
+        label: 'Coleccionable de mapa',
+        title: 'Objeto Coleccionable',
+        physical_qr: null,
+        physical_node_kind: 'collectible',
+        physical_item_kind: 'collectible',
+        physical_item_id: (stage as any).physical_item_id || 'objeto_mapa',
+        physical_item_label: (stage as any).physical_item_label || 'Objeto de mapa',
+        game_family: 'physical_qr',
+        game_type: 'qr_collectible',
+        game_template_id: 'qr_collectible',
+        entry_mode: 'gps',
+        completion_method: 'proximity',
+        requires_proximity: true,
+        qr_payload: '',
+        fallback_code: 'OK',
+        physical_fallback_code: 'OK',
+        config: {
+          ...((stage as any).config || {}),
+          is_map_collectible: true,
+          completion_method: 'proximity',
+          game_id: 'qr_collectible',
+          game_title: 'Objeto de mapa',
+        },
+        messages: {
+          hint: 'Acércate para recoger este objeto.',
+          gps_unavailable: 'Activa GPS para poder recoger el objeto.',
+          locked: 'Muévete al punto para recoger el objeto.',
+        },
+        content: 'Un objeto coleccionable se encuentra en esta ubicación. Acércate para recogerlo.',
+        description: 'Objeto coleccionable de mapa.',
+        _type_choice_done: true,
+      } as any)
+      onFinishChoice?.()
+      return
+    }
+
+    if (nextMode === 'qr') {
+      const card = buildDefaultPhysicalQrCard(stage, 'collectible')
+      onApplyLocal({
+        ...(stage as unknown as Record<string, unknown>),
+        physical_qr: card,
+        physical_node_kind: 'collectible',
+        physical_item_kind: 'collectible',
+        qr_payload: card.payload,
+        physical_item_id: card.item_id,
+        physical_item_label: card.label,
+        game_family: 'physical_qr',
+        game_type: 'qr_collectible',
+        game_template_id: 'qr_collectible',
+        entry_mode: 'qr',
+        completion_method: 'qr_scan',
+        requires_proximity: false,
+        fallback_code: buildFallbackCodeForPhysicalStage(stage),
+        physical_fallback_code: buildFallbackCodeForPhysicalStage(stage),
+        config: {
+          ...((stage as any).config || {}),
+          is_map_collectible: false,
+          completion_method: 'qr_scan',
+          game_id: 'qr_collectible',
+          game_title: 'Objeto QR',
+        },
+        _type_choice_done: true,
+      } as any)
+      onFinishChoice?.()
+      return
+    }
+
+    const card = buildDefaultPhysicalQrCard(stage, nextMode as any)
 
     patchStage({
       physical_node_kind: nextMode,
@@ -258,18 +361,25 @@ export default function NodePhysicalTypePanel({
             <small>Ruta, GPS, rumbo, minijuego o prueba en mapa.</small>
           </button>
 
-          {physicalModes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={mode === item.id ? 'active' : ''}
-              onClick={() => setMode(item.id)}
-            >
-              <i>{item.icon}</i>
-              <strong>{item.label}</strong>
-              <small>{item.help}</small>
-            </button>
-          ))}
+          <button
+            type="button"
+            className={mode === 'map_collectible' ? 'active' : ''}
+            onClick={() => setMode('map_collectible')}
+          >
+            <i>🌟</i>
+            <strong>Coleccionable en mapa</strong>
+            <small>Objeto que se recoge en el mapa por proximidad GPS.</small>
+          </button>
+
+          <button
+            type="button"
+            className={mode === 'qr' ? 'active' : ''}
+            onClick={() => setMode('qr')}
+          >
+            <i>▣</i>
+            <strong>QR físico</strong>
+            <small>Tarjeta imprimible con objeto, llave, pista o bonus.</small>
+          </button>
         </div>
       </section>
     )
@@ -450,17 +560,19 @@ export default function NodePhysicalTypePanel({
             </button>
           </div>
 
-          <PhysicalQrCardsPanel
-            initialLabel={
-              (stage as AdminReactOverviewStage & { physical_item_label?: string })
-                .physical_item_label ||
-              stage.title ||
-              'Buscar a tu enemigo'
-            }
-            initialKind={mode}
-            compact
-            onSaveToNode={saveQrCard}
-          />
+          {mode !== 'map_collectible' && (
+            <PhysicalQrCardsPanel
+              initialLabel={
+                (stage as AdminReactOverviewStage & { physical_item_label?: string })
+                  .physical_item_label ||
+                stage.title ||
+                'Buscar a tu enemigo'
+              }
+              initialKind={mode as any}
+              compact
+              onSaveToNode={saveQrCard}
+            />
+          )}
         </div>
       ) : !chooserOnly ? (
         <div style={emptyBox}>

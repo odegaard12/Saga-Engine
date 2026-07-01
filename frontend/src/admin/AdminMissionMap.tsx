@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-import type { AdminReactOverviewStage } from './lib/adminApi'
+import { fetchAdminReactOverview, type AdminReactOverviewStage } from './lib/adminApi'
 import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNodeVisuals'
 
 type AdminMissionMapProps = {
@@ -11,6 +11,8 @@ type AdminMissionMapProps = {
   onSelectStage: (stage: AdminReactOverviewStage) => void
   onCreateStageAt?: (lat: number, lon: number, clientPoint?: { x: number; y: number }) => void
   onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
+  showHeatmap?: boolean
+  onToggleHeatmap?: () => void
 }
 
 function hasCoords(stage: AdminReactOverviewStage) {
@@ -97,13 +99,23 @@ export default function AdminMissionMap({
   onSelectStage,
   onCreateStageAt,
   onMoveStage,
+  showHeatmap: propShowHeatmap,
+  onToggleHeatmap,
 }: AdminMissionMapProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
-  const heatmapLayerRef = useRef<L.Polyline | null>(null)
+  const heatmapLayerRef = useRef<L.Layer[]>([])
   const dragClickSuppressUntilRef = useRef(0)
-  const [showHeatmap, setShowHeatmap] = useState(false)
+  const [localShowHeatmap, setLocalShowHeatmap] = useState(false)
+  const [heatmapStatus, setHeatmapStatus] = useState<'idle' | 'loading' | 'ok' | 'empty' | 'error'>(
+    'idle'
+  )
+  const [playerCount, setPlayerCount] = useState(0)
+
+  const showHeatmap = propShowHeatmap !== undefined ? propShowHeatmap : localShowHeatmap
+  const toggleHeatmap =
+    onToggleHeatmap !== undefined ? onToggleHeatmap : () => setLocalShowHeatmap(!localShowHeatmap)
 
   const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
@@ -266,6 +278,100 @@ export default function AdminMissionMap({
       layersRef.current.push(ring, marker)
     })
 
+    // Dibujar línea de orden de ruta entre nodos consecutivos (thin grey)
+    for (let i = 0; i < mappedStages.length - 1; i++) {
+      const fromCoords = getStageCoords(mappedStages[i])
+      const toCoords = getStageCoords(mappedStages[i + 1])
+      if (!fromCoords || !toCoords) continue
+      const routeLine = L.polyline([fromCoords, toCoords], {
+        color: 'rgba(148,163,184,0.25)',
+        weight: 1.5,
+        opacity: 0.7,
+        dashArray: '4 8',
+      }).addTo(map)
+      layersRef.current.push(routeLine)
+    }
+
+    // Dibujar líneas de dependencias de coleccionables y recetas
+    // RECIPES_DB: objeto_resultante -> ingredientes
+    const RECIPES_DB: Record<string, string[]> = {
+      llave_maestra: ['llave_rota', 'cinta_aislante'],
+      emp_device: ['bateria_litio', 'cables_cobre', 'placa_base'],
+    }
+
+    // Normalizar ID para comparación consistente
+    function normId(value: unknown): string {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[- ]/g, '_')
+    }
+
+    mappedStages.forEach((targetStage) => {
+      const target = targetStage as any
+      const targetConfig = target.config && typeof target.config === 'object' ? target.config : {}
+      // Leer required_item_id desde múltiples posibles ubicaciones
+      const reqId = normId(
+        target.required_item_id || targetConfig.required_item_id || targetConfig.item_id || ''
+      )
+      if (!reqId) return
+
+      const targetCoords = getStageCoords(targetStage)
+      if (!targetCoords) return
+
+      // Obtener ingredientes/orígenes del objeto requerido
+      const sourceItemIds = (RECIPES_DB[reqId] || [reqId]).map(normId)
+      const isCrafted = Boolean(RECIPES_DB[reqId])
+
+      sourceItemIds.forEach((itemId) => {
+        // Encontrar nodos que producen este item
+        mappedStages.forEach((sourceStage) => {
+          if (sourceStage === targetStage) return
+          const source = sourceStage as any
+          const sourceConfig =
+            source.config && typeof source.config === 'object' ? source.config : {}
+
+          // Buscar en múltiples campos donde puede estar el ID del objeto generado
+          const sourceItemId = normId(
+            source.physical_item_id ||
+              sourceConfig.physical_item_id ||
+              (source.physical_qr &&
+                typeof source.physical_qr === 'object' &&
+                (source.physical_qr as any).item_id) ||
+              ''
+          )
+
+          if (sourceItemId && sourceItemId === itemId) {
+            const sourceCoords = getStageCoords(sourceStage)
+            if (!sourceCoords) return
+
+            // Crear polilínea entre nodos enlazados
+            const color = isCrafted ? '#a78bfa' : '#38bdf8' // Violeta si es crafteo, Celeste si es directo
+            const line = L.polyline([sourceCoords, targetCoords], {
+              color,
+              weight: 3,
+              opacity: 0.9,
+              className: 'admin-dependency-polyline',
+            }).addTo(map)
+
+            const srcLabel =
+              source.title || source.physical_item_label || `Nodo ${sourceStage.index + 1}`
+            const tgtLabel = target.title || `Nodo ${targetStage.index + 1}`
+            const tooltipText = isCrafted
+              ? `🔧 Ingrediente: "${itemId}" de ${sourceStage.index + 1} (${srcLabel}) → receta de "${reqId}" requerida en ${targetStage.index + 1} (${tgtLabel})`
+              : `🔑 Requisito: "${reqId}" obtenido en ${sourceStage.index + 1} (${srcLabel}) → necesario para ${targetStage.index + 1} (${tgtLabel})`
+
+            line.bindTooltip(tooltipText, {
+              sticky: true,
+              opacity: 0.96,
+            })
+
+            layersRef.current.push(line)
+          }
+        })
+      })
+    })
+
     if (!selectedStage) {
       if (bounds.length > 1) {
         map.fitBounds(L.latLngBounds(bounds), {
@@ -289,33 +395,70 @@ export default function AdminMissionMap({
     const map = mapRef.current
     if (!map) return
 
-    if (heatmapLayerRef.current) {
-      heatmapLayerRef.current.remove()
-      heatmapLayerRef.current = null
+    // Limpiar capas previas del heatmap
+    heatmapLayerRef.current.forEach((l) => l.remove())
+    heatmapLayerRef.current = []
+
+    if (!showHeatmap) {
+      setHeatmapStatus('idle')
+      setPlayerCount(0)
+      return
     }
 
-    if (showHeatmap) {
-      try {
-        const raw = localStorage.getItem('saga-gps-tracker')
-        if (raw) {
-          const state = JSON.parse(raw)
-          const route = state.state?.route || []
-          
-          if (Array.isArray(route) && route.length > 0) {
-            const latlngs: L.LatLngExpression[] = route.map((pt: any) => [pt.lat, pt.lon])
-            heatmapLayerRef.current = L.polyline(latlngs, {
-              color: '#f43f5e',
-              weight: 4,
-              opacity: 0.8,
-              dashArray: '5, 10',
-              lineCap: 'round'
-            }).addTo(map)
-          }
-        }
-      } catch (err) {
-        console.error('Error loading tracker data', err)
-      }
-    }
+    setHeatmapStatus('loading')
+
+    // Leer posiciones desde el servidor (los jugadores envían heartbeats con lat/lon)
+    fetchAdminReactOverview()
+      .then((data: any) => {
+        const profiles: any[] = data?.profiles || []
+        let count = 0
+        const COLORS = ['#f43f5e', '#f97316', '#a855f7', '#3b82f6', '#10b981', '#eab308']
+
+        profiles.forEach((profile, idx) => {
+          const lat = profile.lat ?? profile.live_lat ?? profile.last_lat
+          const lon = profile.lon ?? profile.live_lon ?? profile.last_lon
+          if (typeof lat !== 'number' || typeof lon !== 'number') return
+          if (lat === 0 && lon === 0) return
+
+          count++
+          const color = COLORS[idx % COLORS.length]
+          const name = String(profile.name || profile.id || `Jugador ${idx + 1}`)
+
+          // Círculo de posición actual
+          const circle = L.circleMarker([lat, lon], {
+            radius: 14,
+            color,
+            fillColor: color,
+            fillOpacity: 0.28,
+            weight: 3,
+            opacity: 0.9,
+            className: 'admin-player-position-ring',
+          }).addTo(map)
+
+          // Marcador con nombre
+          const pinIcon = L.divIcon({
+            className: '',
+            iconSize: [10, 10],
+            html: `<div class="admin-player-dot" style="background:${color};" title="${name}"></div>`,
+          })
+          const pin = L.marker([lat, lon], { icon: pinIcon, interactive: false }).addTo(map)
+
+          // Popup con info
+          circle.bindTooltip(
+            `👤 ${name}<br/>📍 ${lat.toFixed(5)}, ${lon.toFixed(5)}<br/><small>${profile.gps_status || 'ok'}</small>`,
+            { sticky: true, opacity: 0.96 }
+          )
+
+          heatmapLayerRef.current.push(circle, pin)
+        })
+
+        setPlayerCount(count)
+        setHeatmapStatus(count > 0 ? 'ok' : 'empty')
+      })
+      .catch((err) => {
+        console.error('Heatmap: error cargando posiciones', err)
+        setHeatmapStatus('error')
+      })
   }, [showHeatmap, mappedStages])
 
   useEffect(() => {
@@ -351,11 +494,7 @@ export default function AdminMissionMap({
           <span>
             <i style={{ background: '#a78bfa' }} /> Circuit
           </span>
-          <button 
-            type="button"
-            onClick={() => setShowHeatmap(!showHeatmap)}
-            style={heatmapBtn}
-          >
+          <button type="button" onClick={toggleHeatmap} style={heatmapBtn}>
             {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros (Heatmap)'}
           </button>
         </div>
@@ -450,6 +589,7 @@ const heatmapBtn: React.CSSProperties = {
   fontSize: 10,
   cursor: 'pointer',
   marginLeft: 8,
+  pointerEvents: 'auto',
 }
 
 const emptyState: React.CSSProperties = {

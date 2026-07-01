@@ -22,14 +22,14 @@ export function TeamRelayRuntimeScreen({
   const { memberPositions } = useTeamStore()
 
   // Calcula cuántos miembros hay cerca del nodo.
-  // En un caso real calcularíamos la distancia GPS, por ahora asumiremos 
+  // En un caso real calcularíamos la distancia GPS, por ahora asumiremos
   // que los miembros que han actualizado posición en los últimos 5 mins están activos.
   const activeMembersCount = Object.values(memberPositions).filter(
-    pos => Date.now() - pos.timestamp < 5 * 60 * 1000
+    (pos) => Date.now() - pos.timestamp < 5 * 60 * 1000
   ).length
 
   // Umbral configurable
-  const requiredMembers = 2 
+  const requiredMembers = 2
   const isReady = activeMembersCount >= requiredMembers
 
   const handleHoldStart = () => {
@@ -73,7 +73,13 @@ export function TeamRelayRuntimeScreen({
         onPointerLeave={handleHoldEnd}
         disabled={!isReady || submitting}
       >
-        {submitting ? 'Registrando...' : isReady ? (holding ? 'Mantén presionado...' : 'Validar Relevo') : 'Esperando equipo'}
+        {submitting
+          ? 'Registrando...'
+          : isReady
+            ? holding
+              ? 'Mantén presionado...'
+              : 'Validar Relevo'
+            : 'Esperando equipo'}
       </button>
     </section>
   )

@@ -1,8 +1,4 @@
-import {
-  loadInventorySnapshot,
-  saveInventorySnapshot,
-  type InventoryItem,
-} from './inventory'
+import { loadInventorySnapshot, saveInventorySnapshot, type InventoryItem } from './inventory'
 
 export type RecipeInput = {
   item_id: string
@@ -29,11 +25,9 @@ export const RECIPES: Recipe[] = [
     label: 'Reparar Llave',
     inputs: [
       { item_id: 'llave_rota', quantity: 1 },
-      { item_id: 'cinta_aislante', quantity: 1 }
+      { item_id: 'cinta_aislante', quantity: 1 },
     ],
-    outputs: [
-      { item_id: 'llave_maestra', label: 'Llave Maestra', quantity: 1 }
-    ]
+    outputs: [{ item_id: 'llave_maestra', label: 'Llave Maestra', quantity: 1 }],
   },
   {
     recipe_id: 'craft_emp_device',
@@ -41,19 +35,17 @@ export const RECIPES: Recipe[] = [
     inputs: [
       { item_id: 'bateria_litio', quantity: 2 },
       { item_id: 'cables_cobre', quantity: 3 },
-      { item_id: 'placa_base', quantity: 1 }
+      { item_id: 'placa_base', quantity: 1 },
     ],
-    outputs: [
-      { item_id: 'emp_device', label: 'Carga EMP', quantity: 1 }
-    ]
-  }
+    outputs: [{ item_id: 'emp_device', label: 'Carga EMP', quantity: 1 }],
+  },
 ]
 
 export function checkCraftingPossible(user: string, recipe: Recipe): boolean {
   const snapshot = loadInventorySnapshot(user)
-  
+
   for (const input of recipe.inputs) {
-    const item = snapshot.items.find(i => i.item_id === input.item_id)
+    const item = snapshot.items.find((i) => i.item_id === input.item_id)
     if (!item || item.quantity < input.quantity || item.state === 'used') {
       return false
     }
@@ -62,7 +54,7 @@ export function checkCraftingPossible(user: string, recipe: Recipe): boolean {
 }
 
 export function craftRecipe(user: string, recipeId: string): boolean {
-  const recipe = RECIPES.find(r => r.recipe_id === recipeId)
+  const recipe = RECIPES.find((r) => r.recipe_id === recipeId)
   if (!recipe) return false
 
   if (!checkCraftingPossible(user, recipe)) {
@@ -74,7 +66,7 @@ export function craftRecipe(user: string, recipeId: string): boolean {
 
   // 1. Deducir inputs
   for (const input of recipe.inputs) {
-    const item = snapshot.items.find(i => i.item_id === input.item_id)
+    const item = snapshot.items.find((i) => i.item_id === input.item_id)
     if (item) {
       item.quantity -= input.quantity
       if (item.quantity <= 0) {
@@ -86,7 +78,7 @@ export function craftRecipe(user: string, recipeId: string): boolean {
 
   // 2. Añadir outputs
   for (const output of recipe.outputs) {
-    const existing = snapshot.items.find(i => i.item_id === output.item_id)
+    const existing = snapshot.items.find((i) => i.item_id === output.item_id)
     if (existing) {
       existing.quantity += output.quantity
       existing.state = 'collected'

@@ -759,9 +759,10 @@ const tabButton: CSSProperties = {
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'rgba(187,247,208,.16)',
-  color: '#dcfce7',
-  boxShadow: 'inset 0 0 0 1px rgba(187,247,208,.18)',
+  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(16, 185, 129, 0.16))',
+  color: '#a7f3d0',
+  border: '1px solid rgba(52, 211, 153, 0.35)',
+  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
 }
 
 const statusRow: CSSProperties = {

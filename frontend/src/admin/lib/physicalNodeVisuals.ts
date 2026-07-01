@@ -66,15 +66,48 @@ export function getPhysicalNodeKind(stage: unknown): PhysicalNodeKind | null {
 
 export function getPhysicalNodeVisual(stage: unknown): PhysicalNodeVisual | null {
   const kind = getPhysicalNodeKind(stage)
-  return kind ? physicalNodeVisuals[kind] : null
+  if (!kind) return null
+  const record = stage as Record<string, unknown>
+  const customIcon =
+    record.physical_icon ||
+    record.icon ||
+    (record.config &&
+      typeof record.config === 'object' &&
+      (record.config as Record<string, unknown>).physical_icon)
+  const baseVisual = physicalNodeVisuals[kind]
+  if (customIcon) {
+    return {
+      ...baseVisual,
+      icon: String(customIcon),
+    }
+  }
+  return baseVisual
 }
 
 export function getPhysicalNodeMapLabel(stage: unknown): string {
   const visual = getPhysicalNodeVisual(stage)
-  return visual ? `${visual.icon} ${visual.shortLabel}` : ''
+  if (!visual) return ''
+  const record = stage as Record<string, unknown>
+  const isMapCollectible =
+    record.config &&
+    typeof record.config === 'object' &&
+    (record.config as Record<string, unknown>).is_map_collectible
+  if (isMapCollectible) {
+    return `${visual.icon} Coleccionable`
+  }
+  return `${visual.icon} ${visual.shortLabel}`
 }
 
 export function getPhysicalNodeAccessibleLabel(stage: unknown): string {
   const visual = getPhysicalNodeVisual(stage)
-  return visual ? `${visual.label} físico con QR` : 'Nodo normal'
+  if (!visual) return 'Nodo normal'
+  const record = stage as Record<string, unknown>
+  const isMapCollectible =
+    record.config &&
+    typeof record.config === 'object' &&
+    (record.config as Record<string, unknown>).is_map_collectible
+  if (isMapCollectible) {
+    return `${visual.label} coleccionable en mapa`
+  }
+  return `${visual.label} físico con QR`
 }

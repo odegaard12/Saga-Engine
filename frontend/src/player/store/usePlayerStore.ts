@@ -20,11 +20,15 @@ interface PlayerState {
   toolsOpen: boolean
   teamOpen: boolean
   offlinePrepVisible: boolean
-  
+
   // Acciones (Actions)
   setStatus: (status: PlayerState['status']) => void
   setGamePayload: (payload: PlayerGamePayload, config: PublicConfig) => void
-  updateGps: (position: { lat: number; lon: number }, accuracy: number | null, fresh: boolean) => void
+  updateGps: (
+    position: { lat: number; lon: number },
+    accuracy: number | null,
+    fresh: boolean
+  ) => void
   setGpsStatus: (status: PlayerGpsStatus) => void
   setGpsPosition: (pos: { lat: number; lon: number } | null) => void
   setGpsAccuracy: (acc: number | null) => void
@@ -55,24 +59,24 @@ export const usePlayerStore = create<PlayerState>()(
 
       setStatus: (status) => set({ status }),
       setGamePayload: (payload, config) => set({ payload, config, status: 'ready' }),
-      updateGps: (gpsPosition, gpsAccuracy, gpsFresh) => 
+      updateGps: (gpsPosition, gpsAccuracy, gpsFresh) =>
         set({ gpsPosition, gpsAccuracy, gpsFresh, gpsCapturedAt: Date.now(), gpsStatus: 'active' }),
       setGpsStatus: (gpsStatus) => set({ gpsStatus }),
       setGpsPosition: (gpsPosition) => set({ gpsPosition }),
       setGpsAccuracy: (gpsAccuracy) => set({ gpsAccuracy }),
       setGpsFresh: (gpsFresh) => set({ gpsFresh }),
       setGpsCapturedAt: (gpsCapturedAt) => set({ gpsCapturedAt }),
-      
+
       setToolsOpen: (toolsOpen) => set({ toolsOpen }),
       setTeamOpen: (teamOpen) => set({ teamOpen }),
-      setOfflinePrepVisible: (offlinePrepVisible) => set({ offlinePrepVisible })
+      setOfflinePrepVisible: (offlinePrepVisible) => set({ offlinePrepVisible }),
     }),
     {
       name: 'saga-player-store',
       // Solo persistimos los datos que tienen sentido tras reiniciar
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         gpsPosition: state.gpsPosition,
-        offlinePrepVisible: state.offlinePrepVisible 
+        offlinePrepVisible: state.offlinePrepVisible,
       }),
     }
   )
