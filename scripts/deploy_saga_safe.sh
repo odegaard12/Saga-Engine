@@ -82,7 +82,7 @@ if [ -z "$IMAGE" ]; then
   exit 1
 fi
 
-if ! [[ "$IMAGE" =~ ^[A-Za-z0-9._/:~-]+$ ]]; then
+if ! [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9._-]*(/[a-z0-9._-]+)*(:[a-z0-9._-]+)?$ ]]; then
   echo "ERROR: invalid IMAGE format."
   exit 1
 fi

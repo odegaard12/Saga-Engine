@@ -23,7 +23,9 @@ def main() -> int:
         raise RuntimeError("Set GITHUB_PR_NUMBER before updating a pull request.")
 
     body = Path("/tmp/pr_body.md").read_text(encoding="utf-8")
-    version = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip() or "2.0.1"
+    version = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
+    if not version:
+        raise RuntimeError("VERSION must not be empty.")
 
     data = json.dumps(
         {

@@ -64,7 +64,6 @@ def test_player_event_sync_rejects_unknown_player(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(event_log))
 
     client = make_client()
-    seed_player_session(client, "UNKNOWN PLAYER")
 
     response = client.post(
         "/api/events/sync",

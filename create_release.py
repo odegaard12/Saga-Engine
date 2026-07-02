@@ -19,7 +19,9 @@ def main() -> int:
     token = read_token()
     repository = str(os.getenv("GITHUB_REPOSITORY") or "odegaard12/Saga-Engine").strip()
     body = Path(__file__).with_name("RELEASE_NOTES.md").read_text(encoding="utf-8")
-    version = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip() or "2.0.1"
+    version = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
+    if not version:
+        raise RuntimeError("VERSION must not be empty.")
 
     data = json.dumps(
         {

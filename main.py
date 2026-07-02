@@ -268,12 +268,21 @@ def get_session_signing_secret():
     if salt and password_hash:
         return f"{salt}:{password_hash}"
 
-    return "saga-dev-session-secret"
+    raise RuntimeError("SECRET_KEY is required when admin auth has not been initialized.")
+
+
+def normalize_player_session_user(user):
+    text = _as_str(user).strip()
+    safe = "".join(ch for ch in text if ch.isalnum() or ch in {" ", "_", "-"})
+    return safe[:120].strip()
 
 
 def set_player_session_cookie(response: Response, request: Request, user: str):
+    safe_user = normalize_player_session_user(user)
+    if not safe_user:
+        return
     token = player_session_security.create_player_session_token(
-        user,
+        safe_user,
         ttl_seconds=PLAYER_SESSION_TTL_SECONDS,
         secret=get_session_signing_secret(),
     )
@@ -1265,7 +1274,11 @@ async def react_player(name: str, request: Request):
     # Serve the React app directly. The frontend derives the player from /player/{name}.
     # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
     response = react_index_or_missing()
-    set_player_session_cookie(response, request, name)
+    profile = resolve_known_player_profile(name)
+    if profile:
+        set_player_session_cookie(response, request, profile.get("id") or name)
+    else:
+        clear_player_session_cookie(response, request)
     return response
 
 @app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
@@ -1348,7 +1361,8 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         "current_stage": current_stage
     }
     response = JSONResponse(payload)
-    set_player_session_cookie(response, request, profile_id)
+    if resolve_known_player_profile(profile_id):
+        set_player_session_cookie(response, request, profile_id)
     return response
 
 @app.get("/api/team/{user}")
