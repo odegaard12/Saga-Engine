@@ -40,6 +40,7 @@ def configure_sqlite_events(monkeypatch, tmp_path: Path):
 def test_event_sync_and_admin_events_use_sqlite_backend(monkeypatch, tmp_path: Path):
     events_json, sqlite_db = configure_sqlite_events(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     sync_response = client.post(
@@ -82,6 +83,7 @@ def test_event_sync_and_admin_events_use_sqlite_backend(monkeypatch, tmp_path: P
 def test_admin_event_mark_uses_sqlite_backend(monkeypatch, tmp_path: Path):
     events_json, sqlite_db = configure_sqlite_events(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     sync_response = client.post(

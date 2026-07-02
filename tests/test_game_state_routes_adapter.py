@@ -62,6 +62,7 @@ def test_public_state_and_game_routes_read_sqlite_game_state(monkeypatch, tmp_pa
     game_json, sqlite_db, _ = configure_sqlite_game_state(monkeypatch, tmp_path)
     set_sqlite_player_level(str(sqlite_db), "PLAYER 1", 2)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
 
     state_response = client.get("/api/state/PLAYER%201")
@@ -83,6 +84,7 @@ def test_public_state_and_game_routes_read_sqlite_game_state(monkeypatch, tmp_pa
 def test_advance_route_writes_sqlite_game_state(monkeypatch, tmp_path: Path):
     game_json, sqlite_db, _ = configure_sqlite_game_state(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -104,6 +106,7 @@ def test_advance_route_writes_sqlite_game_state(monkeypatch, tmp_path: Path):
 def test_admin_profile_action_writes_sqlite_game_state(monkeypatch, tmp_path: Path):
     game_json, sqlite_db, _ = configure_sqlite_game_state(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     response = client.post(
         "/api/admin/profile-action",
@@ -130,6 +133,7 @@ def test_admin_mission_status_and_react_overview_read_sqlite_game_state(monkeypa
     game_json, sqlite_db, _ = configure_sqlite_game_state(monkeypatch, tmp_path)
     set_sqlite_player_level(str(sqlite_db), "PLAYER 1", 2)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     headers = admin_headers()
 

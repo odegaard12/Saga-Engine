@@ -86,6 +86,7 @@ def add_inventory_event(item_id: str, quantity: int):
 def test_advance_rejects_missing_required_item(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -105,6 +106,7 @@ def test_advance_accepts_when_required_item_is_present(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path)
     add_inventory_event("runa_agua", 2)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -124,6 +126,7 @@ def test_advance_consumes_required_item_when_configured(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path, consume=True)
     add_inventory_event("runa_agua", 2)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(

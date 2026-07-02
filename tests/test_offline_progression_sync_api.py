@@ -83,6 +83,7 @@ def test_sync_node_completed_advances_official_progress(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -111,6 +112,7 @@ def test_sync_node_completed_rejects_bad_code(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -138,6 +140,7 @@ def test_sync_node_completed_requires_item(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path, require_item=True)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -167,6 +170,7 @@ def test_sync_node_completed_consumes_required_item(monkeypatch, tmp_path):
     configure_offline_progression(monkeypatch, tmp_path, require_item=True, consume=True)
     add_inventory_item("runa_agua", 1)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -197,6 +201,7 @@ def test_sync_node_completed_forces_official_node_id(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     response = client.post(
@@ -244,6 +249,7 @@ def test_sync_node_completed_deduplicates_client_event_id(monkeypatch, tmp_path)
         ],
     }
 
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
     seed_player_session(client)
     first = client.post("/api/events/sync", json=event_payload)
