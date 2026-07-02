@@ -14,6 +14,14 @@ def make_client():
     return TestClient(main.app)
 
 
+def seed_player_session(client, user: str = "PLAYER 1"):
+    import main
+
+    main.clear_player_rate_limits()
+    response = client.get(f"/api/game/{user.replace(' ', '%20')}")
+    assert response.status_code == 200
+
+
 def configure_item_requirement_test(monkeypatch, tmp_path: Path, *, consume: bool = False):
     import main
 
@@ -78,7 +86,10 @@ def add_inventory_event(item_id: str, quantity: int):
 def test_advance_rejects_missing_required_item(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path)
 
-    response = make_client().post(
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/advance",
         json={"user": "PLAYER 1", "code": "OMEGA"},
     )
@@ -95,7 +106,10 @@ def test_advance_accepts_when_required_item_is_present(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path)
     add_inventory_event("runa_agua", 2)
 
-    response = make_client().post(
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/advance",
         json={"user": "PLAYER 1", "code": "OMEGA"},
     )
@@ -112,7 +126,10 @@ def test_advance_consumes_required_item_when_configured(monkeypatch, tmp_path):
     configure_item_requirement_test(monkeypatch, tmp_path, consume=True)
     add_inventory_event("runa_agua", 2)
 
-    response = make_client().post(
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/advance",
         json={"user": "PLAYER 1", "code": "OMEGA"},
     )

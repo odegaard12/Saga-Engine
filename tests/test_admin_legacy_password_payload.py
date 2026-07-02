@@ -17,7 +17,7 @@ class DummyRequest:
 
 
 def reset_admin_test_state():
-    main.ADMIN_SESSIONS.clear()
+    main.clear_admin_sessions()
     main.ADMIN_LOGIN_ATTEMPTS.clear()
 
 

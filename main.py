@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
@@ -31,10 +32,32 @@ from backend.app.storage.positions_store import (
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
+from backend.app.security import player_session as player_session_security
 
-app = FastAPI()
+
+def _split_csv_env(name, default=""):
+    raw = str(os.getenv(name, default) or "").strip()
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+ENABLE_API_DOCS = (os.getenv("SAGA_ENABLE_API_DOCS") or "0").strip() == "1"
+API_DOCS_URL = "/docs" if ENABLE_API_DOCS else None
+API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
+API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
+
+app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
 from backend.app.routers import field_proofs
 app.include_router(field_proofs.router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_split_csv_env("SAGA_CORS_ALLOW_ORIGINS"),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "HEAD", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "X-Requested-With"],
+)
 
 
 
@@ -101,6 +124,7 @@ STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
+ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
 
 BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
 ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
@@ -114,6 +138,12 @@ ADMIN_LOGIN_ATTEMPTS = {}
 ADMIN_SESSION_COOKIE = "saga_admin_session"
 ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS", "3600") or "3600")
 ADMIN_SESSIONS = {}
+PLAYER_SESSION_COOKIE = "saga_player_session"
+PLAYER_SESSION_TTL_SECONDS = int(os.getenv("PLAYER_SESSION_TTL_SECONDS", "43200") or "43200")
+PLAYER_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("PLAYER_RATE_LIMIT_WINDOW_SECONDS", "60") or "60")
+ADVANCE_RATE_LIMIT_MAX = int(os.getenv("ADVANCE_RATE_LIMIT_MAX", "24") or "24")
+EVENT_SYNC_RATE_LIMIT_MAX = int(os.getenv("EVENT_SYNC_RATE_LIMIT_MAX", "12") or "12")
+PLAYER_RATE_LIMITS = {"advance": {}, "events_sync": {}}
 
 
 def hash_password(password, salt=None, iterations=200000):
@@ -166,18 +196,31 @@ def _now_ts():
 
 
 def prune_admin_sessions(now=None):
-    return admin_auth_security.prune_admin_sessions(ADMIN_SESSIONS, now=now)
+    admin_auth_security.prune_admin_sessions(ADMIN_SESSIONS, now=now)
+    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
 
 
 def create_admin_session():
-    return admin_auth_security.create_admin_session(
-        ADMIN_SESSIONS,
-        ADMIN_SESSION_TTL_SECONDS,
-    )
+    sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
+    ADMIN_SESSIONS.clear()
+    ADMIN_SESSIONS.update(sessions)
+    token = admin_auth_security.create_admin_session(ADMIN_SESSIONS, ADMIN_SESSION_TTL_SECONDS)
+    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
+    return token
 
 
 def verify_admin_session_token(token):
-    return admin_auth_security.verify_admin_session_token(ADMIN_SESSIONS, token)
+    sessions = admin_auth_security.load_admin_sessions(ADMIN_SESSIONS_DB)
+    ADMIN_SESSIONS.clear()
+    ADMIN_SESSIONS.update(sessions)
+    valid = admin_auth_security.verify_admin_session_token(ADMIN_SESSIONS, token)
+    admin_auth_security.save_admin_sessions(ADMIN_SESSIONS_DB, ADMIN_SESSIONS)
+    return valid
+
+
+def clear_admin_sessions():
+    ADMIN_SESSIONS.clear()
+    admin_auth_security.clear_all_admin_sessions(ADMIN_SESSIONS_DB)
 
 
 def admin_cookie_settings(request: Request):
@@ -206,12 +249,127 @@ def legacy_admin_password_payload_enabled():
 
 
 def admin_request_authorized(request: Request, data=None):
-    return admin_auth_security.admin_request_authorized(
-        request,
-        data,
-        auth_path=ADMIN_AUTH_DB,
-        sessions=ADMIN_SESSIONS,
+    cookie_token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if verify_admin_session_token(cookie_token):
+        return True
+    if not legacy_admin_password_payload_enabled():
+        return False
+    return verify_admin_password(get_admin_password_from_payload(data or {}))
+
+
+def get_session_signing_secret():
+    explicit = str(os.getenv("SECRET_KEY") or "").strip()
+    if explicit:
+        return explicit
+
+    auth = load_admin_auth()
+    salt = str(auth.get("salt") or "").strip()
+    password_hash = str(auth.get("password_hash") or "").strip()
+    if salt and password_hash:
+        return f"{salt}:{password_hash}"
+
+    raise RuntimeError("SECRET_KEY is required when admin auth has not been initialized.")
+
+
+def normalize_player_session_user(user):
+    text = _as_str(user).strip()
+    safe = "".join(ch for ch in text if ch.isalnum() or ch in {" ", "_", "-"})
+    return safe[:120].strip()
+
+
+def set_player_session_cookie(response: Response, request: Request, user: str):
+    profile = resolve_known_player_profile(user)
+    if not profile:
+        return
+    safe_user = normalize_player_session_user(profile.get("id"))
+    if not safe_user:
+        return
+    token = player_session_security.create_player_session_token(
+        safe_user,
+        ttl_seconds=PLAYER_SESSION_TTL_SECONDS,
+        secret=get_session_signing_secret(),
     )
+    response.set_cookie(
+        PLAYER_SESSION_COOKIE,
+        token,
+        **player_session_security.player_cookie_settings(request, PLAYER_SESSION_TTL_SECONDS),
+    )
+
+
+def clear_player_session_cookie(response: Response, request: Request):
+    response.delete_cookie(
+        PLAYER_SESSION_COOKIE,
+        path="/",
+        secure=(request.url.scheme or "").lower() == "https",
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def verify_player_session(request: Request, user: str):
+    return player_session_security.verify_player_session_token(
+        request.cookies.get(PLAYER_SESSION_COOKIE),
+        user=user,
+        secret=get_session_signing_secret(),
+    )
+
+
+def require_player_session(request: Request, user: str):
+    if not verify_player_session(request, user):
+        raise HTTPException(status_code=403, detail="player session required")
+
+
+def apply_security_headers(response: Response, request: Request):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=(), interest-cohort=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' data: blob: https: http:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https: http:; "
+        "style-src 'self' 'unsafe-inline' https: http:; "
+        "img-src 'self' data: blob: https: http:; "
+        "connect-src 'self' https: http: ws: wss:; "
+        "worker-src 'self' blob:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    )
+    if (request.url.scheme or "").lower() == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+def prune_player_rate_limit_bucket(bucket_name: str, now=None):
+    now = float(now or time.time())
+    bucket = PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
+    stale = []
+    for key, timestamps in bucket.items():
+        fresh = [ts for ts in timestamps if now - ts <= PLAYER_RATE_LIMIT_WINDOW_SECONDS]
+        if fresh:
+            bucket[key] = fresh
+        else:
+            stale.append(key)
+    for key in stale:
+        bucket.pop(key, None)
+
+
+def enforce_player_rate_limit(bucket_name: str, request: Request, user: str, limit: int):
+    now = time.time()
+    prune_player_rate_limit_bucket(bucket_name, now=now)
+    bucket = PLAYER_RATE_LIMITS.setdefault(bucket_name, {})
+    key = f"{get_client_ip(request)}:{_as_str(user).strip()}"
+    hits = bucket.get(key, [])
+    if len(hits) >= int(limit):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+    hits.append(now)
+    bucket[key] = hits
+
+
+def clear_player_rate_limits():
+    for bucket in PLAYER_RATE_LIMITS.values():
+        bucket.clear()
 
 
 TRUST_PROXY_HEADERS = client_ip_security.TRUST_PROXY_HEADERS
@@ -1086,7 +1244,7 @@ async def saga_no_cache_html(request, call_next):
             if "saga_csd=1" not in cookie:
                 response.headers["Clear-Site-Data"] = '"cache", "storage", "executionContexts"'
                 response.headers["Set-Cookie"] = "saga_csd=1; Max-Age=600; Path=/; SameSite=Lax"
-        return response
+        return apply_security_headers(response, request)
 
     ct = (response.headers.get("content-type") or "").lower()
     if request.method == "GET" and ("text/html" in ct):
@@ -1096,7 +1254,7 @@ async def saga_no_cache_html(request, call_next):
         response.headers["CDN-Cache-Control"] = "no-store"
         response.headers["Surrogate-Control"] = "no-store"
 
-    return response
+    return apply_security_headers(response, request)
 
 @app.head("/", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/", response_class=HTMLResponse)
@@ -1115,10 +1273,16 @@ async def react_admin_shell_path(path: str):
 
 @app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
-async def react_player(name: str):
+async def react_player(name: str, request: Request):
     # Serve the React app directly. The frontend derives the player from /player/{name}.
     # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
-    return react_index_or_missing()
+    response = react_index_or_missing()
+    profile = resolve_known_player_profile(name)
+    if profile:
+        set_player_session_cookie(response, request, profile.get("id") or name)
+    else:
+        clear_player_session_cookie(response, request)
+    return response
 
 @app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin")
@@ -1156,7 +1320,6 @@ async def get_config():
         "prologue_body": cfg.get("prologue_body", ""),
         "map_center": cfg.get("map_center", [40.4168, -3.7038]),
         "map_zoom": cfg.get("map_zoom", 13),
-        "mapbox_token": cfg.get("mapbox_token", ""),
         "mapbox_style": cfg.get("mapbox_style", ""),
         "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
         "player_profiles": get_player_profiles(cfg)
@@ -1171,7 +1334,7 @@ async def get_state(user: str):
     return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
 
 @app.get("/api/game/{user}")
-async def get_game_payload(user: str, offline_pack: bool = False):
+async def get_game_payload(user: str, request: Request, offline_pack: bool = False):
     runtime_stages = get_runtime_stages()
     profile = get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -1189,7 +1352,7 @@ async def get_game_payload(user: str, offline_pack: bool = False):
         for i, stage in enumerate(runtime_stages)
     ]
 
-    return {
+    payload = {
         "user": profile_id,
         "display_name": profile.get("display_name", profile_id),
         "session_mode": profile.get("mode", "solo"),
@@ -1200,6 +1363,10 @@ async def get_game_payload(user: str, offline_pack: bool = False):
         "stages": stages,
         "current_stage": current_stage
     }
+    response = JSONResponse(payload)
+    if resolve_known_player_profile(profile_id):
+        set_player_session_cookie(response, request, profile_id)
+    return response
 
 @app.get("/api/team/{user}")
 async def get_team_payload(user: str):
@@ -1403,6 +1570,8 @@ def apply_synced_player_event(normalized_event, user, profile):
 async def sync_player_events(request: Request):
     data = await request.json()
     user = _as_str(data.get("user")).strip()
+    require_player_session(request, user)
+    enforce_player_rate_limit("events_sync", request, user, EVENT_SYNC_RATE_LIMIT_MAX)
 
     profile = resolve_known_player_profile(user)
     if not profile:
@@ -1811,10 +1980,7 @@ async def admin_react_overview(request: Request):
     data = await request.json()
 
     if not admin_request_authorized(request, data):
-        return {
-            "status": "fail",
-            "message": "Invalid admin password",
-        }
+        raise HTTPException(status_code=403, detail="forbidden")
 
     if admin_password_change_required():
         return {
@@ -2166,6 +2332,8 @@ async def advance(request: Request):
     data = await request.json()
     user = data.get("user")
     code = (data.get("code") or "").strip().upper()
+    require_player_session(request, user)
+    enforce_player_rate_limit("advance", request, user, ADVANCE_RATE_LIMIT_MAX)
 
     profile = get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
@@ -2330,7 +2498,14 @@ async def admin_login(request: Request):
 
     if verify_admin_password(data.get("password")):
         clear_admin_login_state(ip)
-        response = JSONResponse({"status": "ok", "must_change": admin_password_change_required()})
+        expires_at = int(time.time()) + ADMIN_SESSION_TTL_SECONDS
+        response = JSONResponse(
+            {
+                "status": "ok",
+                "must_change": admin_password_change_required(),
+                "session_expires_at": expires_at,
+            }
+        )
         set_admin_session_cookie(response, request, create_admin_session())
         return response
 
@@ -2342,14 +2517,19 @@ async def admin_logout(request: Request):
     token = request.cookies.get(ADMIN_SESSION_COOKIE)
     if token:
         ADMIN_SESSIONS.pop(token, None)
+        admin_auth_security.clear_persistent_admin_session(ADMIN_SESSIONS_DB, token)
 
     response = JSONResponse({"status": "ok"})
     clear_admin_session_cookie(response, request)
+    clear_player_session_cookie(response, request)
     return response
 
 @app.post("/api/admin/change-password")
 async def admin_change_password(request: Request):
     data = await request.json()
+    if not admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
     current_password = (data.get("password") or "").strip()
     new_password = (data.get("new_password") or "").strip()
     confirm_password = (data.get("confirm_password") or "").strip()
@@ -2367,6 +2547,7 @@ async def admin_change_password(request: Request):
         return JSONResponse(status_code=400, content={"status": "error", "detail": "choose a stronger password (minimum 10 chars, avoid temporary/default values)"})
 
     set_admin_password(new_password, must_change=False, source="web_change")
+    clear_admin_sessions()
     return {"status": "ok"}
 
 @app.api_route("/sw.js", methods=["GET", "HEAD"])
@@ -2399,7 +2580,3 @@ def player_service_worker():
 @app.get("/service-worker.js")
 def player_service_worker_alias():
     return player_service_worker()
-
-    return player_service_worker()
-
-

@@ -63,6 +63,7 @@ venv/
 
 # Protecciones extra de seguridad y basura
 data/*.sqlite3
+data/stages.json
 frontend/.env
 PR_DESCRIPTION.md
 *.zip

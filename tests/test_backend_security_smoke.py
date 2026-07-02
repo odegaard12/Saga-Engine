@@ -51,6 +51,14 @@ def test_admin_react_overview_accepts_session_cookie_without_password():
     assert response.json()["status"] == "ok"
 
 
+def test_admin_react_overview_rejects_unauthenticated_request():
+    client = make_client()
+
+    response = client.post("/api/admin/react-overview", json={})
+
+    assert response.status_code == 403
+
+
 def test_admin_reset_rejects_unauthenticated_mutation():
     client = make_client()
 
@@ -61,6 +69,29 @@ def test_admin_reset_rejects_unauthenticated_mutation():
     assert response.status_code == 403
 
     assert main.get_player_progress_level("PLAYER 1", 0) == 4
+
+
+def test_advance_rejects_missing_player_session():
+    client = make_client()
+
+    response = client.post("/api/advance", json={"user": "PLAYER 1", "code": "OMEGA"})
+
+    assert response.status_code == 403
+
+
+def test_change_password_requires_admin_session():
+    client = make_client()
+
+    response = client.post(
+        "/api/admin/change-password",
+        json={
+            "password": "pytest_admin_password",
+            "new_password": "stronger_password_123",
+            "confirm_password": "stronger_password_123",
+        },
+    )
+
+    assert response.status_code == 403
 
 
 def test_admin_reset_accepts_session_cookie():
@@ -126,6 +157,28 @@ def test_admin_save_requires_authentication():
     response = client.post("/api/admin/save", json={"stages": []})
 
     assert response.status_code == 403
+
+
+def test_public_config_hides_mapbox_token():
+    client = make_client()
+    original = main.load_config()
+
+    updated = {**original, "mapbox_token": "pk.secret-should-not-leak"}
+    main.save_config(updated)
+
+    try:
+        response = client.get("/api/config")
+        assert response.status_code == 200
+        assert "mapbox_token" not in response.json()
+    finally:
+        main.save_config(original)
+
+
+def test_docs_and_redoc_are_disabled_by_default():
+    client = make_client()
+
+    assert client.get("/docs").status_code == 404
+    assert client.get("/redoc").status_code == 404
 
 
 def test_json_save_uses_atomic_replace_and_leaves_valid_json():

@@ -10,11 +10,18 @@ def make_client():
     return TestClient(main.app)
 
 
+def seed_player_session(client: TestClient, user: str = "PLAYER 1"):
+    main.clear_player_rate_limits()
+    response = client.get(f"/api/game/{user.replace(' ', '%20')}")
+    assert response.status_code == 200
+
+
 def test_player_event_sync_accepts_known_player(tmp_path: Path, monkeypatch):
     event_log = tmp_path / "events.json"
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(event_log))
 
     client = make_client()
+    seed_player_session(client)
 
     response = client.post(
         "/api/events/sync",
@@ -74,6 +81,7 @@ def test_player_event_sync_rejects_unsupported_event_type(tmp_path: Path, monkey
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(event_log))
 
     client = make_client()
+    seed_player_session(client)
 
     response = client.post(
         "/api/events/sync",
@@ -139,6 +147,7 @@ def test_player_event_sync_deduplicates_client_event_id(tmp_path: Path, monkeypa
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(event_log))
 
     client = make_client()
+    seed_player_session(client)
     payload = {
         "user": "PLAYER 1",
         "events": [
@@ -167,4 +176,3 @@ def test_player_event_sync_deduplicates_client_event_id(tmp_path: Path, monkeypa
 
     assert len(qr_events) == 1
     assert len(sync_events) == 2
-

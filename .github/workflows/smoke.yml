@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
+  smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -80,7 +80,7 @@ jobs:
           nohup python -m uvicorn main:app --host 127.0.0.1 --port 8097 >/tmp/saga_smoke.log 2>&1 &
 
           for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8097/docs >/dev/null; then
+            if curl -fsS http://127.0.0.1:8097/api/version >/dev/null; then
               echo "App is ready"
               exit 0
             fi

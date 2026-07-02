@@ -1,19 +1,28 @@
-# SAGA Engine v1.0.1 — iOS Polish and Documentation update
+# SAGA Engine v2.0.1 — Security Hardening & Release Alignment
 
-SAGA Engine v1.0.1 addresses post-launch polish feedback, specifically targeting iOS Safari rendering artifacts and iPhone full-screen display issues, alongside documentation corrections.
+SAGA Engine v2.0.1 focuses on repository hardening, safer runtime defaults, and release consistency across the backend, frontend, Docker image, and deployment tooling.
 
-## iOS Map Flickering Fixes
-- Added `translate3d` and `translateZ(0)` hardware acceleration to Leaflet markers and overlays in `MapSurface.tsx`.
-- Removed layout-thrashing CSS filters (`drop-shadow`) from animated route guides, replacing them with GPU-friendly offset animations.
-- The map tile layer no longer repaints/blinks when CSS keyframes cycle.
+## Security hardening
+- Disabled `/docs`, `/redoc`, and OpenAPI by default in production-style runs.
+- Removed `mapbox_token` from the public `/api/config` response.
+- Added signed player-session cookies for `/api/advance` and `/api/events/sync`.
+- Added basic rate limiting for `/api/advance` and `/api/events/sync`.
+- Changed `/api/admin/react-overview` to return HTTP 403 on auth failures.
+- Required an active admin session for `/api/admin/change-password`.
+- Added explicit CORS middleware plus browser security headers.
+- Persisted admin sessions in runtime storage so they survive process restarts.
 
-## iPhone Display Edges
-- Set the root `html` and `body` background colors to Slate 900 (`#020617`). This perfectly hides the top and bottom swipe safe-areas on edge-to-edge mobile devices (like iPhones), maintaining the immersive app feel.
+## Container and deploy safety
+- Docker now runs as a non-root user.
+- Docker copies only runtime files instead of the whole repository tree.
+- The safe deploy script now uses `$HOME`-relative defaults, validates image names, and removes hardcoded LAN/server paths from user-facing output.
+- Vite development host settings now come from environment variables instead of a hardcoded production domain.
 
-## UI Transitions
-- Upgraded `PlayerLayout.tsx` overlays to use 3D scaling and hardware hints (`will-change: transform, opacity`), ensuring 120 FPS capable UI pops and fade-ins.
+## Repository hygiene
+- Added Python dependency coverage to Dependabot.
+- Removed unsafe GitHub token scraping patterns from release helper scripts.
+- Aligned repo, frontend, and docs version metadata to `2.0.1`.
+- Removed the dead return in the service-worker alias route.
 
-## Documentation
-- Cleared legacy "Tema de Juegos" mentions from `README.md`.
-- Restricted the official Minigames list to the 4 confirmed stable families.
-- Restricted the physical QR types strictly to Objeto QR, Llave QR, Pista QR, and Bonus Oculto.
+## Notes
+- Existing baseline backend failures in `tests/test_sqlite_migration_dry_run.py` remain pre-existing and are unrelated to this release hardening pass.

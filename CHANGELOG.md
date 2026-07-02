@@ -4,6 +4,32 @@ All notable changes to SAGA Engine are documented in this file.
 
 ---
 
+## [2.0.1] — 2026-07-02
+
+### 🔐 Security hardening
+- Disabled public `/docs`, `/redoc`, and OpenAPI endpoints by default unless `SAGA_ENABLE_API_DOCS=1`.
+- Removed `mapbox_token` from the public `/api/config` payload.
+- Required a signed player session cookie before accepting `/api/advance` and `/api/events/sync`.
+- Added basic per-player rate limiting to `/api/advance` and `/api/events/sync`.
+- Made `/api/admin/react-overview` fail with HTTP 403 when auth is missing.
+- Required an active admin session before allowing `/api/admin/change-password`.
+- Added explicit CORS middleware and common browser security headers.
+- Persisted admin sessions in runtime storage instead of keeping them only in memory.
+
+### 🐳 Repo and deploy hardening
+- Docker now runs as a non-root user and copies only runtime files into the image.
+- Deploy script now uses `$HOME`-relative defaults, validates the image name, and avoids hardcoded LAN hints.
+- Removed tracked runtime data artifacts from the repository path policy and tightened `.gitignore`.
+- Added Python dependency coverage to Dependabot.
+- Removed hardcoded frontend host/domain defaults from Vite config.
+
+### 📝 Release alignment
+- Aligned repository version metadata to `2.0.1`.
+- Reworked release helper scripts to use `GITHUB_TOKEN`/`GH_TOKEN` instead of reading GitHub CLI credential files.
+- Cleaned the dead return in `player_service_worker_alias`.
+
+---
+
 ## [1.3.0] — 2026-06-29
 
 ### 🚀 Mejoras y correcciones (Offline y Rendimiento)

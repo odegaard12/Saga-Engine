@@ -3,7 +3,8 @@ set -euo pipefail
 
 APP_NAME="${APP_NAME:-saga_engine_app}"
 CANDIDATE_NAME="${CANDIDATE_NAME:-saga_engine_candidate}"
-DATA_DIR="${DATA_DIR:-/home/odegaard12/saga_engine_data}"
+DEPLOY_BASE_DIR="${DEPLOY_BASE_DIR:-$HOME/saga_engine}"
+DATA_DIR="${DATA_DIR:-$HOME/saga_engine_data}"
 HOST_PORT="${HOST_PORT:-8096}"
 APP_PORT="${APP_PORT:-5000}"
 CANDIDATE_PORT="${CANDIDATE_PORT:-18096}"
@@ -81,6 +82,11 @@ if [ -z "$IMAGE" ]; then
   exit 1
 fi
 
+if ! [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9._-]*(/[a-z0-9._-]+)*(:[a-z0-9._-]+)?$ ]]; then
+  echo "ERROR: invalid IMAGE format."
+  exit 1
+fi
+
 detect_env_file() {
   if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
     echo "$ENV_FILE"
@@ -88,12 +94,13 @@ detect_env_file() {
   fi
 
   for candidate in \
-    "/home/odegaard12/saga_engine/prod.env" \
-    "/home/odegaard12/saga_engine/.env" \
-    "/home/odegaard12/saga_engine_data/prod.env" \
-    "/home/odegaard12/saga_engine_data/.env"
+    "${ENV_FILE:-}" \
+    "${DEPLOY_BASE_DIR}/prod.env" \
+    "${DEPLOY_BASE_DIR}/.env" \
+    "${DATA_DIR}/prod.env" \
+    "${DATA_DIR}/.env"
   do
-    if [ -f "$candidate" ]; then
+    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
       echo "$candidate"
       return
     fi
@@ -144,7 +151,7 @@ ENV_FILE_DETECTED="$(detect_env_file || true)"
 if [ -z "$ENV_FILE_DETECTED" ]; then
   echo "ERROR: no encuentro prod.env/.env en rutas esperadas."
   echo "Candidatos encontrados, sin mostrar contenido:"
-  find /home/odegaard12 -maxdepth 4 -type f \( -name "prod.env" -o -name ".env" \) -print || true
+  find "$HOME" -maxdepth 4 -type f \( -name "prod.env" -o -name ".env" \) -print || true
   exit 1
 fi
 
@@ -204,7 +211,7 @@ echo "== Candidato OK =="
 
 if [ "$PROMOTE" -ne 1 ]; then
   echo "Modo sin --promote: producción NO tocada."
-  echo "Puedes probar en LAN: http://192.168.68.103:${CANDIDATE_PORT}/admin-react"
+  echo "Puedes probar en local: http://127.0.0.1:${CANDIDATE_PORT}/admin-react"
   docker ps --filter "name=${APP_NAME}" --filter "name=${CANDIDATE_NAME}" \
     --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}"
   exit 0

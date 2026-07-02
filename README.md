@@ -7,7 +7,7 @@
 **Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
 Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-[![Version](https://img.shields.io/badge/version-2.0.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.0.1-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -48,7 +48,7 @@ Pensado para **escape rooms urbanos, gymkhanas, formaciones corporativas, tours 
 - Pruebas de campo (fotos) almacenadas localmente y sincronizadas después
 
 ### 🎮 Minijuegos (Game Families)
-Sistema extensible de familias de minijuegos. En v1.1.0 incluye:
+Sistema extensible de familias de minijuegos. En v2.0.1 incluye:
 
 | Family | Descripción |
 |---|---|
@@ -176,7 +176,7 @@ npm run dev
 |---|---|---|
 | `SECRET_KEY` | Clave secreta para sesiones admin | `cambiar-en-produccion` |
 | `ADMIN_PASSWORD` | Contraseña del panel de admin | `mi-password` |
-| `SAGA_VERSION` | Versión mostrada en el cliente | `1.1.0` |
+| `SAGA_VERSION` | Versión mostrada en el cliente | `2.0.1` |
 | `SAGA_BUILD_TIME` | Timestamp de compilación | `2026-06-23T14:00:00+0200` |
 | `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
 
@@ -264,6 +264,6 @@ MIT — ver [LICENSE](LICENSE)
 <div align="center">
 
 Construido con ❤️ para misiones de campo reales.  
-**SAGA Engine v2.0.0** — 2026
+**SAGA Engine v2.0.1** — 2026
 
 </div>
