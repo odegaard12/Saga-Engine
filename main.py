@@ -278,7 +278,10 @@ def normalize_player_session_user(user):
 
 
 def set_player_session_cookie(response: Response, request: Request, user: str):
-    safe_user = normalize_player_session_user(user)
+    profile = resolve_known_player_profile(user)
+    if not profile:
+        return
+    safe_user = normalize_player_session_user(profile.get("id"))
     if not safe_user:
         return
     token = player_session_security.create_player_session_token(
