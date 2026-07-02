@@ -15,6 +15,9 @@ def make_client():
 
 
 def seed_player_session(client, user: str = "PLAYER 1"):
+    import main
+
+    main.clear_player_rate_limits()
     response = client.get(f"/api/game/{user.replace(' ', '%20')}")
     assert response.status_code == 200
 

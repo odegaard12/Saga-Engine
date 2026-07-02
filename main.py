@@ -355,6 +355,11 @@ def enforce_player_rate_limit(bucket_name: str, request: Request, user: str, lim
     bucket[key] = hits
 
 
+def clear_player_rate_limits():
+    for bucket in PLAYER_RATE_LIMITS.values():
+        bucket.clear()
+
+
 TRUST_PROXY_HEADERS = client_ip_security.TRUST_PROXY_HEADERS
 TRUSTED_PROXY_IPS = client_ip_security.TRUSTED_PROXY_IPS
 TRUSTED_PROXY_CIDRS = client_ip_security.TRUSTED_PROXY_CIDRS
