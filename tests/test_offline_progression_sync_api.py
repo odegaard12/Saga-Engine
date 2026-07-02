@@ -8,6 +8,11 @@ def make_client():
     return TestClient(main.app)
 
 
+def seed_player_session(client: TestClient, user: str = "PLAYER 1"):
+    response = client.get(f"/api/game/{user.replace(' ', '%20')}")
+    assert response.status_code == 200
+
+
 def configure_offline_progression(monkeypatch, tmp_path: Path, *, require_item=False, consume=False):
     import main
 
@@ -75,7 +80,9 @@ def test_sync_node_completed_advances_official_progress(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
-    response = make_client().post(
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
@@ -101,7 +108,9 @@ def test_sync_node_completed_rejects_bad_code(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
-    response = make_client().post(
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
@@ -126,7 +135,9 @@ def test_sync_node_completed_requires_item(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path, require_item=True)
 
-    response = make_client().post(
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
@@ -153,7 +164,9 @@ def test_sync_node_completed_consumes_required_item(monkeypatch, tmp_path):
     configure_offline_progression(monkeypatch, tmp_path, require_item=True, consume=True)
     add_inventory_item("runa_agua", 1)
 
-    response = make_client().post(
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
@@ -181,7 +194,9 @@ def test_sync_node_completed_forces_official_node_id(monkeypatch, tmp_path):
 
     configure_offline_progression(monkeypatch, tmp_path)
 
-    response = make_client().post(
+    client = make_client()
+    seed_player_session(client)
+    response = client.post(
         "/api/events/sync",
         json={
             "user": "PLAYER 1",
@@ -226,8 +241,10 @@ def test_sync_node_completed_deduplicates_client_event_id(monkeypatch, tmp_path)
         ],
     }
 
-    first = make_client().post("/api/events/sync", json=event_payload)
-    second = make_client().post("/api/events/sync", json=event_payload)
+    client = make_client()
+    seed_player_session(client)
+    first = client.post("/api/events/sync", json=event_payload)
+    second = client.post("/api/events/sync", json=event_payload)
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -237,4 +254,3 @@ def test_sync_node_completed_deduplicates_client_event_id(monkeypatch, tmp_path)
 
     completed = list_events(main.EVENT_LOG_DB, user="PLAYER 1", event_type="node_completed")
     assert len(completed) == 1
-

@@ -12,6 +12,11 @@ def make_client():
     return TestClient(main.app)
 
 
+def seed_player_session(client: TestClient, user: str = "PLAYER 1"):
+    response = client.get(f"/api/game/{user.replace(' ', '%20')}")
+    assert response.status_code == 200
+
+
 def write_test_stages(path: Path, count: int = 3):
     stages = []
     for index in range(count):
@@ -40,7 +45,7 @@ def configure_sqlite_game_state(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(main, "GAME_DB", str(game_json))
     monkeypatch.setattr(main, "STAGES_DB", str(stages_json))
     monkeypatch.setattr(main, "admin_password_change_required", lambda: False)
-    main.ADMIN_SESSIONS.clear()
+    main.clear_admin_sessions()
 
     write_test_stages(stages_json, count=3)
     save_sqlite_stages(str(sqlite_db), json.loads(stages_json.read_text(encoding="utf-8")))
@@ -78,6 +83,7 @@ def test_advance_route_writes_sqlite_game_state(monkeypatch, tmp_path: Path):
     game_json, sqlite_db, _ = configure_sqlite_game_state(monkeypatch, tmp_path)
 
     client = make_client()
+    seed_player_session(client)
     response = client.post(
         "/api/advance",
         json={

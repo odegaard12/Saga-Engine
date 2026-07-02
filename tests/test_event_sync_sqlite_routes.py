@@ -14,6 +14,11 @@ def make_client():
     return TestClient(main.app)
 
 
+def seed_player_session(client: TestClient, user: str = "PLAYER 1"):
+    response = client.get(f"/api/game/{user.replace(' ', '%20')}")
+    assert response.status_code == 200
+
+
 def admin_headers():
     token = main.create_admin_session()
     return {"Cookie": f"{main.ADMIN_SESSION_COOKIE}={token}"}
@@ -26,7 +31,7 @@ def configure_sqlite_events(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("SAGA_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("SAGA_SQLITE_DB", str(sqlite_db))
     monkeypatch.setattr(main, "EVENT_LOG_DB", str(events_json))
-    main.ADMIN_SESSIONS.clear()
+    main.clear_admin_sessions()
 
     return events_json, sqlite_db
 
@@ -35,6 +40,7 @@ def test_event_sync_and_admin_events_use_sqlite_backend(monkeypatch, tmp_path: P
     events_json, sqlite_db = configure_sqlite_events(monkeypatch, tmp_path)
 
     client = make_client()
+    seed_player_session(client)
     sync_response = client.post(
         "/api/events/sync",
         json={
@@ -76,6 +82,7 @@ def test_admin_event_mark_uses_sqlite_backend(monkeypatch, tmp_path: Path):
     events_json, sqlite_db = configure_sqlite_events(monkeypatch, tmp_path)
 
     client = make_client()
+    seed_player_session(client)
     sync_response = client.post(
         "/api/events/sync",
         json={

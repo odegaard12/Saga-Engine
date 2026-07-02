@@ -44,6 +44,16 @@ def save_admin_auth(path: str, data: dict[str, Any]) -> None:
     save_document(path, 'admin_auth', data)
 
 
+def load_admin_sessions(path: str) -> dict[str, dict[str, Any]]:
+    data = load_document(path, "admin_sessions", {})
+    return data if isinstance(data, dict) else {}
+
+
+def save_admin_sessions(path: str, sessions: dict[str, dict[str, Any]]) -> None:
+    safe_sessions = sessions if isinstance(sessions, dict) else {}
+    save_document(path, "admin_sessions", safe_sessions)
+
+
 def verify_admin_password(path: str, password: str | None) -> bool:
     auth = load_admin_auth(path)
     salt = auth.get("salt")
@@ -164,6 +174,13 @@ def create_admin_session(sessions: dict[str, dict[str, Any]], ttl_seconds: int) 
     return token
 
 
+def create_persistent_admin_session(path: str, ttl_seconds: int) -> str:
+    sessions = load_admin_sessions(path)
+    token = create_admin_session(sessions, ttl_seconds)
+    save_admin_sessions(path, sessions)
+    return token
+
+
 def verify_admin_session_token(
     sessions: dict[str, dict[str, Any]],
     token: str | None,
@@ -182,6 +199,25 @@ def verify_admin_session_token(
         return False
 
     return True
+
+
+def verify_persistent_admin_session_token(path: str, token: str | None) -> bool:
+    sessions = load_admin_sessions(path)
+    valid = verify_admin_session_token(sessions, token)
+    save_admin_sessions(path, sessions)
+    return valid
+
+
+def clear_persistent_admin_session(path: str, token: str | None) -> None:
+    sessions = load_admin_sessions(path)
+    raw = str(token or "").strip()
+    if raw:
+        sessions.pop(raw, None)
+    save_admin_sessions(path, sessions)
+
+
+def clear_all_admin_sessions(path: str) -> None:
+    save_admin_sessions(path, {})
 
 
 def admin_cookie_settings(request, ttl_seconds: int) -> dict[str, Any]:
