@@ -178,7 +178,7 @@ function getPhysicalRequirementOption(
           ? 'Pista QR'
           : kind === 'bonus'
             ? 'Bonus QR'
-            : 'Objeto QR')
+            : 'Coleccionable')
   ).trim()
 
   const itemId = String(

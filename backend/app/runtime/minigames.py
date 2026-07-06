@@ -269,6 +269,20 @@ def _normalize_mosaic_choices(value):
 
 def normalize_minigame_config(minigame_type, raw_cfg):
     raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+    out = _normalize_minigame_config_raw(minigame_type, raw)
+    if not isinstance(out, dict):
+        out = {}
+    for field in ["is_map_collectible", "game_id", "game_title", "completion_method"]:
+        if field in raw:
+            if field == "is_map_collectible":
+                out[field] = _as_bool(raw[field])
+            else:
+                out[field] = _as_str(raw[field]).strip()
+    return out
+
+
+def _normalize_minigame_config_raw(minigame_type, raw_cfg):
+    raw = raw_cfg if isinstance(raw_cfg, dict) else {}
     normalized_type = _as_str(minigame_type).strip().lower()
     if normalized_type not in SUPPORTED_MINIGAME_TYPES:
         normalized_type = "signal_hunt"

@@ -12,8 +12,8 @@ const physicalNodeVisuals: Record<PhysicalNodeKind, PhysicalNodeVisual> = {
   collectible: {
     kind: 'collectible',
     icon: '⭐',
-    label: 'Objeto QR',
-    shortLabel: 'Objeto',
+    label: 'Coleccionable',
+    shortLabel: 'Coleccionable',
     tone: 'collectible',
   },
   requirement: {

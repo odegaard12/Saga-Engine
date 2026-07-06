@@ -34,6 +34,15 @@ from backend.app.security import admin_auth as admin_auth_security
 from backend.app.security import client_ip as client_ip_security
 from backend.app.security import player_session as player_session_security
 
+from backend.app.runtime.core_engine import (
+    normalize_stage,
+    validate_stage,
+    preserve_physical_stage_fields
+)
+from backend.app.runtime.minigames import (
+    _clean_code,
+    build_stage_minigame_runtime
+)
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -48,8 +57,10 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs
+from backend.app.routers import field_proofs, admin, game
 app.include_router(field_proofs.router)
+app.include_router(admin.router)
+app.include_router(game.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -710,359 +721,17 @@ def project_live_profile_status(profile, raw=None, now=None):
         "debug_enabled": _as_bool(raw.get("debug_enabled"), False),
     }
 
-def _build_success_conditions(raw):
-    conditions = [{"kind": "minigame_ok", "value": MINIGAME_OK_CODE}]
 
-    answer = _clean_code(raw.get("answer"))
-    rune = _clean_code(raw.get("rune"))
-
-    if answer:
-        conditions.append({"kind": "answer", "value": answer})
-    if rune:
-        conditions.append({"kind": "rune", "value": rune})
-
-    return conditions
-
-# RUNTIME_CONTRACT_CLEANUP_V1: el player React debe recibir family-native minigames.
-# Avoid letting incomplete data silently fall back to outdated minigame defaults.
-SAGA_PHYSICAL_STAGE_FIELDS = (
-    "physical_node_kind",
-    "physical_item_kind",
-    "physical_item_id",
-    "physical_item_label",
-    "qr_payload",
-    "physical_qr",
+from backend.app.runtime.core_engine import (
+    _build_success_conditions,
+    preserve_physical_stage_fields,
+    normalize_stage,
+    stage_has_manual_fallback,
+    evaluate_entry,
+    validate_stage,
+    _positive_int,
+    read_stage_item_requirement,
 )
-
-
-def preserve_physical_stage_fields(raw_stage, node):
-    if not isinstance(raw_stage, dict) or not isinstance(node, dict):
-        return node
-
-    for key in SAGA_PHYSICAL_STAGE_FIELDS:
-        if key in raw_stage:
-            node[key] = raw_stage[key]
-
-    return node
-
-
-def normalize_stage(raw):
-    raw = raw or {}
-
-    cfg = raw.get("config")
-    if not isinstance(cfg, dict):
-        cfg = {}
-
-    raw_entry = raw.get("entry")
-    if not isinstance(raw_entry, dict):
-        raw_entry = {}
-
-    raw_messages = raw.get("messages")
-    if not isinstance(raw_messages, dict):
-        raw_messages = {}
-
-    raw_debug = raw.get("debug")
-    if not isinstance(raw_debug, dict):
-        raw_debug = {}
-
-    entry_mode = _as_str(
-        raw_entry.get("mode") or raw.get("entry_mode") or "gps"
-    ).strip().lower() or "gps"
-
-    require_proximity = _as_bool(
-        raw_entry.get("require_proximity", raw.get("require_proximity")),
-        default=(entry_mode != "free")
-    )
-
-    raw_minigame = raw.get("minigame")
-    if not isinstance(raw_minigame, dict):
-        raw_minigame = {}
-
-    raw_interaction_type = _as_str(
-        raw_minigame.get("type") or raw.get("type")
-    ).strip().lower()
-
-    interaction_type_fallback_reason = ""
-    if not raw_interaction_type:
-        interaction_type = "signal_hunt"
-        interaction_type_fallback_reason = "missing_minigame_type"
-    elif raw_interaction_type not in SUPPORTED_MINIGAME_TYPES:
-        interaction_type = "signal_hunt"
-        interaction_type_fallback_reason = f"unsupported_minigame_type:{raw_interaction_type}"
-    else:
-        interaction_type = raw_interaction_type
-
-    raw_minigame_config = raw_minigame.get("config")
-    if not isinstance(raw_minigame_config, dict):
-        raw_minigame_config = None
-
-    interaction_config = normalize_minigame_config(
-        interaction_type,
-        raw_minigame_config if raw_minigame_config is not None else cfg
-    )
-
-    item_requirement = read_stage_item_requirement(raw)
-
-    node = {
-        "id": raw.get("id"),
-        "version": 2,
-        "enabled": _as_bool(raw.get("enabled", True), True),
-        "presentation": {
-            "title": _as_str(raw.get("title")).strip(),
-            "content": _as_str(raw.get("content")).strip(),
-        },
-        "location": {
-            "lat": _as_float(raw.get("lat")),
-            "lon": _as_float(raw.get("lon")),
-            "radius_m": _as_radius(raw.get("radius", 0), 0),
-        },
-        "entry": {
-            "mode": entry_mode,
-            "require_proximity": require_proximity,
-            "allow_debug_bypass": _as_bool(
-                raw_entry.get("allow_debug_bypass", raw.get("allow_debug_bypass")),
-                True
-            ),
-            "allow_manual_fallback_without_gps": _as_bool(
-                raw_entry.get(
-                    "allow_manual_fallback_without_gps",
-                    raw.get("allow_manual_fallback_without_gps")
-                ),
-                True
-            ),
-        },
-        "interaction": {
-            "type": interaction_type,
-            "config": interaction_config,
-        },
-        "success": {
-            "mode": "any_of",
-            "conditions": _build_success_conditions(raw),
-            "case_sensitive": False,
-        },
-        "requirements": {
-            "items": [item_requirement] if item_requirement else [],
-        },
-        "messages": {
-            "locked": _as_str(
-                raw_messages.get("locked") or raw.get("locked_message")
-            ).strip(),
-            "gps_unavailable": _as_str(
-                raw_messages.get("gps_unavailable") or raw.get("gps_unavailable_message")
-            ).strip(),
-            "hint": _as_str(
-                raw_messages.get("hint") or raw.get("hint")
-            ).strip(),
-        },
-        "debug": {
-            "force_unlock": _as_bool(
-                raw_debug.get("force_unlock", raw.get("force_unlock")),
-                False
-            ),
-            "raw_interaction_type": raw_interaction_type,
-            "interaction_type_fallback_reason": interaction_type_fallback_reason,
-        },
-    }
-
-    return preserve_physical_stage_fields(raw, node)
-
-def stage_has_manual_fallback(node):
-    for condition in node["success"]["conditions"]:
-        if condition.get("kind") in {"answer", "rune"} and _clean_code(condition.get("value")):
-            return True
-    return False
-
-def evaluate_entry(node, distance_m=None, gps_available=True, debug_enabled=False):
-    entry = node.get("entry") or {}
-    debug = node.get("debug") or {}
-    location = node.get("location") or {}
-
-    if not node.get("enabled", True):
-        return {
-            "can_enter": False,
-            "can_submit_manual_code": False,
-            "reason": "disabled",
-        }
-
-    if debug_enabled and (entry.get("allow_debug_bypass") or debug.get("force_unlock")):
-        return {
-            "can_enter": True,
-            "can_submit_manual_code": True,
-            "reason": "debug_bypass",
-        }
-
-    require_proximity = bool(entry.get("require_proximity", True))
-    mode = _as_str(entry.get("mode") or "gps").strip().lower()
-
-    if mode == "free" or not require_proximity:
-        return {
-            "can_enter": True,
-            "can_submit_manual_code": True,
-            "reason": "free_entry",
-        }
-
-    if not gps_available:
-        return {
-            "can_enter": False,
-            "can_submit_manual_code": bool(entry.get("allow_manual_fallback_without_gps")) and stage_has_manual_fallback(node),
-            "reason": "gps_unavailable",
-        }
-
-    if distance_m is None:
-        return {
-            "can_enter": False,
-            "can_submit_manual_code": stage_has_manual_fallback(node),
-            "reason": "distance_unknown",
-        }
-
-    radius = location.get("radius_m") or 0
-    if distance_m <= radius:
-        return {
-            "can_enter": True,
-            "can_submit_manual_code": True,
-            "reason": "within_radius",
-        }
-
-    return {
-        "can_enter": False,
-        "can_submit_manual_code": stage_has_manual_fallback(node),
-        "reason": "out_of_range",
-    }
-
-def validate_stage(raw_stage, idx=None):
-    node = normalize_stage(raw_stage)
-    errors = []
-
-    def add(field, detail):
-        errors.append({
-            "index": idx,
-            "field": field,
-            "detail": detail,
-        })
-
-    title = node["presentation"]["title"]
-    if not title:
-        add("title", "title is required")
-
-    raw_minigame_for_type = raw_stage.get("minigame") if isinstance(raw_stage, dict) else {}
-    if not isinstance(raw_minigame_for_type, dict):
-        raw_minigame_for_type = {}
-
-    raw_type_for_validation = _as_str(
-        raw_minigame_for_type.get("type") or raw_stage.get("type")
-    ).strip().lower()
-
-    if not raw_type_for_validation:
-        add("type", "minigame type is required")
-    elif raw_type_for_validation not in SUPPORTED_MINIGAME_TYPES:
-        add("type", f"unsupported minigame type: {raw_type_for_validation}")
-
-    raw_minigame = raw_stage.get("minigame") if isinstance(raw_stage, dict) else {}
-    if not isinstance(raw_minigame, dict):
-        raw_minigame = {}
-
-    raw_interaction_type = _as_str(
-        raw_minigame.get("type") or (raw_stage.get("type") if isinstance(raw_stage, dict) else "")
-    ).strip().lower()
-    interaction_type = raw_interaction_type or node["interaction"]["type"]
-    if interaction_type not in SUPPORTED_MINIGAME_TYPES:
-        add("type", f"unsupported minigame type: {interaction_type}")
-
-    raw_config = raw_minigame.get("config") if isinstance(raw_minigame.get("config"), dict) else (
-        raw_stage.get("config") if isinstance(raw_stage, dict) else {}
-    )
-    if raw_config is not None and not isinstance(raw_config, dict):
-        add("config", "config must be an object")
-        raw_config = {}
-
-    for field, detail in validate_minigame_config(node["interaction"]["type"], raw_config):
-        add(field, detail)
-
-    entry_mode = node["entry"]["mode"]
-    if entry_mode not in {"gps", "free"}:
-        add("entry.mode", f"unsupported entry mode: {entry_mode}")
-
-    location = node["location"]
-    if node["entry"]["mode"] == "gps" and node["entry"]["require_proximity"]:
-        if location["lat"] is None:
-            add("lat", "lat is required for gps entry")
-        if location["lon"] is None:
-            add("lon", "lon is required for gps entry")
-        if location["radius_m"] is None or location["radius_m"] <= 0:
-            add("radius", "radius must be > 0 for gps entry")
-
-    conditions = node["success"]["conditions"]
-    if not isinstance(conditions, list) or not conditions:
-        add("success.conditions", "at least one success condition is required")
-
-    for i, condition in enumerate(conditions):
-        kind = _as_str(condition.get("kind")).strip()
-        value = _clean_code(condition.get("value"))
-
-        if kind not in {"minigame_ok", "answer", "rune"}:
-            add(f"success.conditions[{i}].kind", f"unsupported success condition kind: {kind}")
-        if not value:
-            add(f"success.conditions[{i}].value", "success condition value is required")
-
-    return errors
-
-def validate_stages(raw_stages):
-    if not isinstance(raw_stages, list):
-        return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
-
-    errors = []
-    for idx, stage in enumerate(raw_stages):
-        if not isinstance(stage, dict):
-            errors.append({"index": idx, "field": "node", "detail": "each node must be an object"})
-            continue
-        errors.extend(validate_stage(stage, idx=idx))
-    return errors
-
-def get_runtime_stages():
-    raw_stages = load_stages(STAGES_DB)
-    if not isinstance(raw_stages, list):
-        return []
-    return [normalize_stage(stage) for stage in raw_stages]
-
-def project_stage_for_player(raw_stage, include_runtime=False):
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
-
-    out = {
-        "id": node["id"],
-        "title": node["presentation"]["title"],
-        "lat": node["location"]["lat"],
-        "lon": node["location"]["lon"],
-        "radius": node["location"]["radius_m"],
-    }
-
-    if include_runtime:
-        out.update({
-            "content": node["presentation"]["content"],
-            "type": node["interaction"]["type"],
-            "config": node["interaction"]["config"],
-            "minigame": build_stage_minigame_runtime(node),
-            "entry": node["entry"],
-            "success": node["success"],
-            "requirements": node.get("requirements", {"items": []}),
-            "messages": node["messages"],
-        })
-
-    out = preserve_physical_stage_fields(node, out)
-    return out
-
-def stage_accepts_code(raw_stage, code):
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
-    submitted = _clean_code(code)
-
-    if not submitted:
-        return False
-
-    for condition in node["success"]["conditions"]:
-        expected = _clean_code(condition.get("value"))
-        if expected and submitted == expected:
-            return True
-
-    return False
 
 APP_DIR = Path(__file__).resolve().parent
 REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
@@ -1325,68 +994,63 @@ async def get_config():
         "player_profiles": get_player_profiles(cfg)
     }
 
-@app.get("/api/state/{user}")
-async def get_state(user: str):
-    stages = load_stages(STAGES_DB)
-    profile = get_player_profile(user)
-    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
-    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
-    return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
+def validate_stages(raw_stages):
+    if not isinstance(raw_stages, list):
+        return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
 
-@app.get("/api/game/{user}")
-async def get_game_payload(user: str, request: Request, offline_pack: bool = False):
-    runtime_stages = get_runtime_stages()
-    profile = get_player_profile(user)
-    profile_id = profile.get("id") or user
-    live_positions = load_live_positions()
+    errors = []
+    for idx, stage in enumerate(raw_stages):
+        if not isinstance(stage, dict):
+            errors.append({"index": idx, "field": "node", "detail": "each node must be an object"})
+            continue
+        errors.extend(validate_stage(stage, idx=idx))
+    return errors
 
-    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
-    finished = lvl >= len(runtime_stages)
+def get_runtime_stages():
+    raw_stages = load_stages(STAGES_DB)
+    if not isinstance(raw_stages, list):
+        return []
+    return [normalize_stage(stage) for stage in raw_stages]
 
-    current_stage = None
-    if not finished and 0 <= lvl < len(runtime_stages):
-        current_stage = project_stage_for_player(runtime_stages[lvl], include_runtime=True)
+def project_stage_for_player(raw_stage, include_runtime=False):
+    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
 
-    stages = [
-        project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)))
-        for i, stage in enumerate(runtime_stages)
-    ]
-
-    payload = {
-        "user": profile_id,
-        "display_name": profile.get("display_name", profile_id),
-        "session_mode": profile.get("mode", "solo"),
-        "profile": profile,
-        "live_status": project_live_profile_status(profile, live_positions.get(profile_id)),
-        "level": lvl,
-        "finished": finished,
-        "stages": stages,
-        "current_stage": current_stage
+    out = {
+        "id": node["id"],
+        "title": node["presentation"]["title"],
+        "lat": node["location"]["lat"],
+        "lon": node["location"]["lon"],
+        "radius": node["location"]["radius_m"],
     }
-    response = JSONResponse(payload)
-    if resolve_known_player_profile(profile_id):
-        set_player_session_cookie(response, request, profile_id)
-    return response
 
-@app.get("/api/team/{user}")
-async def get_team_payload(user: str):
-    cfg = load_config()
-    current_profile = get_player_profile(user, cfg)
-    current_profile_id = current_profile.get("id") or _as_str(user).strip() or "PLAYER 1"
-    live_positions = load_live_positions()
-    now = int(time.time())
+    if include_runtime:
+        out.update({
+            "content": node["presentation"]["content"],
+            "type": node["interaction"]["type"],
+            "config": node["interaction"]["config"],
+            "minigame": build_stage_minigame_runtime(node),
+            "entry": node["entry"],
+            "success": node["success"],
+            "requirements": node.get("requirements", {"items": []}),
+            "messages": node["messages"],
+        })
 
-    profiles = []
-    for profile in get_player_profiles(cfg):
-        projected = project_live_profile_status(profile, live_positions.get(profile.get("id")), now)
-        projected["is_self"] = _as_str(profile.get("id")).strip() == _as_str(current_profile_id).strip()
-        profiles.append(projected)
+    out = preserve_physical_stage_fields(node, out)
+    return out
 
-    return {
-        "status": "ok",
-        "user": current_profile_id,
-        "profiles": profiles
-    }
+def stage_accepts_code(raw_stage, code):
+    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
+    submitted = _clean_code(code)
+
+    if not submitted:
+        return False
+
+    for condition in node["success"]["conditions"]:
+        expected = _clean_code(condition.get("value"))
+        if expected and submitted == expected:
+            return True
+
+    return False
 
 
 PLAYER_EVENT_TYPES = {
@@ -1564,241 +1228,6 @@ def apply_synced_player_event(normalized_event, user, profile):
         "server_applied": True,
     }
     return append_event(EVENT_LOG_DB, event)
-
-
-@app.post("/api/events/sync")
-async def sync_player_events(request: Request):
-    data = await request.json()
-    user = _as_str(data.get("user")).strip()
-    require_player_session(request, user)
-    enforce_player_rate_limit("events_sync", request, user, EVENT_SYNC_RATE_LIMIT_MAX)
-
-    profile = resolve_known_player_profile(user)
-    if not profile:
-        raise HTTPException(status_code=403, detail="unknown player")
-
-    events = data.get("events")
-    if not isinstance(events, list):
-        raise HTTPException(status_code=400, detail="events must be a list")
-
-    if len(events) > 100:
-        raise HTTPException(status_code=400, detail="too many events")
-
-    stored = []
-    seen_client_events = {}
-    for raw_event in events:
-        normalized = normalize_player_event(raw_event, user, profile)
-        client_event_id = _as_str(normalized.get("client_event_id")).strip()
-
-        if client_event_id:
-            payload = normalized.get("payload") if isinstance(normalized.get("payload"), dict) else {}
-            normalized["payload"] = {
-                **payload,
-                "client_event_id": client_event_id,
-            }
-
-            existing = seen_client_events.get(client_event_id) or find_existing_player_client_event(user, client_event_id)
-            if existing:
-                duplicate = {
-                    **existing,
-                    "status": existing.get("status") or "synced",
-                    "duplicate": True,
-                }
-                stored.append(duplicate)
-                seen_client_events[client_event_id] = duplicate
-                continue
-
-        stored_event = apply_synced_player_event(normalized, user, profile)
-        stored.append(stored_event)
-
-        if client_event_id:
-            seen_client_events[client_event_id] = stored_event
-
-    append_event(
-        EVENT_LOG_DB,
-        {
-            "type": "offline_sync_received",
-            "status": "synced",
-            "source": "server",
-            "user": user,
-            "team_id": _as_str(profile.get("id")),
-            "payload": {
-                "event_count": len(stored),
-            },
-        },
-    )
-
-    return {
-        "status": "ok",
-        "accepted": len(stored),
-        "events": [
-            {
-                "id": event.get("id"),
-                "type": event.get("type"),
-                "status": event.get("status"),
-                "client_event_id": event.get("client_event_id") or (
-                    event.get("payload", {}).get("client_event_id")
-                    if isinstance(event.get("payload"), dict)
-                    else None
-                ),
-                "node_id": event.get("node_id"),
-                "error": event.get("error"),
-                "duplicate": bool(event.get("duplicate")),
-            }
-            for event in stored
-        ],
-    }
-
-@app.post("/api/admin/events")
-async def admin_events(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    limit = data.get("limit", 100)
-    try:
-        limit = max(1, min(500, int(limit)))
-    except (TypeError, ValueError):
-        limit = 100
-
-    status = sanitize_event_text(data.get("status"), 80) or None
-    user = sanitize_event_text(data.get("user"), 120) or None
-    event_type = sanitize_event_text(data.get("type"), 80) or None
-
-    return {
-        "status": "ok",
-        "events": list_events(
-            EVENT_LOG_DB,
-            status=status,
-            user=user,
-            event_type=event_type,
-            limit=limit,
-        ),
-    }
-
-@app.post("/api/admin/events/mark")
-async def admin_mark_event(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    event_id = sanitize_event_text(data.get("event_id"), 120)
-    next_status = sanitize_event_text(data.get("status"), 40)
-
-    if not event_id:
-        raise HTTPException(status_code=400, detail="event_id is required")
-
-    updated = mark_event_status(
-        EVENT_LOG_DB,
-        event_id,
-        next_status,
-        error=sanitize_event_text(data.get("error"), 300) or None,
-    )
-
-    if not updated:
-        raise HTTPException(status_code=404, detail="event not found")
-
-    return {
-        "status": "ok",
-        "event": updated,
-    }
-
-
-@app.post("/api/heartbeat")
-async def heartbeat(request: Request):
-    data = await request.json()
-
-    user = _as_str(data.get("user")).strip()
-    if not user:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "user required"}
-        )
-
-    cfg = load_config()
-    profile = resolve_known_player_profile(user, cfg)
-    if not profile:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "detail": "unknown profile"}
-        )
-
-    profile_id = profile.get("id") or user
-
-    now = time.time()
-    ip = get_heartbeat_client_ip(request)
-    rate_key = f"{ip}:{profile_id}"
-
-    prune_heartbeat_rate_state(now)
-    last_seen_for_key = float(HEARTBEAT_LAST_SEEN_BY_KEY.get(rate_key) or 0)
-    if last_seen_for_key and (now - last_seen_for_key) < HEARTBEAT_MIN_INTERVAL_SECONDS:
-        retry_after = max(1, int(HEARTBEAT_MIN_INTERVAL_SECONDS - (now - last_seen_for_key)))
-        return JSONResponse(
-            status_code=429,
-            headers={"Retry-After": str(retry_after)},
-            content={"status": "error", "detail": f"heartbeat too frequent; retry in {retry_after}s"}
-        )
-
-    lat_present = data.get("lat") is not None
-    lon_present = data.get("lon") is not None
-
-    if lat_present != lon_present:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "lat and lon must be sent together"}
-        )
-
-    lat = _as_float(data.get("lat"))
-    lon = _as_float(data.get("lon"))
-
-    if lat_present and (lat is None or lon is None):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "invalid coordinates"}
-        )
-
-    if lat is not None and not (-90 <= lat <= 90):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "lat out of range"}
-        )
-
-    if lon is not None and not (-180 <= lon <= 180):
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "lon out of range"}
-        )
-
-    current = get_live_position(profile_id)
-    if not isinstance(current, dict):
-        current = {}
-
-    if lat is not None and lon is not None:
-        current["lat"] = lat
-        current["lon"] = lon
-
-    current["last_seen"] = int(now)
-    current["gps_status"] = normalize_heartbeat_gps_status(
-        data.get("gps_status") or current.get("gps_status") or "unknown"
-    )
-    current["source"] = normalize_heartbeat_source(
-        data.get("source") or current.get("source") or "player"
-    )
-
-    # Public heartbeat must not be able to toggle debug state remotely.
-    current["debug_enabled"] = False
-
-    upsert_live_position_for_user(profile_id, current)
-    HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
-
-    return {
-        "status": "ok",
-        "user": profile_id,
-        "live_status": project_live_profile_status(profile, current)
-    }
-
 
 
 def _safe_runtime_json_file(global_names, fallback):
@@ -2170,63 +1599,6 @@ async def save_config_endpoint(request: Request):
 
 
 
-def _positive_int(value, default=1):
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return max(1, parsed)
-
-
-def read_stage_item_requirement(raw_stage):
-    node = raw_stage if isinstance(raw_stage, dict) else {}
-    config = {}
-
-    interaction = node.get("interaction")
-    if isinstance(interaction, dict) and isinstance(interaction.get("config"), dict):
-        config.update(interaction.get("config") or {})
-
-    if isinstance(node.get("config"), dict):
-        config.update(node.get("config") or {})
-
-    requirements = node.get("requirements")
-    if isinstance(requirements, dict):
-        items = requirements.get("items")
-        if isinstance(items, list) and items and isinstance(items[0], dict):
-            config.update(items[0])
-
-    item_id = _as_str(
-        config.get("required_item_id")
-        or config.get("item_id")
-        or config.get("id")
-    ).strip()
-
-    if not item_id:
-        return None
-
-    label = _as_str(
-        config.get("required_item_label")
-        or config.get("label")
-        or item_id
-    ).strip() or item_id
-
-    return {
-        "item_id": item_id,
-        "label": label,
-        "quantity": _positive_int(
-            config.get("required_item_quantity")
-            or config.get("quantity")
-            or 1,
-            1,
-        ),
-        "consume": _as_bool(
-            config.get("required_item_consume")
-            or config.get("consume"),
-            False,
-        ),
-    }
-
-
 def _event_payload(event):
     payload = event.get("payload") if isinstance(event, dict) else {}
     return payload if isinstance(payload, dict) else {}
@@ -2326,229 +1698,6 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
         },
     )
 
-
-@app.post("/api/advance")
-async def advance(request: Request):
-    data = await request.json()
-    user = data.get("user")
-    code = (data.get("code") or "").strip().upper()
-    require_player_session(request, user)
-    enforce_player_rate_limit("advance", request, user, ADVANCE_RATE_LIMIT_MAX)
-
-    profile = get_player_profile(user)
-    profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
-
-    stages = get_runtime_stages()
-    lvl = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
-
-    if lvl < len(stages):
-        current_node = stages[lvl]
-
-        if stage_accepts_code(current_node, code):
-            requirement_status = evaluate_stage_item_requirement(current_node, profile_id)
-
-            if not requirement_status["ok"]:
-                return {
-                    "status": "fail",
-                    "user": profile_id,
-                    "reason": "missing_required_item",
-                    "requirement": requirement_status,
-                }
-
-            if requirement_status["required"] and requirement_status["consume"]:
-                append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
-
-            set_player_progress_level(profile_id, lvl + 1)
-            return {
-                "status": "ok",
-                "user": profile_id,
-                "requirement": requirement_status,
-            }
-
-    return {"status": "fail", "user": profile_id}
-
-@app.post("/api/reset")
-async def reset(request: Request):
-    data = await request.json()
-
-    # /api/reset mutates player progress. Keep it admin-only.
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    user = _as_str(data.get("user")).strip()
-    if not user:
-        raise HTTPException(status_code=400, detail="user is required")
-
-    reset_player_level(GAME_DB, user)
-    return {"status": "ok"}
-
-def _clamp_game_level(value, max_level):
-    try:
-        value = int(value)
-    except Exception:
-        value = 0
-    if value < 0:
-        return 0
-    if value > max_level:
-        return max_level
-    return value
-
-@app.post("/api/admin/profile-action")
-async def admin_profile_action(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "bad password"}
-        )
-
-    if admin_password_change_required():
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "password change required"}
-        )
-
-    profile_id = _as_str(data.get("profile_id")).strip()
-    action = _as_str(data.get("action")).strip().lower()
-
-    allowed_actions = {
-        "reset_profile",
-        "level_prev",
-        "level_next",
-        "mark_finished",
-    }
-
-    if action not in allowed_actions:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "invalid action"}
-        )
-
-    cfg = load_config()
-    profiles = {
-        _as_str((p or {}).get("id")).strip(): (p or {})
-        for p in get_player_profiles(cfg)
-    }
-
-    if not profile_id or profile_id not in profiles:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "detail": "unknown profile"}
-        )
-
-    runtime_stages = get_runtime_stages()
-    max_level = len(runtime_stages)
-
-    previous_level = _clamp_game_level(get_player_progress_level(profile_id, 0), max_level)
-
-    if action == "reset_profile":
-        new_level = 0
-    elif action == "level_prev":
-        new_level = max(0, previous_level - 1)
-    elif action == "level_next":
-        new_level = min(max_level, previous_level + 1)
-    else:  # mark_finished
-        new_level = max_level
-
-    set_player_progress_level(profile_id, new_level)
-
-    return {
-        "status": "ok",
-        "profile_id": profile_id,
-        "action": action,
-        "previous_level": previous_level,
-        "level": new_level,
-        "finished": new_level >= max_level,
-        "total_stages": max_level,
-    }
-
-
-@app.post("/api/admin/save")
-async def save_stages_endpoint(request: Request):
-    data = await request.json()
-    if not admin_request_authorized(request, data):
-        return JSONResponse(status_code=403, content={"status": "error"})
-    if admin_password_change_required():
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
-
-    stages = data.get("stages")
-    errors = validate_stages(stages)
-    if errors:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "detail": "invalid stages", "errors": errors}
-        )
-
-    save_stages(STAGES_DB, stages)
-    return {"status": "ok"}
-
-@app.post("/api/admin/login")
-async def admin_login(request: Request):
-    data = await request.json()
-    now = time.time()
-    ip = get_client_ip(request)
-
-    remaining = get_admin_lock_remaining_seconds(ip, now)
-    if remaining > 0:
-        raise HTTPException(
-            status_code=429,
-            detail=f"too many failed attempts; retry in {remaining}s"
-        )
-
-    if verify_admin_password(data.get("password")):
-        clear_admin_login_state(ip)
-        expires_at = int(time.time()) + ADMIN_SESSION_TTL_SECONDS
-        response = JSONResponse(
-            {
-                "status": "ok",
-                "must_change": admin_password_change_required(),
-                "session_expires_at": expires_at,
-            }
-        )
-        set_admin_session_cookie(response, request, create_admin_session())
-        return response
-
-    register_admin_login_failure(ip, now)
-    raise HTTPException(status_code=401, detail="invalid admin password")
-
-@app.post("/api/admin/logout")
-async def admin_logout(request: Request):
-    token = request.cookies.get(ADMIN_SESSION_COOKIE)
-    if token:
-        ADMIN_SESSIONS.pop(token, None)
-        admin_auth_security.clear_persistent_admin_session(ADMIN_SESSIONS_DB, token)
-
-    response = JSONResponse({"status": "ok"})
-    clear_admin_session_cookie(response, request)
-    clear_player_session_cookie(response, request)
-    return response
-
-@app.post("/api/admin/change-password")
-async def admin_change_password(request: Request):
-    data = await request.json()
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    current_password = (data.get("password") or "").strip()
-    new_password = (data.get("new_password") or "").strip()
-    confirm_password = (data.get("confirm_password") or "").strip()
-
-    if not verify_admin_password(current_password):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
-
-    if not new_password:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "new password required"})
-
-    if new_password != confirm_password:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "passwords do not match"})
-
-    if is_weak_admin_password(new_password):
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "choose a stronger password (minimum 10 chars, avoid temporary/default values)"})
-
-    set_admin_password(new_password, must_change=False, source="web_change")
-    clear_admin_sessions()
-    return {"status": "ok"}
 
 @app.api_route("/sw.js", methods=["GET", "HEAD"])
 def player_service_worker():

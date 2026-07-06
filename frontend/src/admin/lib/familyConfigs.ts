@@ -171,7 +171,24 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
   }
 }
 
-export function normalizeAdminConfigForFamily(type: string, input: Record<string, unknown>) {
+export function normalizeAdminConfigForFamily(type: string, input: Record<string, unknown>): Record<string, any> {
+  const raw = input || {}
+  const out = _normalizeAdminConfigForFamilyRaw(type, raw) as Record<string, any>
+
+  for (const field of ['is_map_collectible', 'game_id', 'game_title', 'completion_method']) {
+    if (field in raw) {
+      if (field === 'is_map_collectible') {
+        out[field] = Boolean(raw[field])
+      } else {
+        out[field] = String(raw[field]).trim()
+      }
+    }
+  }
+
+  return out
+}
+
+function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, unknown>) {
   const raw = input || {}
 
   if (type === 'audio_challenge') {

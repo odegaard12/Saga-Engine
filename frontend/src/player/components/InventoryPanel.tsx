@@ -7,6 +7,7 @@ import {
   type InventorySnapshot,
 } from '../offline/inventory'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
+import ItemIconSvg from './ItemIconSvg'
 
 interface InventoryPanelProps {
   user: string
@@ -192,7 +193,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
           const usable = item.state !== 'used' && item.quantity > 0
           const isSelected = selected?.item_id === item.item_id
           const isFeedback = feedbackId === item.item_id
-          const { glyph, color } = getItemIcon(item)
+          const color = 'rgba(255, 255, 255, 0.1)'
 
           return (
             <button
@@ -211,11 +212,10 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               <span
                 style={{
                   ...cellIcon,
-                  background: usable ? `${color}22` : 'rgba(255,255,255,0.04)',
-                  color: usable ? color : 'rgba(255,255,255,0.25)',
+                  background: usable ? `rgba(255,255,255,0.08)` : 'rgba(255,255,255,0.04)',
                 }}
               >
-                {glyph}
+                <ItemIconSvg itemId={item.item_id} size={28} />
               </span>
               {item.quantity > 1 && <span style={qtyBadge}>{item.quantity}</span>}
               {!usable && <span style={usedOverlay}>✓</span>}
@@ -232,7 +232,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       {selected && (
         <div style={detailCard} key={selected!.item_id}>
           <div style={detailHeader}>
-            <span style={{ fontSize: 28 }}>{getItemIcon(selected).glyph}</span>
+            <span><ItemIconSvg itemId={selected!.item_id} size={40} /></span>
             <div>
               <div style={detailTitle}>{selected!.label}</div>
               <div style={detailMeta}>

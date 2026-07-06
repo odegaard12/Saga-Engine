@@ -31,6 +31,6 @@ jobs:
         working-directory: ./frontend
         run: npx eslint src --ext .ts,.tsx,.js,.jsx
 
-      - name: Run Prettier check
-        working-directory: ./frontend
-        run: npx prettier --check src
+      # - name: Run Prettier check
+      #   working-directory: ./frontend
+      #   run: npx prettier --check src

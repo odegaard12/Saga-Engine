@@ -12327,3 +12327,101 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .saga-guided-v4-note.warning b {
   color: #fb923c;
 }
+
+/* ============================================================
+   #iphone-safe-area-v1
+   Fixes for iPhone Dynamic Island / notch.
+   The admin shell top bar and node editor header must be pushed
+   below the camera island using max(…, env(safe-area-inset-top)).
+   ============================================================ */
+
+/* Overlay container: ensure it never sits under the island */
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v4-shell),
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v4-shell) {
+  padding-top: max(0px, env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Editor header: add safe-area-top padding on touch devices */
+@media (pointer: coarse) {
+  .saga-guided-v4-header {
+    padding-top: max(14px, calc(env(safe-area-inset-top, 0px) + 6px)) !important;
+  }
+
+  /* Shell itself: shrink height to fit real visible area including bars */
+  .saga-node-editor-host .admin-guided-v4-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v4-shell,
+  .saga-physical-guided-v4-shell {
+    height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 8px
+    ) !important;
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 8px
+    ) !important;
+    border-radius: 0 !important;
+    /* No radius on full-screen mobile sheet */
+  }
+
+  /* Body scrolls properly within the editor on mobile */
+  .saga-guided-v4-body {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+  }
+
+  /* Footer safe area bottom */
+  .saga-guided-v4-footer {
+    padding-bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + 6px)) !important;
+  }
+}
+
+/* Left rail (sidebar node list) safe-area for notch on landscape */
+@media (max-height: 600px) and (pointer: coarse) {
+  .saga-left-rail {
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+  }
+}
+
+/* ============================================================
+   #map-smooth-v1
+   Reduce map marker repaints by promoting them to GPU compositing.
+   Leaflet repaints .leaflet-marker-icon on every position update.
+   GPU compositing prevents the CPU paint-then-composite flicker.
+   ============================================================ */
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  will-change: transform !important;
+}
+
+.leaflet-tile {
+  will-change: transform !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Prevent full-layer repaint on container during GPS updates */
+.leaflet-pane,
+.leaflet-map-pane {
+  will-change: transform !important;
+}
+
+/* Smooth tile transitions instead of hard blink */
+.leaflet-tile-container {
+  transition: opacity 0.18s ease-out !important;
+}
+
+/* Collectible icon in node sidebar — use full label, not badge-only */
+.saga-physical-node-badge--collectible::after {
+  content: ' Coleccionable';
+  font-size: 0.7em;
+  font-weight: 600;
+  opacity: 0.85;
+  display: none; /* label shown in <small> already */
+}

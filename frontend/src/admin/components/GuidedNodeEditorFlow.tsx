@@ -13,714 +13,68 @@ import SequenceCodeEditor from './sequenceCode/SequenceCodeEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
 import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 
-type StageLike = Record<string, any>
+import {
+  type StageLike,
+  type StepKey,
+  type EditorMode,
+  STEPS,
+  READY_STATUSES,
+  TECHNICAL_CONFIG_KEYS,
+  LEGACY_MESSAGE_FALLBACKS,
+  QR_KIND_BY_GAME_ID,
+  QR_GAME_BY_KIND,
+  CONFIG_FIELD_META,
+  CONFIG_ORDER,
+  configOf,
+  titleOf,
+  nodeNumber,
+  displayTitle,
+  normalizeQrKind,
+  hasExplicitQrMarker,
+  gameFromStage,
+  isMapCollectibleStage,
+  isQrStage,
+  gameOptions,
+  qrOptions,
+  statusLabel,
+  offlineLabel,
+  isPlayableNow,
+  usesLocationRadius,
+  normalizeDifficultyForEditor,
+  isValidFixedCircuitConfig,
+  isValidSequenceCodeConfig,
+  isValidTiltMazeConfig,
+  isValidPlaceMosaicConfig,
+  normalizeCopy,
+  shouldReplaceGeneratedGameTitle,
+  shouldReplaceSequenceTitle,
+  shouldReplacePlaceMosaicTitle,
+  isLegacySequenceCopy,
+  isLegacySequenceHint,
+  isExperimentalOrPlanned,
+  normalizeMessage,
+  CUSTOM_GAME_EDITOR_IDS,
+  hasCustomGameEditor,
+  guidedConfigKeysForGame,
+  slugOf,
+  fallbackCode,
+  qrKindForGame,
+  qrGameForKind,
+  qrLabel,
+  qrItemId,
+  qrPayload,
+  qrDesignFromConfig,
+  formatConfigValue,
+  parseConfigValue,
+  copyText
+} from './guided-editor/guidedEditorUtils'
 
-type GuidedNodeEditorFlowProps = {
+export interface GuidedNodeEditorFlowProps {
   stage: StageLike
-  onPatch: (patch: Record<string, any>) => void
+  onPatch: (updates: Record<string, any>) => void
   onClose: () => void
   onDelete: () => void
   onRequestChangeType?: () => void
-}
-
-type StepKey = 'type' | 'subtype' | 'config' | 'content' | 'rules' | 'review'
-type EditorMode = 'game' | 'qr' | 'map_collectible'
-
-const STEPS: Array<{ key: StepKey; label: string }> = [
-  { key: 'subtype', label: 'Modo' },
-  { key: 'config', label: 'Ajustes' },
-  { key: 'content', label: 'Textos' },
-  { key: 'rules', label: 'Reglas' },
-  { key: 'review', label: 'Revisar' },
-]
-
-const READY_STATUSES = new Set(['runtime_ready'])
-
-const TECHNICAL_CONFIG_KEYS = new Set([
-  'completion_method',
-  'game_id',
-  'game_title',
-  'objective',
-  'source_lat',
-  'source_lon',
-  'max_signal',
-  'noise_floor',
-  'jitter',
-  'decay_curve',
-  'timeout_ms',
-  'update_rate_ms',
-  'use_audio',
-  'use_vibration',
-  'use_direction_hint',
-  'false_peaks',
-  'dead_zones',
-  'seed',
-  'path_cells',
-  'pattern_mode',
-  'shuffle_choices',
-  'hint_text',
-  'max_attempts',
-  'image_data_url',
-  'image_alt',
-  'grid_size',
-  'preview_ms',
-  'max_moves',
-  'require_final_question',
-  'final_question',
-  'final_choices',
-  'final_correct_index',
-])
-
-const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
-  'GPS unavailable message.': 'Activa GPS para localizar la señal.',
-  'Move closer to unlock this node.': 'Acércate más al punto para desbloquear el nodo.',
-  'Complete this node to continue.': 'Completa este nodo para continuar.',
-}
-
-const QR_KIND_BY_GAME_ID: Partial<Record<AdminGameId, PhysicalQrKind>> = {
-  qr_collectible: 'collectible',
-  qr_key_gate: 'requirement',
-  clue_card: 'clue',
-  bonus_cache: 'bonus',
-}
-
-const QR_GAME_BY_KIND: Record<PhysicalQrKind, AdminGameId> = {
-  collectible: 'qr_collectible',
-  requirement: 'qr_key_gate',
-  clue: 'clue_card',
-  bonus: 'bonus_cache',
-}
-
-const CONFIG_FIELD_META: Record<
-  string,
-  {
-    label: string
-    help: string
-    type: 'text' | 'number' | 'select' | 'sequence'
-    options?: Array<{ value: string; label: string }>
-  }
-> = {
-  objective: {
-    label: 'Objetivo interno',
-    help: 'Define que intenta resolver el juego. Normalmente viene de la plantilla.',
-    type: 'text',
-  },
-  completion_method: {
-    label: 'Cómo se completa',
-    help: 'Forma principal de cerrar el nodo en el móvil del jugador.',
-    type: 'select',
-    options: [
-      { value: 'proximity', label: 'Llegar a la zona' },
-      { value: 'hold', label: 'Mantenerse en la zona' },
-      { value: 'bearing', label: 'Rumbo / brújula' },
-      { value: 'puzzle', label: 'Puzzle visual' },
-      { value: 'manual_code', label: 'Código manual' },
-      { value: 'sequence', label: 'Secuencia' },
-      { value: 'qr_complete', label: 'QR completa el nodo' },
-      { value: 'photo', label: 'Foto' },
-      { value: 'inventory_only', label: 'Objeto/mochila' },
-      { value: 'team', label: 'Equipo' },
-      { value: 'motion', label: 'Movimiento / sensor' },
-    ],
-  },
-  source_radius_m: {
-    label: 'Radio de señal',
-    help: 'Zona aproximada donde la señal empieza a funcionar.',
-    type: 'number',
-  },
-  lock_threshold: {
-    label: 'Umbral de bloqueo',
-    help: 'Valor de señal o precisión necesario para dar el nodo por válido.',
-    type: 'number',
-  },
-  hold_ms: {
-    label: 'Tiempo de espera',
-    help: 'Milisegundos que debe mantenerse la condición antes de completar.',
-    type: 'number',
-  },
-  target_bearing_deg: {
-    label: 'Rumbo objetivo',
-    help: 'Dirección en grados: 0 norte, 90 este, 180 sur, 270 oeste.',
-    type: 'number',
-  },
-  tolerance_deg: {
-    label: 'Tolerancia de rumbo',
-    help: 'Margen permitido alrededor del rumbo objetivo.',
-    type: 'number',
-  },
-  grid_cols: {
-    label: 'Columnas',
-    help: 'Tamaño horizontal del puzzle lógico.',
-    type: 'number',
-  },
-  grid_rows: {
-    label: 'Filas',
-    help: 'Tamaño vertical del puzzle lógico.',
-    type: 'number',
-  },
-  difficulty: {
-    label: 'Dificultad',
-    help: 'Nivel de dificultad del reto.',
-    type: 'select',
-    options: [
-      { value: 'easy', label: 'Fácil' },
-      { value: 'normal', label: 'Normal' },
-      { value: 'hard', label: 'Difícil' },
-    ],
-  },
-  expected_code: {
-    label: 'Código esperado',
-    help: 'Palabra o código que deberá introducir el jugador.',
-    type: 'text',
-  },
-  sequence: {
-    label: 'Secuencia',
-    help: 'Lista de valores separados por coma.',
-    type: 'sequence',
-  },
-  game_id: {
-    label: 'ID de juego',
-    help: 'Identificador del catálogo. No suele hacer falta tocarlo.',
-    type: 'text',
-  },
-  game_title: {
-    label: 'Nombre de juego',
-    help: 'Nombre de referencia de la plantilla.',
-    type: 'text',
-  },
-}
-
-const CONFIG_ORDER = [
-  'objective',
-  'completion_method',
-  'source_radius_m',
-  'lock_threshold',
-  'hold_ms',
-  'target_bearing_deg',
-  'tolerance_deg',
-  'grid_cols',
-  'grid_rows',
-  'difficulty',
-  'expected_code',
-  'sequence',
-  'game_id',
-  'game_title',
-]
-
-function configOf(stage: StageLike): Record<string, unknown> {
-  return stage.config && typeof stage.config === 'object' ? stage.config : {}
-}
-
-function titleOf(stage: StageLike) {
-  return String(stage.title || stage.name || 'NEW NODE')
-}
-
-function nodeNumber(stage: StageLike) {
-  if (typeof stage.index === 'number') return String(stage.index + 1)
-  const raw = String(stage.title || stage.name || stage.id || stage.node_id || '')
-  return raw.match(/\d+/)?.[0] || ''
-}
-
-function displayTitle(stage: StageLike) {
-  const n = nodeNumber(stage)
-  const title = titleOf(stage)
-  if (n && !title.trim().startsWith(`${n}.`)) return `${n}. ${title}`
-  return title
-}
-
-function normalizeQrKind(value: unknown): PhysicalQrKind {
-  const raw = String(value || 'collectible')
-  if (raw === 'object') return 'collectible'
-  if (raw === 'key') return 'requirement'
-  if (raw === 'requirement' || raw === 'clue' || raw === 'bonus' || raw === 'collectible')
-    return raw
-  return 'collectible'
-}
-
-function hasExplicitQrMarker(stage: StageLike): boolean {
-  return Boolean(
-    stage.physical_qr ||
-    stage.physical_node_kind ||
-    stage.physical_item_kind ||
-    stage.physical_item_id ||
-    stage.physical_item_label ||
-    stage.qr_payload ||
-    String(stage.game_family || '').includes('physical') ||
-    String(stage.game_type || '').includes('qr_') ||
-    String(stage.game_template_id || '').includes('qr_')
-  )
-}
-
-function gameFromStage(stage: StageLike): AdminGameCatalogItem {
-  const config = configOf(stage)
-
-  const configId = typeof config.game_id === 'string' ? config.game_id : ''
-
-  const gameTypeId = typeof stage.game_type === 'string' ? stage.game_type : ''
-
-  const templateId = typeof stage.game_template_id === 'string' ? stage.game_template_id : ''
-
-  const byConfig = configId ? adminGameCatalog.find((game) => game.id === configId) : null
-
-  const byGameType = gameTypeId ? adminGameCatalog.find((game) => game.id === gameTypeId) : null
-
-  const byTemplate = templateId ? adminGameCatalog.find((game) => game.id === templateId) : null
-
-  // Al cambiar de juego, los dos identificadores superiores
-  // se actualizan juntos. Si coinciden, son la identidad más
-  // reciente y evitan mostrar un editor antiguo por config obsoleta.
-  if (byGameType && byTemplate && byGameType.id === byTemplate.id) {
-    return byGameType
-  }
-
-  if (byConfig) return byConfig
-  if (byTemplate) return byTemplate
-  if (byGameType) return byGameType
-
-  // Legacy: los nodos antiguos signal_hunt sin game_id eran GPS/señal.
-  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer signal_hunt físico/QR.
-  if (stage.type === 'signal_hunt' && !hasExplicitQrMarker(stage)) {
-    return (
-      adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
-    )
-  }
-
-  return (
-    adminGameCatalog.find((game) => game.family === stage.type && game.category !== 'physical') ||
-    adminGameCatalog.find((game) => game.family === stage.type) ||
-    adminGameCatalog[0]
-  )
-}
-
-function isMapCollectibleStage(stage: StageLike): boolean {
-  const config = configOf(stage)
-  return Boolean(config.is_map_collectible)
-}
-
-function isQrStage(stage: StageLike): boolean {
-  if (isMapCollectibleStage(stage)) return false
-  const config = configOf(stage)
-  const gameId =
-    typeof config.game_id === 'string'
-      ? config.game_id
-      : typeof stage.game_type === 'string'
-        ? stage.game_type
-        : typeof stage.game_template_id === 'string'
-          ? stage.game_template_id
-          : ''
-  const explicit = gameId ? adminGameCatalog.find((game) => game.id === gameId) : null
-
-  return Boolean(hasExplicitQrMarker(stage) || explicit?.category === 'physical')
-}
-
-function gameOptions(showExperimental = false): AdminGameCatalogItem[] {
-  return adminGameCatalog.filter((game) => {
-    if (game.category === 'physical') return false
-    if (showExperimental) return true
-    return isPlayableNow(game)
-  })
-}
-
-function qrOptions(): AdminGameCatalogItem[] {
-  return adminGameCatalog.filter((game) => game.category === 'physical')
-}
-
-function statusLabel(game: AdminGameCatalogItem) {
-  if (game.runtimeStatus === 'runtime_ready') return 'Jugable'
-  if (game.runtimeStatus === 'runtime_partial') return 'Experimental'
-  if (game.runtimeStatus === 'preset_only') return 'Plantilla'
-  return 'No listo'
-}
-
-function offlineLabel(game: AdminGameCatalogItem) {
-  if (game.offlineStatus === 'offline_ready') return 'Offline listo'
-  if (game.offlineStatus === 'offline_partial') return 'Offline parcial'
-  return 'Offline pendiente'
-}
-
-function isPlayableNow(game: AdminGameCatalogItem) {
-  return READY_STATUSES.has(game.runtimeStatus)
-}
-
-function usesLocationRadius(game: AdminGameCatalogItem) {
-  return (
-    game.category === 'gps' ||
-    game.category === 'compass' ||
-    game.category === 'photo' ||
-    game.category === 'team' ||
-    game.completionMethod === 'proximity' ||
-    game.completionMethod === 'hold' ||
-    game.completionMethod === 'bearing'
-  )
-}
-
-function normalizeDifficultyForEditor(value: unknown) {
-  const raw = String(value ?? '')
-    .trim()
-    .toLowerCase()
-
-  if (raw === 'easy' || raw === 'facil' || raw === 'fácil' || raw === '1') {
-    return 'easy'
-  }
-
-  if (
-    raw === 'hard' ||
-    raw === 'dificil' ||
-    raw === 'difícil' ||
-    raw === '3' ||
-    raw === '4' ||
-    raw === '5'
-  ) {
-    return 'hard'
-  }
-
-  return 'normal'
-}
-
-function isValidFixedCircuitConfig(config: Record<string, unknown>) {
-  if (config.pattern_mode !== 'fixed') return true
-  if (!Array.isArray(config.path_cells)) return false
-  if (config.path_cells.length < 4) return false
-
-  const rows = Math.max(4, Math.min(6, Number(config.grid_rows || 5)))
-
-  const cols = Math.max(4, Math.min(6, Number(config.grid_cols || 5)))
-
-  const seen = new Set<string>()
-  let previous: [number, number] | null = null
-
-  for (const rawCell of config.path_cells) {
-    const cell = String(rawCell)
-
-    if (!/^\d+:\d+$/.test(cell)) return false
-    if (seen.has(cell)) return false
-
-    const [row, col] = cell.split(':').map(Number)
-
-    if (row < 0 || row >= rows || col < 0 || col >= cols) {
-      return false
-    }
-
-    if (previous && Math.abs(row - previous[0]) + Math.abs(col - previous[1]) !== 1) {
-      return false
-    }
-
-    seen.add(cell)
-    previous = [row, col]
-  }
-
-  return true
-}
-
-function isValidSequenceCodeConfig(config: Record<string, unknown>) {
-  if (!Array.isArray(config.sequence)) {
-    return false
-  }
-
-  const sequence = config.sequence.map((item) => String(item).trim())
-
-  if (sequence.length < 3 || sequence.length > 10) {
-    return false
-  }
-
-  if (sequence.some((item) => !item || item.length > 32)) {
-    return false
-  }
-
-  const unique = new Set(sequence.map((item) => item.toLocaleLowerCase()))
-
-  if (unique.size !== sequence.length) {
-    return false
-  }
-
-  const maxAttempts = Number(config.max_attempts ?? 3)
-
-  return Number.isInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 8
-}
-
-function isValidTiltMazeConfig(config: Record<string, unknown>) {
-  const rows = Number(config.grid_rows ?? 9)
-
-  const cols = Number(config.grid_cols ?? 9)
-
-  const timeLimit = Number(config.time_limit_s ?? 75)
-
-  const lives = Number(config.lives ?? 3)
-
-  return (
-    Number.isInteger(rows) &&
-    rows >= 5 &&
-    rows <= 13 &&
-    Number.isInteger(cols) &&
-    cols >= 5 &&
-    cols <= 13 &&
-    Number.isInteger(timeLimit) &&
-    timeLimit >= 20 &&
-    timeLimit <= 180 &&
-    Number.isInteger(lives) &&
-    lives >= 1 &&
-    lives <= 5
-  )
-}
-
-function isValidPlaceMosaicConfig(config: Record<string, unknown>) {
-  const image = String(config.image_data_url || '').trim()
-
-  const imageValid =
-    image.length <= 600000 &&
-    (image.startsWith('data:image/jpeg;base64,') ||
-      image.startsWith('data:image/png;base64,') ||
-      image.startsWith('data:image/webp;base64,'))
-
-  const gridSize = Number(config.grid_size ?? config.grid_cols ?? 3)
-
-  if (!imageValid || !Number.isInteger(gridSize) || gridSize < 2 || gridSize > 4) {
-    return false
-  }
-
-  if (config.require_final_question !== true) {
-    return true
-  }
-
-  const question = String(config.final_question || '').trim()
-
-  const choices = Array.isArray(config.final_choices)
-    ? config.final_choices.map((item) => String(item).trim()).filter(Boolean)
-    : []
-
-  const correctIndex = Number(config.final_correct_index ?? 0)
-
-  return (
-    question.length >= 3 &&
-    choices.length >= 2 &&
-    choices.length <= 4 &&
-    Number.isInteger(correctIndex) &&
-    correctIndex >= 0 &&
-    correctIndex < choices.length
-  )
-}
-
-function normalizeCopy(value: unknown) {
-  return String(value || '')
-    .trim()
-    .toLocaleLowerCase()
-}
-
-function shouldReplaceGeneratedGameTitle(value: unknown) {
-  const title = normalizeCopy(value)
-
-  if (!title) return true
-  if (/^new node(?:\s+\d+)?$/.test(title)) return true
-  if (/^nuevo nodo(?:\s+\d+)?$/.test(title)) return true
-
-  return new Set([
-    'restaurar el circuito',
-    'matriz de circuitos',
-    'código secuencial',
-    'codigo secuencial',
-    'la clave del tríptico',
-    'la clave del triptico',
-    'mosaico del lugar',
-    'laberinto de equilibrio',
-  ]).has(title)
-}
-
-function shouldReplaceSequenceTitle(value: unknown) {
-  return shouldReplaceGeneratedGameTitle(value)
-}
-
-function shouldReplacePlaceMosaicTitle(value: unknown) {
-  return shouldReplaceGeneratedGameTitle(value)
-}
-
-function isLegacySequenceCopy(value: unknown) {
-  const content = normalizeCopy(value)
-
-  if (!content) return true
-
-  return (
-    content.includes('memoriza la secuencia') ||
-    content.includes('memoriza la ruta de energía') ||
-    content.includes('memoriza la ruta de energia') ||
-    content.includes('busca el punto marcado') ||
-    content === 'ordena las fichas para reconstruir el código.' ||
-    content === 'ordena las fichas para reconstruir el codigo.'
-  )
-}
-
-function isLegacySequenceHint(value: unknown) {
-  const hint = normalizeCopy(value)
-
-  if (!hint) return true
-
-  return (
-    hint.includes('memoriza la secuencia') ||
-    hint.includes('recuerda el orden en el que encontraste')
-  )
-}
-
-function isExperimentalOrPlanned(game: AdminGameCatalogItem) {
-  return !isPlayableNow(game)
-}
-
-function normalizeMessage(value: unknown, fallback: string) {
-  const raw = String(value || '').trim()
-  if (!raw) return fallback
-  return LEGACY_MESSAGE_FALLBACKS[raw] || raw
-}
-
-const CUSTOM_GAME_EDITOR_IDS = new Set([
-  'logic_circuit',
-  'sequence_code',
-  'place_mosaic',
-  'tilt_maze',
-])
-
-function hasCustomGameEditor(game: AdminGameCatalogItem) {
-  return CUSTOM_GAME_EDITOR_IDS.has(game.id)
-}
-
-function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
-  if (game.id === 'sequence_code' || game.id === 'place_mosaic' || game.id === 'tilt_maze') {
-    return []
-  }
-
-  const keys = new Set<string>()
-
-  if (
-    game.category === 'gps' ||
-    game.completionMethod === 'proximity' ||
-    game.completionMethod === 'hold' ||
-    game.completionMethod === 'team'
-  ) {
-    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.category === 'compass' || game.completionMethod === 'bearing') {
-    for (const key of ['target_bearing_deg', 'tolerance_deg', 'hold_ms']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.category === 'logic' || game.completionMethod === 'puzzle') {
-    for (const key of ['grid_cols', 'grid_rows', 'difficulty']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.category === 'motion' || game.completionMethod === 'motion') {
-    for (const key of ['difficulty', 'time_limit_ms', 'stabilize_ms']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.completionMethod === 'manual_code') {
-    for (const key of ['expected_code', 'difficulty']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.completionMethod === 'sequence') {
-    for (const key of ['sequence', 'difficulty']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  return Array.from(keys).filter((key) => !TECHNICAL_CONFIG_KEYS.has(key))
-}
-
-function slugOf(value: unknown) {
-  return (
-    String(value || 'item')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80) || 'objeto_saga'
-  )
-}
-
-function fallbackCode(stage: StageLike) {
-  const config = configOf(stage)
-  const raw = String(
-    stage.fallback_code ||
-      stage.physical_fallback_code ||
-      config.success_code ||
-      config.fallback_code ||
-      ''
-  )
-  if (raw) return raw.toUpperCase()
-  const n = nodeNumber(stage) || '00'
-  return `SAGA-${n.padStart(2, '0')}`
-}
-
-function qrKindForGame(game: AdminGameCatalogItem): PhysicalQrKind {
-  return QR_KIND_BY_GAME_ID[game.id] || normalizeQrKind('collectible')
-}
-
-function qrGameForKind(kind: PhysicalQrKind): AdminGameCatalogItem {
-  return getAdminGame(QR_GAME_BY_KIND[kind])
-}
-
-function qrLabel(stage: StageLike) {
-  return String(stage.physical_item_label || stage.title || 'Objeto SAGA')
-}
-
-function qrItemId(stage: StageLike) {
-  return String(stage.physical_item_id || slugOf(stage.id || stage.node_id || qrLabel(stage)))
-}
-
-function qrPayload(stage: StageLike) {
-  return String(stage.qr_payload || `SAGA1:ITEM:${qrItemId(stage)}:${qrLabel(stage)}`)
-}
-
-function qrDesignFromConfig(config: Record<string, unknown>): QrCardDesign {
-  const preset = String(config.qr_card_preset || 'clean')
-
-  const shape = String(config.qr_card_shape || 'rounded')
-
-  const accent = String(config.qr_card_accent || '#2563eb')
-
-  const imageDataUrl = String(config.qr_card_image_data_url || '')
-
-  return {
-    preset: preset === 'dark' || preset === 'photo' ? preset : 'clean',
-    shape: shape === 'square' ? 'square' : 'rounded',
-    accent: /^#[0-9a-f]{6}$/i.test(accent) ? accent : '#2563eb',
-    imageDataUrl,
-  }
-}
-
-function formatConfigValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  if (value === undefined || value === null) return ''
-  return String(value)
-}
-
-function parseConfigValue(key: string, value: string): unknown {
-  const meta = CONFIG_FIELD_META[key]
-  if (meta?.type === 'number') {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : 0
-  }
-  if (meta?.type === 'sequence') {
-    return value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-  }
-  return value
-}
-
-function copyText(value: string, onDone: (message: string) => void) {
-  void navigator.clipboard
-    .writeText(value)
-    .then(() => onDone('Copiado'))
-    .catch(() => onDone('No se pudo copiar'))
 }
 
 export default function GuidedNodeEditorFlow({
@@ -897,6 +251,7 @@ export default function GuidedNodeEditorFlow({
       const nextConfig = {
         ...(base.config || {}),
         ...config,
+        is_map_collectible: false,
         game_id: selectedGame.id,
         game_title: selectedGame.title,
         completion_method: selectedGame.completionMethod,
@@ -1159,9 +514,9 @@ export default function GuidedNodeEditorFlow({
           <section className="saga-guided-v4-page saga-guided-v4-page--catalog">
             <div className="saga-guided-v4-pagehead">
               <span>Paso 2</span>
-              <h3>Escolle o xogo</h3>
+              <h3>Elige el juego</h3>
               <p>
-                Mostra o catálogo real. Os planificados poden prepararse, pero os máis seguros son
+                Muestra el catálogo real. Los planificados pueden prepararse, pero los más seguros son
                 “Jugable”.
               </p>
             </div>
@@ -1433,6 +788,7 @@ export default function GuidedNodeEditorFlow({
                   </span>
                 </article>
 
+                {/* ── SECCIÓN 1: ¿Qué objeto da? ── */}
                 <label className="wide">
                   <span>🎁 ¿Qué objeto DA este nodo al jugador?</span>
                   <select
@@ -1454,6 +810,7 @@ export default function GuidedNodeEditorFlow({
                           physical_item_id: 'objeto_personalizado',
                           physical_item_label: 'Objeto Personalizado',
                           title: 'Objeto Personalizado',
+                          config: { ...config, collectible_purpose: 'standalone' },
                         })
                       } else {
                         const labels: Record<string, string> = {
@@ -1463,74 +820,76 @@ export default function GuidedNodeEditorFlow({
                           cinta_aislante: 'Cinta aislante',
                           llave_rota: 'Llave rota',
                         }
+                        const purposes: Record<string, string> = {
+                          placa_base: 'crafting',
+                          cables_cobre: 'crafting',
+                          bateria_litio: 'crafting',
+                          cinta_aislante: 'crafting',
+                          llave_rota: 'crafting',
+                        }
                         onPatch({
                           physical_item_id: val,
                           physical_item_label: labels[val],
                           title: labels[val],
+                          config: { ...config, collectible_purpose: purposes[val] || 'standalone' },
                         })
                       }
                     }}
                   >
-                    <option value="placa_base">
-                      💾 Placa base → ingrediente para fabricar Dispositivo EMP
-                    </option>
-                    <option value="cables_cobre">
-                      🔌 Cables de cobre → ingrediente para fabricar Dispositivo EMP
-                    </option>
-                    <option value="bateria_litio">
-                      🔋 Batería de litio → ingrediente para fabricar Dispositivo EMP
-                    </option>
-                    <option value="cinta_aislante">
-                      🩹 Cinta aislante → ingrediente para reparar la Llave Maestra
-                    </option>
-                    <option value="llave_rota">
-                      🔑 Llave rota → ingrediente para reparar la Llave Maestra
-                    </option>
-                    <option value="custom">✏️ Otro objeto (nombre personalizado)</option>
+                    <option value="placa_base">💾 Placa base → ingrediente EMP</option>
+                    <option value="cables_cobre">🔌 Cables de cobre → ingrediente EMP</option>
+                    <option value="bateria_litio">🔋 Batería de litio → ingrediente EMP</option>
+                    <option value="cinta_aislante">🩹 Cinta aislante → ingrediente Llave Maestra</option>
+                    <option value="llave_rota">🔑 Llave rota → ingrediente Llave Maestra</option>
+                    <option value="custom">✏️ Objeto personalizado (tú defines nombre e ID)</option>
                   </select>
                   <small>
-                    Este objeto quedará en la mochila del jugador al recogerlo. El ID interno sirve
-                    para que otros nodos lo puedan requerir.
+                    El ID interno sirve para que otros nodos puedan requerirlo o para la Mesa de
+                    Trabajo.
                   </small>
                 </label>
 
+                {/* Warnings de ingredientes incompletos */}
                 {['placa_base', 'cables_cobre', 'bateria_litio'].includes(
                   stage.physical_item_id || ''
                 ) ? (
                   <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ ¡Atención! Ingrediente incompleto</b>
+                    <b>⚠️ Ingrediente del Dispositivo EMP</b>
                     <span>
-                      Has configurado un ingrediente para el <strong>Dispositivo EMP</strong>. El
-                      jugador NO podrá usar este objeto directamente. Para que pueda fabricar el
-                      dispositivo final en su Mesa de Trabajo,{' '}
-                      <strong>debes añadir a la misión otros nodos</strong> que entreguen el resto
-                      de ingredientes (Placa base, Cables y Batería). El sistema te bloqueará el
-                      guardado si olvidas alguno.
+                      Necesitas <strong>3 nodos</strong> que entreguen: Placa base + Cables de cobre
+                      + Batería de litio. El sistema bloqueará el guardado si faltan.
                     </span>
                   </article>
                 ) : null}
 
                 {['cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '') ? (
                   <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ ¡Atención! Ingrediente incompleto</b>
+                    <b>⚠️ Ingrediente de la Llave Maestra</b>
                     <span>
-                      Has configurado un ingrediente para la <strong>Llave Maestra</strong>. El
-                      jugador NO podrá usar este objeto directamente. Para que pueda fabricarla en
-                      su Mesa de Trabajo, <strong>debes añadir a la misión otro nodo</strong> que
-                      entregue el ingrediente restante. El sistema te bloqueará el guardado si lo
-                      olvidas.
+                      Necesitas <strong>2 nodos</strong> que entreguen: Llave rota + Cinta aislante.
+                      El sistema bloqueará el guardado si falta el otro.
                     </span>
                   </article>
                 ) : null}
 
-                {![
-                  'placa_base',
-                  'cables_cobre',
-                  'bateria_litio',
-                  'cinta_aislante',
-                  'llave_rota',
-                ].includes(stage.physical_item_id || '') ? (
+                {/* Campos para objeto personalizado */}
+                {!['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(
+                  stage.physical_item_id || ''
+                ) ? (
                   <>
+                    <label>
+                      <span>🎨 Icono del objeto</span>
+                      <input
+                        value={String(config.physical_icon || config.icon || '⭐')}
+                        onChange={(event) =>
+                          onPatch({ config: { ...config, physical_icon: event.target.value } })
+                        }
+                        placeholder="Escribe un emoji: 🗝️ 🧿 💎 📦 🔮"
+                        maxLength={4}
+                        style={{ fontSize: '1.4em', width: '72px', textAlign: 'center' }}
+                      />
+                    </label>
+
                     <label>
                       <span>Nombre visible del objeto</span>
                       <input
@@ -1546,7 +905,7 @@ export default function GuidedNodeEditorFlow({
                     </label>
 
                     <label>
-                      <span>ID interno del objeto (para dependencias)</span>
+                      <span>ID interno (para dependencias entre nodos)</span>
                       <input
                         value={qrItemId(stage)}
                         onChange={(event) =>
@@ -1555,21 +914,67 @@ export default function GuidedNodeEditorFlow({
                         placeholder="ej: tarjeta_magnetica"
                       />
                       <small>
-                        Este ID es el que pondrás en otro nodo si ese nodo debe requerir este objeto
-                        para poder jugarse.
+                        Copia este ID en el campo &quot;Requiere objeto&quot; del nodo que depende de éste.
                       </small>
                     </label>
+
+                    {/* ── SECCIÓN 2: ¿Para qué sirve? ── */}
+                    <label className="wide">
+                      <span>🎯 ¿Para qué sirve este coleccionable?</span>
+                      <select
+                        value={String(config.collectible_purpose || 'standalone')}
+                        onChange={(event) =>
+                          onPatch({
+                            config: { ...config, collectible_purpose: event.target.value },
+                          })
+                        }
+                      >
+                        <option value="standalone">
+                          🎒 Solo coleccionable — el jugador lo guarda en la mochila
+                        </option>
+                        <option value="unlock_node">
+                          🔓 Desbloquea un nodo — otro nodo de la misión lo requiere
+                        </option>
+                        <option value="crafting">
+                          🔨 Ingrediente — el jugador lo combina en la Mesa de Trabajo
+                        </option>
+                        <option value="score">
+                          🏆 Puntuación — se canjea por puntos al finalizar la misión
+                        </option>
+                      </select>
+                      <small>
+                        Informativo. Ayuda a clarificar la narrativa de la misión sin cambiar la
+                        mecánica GPS.
+                      </small>
+                    </label>
+
+                    {String(config.collectible_purpose || 'standalone') === 'unlock_node' ? (
+                      <article
+                        className="saga-guided-v4-note wide"
+                        style={{
+                          borderColor: 'rgba(96,165,250,0.3)',
+                          background: 'rgba(96,165,250,0.06)',
+                        }}
+                      >
+                        <b>🔓 ¿Cómo vincular el desbloqueo?</b>
+                        <span>
+                          Copia el ID <strong>{qrItemId(stage) || '—'}</strong> y pégalo en el campo
+                          &quot;Requiere objeto&quot; del nodo que quieres que esté bloqueado hasta que el
+                          jugador recoja éste.
+                        </span>
+                      </article>
+                    ) : null}
                   </>
                 ) : null}
 
+                {/* ── SECCIÓN 3: Requisito de entrada ── */}
                 <div className="saga-guided-v4-dep-box wide">
                   <div className="saga-guided-v4-dep-box__title">
                     🔒 ¿Este nodo requiere algo para poder recogerse?
                   </div>
                   <p className="saga-guided-v4-dep-box__desc">
                     Opcional. Si lo configuras, el jugador necesitará tener ese objeto en su mochila
-                    antes de poder recoger este coleccionable. Aparecerá una línea de conexión en el
-                    mapa del administrador.
+                    antes de poder recoger este coleccionable.
                   </p>
                   <select
                     value={
@@ -1591,19 +996,15 @@ export default function GuidedNodeEditorFlow({
                     }}
                   >
                     <option value="none">🟢 Libre: cualquier jugador puede recogerlo</option>
-                    <option value="llave_maestra">
-                      🔑 Requiere Llave Maestra (objeto fabricable)
-                    </option>
-                    <option value="emp_device">
-                      ⚡ Requiere Dispositivo EMP (objeto fabricable)
-                    </option>
+                    <option value="llave_maestra">🔑 Requiere Llave Maestra (fabricable)</option>
+                    <option value="emp_device">⚡ Requiere Dispositivo EMP (fabricable)</option>
                     <option value="custom">✏️ Requiere otro objeto (ID personalizado)</option>
                   </select>
 
                   {stage.required_item_id &&
                   !['llave_maestra', 'emp_device'].includes(stage.required_item_id) ? (
                     <label>
-                      <span>ID del objeto que se necesita tener</span>
+                      <span>ID del objeto requerido</span>
                       <input
                         value={stage.required_item_id}
                         onChange={(event) =>
@@ -1618,8 +1019,9 @@ export default function GuidedNodeEditorFlow({
                   ) : null}
                 </div>
 
+                {/* ── SECCIÓN 4: Radio GPS ── */}
                 <label>
-                  <span>Radio de recolección (metros)</span>
+                  <span>📍 Radio de recolección (metros)</span>
                   <input
                     type="number"
                     value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 30)}
@@ -1630,8 +1032,8 @@ export default function GuidedNodeEditorFlow({
                     }}
                   />
                   <small>
-                    El jugador debe estar a menos de este número de metros del punto GPS para
-                    recoger el objeto.
+                    El jugador debe estar a menos de esta distancia del punto GPS para recoger el
+                    objeto.
                   </small>
                 </label>
               </div>
@@ -2144,24 +1546,24 @@ export default function GuidedNodeEditorFlow({
             <div className="saga-guided-v4-review">
               <article>
                 <b>Tipo</b>
-                <span>{mode === 'qr' ? 'QR físico' : 'Nodo de juego'}</span>
+                <span>{mode === 'qr' ? 'QR físico' : mode === 'map_collectible' ? 'Coleccionable en mapa' : 'Nodo de juego'}</span>
               </article>
               <article>
                 <b>Modo</b>
-                <span>{(mode === 'qr' ? selectedQr : selectedGame).title}</span>
+                <span>{mode === 'qr' ? selectedQr.title : mode === 'map_collectible' ? 'Objeto de mapa' : selectedGame.title}</span>
               </article>
               <article>
                 <b>Estado</b>
-                <span>{statusLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
+                <span>{mode === 'map_collectible' ? 'Jugable' : statusLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
               </article>
               <article>
                 <b>Offline</b>
-                <span>{offlineLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
+                <span>{mode === 'map_collectible' ? 'Offline listo' : offlineLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
               </article>
               <article>
                 <b>Completa por</b>
                 <span>
-                  {String(
+                  {mode === 'map_collectible' ? 'proximity' : String(
                     config.completion_method ||
                       (mode === 'qr' ? selectedQr.completionMethod : selectedGame.completionMethod)
                   )}

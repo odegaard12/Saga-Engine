@@ -437,28 +437,6 @@ export function PlayerHud({
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.deviceSettings', locale)}</div>
 
-          <div style={toolsLanguageBlock}>
-            <span style={toolsMiniLabel}>{t('player.tools.language', locale)}</span>
-
-            <div className="saga-tools-language-row">
-              <button
-                type="button"
-                className={locale === 'en' ? 'active' : ''}
-                onClick={() => chooseLocale('en')}
-              >
-                ENGLISH
-              </button>
-
-              <button
-                type="button"
-                className={locale === 'es' ? 'active' : ''}
-                onClick={() => chooseLocale('es')}
-              >
-                ESPAÑOL
-              </button>
-            </div>
-          </div>
-
           <div
             style={{
               display: 'flex',

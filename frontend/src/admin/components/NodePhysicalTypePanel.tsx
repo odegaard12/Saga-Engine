@@ -19,7 +19,7 @@ type NodePhysicalTypePanelProps = {
 }
 
 const physicalModes: Array<{ id: PhysicalQrKind; label: string; help: string; icon: string }> = [
-  { id: 'collectible', label: 'Objeto QR', help: 'Objeto físico que se recoge', icon: '⭐' },
+  { id: 'collectible', label: 'Coleccionable', help: 'Objeto físico que se recoge', icon: '⭐' },
   {
     id: 'requirement',
     label: 'Llave QR',
@@ -330,7 +330,7 @@ export default function NodePhysicalTypePanel({
       >
         <GuidedNodeEditorFlow
           stage={stage as unknown as Record<string, any>}
-          onPatch={(patch) => patchStage(patch)}
+          onPatch={(patch: Record<string, any>) => patchStage(patch)}
           onClose={onClose ?? (() => undefined)}
           onDelete={requestDeleteLocal}
         />

@@ -1,3 +1,17 @@
+# 2.1.0
+
+### Diseño Premium (Player)
+- Añadidos efectos de cristalizado (glassmorphism) en los controles y menús del jugador usando ackdrop-filter: blur().
+- Incorporadas nuevas micro-animaciones (escala al tocar, deslizamiento suave) en mobile-shell.css.
+- Actualizada la paleta visual a tonos dark blue/purple más ricos (Premium Design).
+
+### Refactorización y Mantenimiento (Admin)
+- Refactorización mayor del editor guiado (GuidedNodeEditorFlow.tsx). Extraídas más de 700 líneas de lógica pura, tipos y constantes a un nuevo archivo guidedEditorUtils.ts para mejorar la mantenibilidad y reducir la deuda técnica.
+- Solucionado el bug visual en el paso 5 de 'Revisar' que mostraba erróneamente un tipo de juego cuando se configuraba un Coleccionable de Mapa.
+
+### PWA y Offline
+- Confirmada la disponibilidad de la PWA para instalaciones offline. *Nota: Requiere acceder mediante HTTPS (por ejemplo a través de un túnel Cloudflare) para que el navegador ofrezca la opción de instalación e inicie el Service Worker.*
+
 # Changelog
 
 All notable changes to SAGA Engine are documented in this file.

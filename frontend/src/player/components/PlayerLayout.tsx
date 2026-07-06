@@ -35,11 +35,11 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     gap: 2,
     padding: 4,
     borderRadius: 24,
-    border: '1px solid rgba(255,255,255,.20)',
-    background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
-    boxShadow: '0 16px 34px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.10)',
-    backdropFilter: 'blur(8px) saturate(120%)',
-    WebkitBackdropFilter: 'blur(8px) saturate(120%)',
+    border: '1px solid var(--saga-glass-border)',
+    background: 'var(--saga-glass-bg)',
+    boxShadow: 'var(--saga-glass-shadow)',
+    backdropFilter: 'blur(16px) saturate(120%)',
+    WebkitBackdropFilter: 'blur(16px) saturate(120%)',
     pointerEvents: 'auto',
   }
 }
