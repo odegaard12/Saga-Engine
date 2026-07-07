@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import ItemIconSvg from '../../player/components/ItemIconSvg'
 
 export type AdminItem = {
   id: string
@@ -99,8 +100,8 @@ export default function ObjectsPanel() {
           {ITEMS.map((item) => (
             <div key={item.id} style={itemCard}>
               <div style={itemHeader}>
-                <span style={itemIcon}>{item.icon}</span>
-                <div>
+                <ItemIconSvg itemId={item.id} size={24} className="admin-obj-icon" />
+                <div style={{ marginLeft: '12px' }}>
                   <strong style={itemLabel}>{item.label}</strong>
                   <code style={itemCode}>ID: {item.id}</code>
                 </div>

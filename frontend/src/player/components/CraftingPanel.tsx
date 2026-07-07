@@ -6,30 +6,7 @@ interface CraftingPanelProps {
   user: string
 }
 
-// ─── Icon resolver (shared with inventory) ────────────────────────────────────
-const ICON_MAP: [RegExp, string, string][] = [
-  [/llave|key/i, '🔑', '#f59e0b'],
-  [/emp|electr|bateria|pila/i, '⚡', '#3b82f6'],
-  [/cable|wire/i, '〰️', '#64748b'],
-  [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
-  [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
-  [/herramienta|tool/i, '🔧', '#f97316'],
-  [/arma|pistol|rifle/i, '🔫', '#ef4444'],
-  [/escudo|shield/i, '🛡️', '#06b6d4'],
-  [/map|mapa/i, '🗺️', '#10b981'],
-  [/radio|señal|signal/i, '📡', '#a855f7'],
-  [/linterna|luz/i, '🔦', '#fbbf24'],
-  [/nota|papel|doc/i, '📄', '#e2e8f0'],
-  [/medic|pastilla/i, '💊', '#fb7185'],
-  [/bomb|explosiv/i, '💣', '#ef4444'],
-]
-
-function getIcon(label: string): { glyph: string; color: string } {
-  for (const [p, g, c] of ICON_MAP) {
-    if (p.test(label)) return { glyph: g, color: c }
-  }
-  return { glyph: '⚙️', color: '#8b5cf6' }
-}
+import ItemIconSvg from './ItemIconSvg'
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -43,7 +20,6 @@ function RecipeCard({
   onCrafted: (msg: string) => void
 }) {
   const canCraft = checkCraftingPossible(user, recipe)
-  const outputIcon = getIcon(recipe.outputs[0]?.label || recipe.label)
   const [pressed, setPressed] = useState(false)
 
   return (
@@ -59,11 +35,10 @@ function RecipeCard({
         <span
           style={{
             ...recipeOutputIcon,
-            background: `${outputIcon.color}1a`,
-            color: outputIcon.color,
+            background: `rgba(255,255,255,0.08)`,
           }}
         >
-          {outputIcon.glyph}
+          <ItemIconSvg itemId={recipe.outputs[0]?.label || recipe.label} size={32} />
         </span>
         <div style={recipeOutputBody}>
           <div style={recipeTitle}>{recipe.label}</div>
@@ -77,10 +52,9 @@ function RecipeCard({
       {/* Inputs needed */}
       <div style={inputsRow}>
         {recipe.inputs.map((inp) => {
-          const ic = getIcon(inp.item_id)
           return (
             <div key={inp.item_id} style={inputChip}>
-              <span style={{ fontSize: 14 }}>{ic.glyph}</span>
+              <ItemIconSvg itemId={inp.item_id} size={16} />
               <span style={inputChipLabel}>
                 {inp.quantity}× {inp.item_id.replace(/_/g, ' ')}
               </span>

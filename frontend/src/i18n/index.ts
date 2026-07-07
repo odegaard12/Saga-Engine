@@ -287,12 +287,7 @@ function isLocale(value: string | null): value is Locale {
 }
 
 export function getLocale(): Locale {
-  try {
-    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-    return isLocale(stored) ? stored : DEFAULT_LOCALE
-  } catch {
-    return DEFAULT_LOCALE
-  }
+  return 'es'
 }
 
 export function setLocale(locale: Locale) {

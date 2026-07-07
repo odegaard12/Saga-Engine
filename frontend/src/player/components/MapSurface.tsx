@@ -23,7 +23,7 @@ type NodeVisualState = 'locked' | 'ready' | 'engaging'
 type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
 const physicalNodeVisuals: Record<PhysicalNodeKind, { kind: PhysicalNodeKind; label: string }> = {
-  collectible: { kind: 'collectible', label: 'Coleccionable QR' },
+  collectible: { kind: 'collectible', label: 'Coleccionable' },
   requirement: { kind: 'requirement', label: 'Llave o requisito QR' },
   clue: { kind: 'clue', label: 'Pista QR' },
   bonus: { kind: 'bonus', label: 'Bonus QR' },
@@ -623,6 +623,10 @@ export function MapSurface({
     const map = L.map(mapRootRef.current, {
       zoomControl: false,
       attributionControl: false,
+      fadeAnimation: true,       // Smooth tile fade-in instead of hard paint
+      zoomAnimation: true,       // Smooth CSS zoom transitions
+      markerZoomAnimation: true, // Keep markers visible during zoom
+      preferCanvas: false,       // SVG renders cleaner on Retina
     })
 
     const offlineGridLayer = new (
@@ -640,9 +644,10 @@ export function MapSurface({
       {
         maxZoom: 20,
         maxNativeZoom: 19,
-        keepBuffer: 32,
-        updateWhenZooming: true,
-        updateWhenIdle: false,
+        keepBuffer: 48,          // Keep more tiles in memory to prevent edge flickering
+        updateWhenZooming: false, // Don't re-fetch during zoom animation
+        updateWhenIdle: true,     // Only update when map is not moving
+        crossOrigin: true,        // Enable CORS for better caching
         attribution:
           'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EAP, and the GIS User Community',
       }
@@ -1371,36 +1376,40 @@ export function MapSurface({
     const map = mapRef.current
     if (!map) return
 
-    const refreshMap = () => {
+    const refreshMap = (forceRedraw = false) => {
       window.requestAnimationFrame(() => {
         map.invalidateSize({ pan: false })
 
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           mapRootRef.current?.classList.remove('saga-map-offline-tiles')
 
-          tileLayerRef.current?.redraw()
+          if (forceRedraw) {
+            tileLayerRef.current?.redraw()
+          }
         }
       })
     }
 
-    refreshMap()
+    refreshMap(false)
 
-    window.addEventListener('online', refreshMap)
+    const handleOnline = () => refreshMap(true)
+    window.addEventListener('online', handleOnline)
 
-    window.addEventListener('pageshow', refreshMap)
+    const handlePageShow = () => refreshMap(false)
+    window.addEventListener('pageshow', handlePageShow)
 
     const visibilityHandler = () => {
       if (document.visibilityState === 'visible') {
-        refreshMap()
+        refreshMap(false)
       }
     }
 
     document.addEventListener('visibilitychange', visibilityHandler)
 
     return () => {
-      window.removeEventListener('online', refreshMap)
+      window.removeEventListener('online', handleOnline)
 
-      window.removeEventListener('pageshow', refreshMap)
+      window.removeEventListener('pageshow', handlePageShow)
 
       document.removeEventListener('visibilitychange', visibilityHandler)
     }

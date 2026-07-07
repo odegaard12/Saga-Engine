@@ -178,7 +178,7 @@ function getPhysicalRequirementOption(
           ? 'Pista QR'
           : kind === 'bonus'
             ? 'Bonus QR'
-            : 'Objeto QR')
+            : 'Coleccionable')
   ).trim()
 
   const itemId = String(
@@ -558,6 +558,7 @@ export default function NodeDetailDrawer({
             stage={draft}
             onPatch={patchGuidedV3Stage}
             onClose={onClose}
+            stages={stages}
             onDelete={() => {
               if (
                 window.confirm(

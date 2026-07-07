@@ -551,23 +551,6 @@ export default function AdminMissionControlShell({
                 onDeleteLocal={onDeleteStage}
               />
             </div>
-          ) : isPhysicalNode(liveSelectedStage) ? (
-            <>
-              <div
-                className="saga-node-physical-type"
-                data-saga-node-physical-type="saga-node-physical-editor-v1"
-              >
-                <NodePhysicalTypePanel
-                  stage={liveSelectedStage}
-                  onApplyLocal={onApplyStage}
-                  onRequestChangeType={() =>
-                    setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
-                  }
-                  onClose={() => onSelectStage(null)}
-                  onDeleteLocal={onDeleteStage}
-                />
-              </div>
-            </>
           ) : (
             <NodeDetailDrawer
               stage={liveSelectedStage}
@@ -672,6 +655,12 @@ function isPhysicalNode(stage: AdminReactOverviewStage | null) {
     physical_node_kind?: string
     physical_item_kind?: string
     physical_qr?: { kind?: string }
+    is_map_collectible?: boolean
+    config?: { is_map_collectible?: boolean }
+  }
+
+  if (record.is_map_collectible || record.config?.is_map_collectible) {
+    return false
   }
 
   const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind

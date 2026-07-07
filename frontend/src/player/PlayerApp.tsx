@@ -963,9 +963,9 @@ export default function PlayerApp() {
       showNotice('Debug desactivado. Recuperando GPS real…', 'info')
 
       if (hasRememberedGpsReady(user)) {
-        void handleRequestLiveGps({ silent: true, forceFocus: true })
+        void handleRequestLiveGps({ silent: true, forceFocus: true, exitingDebug: true })
         window.setTimeout(() => {
-          void handleRequestLiveGps({ silent: true, forceFocus: true })
+          void handleRequestLiveGps({ silent: true, forceFocus: true, exitingDebug: true })
         }, 1500)
       }
 
@@ -1092,7 +1092,9 @@ export default function PlayerApp() {
     setInteractionOpen(true)
   }
 
-  async function handleRequestLiveGps(options: { silent?: boolean; forceFocus?: boolean } = {}) {
+  async function handleRequestLiveGps(
+    options: { silent?: boolean; forceFocus?: boolean; exitingDebug?: boolean } = {}
+  ) {
     if (typeof window === 'undefined' || !window.navigator.geolocation) {
       setBrowserGpsStatus('unavailable')
       if (!options.silent) showNotice('GPS no disponible en este dispositivo o navegador.', 'warn')
@@ -1107,6 +1109,10 @@ export default function PlayerApp() {
           'El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.',
           'warn'
         )
+      return
+    }
+
+    if (localDebugEnabled && !options.exitingDebug) {
       return
     }
 
@@ -1125,6 +1131,10 @@ export default function PlayerApp() {
       showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
     const onSuccess = (position: GeolocationPosition) => {
+      if (localDebugEnabled) {
+        return
+      }
+
       const next = {
         lat: position.coords.latitude,
         lon: position.coords.longitude,
