@@ -10821,7 +10821,7 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .admin-guided-v4-shell .admin-node-editor-tabs,
 .admin-guided-v4-shell .admin-node-editor-inline-topbar,
 .admin-guided-v4-shell .admin-drawer-footer,
-.admin-guided-v4-body-host > :not(.saga-guided-editor-v4) {
+.admin-guided-v4-body-host > :not(.saga-guided-editor-v4):not(.saga-guided-v4-flow-container) {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -12495,3 +12495,22 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   padding-right: 4px !important;
 }
 
+/* Custom scroll view for QR and Collectible editors */
+.saga-guided-v4-scroll-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow-y: auto !important;
+  color: #f8fafc !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.14), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(99, 102, 241, 0.13), transparent 32%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.985), rgba(15, 23, 42, 0.965)) !important;
+}
+
+.saga-guided-v4-flow-container {
+  display: block !important;
+  height: 100% !important;
+  width: 100% !important;
+}

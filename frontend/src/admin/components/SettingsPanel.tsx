@@ -167,31 +167,6 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>{t('admin.settingsPanel.story')}</strong>
-          <span>{t('admin.settingsPanel.storySubtitle')}</span>
-        </div>
-
-        <div className="admin-settings-grid-modern">
-          <label>
-            {t('admin.settingsPanel.storyTitle')}
-            <input
-              value={missionDraft.story_title || ''}
-              onChange={(event) => onUpdateMissionDraft('story_title', event.target.value)}
-            />
-          </label>
-
-          <label className="admin-wide-field">
-            {t('admin.settingsPanel.storyText')}
-            <textarea
-              value={missionDraft.story_text || ''}
-              onChange={(event) => onUpdateMissionDraft('story_text', event.target.value)}
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="admin-settings-section-modern">
-        <div className="admin-settings-section-head">
           <strong>{t('admin.settingsPanel.prologue')}</strong>
           <span>{t('admin.settingsPanel.prologueSubtitle')}</span>
         </div>
@@ -218,6 +193,7 @@ export default function SettingsPanel({
             <textarea
               value={missionDraft.prologue_body || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
+              placeholder="Puedes usar Markdown para imágenes: ![Descripción de la imagen](https://url-de-la-imagen.jpg)"
             />
           </label>
         </div>

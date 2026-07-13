@@ -559,6 +559,7 @@ export default function NodeDetailDrawer({
             onPatch={patchGuidedV3Stage}
             onClose={onClose}
             stages={stages}
+            onRequestChangeType={onRequestChangeType}
             onDelete={() => {
               if (
                 window.confirm(

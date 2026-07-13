@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v1.2.2-rpg-viewfinder'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.2'
+const CACHE_NAME = 'saga-player-shell-v2.2.2-latest'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v2.2.2'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'
@@ -187,8 +187,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
 
   if (
-    url.hostname === 'server.arcgisonline.com' &&
-    url.pathname.includes('/World_Imagery/MapServer/tile/')
+    url.hostname.endsWith('tile.openstreetmap.org')
   ) {
     event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return

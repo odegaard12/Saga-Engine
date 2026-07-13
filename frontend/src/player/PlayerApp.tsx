@@ -23,6 +23,7 @@ import type {
 } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
+import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
@@ -138,6 +139,8 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
 
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [showPrologue, setShowPrologue] = useState(false)
+  const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -290,12 +293,36 @@ export default function PlayerApp() {
 
         if (!cancelled) {
           setState({ status: 'ready', payload, config })
+          
+          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
+          if (payload.level < lastLevel) {
+            sessionStorage.removeItem('saga_seen_prologue')
+          }
+          sessionStorage.setItem('saga_last_level', String(payload.level))
+
+          if (config.prologue_body && !sessionStorage.getItem('saga_seen_prologue')) {
+            setShowPrologue(true)
+            sessionStorage.setItem('saga_seen_prologue', 'true')
+          }
         }
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
 
         if (!cancelled && offlinePack?.payload && offlinePack?.config) {
           setState({ status: 'ready', payload: offlinePack.payload, config: offlinePack.config })
+          
+          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
+          if (offlinePack.payload.level < lastLevel) {
+            sessionStorage.removeItem('saga_seen_prologue')
+          }
+          sessionStorage.setItem('saga_last_level', String(offlinePack.payload.level))
+
+          if (offlinePack.config.prologue_body && !sessionStorage.getItem('saga_seen_prologue')) {
+            setShowPrologue(true)
+            sessionStorage.setItem('saga_seen_prologue', 'true')
+          }
           return
         }
 
@@ -352,8 +379,19 @@ export default function PlayerApp() {
           setState((prev) => ({
             status: 'ready',
             payload: nextPayload,
-            config: prev.status === 'ready' ? prev.config : nextConfig,
+            config: nextConfig,
           }))
+
+          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
+          if (nextPayload.level < lastLevel) {
+            sessionStorage.removeItem('saga_seen_prologue')
+            if (nextConfig.prologue_body) {
+              setShowPrologue(true)
+              sessionStorage.setItem('saga_seen_prologue', 'true')
+            }
+          }
+          sessionStorage.setItem('saga_last_level', String(nextPayload.level))
 
           setMapRefreshToken((value) => value + 1)
         }
@@ -657,6 +695,14 @@ export default function PlayerApp() {
       if (document.visibilityState === 'visible') {
         if (handleRequestLiveGpsRef.current) {
           void handleRequestLiveGpsRef.current({ silent: true, forceFocus: false })
+        }
+        // FORZAR ACTUALIZACIÓN DE SERVICE WORKER AL RESUMIR
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready
+            .then((registration) => {
+              void registration.update().catch(() => undefined)
+            })
+            .catch(() => undefined)
         }
       }
     }
@@ -1324,34 +1370,17 @@ export default function PlayerApp() {
 
     if (!runtime.canEnter) return
 
-    if (isMapCollectible && currentStage) {
-      const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
-      const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto'
 
-      collectInventoryItem({
-        user: payload.user,
-        item_id: itemId,
-        label: label,
-        quantity: 1,
-        source: 'manual',
-        node_id: String(currentStage.id),
-        metadata: {
-          physical_icon:
-            (currentStage as any).physical_icon || (currentStage as any).config?.physical_icon,
-        },
-        queue_event: true,
-      })
-
-      showNotice(`¡Recogido: ${label}!`, 'success')
-      vibrate([10, 40, 10])
-      void handleSubmitCode('OK')
-      return
-    }
 
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
     showOverlay('activate')
-    openInteraction()
+    
+    if (currentStage?.intro_body && !isMapCollectible) {
+      setActiveStageIntro(true)
+    } else {
+      openInteraction()
+    }
   }
 
   function handleMapNodeTap() {
@@ -1418,6 +1447,28 @@ export default function PlayerApp() {
     try {
       setSubmitting(true)
       setSubmitError(null)
+
+      if (isMapCollectible && currentStage && code === 'OK') {
+        const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
+        const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto'
+
+        collectInventoryItem({
+          user: payload.user,
+          item_id: itemId,
+          label: label,
+          quantity: 1,
+          source: 'manual',
+          node_id: String(currentStage.id),
+          metadata: {
+            physical_icon:
+              (currentStage as any).physical_icon || (currentStage as any).config?.physical_icon,
+          },
+          queue_event: true,
+        })
+
+        showNotice(`¡Recogido: ${label}!`, 'success')
+        vibrate([10, 40, 10])
+      }
 
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
@@ -1680,6 +1731,8 @@ export default function PlayerApp() {
             </span>
           </button>
 
+
+
           <button
             type="button"
             style={{
@@ -1827,6 +1880,7 @@ export default function PlayerApp() {
           if (!submitting) setInteractionOpen(false)
         }}
         onSubmitCode={handleSubmitCode}
+        onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
       />
 
       {payload.finished && dismissedFinishScreen ? (
@@ -1840,6 +1894,28 @@ export default function PlayerApp() {
           🏆
         </button>
       ) : null}
+
+      {showPrologue && state.status === 'ready' && state.config && (
+        <StoryModal
+          title={state.config.prologue_title || 'Prólogo'}
+          subtitle={state.config.prologue_subtitle}
+          body={state.config.prologue_body || ''}
+          buttonText="Comenzar Aventura"
+          onClose={() => setShowPrologue(false)}
+        />
+      )}
+
+      {activeStageIntro && currentStage && (
+        <StoryModal
+          title={currentStage.intro_title || currentStage.title || 'Historia'}
+          body={currentStage.intro_body || ''}
+          buttonText="Continuar a la prueba"
+          onClose={() => {
+            setActiveStageIntro(false)
+            openInteraction()
+          }}
+        />
+      )}
     </ScreenFrame>
   )
 }

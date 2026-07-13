@@ -57,6 +57,8 @@ export interface PlayerStage {
   radius: number
   type?: string
   content?: string
+  intro_title?: string
+  intro_body?: string
   config?: StageConfig
   minigame?: StageMinigameRuntime
   entry?: StageEntryRules

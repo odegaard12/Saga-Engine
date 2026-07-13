@@ -20,6 +20,8 @@ SAGA_PHYSICAL_STAGE_FIELDS = (
     "qr_payload",
     "physical_qr",
     "is_map_collectible",
+    "intro_title",
+    "intro_body",
 )
 
 def _positive_int(value, default=1):

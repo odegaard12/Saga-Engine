@@ -640,16 +640,15 @@ export function MapSurface({
     offlineGridLayer.addTo(map)
 
     const tileLayer = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        maxZoom: 20,
-        maxNativeZoom: 19,
+        maxZoom: 19,
         keepBuffer: 48,          // Keep more tiles in memory to prevent edge flickering
         updateWhenZooming: false, // Don't re-fetch during zoom animation
         updateWhenIdle: true,     // Only update when map is not moving
         crossOrigin: true,        // Enable CORS for better caching
         attribution:
-          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EAP, and the GIS User Community',
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }
     )
 

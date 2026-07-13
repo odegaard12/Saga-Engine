@@ -110,6 +110,36 @@ export default function AdminQrEditor({
 
           <div className="saga-guided-v4-dep-box wide">
             <div className="saga-guided-v4-dep-box__title">
+              📖 Historia / Introducción (Opcional)
+            </div>
+            <p className="saga-guided-v4-dep-box__desc">
+              Texto que se mostrará al jugador ANTES de indicarle que escanee el QR.
+            </p>
+            <div style={{ padding: '0 12px 12px' }}>
+              <label className="wide">
+                <span>Título de la historia</span>
+                <input 
+                  type="text" 
+                  value={stage.intro_title || ''} 
+                  onChange={(e) => onPatch({ intro_title: e.target.value })}
+                  placeholder="Ej: El cofre secreto"
+                  style={{ marginBottom: 8 }}
+                />
+              </label>
+              <label className="wide">
+                <span>Narrativa previa</span>
+                <textarea 
+                  value={stage.intro_body || ''} 
+                  onChange={(e) => onPatch({ intro_body: e.target.value })}
+                  placeholder="Soporta Markdown para imágenes: ![alt](url)."
+                  rows={3}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="saga-guided-v4-dep-box wide">
+            <div className="saga-guided-v4-dep-box__title">
               🆘 Código de Emergencia (Fallback)
             </div>
             <p className="saga-guided-v4-dep-box__desc">
