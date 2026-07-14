@@ -674,7 +674,27 @@ export function MapSurface({
     updateZoom()
     setMapReadyToken((value) => value + 1)
 
+    // iOS Safari fix: Leaflet may initialise with 0×0 dimensions if the
+    // container is not yet painted. Force a size recalculation after mount
+    // and whenever the container is resized (e.g. orientation change).
+    const invalidate = () => {
+      try { map.invalidateSize({ animate: false }) } catch {}
+    }
+    const t1 = setTimeout(invalidate, 100)
+    const t2 = setTimeout(invalidate, 400)
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapRootRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        invalidate()
+      })
+      resizeObserver.observe(mapRootRef.current)
+    }
+
     return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      resizeObserver?.disconnect()
       map.off('zoomend', updateZoom)
       playerMarkerRef.current?.remove()
       playerAuraRef.current?.remove()
@@ -1550,10 +1570,8 @@ export function MapSurface({
 }
 
 const surface: React.CSSProperties = {
-  position: 'relative',
-  width: '100%',
-  height: '100%',
-  minHeight: 0,
+  position: 'absolute',
+  inset: 0,
   borderRadius: 28,
   overflow: 'hidden',
   border: '1px solid rgba(15,23,42,.10)',
@@ -1564,6 +1582,8 @@ const surface: React.CSSProperties = {
 const canvas: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
+  width: '100%',
+  height: '100%',
 }
 
 const mapAnimations = `
