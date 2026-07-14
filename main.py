@@ -14,6 +14,11 @@ import sqlite3
 import time
 import ipaddress
 from pathlib import Path
+try:
+    import httpx as _httpx
+    _HTTPX_AVAILABLE = True
+except ImportError:
+    _HTTPX_AVAILABLE = False
 
 from backend.app.storage.json_store import load_json, save_json, update_json
 from backend.app.storage.runtime_store import load_document, load_stages, save_document, save_stages
@@ -971,6 +976,45 @@ def get_runtime_version_payload():
 @app.get("/api/version")
 async def get_version():
     return get_runtime_version_payload()
+
+
+# ---------------------------------------------------------------------------
+# OSM tile proxy – serves tiles from the same HTTP origin so iOS Safari
+# does not block them as "mixed content" when the app runs over plain HTTP.
+# ---------------------------------------------------------------------------
+_OSM_TILE_BASE = "https://tile.openstreetmap.org"
+_TILE_PROXY_HEADERS = {
+    "User-Agent": "SAGA-Engine/2.x tile-proxy (self-hosted, https://github.com/odegaard12/Saga-Engine)",
+    "Referer": "https://www.openstreetmap.org/",
+}
+
+@app.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
+async def osm_tile_proxy(z: int, x: int, y: int):
+    """Proxy OSM raster tiles so they are served from the same HTTP origin,
+    avoiding iOS Safari mixed-content (HTTPS tile ← HTTP page) restrictions."""
+    if z < 0 or z > 19:
+        raise HTTPException(status_code=400, detail="Invalid zoom")
+    url = f"{_OSM_TILE_BASE}/{z}/{x}/{y}.png"
+    if _HTTPX_AVAILABLE:
+        try:
+            async with _httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(url, headers=_TILE_PROXY_HEADERS, follow_redirects=True)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
+            return Response(
+                content=resp.content,
+                media_type="image/png",
+                headers={
+                    "Cache-Control": "public, max-age=86400",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+        except _httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"Tile proxy error: {exc}")
+    else:
+        # Fallback: redirect the client directly to OSM (may still fail on iOS HTTP)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=url, status_code=302)
 
 
 @app.get("/api/config")

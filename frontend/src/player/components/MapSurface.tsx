@@ -640,13 +640,13 @@ export function MapSurface({
     offlineGridLayer.addTo(map)
 
     const tileLayer = L.tileLayer(
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      '/map-tiles/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
         keepBuffer: 48,          // Keep more tiles in memory to prevent edge flickering
         updateWhenZooming: false, // Don't re-fetch during zoom animation
         updateWhenIdle: true,     // Only update when map is not moving
-        crossOrigin: true,        // Enable CORS for better caching
+        crossOrigin: false,       // Same-origin proxy, no CORS needed
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }

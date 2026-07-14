@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v2.2.2-latest'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v2.2.2'
+const CACHE_NAME = 'saga-player-shell-v2.2.3-latest'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v2.2.3'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'
@@ -186,12 +186,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
 
-  if (
-    url.hostname.endsWith('tile.openstreetmap.org')
-  ) {
-    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
-    return
-  }
+  // Map tiles are now served via a same-origin proxy (/map-tiles/...) and
+  // will be caught by the isShellAsset or cacheFirst logic below if needed.
+  // No special OSM hostname handling required.
 
   if (url.origin !== self.location.origin) return
 
