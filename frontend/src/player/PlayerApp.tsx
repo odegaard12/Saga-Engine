@@ -140,10 +140,16 @@ export default function PlayerApp() {
   const [showPrologue, setShowPrologue] = useState(() => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
-      if (url.searchParams.get('login') === '1') {
+      const loginId = url.searchParams.get('login')
+      if (loginId) {
         url.searchParams.delete('login')
         window.history.replaceState({}, '', url.toString())
-        return true
+        
+        const storedLoginId = localStorage.getItem('saga_last_login_id')
+        if (storedLoginId !== loginId) {
+          localStorage.setItem('saga_last_login_id', loginId)
+          return true
+        }
       }
     }
     return false
@@ -1662,24 +1668,6 @@ export default function PlayerApp() {
             showLauncher={false}
           />
 
-          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
-            <button
-              type="button"
-              style={mapRouteToggleInlineButton}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                setShowPrologue(true)
-              }}
-              aria-label="Historia"
-              title="Leer historia"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>
-                📖
-              </span>
-            </button>
-          ) : null}
-
           <button
             type="button"
             style={mapRouteToggleInlineButton}
@@ -1767,6 +1755,24 @@ export default function PlayerApp() {
           >
             CENTRAR
           </button>
+
+          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setShowPrologue(true)
+              }}
+              aria-label="Historia"
+              title="Leer historia"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                📖
+              </span>
+            </button>
+          ) : null}
         </div>
       ) : null}
       {/* saga-map-quick-controls-row-v1 */}
