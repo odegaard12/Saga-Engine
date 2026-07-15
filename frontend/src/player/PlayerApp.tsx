@@ -1685,6 +1685,24 @@ export default function PlayerApp() {
             </span>
           </button>
 
+          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setShowPrologue(true)
+              }}
+              aria-label="Historia"
+              title="Leer historia"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                📖
+              </span>
+            </button>
+          ) : null}
+
           <button
             type="button"
             style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
@@ -1752,27 +1770,6 @@ export default function PlayerApp() {
               void handleRequestLiveGps({ forceFocus: true })
             }}
             aria-label="Centrar en mi ubicación"
-          >
-            CENTRAR
-          </button>
-
-          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
-            <button
-              type="button"
-              style={mapRouteToggleInlineButton}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                setShowPrologue(true)
-              }}
-              aria-label="Historia"
-              title="Leer historia"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>
-                📖
-              </span>
-            </button>
-          ) : null}
         </div>
       ) : null}
       {/* saga-map-quick-controls-row-v1 */}
