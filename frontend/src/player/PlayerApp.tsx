@@ -301,32 +301,12 @@ export default function PlayerApp() {
 
         if (!cancelled) {
           setState({ status: 'ready', payload, config })
-          
-          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
-          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          sessionStorage.setItem(`saga_last_level_${user}`, String(payload.level))
-
-          if (lastLevel !== -1 && payload.level > lastLevel) {
-            if (config.prologue_body || config.prologue_title || config.prologue_subtitle) {
-              setShowPrologue(true)
-            }
-          }
         }
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
 
         if (!cancelled && offlinePack?.payload && offlinePack?.config) {
           setState({ status: 'ready', payload: offlinePack.payload, config: offlinePack.config })
-          
-          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
-          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          sessionStorage.setItem(`saga_last_level_${user}`, String(offlinePack.payload.level))
-
-          if (lastLevel !== -1 && offlinePack.payload.level > lastLevel) {
-            if (offlinePack.config.prologue_body || offlinePack.config.prologue_title || offlinePack.config.prologue_subtitle) {
-              setShowPrologue(true)
-            }
-          }
           return
         }
 
@@ -385,16 +365,6 @@ export default function PlayerApp() {
             payload: nextPayload,
             config: nextConfig,
           }))
-
-          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
-          const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          if (lastLevel !== -1 && nextPayload.level > lastLevel) {
-            if (nextConfig.prologue_body || nextConfig.prologue_title || nextConfig.prologue_subtitle) {
-              setShowPrologue(true)
-            }
-          }
-          sessionStorage.setItem(`saga_last_level_${user}`, String(nextPayload.level))
-
           setMapRefreshToken((value) => value + 1)
         }
       } catch {
