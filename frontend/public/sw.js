@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v3.0.2-latest'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.0.2'
+const CACHE_NAME = 'saga-player-shell-v3.0.3-latest'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.0.3'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'

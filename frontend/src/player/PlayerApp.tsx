@@ -136,6 +136,7 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
 }
 
 export default function PlayerApp() {
+  const user = getPlayerNameFromLocation() || getUserFromUrl()
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [showPrologue, setShowPrologue] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -223,7 +224,6 @@ export default function PlayerApp() {
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
   >(null)
   const prevTeamStatusRef = useRef<Record<string, string>>({})
-  const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
   const isPhone = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
