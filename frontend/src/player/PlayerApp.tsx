@@ -144,10 +144,12 @@ export default function PlayerApp() {
       if (loginId) {
         url.searchParams.delete('login')
         window.history.replaceState({}, '', url.toString())
-        
-        const storedLoginId = localStorage.getItem('saga_last_login_id')
-        if (storedLoginId !== loginId) {
-          localStorage.setItem('saga_last_login_id', loginId)
+      }
+      
+      if (loginId) {
+        const hasSeen = localStorage.getItem(`saga_prologue_seen_${user}`)
+        if (!hasSeen) {
+          localStorage.setItem(`saga_prologue_seen_${user}`, '1')
           return true
         }
       }
