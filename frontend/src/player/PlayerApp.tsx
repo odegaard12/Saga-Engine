@@ -1772,6 +1772,9 @@ export default function PlayerApp() {
               void handleRequestLiveGps({ forceFocus: true })
             }}
             aria-label="Centrar en mi ubicación"
+          >
+            CENTRAR
+          </button>
         </div>
       ) : null}
       {/* saga-map-quick-controls-row-v1 */}
