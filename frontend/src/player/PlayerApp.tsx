@@ -61,6 +61,7 @@ import {
   rememberGpsReady,
   hasRememberedGpsReady,
 } from './utils/gpsStorage'
+import { haptics, sounds } from './utils/haptics'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import {
   getPlayerAvatarInitials,
@@ -94,10 +95,7 @@ type FocusRequest = {
 } | null
 
 function vibrate(pattern: number | number[]) {
-  if (typeof window === 'undefined') return
-  if (!('navigator' in window)) return
-  if (typeof window.navigator.vibrate !== 'function') return
-  window.navigator.vibrate(pattern)
+  haptics.vibrate(pattern)
 }
 
 function getUserFromUrl(): string {
@@ -139,7 +137,17 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
 
 export default function PlayerApp() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
-  const [showPrologue, setShowPrologue] = useState(false)
+  const [showPrologue, setShowPrologue] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.get('login') === '1') {
+        url.searchParams.delete('login')
+        window.history.replaceState({}, '', url.toString())
+        return true
+      }
+    }
+    return false
+  })
   const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
@@ -294,16 +302,14 @@ export default function PlayerApp() {
         if (!cancelled) {
           setState({ status: 'ready', payload, config })
           
-          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
           const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          if (payload.level < lastLevel) {
-            sessionStorage.removeItem('saga_seen_prologue')
-          }
-          sessionStorage.setItem('saga_last_level', String(payload.level))
+          sessionStorage.setItem(`saga_last_level_${user}`, String(payload.level))
 
-          if (config.prologue_body && !sessionStorage.getItem('saga_seen_prologue')) {
-            setShowPrologue(true)
-            sessionStorage.setItem('saga_seen_prologue', 'true')
+          if (lastLevel !== -1 && payload.level > lastLevel) {
+            if (config.prologue_body || config.prologue_title || config.prologue_subtitle) {
+              setShowPrologue(true)
+            }
           }
         }
       } catch (error) {
@@ -312,16 +318,14 @@ export default function PlayerApp() {
         if (!cancelled && offlinePack?.payload && offlinePack?.config) {
           setState({ status: 'ready', payload: offlinePack.payload, config: offlinePack.config })
           
-          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
           const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          if (offlinePack.payload.level < lastLevel) {
-            sessionStorage.removeItem('saga_seen_prologue')
-          }
-          sessionStorage.setItem('saga_last_level', String(offlinePack.payload.level))
+          sessionStorage.setItem(`saga_last_level_${user}`, String(offlinePack.payload.level))
 
-          if (offlinePack.config.prologue_body && !sessionStorage.getItem('saga_seen_prologue')) {
-            setShowPrologue(true)
-            sessionStorage.setItem('saga_seen_prologue', 'true')
+          if (lastLevel !== -1 && offlinePack.payload.level > lastLevel) {
+            if (offlinePack.config.prologue_body || offlinePack.config.prologue_title || offlinePack.config.prologue_subtitle) {
+              setShowPrologue(true)
+            }
           }
           return
         }
@@ -382,16 +386,14 @@ export default function PlayerApp() {
             config: nextConfig,
           }))
 
-          const lastLevelStr = sessionStorage.getItem('saga_last_level')
+          const lastLevelStr = sessionStorage.getItem(`saga_last_level_${user}`)
           const lastLevel = lastLevelStr ? parseInt(lastLevelStr, 10) : -1
-          if (nextPayload.level < lastLevel) {
-            sessionStorage.removeItem('saga_seen_prologue')
-            if (nextConfig.prologue_body) {
+          if (lastLevel !== -1 && nextPayload.level > lastLevel) {
+            if (nextConfig.prologue_body || nextConfig.prologue_title || nextConfig.prologue_subtitle) {
               setShowPrologue(true)
-              sessionStorage.setItem('saga_seen_prologue', 'true')
             }
           }
-          sessionStorage.setItem('saga_last_level', String(nextPayload.level))
+          sessionStorage.setItem(`saga_last_level_${user}`, String(nextPayload.level))
 
           setMapRefreshToken((value) => value + 1)
         }
@@ -1415,7 +1417,7 @@ export default function PlayerApp() {
       if (isMapCollectible) {
         handlePrimaryAction()
       } else {
-        showNotice('Target in range. Use Open Interaction.', 'info')
+        showNotice('Ya estás en rango. Pulsa el botón principal para abrir el nodo.', 'info')
       }
       return
     }
@@ -1423,24 +1425,24 @@ export default function PlayerApp() {
     if (runtime.reason === 'out_of_range') {
       showNotice(
         distanceMeters !== null
-          ? 'Too far away. Move closer to the node.'
-          : 'Too far from the node.',
+          ? `Demasiado lejos (${distanceMeters}m). Acércate al nodo.`
+          : 'Fuera de rango. Acércate al nodo.',
         'warn'
       )
       return
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showNotice('Position is not ready yet.', 'info')
+      showNotice('GPS no disponible. Actívalo para detectar tu posición.', 'info')
       return
     }
 
     if (runtime.reason === 'missing_stage') {
-      showNotice('Complete the previous stage first.', 'warn')
+      showNotice('Completa el nodo anterior antes de acceder a este.', 'warn')
       return
     }
 
-    showNotice('Interaction is not available yet.', 'info')
+    showNotice('Este nodo no está disponible todavía.', 'info')
   }
 
   async function handleSubmitCode(code: string) {
@@ -1450,7 +1452,11 @@ export default function PlayerApp() {
 
       if (isMapCollectible && currentStage && code === 'OK') {
         const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
-        const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto'
+        const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto Coleccionable'
+        const icon = (currentStage as any).physical_icon ||
+          (currentStage as any).config?.physical_icon ||
+          (currentStage as any).icon ||
+          '⭐'
 
         collectInventoryItem({
           user: payload.user,
@@ -1460,14 +1466,16 @@ export default function PlayerApp() {
           source: 'manual',
           node_id: String(currentStage.id),
           metadata: {
-            physical_icon:
-              (currentStage as any).physical_icon || (currentStage as any).config?.physical_icon,
+            physical_icon: icon,
+            node_title: currentStage.title || '',
+            node_id: String(currentStage.id),
           },
           queue_event: true,
         })
 
-        showNotice(`¡Recogido: ${label}!`, 'success')
-        vibrate([10, 40, 10])
+        sounds.collect()
+        haptics.collect()
+        showNotice(`⭐ ¡Recogido: ${label}!`, 'success')
       }
 
       const result = await advancePlayer(payload.user, code)
@@ -1475,13 +1483,13 @@ export default function PlayerApp() {
         const missingItem = result.reason === 'missing_required_item'
         setSubmitError(
           missingItem
-            ? 'Missing required item for this node.'
-            : 'Invalid code for the current stage.'
+            ? 'Te falta un objeto requerido. Recógelo antes de continuar.'
+            : 'Código incorrecto para este nodo.'
         )
         showNotice(
           missingItem
-            ? 'Missing required item for this node.'
-            : 'The code was not accepted for this stage.',
+            ? '¡Necesitas un objeto! Revisa tu mochila.'
+            : 'Código no aceptado. Inténtalo de nuevo.',
           'warn'
         )
         return
@@ -1492,10 +1500,14 @@ export default function PlayerApp() {
 
       if (nextPayload.finished) {
         showOverlay('finish')
-        showNotice('Mission complete.', 'success')
+        sounds.success()
+        haptics.success()
+        showNotice('¡Misión completada! 🏆', 'success')
       } else {
         showOverlay('node')
-        showNotice('Node cleared.', 'success')
+        sounds.success()
+        haptics.success()
+        showNotice('¡Nodo superado! ⚡', 'success')
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown submit error'
@@ -1519,24 +1531,24 @@ export default function PlayerApp() {
 
           if (localResult.payload.finished) {
             showOverlay('finish')
-            showNotice('Mission complete locally. Sync when connection returns.', 'success')
+            showNotice('¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.', 'success')
           } else {
             showOverlay('node')
-            showNotice('Node cleared locally. Progress queued for sync.', 'success')
+            showNotice('¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.', 'success')
           }
 
           return
         }
 
         if (localResult.reason === 'missing_required_item') {
-          setSubmitError('Missing required item for this node.')
-          showNotice('Missing required item for this node.', 'warn')
+          setSubmitError('Te falta un objeto requerido. Recógelo antes de continuar.')
+          showNotice('¡Necesitas un objeto! Revisa tu mochila.', 'warn')
           return
         }
 
         if (localResult.reason === 'invalid_code') {
-          setSubmitError('Invalid code for the downloaded offline mission.')
-          showNotice('The offline code was not accepted.', 'warn')
+          setSubmitError('Código incorrecto para la misión offline descargada.')
+          showNotice('Código no aceptado en modo offline.', 'warn')
           return
         }
 
@@ -1549,11 +1561,11 @@ export default function PlayerApp() {
             reason: 'advance_sync_failed',
           },
         })
-        setSubmitError(`${message}. Code saved locally and will sync when connection returns.`)
-        showNotice(`Code saved offline (${snapshot.queued_events.length} pending).`, 'warn')
+        setSubmitError('Sin conexión. El código se ha guardado localmente y se sincronizará cuando vuelva la red.')
+        showNotice(`Código guardado offline (${snapshot.queued_events.length} pendientes). ¡Sigue jugando!`, 'warn')
       } catch {
         setSubmitError(message)
-        showNotice('Mission sync failed. Try again.', 'warn')
+        showNotice('Error al enviar. Comprueba tu conexión.', 'warn')
       }
     } finally {
       setSubmitting(false)
@@ -1860,6 +1872,7 @@ export default function PlayerApp() {
           submitting={submitting}
           errorMessage={submitError}
           onSubmitCode={handleSubmitCode}
+          onShowPrologue={(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? () => setShowPrologue(true) : undefined}
         />
       </div>
 

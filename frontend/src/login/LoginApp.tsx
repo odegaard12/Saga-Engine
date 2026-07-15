@@ -523,7 +523,7 @@ export default function LoginApp() {
                     style={enterButton}
                     onClick={() => {
                       const label = profile.display_name || profile.id
-                      const href = `/player/${encodeURIComponent(profile.id)}`
+                      const href = `/player/${encodeURIComponent(profile.id)}?login=1`
 
                       const proceed = () => {
                         window.history.pushState(null, '', href)
