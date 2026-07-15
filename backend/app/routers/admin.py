@@ -25,6 +25,7 @@ async def admin_react_overview(request: Request):
 
     gamestate = main.load_player_progress()
     positions = main.load_live_positions()
+    inventory_state = main.load_inventory_state()
 
     stage_summaries = [
         main._admin_react_stage_summary(stage, idx)
@@ -42,7 +43,7 @@ async def admin_react_overview(request: Request):
             family_counts[stage_type] += 1
 
     profile_summaries = [
-        main._admin_react_profile_summary(profile, gamestate, positions)
+        main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
         for profile in profiles
     ]
 
@@ -225,7 +226,7 @@ async def admin_profile_action(request: Request):
         "mark_finished",
     }
 
-    if action not in allowed_actions:
+    if action not in allowed_actions and not action.startswith("give_item:") and not action.startswith("remove_item:"):
         return JSONResponse(
             status_code=400,
             content={"status": "error", "detail": "invalid action"}
@@ -254,10 +255,46 @@ async def admin_profile_action(request: Request):
         new_level = max(0, previous_level - 1)
     elif action == "level_next":
         new_level = min(max_level, previous_level + 1)
-    else:  # mark_finished
+        # Automatically award any collectible from the node being skipped
+        if previous_level < len(runtime_stages):
+            skipped_stage = runtime_stages[previous_level]
+            if skipped_stage.get("physical_node_kind") == "collectible" and skipped_stage.get("physical_item_id"):
+                item_id = skipped_stage.get("physical_item_id")
+                item_label = skipped_stage.get("physical_item_label") or item_id
+                
+                inventory_state = main.load_inventory_state()
+                inventory = inventory_state.get(profile_id, {"user": profile_id, "updated_at": "", "items": []})
+                existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
+                
+                if existing:
+                    existing["quantity"] = existing.get("quantity", 0) + 1
+                else:
+                    inventory["items"].append({"item_id": item_id, "label": item_label, "state": "collected", "quantity": 1})
+                
+                main.save_player_inventory(profile_id, inventory)
+    elif action == "mark_finished":
         new_level = max_level
+    else:
+        new_level = previous_level
 
-    main.set_player_progress_level(profile_id, new_level)
+    if action.startswith("give_item:") or action.startswith("remove_item:"):
+        inventory_state = main.load_inventory_state()
+        inventory = inventory_state.get(profile_id, {"user": profile_id, "updated_at": "", "items": []})
+        
+        if action.startswith("give_item:"):
+            item_id = action.replace("give_item:", "")
+            existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
+            if existing:
+                existing["quantity"] = existing.get("quantity", 0) + 1
+            else:
+                inventory["items"].append({"item_id": item_id, "label": item_id, "state": "collected", "quantity": 1})
+        elif action.startswith("remove_item:"):
+            item_id = action.replace("remove_item:", "")
+            inventory["items"] = [i for i in inventory["items"] if i.get("item_id") != item_id]
+        
+        main.save_player_inventory(profile_id, inventory)
+    else:
+        main.set_player_progress_level(profile_id, new_level)
 
     return {
         "status": "ok",

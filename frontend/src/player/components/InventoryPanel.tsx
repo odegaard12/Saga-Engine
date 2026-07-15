@@ -7,7 +7,6 @@ import {
   type InventorySnapshot,
 } from '../offline/inventory'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
-import ItemIconSvg from './ItemIconSvg'
 
 interface InventoryPanelProps {
   user: string
@@ -18,7 +17,7 @@ const ICON_MAP: [RegExp, string, string][] = [
   [/llave|key/i, '🔑', '#f59e0b'],
   [/emp|electr|bateria|pila|cable/i, '⚡', '#3b82f6'],
   [/placa|chip|circuito|board/i, '🖥️', '#6366f1'],
-  [/cinta|tape|adhesiv/i, '🪝', '#84cc16'],
+  [/cinta|tape|adhesiv/i, '🩹', '#84cc16'],
   [/arma|pistol|rifle/i, '🔫', '#ef4444'],
   [/escudo|shield/i, '🛡️', '#06b6d4'],
   [/map|mapa/i, '🗺️', '#10b981'],
@@ -31,36 +30,52 @@ const ICON_MAP: [RegExp, string, string][] = [
   [/bomb|explosiv/i, '💣', '#ef4444'],
   [/cerrojo|candado|lock/i, '🔒', '#94a3b8'],
   [/flecha|arrow/i, '➡️', '#38bdf8'],
-  [/cristal|glass/i, '💎', '#22d3ee'],
+  [/cristal|glass|gema|gem/i, '💎', '#22d3ee'],
   [/moneda|coin|dinero/i, '🪙', '#facc15'],
   [/hueso|bone/i, '🦴', '#e2e8f0'],
+  [/foto|camara|camera/i, '📷', '#f0abfc'],
+  [/libro|book|manual/i, '📚', '#a78bfa'],
+  [/coleccionable|collectible/i, '⭐', '#fbbf24'],
+  [/objeto|item|mapa|pieza/i, '📦', '#60a5fa'],
 ]
 
-function getItemIcon(itemOrLabel: string | InventoryItem): { glyph: string; color: string } {
-  if (typeof itemOrLabel !== 'string') {
-    const customIcon = itemOrLabel.metadata?.physical_icon || itemOrLabel.metadata?.icon
-    if (customIcon) {
-      return { glyph: String(customIcon), color: '#38bdf8' }
-    }
-    return getItemIcon(itemOrLabel.label || itemOrLabel.item_id)
+function getItemIcon(item: InventoryItem): { glyph: string; color: string } {
+  // 1. Custom icon from metadata (highest priority - explicitly set by admin/node)
+  const customIcon = item.metadata?.physical_icon || item.metadata?.icon
+  if (customIcon && typeof customIcon === 'string' && customIcon.trim()) {
+    return { glyph: customIcon.trim(), color: '#fbbf24' }
   }
+  // 2. Items collected by GPS proximity (manual source) = always ⭐ coleccionable
+  //    unless the item_id gives us a clear hint
+  if (item.source === 'manual' || (!item.source && item.node_id)) {
+    // Check item_id for explicit type hints
+    const idText = (item.item_id || '').toLowerCase()
+    if (/llave|key/.test(idText)) return { glyph: '🔑', color: '#f59e0b' }
+    if (/emp|bateria|pila|cable|electr/.test(idText)) return { glyph: '⚡', color: '#3b82f6' }
+    if (/placa|chip|circuito|board/.test(idText)) return { glyph: '🖥️', color: '#6366f1' }
+    // Default for all proximity collectibles = star
+    return { glyph: '⭐', color: '#fbbf24' }
+  }
+  // 3. QR-collected items: match by label (they have descriptive names)
+  const text = `${item.label || ''} ${item.item_id || ''}`.toLowerCase()
   for (const [pattern, glyph, color] of ICON_MAP) {
-    if (pattern.test(itemOrLabel)) return { glyph, color }
+    if (pattern.test(text)) return { glyph, color }
   }
-  return { glyph: '◈', color: '#60a5fa' }
+  // 4. Fallback
+  return { glyph: '📦', color: '#60a5fa' }
 }
 
 function getSourceBadge(source?: string): string {
   if (source === 'qr') return 'QR'
   if (source === 'nfc') return 'NFC'
-  if (source === 'manual') return 'MAN'
-  return 'SYS'
+  if (source === 'manual') return 'Campo'
+  return 'Sistema'
 }
 
 function getUpdatedLabel(value?: string): string {
-  if (!value) return 'sin sincronizar'
+  if (!value) return ''
   const ts = Date.parse(value)
-  if (!Number.isFinite(ts)) return 'actualizado'
+  if (!Number.isFinite(ts)) return ''
   const age = Math.max(0, Math.round((Date.now() - ts) / 1000))
   if (age < 10) return 'ahora'
   if (age < 60) return `${age}s`
@@ -112,10 +127,9 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
   const totalItems = countInventoryItems(user)
   const visibleItems = snapshot.items.slice(0, 12)
-
-  // How many empty cells to fill grid
   const gridSize = Math.max(8, Math.ceil(visibleItems.length / 4) * 4)
   const emptyCells = gridSize - visibleItems.length
+  const updatedLabel = getUpdatedLabel(snapshot.updated_at)
 
   return (
     <section style={panel}>
@@ -123,162 +137,151 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
       <div style={headerRow}>
         <div style={headerLeft}>
           <span style={headerLabel}>MOCHILA</span>
-          <span style={headerCount}>{totalItems} obj.</span>
+          <span style={headerCount}>{totalItems} {totalItems === 1 ? 'objeto' : 'objetos'}</span>
+          {updatedLabel && <span style={syncBadge}>· {updatedLabel}</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={syncBadge}>⏱ {getUpdatedLabel(snapshot.updated_at)}</span>
-          <button
-            type="button"
-            onClick={() => setShowGuide((v) => !v)}
-            style={guideToggleBtn}
-            title="Cómo funciona"
-          >
-            {showGuide ? '✕' : '❓'}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowGuide((v) => !v)}
+          style={guideToggleBtn}
+          title="Cómo funciona la mochila"
+        >
+          {showGuide ? '✕' : '❓'}
+        </button>
       </div>
 
       {/* How to play guide */}
       {showGuide && (
         <div style={guideBox}>
-          <div style={guideTitle}>📖 Cómo funciona</div>
+          <div style={guideTitle}>📖 Cómo funciona la mochila</div>
           <div style={guideStep}>
             <span style={guideNum}>1</span>
             <span>
-              🌟 <strong>Recoge objetos</strong> — Al acercarte a un coleccionable en el mapa, se
-              abre un panel automáticamente. Pulsa <strong>OK / Recoger</strong> para guardarlo aquí
-              en la mochila.
+              🌟 <strong>Recoge objetos</strong> — Al acercarte a un nodo coleccionable en el mapa, aparece un panel automáticamente. Pulsa <strong>Recoger</strong> para guardarlo aquí.
             </span>
           </div>
           <div style={guideStep}>
             <span style={guideNum}>2</span>
             <span>
-              ⚒️ <strong>Combínalos en la Mesa</strong> — Algunos objetos son ingredientes para
-              fabricar algo más potente. Ve a la pestaña <strong>Mesa</strong> y, si tienes todos
-              los ingredientes, pulsa <strong>Ensamblar</strong>.
+              🔑 <strong>Desbloquea nodos</strong> — Ciertos puntos del mapa sólo se abren si llevas el objeto correcto. Cuando llegues con el objeto necesario, el nodo se activa.
             </span>
           </div>
           <div style={guideStep}>
             <span style={guideNum}>3</span>
             <span>
-              🔑 <strong>Desbloquea nodos</strong> — Ciertos puntos del mapa sólo se abren si llevas
-              el objeto correcto en la mochila. Cuando llegues a ese punto con el objeto necesario,
-              el nodo se desbloqueará automáticamente.
+              ⚒️ <strong>Combínalos en la Mesa</strong> — Algunos objetos son ingredientes para fabricar algo más potente. Ve a la pestaña <strong>Mesa</strong> para ensamblarlos.
             </span>
           </div>
           <div style={guideTip}>
-            💡 El objeto permanece en tu mochila hasta que se usa o el admin lo configura para
-            consumirse al superar el nodo.
+            💡 El objeto permanece en la mochila hasta que se usa o el creador de la misión lo configura para consumirse.
           </div>
-          {selected!.state !== 'used' && selected!.quantity > 0 ? (
-            <button
-              type="button"
-              style={useBtn}
-              onClick={() => {
-                handleUseItem(selected!)
-                setSelected(null)
-              }}
-            >
-              Usar objeto
-            </button>
-          ) : (
-            <div style={usedText}>Este objeto ya fue usado</div>
-          )}
         </div>
       )}
 
       {/* Grid */}
-      <div style={grid}>
-        {visibleItems.map((item) => {
-          const usable = item.state !== 'used' && item.quantity > 0
-          const isSelected = selected?.item_id === item.item_id
-          const isFeedback = feedbackId === item.item_id
-          const color = 'rgba(255, 255, 255, 0.1)'
+      {snapshot.items.length > 0 ? (
+        <div style={grid}>
+          {visibleItems.map((item) => {
+            const usable = item.state !== 'used' && item.quantity > 0
+            const isSelected = selected?.item_id === item.item_id
+            const isFeedback = feedbackId === item.item_id
+            const { glyph, color } = getItemIcon(item)
 
-          return (
-            <button
-              key={item.item_id}
-              type="button"
-              style={{
-                ...cell,
-                ...(isSelected ? cellSelected : {}),
-                ...(isFeedback ? cellFeedback : {}),
-                ...(!usable ? cellUsed : {}),
-                borderColor: isSelected ? color : undefined,
-                boxShadow: isSelected ? `0 0 0 1px ${color}44, 0 4px 20px ${color}22` : undefined,
-              }}
-              onClick={() => setSelected(isSelected ? null : item)}
-            >
-              <span
+            return (
+              <button
+                key={item.item_id}
+                type="button"
                 style={{
-                  ...cellIcon,
-                  background: usable ? `rgba(255,255,255,0.08)` : 'rgba(255,255,255,0.04)',
+                  ...cell,
+                  ...(isSelected ? cellSelected : {}),
+                  ...(isFeedback ? cellFeedback : {}),
+                  ...(!usable ? cellUsed : {}),
+                  borderColor: isSelected ? color + '55' : undefined,
+                  boxShadow: isSelected ? `0 0 0 1px ${color}44, 0 4px 20px ${color}22` : undefined,
                 }}
+                onClick={() => setSelected(isSelected ? null : item)}
               >
-                <ItemIconSvg itemId={item.item_id} size={28} />
-              </span>
-              {item.quantity > 1 && <span style={qtyBadge}>{item.quantity}</span>}
-              {!usable && <span style={usedOverlay}>✓</span>}
-              <span style={cellName}>{item.label.slice(0, 12)}</span>
-            </button>
-          )
-        })}
-        {Array.from({ length: emptyCells }).map((_, i) => (
-          <div key={`e-${i}`} style={emptyCell} />
-        ))}
-      </div>
-
-      {/* Selected detail */}
-      {selected && (
-        <div style={detailCard} key={selected!.item_id}>
-          <div style={detailHeader}>
-            <span><ItemIconSvg itemId={selected!.item_id} size={40} /></span>
-            <div>
-              <div style={detailTitle}>{selected!.label}</div>
-              <div style={detailMeta}>
-                <span style={sourcePill}>{getSourceBadge(selected!.source)}</span>
-                {selected!.node_id && <span style={nodePill}>Nodo {selected!.node_id}</span>}
-                <span style={qtyText}>×{selected!.quantity}</span>
-              </div>
-            </div>
-          </div>
-          {selected!.state !== 'used' && selected!.quantity > 0 ? (
-            <button
-              type="button"
-              style={useBtn}
-              onClick={() => {
-                handleUseItem(selected!)
-                setSelected(null)
-              }}
-            >
-              Usar objeto
-            </button>
-          ) : (
-            <div style={usedText}>Este objeto ya fue usado</div>
-          )}
+                <span
+                  style={{
+                    ...cellIcon,
+                    background: usable
+                      ? `${color}22`
+                      : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${color}33`,
+                  }}
+                >
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>{glyph}</span>
+                </span>
+                {item.quantity > 1 && <span style={qtyBadge}>{item.quantity}</span>}
+                {!usable && <span style={usedOverlay}>✓</span>}
+                <span style={cellName}>{item.label}</span>
+              </button>
+            )
+          })}
+          {Array.from({ length: emptyCells }).map((_, i) => (
+            <div key={`e-${i}`} style={emptyCell} />
+          ))}
         </div>
-      )}
-
-      {snapshot.items.length === 0 && (
+      ) : (
         <div style={emptyMsg}>
-          <span style={{ fontSize: 36 }}>🎒</span>
-          <div style={{ fontWeight: 900, color: 'rgba(255,255,255,0.7)' }}>Mochila vacía</div>
+          <span style={{ fontSize: 40 }}>🎒</span>
+          <div style={{ fontWeight: 900, color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>Mochila vacía</div>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 12,
               opacity: 0.55,
-              marginTop: 2,
+              marginTop: 4,
               lineHeight: 1.5,
               maxWidth: 220,
               textAlign: 'center',
             }}
           >
-            Acércate a un coleccionable en el mapa para recoger objetos. También puedes escanear
-            tarjetas QR físicas.
+            Acércate a un nodo coleccionable en el mapa para recoger objetos o escanea un código QR físico.
           </div>
-          <button type="button" style={guideToggleBtn} onClick={() => setShowGuide(true)}>
+          <button type="button" style={{ ...guideToggleBtn, marginTop: 8 }} onClick={() => setShowGuide(true)}>
             ❓ Ver cómo funciona
           </button>
+        </div>
+      )}
+
+      {/* Selected detail */}
+      {selected && (
+        <div style={detailCard} key={selected.item_id}>
+          <div style={detailHeader}>
+            <div style={{
+              ...cellIcon,
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: `${getItemIcon(selected).color}22`,
+              border: `1px solid ${getItemIcon(selected).color}44`,
+              fontSize: 28,
+            }}>
+              <span style={{ lineHeight: 1 }}>{getItemIcon(selected).glyph}</span>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={detailTitle}>{selected.label}</div>
+              <div style={detailMeta}>
+                <span style={sourcePill}>{getSourceBadge(selected.source)}</span>
+                {selected.node_id && <span style={nodePill}>Nodo {selected.node_id}</span>}
+                <span style={qtyText}>×{selected.quantity}</span>
+              </div>
+            </div>
+          </div>
+          {selected.state !== 'used' && selected.quantity > 0 ? (
+            <button
+              type="button"
+              style={useBtn}
+              onClick={() => {
+                handleUseItem(selected)
+                setSelected(null)
+              }}
+            >
+              ✅ Usar objeto
+            </button>
+          ) : (
+            <div style={usedText}>Este objeto ya fue usado ✓</div>
+          )}
         </div>
       )}
     </section>
@@ -303,7 +306,8 @@ const headerRow: CSSProperties = {
 const headerLeft: CSSProperties = {
   display: 'flex',
   alignItems: 'baseline',
-  gap: 8,
+  gap: 6,
+  flexWrap: 'wrap',
 }
 
 const headerLabel: CSSProperties = {
@@ -317,7 +321,7 @@ const headerLabel: CSSProperties = {
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: 'rgba(255,255,255,0.4)',
+  color: 'rgba(255,255,255,0.5)',
 }
 
 const syncBadge: CSSProperties = {
@@ -339,9 +343,10 @@ const guideToggleBtn: CSSProperties = {
   color: 'rgba(255,255,255,0.6)',
   fontSize: 11,
   fontWeight: 800,
-  padding: '2px 10px',
+  padding: '3px 10px',
   cursor: 'pointer',
   lineHeight: 1.8,
+  transition: 'background 0.2s',
 }
 
 const guideBox: CSSProperties = {
@@ -427,20 +432,20 @@ const cellUsed: CSSProperties = {
 }
 
 const cellIcon: CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 10,
+  width: 40,
+  height: 40,
+  borderRadius: 12,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 20,
+  fontSize: 22,
   transition: 'background 0.2s',
 }
 
 const qtyBadge: CSSProperties = {
   position: 'absolute',
-  top: 6,
-  right: 6,
+  top: 5,
+  right: 5,
   background: 'rgba(251,191,36,0.9)',
   color: '#1c1008',
   fontSize: 9,
@@ -471,9 +476,11 @@ const cellName: CSSProperties = {
   textAlign: 'center',
   letterSpacing: '0.04em',
   lineHeight: 1.2,
-  wordBreak: 'break-word',
-  maxWidth: '100%',
+  width: '100%',
+  whiteSpace: 'nowrap',
   overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  padding: '0 2px',
 }
 
 const emptyCell: CSSProperties = {
@@ -491,7 +498,6 @@ const detailCard: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 12,
-  animation: 'fadeInUp 0.2s ease',
 }
 
 const detailHeader: CSSProperties = {
@@ -517,12 +523,12 @@ const detailMeta: CSSProperties = {
 const sourcePill: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.1em',
   color: '#93c5fd',
   background: 'rgba(59,130,246,0.15)',
   border: '1px solid rgba(59,130,246,0.25)',
   borderRadius: 999,
-  padding: '1px 7px',
+  padding: '2px 7px',
 }
 
 const nodePill: CSSProperties = {
@@ -533,7 +539,7 @@ const nodePill: CSSProperties = {
   background: 'rgba(6,182,212,0.12)',
   border: '1px solid rgba(6,182,212,0.2)',
   borderRadius: 999,
-  padding: '1px 7px',
+  padding: '2px 7px',
 }
 
 const qtyText: CSSProperties = {
@@ -544,7 +550,7 @@ const qtyText: CSSProperties = {
 
 const useBtn: CSSProperties = {
   width: '100%',
-  padding: '10px 0',
+  padding: '11px 0',
   borderRadius: 12,
   border: 'none',
   background: 'linear-gradient(135deg, #22c55e, #16a34a)',
@@ -559,10 +565,10 @@ const useBtn: CSSProperties = {
 
 const usedText: CSSProperties = {
   textAlign: 'center',
-  fontSize: 11,
+  fontSize: 12,
   color: 'rgba(255,255,255,0.35)',
   fontWeight: 700,
-  padding: '6px 0',
+  padding: '8px 0',
 }
 
 const emptyMsg: CSSProperties = {
@@ -570,7 +576,7 @@ const emptyMsg: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   gap: 6,
-  padding: '28px 0',
+  padding: '28px 8px',
   color: 'rgba(255,255,255,0.5)',
   fontSize: 13,
   fontWeight: 700,

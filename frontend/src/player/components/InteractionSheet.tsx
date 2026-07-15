@@ -266,8 +266,10 @@ export function InteractionSheet({
 
           {isStageCollectible(currentStage) ? (
             <div style={collectibleCardStyle}>
-              <div style={collectibleIconStyle}>
-                {(currentStage as any).physical_icon || (currentStage as any).config?.physical_icon || '⭐'}
+              <div style={collectibleIconContainerStyle}>
+                <div style={collectibleIconStyle}>
+                  {(currentStage as any).physical_icon || (currentStage as any).config?.physical_icon || '⭐'}
+                </div>
               </div>
               <h4 style={collectibleTitleStyle}>
                 {(currentStage as any).physical_item_label || currentStage.title || 'Objeto de misión'}
@@ -310,7 +312,7 @@ export function InteractionSheet({
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
-                {helperText || 'This node is not available in the current family runtime yet.'}
+                {helperText || 'Este nodo no tiene un juego configurado aún. El administrador debe asignarle un tipo de minijuego.'}
               </div>
             </section>
           )}
@@ -511,12 +513,18 @@ const collectibleCardStyle: CSSProperties = {
   margin: '12px 0',
 }
 
+const collectibleIconContainerStyle: CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  justifyContent: 'center',
+  marginBottom: 16,
+}
+
 const collectibleIconStyle: CSSProperties = {
   fontSize: 64,
   lineHeight: 1,
-  marginBottom: 16,
   filter: 'drop-shadow(0 0 16px rgba(251, 191, 36, 0.4))',
-  animation: 'sagaTypeBadgeFloat 3s ease-in-out infinite',
+  animation: 'sagaIconFloat 3s ease-in-out infinite',
 }
 
 const collectibleTitleStyle: CSSProperties = {
@@ -539,6 +547,10 @@ const collectibleDescStyle: CSSProperties = {
 const collectibleBtnStyle: CSSProperties = {
   width: '100%',
   minHeight: 52,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
   borderRadius: 16,
   border: 'none',
   background: 'linear-gradient(135deg, #10b981, #059669)',
@@ -566,5 +578,10 @@ const sheetAnimations = `
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes sagaIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 `

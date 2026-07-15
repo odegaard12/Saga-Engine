@@ -61,6 +61,8 @@ function fileToAvatarDataUrl(file: File): Promise<string> {
 
 type PlayersPanelProps = {
   playerDrafts: PlayerDraft[]
+  profiles?: AdminReactOverviewProfile[]
+  stages?: AdminReactOverviewStage[]
   playerSaveState: 'idle' | 'saving' | 'saved' | 'error'
   playerSaveError: string | null
   profileProgress: Record<string, { level: number | null; finished: boolean }>
@@ -75,6 +77,8 @@ type PlayersPanelProps = {
 
 export default function PlayersPanel({
   playerDrafts,
+  profiles = [],
+  stages = [],
   playerSaveState,
   playerSaveError,
   profileProgress,
@@ -332,6 +336,81 @@ export default function PlayersPanel({
                   />
                 </label>
               ) : null}
+
+              {(() => {
+                const liveProfile = profiles.find(p => String(p.id) === String(draft.id || draft.display_name))
+                const inventory = liveProfile?.inventory_snapshot?.items || []
+                return (
+                  <section className="admin-player-inventory" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Mochila / Coleccionables
+                      </strong>
+                    </div>
+                    {inventory.length === 0 ? (
+                      <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                        La mochila está vacía.
+                      </div>
+                    ) : (
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {inventory.map((item: any, itemIdx: number) => (
+                          <li key={itemIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '1.1rem' }}>{item.quantity}x</span>
+                              <strong style={{ color: '#e2e8f0' }}>{item.label || item.item_id}</strong>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              <button
+                                type="button"
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '4px', cursor: 'pointer' }}
+                                onClick={() => {
+                                  if (window.confirm(`¿Quitar ${item.label || item.item_id} a ${draft.display_name}?`)) {
+                                    onProfileAction(draft.id, `remove_item:${item.item_id}` as AdminProfileAction)
+                                  }
+                                }}
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <select
+                        style={{ padding: '0.3rem', fontSize: '0.85rem', background: 'rgba(0,0,0,0.3)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px' }}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (!val) return
+                          if (val === '__manual__') {
+                            const itemId = window.prompt('ID o Nombre del objeto a entregar (ej. llave_dorada):')
+                            if (itemId) {
+                              onProfileAction(draft.id, `give_item:${itemId}` as AdminProfileAction)
+                            }
+                          } else {
+                            if (window.confirm(`¿Dar ${val} a ${draft.display_name}?`)) {
+                              onProfileAction(draft.id, `give_item:${val}` as AdminProfileAction)
+                            }
+                          }
+                          e.target.value = ''
+                        }}
+                      >
+                        <option value="">+ Añadir Objeto...</option>
+                        {Array.from(new Set(
+                          stages
+                            .filter(s => s.physical_item_id)
+                            .map(s => s.physical_item_id)
+                        )).map(itemId => (
+                          <option key={itemId as string} value={itemId as string}>
+                            Dar "{stages.find(s => s.physical_item_id === itemId)?.physical_item_label || itemId}" ({itemId})
+                          </option>
+                        ))}
+                        <option value="__manual__">Escribir ID manualmente...</option>
+                      </select>
+                    </div>
+                  </section>
+                )
+              })()}
             </section>
           ))}
         </div>

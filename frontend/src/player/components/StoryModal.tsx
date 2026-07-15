@@ -45,7 +45,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
         }}
       >
         <div style={{ padding: '32px 24px 16px', textAlign: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#f0b429' }}>
+          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
             {title}
           </h1>
           {subtitle && (
@@ -61,20 +61,23 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
 
         <div style={{ padding: '24px', display: 'flex', justifyContent: 'center' }}>
           <button
+            type="button"
             onClick={onClose}
             style={{
-              padding: '16px 32px',
-              fontSize: '1.2rem',
-              fontWeight: 600,
-              color: '#000',
-              backgroundColor: '#f0b429',
+              width: '100%',
+              padding: '16px',
+              backgroundColor: 'var(--primary-color, #10b981)',
+              color: '#fff',
               border: 'none',
-              borderRadius: '30px',
+              borderRadius: '12px',
+              fontSize: '1.2rem',
+              fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(240, 180, 41, 0.4)',
+              textTransform: 'uppercase',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
               transition: 'transform 0.2s',
             }}
-            onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+            onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
             onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
             {buttonText}

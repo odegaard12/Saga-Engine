@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type {
@@ -548,7 +548,7 @@ const OfflineGridLayer = L.GridLayer.extend({
   },
 })
 
-export function MapSurface({
+export const MapSurface = React.memo(function MapSurface({
   currentStage,
   missionStages = [],
   currentLevel = 0,
@@ -648,7 +648,7 @@ export function MapSurface({
         updateWhenIdle: true,     // Only update when map is not moving
         crossOrigin: false,       // Same-origin proxy, no CORS needed
         attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
       }
     )
 
@@ -1567,7 +1567,27 @@ export function MapSurface({
       </section>
     </>
   )
-}
+}, (prev, next) => {
+  if (prev.currentStage !== next.currentStage) return false
+  if (prev.currentLevel !== next.currentLevel) return false
+  if (prev.gpsState !== next.gpsState) return false
+  if (prev.debugSimulation !== next.debugSimulation) return false
+  if (prev.followPlayer !== next.followPlayer) return false
+  if (prev.focusRequest?.token !== next.focusRequest?.token) return false
+  if (prev.refreshToken !== next.refreshToken) return false
+  if (prev.nodeState !== next.nodeState) return false
+  if (prev.selfLabel !== next.selfLabel) return false
+  if (prev.viewerUser !== next.viewerUser) return false
+  if (prev.missionStages !== next.missionStages) return false
+  if (prev.otherPlayers !== next.otherPlayers) return false
+  if (prev.fieldProofs !== next.fieldProofs) return false
+  if (prev.selfProfile?.user !== next.selfProfile?.user) return false
+  
+  if (prev.playerPosition?.lat !== next.playerPosition?.lat) return false
+  if (prev.playerPosition?.lon !== next.playerPosition?.lon) return false
+  
+  return true
+})
 
 const surface: React.CSSProperties = {
   position: 'absolute',

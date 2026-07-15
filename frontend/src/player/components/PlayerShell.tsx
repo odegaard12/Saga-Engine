@@ -10,6 +10,7 @@ interface PlayerShellProps {
   teamLiveCount?: number
   gpsState?: string
   onOpenTeam?: () => void
+  onShowPrologue?: () => void
 }
 
 function getGpsShellLabel(gpsState?: string): string {
@@ -51,6 +52,7 @@ export function PlayerShell({
   teamLiveCount = 0,
   gpsState,
   onOpenTeam,
+  onShowPrologue,
 }: PlayerShellProps) {
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -127,7 +129,7 @@ export function PlayerShell({
                 )
               })
             ) : (
-              <span style={progressEmpty}>No route</span>
+              <span style={progressEmpty}>Sin ruta</span>
             )}
           </div>
 
@@ -196,6 +198,15 @@ const soloPill: CSSProperties = {
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.08em',
+}
+
+const bookPill: CSSProperties = {
+  ...soloPill,
+  background: 'rgba(255,255,255,0.1)',
+  cursor: 'pointer',
+  border: 'none',
+  padding: '0 8px',
+  fontSize: 14,
 }
 
 const playerTitle: CSSProperties = {
@@ -279,10 +290,10 @@ const countPill: CSSProperties = {
   borderRadius: 999,
   background: 'rgba(255,255,255,.12)',
   border: '1px solid rgba(255,255,255,.16)',
-  color: '#ffffff',
-  fontSize: 11,
+  color: 'rgba(255,255,255,0.9)',
+  fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.05em',
 }
 
 const progressEmpty: CSSProperties = {

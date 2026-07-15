@@ -602,6 +602,8 @@ export default function AdminMissionControlShell({
                 playerDrafts={playerDrafts}
                 playerSaveState={playerSaveState}
                 playerSaveError={playerSaveError}
+                profiles={profiles}
+                stages={stages}
                 profileProgress={profileProgress}
                 profileActionState={profileActionState}
                 profileActionError={profileActionError}

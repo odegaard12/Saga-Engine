@@ -106,7 +106,8 @@ export interface PlayerGamePayload {
   level: number
   finished: boolean
   stages: PlayerStage[]
-  current_stage?: PlayerStage | null
+  current_stage: PlayerStage | null
+  inventory_snapshot?: any
 }
 
 export interface PublicConfig {

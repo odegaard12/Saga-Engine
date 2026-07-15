@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import jsQR from 'jsqr'
 import { collectInventoryItem } from '../offline/inventory'
+import { sounds, haptics } from '../utils/haptics'
 
 interface QuickProofPanelProps {
   user: string
@@ -250,10 +251,12 @@ export function QuickProofPanel({
         },
       })
 
-      setNotice(`Guardado en Objetos: ${parsed.label}`)
+      setNotice(`📷 Guardado: ${parsed.label}`)
       setMessage(
         `Guardado en Objetos. Tienes ${snapshot.items.length} tipo${snapshot.items.length === 1 ? '' : 's'} de objeto.`
       )
+      sounds.qrScan()
+      haptics.qrScan()
       setMode('idle')
       stopCamera()
       window.dispatchEvent(

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
+import { haptics, sounds } from '../../../utils/haptics'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -679,8 +680,9 @@ export function SignalHuntRuntimeScreen({ resolved, stage, submitting, onWin }: 
     setGpsState('locked')
     setHoldProgress(1)
 
-    if (typeof navigator !== 'undefined' && cfg.use_vibration !== false && 'vibrate' in navigator) {
-      navigator.vibrate?.([18, 34, 26])
+    if (cfg.use_vibration !== false) {
+      haptics.signalLock()
+      sounds.signalLock()
     }
 
     await onWin()
@@ -698,14 +700,9 @@ export function SignalHuntRuntimeScreen({ resolved, stage, submitting, onWin }: 
         if (holdStartRef.current === null) {
           holdStartRef.current = now
 
-          if (
-            !windowPulseRef.current &&
-            typeof navigator !== 'undefined' &&
-            cfg.use_vibration !== false &&
-            'vibrate' in navigator
-          ) {
+          if (!windowPulseRef.current && cfg.use_vibration !== false) {
             windowPulseRef.current = true
-            navigator.vibrate?.(10)
+            haptics.tick()
           }
         }
 
