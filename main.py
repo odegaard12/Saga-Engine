@@ -141,6 +141,15 @@ POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
+INVENTORY_DB = os.path.join(DATA_DIR, "inventory.json")
+
+def load_inventory_state():
+    return load_json(INVENTORY_DB, {})
+
+def save_player_inventory(user: str, inventory_snapshot: dict):
+    state = load_inventory_state()
+    state[user] = inventory_snapshot
+    save_json(INVENTORY_DB, state)
 
 BOOTSTRAP_ADMIN_PASS = (os.getenv("ADMIN_PASS") or "").strip()
 ALLOW_DEFAULT_ADMIN = (os.getenv("ALLOW_DEFAULT_ADMIN") or "0").strip() == "1"
@@ -799,7 +808,14 @@ def react_manifest_webmanifest():
 
 def react_index_or_missing():
     if REACT_INDEX_FILE.exists():
-        return FileResponse(REACT_INDEX_FILE)
+        return FileResponse(
+            REACT_INDEX_FILE,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            }
+        )
 
     return HTMLResponse(
         """
@@ -979,31 +995,34 @@ async def get_version():
 
 
 # ---------------------------------------------------------------------------
-# OSM tile proxy – serves tiles from the same HTTP origin so iOS Safari
-# does not block them as "mixed content" when the app runs over plain HTTP.
+# Map Satellite tile proxy – serves tiles from the same HTTP origin
 # ---------------------------------------------------------------------------
-_OSM_TILE_BASE = "https://tile.openstreetmap.org"
+_MAP_TILE_BASE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
 _TILE_PROXY_HEADERS = {
-    "User-Agent": "SAGA-Engine/2.x tile-proxy (self-hosted, https://github.com/odegaard12/Saga-Engine)",
-    "Referer": "https://www.openstreetmap.org/",
+    "User-Agent": "SAGA-Engine/2.x tile-proxy",
 }
 
 @app.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def osm_tile_proxy(z: int, x: int, y: int):
-    """Proxy OSM raster tiles so they are served from the same HTTP origin,
+async def map_tile_proxy(z: int, x: int, y: int):
+    """Proxy Map raster tiles so they are served from the same HTTP origin,
     avoiding iOS Safari mixed-content (HTTPS tile ← HTTP page) restrictions."""
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
-    url = f"{_OSM_TILE_BASE}/{z}/{x}/{y}.png"
+    
+    # ESRI expects /tile/z/y/x (level/row/column)
+    url = f"{_MAP_TILE_BASE}/{z}/{y}/{x}"
+    
     if _HTTPX_AVAILABLE:
         try:
             async with _httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.get(url, headers=_TILE_PROXY_HEADERS, follow_redirects=True)
             if resp.status_code != 200:
                 raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
+            
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
             return Response(
                 content=resp.content,
-                media_type="image/png",
+                media_type=content_type,
                 headers={
                     "Cache-Control": "public, max-age=86400",
                     "Access-Control-Allow-Origin": "*",
@@ -1012,7 +1031,7 @@ async def osm_tile_proxy(z: int, x: int, y: int):
         except _httpx.RequestError as exc:
             raise HTTPException(status_code=502, detail=f"Tile proxy error: {exc}")
     else:
-        # Fallback: redirect the client directly to OSM (may still fail on iOS HTTP)
+        # Fallback: redirect the client directly to upstream
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=url, status_code=302)
 
@@ -1412,7 +1431,9 @@ def _admin_react_stage_summary(stage, index):
     return preserve_physical_stage_fields(stage, summary)
 
 
-def _admin_react_profile_summary(profile, gamestate, positions):
+def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=None):
+    if inventory_state is None:
+        inventory_state = {}
     profile = profile or {}
     profile_id = str(profile.get("id") or profile.get("display_name") or "")
     raw_state = gamestate.get(profile_id, {}) if isinstance(gamestate, dict) else {}
@@ -1445,6 +1466,7 @@ def _admin_react_profile_summary(profile, gamestate, positions):
         "lat": pos.get("lat"),
         "lon": pos.get("lon"),
         "last_seen": pos.get("last_seen") or pos.get("ts") or state.get("last_seen"),
+        "inventory_snapshot": inventory_state.get(profile_id, {}),
     }
 
 
@@ -1464,9 +1486,9 @@ async def admin_react_overview(request: Request):
     cfg = load_config()
     stages = get_runtime_stages()
     profiles = get_player_profiles(cfg)
-
     gamestate = load_player_progress()
     positions = load_live_positions()
+    inventory_state = load_inventory_state()
 
     stage_summaries = [
         _admin_react_stage_summary(stage, idx)
@@ -1484,7 +1506,7 @@ async def admin_react_overview(request: Request):
             family_counts[stage_type] += 1
 
     profile_summaries = [
-        _admin_react_profile_summary(profile, gamestate, positions)
+        _admin_react_profile_summary(profile, gamestate, positions, inventory_state)
         for profile in profiles
     ]
 
