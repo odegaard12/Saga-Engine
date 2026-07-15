@@ -1692,6 +1692,24 @@ export default function PlayerApp() {
             showLauncher={false}
           />
 
+          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setShowPrologue(true)
+              }}
+              aria-label="Historia"
+              title="Leer historia"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                📖
+              </span>
+            </button>
+          ) : null}
+
           <button
             type="button"
             style={mapRouteToggleInlineButton}
@@ -1872,7 +1890,6 @@ export default function PlayerApp() {
           submitting={submitting}
           errorMessage={submitError}
           onSubmitCode={handleSubmitCode}
-          onShowPrologue={(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? () => setShowPrologue(true) : undefined}
         />
       </div>
 
