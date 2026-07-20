@@ -8,6 +8,7 @@ import {
 } from './familyConfigs'
 
 export type AdminGameId =
+  | 'simple_checkpoint'
   | 'shake_antenna_charge'
   | 'gps_signal_lock'
   | 'hot_cold_search'
@@ -89,6 +90,33 @@ export type MissionTemplate = {
 }
 
 export const adminGameCatalog: AdminGameCatalogItem[] = [
+  {
+    id: 'simple_checkpoint',
+    title: 'Checkpoint / Texto Rápido',
+    icon: '📍',
+    family: 'signal_hunt',
+    category: 'gps',
+    difficulty: 'Fácil',
+    duration: '1 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'proximity',
+    offlineNote: 'Solo requiere llegar a las coordenadas GPS.',
+    summary: 'Nodo básico de control. El jugador llega al punto y lee el texto o pista.',
+    playerGoal: 'Llega al punto de control para avanzar en la ruta.',
+    editorHint: 'Ideal para inicio de ruta, puntos intermedios y revelación de historia.',
+    config: {
+      game_id: 'simple_checkpoint',
+      objective: 'checkpoint',
+      completion_method: 'proximity',
+    },
+    content: 'Punto de control alcanzado. Lee la información antes de continuar.',
+    messages: {
+      hint: 'Revisa las coordenadas en el mapa.',
+      gps_unavailable: 'Sin cobertura GPS.',
+      locked: 'Acércate al punto para continuar.',
+    },
+  },
   {
     id: 'logic_circuit',
     title: 'Matriz de circuitos',

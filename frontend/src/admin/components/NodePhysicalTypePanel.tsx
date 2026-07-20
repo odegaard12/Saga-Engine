@@ -344,21 +344,44 @@ export default function NodePhysicalTypePanel({
         <header className="saga-type-chooser-v4-head">
           <div>
             <span>TIPO DE NODO</span>
-            <h2>{isPhysical ? 'QR físico' : 'Nodo de juego'}</h2>
-            <p>Escoge si este punto será un juego normal o una tarjeta QR física.</p>
+            <h2>Selecciona el tipo de nodo</h2>
+            <p>Elige la experiencia o interacción que tendrá este punto en la misión.</p>
           </div>
-          <b>{isPhysical ? 'QR FÍSICO' : 'JUEGO'}</b>
         </header>
 
         <div className="saga-type-chooser-v4-grid">
           <button
             type="button"
-            className={mode === 'none' ? 'active' : ''}
+            className={mode === 'none' && ((stage as any).game_type === 'simple_checkpoint' || (stage as any).config?.game_id === 'simple_checkpoint') ? 'active' : ''}
+            onClick={() => {
+              onApplyLocal({
+                ...stage,
+                game_type: 'simple_checkpoint',
+                game_template_id: 'simple_checkpoint',
+                title: stage.title || 'Checkpoint / Texto Rápido',
+                config: {
+                  ...((stage as any).config || {}),
+                  game_id: 'simple_checkpoint',
+                  objective: 'checkpoint',
+                  completion_method: 'proximity',
+                },
+              } as AdminReactOverviewStage)
+              setMode('none')
+            }}
+          >
+            <i>📍</i>
+            <strong>Checkpoint / Pista</strong>
+            <small>Punto GPS simple. Muestra texto, historia o pista sin minijuegos complejos.</small>
+          </button>
+
+          <button
+            type="button"
+            className={mode === 'none' && (stage as any).game_type !== 'simple_checkpoint' && (stage as any).config?.game_id !== 'simple_checkpoint' ? 'active' : ''}
             onClick={() => setMode('none')}
           >
-            <i>🗺️</i>
-            <strong>Nodo de juego</strong>
-            <small>Ruta, GPS, rumbo, minijuego o prueba en mapa.</small>
+            <i>🎮</i>
+            <strong>Minijuego o Desafío</strong>
+            <small>Prueba interactiva en mapa: Laberinto, Secuencia, Matriz, Agitar o Sonido.</small>
           </button>
 
           <button
@@ -367,8 +390,8 @@ export default function NodePhysicalTypePanel({
             onClick={() => setMode('map_collectible')}
           >
             <i>🌟</i>
-            <strong>Coleccionable en mapa</strong>
-            <small>Objeto que se recoge en el mapa por proximidad GPS.</small>
+            <strong>Coleccionable (GPS)</strong>
+            <small>Objeto digital que el jugador recoge automáticamente al acercarse con el GPS.</small>
           </button>
 
           <button
@@ -376,9 +399,9 @@ export default function NodePhysicalTypePanel({
             className={mode === 'qr' ? 'active' : ''}
             onClick={() => setMode('qr')}
           >
-            <i>▣</i>
-            <strong>QR físico</strong>
-            <small>Tarjeta imprimible con objeto, llave, pista o bonus.</small>
+            <i>🖨️</i>
+            <strong>Tarjeta QR Física</strong>
+            <small>Llave, pista u objeto impreso que requiere escanear un código QR físico.</small>
           </button>
         </div>
       </section>

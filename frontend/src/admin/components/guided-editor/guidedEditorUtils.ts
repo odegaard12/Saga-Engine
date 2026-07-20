@@ -18,18 +18,13 @@ export type GuidedNodeEditorFlowProps = {
   stages?: StageLike[]
 }
 
-export type StepKey = 'type' | 'subtype' | 'details' | 'mechanics' | 'config' | 'rules' | 'rewards' | 'content' | 'fallbacks'
+export type StepKey = 'rules' | 'config' | 'content'
 export type EditorMode = 'game' | 'qr' | 'map_collectible'
 
-export const STEPS: Array<{ key: StepKey; label: string }> = [
-  { key: 'subtype', label: 'Tipo' },
-  { key: 'details', label: 'Detalles' },
-  { key: 'mechanics', label: 'Mecánica' },
-  { key: 'config', label: 'Ajustes' },
-  { key: 'rules', label: 'Requisitos' },
-  { key: 'rewards', label: 'Recompensa' },
-  { key: 'content', label: 'Historia' },
-  { key: 'fallbacks', label: 'Ayuda' },
+export const STEPS: Array<{ key: StepKey; label: string; icon: string }> = [
+  { key: 'rules', label: '1. Tipo y Reglas', icon: '🎯' },
+  { key: 'config', label: '2. Ajustes del Juego', icon: '⚙️' },
+  { key: 'content', label: '3. Historia y Pistas', icon: '📜' },
 ]
 
 export const READY_STATUSES = new Set(['runtime_ready'])

@@ -93,6 +93,39 @@ function buildPinHtml(
   `
 }
 
+function buildAdminNodePopupHtml(
+  stage: AdminReactOverviewStage,
+  totalNodes: number
+) {
+  const index = stage.index + 1
+  const title = escapeHtml(stage.title || `Nodo ${index}`)
+  const family = escapeHtml(getFamilyLabel(stage))
+  const radius = typeof stage.radius === 'number' ? stage.radius : 25
+  const physicalVisual = getPhysicalNodeVisual(stage)
+  const physicalText = physicalVisual ? `${physicalVisual.icon} ${escapeHtml(physicalVisual.label)}` : ''
+
+  return `
+    <div class="admin-node-quick-popup" style="padding:10px 12px;min-width:230px;color:#f8fafc;font-family:system-ui,sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:900;background:rgba(56,189,248,0.22);color:#38bdf8;padding:3px 10px;border-radius:999px;border:1px solid rgba(56,189,248,0.45);letter-spacing:0.5px;">
+          NODO #${index} DE ${totalNodes}
+        </span>
+        <span style="font-size:11px;color:#94a3b8;font-weight:800;background:rgba(15,23,42,0.6);padding:3px 8px;border-radius:6px;">📡 ${radius}m</span>
+      </div>
+      <strong style="display:block;font-size:15px;font-weight:900;color:#fff;margin-bottom:6px;line-height:1.2;">${title}</strong>
+      <div style="font-size:12px;color:#cbd5e1;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:6px;">🎮 ${family}</span>
+        ${physicalText ? `<span style="color:#34d399;background:rgba(52,211,153,0.14);padding:2px 8px;border-radius:6px;font-weight:700;">${physicalText}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;">
+        <button type="button" class="admin-popup-edit-btn" style="flex:1;padding:8px 14px;border-radius:10px;border:1px solid rgba(56,189,248,0.6);background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(14,165,233,0.35);">
+          ✏️ Editar Nodo
+        </button>
+      </div>
+    </div>
+  `
+}
+
 export default function AdminMissionMap({
   stages,
   selectedStage,
@@ -223,6 +256,23 @@ export default function AdminMissionMap({
         opacity: 0.96,
       })
 
+      marker.bindPopup(buildAdminNodePopupHtml(stage, mappedStages.length), {
+        closeButton: true,
+        autoPan: true,
+        keepInView: true,
+      })
+
+      marker.on('popupopen', () => {
+        const popupElement = marker.getPopup()?.getElement()
+        const editBtn = popupElement?.querySelector('.admin-popup-edit-btn')
+        if (editBtn) {
+          editBtn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            onSelectStage(stage)
+          })
+        }
+      })
+
       ring.on('click', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent)
         L.DomEvent.preventDefault(event.originalEvent)
@@ -235,6 +285,7 @@ export default function AdminMissionMap({
         }
 
         onSelectStage(stage)
+        marker.openPopup()
       })
 
       marker.on('click', (event: L.LeafletMouseEvent) => {
@@ -249,6 +300,7 @@ export default function AdminMissionMap({
         }
 
         onSelectStage(stage)
+        marker.openPopup()
       })
 
       marker.on('dragstart', () => {
