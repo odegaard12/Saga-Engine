@@ -129,22 +129,25 @@ const overlay: CSSProperties = {
   inset: 0,
   zIndex: 7600,
   display: 'grid',
-  alignItems: 'end',
-  background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(1.5px)',
-  WebkitBackdropFilter: 'blur(1.5px)',
+  alignItems: 'center',
+  padding: '16px 12px',
+  background: 'rgba(2,6,23,.75)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
 const sheet: CSSProperties = {
-  width: 'min(100%, 560px)',
+  width: 'min(100%, 540px)',
   margin: '0 auto',
-  padding: 12,
-  paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-  borderRadius: '24px 24px 0 0',
-  background: 'rgba(2,6,23,.95)',
+  maxHeight: '92vh',
+  padding: 16,
+  borderRadius: 24,
+  background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
   color: '#f8fafc',
   display: 'grid',
-  gap: 10,
+  gap: 12,
+  border: '1px solid rgba(56, 189, 248, 0.25)',
+  boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(14, 165, 233, 0.15)',
 }
 
 const header: CSSProperties = {

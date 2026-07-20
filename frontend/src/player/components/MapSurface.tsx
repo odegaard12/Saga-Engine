@@ -162,10 +162,11 @@ function getClusterRadiusForZoom(zoom: number) {
 }
 
 function getPhotoClusterRadiusForZoom(zoom: number) {
-  if (zoom >= 19) return 4
-  if (zoom >= 18) return 12
-  if (zoom >= 17) return 30
-  return 80
+  if (zoom >= 19) return 2
+  if (zoom >= 18) return 5
+  if (zoom >= 17) return 12
+  if (zoom >= 16) return 30
+  return 60
 }
 
 type PlayerMarkerGroup = {
@@ -411,8 +412,19 @@ function createAvatarIcon(
   return L.divIcon({
     className: 'saga-avatar-icon-wrap',
     html: `<div class="saga-avatar-pin saga-avatar-pin--${kind}" style="--saga-player-color:${safeColor};">${avatarHtml}</div>`,
-    iconSize: kind === 'self' ? [56, 56] : [50, 50],
-    iconAnchor: kind === 'self' ? [28, 28] : [25, 25],
+    iconSize: kind === 'self' ? [46, 46] : [42, 42],
+    iconAnchor: kind === 'self' ? [23, 23] : [21, 21],
+  })
+}
+
+function bindMarkerActiveEvents(marker: L.Marker) {
+  marker.off('popupopen')
+  marker.off('popupclose')
+  marker.on('popupopen', () => {
+    marker.getElement()?.classList.add('saga-avatar-active')
+  })
+  marker.on('popupclose', () => {
+    marker.getElement()?.classList.remove('saga-avatar-active')
   })
 }
 
@@ -1178,8 +1190,8 @@ export const MapSurface = React.memo(function MapSurface({
       })
 
       playerMarkerRef.current.off('click')
-
       playerMarkerRef.current.on('click', () => playerMarkerRef.current?.openPopup())
+      bindMarkerActiveEvents(playerMarkerRef.current)
     } else {
       playerMarkerRef.current.setLatLng(nextLatLng)
 
@@ -1331,6 +1343,7 @@ export const MapSurface = React.memo(function MapSurface({
           })
           existing.off('click')
           existing.on('click', () => existing.openPopup())
+          bindMarkerActiveEvents(existing)
           return
         }
 
@@ -1352,6 +1365,7 @@ export const MapSurface = React.memo(function MapSurface({
           keepInView: true,
         })
         marker.on('click', () => marker.openPopup())
+        bindMarkerActiveEvents(marker)
 
         otherPlayerMarkersRef.current.set(key, marker)
       })
@@ -1374,21 +1388,14 @@ export const MapSurface = React.memo(function MapSurface({
 
     const groups = groupFieldProofs(fieldProofs, getPhotoClusterRadiusForZoom(mapZoom))
 
-    for (const group of groups) {
-      let offsetLat = 0
-      let offsetLon = 0
-      if (
-        playerPosition &&
-        Math.abs(group.lat - playerPosition.lat) < 0.00015 &&
-        Math.abs(group.lon - playerPosition.lon) < 0.00015
-      ) {
-        offsetLat = -0.00015 // Shift South
-        offsetLon = 0.00015  // Shift East
-      }
+    groups.forEach((group, groupIndex) => {
+      const baseCenter = { lat: group.lat, lon: group.lon }
+      const nearPlayer = playerPosition && getDistanceMeters(baseCenter, playerPosition) <= 35
+      const visualCenter = nearPlayer
+        ? offsetLatLon(baseCenter, 28 + groupIndex * 10, 135 + groupIndex * 45)
+        : baseCenter
 
-      const center = { lat: group.lat + offsetLat, lon: group.lon + offsetLon }
-
-      const marker = L.marker([center.lat, center.lon], {
+      const marker = L.marker([visualCenter.lat, visualCenter.lon], {
         icon: createFieldProofIcon(group.proofs),
         keyboard: false,
         riseOnHover: true,
@@ -1406,7 +1413,7 @@ export const MapSurface = React.memo(function MapSurface({
       })
 
       fieldProofLayersRef.current.push(marker)
-    }
+    })
   }, [fieldProofs, mapReadyToken, mapZoom, onOpenFieldProofs, playerPosition?.lat, playerPosition?.lon])
 
   useEffect(() => {
@@ -1819,15 +1826,15 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin {
-  will-change: auto;
+  will-change: transform;
   transform: translateZ(0);
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 950;
   border:
     3px solid
@@ -1845,8 +1852,17 @@ const mapAnimations = `
       rgba(15,23,42,.72)
     );
   overflow: hidden;
-  transition: none;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
   animation: none;
+}
+
+.saga-avatar-active {
+  z-index: 99999 !important;
+}
+
+.saga-avatar-active .saga-avatar-pin {
+  transform: scale(1.35) translateZ(0) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,.45), 0 0 0 6px rgba(56,189,248,.30) !important;
 }
 
 .saga-avatar-pin img {
@@ -1856,10 +1872,10 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin--self {
-  min-width: 56px;
+  min-width: 46px;
   padding: 0;
-  width: 56px;
-  height: 56px;
+  width: 46px;
+  height: 46px;
   border-color:
     rgba(207,250,254,.98);
   box-shadow:
@@ -1871,7 +1887,7 @@ const mapAnimations = `
       rgba(255,255,255,.36);
   opacity: 1;
   transform: translateZ(0);
-  transition: none;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
   animation: none;
 }
 

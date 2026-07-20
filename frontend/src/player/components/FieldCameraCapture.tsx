@@ -20,6 +20,7 @@ export function FieldCameraCapture({
   const [note, setNote] = useState('')
   const [torchSupported, setTorchSupported] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -38,44 +39,54 @@ export function FieldCameraCapture({
         .saga-camera-center-target {
           position: absolute;
           top: 50%; left: 50%;
-          width: 240px; height: 240px;
-          margin-top: -120px; margin-left: -120px;
-          border: 2px solid rgba(255, 255, 255, 0.8);
-          border-radius: 16px;
+          width: min(85vw, 320px); height: min(50vh, 340px);
+          transform: translate(-50%, -50%);
+          border: 2px solid rgba(255, 255, 255, 0.85);
+          border-radius: 24px;
           box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
-        }
-        .saga-camera-center-target::before, .saga-camera-center-target::after {
-          content: '';
-          position: absolute;
-          background: #fff;
-        }
-        .saga-camera-center-target::before {
-          top: 50%; left: -6px; width: 12px; height: 2px; margin-top: -1px;
-          box-shadow: 246px 0 0 #fff;
-        }
-        .saga-camera-center-target::after {
-          left: 50%; top: -6px; height: 12px; width: 2px; margin-left: -1px;
-          box-shadow: 0 246px 0 #fff;
         }
         .saga-camera-corner {
           position: absolute;
-          width: 24px;
-          height: 24px;
-          border: 3px solid #0ea5e9;
+          width: 28px;
+          height: 28px;
+          border: 3px solid #38bdf8;
         }
-        .saga-camera-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 16px; }
-        .saga-camera-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 16px; }
-        .saga-camera-corner--bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 16px; }
-        .saga-camera-corner--br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 16px; }
+        .saga-camera-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 20px; }
+        .saga-camera-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 20px; }
+        .saga-camera-corner--bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 20px; }
+        .saga-camera-corner--br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 20px; }
         .saga-camera-hint {
           position: absolute;
-          bottom: 15%; left: 0; right: 0;
+          bottom: 12px; left: 0; right: 0;
           text-align: center;
-          color: #fff;
-          font-weight: 600;
-          font-size: 14px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-          letter-spacing: 0.05em;
+          color: rgba(255, 255, 255, 0.9);
+          font-weight: 800;
+          font-size: 13px;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+          letter-spacing: 0.08em;
+        }
+        .saga-shutter-btn {
+          width: 68px;
+          height: 68px;
+          border-radius: 50%;
+          border: 4px solid #ffffff;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: transform 0.15s ease;
+          padding: 0;
+        }
+        .saga-shutter-btn:active {
+          transform: scale(0.92);
+        }
+        .saga-shutter-inner {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+          box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
         }
       `
       document.head.appendChild(style)
@@ -99,10 +110,12 @@ export function FieldCameraCapture({
       }
 
       try {
+        streamRef.current?.getTracks().forEach((track) => track.stop())
+
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            facingMode: { ideal: 'environment' },
+            facingMode: { ideal: facingMode },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
           },
@@ -130,7 +143,7 @@ export function FieldCameraCapture({
           await videoRef.current.play().catch(() => undefined)
         }
       } catch {
-        setError('No se pudo abrir la cámara. Revisa permisos del navegador.')
+        setError('No se pudo abrir la cámara. Revisa los permisos del navegador.')
       }
     }
 
@@ -141,7 +154,7 @@ export function FieldCameraCapture({
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
-  }, [open])
+  }, [open, facingMode])
 
   if (!open) return null
 
@@ -191,24 +204,40 @@ export function FieldCameraCapture({
   return (
     <div style={overlay}>
       <section style={sheet} aria-label="Cámara de campo">
+        {/* Header bar */}
         <div style={header}>
-          <strong>Foto de campo</strong>
-          <button type="button" style={ghostButton} onClick={onClose} disabled={busy}>
-            Cerrar
+          <strong style={headerTitle}>📸 Foto de campo</strong>
+          <button type="button" style={closeBtnStyle} onClick={onClose} disabled={busy} aria-label="Cerrar">
+            ✕
           </button>
         </div>
 
+        {/* Viewfinder frame (large height) */}
         <div style={cameraFrame}>
-          {torchSupported && !preview ? (
-            <button
-              type="button"
-              style={torchButton}
-              onClick={toggleTorch}
-              aria-label="Alternar Linterna"
-            >
-              {torchOn ? '🔦 ON' : '🔦 OFF'}
-            </button>
+          {!preview ? (
+            <div style={topControlsGroup}>
+              {torchSupported ? (
+                <button
+                  type="button"
+                  style={pillControlBtn}
+                  onClick={toggleTorch}
+                  aria-label="Alternar Linterna"
+                >
+                  {torchOn ? '🔦 Linterna ON' : '🔦 Linterna OFF'}
+                </button>
+              ) : <div />}
+
+              <button
+                type="button"
+                style={pillControlBtn}
+                onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+                aria-label="Cambiar cámara"
+              >
+                🔄 {facingMode === 'environment' ? 'Cam. Trasera' : 'Cam. Frontal'}
+              </button>
+            </div>
           ) : null}
+
           {preview ? (
             <img src={preview} alt="Vista previa" style={previewImage} />
           ) : (
@@ -221,7 +250,6 @@ export function FieldCameraCapture({
                   <div className="saga-camera-corner saga-camera-corner--bl" />
                   <div className="saga-camera-corner saga-camera-corner--br" />
                 </div>
-                <div className="saga-camera-hint">ENCUADRA EL OBJETIVO</div>
               </div>
             </>
           )}
@@ -229,53 +257,51 @@ export function FieldCameraCapture({
           {error ? <div style={errorBox}>{error}</div> : null}
         </div>
 
-        <label style={noteLabel}>
-          Nota opcional
+        {/* Bottom controls / Note */}
+        <div style={controlsBottomContainer}>
           <input
             value={note}
             maxLength={180}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="Ej.: pista junto al árbol, foto del equipo..."
+            placeholder="Añade una nota a la foto (opcional)..."
             style={noteInput}
             disabled={busy}
           />
-        </label>
 
-        <div style={actions}>
-          {preview ? (
-            <>
+          <div style={shutterContainer}>
+            {preview ? (
+              <div style={previewActionsGroup}>
+                <button
+                  type="button"
+                  style={secondaryBtnStyle}
+                  onClick={() => setPreview('')}
+                  disabled={busy}
+                >
+                  🔄 Repetir foto
+                </button>
+                <button
+                  type="button"
+                  style={primaryBtnStyle}
+                  onClick={() => void submitPhoto()}
+                  disabled={busy}
+                >
+                  {busy ? 'Subiendo…' : '✔ Guardar en mapa'}
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                style={secondaryButton}
-                onClick={() => setPreview('')}
-                disabled={busy}
+                className="saga-shutter-btn"
+                onClick={captureFrame}
+                disabled={busy || Boolean(error)}
+                aria-label="Disparar foto"
+                title="Disparar foto"
               >
-                Repetir
+                <div className="saga-shutter-inner" />
               </button>
-              <button
-                type="button"
-                style={primaryButton}
-                onClick={() => void submitPhoto()}
-                disabled={busy}
-              >
-                {busy ? 'Subiendo…' : 'Subir al mapa'}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              style={primaryButton}
-              onClick={captureFrame}
-              disabled={busy || Boolean(error)}
-            >
-              Hacer foto
-            </button>
-          )}
+            )}
+          </div>
         </div>
-
-        <p style={helpText}>
-          La foto se guarda en esta ubicación y será visible para todos los jugadores de la partida.
-        </p>
       </section>
     </div>
   )
@@ -284,24 +310,27 @@ export function FieldCameraCapture({
 const overlay: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 7000,
+  zIndex: 7500,
   display: 'grid',
-  alignItems: 'end',
-  background: 'rgba(2,6,23,.46)',
-  backdropFilter: 'blur(10px)',
+  placeItems: 'center',
+  padding: 12,
+  background: 'rgba(2, 6, 23, 0.85)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
 }
 
 const sheet: CSSProperties = {
-  width: 'min(100%, 520px)',
+  width: 'min(100%, 540px)',
+  height: 'min(94vh, 760px)',
   margin: '0 auto',
-  padding: 14,
-  paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
-  borderRadius: '24px 24px 0 0',
-  border: '2px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.99))',
-  boxShadow: '0 -18px 48px rgba(0,0,0,.58)',
+  padding: 16,
+  borderRadius: 24,
+  border: '1px solid rgba(56, 189, 248, 0.3)',
+  background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
+  boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(14,165,233,0.15)',
   color: '#fff',
-  display: 'grid',
+  display: 'flex',
+  flexDirection: 'column',
   gap: 12,
 }
 
@@ -309,43 +338,65 @@ const header: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  gap: 10,
+  padding: '0 4px',
 }
 
-const ghostButton: CSSProperties = {
-  minHeight: 34,
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#e2e8f0',
+const headerTitle: CSSProperties = {
+  fontSize: 17,
   fontWeight: 900,
+  letterSpacing: '-0.02em',
+  color: '#f8fafc',
+}
+
+const closeBtnStyle: CSSProperties = {
+  width: 36,
+  height: 36,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.15)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#f8fafc',
+  fontWeight: 700,
+  fontSize: 16,
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer',
 }
 
 const cameraFrame: CSSProperties = {
   position: 'relative',
+  flex: 1,
   width: '100%',
-  aspectRatio: '4 / 3',
-  overflow: 'hidden',
+  minHeight: 280,
   borderRadius: 20,
   background: '#020617',
-  border: '2px solid rgba(14,165,233,.40)',
-  boxShadow: 'inset 0 0 24px rgba(0,0,0,.80)',
+  border: '1px solid rgba(56,189,248,.30)',
+  overflow: 'hidden',
+  boxShadow: 'inset 0 0 30px rgba(0,0,0,.90)',
 }
 
-const torchButton: CSSProperties = {
+const topControlsGroup: CSSProperties = {
   position: 'absolute',
   top: 12,
+  left: 12,
   right: 12,
   zIndex: 10,
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 8,
+}
+
+const pillControlBtn: CSSProperties = {
   minHeight: 34,
-  padding: '0 12px',
+  padding: '0 14px',
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.2)',
-  background: 'rgba(0,0,0,.5)',
+  border: '1px solid rgba(255,255,255,.25)',
+  background: 'rgba(15,23,42,.80)',
   color: '#fff',
-  fontWeight: 900,
+  fontWeight: 800,
+  fontSize: 12,
   backdropFilter: 'blur(10px)',
+  boxShadow: '0 2px 10px rgba(0,0,0,.5)',
 }
 
 const video: CSSProperties = {
@@ -364,62 +415,69 @@ const errorBox: CSSProperties = {
   left: 12,
   right: 12,
   bottom: 12,
-  padding: 10,
+  padding: 12,
   borderRadius: 14,
-  background: 'rgba(127,29,29,.88)',
+  background: 'rgba(127,29,29,.90)',
   color: '#fee2e2',
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 800,
+  textAlign: 'center',
 }
 
-const noteLabel: CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  color: 'rgba(226,232,240,.84)',
-  fontSize: 11,
-  fontWeight: 900,
+const controlsBottomContainer: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  alignItems: 'center',
+  width: '100%',
 }
 
 const noteInput: CSSProperties = {
-  minHeight: 42,
+  width: '100%',
+  minHeight: 44,
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.12)',
-  background: 'rgba(255,255,255,.08)',
+  border: '1px solid rgba(255,255,255,.15)',
+  background: 'rgba(255,255,255,.07)',
   color: '#fff',
-  padding: '0 12px',
+  padding: '0 14px',
   fontSize: 14,
   outline: 'none',
+  boxSizing: 'border-box',
 }
 
-const actions: CSSProperties = {
+const shutterContainer: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  width: '100%',
+  minHeight: 68,
+}
+
+const previewActionsGroup: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
-  gap: 10,
+  gap: 12,
+  width: '100%',
 }
 
-const primaryButton: CSSProperties = {
+const primaryBtnStyle: CSSProperties = {
   minHeight: 46,
   borderRadius: 16,
-  border: '1px solid rgba(125,211,252,.32)',
-  background: 'linear-gradient(135deg, rgba(14,165,233,.94), rgba(37,99,235,.90))',
+  border: '1px solid rgba(125,211,252,.35)',
+  background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
   color: '#fff',
   fontSize: 14,
   fontWeight: 950,
+  cursor: 'pointer',
 }
 
-const secondaryButton: CSSProperties = {
+const secondaryBtnStyle: CSSProperties = {
   minHeight: 46,
   borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(255,255,255,.15)',
   background: 'rgba(255,255,255,.08)',
   color: '#e2e8f0',
   fontSize: 14,
   fontWeight: 950,
-}
-
-const helpText: CSSProperties = {
-  margin: 0,
-  color: 'rgba(226,232,240,.62)',
-  fontSize: 11,
-  lineHeight: 1.35,
+  cursor: 'pointer',
 }
