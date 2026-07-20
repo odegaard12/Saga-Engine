@@ -522,16 +522,16 @@ export default function AdminMissionControlShell({
               aria-label="Crear nodo aquí"
               style={{ left: pendingCreateLocation.clientX, top: pendingCreateLocation.clientY }}
             >
-              <strong>Crear nodo aquí?</strong>
+              <strong>📍 ¿Crear nuevo nodo aquí?</strong>
               <small>
-                {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
+                Coordenadas: {pendingCreateLocation.lat.toFixed(5)}, {pendingCreateLocation.lon.toFixed(5)}
               </small>
               <div>
-                <button type="button" onClick={confirmPendingCreateNode}>
-                  Crear
+                <button type="button" onClick={confirmPendingCreateNode} style={{ fontWeight: 800 }}>
+                  ➕ Crear Nodo
                 </button>
                 <button type="button" onClick={cancelPendingCreateNode}>
-                  Descartar
+                  Cancelar
                 </button>
               </div>
             </section>

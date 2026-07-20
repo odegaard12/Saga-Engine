@@ -1,4 +1,4 @@
-const PLAYER_SHELL_CACHE = 'saga-player-shell-v3.1.2-rev1'
+const PLAYER_SHELL_CACHE = 'saga-player-shell-v3.2.0'
 
 export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined') return null

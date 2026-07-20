@@ -244,7 +244,7 @@ export default function NodeDetailDrawer({
   useEffect(() => {
     setDraft(stage)
     setActiveTab('basics')
-  }, [stage])
+  }, [stage.id, stage.index])
 
   const family =
     familyCards.find((item) => item.id === draft.type) ||

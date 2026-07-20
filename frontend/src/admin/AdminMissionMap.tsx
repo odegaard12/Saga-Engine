@@ -502,12 +502,6 @@ export default function AdminMissionMap({
 
       <div ref={mapRootRef} style={mapCanvas} aria-label="React admin mission map" />
 
-      {mappedStages.length === 0 ? (
-        <div style={emptyState}>
-          <strong>No mapped nodes yet.</strong>
-          <span>Click anywhere on the map to create the first node.</span>
-        </div>
-      ) : null}
     </section>
   )
 }

@@ -100,7 +100,7 @@ export default function AdminGameEditor({
       isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
     )
     setStepIndex(0)
-  }, [stage.id, stage.index, stage])
+  }, [stage.id, stage.index])
 
   const mode = editorMode
   const selected = gameFromStage(stage)
