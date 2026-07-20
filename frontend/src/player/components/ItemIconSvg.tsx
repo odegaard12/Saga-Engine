@@ -1,21 +1,29 @@
-import React from 'react'
 
 export type ItemIconSvgProps = {
   itemId: string
+  customIcon?: string
   className?: string
   size?: number
 }
 
-export default function ItemIconSvg({ itemId, className = '', size = 24 }: ItemIconSvgProps) {
+export default function ItemIconSvg({ itemId, customIcon, className = '', size = 24 }: ItemIconSvgProps) {
   const id = itemId.toLowerCase()
 
-  // Base style to center the SVG
+  // Base style to center the SVG or emoji
   const style = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     width: size,
     height: size,
+  }
+
+  if (customIcon) {
+    return (
+      <div className={`saga-svg-icon saga-svg-icon-custom ${className}`} style={{ ...style, fontSize: size * 0.8 }}>
+        {customIcon}
+      </div>
+    )
   }
 
   // Key / Llave

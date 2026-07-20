@@ -1,11 +1,10 @@
-import { useMemo } from 'react'
 import type { StageLike } from './guided-editor/guidedEditorUtils'
 import { configOf } from './guided-editor/guidedEditorUtils'
 import PhysicalQrCardsPanel, { type PhysicalQrKind, type SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
 
 export interface AdminQrEditorProps {
   stage: StageLike
-  onPatch: (updates: Record<string, any>) => void
+  onPatch: (updates: Record<string, unknown>) => void
   onClose: () => void
   onDelete: () => void
   onRequestChangeType?: () => void
@@ -18,7 +17,7 @@ export default function AdminQrEditor({
   onClose,
   onDelete,
   onRequestChangeType,
-  stages = [],
+  stages: _stages = [],
 }: AdminQrEditorProps) {
   const config = configOf(stage)
   const mode = (stage.physical_node_kind || 'collectible') as PhysicalQrKind
@@ -105,6 +104,36 @@ export default function AdminQrEditor({
                 compact
                 onSaveToNode={handleSaveQr}
               />
+            </div>
+          </div>
+
+          <div className="saga-guided-v4-dep-box wide">
+            <div className="saga-guided-v4-dep-box__title">
+              📖 Historia / Introducción (Opcional)
+            </div>
+            <p className="saga-guided-v4-dep-box__desc">
+              Texto que se mostrará al jugador ANTES de indicarle que escanee el QR.
+            </p>
+            <div style={{ padding: '0 12px 12px' }}>
+              <label className="wide">
+                <span>Título de la historia</span>
+                <input 
+                  type="text" 
+                  value={stage.intro_title || ''} 
+                  onChange={(e) => onPatch({ intro_title: e.target.value })}
+                  placeholder="Ej: El cofre secreto"
+                  style={{ marginBottom: 8 }}
+                />
+              </label>
+              <label className="wide">
+                <span>Narrativa previa</span>
+                <textarea 
+                  value={stage.intro_body || ''} 
+                  onChange={(e) => onPatch({ intro_body: e.target.value })}
+                  placeholder="Soporta Markdown para imágenes: ![alt](url)."
+                  rows={3}
+                />
+              </label>
             </div>
           </div>
 

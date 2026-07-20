@@ -13,8 +13,9 @@ import {
   loadOfflineSnapshot,
   type SagaOfflineSnapshot,
 } from '../offline/localFirst'
-import { cacheMissionMapTiles, cachePlayerShell } from '../offline/pwaShell'
+import { cachePlayerShell } from '../offline/pwaShell'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../offline/fieldProofCache'
+import { prefetchMissionMapTiles } from '../offline/mapTileCache'
 
 type Props = {
   user: string
@@ -99,7 +100,9 @@ export function MissionPackPanel({ user, payload }: Props) {
 
       await Promise.all([
         cachePlayerShell(`/player/${encodeURIComponent(user)}`),
-        cacheMissionMapTiles(game.stages || []),
+        prefetchMissionMapTiles(game.stages || [], (progress) => {
+          setMessage(progress.detail || 'Descargando mapas...')
+        }),
         cacheFieldProofAssets(fieldProofs),
       ])
 

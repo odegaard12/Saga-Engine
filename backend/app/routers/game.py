@@ -35,6 +35,9 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         for i, stage in enumerate(runtime_stages)
     ]
 
+    inventory_state = main.load_inventory_state()
+    inventory_snapshot = inventory_state.get(profile_id, {"items": []})
+
     payload = {
         "user": profile_id,
         "display_name": profile.get("display_name", profile_id),
@@ -44,7 +47,8 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         "level": lvl,
         "finished": finished,
         "stages": stages,
-        "current_stage": current_stage
+        "current_stage": current_stage,
+        "inventory_snapshot": inventory_snapshot,
     }
     response = JSONResponse(payload)
     if main.resolve_known_player_profile(profile_id):
@@ -92,6 +96,10 @@ async def sync_player_events(request: Request):
 
     if len(events) > 100:
         raise HTTPException(status_code=400, detail="too many events")
+
+    inventory_snapshot = data.get("inventory_snapshot")
+    if isinstance(inventory_snapshot, dict):
+        main.save_player_inventory(user, inventory_snapshot)
 
     stored = []
     seen_client_events = {}

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import QrCardStudio, { getQrDesignSignature, type QrCardDesign } from './QrCardStudio'
+import QrCardStudio, { getQrDesignSignature } from './QrCardStudio'
+import type { QrCardDesign } from './QrCardStudio'
 import {
-  adminGameCatalog,
-  getAdminGame,
+  adminGameCatalog as _adminGameCatalog,
+  getAdminGame as _getAdminGame,
   getDefaultAdminStagePatchForGame,
   type AdminGameCatalogItem,
-  type AdminGameId,
+  type AdminGameId as _AdminGameId,
 } from '../lib/gameCatalog'
-import type { SavedPhysicalQrCard, PhysicalQrKind } from './PhysicalQrCardsPanel'
+import type { SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
+import type { PhysicalQrKind as _PhysicalQrKind } from './PhysicalQrCardsPanel'
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
 import SequenceCodeEditor from './sequenceCode/SequenceCodeEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
@@ -18,19 +20,19 @@ import {
   type StepKey,
   type EditorMode,
   STEPS,
-  READY_STATUSES,
-  TECHNICAL_CONFIG_KEYS,
-  LEGACY_MESSAGE_FALLBACKS,
-  QR_KIND_BY_GAME_ID,
-  QR_GAME_BY_KIND,
+  READY_STATUSES as _READY_STATUSES,
+  TECHNICAL_CONFIG_KEYS as _TECHNICAL_CONFIG_KEYS,
+  LEGACY_MESSAGE_FALLBACKS as _LEGACY_MESSAGE_FALLBACKS,
+  QR_KIND_BY_GAME_ID as _QR_KIND_BY_GAME_ID,
+  QR_GAME_BY_KIND as _QR_GAME_BY_KIND,
   CONFIG_FIELD_META,
-  CONFIG_ORDER,
+  CONFIG_ORDER as _CONFIG_ORDER,
   configOf,
-  titleOf,
-  nodeNumber,
+  titleOf as _titleOf,
+  nodeNumber as _nodeNumber,
   displayTitle,
   normalizeQrKind,
-  hasExplicitQrMarker,
+  hasExplicitQrMarker as _hasExplicitQrMarker,
   gameFromStage,
   isMapCollectibleStage,
   isQrStage,
@@ -38,14 +40,14 @@ import {
   qrOptions,
   statusLabel,
   offlineLabel,
-  isPlayableNow,
+  isPlayableNow as _isPlayableNow,
   usesLocationRadius,
   normalizeDifficultyForEditor,
   isValidFixedCircuitConfig,
   isValidSequenceCodeConfig,
   isValidTiltMazeConfig,
   isValidPlaceMosaicConfig,
-  normalizeCopy,
+  normalizeCopy as _normalizeCopy,
   shouldReplaceGeneratedGameTitle,
   shouldReplaceSequenceTitle,
   shouldReplacePlaceMosaicTitle,
@@ -53,7 +55,7 @@ import {
   isLegacySequenceHint,
   isExperimentalOrPlanned,
   normalizeMessage,
-  CUSTOM_GAME_EDITOR_IDS,
+  CUSTOM_GAME_EDITOR_IDS as _CUSTOM_GAME_EDITOR_IDS,
   hasCustomGameEditor,
   guidedConfigKeysForGame,
   slugOf,
@@ -66,7 +68,7 @@ import {
   qrDesignFromConfig,
   formatConfigValue,
   parseConfigValue,
-  copyText
+  copyText as _copyText
 } from './guided-editor/guidedEditorUtils'
 
 export interface AdminGameEditorProps {
@@ -87,7 +89,7 @@ export default function AdminGameEditor({
   stages = [],
 }: AdminGameEditorProps) {
   const [stepIndex, setStepIndex] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [_notice, setNotice] = useState<string | null>(null)
   const [showExperimentalGames, setShowExperimentalGames] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>(() =>
     isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
@@ -98,7 +100,7 @@ export default function AdminGameEditor({
       isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
     )
     setStepIndex(0)
-  }, [stage.id, stage.index])
+  }, [stage.id, stage.index, stage])
 
   const mode = editorMode
   const selected = gameFromStage(stage)
@@ -117,9 +119,9 @@ export default function AdminGameEditor({
 
   const qrDesignSignature = getQrDesignSignature(qrPayload(stage), qrDesign)
 
-  const qrValidated = String(config.qr_validation_signature || '') === qrDesignSignature
+  const _qrValidated = String(config.qr_validation_signature || '') === qrDesignSignature
 
-  const customGameEditor = mode === 'game' && hasCustomGameEditor(selectedGame)
+  const _customGameEditor = mode === 'game' && hasCustomGameEditor(selectedGame)
 
   const collectibleItems = useMemo(() => {
     return stages
@@ -388,6 +390,7 @@ export default function AdminGameEditor({
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function applyMapCollectible() {
     setEditorMode('map_collectible')
     onPatch({
@@ -533,7 +536,7 @@ export default function AdminGameEditor({
         {step === 'subtype' && mode === 'game' ? (
           <section className="saga-guided-v4-page saga-guided-v4-page--catalog">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 2</span>
+              <span>Paso {stepIndex + 1}</span>
               <h3>Elige el juego</h3>
               <p>
                 Muestra el catálogo real. Los planificados pueden prepararse, pero los más seguros son
@@ -575,7 +578,7 @@ export default function AdminGameEditor({
         {step === 'subtype' && mode === 'qr' ? (
           <section className="saga-guided-v4-page saga-guided-v4-page--choices">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 1</span>
+              <span>Paso {stepIndex + 1}</span>
               <h3>Elige el subtipo de QR físico</h3>
               <p>Selecciona una plantilla de tarjeta física del catálogo SAGA.</p>
             </div>
@@ -603,465 +606,167 @@ export default function AdminGameEditor({
         {step === 'subtype' && mode === 'map_collectible' ? (
           <section className="saga-guided-v4-page">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 1</span>
+              <span>Paso {stepIndex + 1}</span>
               <h3>🌟 Coleccionable en mapa</h3>
               <p>Objeto GPS que el jugador recoge al acercarse físicamente al punto.</p>
             </div>
 
             <div className="saga-guided-v4-formgrid">
-              <article className="saga-guided-v4-note wide">
-                <b>¿Cómo funciona para el jugador?</b>
+              <article className="saga-guided-v4-note wide" style={{ borderLeft: '3px solid var(--saga-primary)', background: 'rgba(14, 165, 233, 0.04)' }}>
+                <b>📌 Funcionamiento del Coleccionable</b>
                 <span>
-                  <strong>1️⃣ Se acerca al punto</strong> → Su app detecta que está dentro del radio
-                  GPS.
-                  <br />
-                  <strong>2️⃣ Se abre un panel</strong> → La pantalla muestra el objeto y un botón
-                  para recogerlo.
-                  <br />
-                  <strong>3️⃣ Pulsa OK / Recoger</strong> → El objeto se guarda en su mochila
-                  automáticamente.
-                  <br />
-                  <strong>4️⃣ Lo usa en la Mesa o en un nodo</strong> → Si es ingrediente, puede
-                  combinarlo en la Mesa para fabricar algo mayor. Si un nodo lo requiere, ese nodo
-                  se desbloquea al llegar con el objeto.
+                  El jugador se acerca al punto GPS. Al entrar en el radio, la app detecta la cercanía y le permite recoger el objeto directamente para guardarlo en la mochila. No requiere escanear un QR físico ni jugar a un minijuego.
                 </span>
               </article>
 
-              <article
-                className="saga-guided-v4-note wide"
-                style={{
-                  borderColor: 'rgba(251,191,36,0.22)',
-                  background: 'rgba(251,191,36,0.06)',
-                }}
-              >
-                <b>💡 Diferencia con QR físico</b>
+              <article className="saga-guided-v4-note wide" style={{ borderLeft: '3px solid #f59e0b', background: 'rgba(245, 158, 11, 0.04)' }}>
+                <b>💡 Diferencia con código QR</b>
                 <span>
-                  El coleccionable de mapa <strong>no necesita tarjeta impresa</strong>. Se recoge
-                  solo por GPS al pasar cerca. El QR físico sí necesita que el jugador escanee una
-                  tarjeta impresa que tú habrás colocado en el lugar.
+                  El coleccionable GPS <strong>no requiere tarjeta impresa</strong>. Se obtiene de forma 100% digital al estar físicamente en la ubicación.
                 </span>
               </article>
             </div>
           </section>
         ) : null}
 
-        {step === 'config' ? (
+        
+        {step === 'details' ? (
           <section className="saga-guided-v4-page">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 2</span>
-              <h3>
-                {mode === 'qr'
-                  ? 'Configurar QR físico'
-                  : mode === 'map_collectible'
-                    ? 'Configurar objeto en mapa'
-                    : 'Ajustes del juego'}
-              </h3>
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Detalles básicos</h3>
+              <p>Nombre interno e ID.</p>
             </div>
-
+            
             <div className="saga-guided-v4-formgrid">
-              {/* PREMIUM HOW-TO-PLAY CARD */}
-              <article className="saga-guided-v4-note wide saga-how-to-play-card">
-                <header className="saga-how-to-play-card__head">
-                  <span className="saga-how-to-play-card__emoji">🎮</span>
-                  <div>
-                    <strong>¿Cómo juega esto el usuario?</strong>
-                    <small>Mecánica y objetivo del jugador en la app móvil</small>
-                  </div>
-                </header>
-                <div className="saga-how-to-play-card__body">
-                  <p>
-                    <strong>Objetivo:</strong>{' '}
-                    {mode === 'map_collectible'
-                      ? 'Acercarse físicamente al punto para recoger el objeto en el mapa.'
-                      : (mode === 'qr' ? selectedQr.playerGoal : selectedGame.playerGoal)}
-                  </p>
-                  <p>
-                    <strong>Funcionamiento:</strong>{' '}
-                    {mode === 'map_collectible'
-                      ? 'El dispositivo detecta la proximidad GPS al nodo y muestra el objeto en pantalla para ser recogido manualmente y guardado en la mochila.'
-                      : (mode === 'qr' ? selectedQr.offlineNote : selectedGame.offlineNote)}
-                  </p>
-                  <p className="saga-how-to-play-card__hint">
-                    💡 <em>{(mode === 'qr' ? selectedQr.editorHint : selectedGame.editorHint)}</em>
-                  </p>
-                </div>
-              </article>
-
-            {mode === 'game' ? (
-              <>
-                {usesLocationRadius(selectedGame) ? (
-                  <label>
-                    <span>Radio visible del nodo</span>
-                    <input
-                      type="number"
-                      value={Number(
-                        stage.radius_m || stage.proximity_radius_m || stage.radius || 50
-                      )}
+              {mode === 'game' ? (
+                <label>
+                  <span>Título interno del juego</span>
+                  <input
+                    value={String(stage.title || '')}
+                    onChange={(event) => onPatch({ title: event.target.value })}
+                  />
+                </label>
+              ) : mode === 'map_collectible' ? (
+                <>
+                  <label className="wide">
+                    <span>🎁 ¿Qué objeto DA este nodo al jugador al pasar cerca?</span>
+                    <select
+                      value={
+                        ['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '')
+                          ? stage.physical_item_id || 'placa_base'
+                          : 'custom'
+                      }
                       onChange={(event) => {
-                        patchNumber('radius_m', event.target.value)
-                        patchNumber('proximity_radius_m', event.target.value)
-                        patchNumber('radius', event.target.value)
+                        const val = event.target.value
+                        if (val === 'custom') {
+                          onPatch({ physical_item_id: 'objeto_personalizado', physical_item_label: 'Objeto Personalizado', title: 'Objeto Personalizado', config: { ...config, collectible_purpose: 'standalone' } })
+                        } else {
+                          const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
+                          const purposes: Record<string, string> = { placa_base: 'crafting', cables_cobre: 'crafting', bateria_litio: 'crafting', cinta_aislante: 'crafting', llave_rota: 'crafting' }
+                          onPatch({ physical_item_id: val, physical_item_label: labels[val], title: labels[val], config: { ...config, collectible_purpose: purposes[val] || 'standalone' } })
+                        }
                       }}
+                    >
+                      <option value="placa_base">💾 Placa base → ingrediente EMP</option>
+                      <option value="cables_cobre">🔌 Cables de cobre → ingrediente EMP</option>
+                      <option value="bateria_litio">🔋 Batería de litio → ingrediente EMP</option>
+                      <option value="cinta_aislante">🩹 Cinta aislante → ingrediente Llave Maestra</option>
+                      <option value="llave_rota">🔑 Llave rota → ingrediente Llave Maestra</option>
+                      <option value="custom">✏️ Objeto personalizado (tú defines nombre e ID)</option>
+                    </select>
+                  </label>
+                  {!['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '') ? (
+                    <>
+                      <label>
+                        <span>Nombre visible</span>
+                        <input value={qrLabel(stage)} onChange={(event) => onPatch({ physical_item_label: event.target.value, title: event.target.value })} />
+                      </label>
+                      <label>
+                        <span>ID interno</span>
+                        <input value={qrItemId(stage)} onChange={(event) => onPatch({ physical_item_id: slugOf(event.target.value) })} />
+                      </label>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <label>
+                    <span>Título interno del QR</span>
+                    <input
+                      value={String(stage.title || '')}
+                      onChange={(event) => onPatch({ title: event.target.value })}
                     />
                   </label>
-                ) : null}
-
-                {configKeys.map((key) => {
-                  const meta = CONFIG_FIELD_META[key] || {
-                    label: key,
-                    help: 'Ajuste avanzado oculto normalmente. Revisa solo si sabes qué hace.',
-                    type: 'text' as const,
-                  }
-                  if (key === 'completion_method') return null
-
-                  return (
-                    <label key={key} className={key === 'objective' ? 'wide' : ''}>
-                      <span>{meta.label}</span>
-                      {meta.type === 'select' ? (
-                        <select
-                          value={
-                            key === 'difficulty'
-                              ? normalizeDifficultyForEditor(config[key])
-                              : formatConfigValue(config[key])
-                          }
-                          onChange={(event) => patchConfig(key, event.target.value)}
-                        >
-                          {meta.options?.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type={meta.type === 'number' ? 'number' : 'text'}
-                          value={formatConfigValue(config[key])}
-                          onChange={(event) => patchConfig(key, event.target.value)}
-                        />
-                      )}
-                      <small>{meta.help}</small>
-                    </label>
-                  )
-                })}
-
-                {selectedGame.id === 'logic_circuit' ? (
-                  <div className="wide saga-guided-v4-custom-editor">
-                    <CircuitPatternEditor
-                      key={selectedGame.id}
-                      config={config}
-                      onChange={(values) =>
-                        onPatch({
-                          config: {
-                            ...config,
-                            ...values,
-                          },
-                        })
+                  <label className="wide">
+                    <span>🎁 ¿Qué objeto DA al escanear?</span>
+                    <select
+                      value={
+                        ['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '')
+                          ? stage.physical_item_id || 'placa_base'
+                          : 'custom'
                       }
-                    />
-                  </div>
-                ) : null}
-
-                {selectedGame.id === 'tilt_maze' ? (
-                  <div className="wide saga-guided-v4-custom-editor">
-                    <TiltMazeEditor
-                      key={selectedGame.id}
-                      config={config}
-                      onChange={(values) =>
-                        onPatch({
-                          config: {
-                            ...config,
-                            ...values,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                ) : null}
-
-                {selectedGame.id === 'place_mosaic' ? (
-                  <div className="wide saga-guided-v4-custom-editor">
-                    <PlaceMosaicEditor
-                      key={selectedGame.id}
-                      config={config}
-                      onChange={(values) =>
-                        onPatch({
-                          config: {
-                            ...config,
-                            ...values,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                ) : null}
-
-                {selectedGame.id === 'sequence_code' ? (
-                  <div className="wide saga-guided-v4-custom-editor">
-                    <SequenceCodeEditor
-                      key={selectedGame.id}
-                      config={config}
-                      onChange={(values) =>
-                        onPatch({
-                          config: {
-                            ...config,
-                            ...values,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                ) : null}
-              </>
-            ) : mode === 'map_collectible' ? (
-              <>
-                {/* ── SECCIÓN 1: ¿Qué objeto da? ── */}
-                <label className="wide">
-                  <span>🎁 ¿Qué objeto DA este nodo al jugador al pasar cerca?</span>
-                  <select
-                    value={
-                      [
-                        'placa_base',
-                        'cables_cobre',
-                        'bateria_litio',
-                        'cinta_aislante',
-                        'llave_rota',
-                      ].includes(stage.physical_item_id || '')
-                        ? stage.physical_item_id || 'placa_base'
-                        : 'custom'
-                    }
-                    onChange={(event) => {
-                      const val = event.target.value
-                      if (val === 'custom') {
-                        onPatch({
-                          physical_item_id: 'objeto_personalizado',
-                          physical_item_label: 'Objeto Personalizado',
-                          title: 'Objeto Personalizado',
-                          config: { ...config, collectible_purpose: 'standalone' },
-                        })
-                      } else {
-                        const labels: Record<string, string> = {
-                          placa_base: 'Placa base',
-                          cables_cobre: 'Cables de cobre',
-                          bateria_litio: 'Batería de litio',
-                          cinta_aislante: 'Cinta aislante',
-                          llave_rota: 'Llave rota',
+                      onChange={(event) => {
+                        const val = event.target.value
+                        if (val === 'custom') {
+                          onPatch({ physical_item_id: 'objeto_personalizado', physical_item_label: 'Objeto Personalizado', title: 'Objeto Personalizado', config: { ...config, collectible_purpose: 'standalone' } })
+                        } else {
+                          const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
+                          const purposes: Record<string, string> = { placa_base: 'crafting', cables_cobre: 'crafting', bateria_litio: 'crafting', cinta_aislante: 'crafting', llave_rota: 'crafting' }
+                          onPatch({ physical_item_id: val, physical_item_label: labels[val], title: labels[val], config: { ...config, collectible_purpose: purposes[val] || 'standalone' } })
                         }
-                        const purposes: Record<string, string> = {
-                          placa_base: 'crafting',
-                          cables_cobre: 'crafting',
-                          bateria_litio: 'crafting',
-                          cinta_aislante: 'crafting',
-                          llave_rota: 'crafting',
-                        }
-                        onPatch({
-                          physical_item_id: val,
-                          physical_item_label: labels[val],
-                          title: labels[val],
-                          config: { ...config, collectible_purpose: purposes[val] || 'standalone' },
-                        })
-                      }
-                    }}
-                  >
-                    <option value="placa_base">💾 Placa base → ingrediente EMP</option>
-                    <option value="cables_cobre">🔌 Cables de cobre → ingrediente EMP</option>
-                    <option value="bateria_litio">🔋 Batería de litio → ingrediente EMP</option>
-                    <option value="cinta_aislante">🩹 Cinta aislante → ingrediente Llave Maestra</option>
-                    <option value="llave_rota">🔑 Llave rota → ingrediente Llave Maestra</option>
-                    <option value="custom">✏️ Objeto personalizado (tú defines nombre e ID)</option>
-                  </select>
-                  <small>
-                    El ID interno sirve para que otros nodos puedan requerirlo o para la Mesa de Trabajo.
-                  </small>
-                </label>
-
-                {/* Warnings de ingredientes incompletos */}
-                {['placa_base', 'cables_cobre', 'bateria_litio'].includes(
-                  stage.physical_item_id || ''
-                ) ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ Ingrediente del Dispositivo EMP</b>
-                    <span>
-                      Necesitas <strong>3 nodos</strong> que entreguen: Placa base + Cables de cobre
-                      + Batería de litio. El sistema bloqueará el guardado si faltan.
-                    </span>
-                  </article>
-                ) : null}
-
-                {['cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '') ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ Ingrediente de la Llave Maestra</b>
-                    <span>
-                      Necesitas <strong>2 nodos</strong> que entreguen: Llave rota + Cinta aislante.
-                      El sistema bloqueará el guardado si falta el otro.
-                    </span>
-                  </article>
-                ) : null}
-
-                {/* Campos para objeto personalizado */}
-                {!['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(
-                  stage.physical_item_id || ''
-                ) ? (
-                  <>
-                    <label>
-                      <span>🎨 Icono del objeto</span>
-                      <input
-                        value={String(config.physical_icon || config.icon || '⭐')}
-                        onChange={(event) =>
-                          onPatch({ config: { ...config, physical_icon: event.target.value } })
-                        }
-                        placeholder="Escribe un emoji: 🗝️ 🧿 💎 📦 🔮"
-                        maxLength={4}
-                        style={{ fontSize: '1.4em', width: '72px', textAlign: 'center' }}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Nombre visible del objeto</span>
-                      <input
-                        value={qrLabel(stage)}
-                        onChange={(event) =>
-                          onPatch({
-                            physical_item_label: event.target.value,
-                            title: event.target.value,
-                          })
-                        }
-                        placeholder="Ej: Tarjeta magnética, Fragmento de mapa..."
-                      />
-                    </label>
-
-                    <label>
-                      <span>ID interno (para dependencias entre nodos)</span>
-                      <input
-                        value={qrItemId(stage)}
-                        onChange={(event) =>
-                          onPatch({ physical_item_id: slugOf(event.target.value) })
-                        }
-                        placeholder="ej: tarjeta_magnetica"
-                      />
-                      <small>
-                        Copia este ID en el campo &quot;Requiere objeto&quot; del nodo que depende de éste.
-                      </small>
-                    </label>
-
-                    {/* ── SECCIÓN 2: ¿Para qué sirve? ── */}
-                    <label className="wide">
-                      <span>🎯 ¿Para qué sirve este coleccionable?</span>
-                      <select
-                        value={String(config.collectible_purpose || 'standalone')}
-                        onChange={(event) =>
-                          onPatch({
-                            config: { ...config, collectible_purpose: event.target.value },
-                          })
-                        }
-                      >
-                        <option value="standalone">
-                          🎒 Solo coleccionable — el jugador lo guarda en la mochila
-                        </option>
-                        <option value="unlock_node">
-                          🔓 Desbloquea un nodo — otro nodo de la misión lo requiere
-                        </option>
-                        <option value="crafting">
-                          🔨 Ingrediente — el jugador lo combina en la Mesa de Trabajo
-                        </option>
-                        <option value="score">
-                          🏆 Puntuación — se canjea por puntos al finalizar la misión
-                        </option>
-                      </select>
-                      <small>
-                        Informativo. Ayuda a clarificar la narrativa de la misión.
-                      </small>
-                    </label>
-                  </>
-                ) : null}
-
-                {/* NUEVO: ¿En qué otro nodo se usará este objeto? */}
-                <label className="wide">
-                  <span>🔗 ¿En qué otro nodo de esta misión se usará este objeto? (Opcional)</span>
-                  <select
-                    value={String(config.target_unlock_node_id || '')}
-                    onChange={(event) => {
-                      onPatch({
-                        config: {
-                          ...config,
-                          target_unlock_node_id: event.target.value,
-                          collectible_purpose: event.target.value ? 'unlock_node' : config.collectible_purpose,
-                        }
-                      })
-                    }}
-                  >
-                    <option value="">🎒 Ninguno / Solo coleccionable o Mesa de Trabajo</option>
-                    {stages.filter(s => s.id !== stage.id).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {`Nodo ${s.index + 1}: ${s.title || 'Sin título'}`}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    Si seleccionas un nodo de destino, el mapa del administrador dibujará una línea punteada entre ambos.
-                  </small>
-                </label>
-
-                {/* ── SECCIÓN 3: Requisito de entrada ── */}
-                <div className="saga-guided-v4-dep-box wide">
-                  <div className="saga-guided-v4-dep-box__title">
-                    🔒 ¿Este nodo requiere algo para poder recogerse?
-                  </div>
-                  <p className="saga-guided-v4-dep-box__desc">
-                    Opcional. Si lo configuras, el jugador necesitará tener ese objeto en su mochila
-                    antes de poder recoger este coleccionable.
-                  </p>
-                  <select
-                    value={
-                      !stage.required_item_id
-                        ? 'none'
-                        : ['llave_maestra', 'emp_device'].includes(stage.required_item_id)
-                          ? stage.required_item_id
-                          : collectibleItems.some(item => item.id === stage.required_item_id)
-                            ? stage.required_item_id
-                            : 'custom'
-                    }
-                    onChange={(event) => {
-                      const val = event.target.value
-                      if (val === 'none') {
-                        onPatch({ required_item_id: '', requires_item: false })
-                      } else if (val === 'custom') {
-                        onPatch({ required_item_id: 'item_requerido', requires_item: true })
-                      } else {
-                        onPatch({ required_item_id: val, requires_item: true })
-                      }
-                    }}
-                  >
-                    <option value="none">🟢 Libre: cualquier jugador puede recogerlo</option>
-                    <option value="llave_maestra">🔑 Requiere Llave Maestra (fabricable)</option>
-                    <option value="emp_device">⚡ Requiere Dispositivo EMP (fabricable)</option>
-                    {collectibleItems.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                    <option value="custom">✏️ Requiere otro objeto (ID personalizado)</option>
-                  </select>
-
-                  {stage.required_item_id &&
-                  !['llave_maestra', 'emp_device'].includes(stage.required_item_id) &&
-                  !collectibleItems.some(item => item.id === stage.required_item_id) ? (
-                    <label>
-                      <span>ID del objeto requerido</span>
-                      <input
-                        value={stage.required_item_id}
-                        onChange={(event) =>
-                          onPatch({
-                            required_item_id: slugOf(event.target.value),
-                            requires_item: true,
-                          })
-                        }
-                        placeholder="ej: llave_del_cofre"
-                      />
-                    </label>
+                      }}
+                    >
+                      <option value="placa_base">💾 Placa base → ingrediente EMP</option>
+                      <option value="cables_cobre">🔌 Cables de cobre → ingrediente EMP</option>
+                      <option value="bateria_litio">🔋 Batería de litio → ingrediente EMP</option>
+                      <option value="cinta_aislante">🩹 Cinta aislante → ingrediente Llave Maestra</option>
+                      <option value="llave_rota">🔑 Llave rota → ingrediente Llave Maestra</option>
+                      <option value="custom">✏️ Objeto personalizado (tú defines nombre e ID)</option>
+                    </select>
+                  </label>
+                  {!['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '') ? (
+                    <>
+                      <label>
+                        <span>Nombre visible</span>
+                        <input value={qrLabel(stage)} onChange={(event) => onPatch({ physical_item_label: event.target.value, title: event.target.value })} />
+                      </label>
+                      <label>
+                        <span>ID interno</span>
+                        <input value={qrItemId(stage)} onChange={(event) => onPatch({ physical_item_id: slugOf(event.target.value) })} />
+                      </label>
+                    </>
                   ) : null}
-                </div>
+                </>
+              )}
+            </div>
+          </section>
+        ) : null}
 
-                {/* ── SECCIÓN 4: Radio GPS ── */}
+        {step === 'mechanics' ? (
+          <section className="saga-guided-v4-page">
+            <div className="saga-guided-v4-pagehead">
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Mecánica de aproximación</h3>
+              <p>GPS y radios de acceso.</p>
+            </div>
+            <div className="saga-guided-v4-formgrid">
+              {mode === 'game' && usesLocationRadius(selectedGame) ? (
+                <label>
+                  <span>📍 Radio visible del nodo (metros)</span>
+                  <input
+                    type="number"
+                    value={Number(stage.radius_m || stage.proximity_radius_m || stage.radius || 50)}
+                    onChange={(event) => {
+                      patchNumber('radius_m', event.target.value)
+                      patchNumber('proximity_radius_m', event.target.value)
+                      patchNumber('radius', event.target.value)
+                    }}
+                  />
+                  <small>Distancia a la que el nodo se hace jugable.</small>
+                </label>
+              ) : null}
+              {mode === 'map_collectible' ? (
                 <label>
                   <span>📍 Radio de recolección (metros)</span>
                   <input
@@ -1073,183 +778,208 @@ export default function AdminGameEditor({
                       patchNumber('radius', event.target.value)
                     }}
                   />
-                  <small>
-                    El jugador debe estar a menos de esta distancia del punto GPS para recoger el objeto.
-                  </small>
+                  <small>Distancia para poder recoger el objeto del mapa.</small>
                 </label>
-              </>
-            ) : (
-              <>
-                {/* ── SECCIÓN 1: ¿Qué objeto da? ── */}
-                <label className="wide">
-                  <span>🎁 ¿Qué objeto DA este nodo al jugador al escanear el QR?</span>
-                  <select
-                    value={
-                      [
-                        'placa_base',
-                        'cables_cobre',
-                        'bateria_litio',
-                        'cinta_aislante',
-                        'llave_rota',
-                      ].includes(stage.physical_item_id || '')
-                        ? stage.physical_item_id || 'placa_base'
-                        : 'custom'
+              ) : null}
+              {mode === 'qr' ? (
+                <div className="wide">
+                  <p>Este nodo es físico y se activa al escanear el QR independientemente de la distancia (aunque se recomiende GPS).</p>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {step === 'config' ? (
+          <section className="saga-guided-v4-page">
+            <div className="saga-guided-v4-pagehead">
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Ajustes del nodo</h3>
+              <p>Opciones de configuración avanzada.</p>
+            </div>
+            <div className="saga-guided-v4-formgrid">
+              {mode === 'game' ? (
+                <>
+                  {configKeys.map((key) => {
+                    const meta = CONFIG_FIELD_META[key] || {
+                      label: key,
+                      help: 'Ajuste avanzado',
+                      type: 'text' as const,
                     }
-                    onChange={(event) => {
-                      const val = event.target.value
-                      if (val === 'custom') {
-                        onPatch({
-                          physical_item_id: 'objeto_personalizado',
-                          physical_item_label: 'Objeto Personalizado',
-                          title: 'Objeto Personalizado',
-                          config: { ...config, collectible_purpose: 'standalone' },
-                        })
-                      } else {
-                        const labels: Record<string, string> = {
-                          placa_base: 'Placa base',
-                          cables_cobre: 'Cables de cobre',
-                          bateria_litio: 'Batería de litio',
-                          cinta_aislante: 'Cinta aislante',
-                          llave_rota: 'Llave rota',
-                        }
-                        const purposes: Record<string, string> = {
-                          placa_base: 'crafting',
-                          cables_cobre: 'crafting',
-                          bateria_litio: 'crafting',
-                          cinta_aislante: 'crafting',
-                          llave_rota: 'crafting',
-                        }
-                        onPatch({
-                          physical_item_id: val,
-                          physical_item_label: labels[val],
-                          title: labels[val],
-                          config: { ...config, collectible_purpose: purposes[val] || 'standalone' },
-                        })
-                      }
-                    }}
-                  >
-                    <option value="placa_base">💾 Placa base → ingrediente EMP</option>
-                    <option value="cables_cobre">🔌 Cables de cobre → ingrediente EMP</option>
-                    <option value="bateria_litio">🔋 Batería de litio → ingrediente EMP</option>
-                    <option value="cinta_aislante">🩹 Cinta aislante → ingrediente Llave Maestra</option>
-                    <option value="llave_rota">🔑 Llave rota → ingrediente Llave Maestra</option>
-                    <option value="custom">✏️ Objeto personalizado (tú defines nombre e ID)</option>
-                  </select>
-                  <small>
-                    El ID interno sirve para que otros nodos puedan requerirlo o para la Mesa de Trabajo.
-                  </small>
-                </label>
+                    if (key === 'completion_method') return null
+                    return (
+                      <label key={key} className={key === 'objective' ? 'wide' : ''}>
+                        <span>{meta.label}</span>
+                        {meta.type === 'select' ? (
+                          <select value={key === 'difficulty' ? normalizeDifficultyForEditor(config[key]) : formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)}>
+                            {meta.options?.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input type={meta.type === 'number' ? 'number' : 'text'} value={formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)} />
+                        )}
+                        <small>{meta.help}</small>
+                      </label>
+                    )
+                  })}
+                  {selectedGame.id === 'logic_circuit' && (
+                    <div className="wide saga-guided-v4-custom-editor"><CircuitPatternEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'tilt_maze' && (
+                    <div className="wide saga-guided-v4-custom-editor"><TiltMazeEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'place_mosaic' && (
+                    <div className="wide saga-guided-v4-custom-editor"><PlaceMosaicEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'sequence_code' && (
+                    <div className="wide saga-guided-v4-custom-editor"><SequenceCodeEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                </>
+              ) : (
+                <div className="wide">
+                  <p>No hay ajustes avanzados para este tipo de nodo.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
 
-                {/* Warnings de ingredientes incompletos */}
-                {['placa_base', 'cables_cobre', 'bateria_litio'].includes(
-                  stage.physical_item_id || ''
-                ) ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ Ingrediente del Dispositivo EMP</b>
-                    <span>
-                      Necesitas <strong>3 nodos</strong> que entreguen: Placa base + Cables de cobre
-                      + Batería de litio. El sistema bloqueará el guardado si faltan.
-                    </span>
-                  </article>
-                ) : null}
-
-                {['cinta_aislante', 'llave_rota'].includes(stage.physical_item_id || '') ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ Ingrediente de la Llave Maestra</b>
-                    <span>
-                      Necesitas <strong>2 nodos</strong> que entreguen: Llave rota + Cinta aislante.
-                      El sistema bloqueará el guardado si falta el otro.
-                    </span>
-                  </article>
-                ) : null}
-
-                {/* Campos para objeto personalizado */}
-                {!['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(
-                  stage.physical_item_id || ''
-                ) ? (
-                  <>
-                    <label>
-                      <span>Nombre visible</span>
-                      <input
-                        value={qrLabel(stage)}
-                        onChange={(event) =>
-                          onPatch({
-                            physical_item_label: event.target.value,
-                            title: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      <span>ID interno</span>
-                      <input
-                        value={qrItemId(stage)}
-                        onChange={(event) => onPatch({ physical_item_id: slugOf(event.target.value) })}
-                      />
-                    </label>
-                  </>
-                ) : null}
-
-                {/* NUEVO: ¿En qué otro nodo se usará este objeto? */}
-                <label className="wide">
-                  <span>🔗 ¿En qué otro nodo de esta misión se usará este objeto? (Opcional)</span>
-                  <select
-                    value={String(config.target_unlock_node_id || '')}
-                    onChange={(event) => {
-                      onPatch({
-                        config: {
-                          ...config,
-                          target_unlock_node_id: event.target.value,
-                          collectible_purpose: event.target.value ? 'unlock_node' : config.collectible_purpose,
-                        }
-                      })
-                    }}
-                  >
-                    <option value="">🎒 Ninguno / Solo coleccionable o Mesa de Trabajo</option>
-                    {stages.filter(s => s.id !== stage.id).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {`Nodo ${s.index + 1}: ${s.title || 'Sin título'}`}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    Si seleccionas un nodo de destino, el mapa del administrador dibujará una línea punteada entre ambos.
-                  </small>
-                </label>
-
+        {step === 'rules' ? (
+          <section className="saga-guided-v4-page">
+            <div className="saga-guided-v4-pagehead">
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Requisitos previos</h3>
+              <p>Objetos necesarios para abrir este nodo.</p>
+            </div>
+            <div className="saga-guided-v4-formgrid">
+              <label className="wide">
+                <span>🔑 ¿Requiere algún objeto de la mochila?</span>
+                <select
+                  value={
+                    !stage.required_item_id
+                      ? 'none'
+                      : ['llave_maestra', 'emp_device'].includes(stage.required_item_id)
+                        ? stage.required_item_id
+                        : collectibleItems.some(item => item.id === stage.required_item_id)
+                          ? stage.required_item_id
+                          : 'custom'
+                  }
+                  onChange={(event) => {
+                    const val = event.target.value
+                    if (val === 'none') onPatch({ required_item_id: '', requires_item: false })
+                    else if (val === 'custom') onPatch({ required_item_id: 'item_requerido', requires_item: true })
+                    else onPatch({ required_item_id: val, requires_item: true })
+                  }}
+                >
+                  <option value="none">🟢 No requiere nada</option>
+                  <option value="llave_maestra">🔑 Requiere Llave Maestra</option>
+                  <option value="emp_device">⚡ Requiere Dispositivo EMP</option>
+                  {collectibleItems.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  <option value="custom">✏️ ID personalizado...</option>
+                </select>
+              </label>
+              {stage.required_item_id && !['llave_maestra', 'emp_device'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
                 <label>
-                  <span>Código fallback</span>
-                  <input
-                    value={fallbackCode(stage)}
-                    onChange={(event) => {
-                      onPatch({
-                        fallback_code: event.target.value,
-                        physical_fallback_code: event.target.value,
-                        config: { ...config, success_code: event.target.value },
-                      })
-                    }}
-                  />
+                  <span>ID del objeto requerido</span>
+                  <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value) })} />
                 </label>
+              ) : null}
+              <label className="checkbox wide">
+                <input checked={Boolean(stage.consume_required_item)} type="checkbox" onChange={(event) => onPatch({ consume_required_item: event.target.checked })} />
+                <span>Consumir objeto al acceder (se retira de la mochila)</span>
+              </label>
+              {(mode === 'map_collectible' || mode === 'qr') ? (
+                <div className="saga-guided-v4-dep-box wide" style={{ borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.04)', marginTop: '20px', padding: '16px', borderRadius: '8px' }}>
+                  <div className="saga-guided-v4-dep-box__title" style={{ color: '#3b82f6', fontWeight: 600, marginBottom: '8px' }}>
+                    🔗 Conexión de línea en mapa (Opcional)
+                  </div>
+                  <p className="saga-guided-v4-dep-box__desc" style={{ fontSize: '0.85em', color: 'var(--saga-text-muted)', marginBottom: '12px' }}>
+                    Si este objeto coleccionable se usará en otro nodo de la misión, selecciónalo aquí. El mapa dibujará una línea punteada conectando ambos.
+                  </p>
+                  <label>
+                    <span>Nodo de destino</span>
+                    <select
+                      value={String(config.target_unlock_node_id || '')}
+                      onChange={(event) => {
+                        onPatch({
+                          config: {
+                            ...config,
+                            target_unlock_node_id: event.target.value,
+                            collectible_purpose: event.target.value ? 'unlock_node' : config.collectible_purpose,
+                          }
+                        })
+                      }}
+                    >
+                      <option value="">🎒 Ninguno / Solo coleccionable o Mesa de Trabajo</option>
+                      {stages.filter(s => s.id !== stage.id).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {`Nodo ${s.index + 1}: ${s.title || 'Sin título'}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
-                <label>
-                  <span>Payload QR</span>
-                  <input
-                    value={qrPayload(stage)}
-                    onChange={(event) =>
-                      onPatch({
-                        qr_payload: event.target.value,
-                        config: {
-                          ...config,
-                          qr_validation_signature: '',
-                          qr_validated_at: '',
-                        },
-                      })
-                    }
-                  />
-                </label>
-              </>
-            )}
+        {step === 'rewards' ? (
+          <section className="saga-guided-v4-page">
+            <div className="saga-guided-v4-pagehead">
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Recompensas</h3>
+              <p>Objetos que da al jugador al completarse (solo juegos).</p>
+            </div>
+            <div className="saga-guided-v4-formgrid">
+              {mode !== 'map_collectible' && mode !== 'qr' ? (
+                <>
+                  <label className="wide">
+                    <span>🎁 ¿Entrega algún objeto al ganar?</span>
+                    <select
+                      value={['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id || '') ? stage.config?.reward_item_id || 'placa_base' : stage.config?.reward_item_id ? 'custom' : 'none'}
+                      onChange={(event) => {
+                        const val = event.target.value
+                        if (val === 'none') onPatch({ config: { ...config, reward_item_id: '', reward_item_label: '', reward_message: '' } })
+                        else if (val === 'custom') onPatch({ config: { ...config, reward_item_id: 'objeto_recompensa', reward_item_label: 'Objeto Recompensa', reward_message: '¡Has recibido un objeto!' } })
+                        else {
+                          const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
+                          onPatch({ config: { ...config, reward_item_id: val, reward_item_label: labels[val], reward_message: `¡Has recibido: ${labels[val]}!` } })
+                        }
+                      }}
+                    >
+                      <option value="none">🟢 Ninguno</option>
+                      <option value="placa_base">💾 Placa base</option>
+                      <option value="cables_cobre">🔌 Cables de cobre</option>
+                      <option value="bateria_litio">🔋 Batería de litio</option>
+                      <option value="cinta_aislante">🩹 Cinta aislante</option>
+                      <option value="llave_rota">🔑 Llave rota</option>
+                      <option value="custom">✏️ Otro objeto...</option>
+                    </select>
+                  </label>
+                  {stage.config?.reward_item_id && !['placa_base', 'cables_cobre', 'bateria_litio', 'cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id) ? (
+                    <>
+                      <label>
+                        <span>Nombre recompensa</span>
+                        <input value={String(stage.config?.reward_item_label || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_label: event.target.value } })} />
+                      </label>
+                      <label>
+                        <span>ID recompensa</span>
+                        <input value={String(stage.config?.reward_item_id || '')} onChange={(event) => onPatch({ config: { ...config, reward_item_id: slugOf(event.target.value) } })} />
+                      </label>
+                    </>
+                  ) : null}
+                  {stage.config?.reward_item_id && (
+                    <label className="wide">
+                      <span>Mensaje al recibir</span>
+                      <input value={String(stage.config?.reward_message || '')} onChange={(event) => onPatch({ config: { ...config, reward_message: event.target.value } })} />
+                    </label>
+                  )}
+                </>
+              ) : (
+                <div className="wide"><p>Las recompensas ya están definidas en la sección Detalles para los coleccionables y QRs físicos.</p></div>
+              )}
             </div>
           </section>
         ) : null}
@@ -1257,481 +987,86 @@ export default function AdminGameEditor({
         {step === 'content' ? (
           <section className="saga-guided-v4-page">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 3</span>
-              <h3>{mode === 'qr' ? 'QR imprimible' : 'Textos y mensajes'}</h3>
-              <p>
-                {mode === 'qr'
-                  ? 'Vista previa y descarga de la tarjeta física.'
-                  : 'Lo que ve el jugador durante la misión.'}
-              </p>
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Historia principal</h3>
+              <p>Texto e introducción narrativa del nodo.</p>
             </div>
-
-            {mode === 'qr' ? (
-              <QrCardStudio
-                payload={qrPayload(stage)}
-                label={qrLabel(stage)}
-                itemId={qrItemId(stage)}
-                typeLabel={selectedQr.title}
-                design={qrDesign}
-                validationSignature={String(config.qr_validation_signature || '')}
-                onDesignChange={(design) =>
-                  onPatch({
-                    config: {
-                      ...config,
-                      qr_card_preset: design.preset,
-                      qr_card_shape: design.shape,
-                      qr_card_accent: design.accent,
-                      qr_card_image_data_url: design.imageDataUrl,
-                      qr_validation_signature: '',
-                      qr_validated_at: '',
-                    },
-                  })
-                }
-                onValidated={(signature) =>
-                  onPatch({
-                    config: {
-                      ...config,
-                      qr_validation_signature: signature,
-                      qr_validated_at: new Date().toISOString(),
-                    },
-                  })
-                }
-                onApply={saveQrCard}
-              />
-            ) : (
-              <div className="saga-guided-v4-formgrid">
-                <label>
-                  <span>Título</span>
-                  <input
-                    value={String(stage.title || '')}
-                    onChange={(event) => onPatch({ title: event.target.value })}
+            <div className="saga-guided-v4-formgrid">
+              {mode === 'game' && (
+                <>
+                  <label className="wide">
+                    <span>Título de la historia (Prólogo)</span>
+                    <input value={String(stage.intro_title || '')} onChange={(event) => onPatch({ intro_title: event.target.value })} placeholder="Ej: El Antiguo Manuscrito..." />
+                  </label>
+                  <label className="wide">
+                    <span>Texto del prólogo (Narrativa)</span>
+                    <textarea value={String(stage.intro_body || '')} onChange={(event) => onPatch({ intro_body: event.target.value })} rows={4} placeholder="Lo que lee antes de empezar..." />
+                  </label>
+                </>
+              )}
+              {mode === 'qr' ? (
+                <div className="wide">
+                  <QrCardStudio
+                    payload={qrPayload(stage)} label={qrLabel(stage)} itemId={qrItemId(stage)}
+                    typeLabel={selectedQr.title} design={qrDesign} validationSignature={String(config.qr_validation_signature || '')}
+                    onDesignChange={(design) => onPatch({ config: { ...config, qr_card_preset: design.preset, qr_card_shape: design.shape, qr_card_accent: design.accent, qr_card_image_data_url: design.imageDataUrl, qr_validation_signature: '', qr_validated_at: '' } })}
+                    onValidated={(signature) => onPatch({ config: { ...config, qr_validation_signature: signature, qr_validated_at: new Date().toISOString() } })}
+                    onApply={saveQrCard}
                   />
-                </label>
-
+                  <label>
+                    <span>Payload QR (Solo lectura)</span>
+                    <input value={qrPayload(stage)} onChange={(e) => onPatch({ qr_payload: e.target.value })} />
+                  </label>
+                </div>
+              ) : (
                 <label className="wide">
-                  <span>Texto principal</span>
+                  <span>Texto en partida / Descripción</span>
                   <textarea
-                    value={String(
-                      stage.content || stage.description || stage.body || selectedGame.content || ''
-                    )}
-                    onChange={(event) =>
-                      onPatch({
-                        content: event.target.value,
-                        description: event.target.value,
-                        body: event.target.value,
-                      })
-                    }
-                    placeholder={selectedGame.content}
+                    value={String(stage.content || stage.description || stage.body || selectedGame.content || '')}
+                    onChange={(event) => onPatch({ content: event.target.value, description: event.target.value, body: event.target.value })}
+                    rows={4}
                   />
                 </label>
-
-                <label>
-                  <span>Pista</span>
-                  <textarea
-                    value={normalizeMessage(stage.messages?.hint, selectedGame.messages.hint)}
-                    onChange={(event) =>
-                      onPatch({ messages: { ...(stage.messages || {}), hint: event.target.value } })
-                    }
-                    placeholder={selectedGame.messages.hint}
-                  />
-                </label>
-
-                <label>
-                  <span>Sin GPS / sensor</span>
-                  <textarea
-                    value={normalizeMessage(
-                      stage.messages?.gps_unavailable,
-                      selectedGame.messages.gps_unavailable
-                    )}
-                    onChange={(event) =>
-                      onPatch({
-                        messages: {
-                          ...(stage.messages || {}),
-                          gps_unavailable: event.target.value,
-                        },
-                      })
-                    }
-                    placeholder={selectedGame.messages.gps_unavailable}
-                  />
-                </label>
-
-                <label>
-                  <span>Bloqueado / no completado</span>
-                  <textarea
-                    value={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)}
-                    onChange={(event) =>
-                      onPatch({
-                        messages: { ...(stage.messages || {}), locked: event.target.value },
-                      })
-                    }
-                    placeholder={selectedGame.messages.locked}
-                  />
-                </label>
-
-                <label>
-                  <span>Al completar</span>
-                  <textarea
-                    value={String(
-                      stage.success_message || 'Ben feito. Desbloqueaches a seguinte pista.'
-                    )}
-                    onChange={(event) => onPatch({ success_message: event.target.value })}
-                    placeholder="Ben feito. Desbloqueaches a seguinte pista."
-                  />
-                </label>
-              </div>
-            )}
+              )}
+            </div>
           </section>
         ) : null}
 
-        {step === 'rules' ? (
+        {step === 'fallbacks' ? (
           <section className="saga-guided-v4-page">
             <div className="saga-guided-v4-pagehead">
-              <span>Paso 4</span>
-              <h3>🔒 Desbloqueos y requisitos</h3>
-              <p>
-                ¿Este nodo necesita que el jugador tenga algún objeto antes de poder jugarlo? Aquí
-                se configura y se crean las líneas de conexión visibles en el mapa de admin.
-              </p>
+              <span>Paso {stepIndex + 1}</span>
+              <h3>Ayudas y Fallbacks</h3>
+              <p>Pistas para los bloqueos y códigos de emergencia.</p>
             </div>
-
             <div className="saga-guided-v4-formgrid">
-              <div className="saga-guided-v4-dep-box wide">
-                <div className="saga-guided-v4-dep-box__title">
-                  🔑 Objeto requerido para jugar este nodo
-                </div>
-                <p className="saga-guided-v4-dep-box__desc">
-                  Si lo dejas en «Ninguno», el jugador puede llegar a este nodo en cualquier momento
-                  según el orden de ruta.
-                  <br />
-                  <br />
-                  Si seleccionas un objeto, el jugador{' '}
-                  <strong>necesita tenerlo en la mochila</strong> antes de que este nodo se
-                  desbloquee. En el mapa del administrador aparecerá una{' '}
-                  <strong>línea de color</strong> conectando el nodo que da ese objeto con este
-                  nodo.
-                  <br />
-                  <br />
-                  💡{' '}
-                  <em>
-                    Para que la línea aparezca en el mapa, el ID de este campo debe coincidir
-                    exactamente con el ID interno del objeto que genera otro nodo.
-                  </em>
-                </p>
-
-                <label>
-                  <span>¿Requiere algún objeto?</span>
-                  <select
-                    value={
-                      !stage.required_item_id
-                        ? 'none'
-                        : ['llave_maestra', 'emp_device'].includes(stage.required_item_id)
-                          ? stage.required_item_id
-                          : collectibleItems.some(item => item.id === stage.required_item_id)
-                            ? stage.required_item_id
-                            : 'custom'
-                    }
-                    onChange={(event) => {
-                      const val = event.target.value
-                      if (val === 'none') {
-                        onPatch({ required_item_id: '', requires_item: false })
-                      } else if (val === 'custom') {
-                        onPatch({ required_item_id: 'item_requerido', requires_item: true })
-                      } else {
-                        onPatch({ required_item_id: val, requires_item: true })
-                      }
-                    }}
-                  >
-                    <option value="none">🟢 No requiere nada — juego libre</option>
-                    <option value="llave_maestra">🔑 Requiere Llave Maestra (fabricable en Mesa)</option>
-                    <option value="emp_device">⚡ Requiere Dispositivo EMP (fabricable en Mesa)</option>
-                    {collectibleItems.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                    <option value="custom">✏️ ID personalizado...</option>
-                  </select>
-                </label>
-
-                {stage.required_item_id &&
-                !['llave_maestra', 'emp_device'].includes(stage.required_item_id) &&
-                !collectibleItems.some(item => item.id === stage.required_item_id) ? (
-                  <label>
-                    <span>ID del objeto requerido</span>
-                    <input
-                      value={String(stage.required_item_id || '')}
-                      onChange={(event) =>
-                        onPatch({
-                          required_item_id: event.target.value,
-                          requires_item: Boolean(event.target.value),
-                        })
-                      }
-                      placeholder="Ej: llave_maestra, emp_device, tarjeta_magnetica..."
-                    />
-                    <small>
-                      Debe coincidir exactamente con el ID interno del objeto que da otro nodo.
-                    </small>
-                  </label>
-                ) : null}
-
-                <label className="checkbox">
-                  <input
-                    checked={Boolean(stage.consume_required_item)}
-                    type="checkbox"
-                    onChange={(event) => onPatch({ consume_required_item: event.target.checked })}
-                  />
-                  <span>Consumir objeto al superar el nodo (se retira de la mochila)</span>
-                </label>
-              </div>
-
-              {/* RECOMPENSAS AL COMPLETAR */}
-              <div
-                className="saga-guided-v4-dep-box wide"
-                style={{ borderLeft: '3px solid #10b981', background: 'rgba(16,185,129,0.04)' }}
-              >
-                <div className="saga-guided-v4-dep-box__title" style={{ color: '#10b981' }}>
-                  🎁 Recompensa al completar (opcional)
-                </div>
-                <p className="saga-guided-v4-dep-box__desc">
-                  ¿Quieres que este juego entregue algún objeto coleccionable al jugador cuando lo
-                  resuelva con éxito?
-                </p>
-
-                <label>
-                  <span>¿Entrega algún objeto?</span>
-                  <select
-                    value={
-                      [
-                        'placa_base',
-                        'cables_cobre',
-                        'bateria_litio',
-                        'cinta_aislante',
-                        'llave_rota',
-                      ].includes(stage.config?.reward_item_id || '')
-                        ? stage.config?.reward_item_id || 'placa_base'
-                        : stage.config?.reward_item_id
-                          ? 'custom'
-                          : 'none'
-                    }
-                    onChange={(event) => {
-                      const val = event.target.value
-                      if (val === 'none') {
-                        onPatch({
-                          config: {
-                            ...config,
-                            reward_item_id: '',
-                            reward_item_label: '',
-                            reward_message: '',
-                          },
-                        })
-                      } else if (val === 'custom') {
-                        onPatch({
-                          config: {
-                            ...config,
-                            reward_item_id: 'objeto_recompensa',
-                            reward_item_label: 'Objeto Recompensa',
-                            reward_message: '¡Has recibido un objeto!',
-                          },
-                        })
-                      } else {
-                        const labels: Record<string, string> = {
-                          placa_base: 'Placa base',
-                          cables_cobre: 'Cables de cobre',
-                          bateria_litio: 'Batería de litio',
-                          cinta_aislante: 'Cinta aislante',
-                          llave_rota: 'Llave rota',
-                        }
-                        onPatch({
-                          config: {
-                            ...config,
-                            reward_item_id: val,
-                            reward_item_label: labels[val],
-                            reward_message: `¡Has recibido: ${labels[val]}!`,
-                          },
-                        })
-                      }
-                    }}
-                  >
-                    <option value="none">🟢 Ninguno — no entrega objetos</option>
-                    <option value="placa_base">💾 Placa base (ingrediente EMP)</option>
-                    <option value="cables_cobre">🔌 Cables de cobre (ingrediente EMP)</option>
-                    <option value="bateria_litio">🔋 Batería de litio (ingrediente EMP)</option>
-                    <option value="cinta_aislante">
-                      🩹 Cinta aislante (ingrediente Llave Maestra)
-                    </option>
-                    <option value="llave_rota">🔑 Llave rota (ingrediente Llave Maestra)</option>
-                    <option value="custom">✏️ Otro objeto (ID personalizado)</option>
-                  </select>
-                </label>
-
-                {['placa_base', 'cables_cobre', 'bateria_litio'].includes(
-                  stage.config?.reward_item_id || ''
-                ) ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ ¡Atención! Ingrediente incompleto</b>
-                    <span>
-                      Has seleccionado un ingrediente para el <strong>Dispositivo EMP</strong> como
-                      recompensa. Para que el jugador pueda fabricarlo en su Mesa de Trabajo,
-                      asegúrate de añadir a la misión otros nodos que entreguen el resto de
-                      ingredientes.
-                    </span>
-                  </article>
-                ) : null}
-
-                {['cinta_aislante', 'llave_rota'].includes(stage.config?.reward_item_id || '') ? (
-                  <article className="saga-guided-v4-note warning wide">
-                    <b>⚠️ ¡Atención! Ingrediente incompleto</b>
-                    <span>
-                      Has seleccionado un ingrediente para la <strong>Llave Maestra</strong> como
-                      recompensa. Para que el jugador pueda fabricarla en su Mesa de Trabajo,
-                      asegúrate de añadir a la misión otro nodo que entregue el ingrediente
-                      restante.
-                    </span>
-                  </article>
-                ) : null}
-
-                {stage.config?.reward_item_id &&
-                ![
-                  'placa_base',
-                  'cables_cobre',
-                  'bateria_litio',
-                  'cinta_aislante',
-                  'llave_rota',
-                ].includes(stage.config?.reward_item_id) ? (
-                  <>
-                    <label>
-                      <span>Nombre del objeto de recompensa</span>
-                      <input
-                        value={String(stage.config?.reward_item_label || '')}
-                        onChange={(event) =>
-                          onPatch({
-                            config: {
-                              ...config,
-                              reward_item_label: event.target.value,
-                            },
-                          })
-                        }
-                        placeholder="Ej: Llave dorada"
-                      />
-                    </label>
-                    <label>
-                      <span>ID interno del objeto de recompensa</span>
-                      <input
-                        value={String(stage.config?.reward_item_id || '')}
-                        onChange={(event) =>
-                          onPatch({
-                            config: {
-                              ...config,
-                              reward_item_id: event.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9]+/g, '_'),
-                            },
-                          })
-                        }
-                        placeholder="ej: llave_dorada"
-                      />
-                    </label>
-                  </>
-                ) : null}
-
-                {stage.config?.reward_item_id ? (
-                  <label>
-                    <span>Mensaje de recompensa</span>
-                    <input
-                      value={String(stage.config?.reward_message || '')}
-                      onChange={(event) =>
-                        onPatch({
-                          config: {
-                            ...config,
-                            reward_message: event.target.value,
-                          },
-                        })
-                      }
-                      placeholder="¡Has obtenido un nuevo objeto para tu mochila!"
-                    />
-                  </label>
-                ) : null}
-              </div>
-
               <label>
                 <span>🆘 Código de emergencia (fallback)</span>
                 <input
                   value={fallbackCode(stage)}
-                  onChange={(event) =>
-                    onPatch({
-                      fallback_code: event.target.value,
-                      config: { ...config, success_code: event.target.value },
-                    })
-                  }
+                  onChange={(event) => onPatch({ fallback_code: event.target.value, physical_fallback_code: event.target.value, config: { ...config, success_code: event.target.value } })}
                 />
-                <small>
-                  Si el jugador tiene problemas con la app o GPS, puede introducir este código
-                  manualmente para completar el nodo.
-                </small>
               </label>
-
-              <article className="saga-guided-v4-note wide">
-                <b>💡 Sobre las líneas en el mapa</b>
-                <span>
-                  Línea <strong style={{ color: '#38bdf8' }}>azul celeste</strong>: conexión directa
-                  (el nodo A da el objeto que requiere el nodo B).
-                  <br />
-                  Línea <strong style={{ color: '#a78bfa' }}>violeta</strong>: el objeto es un
-                  ingrediente de una receta de fabricación.
-                </span>
-              </article>
+              <label className="wide">
+                <span>Pista del juego</span>
+                <textarea value={normalizeMessage(stage.messages?.hint, selectedGame.messages.hint)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), hint: event.target.value } })} />
+              </label>
+              <label>
+                <span>Texto &ldquo;Sin GPS&rdquo;</span>
+                <textarea value={normalizeMessage(stage.messages?.gps_unavailable, selectedGame.messages.gps_unavailable)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), gps_unavailable: event.target.value } })} />
+              </label>
+              <label>
+                <span>Texto &ldquo;Bloqueado&rdquo;</span>
+                <textarea value={normalizeMessage(stage.messages?.locked, selectedGame.messages.locked)} onChange={(event) => onPatch({ messages: { ...(stage.messages || {}), locked: event.target.value } })} />
+              </label>
+              <label className="wide">
+                <span>Mensaje de éxito</span>
+                <textarea value={String(stage.success_message || 'Ben feito. Desbloqueaches a seguinte pista.')} onChange={(event) => onPatch({ success_message: event.target.value })} />
+              </label>
             </div>
           </section>
         ) : null}
-
-        {step === 'review' ? (
-          <section className="saga-guided-v4-page">
-            <div className="saga-guided-v4-pagehead">
-              <span>Paso 5</span>
-              <h3>Revisar nodo</h3>
-              <p>Resumen antes de cerrar. Recuerda Guardar en Builder para persistir.</p>
-            </div>
-
-            <div className="saga-guided-v4-review">
-              <article>
-                <b>Tipo</b>
-                <span>{mode === 'qr' ? 'QR físico' : mode === 'map_collectible' ? 'Coleccionable en mapa' : 'Nodo de juego'}</span>
-              </article>
-              <article>
-                <b>Modo</b>
-                <span>{mode === 'qr' ? selectedQr.title : mode === 'map_collectible' ? 'Objeto de mapa' : selectedGame.title}</span>
-              </article>
-              <article>
-                <b>Estado</b>
-                <span>{mode === 'map_collectible' ? 'Jugable' : statusLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
-              </article>
-              <article>
-                <b>Offline</b>
-                <span>{mode === 'map_collectible' ? 'Offline listo' : offlineLabel(mode === 'qr' ? selectedQr : selectedGame)}</span>
-              </article>
-              <article>
-                <b>Completa por</b>
-                <span>
-                  {mode === 'map_collectible' ? 'proximity' : String(
-                    config.completion_method ||
-                      (mode === 'qr' ? selectedQr.completionMethod : selectedGame.completionMethod)
-                  )}
-                </span>
-              </article>
-              <article>
-                <b>Fallback</b>
-                <span>{fallbackCode(stage)}</span>
-              </article>
-              {mode === 'qr' ? (
-                <article>
-                  <b>Validación QR</b>
-                  <span>{qrValidated ? 'Validado para este diseño' : 'Pendiente de validar'}</span>
-                </article>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-      </main>
+</main>
 
       <footer className="saga-guided-v4-footer">
         <button type="button" onClick={goBack} disabled={stepIndex === 0}>

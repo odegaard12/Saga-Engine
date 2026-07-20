@@ -144,7 +144,23 @@ export default function AdminCollectibleEditor({
               />
               <small>Usa minúsculas sin espacios. Este ID servirá si otro nodo requiere este objeto.</small>
             </label>
-            <label>
+            <label className="wide" style={{ marginTop: 12 }}>
+              <span>Historia / Introducción (Opcional)</span>
+              <input 
+                type="text" 
+                value={stage.intro_title || ''} 
+                onChange={(e) => onPatch({ intro_title: e.target.value })}
+                placeholder="Título de la historia"
+                style={{ marginBottom: 8 }}
+              />
+              <textarea 
+                value={stage.intro_body || ''} 
+                onChange={(e) => onPatch({ intro_body: e.target.value })}
+                placeholder="Escribe la narrativa que leerá el jugador ANTES de recoger el objeto. Soporta Markdown para imágenes: ![alt](url)."
+                rows={3}
+              />
+            </label>
+            <label className="wide" style={{ marginTop: 12 }}>
               <span>Mensaje al recoger</span>
               <textarea 
                 value={stage.content || ''} 

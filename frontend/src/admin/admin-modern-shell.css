@@ -192,12 +192,34 @@
 
 .saga-panel-switcher {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.saga-panel-switcher button {
+  min-height: 36px !important;
+  font-size: 11px !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.2s ease !important;
+}
+
+.saga-panel-switcher button:hover {
+  background: rgba(30, 41, 59, 0.7) !important;
+  border-color: rgba(125, 211, 252, 0.3) !important;
+  transform: translateY(-1px) !important;
 }
 
 .saga-rail-actions button,
-.saga-panel-switcher button,
 .saga-command-bar button,
 .saga-mobile-actions button,
 .saga-floating-head button,
@@ -264,9 +286,11 @@
 }
 
 .saga-panel-switcher button.active {
-  color: #020617;
-  background: #f8fafc;
-  border-color: transparent;
+  background: linear-gradient(135deg, #38bdf8, #818cf8) !important;
+  color: #020617 !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25) !important;
+  font-weight: 900 !important;
 }
 
 .saga-route-list {
@@ -1010,7 +1034,7 @@
   }
 
   .saga-left-rail {
-    top: 8px;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
     left: 8px;
     right: 8px;
     bottom: auto;
@@ -1082,7 +1106,7 @@
   }
 
   .saga-floating-panel {
-    top: 88px;
+    top: calc(env(safe-area-inset-top, 0px) + 88px);
     left: 8px;
     right: 8px;
     bottom: 66px;
@@ -10797,7 +10821,7 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .admin-guided-v4-shell .admin-node-editor-tabs,
 .admin-guided-v4-shell .admin-node-editor-inline-topbar,
 .admin-guided-v4-shell .admin-drawer-footer,
-.admin-guided-v4-body-host > :not(.saga-guided-editor-v4) {
+.admin-guided-v4-body-host > :not(.saga-guided-editor-v4):not(.saga-guided-v4-flow-container) {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -10950,33 +10974,43 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   border-color: rgba(248, 113, 113, 0.38) !important;
   background: rgba(127, 29, 29, 0.34) !important;
 }
-
 .saga-guided-v4-stepper {
-  display: grid !important;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-  gap: 7px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: space-between !important;
   padding: 8px 18px !important;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08) !important;
 }
 
 .saga-guided-v4-stepper button {
+  flex: 1 1 0px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  min-height: 30px !important;
+  min-width: 80px !important;
+  min-height: 32px !important;
   border-radius: 999px !important;
   border: 1px solid rgba(148, 163, 184, 0.16) !important;
   background: rgba(15, 23, 42, 0.62) !important;
   color: rgba(226, 232, 240, 0.78) !important;
   font-weight: 950 !important;
   cursor: pointer !important;
-  padding: 0 8px !important;
+  padding: 0 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+.saga-guided-v4-stepper button:hover {
+  border-color: rgba(125, 211, 252, 0.3) !important;
+  background: rgba(30, 41, 59, 0.7) !important;
 }
 
 .saga-guided-v4-stepper button.active {
-  background: rgba(224, 242, 254, 0.96) !important;
+  background: linear-gradient(135deg, #38bdf8, #818cf8) !important;
   color: #020617 !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2) !important;
 }
 
 .saga-guided-v4-stepper span {
@@ -12253,4 +12287,230 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .saga-command-bar .saga-heatmap-toggle[data-status='error'] {
   border-color: rgba(239, 68, 68, 0.6);
   color: #f87171;
+}
+
+.saga-save-validation-warning {
+  margin: 12px 16px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 1.4;
+  animation: slideDownWarning 0.3s ease-out;
+}
+
+.saga-save-validation-warning b {
+  display: block;
+  color: #f87171;
+  margin-bottom: 4px;
+}
+
+@keyframes slideDownWarning {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.saga-guided-v4-note.warning {
+  border-color: rgba(251, 146, 60, 0.4);
+  background: rgba(251, 146, 60, 0.08);
+  color: #fdba74;
+}
+
+.saga-guided-v4-note.warning b {
+  color: #fb923c;
+}
+
+/* ============================================================
+   #iphone-safe-area-v1
+   Fixes for iPhone Dynamic Island / notch.
+   The admin shell top bar and node editor header must be pushed
+   below the camera island using max(…, env(safe-area-inset-top)).
+   ============================================================ */
+
+/* Overlay container: ensure it never sits under the island */
+.admin-drawer-overlay--nonblocking:has(.admin-guided-v4-shell),
+.admin-drawer-overlay--nonblocking:has(.saga-physical-guided-v4-shell) {
+  padding-top: max(0px, env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Editor header: add safe-area-top padding on touch devices */
+@media (pointer: coarse) {
+  .saga-guided-v4-header {
+    padding-top: max(14px, calc(env(safe-area-inset-top, 0px) + 6px)) !important;
+  }
+
+  /* Shell itself: shrink height to fit real visible area including bars */
+  .saga-node-editor-host .admin-guided-v4-shell,
+  .admin-drawer-overlay--nonblocking .admin-guided-v4-shell,
+  .saga-physical-guided-v4-shell {
+    height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 8px
+    ) !important;
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-bottom, 0px)
+      - 8px
+    ) !important;
+    border-radius: 0 !important;
+    /* No radius on full-screen mobile sheet */
+  }
+
+  /* Body scrolls properly within the editor on mobile */
+  .saga-guided-v4-body {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+  }
+
+  /* Footer safe area bottom */
+  .saga-guided-v4-footer {
+    padding-bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + 6px)) !important;
+  }
+}
+
+/* Left rail (sidebar node list) safe-area for notch on landscape */
+@media (max-height: 600px) and (pointer: coarse) {
+  .saga-left-rail {
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+  }
+}
+
+/* ============================================================
+   #map-smooth-v1
+   Reduce map marker repaints by promoting them to GPU compositing.
+   Leaflet repaints .leaflet-marker-icon on every position update.
+   GPU compositing prevents the CPU paint-then-composite flicker.
+   ============================================================ */
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  will-change: transform !important;
+}
+
+.leaflet-tile {
+  will-change: transform !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Prevent full-layer repaint on container during GPS updates */
+.leaflet-pane,
+.leaflet-map-pane {
+  will-change: transform !important;
+}
+
+/* Smooth tile transitions instead of hard blink */
+.leaflet-tile-container {
+  transition: opacity 0.18s ease-out !important;
+}
+
+/* Collectible icon in node sidebar — use full label, not badge-only */
+.saga-physical-node-badge--collectible::after {
+  content: ' Coleccionable';
+  font-size: 0.7em;
+  font-weight: 600;
+  opacity: 0.85;
+  display: none; /* label shown in <small> already */
+}
+
+/* Premium How-To-Play Card */
+.saga-how-to-play-card {
+  border-left: 4px solid #0ea5e9 !important;
+  background: rgba(14, 165, 233, 0.05) !important;
+  border-radius: 12px !important;
+  padding: 14px 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  border: 1px solid rgba(14, 165, 233, 0.15) !important;
+  border-left: 4px solid #0ea5e9 !important;
+}
+
+.saga-how-to-play-card__head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.saga-how-to-play-card__emoji {
+  font-size: 1.5rem !important;
+}
+
+.saga-how-to-play-card__head strong {
+  font-size: 0.98rem !important;
+  color: #38bdf8 !important;
+  display: block !important;
+}
+
+.saga-how-to-play-card__head small {
+  font-size: 0.76rem !important;
+  color: rgba(203, 213, 225, 0.6) !important;
+  display: block !important;
+}
+
+.saga-how-to-play-card__body {
+  font-size: 0.84rem !important;
+  line-height: 1.4 !important;
+  color: rgba(241, 245, 249, 0.9) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.saga-how-to-play-card__body p {
+  margin: 0 !important;
+}
+
+.saga-how-to-play-card__body strong {
+  color: #f1f5f9 !important;
+}
+
+.saga-how-to-play-card__hint {
+  color: #fbbf24 !important;
+  margin-top: 4px !important;
+}
+
+/* Responsive Scroll and Notch Fixes */
+.saga-guided-v4-page {
+  grid-template-rows: auto 1fr !important;
+}
+
+.saga-guided-v4-choice-grid,
+.saga-guided-v4-catalog-grid,
+.saga-guided-v4-review {
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+}
+
+/* Custom scroll view for QR and Collectible editors */
+.saga-guided-v4-scroll-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow-y: auto !important;
+  color: #f8fafc !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.14), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(99, 102, 241, 0.13), transparent 32%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.985), rgba(15, 23, 42, 0.965)) !important;
+}
+
+.saga-guided-v4-flow-container {
+  display: block !important;
+  height: 100% !important;
+  width: 100% !important;
 }

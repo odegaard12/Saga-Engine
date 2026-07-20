@@ -1,3 +1,5 @@
+import { loadInventorySnapshot } from './inventory'
+
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
 
 export type SagaQueuedEvent = {
@@ -217,12 +219,15 @@ export function removeQueuedEvents(user: string, clientEventIds: string[]): Saga
 export function buildEventSyncPayload(user: string): {
   user: string
   events: SagaQueuedEvent[]
+  inventory_snapshot?: unknown
 } {
   const snapshot = loadOfflineSnapshot(user)
+  const inventorySnapshot = loadInventorySnapshot(user)
 
   return {
     user,
     events: snapshot.queued_events,
+    inventory_snapshot: inventorySnapshot,
   }
 }
 

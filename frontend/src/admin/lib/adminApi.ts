@@ -14,6 +14,8 @@ export type AdminReactOverviewStage = {
   has_hint?: boolean
   has_manual_fallback?: boolean
   content?: string
+  intro_title?: string
+  intro_body?: string
   objective?: string
   config_summary?: string[]
   messages?: {
@@ -87,6 +89,7 @@ export type AdminReactOverviewProfile = {
   presence?: string
   gps_status?: string
   last_seen?: number | string | null
+  inventory_snapshot?: any
 }
 
 export type AdminReactOverviewResponse = {

@@ -1,11 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
-import AdminMissionMap from './AdminMissionMap'
 import AdminMissionControlShell from './components/AdminMissionControlShell'
-import FamiliesPanel from './components/FamiliesPanel'
-import NodeDetailDrawer from './components/NodeDetailDrawer'
-import PlayersPanel from './components/PlayersPanel'
-import SettingsPanel from './components/SettingsPanel'
 import { fetchPublicConfig } from '../shared/api'
 import type { PublicConfig } from '../types/player'
 import {
@@ -21,7 +16,7 @@ import {
   type AdminReactOverviewResponse,
   type AdminReactOverviewStage,
 } from './lib/adminApi'
-import { familyCards, type EditableAdminStage, type FamilyId } from './lib/familyConfigs'
+import { familyCards, type EditableAdminStage } from './lib/familyConfigs'
 import {
   getDefaultAdminStagePatchForGame,
   getMissionTemplateById,
@@ -160,7 +155,7 @@ export default function AdminApp() {
     }
   }, [])
 
-  const profiles = overview?.profiles || []
+  const profiles = useMemo(() => overview?.profiles || [], [overview])
   const stages = overview?.stages || []
   const familyCounts = overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
@@ -180,7 +175,7 @@ export default function AdminApp() {
     setPlayerDrafts(buildPlayerDrafts(overview?.profiles || profiles || [], sourceConfig))
   }, [overviewReady, overview, profiles, config])
 
-  const stats = useMemo(() => {
+  useMemo(() => {
     const counts = overview?.counts
     const cfg = overview?.config || config
     const players = counts?.players ?? (Array.isArray(config?.players) ? config.players.length : 0)
@@ -192,14 +187,8 @@ export default function AdminApp() {
     const mapCenter = Array.isArray(cfg?.map_center) ? cfg.map_center.join(', ') : 'Not configured'
     const mapZoom = cfg?.map_zoom ?? '—'
 
-    return [
-      { label: 'Players', value: String(players), detail: 'Configured entries' },
-      { label: 'Profiles', value: String(profileCount), detail: `${finished} finished` },
-      { label: 'Nodes', value: String(stageCount), detail: 'Route model' },
-      { label: 'Map', value: mapCenter, detail: `Zoom ${mapZoom}` },
-      { label: 'Theme', value: cfg?.player_theme || 'classic', detail: 'Player shell' },
-    ]
-  }, [config, overview])
+    void [stageCount, finished, mapCenter, mapZoom]
+  }, [overview, config])
 
   function selectLocalStage(stage: AdminReactOverviewStage | null) {
     if (stage && Date.now() < suppressStageSelectUntilRef.current) {
@@ -1039,6 +1028,7 @@ export default function AdminApp() {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StatCard({
   item,
   compact = false,
@@ -1055,6 +1045,7 @@ function StatCard({
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div className="admin-section-head">
@@ -1064,6 +1055,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
   const finished = Boolean(profile.finished)
   const gps = String(profile.gps_status || 'unknown')
@@ -1091,6 +1083,7 @@ function ProfileCard({ profile }: { profile: AdminReactOverviewProfile }) {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function NodeCard({
   stage,
   selected,

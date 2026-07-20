@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type {
@@ -548,7 +548,7 @@ const OfflineGridLayer = L.GridLayer.extend({
   },
 })
 
-export function MapSurface({
+export const MapSurface = React.memo(function MapSurface({
   currentStage,
   missionStages = [],
   currentLevel = 0,
@@ -640,16 +640,15 @@ export function MapSurface({
     offlineGridLayer.addTo(map)
 
     const tileLayer = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      '/map-tiles/{z}/{x}/{y}.png',
       {
-        maxZoom: 20,
-        maxNativeZoom: 19,
+        maxZoom: 19,
         keepBuffer: 48,          // Keep more tiles in memory to prevent edge flickering
         updateWhenZooming: false, // Don't re-fetch during zoom animation
         updateWhenIdle: true,     // Only update when map is not moving
-        crossOrigin: true,        // Enable CORS for better caching
+        crossOrigin: false,       // Same-origin proxy, no CORS needed
         attribution:
-          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EAP, and the GIS User Community',
+          '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
       }
     )
 
@@ -675,7 +674,27 @@ export function MapSurface({
     updateZoom()
     setMapReadyToken((value) => value + 1)
 
+    // iOS Safari fix: Leaflet may initialise with 0×0 dimensions if the
+    // container is not yet painted. Force a size recalculation after mount
+    // and whenever the container is resized (e.g. orientation change).
+    const invalidate = () => {
+      try { map.invalidateSize({ animate: false }) } catch {}
+    }
+    const t1 = setTimeout(invalidate, 100)
+    const t2 = setTimeout(invalidate, 400)
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapRootRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        invalidate()
+      })
+      resizeObserver.observe(mapRootRef.current)
+    }
+
     return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      resizeObserver?.disconnect()
       map.off('zoomend', updateZoom)
       playerMarkerRef.current?.remove()
       playerAuraRef.current?.remove()
@@ -727,8 +746,9 @@ export function MapSurface({
     const style = document.createElement('style')
     style.id = 'saga-player-aura-style'
     style.textContent = `
-      .saga-player-aura--gps { animation: sagaPlayerAuraBreathe 3.2s ease-in-out infinite; will-change: opacity; }
-      .saga-player-aura--debug { animation: sagaPlayerAuraBreathe 3s ease-in-out infinite; will-change: opacity; }
+      .saga-player-aura--gps { animation: sagaPlayerAuraBreathe 3.2s ease-in-out infinite; will-change: transform, opacity; }
+      .saga-player-aura--debug { animation: sagaPlayerAuraBreathe 3s ease-in-out infinite; will-change: transform, opacity; }
+      .saga-avatar-icon-wrap { will-change: transform; }
       .saga-avatar-pin--self { animation: sagaPlayerLocator 2.3s ease-in-out infinite !important; opacity: 1 !important; transform-origin: center !important; will-change: transform, box-shadow; transform: translateZ(0); }
       .saga-avatar-pin--self img { animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
       .saga-mission-node-icon-wrap { background: transparent !important; border: 0 !important; }
@@ -1430,12 +1450,13 @@ export function MapSurface({
         const currentCenter = map.getCenter()
         const targetLatLng = L.latLng(playerPosition.lat, playerPosition.lon)
         const distance = map.distance(currentCenter, targetLatLng)
+        const zoomDiff = Math.abs(map.getZoom() - 18)
 
         // eslint-disable-next-line
         flyToEndTimeRef.current = Date.now() + 1500
 
-        if (distance > 500) {
-          // Snap instantly if far away to prevent tile caching/rendering bugs
+        if (distance > 500 || zoomDiff > 3) {
+          // Snap instantly if far away or zoom difference is large to prevent tile caching/rendering bugs
           map.setView(targetLatLng, 18, { animate: false })
         } else {
           // Fly to if close
@@ -1502,10 +1523,11 @@ export function MapSurface({
         const currentCenter = map.getCenter()
         const targetLatLng = L.latLng(stageMapData.lat, stageMapData.lon)
         const distance = map.distance(currentCenter, targetLatLng)
+        const zoomDiff = Math.abs(map.getZoom() - 18)
 
         flyToEndTimeRef.current = Date.now() + 1500
 
-        if (distance > 500) {
+        if (distance > 500 || zoomDiff > 3) {
           map.setView(targetLatLng, 18, { animate: false })
         } else {
           map.flyTo(targetLatLng, 18, {
@@ -1548,13 +1570,31 @@ export function MapSurface({
       </section>
     </>
   )
-}
+}, (prev, next) => {
+  if (prev.currentStage !== next.currentStage) return false
+  if (prev.currentLevel !== next.currentLevel) return false
+  if (prev.gpsState !== next.gpsState) return false
+  if (prev.debugSimulation !== next.debugSimulation) return false
+  if (prev.followPlayer !== next.followPlayer) return false
+  if (prev.focusRequest?.token !== next.focusRequest?.token) return false
+  if (prev.refreshToken !== next.refreshToken) return false
+  if (prev.nodeState !== next.nodeState) return false
+  if (prev.selfLabel !== next.selfLabel) return false
+  if (prev.viewerUser !== next.viewerUser) return false
+  if (prev.missionStages !== next.missionStages) return false
+  if (prev.otherPlayers !== next.otherPlayers) return false
+  if (prev.fieldProofs !== next.fieldProofs) return false
+  if (prev.selfProfile?.user !== next.selfProfile?.user) return false
+  
+  if (prev.playerPosition?.lat !== next.playerPosition?.lat) return false
+  if (prev.playerPosition?.lon !== next.playerPosition?.lon) return false
+  
+  return true
+})
 
 const surface: React.CSSProperties = {
-  position: 'relative',
-  width: '100%',
-  height: '100%',
-  minHeight: 0,
+  position: 'absolute',
+  inset: 0,
   borderRadius: 28,
   overflow: 'hidden',
   border: '1px solid rgba(15,23,42,.10)',
@@ -1565,6 +1605,8 @@ const surface: React.CSSProperties = {
 const canvas: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
+  width: '100%',
+  height: '100%',
 }
 
 const mapAnimations = `
@@ -1572,8 +1614,8 @@ const mapAnimations = `
   box-sizing: border-box;
   border: 1px solid rgba(148,163,184,.13);
   background:
-    radial-gradient(circle at 50% 50%, rgba(34,197,94,.12), transparent 34%),
-    linear-gradient(135deg, rgba(15,23,42,.92), rgba(30,41,59,.90));
+    radial-gradient(circle at 50% 50%, rgba(34,197,94,.05), transparent 34%),
+    linear-gradient(135deg, rgba(241,245,249,.92), rgba(226,232,240,.90));
   color: transparent;
 }
 

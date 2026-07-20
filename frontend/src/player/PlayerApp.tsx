@@ -23,6 +23,7 @@ import type {
 } from '../types/player'
 import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
+import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
@@ -60,6 +61,7 @@ import {
   rememberGpsReady,
   hasRememberedGpsReady,
 } from './utils/gpsStorage'
+import { haptics, sounds } from './utils/haptics'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
 import {
   getPlayerAvatarInitials,
@@ -93,10 +95,7 @@ type FocusRequest = {
 } | null
 
 function vibrate(pattern: number | number[]) {
-  if (typeof window === 'undefined') return
-  if (!('navigator' in window)) return
-  if (typeof window.navigator.vibrate !== 'function') return
-  window.navigator.vibrate(pattern)
+  haptics.vibrate(pattern)
 }
 
 function getUserFromUrl(): string {
@@ -137,7 +136,28 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
 }
 
 export default function PlayerApp() {
+  const user = getPlayerNameFromLocation() || getUserFromUrl()
   const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [showPrologue, setShowPrologue] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      const loginId = url.searchParams.get('login')
+      if (loginId) {
+        url.searchParams.delete('login')
+        window.history.replaceState({}, '', url.toString())
+      }
+      
+      if (loginId) {
+        const hasSeen = localStorage.getItem(`saga_prologue_seen_${user}`)
+        if (!hasSeen) {
+          localStorage.setItem(`saga_prologue_seen_${user}`, '1')
+          return true
+        }
+      }
+    }
+    return false
+  })
+  const [activeStageIntro, setActiveStageIntro] = useState(false)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -204,7 +224,6 @@ export default function PlayerApp() {
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
   >(null)
   const prevTeamStatusRef = useRef<Record<string, string>>({})
-  const user = useMemo(() => getPlayerNameFromLocation() || getUserFromUrl(), [])
 
   const isPhone = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
@@ -352,9 +371,8 @@ export default function PlayerApp() {
           setState((prev) => ({
             status: 'ready',
             payload: nextPayload,
-            config: prev.status === 'ready' ? prev.config : nextConfig,
+            config: nextConfig,
           }))
-
           setMapRefreshToken((value) => value + 1)
         }
       } catch {
@@ -657,6 +675,14 @@ export default function PlayerApp() {
       if (document.visibilityState === 'visible') {
         if (handleRequestLiveGpsRef.current) {
           void handleRequestLiveGpsRef.current({ silent: true, forceFocus: false })
+        }
+        // FORZAR ACTUALIZACIÓN DE SERVICE WORKER AL RESUMIR
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready
+            .then((registration) => {
+              void registration.update().catch(() => undefined)
+            })
+            .catch(() => undefined)
         }
       }
     }
@@ -1324,34 +1350,17 @@ export default function PlayerApp() {
 
     if (!runtime.canEnter) return
 
-    if (isMapCollectible && currentStage) {
-      const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
-      const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto'
 
-      collectInventoryItem({
-        user: payload.user,
-        item_id: itemId,
-        label: label,
-        quantity: 1,
-        source: 'manual',
-        node_id: String(currentStage.id),
-        metadata: {
-          physical_icon:
-            (currentStage as any).physical_icon || (currentStage as any).config?.physical_icon,
-        },
-        queue_event: true,
-      })
-
-      showNotice(`¡Recogido: ${label}!`, 'success')
-      vibrate([10, 40, 10])
-      void handleSubmitCode('OK')
-      return
-    }
 
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
     showOverlay('activate')
-    openInteraction()
+    
+    if (currentStage?.intro_body && !isMapCollectible) {
+      setActiveStageIntro(true)
+    } else {
+      openInteraction()
+    }
   }
 
   function handleMapNodeTap() {
@@ -1386,7 +1395,7 @@ export default function PlayerApp() {
       if (isMapCollectible) {
         handlePrimaryAction()
       } else {
-        showNotice('Target in range. Use Open Interaction.', 'info')
+        showNotice('Ya estás en rango. Pulsa el botón principal para abrir el nodo.', 'info')
       }
       return
     }
@@ -1394,24 +1403,24 @@ export default function PlayerApp() {
     if (runtime.reason === 'out_of_range') {
       showNotice(
         distanceMeters !== null
-          ? 'Too far away. Move closer to the node.'
-          : 'Too far from the node.',
+          ? `Demasiado lejos (${distanceMeters}m). Acércate al nodo.`
+          : 'Fuera de rango. Acércate al nodo.',
         'warn'
       )
       return
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showNotice('Position is not ready yet.', 'info')
+      showNotice('GPS no disponible. Actívalo para detectar tu posición.', 'info')
       return
     }
 
     if (runtime.reason === 'missing_stage') {
-      showNotice('Complete the previous stage first.', 'warn')
+      showNotice('Completa el nodo anterior antes de acceder a este.', 'warn')
       return
     }
 
-    showNotice('Interaction is not available yet.', 'info')
+    showNotice('Este nodo no está disponible todavía.', 'info')
   }
 
   async function handleSubmitCode(code: string) {
@@ -1419,18 +1428,46 @@ export default function PlayerApp() {
       setSubmitting(true)
       setSubmitError(null)
 
+      if (isMapCollectible && currentStage && code === 'OK') {
+        const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
+        const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto Coleccionable'
+        const icon = (currentStage as any).physical_icon ||
+          (currentStage as any).config?.physical_icon ||
+          (currentStage as any).icon ||
+          '⭐'
+
+        collectInventoryItem({
+          user: payload.user,
+          item_id: itemId,
+          label: label,
+          quantity: 1,
+          source: 'manual',
+          node_id: String(currentStage.id),
+          metadata: {
+            physical_icon: icon,
+            node_title: currentStage.title || '',
+            node_id: String(currentStage.id),
+          },
+          queue_event: true,
+        })
+
+        sounds.collect()
+        haptics.collect()
+        showNotice(`⭐ ¡Recogido: ${label}!`, 'success')
+      }
+
       const result = await advancePlayer(payload.user, code)
       if (result.status !== 'ok') {
         const missingItem = result.reason === 'missing_required_item'
         setSubmitError(
           missingItem
-            ? 'Missing required item for this node.'
-            : 'Invalid code for the current stage.'
+            ? 'Te falta un objeto requerido. Recógelo antes de continuar.'
+            : 'Código incorrecto para este nodo.'
         )
         showNotice(
           missingItem
-            ? 'Missing required item for this node.'
-            : 'The code was not accepted for this stage.',
+            ? '¡Necesitas un objeto! Revisa tu mochila.'
+            : 'Código no aceptado. Inténtalo de nuevo.',
           'warn'
         )
         return
@@ -1441,10 +1478,14 @@ export default function PlayerApp() {
 
       if (nextPayload.finished) {
         showOverlay('finish')
-        showNotice('Mission complete.', 'success')
+        sounds.success()
+        haptics.success()
+        showNotice('¡Misión completada! 🏆', 'success')
       } else {
         showOverlay('node')
-        showNotice('Node cleared.', 'success')
+        sounds.success()
+        haptics.success()
+        showNotice('¡Nodo superado! ⚡', 'success')
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown submit error'
@@ -1468,24 +1509,24 @@ export default function PlayerApp() {
 
           if (localResult.payload.finished) {
             showOverlay('finish')
-            showNotice('Mission complete locally. Sync when connection returns.', 'success')
+            showNotice('¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.', 'success')
           } else {
             showOverlay('node')
-            showNotice('Node cleared locally. Progress queued for sync.', 'success')
+            showNotice('¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.', 'success')
           }
 
           return
         }
 
         if (localResult.reason === 'missing_required_item') {
-          setSubmitError('Missing required item for this node.')
-          showNotice('Missing required item for this node.', 'warn')
+          setSubmitError('Te falta un objeto requerido. Recógelo antes de continuar.')
+          showNotice('¡Necesitas un objeto! Revisa tu mochila.', 'warn')
           return
         }
 
         if (localResult.reason === 'invalid_code') {
-          setSubmitError('Invalid code for the downloaded offline mission.')
-          showNotice('The offline code was not accepted.', 'warn')
+          setSubmitError('Código incorrecto para la misión offline descargada.')
+          showNotice('Código no aceptado en modo offline.', 'warn')
           return
         }
 
@@ -1498,11 +1539,11 @@ export default function PlayerApp() {
             reason: 'advance_sync_failed',
           },
         })
-        setSubmitError(`${message}. Code saved locally and will sync when connection returns.`)
-        showNotice(`Code saved offline (${snapshot.queued_events.length} pending).`, 'warn')
+        setSubmitError('Sin conexión. El código se ha guardado localmente y se sincronizará cuando vuelva la red.')
+        showNotice(`Código guardado offline (${snapshot.queued_events.length} pendientes). ¡Sigue jugando!`, 'warn')
       } catch {
         setSubmitError(message)
-        showNotice('Mission sync failed. Try again.', 'warn')
+        showNotice('Error al enviar. Comprueba tu conexión.', 'warn')
       }
     } finally {
       setSubmitting(false)
@@ -1646,6 +1687,24 @@ export default function PlayerApp() {
             </span>
           </button>
 
+          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setShowPrologue(true)
+              }}
+              aria-label="Historia"
+              title="Leer historia"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                📖
+              </span>
+            </button>
+          ) : null}
+
           <button
             type="button"
             style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
@@ -1679,6 +1738,8 @@ export default function PlayerApp() {
               {routeOverviewActive ? '📍' : '🧭'}
             </span>
           </button>
+
+
 
           <button
             type="button"
@@ -1827,6 +1888,7 @@ export default function PlayerApp() {
           if (!submitting) setInteractionOpen(false)
         }}
         onSubmitCode={handleSubmitCode}
+        onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
       />
 
       {payload.finished && dismissedFinishScreen ? (
@@ -1840,6 +1902,28 @@ export default function PlayerApp() {
           🏆
         </button>
       ) : null}
+
+      {showPrologue && state.status === 'ready' && state.config && (
+        <StoryModal
+          title={state.config.prologue_title || 'Prólogo'}
+          subtitle={state.config.prologue_subtitle}
+          body={state.config.prologue_body || ''}
+          buttonText="Comenzar Aventura"
+          onClose={() => setShowPrologue(false)}
+        />
+      )}
+
+      {activeStageIntro && currentStage && (
+        <StoryModal
+          title={currentStage.intro_title || currentStage.title || 'Historia'}
+          body={currentStage.intro_body || ''}
+          buttonText="Continuar a la prueba"
+          onClose={() => {
+            setActiveStageIntro(false)
+            openInteraction()
+          }}
+        />
+      )}
     </ScreenFrame>
   )
 }

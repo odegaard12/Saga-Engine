@@ -1,6 +1,7 @@
 import React, { type CSSProperties } from 'react'
 import type { PlayerStage } from '../../types/player'
 import ItemIconSvg from './ItemIconSvg'
+import { renderMarkdown } from '../utils/formatMarkdown'
 
 interface RequirementPreviewPanelProps {
   user: string
@@ -50,10 +51,11 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
   
   const isSignal = family.includes('signal')
   const isCompass = family.includes('bearing')
-  const isPuzzle = family.includes('circuit') || family.includes('sequence')
-  const isPhysical = family.includes('qr') || family.includes('inventory')
+  const isPuzzle = family.includes('circuit') || family.includes('sequence') || family.includes('puzzle')
+  const isPhysical = family.includes('qr') || family.includes('physical') || family.includes('scan')
+  const isCollectible = family.includes('collect') || family.includes('item') || family.includes('inventory')
   
-  const needsGps = radius !== null || isSignal || isCompass
+  const needsGps = radius !== null || isSignal || isCompass || isCollectible
   
   return (
     <section style={panel}>
@@ -98,18 +100,20 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
           <div style={stepNumber}>{requiredItem ? (needsGps ? '3' : '2') : (needsGps ? '2' : '1')}</div>
           <div style={stepContent}>
             <div style={stepTitle}>
-              {isSignal && 'Captura la señal estable'}
-              {isCompass && 'Calibra la brújula y gira'}
-              {isPuzzle && 'Resuelve el código'}
-              {isPhysical && 'Escanea el elemento'}
-              {!isSignal && !isCompass && !isPuzzle && !isPhysical && 'Sigue las instrucciones'}
+              {isSignal && 'Captura la señal de radio'}
+              {isCompass && 'Calibra y triangula'}
+              {isPuzzle && 'Resuelve el código lógico'}
+              {isCollectible && 'Recoge el objeto especial'}
+              {!isCollectible && isPhysical && 'Escanea el objetivo físico'}
+              {!isSignal && !isCompass && !isPuzzle && !isPhysical && !isCollectible && 'Sigue las instrucciones'}
             </div>
             <div style={stepDesc}>
-              {isSignal && 'Una vez en la zona, mantén tu posición sin salir del círculo hasta que la barra se llene por completo al 100%.'}
-              {isCompass && 'Gira lentamente sobre ti mismo hasta que tu teléfono apunte en la dirección correcta para decodificar.'}
-              {isPuzzle && 'Observa tu entorno físico y la información que tienes. Introduce el patrón o código correcto para acceder.'}
-              {isPhysical && 'Busca un código QR, etiqueta NFC o pista física en la vida real. Usa el botón inferior para escanearlo.'}
-              {!isSignal && !isCompass && !isPuzzle && !isPhysical && 'Lee cuidadosamente la descripción de la misión para saber qué hacer a continuación.'}
+              {isSignal && 'Una vez en la zona, mantén tu posición y no salgas del perímetro hasta que la barra de descarga llegue al 100%.'}
+              {isCompass && 'Usa la brújula de tu dispositivo. Gira lentamente sobre ti mismo hasta apuntar en la dirección correcta para revelar la información.'}
+              {isPuzzle && 'Observa tu entorno real y las pistas que tienes. Deberás introducir una clave, patrón o secuencia correcta para avanzar.'}
+              {isCollectible && 'Este nodo contiene un objeto. Una vez estés dentro del rango, podrás recogerlo y se guardará automáticamente en tu mochila para usarlo más adelante.'}
+              {!isCollectible && isPhysical && 'Debes buscar físicamente un código QR o etiqueta NFC oculta en la vida real. Usa tu cámara para escanearlo cuando lo encuentres.'}
+              {!isSignal && !isCompass && !isPuzzle && !isPhysical && !isCollectible && 'Lee cuidadosamente la descripción de la misión para saber qué hacer a continuación.'}
             </div>
           </div>
         </div>

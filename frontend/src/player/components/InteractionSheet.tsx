@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
 import { resolveMinigameDefinition } from '../minigames/registry'
 import { MinigameHost } from './MinigameHost'
+import { renderMarkdown } from '../utils/formatMarkdown'
 
 interface InteractionSheetProps {
   open: boolean
@@ -12,6 +13,7 @@ interface InteractionSheetProps {
   submitting: boolean
   onClose: () => void
   onSubmitCode: (code: string) => Promise<void>
+  onShowHistory?: () => void
 }
 
 function vibrate(pattern: number | number[]) {
@@ -38,6 +40,20 @@ function isMotionStage(stage: PlayerStage | null) {
   )
 }
 
+function isStageCollectible(stage: PlayerStage | null) {
+  if (!stage) return false
+  const s = stage as any
+  const flatKind = s.physical_node_kind || s.physical_item_kind
+  if (flatKind === 'collectible') return true
+  const physicalQr = s.physical_qr
+  if (physicalQr && typeof physicalQr === 'object') {
+    return (physicalQr as Record<string, unknown>).kind === 'collectible'
+  }
+  const config = s.config && typeof s.config === 'object' ? s.config : {}
+  if (config.is_map_collectible || s.is_map_collectible) return true
+  return false
+}
+
 function getCompactLine(stage: PlayerStage | null) {
   if (isMotionStage(stage)) return ''
 
@@ -58,6 +74,7 @@ export function InteractionSheet({
   submitting,
   onClose,
   onSubmitCode,
+  onShowHistory,
 }: InteractionSheetProps) {
   const [dragOffset, setDragOffset] = useState(0)
 
@@ -167,16 +184,30 @@ export function InteractionSheet({
           role="dialog"
         >
           {compactGameMode ? (
-            <button
-              type="button"
-              style={compactGameCloseButton}
-              onClick={handleClose}
-              disabled={submitting}
-              aria-label="Cerrar juego"
-              title="Cerrar juego"
-            >
-              ×
-            </button>
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 120, display: 'flex', gap: 8 }}>
+              {onShowHistory && !isStageCollectible(currentStage) && (
+                <button
+                  type="button"
+                  style={{...compactGameCloseButton, position: 'relative', top: 0, right: 0}}
+                  onClick={(e) => { e.preventDefault(); onShowHistory(); }}
+                  disabled={submitting}
+                  aria-label="Ver historia del nodo"
+                  title="Ver historia"
+                >
+                  ❓
+                </button>
+              )}
+              <button
+                type="button"
+                style={{...compactGameCloseButton, position: 'relative', top: 0, right: 0}}
+                onClick={handleClose}
+                disabled={submitting}
+                aria-label="Cerrar juego"
+                title="Cerrar juego"
+              >
+                ×
+              </button>
+            </div>
           ) : (
             <>
               <div
@@ -208,19 +239,61 @@ export function InteractionSheet({
                   {compactLine ? <div style={compactLineText}>{compactLine}</div> : null}
                 </div>
 
-                <button
-                  type="button"
-                  style={closeButton}
-                  onClick={handleClose}
-                  disabled={submitting}
-                >
-                  CLOSE
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {onShowHistory && !isStageCollectible(currentStage) && (
+                    <button
+                      type="button"
+                      style={{ ...closeButton, background: 'rgba(255,255,255,0.1)' }}
+                      onClick={(e) => { e.preventDefault(); onShowHistory(); }}
+                      disabled={submitting}
+                      title="Historia"
+                    >
+                      ❓
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={closeButton}
+                    onClick={handleClose}
+                    disabled={submitting}
+                  >
+                    CLOSE
+                  </button>
+                </div>
               </div>
             </>
           )}
 
-          {shouldRenderFamilyRuntime && resolvedRuntime ? (
+          {isStageCollectible(currentStage) ? (
+            <div style={collectibleCardStyle}>
+              <div style={collectibleIconContainerStyle}>
+                <div style={collectibleIconStyle}>
+                  {(currentStage as any).physical_icon || (currentStage as any).config?.physical_icon || '⭐'}
+                </div>
+              </div>
+              <h4 style={collectibleTitleStyle}>
+                {(currentStage as any).physical_item_label || currentStage.title || 'Objeto de misión'}
+              </h4>
+              <div style={collectibleDescStyle}>
+                {(currentStage as any).intro_body ? (
+                  renderMarkdown((currentStage as any).intro_body)
+                ) : (
+                  <p style={{ margin: 0 }}>
+                    ¡Has encontrado un objeto coleccionable en esta ubicación!
+                    Presiona el botón de abajo para recogerlo y guardarlo en tu mochila.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                style={collectibleBtnStyle}
+                disabled={submitting}
+                onClick={handleNativeWin}
+              >
+                {submitting ? 'Guardando...' : '🎒 RECOGER OBJETO'}
+              </button>
+            </div>
+          ) : shouldRenderFamilyRuntime && resolvedRuntime ? (
             <FamilyRuntimeHost
               resolved={resolvedRuntime}
               stage={currentStage}
@@ -239,7 +312,7 @@ export function InteractionSheet({
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
-                {helperText || 'This node is not available in the current family runtime yet.'}
+                {helperText || 'Este nodo no tiene un juego configurado aún. El administrador debe asignarle un tipo de minijuego.'}
               </div>
             </section>
           )}
@@ -425,6 +498,71 @@ const bridgeText: CSSProperties = {
   lineHeight: 1.5,
 }
 
+const collectibleCardStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
+  padding: '24px 20px',
+  background: 'rgba(255, 255, 255, 0.03)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  borderRadius: 24,
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.24)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+  margin: '12px 0',
+}
+
+const collectibleIconContainerStyle: CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  justifyContent: 'center',
+  marginBottom: 16,
+}
+
+const collectibleIconStyle: CSSProperties = {
+  fontSize: 64,
+  lineHeight: 1,
+  filter: 'drop-shadow(0 0 16px rgba(251, 191, 36, 0.4))',
+  animation: 'sagaIconFloat 3s ease-in-out infinite',
+}
+
+const collectibleTitleStyle: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 22,
+  fontWeight: 900,
+  margin: '0 0 8px 0',
+  letterSpacing: '-0.02em',
+}
+
+const collectibleDescStyle: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: 14,
+  lineHeight: 1.5,
+  margin: '0 0 24px 0',
+  maxWidth: '100%',
+  textAlign: 'left',
+}
+
+const collectibleBtnStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 52,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  borderRadius: 16,
+  border: 'none',
+  background: 'linear-gradient(135deg, #10b981, #059669)',
+  color: '#ffffff',
+  fontSize: 16,
+  fontWeight: 900,
+  letterSpacing: '0.05em',
+  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+  cursor: 'pointer',
+  transition: 'transform 0.15s ease, opacity 0.15s ease',
+}
+
 const sheetAnimations = `
 @keyframes sagaFadeIn {
   from { opacity: 0; }
@@ -440,5 +578,10 @@ const sheetAnimations = `
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes sagaIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 `

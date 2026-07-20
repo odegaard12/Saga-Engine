@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
-import { t } from '../../i18n'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { t as _t } from '../../i18n'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import GameTemplateWizardPanel from './GameTemplateWizardPanel'
 import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import {
@@ -23,6 +25,7 @@ const LEGACY_NODE_COPY_ES: Record<string, string> = {
   'Move closer to unlock this node.': 'Acércate al nodo para desbloquearlo.',
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function normalizeLegacyNodeCopy(value?: unknown) {
   const clean = String(value ?? '').trim()
   if (!clean) return ''
@@ -83,6 +86,7 @@ function formatCoords(lat: unknown, lon: unknown) {
   return `${lat.toFixed(5)}, ${lon.toFixed(5)}`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function numberOrNull(value: string) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
@@ -218,22 +222,24 @@ export default function NodeDetailDrawer({
     onApplyLocal(nextDraft)
   }
 
-  function patchGuidedV2Stage(patch: Record<string, any>) {
-    setDraft((current: any) => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function patchGuidedV2Stage(patch: Record<string, unknown>) {
+    setDraft((current) => ({
       ...current,
       ...patch,
     }))
   }
 
-  function patchGuidedStage(patch: Record<string, any>) {
-    setDraft((current: any) => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function patchGuidedStage(patch: Record<string, unknown>) {
+    setDraft((current) => ({
       ...current,
       ...patch,
     }))
   }
 
-  const [activeTab, setActiveTab] = useState<DrawerTab>('basics')
-  const [isGameGuideOpen, setIsGameGuideOpen] = useState(false)
+  const [_activeTab, setActiveTab] = useState<DrawerTab>('basics')
+  const [_isGameGuideOpen, _setIsGameGuideOpen] = useState(false)
 
   useEffect(() => {
     setDraft(stage)
@@ -244,7 +250,7 @@ export default function NodeDetailDrawer({
     familyCards.find((item) => item.id === draft.type) ||
     familyCards.find((item) => item.id === 'signal_hunt')
 
-  const messages = draft.messages || {}
+  const _messages = draft.messages || {}
   const isLocalNew = typeof draft.id === 'string' && draft.id.startsWith('local-')
 
   const draftConfig =
@@ -258,11 +264,11 @@ export default function NodeDetailDrawer({
     .map(getPhysicalRequirementOption)
     .filter((item): item is PhysicalRequirementOption => Boolean(item))
 
-  const selectedRequirement = physicalRequirementOptions.find(
+  const _selectedRequirement = physicalRequirementOptions.find(
     (item) => item.itemId === getDraftConfigText('required_item_id')
   )
   const selectedGame = getAdminGameForStage(draft.type, draftConfig)
-  const visibleGameCatalog = getVisibleAdminGames(selectedGame.id)
+  const _visibleGameCatalog = getVisibleAdminGames(selectedGame.id)
 
   function getDraftConfigText(key: string, fallback = '') {
     const value = draftConfig[key]
@@ -282,6 +288,7 @@ export default function NodeDetailDrawer({
     })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function setDraftField<K extends keyof AdminReactOverviewStage>(
     key: K,
     value: AdminReactOverviewStage[K]
@@ -292,6 +299,7 @@ export default function NodeDetailDrawer({
     }))
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function setDraftMessage(key: 'hint' | 'gps_unavailable' | 'locked', value: string) {
     updateDraftLocal((current) => ({
       ...current,
@@ -314,15 +322,18 @@ export default function NodeDetailDrawer({
     }))
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function updateDraftConfigText(key: string, value: string) {
     updateDraftConfig(key, value)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function updateDraftConfigNumber(key: string, value: string) {
     const parsed = Number(value)
     updateDraftConfig(key, Number.isFinite(parsed) ? parsed : value)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function updateDraftConfigSequence(value: string) {
     const parts = value
       .split(',')
@@ -332,6 +343,7 @@ export default function NodeDetailDrawer({
     updateDraftConfig('sequence', parts.length > 0 ? parts : value)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function handleDraftGameChange(nextGameId: AdminGameId) {
     const patch = getDefaultAdminStagePatchForGame(nextGameId)
 
@@ -369,6 +381,7 @@ export default function NodeDetailDrawer({
     })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function handleDraftFamilyChange(nextType: FamilyId) {
     const nextConfig = getDefaultAdminConfigForFamily(nextType)
 
@@ -397,6 +410,7 @@ export default function NodeDetailDrawer({
     }))
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function renderActivationPanel() {
     const rawDraft = draft as Record<string, unknown>
     const rawRadius = rawDraft.radius_m ?? rawDraft.radius ?? rawDraft.activation_radius_m ?? 50
@@ -559,6 +573,7 @@ export default function NodeDetailDrawer({
             onPatch={patchGuidedV3Stage}
             onClose={onClose}
             stages={stages}
+            onRequestChangeType={onRequestChangeType}
             onDelete={() => {
               if (
                 window.confirm(

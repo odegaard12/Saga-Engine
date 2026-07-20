@@ -1,9 +1,7 @@
 import type { PlayerStage } from '../../types/player'
 
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.2'
-const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v1'
-const ESRI_TILE_BASE =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.0.4'
+const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v2'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
 const MAX_TILE_URLS = 3500
@@ -48,8 +46,7 @@ function tileUrl(zoom: number, x: number, y: number) {
   const n = 2 ** zoom
   const wrappedX = ((x % n) + n) % n
   const clampedY = Math.max(0, Math.min(n - 1, y))
-
-  return `${ESRI_TILE_BASE}/${zoom}/${clampedY}/${wrappedX}`
+  return `/map-tiles/${zoom}/${wrappedX}/${clampedY}.png`
 }
 
 function metersPerTile(lat: number, zoom: number) {

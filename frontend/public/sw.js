@@ -1,5 +1,5 @@
-const CACHE_NAME = 'saga-player-shell-v1.2.2-rpg-viewfinder'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v1.2.2'
+const CACHE_NAME = 'saga-player-shell-v3.0.4-latest'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.0.4'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v1'
 
 const DEFAULT_SHELL_URL = '/'
@@ -186,10 +186,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
 
-  if (
-    url.hostname === 'server.arcgisonline.com' &&
-    url.pathname.includes('/World_Imagery/MapServer/tile/')
-  ) {
+  // Map tiles are now served via a same-origin proxy (/map-tiles/...)
+  if (url.pathname.startsWith('/map-tiles/')) {
     event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return
   }

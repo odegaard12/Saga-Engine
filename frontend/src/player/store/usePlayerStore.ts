@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PlayerGamePayload, PublicConfig, PlayerGpsStatus } from '../../types/player'
+import { saveInventorySnapshot } from '../offline/inventory'
 
 interface PlayerState {
   // Estado base de la misión
@@ -58,7 +59,12 @@ export const usePlayerStore = create<PlayerState>()(
       offlinePrepVisible: true,
 
       setStatus: (status) => set({ status }),
-      setGamePayload: (payload, config) => set({ payload, config, status: 'ready' }),
+      setGamePayload: (payload, config) => {
+        if (payload.inventory_snapshot) {
+          saveInventorySnapshot(payload.inventory_snapshot)
+        }
+        set({ payload, config, status: 'ready' })
+      },
       updateGps: (gpsPosition, gpsAccuracy, gpsFresh) =>
         set({ gpsPosition, gpsAccuracy, gpsFresh, gpsCapturedAt: Date.now(), gpsStatus: 'active' }),
       setGpsStatus: (gpsStatus) => set({ gpsStatus }),

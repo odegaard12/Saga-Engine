@@ -9,6 +9,7 @@ import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { useGyroParallax } from '../hooks/useGyroParallax'
+import { usePlayerStore } from '../store/usePlayerStore'
 
 type BackpackTab = 'requirements' | 'inventory' | 'crafting'
 
@@ -42,6 +43,7 @@ interface PlayerHudProps {
   fieldPhotoCount?: number
   submitting?: boolean
   errorMessage?: string | null
+  onShowPrologue?: () => void
   onSubmitCode?: (code: string) => Promise<void>
 }
 
@@ -93,11 +95,29 @@ export function PlayerHud({
   submitting = false,
   errorMessage = null,
   onSubmitCode,
+  onShowPrologue,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
   const [toolsFallbackOpen, setToolsFallbackOpen] = useState(false)
   const [toolsFallbackCode, setToolsFallbackCode] = useState('')
+  const gpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
+  
+  function getGpsAccuracyColor(acc: number | null) {
+    if (!acc) return 'rgba(255, 255, 255, 0.4)'
+    if (acc <= 10) return '#4ade80' // Excellent (Green)
+    if (acc <= 25) return '#facc15' // Good (Yellow)
+    if (acc <= 50) return '#fb923c' // Fair (Orange)
+    return '#f87171' // Poor (Red)
+  }
+  
+  function getGpsAccuracyBars(acc: number | null) {
+    if (!acc) return 0
+    if (acc <= 10) return 4
+    if (acc <= 25) return 3
+    if (acc <= 50) return 2
+    return 1
+  }
 
   useEffect(() => {
     const handleLocaleChange = () => setLocaleState(getLocale())
@@ -316,7 +336,23 @@ export function PlayerHud({
         </div>
 
         <div style={statusRow}>
-          <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '10px' }}>
+              {[1, 2, 3, 4].map((bar) => (
+                <div
+                  key={bar}
+                  style={{
+                    width: '3px',
+                    height: `${bar * 2.5}px`,
+                    background: bar <= getGpsAccuracyBars(gpsAccuracy) ? getGpsAccuracyColor(gpsAccuracy) : 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '1px',
+                  }}
+                />
+              ))}
+            </div>
+            <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
+            {gpsAccuracy && distanceMeters === null && <span style={{ opacity: 0.7, fontSize: '0.9em' }}>({Math.round(gpsAccuracy)}m)</span>}
+          </div>
           <span>
             {typeof currentStage?.radius === 'number'
               ? `Radio ${currentStage.radius} m`
@@ -408,12 +444,30 @@ export function PlayerHud({
 
               {toolsFallbackOpen ? (
                 <form style={fallbackToolForm} onSubmit={handleToolsFallbackSubmit}>
+                  <div
+                    style={{
+                      padding: '0.1rem 0.5rem',
+                      borderRadius: '999px',
+                      fontSize: '0.65rem',
+                      fontWeight: '700',
+                      letterSpacing: '0.05em',
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    <span style={{ fontWeight: 'bold' }}>{getGpsDisplay(gpsState)}</span>
+                  </div>
                   <input
                     value={toolsFallbackCode}
                     onChange={(event) => setToolsFallbackCode(event.target.value.toUpperCase())}
-                    placeholder={t('player.tools.codePlaceholder', locale)}
+                    placeholder="INTRODUCE EL CÓDIGO (EJ: PIEDRA_ROJA)"
                     style={fallbackToolInput}
                     disabled={submitting}
+                    autoFocus
                   />
 
                   <button
