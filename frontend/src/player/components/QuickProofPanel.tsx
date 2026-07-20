@@ -119,6 +119,9 @@ export function QuickProofPanel({
   )
   const [notice, setNotice] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [torchSupported, setTorchSupported] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+
   useEffect(() => {
     if (typeof document === 'undefined') return
 
@@ -290,7 +293,10 @@ export function QuickProofPanel({
 
     stopCamera()
     setMode('qr')
-    setNotice(null)
+    setNotice('')
+    setMessage('')
+    setTorchSupported(false)
+    setTorchOn(false)
     setMessage('Apunta la cámara a la tarjeta QR de SAGA.')
     setScanning(true)
 
@@ -303,6 +309,16 @@ export function QuickProofPanel({
       })
 
       streamRef.current = stream
+
+      const track = stream.getVideoTracks()[0]
+      if (track && 'getCapabilities' in track) {
+        try {
+          const caps = track.getCapabilities() as any
+          if (caps && caps.torch) {
+            setTorchSupported(true)
+          }
+        } catch {}
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -349,6 +365,15 @@ export function QuickProofPanel({
 
   if (hidden) return null
 
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track) return
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] })
+      setTorchOn(!torchOn)
+    } catch {}
+  }
+
   if (!showLauncher && mode === 'idle' && !notice) return null
 
   return (
@@ -378,6 +403,19 @@ export function QuickProofPanel({
 
           <div style={scannerBox}>
             <video ref={videoRef} style={videoStyle} playsInline muted />
+            {torchSupported ? (
+              <button
+                type="button"
+                style={torchButton}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleTorch()
+                }}
+                aria-label="Alternar Linterna"
+              >
+                {torchOn ? '🔦 ON' : '🔦 OFF'}
+              </button>
+            ) : null}
             <canvas ref={canvasRef} style={canvasStyle} />
             {scanning ? <div className="saga-scanner-line" /> : null}
             {scanning ? (
@@ -520,6 +558,23 @@ const closeButton: CSSProperties = {
   fontWeight: 950,
   textAlign: 'center',
   boxShadow: '0 10px 24px rgba(2,6,23,.20)',
+}
+
+const torchButton: CSSProperties = {
+  position: 'absolute',
+  top: 12,
+  right: 12,
+  zIndex: 10,
+  minHeight: 34,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.2)',
+  background: 'rgba(0,0,0,.5)',
+  color: '#fff',
+  fontWeight: 900,
+  backdropFilter: 'blur(10px)',
+  fontSize: 10,
+  cursor: 'pointer',
 }
 
 const scannerBox: CSSProperties = {

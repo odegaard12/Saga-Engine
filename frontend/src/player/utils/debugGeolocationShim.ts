@@ -144,6 +144,7 @@ export function installDebugGeolocationShim() {
   const originalClearWatch = original?.clearWatch?.bind(original)
 
   const debugWatchTimers = new Map<number, number>()
+  const cancelledWatches = new Set<number>()
   let nextWatchId = 900000
 
   const makeUnavailableError = (message: string) =>
@@ -194,10 +195,16 @@ export function installDebugGeolocationShim() {
 
       getDebugCoords()
         .then((coords) => {
+          if (cancelledWatches.has(watchId)) return
+
           if (!coords) {
             if (originalWatchPosition) {
               const realWatchId = originalWatchPosition(success, error, options)
-              debugWatchTimers.set(watchId, realWatchId)
+              if (cancelledWatches.has(watchId)) {
+                originalClearWatch?.(realWatchId)
+              } else {
+                debugWatchTimers.set(watchId, realWatchId)
+              }
               return
             }
 
@@ -212,16 +219,30 @@ export function installDebugGeolocationShim() {
           success(makePosition(coords))
 
           const timer = window.setInterval(async () => {
+            if (cancelledWatches.has(watchId)) {
+               window.clearInterval(timer)
+               return
+            }
             const nextCoords = await getDebugCoords()
             if (nextCoords) success(makePosition(nextCoords))
           }, 1200)
 
-          debugWatchTimers.set(watchId, timer)
+          if (cancelledWatches.has(watchId)) {
+            window.clearInterval(timer)
+          } else {
+            debugWatchTimers.set(watchId, timer)
+          }
         })
         .catch(() => {
+          if (cancelledWatches.has(watchId)) return
+
           if (originalWatchPosition) {
             const realWatchId = originalWatchPosition(success, error, options)
-            debugWatchTimers.set(watchId, realWatchId)
+            if (cancelledWatches.has(watchId)) {
+              originalClearWatch?.(realWatchId)
+            } else {
+              debugWatchTimers.set(watchId, realWatchId)
+            }
             return
           }
 
@@ -236,6 +257,7 @@ export function installDebugGeolocationShim() {
     },
 
     clearWatch(id) {
+      cancelledWatches.add(id)
       const stored = debugWatchTimers.get(id)
       if (stored !== undefined) {
         window.clearInterval(stored)

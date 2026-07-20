@@ -1305,17 +1305,19 @@ export default function PlayerApp() {
 
       await Promise.all(promises)
 
-      const content = await zip.generateAsync({ type: 'base64' })
+      const blobData = await zip.generateAsync({ type: 'blob' })
       const safeUserName = String(payload.user || 'jugador')
         .replace(/[^a-z0-9]/gi, '_')
         .toLowerCase()
-      const downloadUrl = `data:application/zip;base64,${content}`
+      const downloadUrl = URL.createObjectURL(blobData)
       const a = document.createElement('a')
       a.href = downloadUrl
       a.download = `fotos_saga_${safeUserName}.zip`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000)
 
       showNotice('Descarga de ZIP completada', 'success')
     } catch (err) {

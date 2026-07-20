@@ -18,6 +18,8 @@ export function FieldCameraCapture({
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
   const [note, setNote] = useState('')
+  const [torchSupported, setTorchSupported] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -31,40 +33,49 @@ export function FieldCameraCapture({
           inset: 0;
           pointer-events: none;
           z-index: 5;
+          overflow: hidden;
         }
-        .saga-camera-line-h {
-          position: absolute;
-          left: 0; right: 0;
-          height: 1px;
-          background: rgba(255, 255, 255, 0.18);
-        }
-        .saga-camera-line-h--1 { top: 33.33%; }
-        .saga-camera-line-h--2 { top: 66.66%; }
-        .saga-camera-line-v {
-          position: absolute;
-          top: 0; bottom: 0;
-          width: 1px;
-          background: rgba(255, 255, 255, 0.18);
-        }
-        .saga-camera-line-v--1 { left: 33.33%; }
-        .saga-camera-line-v--2 { left: 66.66%; }
-        .saga-camera-corner {
-          position: absolute;
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(14, 165, 233, 0.7);
-        }
-        .saga-camera-corner--tl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
-        .saga-camera-corner--tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
-        .saga-camera-corner--bl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
-        .saga-camera-corner--br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
-        .saga-camera-center-dot {
+        .saga-camera-center-target {
           position: absolute;
           top: 50%; left: 50%;
-          width: 6px; height: 6px;
-          margin-top: -3px; margin-left: -3px;
-          border-radius: 50%;
-          background: rgba(14, 165, 233, 0.5);
+          width: 240px; height: 240px;
+          margin-top: -120px; margin-left: -120px;
+          border: 2px solid rgba(255, 255, 255, 0.8);
+          border-radius: 16px;
+          box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
+        }
+        .saga-camera-center-target::before, .saga-camera-center-target::after {
+          content: '';
+          position: absolute;
+          background: #fff;
+        }
+        .saga-camera-center-target::before {
+          top: 50%; left: -6px; width: 12px; height: 2px; margin-top: -1px;
+          box-shadow: 246px 0 0 #fff;
+        }
+        .saga-camera-center-target::after {
+          left: 50%; top: -6px; height: 12px; width: 2px; margin-left: -1px;
+          box-shadow: 0 246px 0 #fff;
+        }
+        .saga-camera-corner {
+          position: absolute;
+          width: 24px;
+          height: 24px;
+          border: 3px solid #0ea5e9;
+        }
+        .saga-camera-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 16px; }
+        .saga-camera-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 16px; }
+        .saga-camera-corner--bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 16px; }
+        .saga-camera-corner--br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 16px; }
+        .saga-camera-hint {
+          position: absolute;
+          bottom: 15%; left: 0; right: 0;
+          text-align: center;
+          color: #fff;
+          font-weight: 600;
+          font-size: 14px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+          letter-spacing: 0.05em;
         }
       `
       document.head.appendChild(style)
@@ -79,6 +90,8 @@ export function FieldCameraCapture({
 
       setError('')
       setPreview('')
+      setTorchSupported(false)
+      setTorchOn(false)
 
       if (!navigator.mediaDevices?.getUserMedia) {
         setError('La cámara no está disponible en este navegador.')
@@ -101,6 +114,16 @@ export function FieldCameraCapture({
         }
 
         streamRef.current = stream
+
+        const track = stream.getVideoTracks()[0]
+        if (track && 'getCapabilities' in track) {
+          try {
+            const caps = track.getCapabilities() as any
+            if (caps && caps.torch) {
+              setTorchSupported(true)
+            }
+          } catch {}
+        }
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream
@@ -156,6 +179,15 @@ export function FieldCameraCapture({
     onClose()
   }
 
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track) return
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] })
+      setTorchOn(!torchOn)
+    } catch {}
+  }
+
   return (
     <div style={overlay}>
       <section style={sheet} aria-label="Cámara de campo">
@@ -167,21 +199,29 @@ export function FieldCameraCapture({
         </div>
 
         <div style={cameraFrame}>
+          {torchSupported && !preview ? (
+            <button
+              type="button"
+              style={torchButton}
+              onClick={toggleTorch}
+              aria-label="Alternar Linterna"
+            >
+              {torchOn ? '🔦 ON' : '🔦 OFF'}
+            </button>
+          ) : null}
           {preview ? (
             <img src={preview} alt="Vista previa" style={previewImage} />
           ) : (
             <>
               <video ref={videoRef} style={video} autoPlay muted playsInline />
               <div className="saga-camera-grid">
-                <div className="saga-camera-line-h saga-camera-line-h--1" />
-                <div className="saga-camera-line-h saga-camera-line-h--2" />
-                <div className="saga-camera-line-v saga-camera-line-v--1" />
-                <div className="saga-camera-line-v saga-camera-line-v--2" />
-                <div className="saga-camera-corner saga-camera-corner--tl" />
-                <div className="saga-camera-corner saga-camera-corner--tr" />
-                <div className="saga-camera-corner saga-camera-corner--bl" />
-                <div className="saga-camera-corner saga-camera-corner--br" />
-                <div className="saga-camera-center-dot" />
+                <div className="saga-camera-center-target">
+                  <div className="saga-camera-corner saga-camera-corner--tl" />
+                  <div className="saga-camera-corner saga-camera-corner--tr" />
+                  <div className="saga-camera-corner saga-camera-corner--bl" />
+                  <div className="saga-camera-corner saga-camera-corner--br" />
+                </div>
+                <div className="saga-camera-hint">ENCUADRA EL OBJETIVO</div>
               </div>
             </>
           )}
@@ -291,6 +331,21 @@ const cameraFrame: CSSProperties = {
   background: '#020617',
   border: '2px solid rgba(14,165,233,.40)',
   boxShadow: 'inset 0 0 24px rgba(0,0,0,.80)',
+}
+
+const torchButton: CSSProperties = {
+  position: 'absolute',
+  top: 12,
+  right: 12,
+  zIndex: 10,
+  minHeight: 34,
+  padding: '0 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,.2)',
+  background: 'rgba(0,0,0,.5)',
+  color: '#fff',
+  fontWeight: 900,
+  backdropFilter: 'blur(10px)',
 }
 
 const video: CSSProperties = {

@@ -18,6 +18,7 @@ import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import { useI18n } from '../../i18n/useI18n'
 import ObjectsPanel from './ObjectsPanel'
+import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects'
@@ -358,9 +359,19 @@ export default function AdminMissionControlShell({
         </div>
 
         <section className="saga-route-list" aria-label="Route nodes">
-          <div className="saga-section-title">
-            <span>{t('admin.route')}</span>
-            <b>{stages.length}</b>
+          <div className="saga-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span>{t('admin.route')}</span>
+              <b>{stages.length}</b>
+            </div>
+            <button
+              type="button"
+              className="saga-ghost-action"
+              style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,.08)', borderRadius: 8, border: 0, color: '#e2e8f0', cursor: 'pointer' }}
+              onClick={() => printAllQrs(stages)}
+            >
+              🖨️ QRs
+            </button>
           </div>
 
           <div className="saga-node-scroll">

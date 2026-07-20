@@ -830,6 +830,17 @@ export function SignalHuntRuntimeScreen({ resolved, stage, submitting, onWin }: 
 
         <div className="sh-metrics">
           <div className="sh-readout">
+            {position?.accuracy != null ? (
+              <>
+                <span style={{ color: position.accuracy > 25 ? 'var(--sh-warn)' : 'var(--sh-muted)' }}>
+                  precisión
+                </span>
+                <strong style={{ color: position.accuracy > 25 ? 'var(--sh-warn)' : 'rgba(255,255,255,.94)' }}>
+                  ±{Math.round(position.accuracy)}m
+                </strong>
+                <i aria-hidden="true" />
+              </>
+            ) : null}
             <span>dist</span>
             <strong>{formatMeters(distance)}</strong>
             <i aria-hidden="true" />

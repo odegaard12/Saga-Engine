@@ -162,10 +162,10 @@ function getClusterRadiusForZoom(zoom: number) {
 }
 
 function getPhotoClusterRadiusForZoom(zoom: number) {
-  if (zoom >= 19) return 12
-  if (zoom >= 18) return 28
-  if (zoom >= 17) return 60
-  return 100
+  if (zoom >= 19) return 4
+  if (zoom >= 18) return 12
+  if (zoom >= 17) return 30
+  return 80
 }
 
 type PlayerMarkerGroup = {
@@ -210,8 +210,8 @@ function createPlayerClusterIcon(count: number) {
   return L.divIcon({
     className: 'saga-player-cluster-wrap',
     html: `<div class="saga-player-cluster-pin"><span>👥</span><b>${count}</b></div>`,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
+    iconSize: [54, 54],
+    iconAnchor: [27, 27],
   })
 }
 
@@ -287,7 +287,7 @@ function createFieldProofIcon(proofs: FieldProof[]) {
       </div>
     `,
     iconSize: [52, 52],
-    iconAnchor: [26, 26],
+    iconAnchor: [26, 52],
   })
 }
 
@@ -411,8 +411,8 @@ function createAvatarIcon(
   return L.divIcon({
     className: 'saga-avatar-icon-wrap',
     html: `<div class="saga-avatar-pin saga-avatar-pin--${kind}" style="--saga-player-color:${safeColor};">${avatarHtml}</div>`,
-    iconSize: kind === 'self' ? [46, 46] : [42, 42],
-    iconAnchor: kind === 'self' ? [23, 23] : [21, 21],
+    iconSize: kind === 'self' ? [56, 56] : [50, 50],
+    iconAnchor: kind === 'self' ? [28, 28] : [25, 25],
   })
 }
 
@@ -433,11 +433,16 @@ function buildPlayerPopup(
   const title = kind === 'self' ? 'Tú' : identity.label
 
   return `
-    <div style="min-width:156px;font-family:system-ui,sans-serif;">
-      <strong style="display:block;font-size:13px;color:#0f172a;">${escapeHtml(title)}</strong>
-      <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:900;letter-spacing:.08em;color:${escapeHtml(identity.color)};">${presence}</span>
-      ${kind !== 'self' ? `<div style="margin-top:6px;font-size:11px;color:#475569;">Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}</div>` : '<div style="margin-top:6px;font-size:11px;color:#475569;">Tu ubicación actual</div>'}
-      ${profile.gps_status ? `<div style="margin-top:4px;font-size:11px;color:#64748b;">GPS ${escapeHtml(String(profile.gps_status).toUpperCase())}</div>` : ''}
+    <div style="min-width:180px;font-family:system-ui,-apple-system,sans-serif;padding:4px;display:flex;gap:12px;align-items:center;">
+      ${identity.avatarUrl ? `<img src="${escapeHtml(identity.avatarUrl)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid ${escapeHtml(identity.color)};box-shadow:0 2px 4px rgba(0,0,0,0.1);" />` : `<div style="width:48px;height:48px;border-radius:50%;background:${escapeHtml(identity.color)};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:18px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">${escapeHtml(identity.initials)}</div>`}
+      <div style="flex:1;">
+        <strong style="display:block;font-size:14px;color:#0f172a;line-height:1.2;margin-bottom:2px;">${escapeHtml(title)}</strong>
+        <span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;color:${escapeHtml(identity.color)};">${presence}</span>
+        <div style="margin-top:2px;font-size:11px;color:#64748b;line-height:1.3;">
+          ${kind !== 'self' ? `Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}` : 'Tu ubicación actual'}
+        </div>
+        ${profile.gps_status ? `<div style="margin-top:2px;font-size:10px;color:#94a3b8;">GPS ${escapeHtml(String(profile.gps_status).toUpperCase())}</div>` : ''}
+      </div>
     </div>
   `
 }
@@ -1156,6 +1161,7 @@ export const MapSurface = React.memo(function MapSurface({
       playerMarkerRef.current = L.marker(nextLatLng, {
         icon: createAvatarIcon(selfMarkerProfile, 'self'),
         keyboard: false,
+        zIndexOffset: 1200,
       }).addTo(map)
 
       playerMarkerIconKeyRef.current = selfMarkerIconKey
@@ -1369,14 +1375,25 @@ export const MapSurface = React.memo(function MapSurface({
     const groups = groupFieldProofs(fieldProofs, getPhotoClusterRadiusForZoom(mapZoom))
 
     for (const group of groups) {
-      const center = { lat: group.lat, lon: group.lon }
+      let offsetLat = 0
+      let offsetLon = 0
+      if (
+        playerPosition &&
+        Math.abs(group.lat - playerPosition.lat) < 0.00015 &&
+        Math.abs(group.lon - playerPosition.lon) < 0.00015
+      ) {
+        offsetLat = -0.00015 // Shift South
+        offsetLon = 0.00015  // Shift East
+      }
+
+      const center = { lat: group.lat + offsetLat, lon: group.lon + offsetLon }
 
       const marker = L.marker([center.lat, center.lon], {
         icon: createFieldProofIcon(group.proofs),
         keyboard: false,
         riseOnHover: true,
         bubblingMouseEvents: false,
-        zIndexOffset: 980,
+        zIndexOffset: 600,
       }).addTo(map)
 
       marker.bindTooltip(getFieldProofTooltip(group.proofs), {
@@ -1390,7 +1407,7 @@ export const MapSurface = React.memo(function MapSurface({
 
       fieldProofLayersRef.current.push(marker)
     }
-  }, [fieldProofs, mapReadyToken, mapZoom, onOpenFieldProofs])
+  }, [fieldProofs, mapReadyToken, mapZoom, onOpenFieldProofs, playerPosition?.lat, playerPosition?.lon])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1804,13 +1821,13 @@ const mapAnimations = `
 .saga-avatar-pin {
   will-change: auto;
   transform: translateZ(0);
-  width: 42px;
-  height: 42px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 950;
   border:
     3px solid
@@ -1839,10 +1856,10 @@ const mapAnimations = `
 }
 
 .saga-avatar-pin--self {
-  min-width: 46px;
+  min-width: 56px;
   padding: 0;
-  width: 46px;
-  height: 46px;
+  width: 56px;
+  height: 56px;
   border-color:
     rgba(207,250,254,.98);
   box-shadow:
