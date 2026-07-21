@@ -894,6 +894,73 @@ export default function AdminApp() {
     )
   }
 
+  function createLocalNodesWithItems(itemsToCreate: Array<{ id: string; label: string }>) {
+    if (!itemsToCreate.length) return
+
+    const mapCenter =
+      overview?.config?.map_center || config?.map_center || ([40.4168, -3.7038] as [number, number])
+
+    const mappedStagesForCenter = stages.filter(
+      (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
+    )
+
+    const routeCenter: [number, number] =
+      mappedStagesForCenter.length > 0
+        ? [
+            mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lat), 0) /
+              mappedStagesForCenter.length,
+            mappedStagesForCenter.reduce((sum, stage) => sum + Number(stage.lon), 0) /
+              mappedStagesForCenter.length,
+          ]
+        : mapCenter
+
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+
+    itemsToCreate.forEach((item, idx) => {
+      const offset = (idx - (itemsToCreate.length - 1) / 2) * 0.00035
+      const nextIndex = stages.length + idx
+
+      const nextStage: EditableAdminStage = {
+        id: `local-${Date.now()}-${idx}`,
+        index: nextIndex,
+        title: item.label,
+        type: defaultGamePatch.type,
+        label: 'Objeto Coleccionable',
+        lat: routeCenter[0] + offset,
+        lon: routeCenter[1] + offset,
+        radius: 35,
+        entry_mode: 'free',
+        require_proximity: false,
+        has_hint: false,
+        has_manual_fallback: false,
+        physical_node_kind: 'collectible',
+        physical_item_id: item.id,
+        physical_item_label: item.label,
+        content: `Misión: Recoge ${item.label} en esta ubicación real.`,
+        objective: `Objeto: ${item.label}`,
+        config: {
+          ...defaultGamePatch.config,
+          is_map_collectible: true,
+          reward_item_id: item.id,
+          reward_item_label: item.label,
+        },
+        config_summary: [`Coleccionable: ${item.label}`],
+        messages: defaultGamePatch.messages,
+      }
+
+      syncLocalStage(nextStage, { select: false, notice: false })
+    })
+
+    setCmsPanel('none')
+    setSelectedStage(null)
+    setSaveState('idle')
+    setLocalNotice(
+      itemsToCreate.length === 1
+        ? `📍 Chincheta colocada en el mapa para "${itemsToCreate[0].label}". Arrástrala a su posición final.`
+        : `📍 Se han colocado ${itemsToCreate.length} chinchetas en el mapa. Arrástralas a sus posiciones finales.`
+    )
+  }
+
   function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number) {
     const movedStage: AdminReactOverviewStage = {
       ...stageToMove,
@@ -1023,6 +1090,7 @@ export default function AdminApp() {
         onUpdateMissionDraft={updateMissionDraft}
         onSaveSettings={saveMissionSettings}
         onApplyMissionTemplate={applyMissionTemplate}
+        onCreateNodesWithItems={createLocalNodesWithItems}
       />
     </>
   )

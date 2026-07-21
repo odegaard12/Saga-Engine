@@ -645,7 +645,7 @@ export default function AdminGameEditor({
                   value={
                     !stage.required_item_id
                       ? 'none'
-                      : ['llave_maestra', 'emp_device'].includes(stage.required_item_id)
+                      : ['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id)
                         ? stage.required_item_id
                         : collectibleItems.some(item => item.id === stage.required_item_id)
                           ? stage.required_item_id
@@ -661,12 +661,20 @@ export default function AdminGameEditor({
                   <option value="none">🟢 Ninguno (Abierto a todos los jugadores)</option>
                   <option value="llave_maestra">🔑 Requiere Llave Maestra</option>
                   <option value="emp_device">⚡ Requiere Dispositivo EMP</option>
+                  <option value="decodificador_cuantico">💻 Requiere Decodificador Cuántico</option>
+                  <option value="escaner_biometrico">🔬 Requiere Escáner Biométrico</option>
+                  <option value="amuleto_guardian">🛡️ Requiere Amuleto del Guardián</option>
+                  <option value="elixir_alquimia">🧪 Requiere Elixir de Alquimia</option>
+                  <option value="escudo_runico">🛡️ Requiere Escudo Rúnico</option>
+                  <option value="orbe_fuego">🔮 Requiere Orbe de Fuego Arcano</option>
+                  <option value="reliquia_sagrada">🏛️ Requiere Reliquia Sagrada</option>
+                  <option value="amuleto_vision">👁️ Requiere Amuleto de Visión</option>
                   {collectibleItems.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
                   <option value="custom">✏️ ID personalizado...</option>
                 </select>
               </label>
 
-              {stage.required_item_id && !['llave_maestra', 'emp_device'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
+              {stage.required_item_id && !['llave_maestra', 'emp_device', 'decodificador_cuantico', 'escaner_biometrico', 'amuleto_guardian', 'elixir_alquimia', 'escudo_runico', 'orbe_fuego', 'reliquia_sagrada', 'amuleto_vision'].includes(stage.required_item_id) && !collectibleItems.some(item => item.id === stage.required_item_id) ? (
                 <label>
                   <span>ID del objeto requerido</span>
                   <input value={String(stage.required_item_id || '')} onChange={(event) => onPatch({ required_item_id: event.target.value, requires_item: Boolean(event.target.value) })} />
@@ -949,7 +957,7 @@ export default function AdminGameEditor({
 
               <label className="wide">
                 <span>🎉 Mensaje de éxito al completar</span>
-                <textarea value={String(stage.success_message || 'Ben feito. Desbloqueaches a seguinte pista.')} onChange={(event) => onPatch({ success_message: event.target.value })} rows={2} />
+                <textarea value={String(stage.success_message || '¡Bien hecho! Has desbloqueado la siguiente pista.')} onChange={(event) => onPatch({ success_message: event.target.value })} rows={2} />
               </label>
 
               <label className="wide">

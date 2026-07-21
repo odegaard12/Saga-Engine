@@ -344,8 +344,30 @@ export default function PlayersPanel({
                   <section className="admin-player-inventory" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <strong style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Mochila / Coleccionables
+                        🎒 Mochila / Coleccionables ({inventory.length})
                       </strong>
+                      {inventory.length > 0 ? (
+                        <button
+                          type="button"
+                          style={{
+                            padding: '0.2rem 0.6rem',
+                            fontSize: '0.75rem',
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            color: '#fca5a5',
+                            border: '1px solid rgba(239, 68, 68, 0.35)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                          onClick={() => {
+                            if (window.confirm(`¿Vaciar TODOS los objetos de la mochila de ${draft.display_name}?`)) {
+                              onProfileAction(draft.id, 'clear_inventory' as AdminProfileAction)
+                            }
+                          }}
+                        >
+                          🧹 Vaciar mochila
+                        </button>
+                      ) : null}
                     </div>
                     {inventory.length === 0 ? (
                       <div style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>

@@ -224,6 +224,7 @@ async def admin_profile_action(request: Request):
         "level_prev",
         "level_next",
         "mark_finished",
+        "clear_inventory",
     }
 
     if action not in allowed_actions and not action.startswith("give_item:") and not action.startswith("remove_item:"):
@@ -277,11 +278,13 @@ async def admin_profile_action(request: Request):
     else:
         new_level = previous_level
 
-    if action.startswith("give_item:") or action.startswith("remove_item:"):
+    if action.startswith("give_item:") or action.startswith("remove_item:") or action == "clear_inventory":
         inventory_state = main.load_inventory_state()
         inventory = inventory_state.get(profile_id, {"user": profile_id, "updated_at": "", "items": []})
         
-        if action.startswith("give_item:"):
+        if action == "clear_inventory":
+            inventory["items"] = []
+        elif action.startswith("give_item:"):
             item_id = action.replace("give_item:", "")
             existing = next((i for i in inventory["items"] if i.get("item_id") == item_id), None)
             if existing:

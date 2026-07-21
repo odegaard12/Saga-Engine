@@ -6,6 +6,7 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import { SwipeableSheet } from './SwipeableSheet'
+
 interface TeamSheetProps {
   open: boolean
   players: TeamProfileLiveStatus[]
@@ -16,131 +17,132 @@ interface TeamSheetProps {
 function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   const toRad = (deg: number) => (deg * Math.PI) / 180
   const earthRadius = 6371000
-
   const dLat = toRad(b.lat - a.lat)
   const dLon = toRad(b.lon - a.lon)
   const lat1 = toRad(a.lat)
   const lat2 = toRad(b.lat)
-
   const sinLat = Math.sin(dLat / 2)
   const sinLon = Math.sin(dLon / 2)
-
   const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
-
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
-function getPresenceLabel(value?: string) {
-  const presence = String(value || 'offline').toLowerCase()
-  if (presence === 'live') return 'EN LÍNEA'
-  if (presence === 'stale') return 'RECIENTE'
-  return 'SIN CONEXIÓN'
+function getPresenceConfig(value?: string) {
+  const p = String(value || 'offline').toLowerCase()
+  if (p === 'live') return { label: 'EN LÍNEA', color: '#22d3ee', glow: 'rgba(34,211,238,0.35)', dot: '#22c55e' }
+  if (p === 'stale') return { label: 'RECIENTE', color: '#fbbf24', glow: 'rgba(251,191,36,0.25)', dot: '#f59e0b' }
+  return { label: 'SIN SEÑAL', color: '#64748b', glow: 'rgba(100,116,139,0.1)', dot: '#475569' }
 }
 
-function getPresenceStyle(value?: string): CSSProperties {
-  const presence = String(value || 'offline').toLowerCase()
-  if (presence === 'live') {
-    return {
-      background: 'rgba(34,197,94,.16)',
-      border: '1px solid rgba(74,222,128,.20)',
-      color: '#dcfce7',
-    }
-  }
-  if (presence === 'stale') {
-    return {
-      background: 'rgba(245,158,11,.16)',
-      border: '1px solid rgba(251,191,36,.20)',
-      color: '#fef3c7',
-    }
-  }
-  return {
-    background: 'rgba(148,163,184,.16)',
-    border: '1px solid rgba(203,213,225,.18)',
-    color: '#e2e8f0',
-  }
-}
-
-function formatDistance(
-  currentPosition: { lat: number; lon: number } | null | undefined,
-  player: TeamProfileLiveStatus
-) {
-  if (!currentPosition) return null
+function formatDistance(pos: { lat: number; lon: number } | null | undefined, player: TeamProfileLiveStatus) {
+  if (!pos) return null
   if (typeof player.lat !== 'number' || typeof player.lon !== 'number') return null
-  return `${Math.round(getDistanceMeters(currentPosition, { lat: player.lat, lon: player.lon }))} m`
+  const dist = Math.round(getDistanceMeters(pos, { lat: player.lat, lon: player.lon }))
+  return dist < 1000 ? `${dist} m` : `${(dist / 1000).toFixed(1)} km`
 }
 
 export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheetProps) {
   if (!open) return null
 
   const sorted = [...players].sort((a, b) => {
-    const rank = (value?: string) => {
-      const presence = String(value || 'offline').toLowerCase()
-      if (presence === 'live') return 0
-      if (presence === 'stale') return 1
-      return 2
-    }
+    const rank = (v?: string) => { const p = String(v||'offline').toLowerCase(); return p==='live'?0:p==='stale'?1:2 }
     return rank(a.presence) - rank(b.presence) || a.display_name.localeCompare(b.display_name)
   })
 
+  const liveCount = sorted.filter(p => p.presence === 'live').length
+
   return (
-    <SwipeableSheet open={open} onClose={onClose}>
-      <div style={header}>
+    <SwipeableSheet open={open} onClose={onClose} sheetStyle={{
+      background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
+      border: '1px solid rgba(255,255,255,.22)',
+      boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+      backdropFilter: 'blur(24px) saturate(1.12)',
+      WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+    }}>
+      <div style={headerRow}>
         <div>
-          <div style={eyebrow}>EQUIPO</div>
+          <div style={eyebrow}>
+            <span style={{ width:7, height:7, borderRadius:'50%', display:'inline-block', background: liveCount>0?'#22c55e':'#475569', boxShadow: liveCount>0?'0 0 6px #22c55e':'none', flexShrink:0 }} />
+            CONTROL DE EQUIPO
+          </div>
           <div style={title}>Jugadores</div>
         </div>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
+          <button type="button" aria-label="Cerrar" style={closeBtn} onClick={onClose}>×</button>
+          <div style={counterBadge}>
+            <span style={{ color:'#22c55e', fontWeight:900 }}>{liveCount}</span>
+            <span style={{ color:'#64748b' }}> / {sorted.length}</span>
+          </div>
+        </div>
+      </div>
 
-        <button
-          type="button"
-          aria-label="Cerrar jugadores"
-          style={closeButton}
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onClose()
-          }}
-        >
-          ×
-        </button>
+      <div style={statusBar}>
+        <div style={{ ...sPill, background:'rgba(34,211,238,0.10)', color:'#22d3ee', borderColor:'rgba(34,211,238,0.25)' }}>
+          🟢 {liveCount} conectado{liveCount!==1?'s':''}
+        </div>
+        <div style={{ ...sPill, background:'rgba(100,116,139,0.08)', color:'#94a3b8', borderColor:'rgba(100,116,139,0.15)' }}>
+          👥 {sorted.length} jugador{sorted.length!==1?'es':''}
+        </div>
       </div>
 
       {sorted.length === 0 ? (
-        <div style={emptyState}>Todavía no hay otros jugadores disponibles.</div>
+        <div style={emptyState}>
+          <div style={{ fontSize:32, marginBottom:8 }}>📡</div>
+          <div style={{ fontWeight:700, color:'#f8fafc' }}>Sin señal</div>
+          <div style={{ color:'#64748b', marginTop:4, fontSize:13 }}>Ningún jugador conectado aún</div>
+        </div>
       ) : (
-        <div style={list}>
+        <div style={{ display:'grid', gap:8 }}>
           {sorted.map((player) => {
             const distance = formatDistance(currentPosition, player)
-            const gps = String(player.gps_status || 'unknown').toUpperCase()
-
+            const gps = String(player.gps_status || '?').toUpperCase()
+            const pres = getPresenceConfig(player.presence)
+            const isLive = player.presence === 'live'
+            const color = getPlayerColor(player)
             return (
-              <article key={player.user} style={card}>
-                <div
-                  style={{
-                    ...avatar,
-                    background: getPlayerColor(player),
-                    border: '1px solid rgba(255,255,255,.20)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {getPlayerAvatarUrl(player) ? (
-                    <img src={getPlayerAvatarUrl(player)} alt="" style={avatarImage} />
-                  ) : (
-                    getPlayerAvatarInitials(player)
-                  )}
+              <article key={player.user} style={{
+                display:'flex', flexDirection:'row', alignItems:'center', gap:12, padding:'10px 12px',
+                borderRadius:16, border:'1px solid', transition:'background 0.2s, border-color 0.2s',
+                borderColor: isLive ? 'rgba(34,211,238,0.22)' : 'rgba(255,255,255,0.06)',
+                background: isLive ? 'rgba(34,211,238,0.04)' : 'rgba(255,255,255,0.03)',
+              }}>
+                <div style={{ position:'relative', flexShrink:0 }}>
+                  <div style={{
+                    width:44, height:44, borderRadius:999, display:'inline-flex', alignItems:'center', justifyContent:'center',
+                    background: color, overflow:'hidden',
+                    boxShadow: isLive ? `0 0 0 2px ${pres.color}, 0 0 10px ${pres.glow}` : '0 0 0 1px rgba(255,255,255,0.1)',
+                  }}>
+                    {getPlayerAvatarUrl(player)
+                      ? <img src={getPlayerAvatarUrl(player)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                      : <span style={{ fontSize:14, fontWeight:900, color:'#fff', letterSpacing:'0.05em' }}>{getPlayerAvatarInitials(player)}</span>
+                    }
+                  </div>
+                  <span style={{
+                    position:'absolute', bottom:0, right:0, width:10, height:10, borderRadius:'50%',
+                    background: pres.dot, border:'2px solid rgba(17,24,39,0.95)',
+                    boxShadow: isLive ? `0 0 6px ${pres.dot}` : 'none',
+                  }} />
                 </div>
 
-                <div style={content}>
-                  <div style={rowTop}>
-                    <div style={name}>{player.display_name || player.user}</div>
-                    <span style={{ ...presencePill, ...getPresenceStyle(player.presence) }}>
-                      {getPresenceLabel(player.presence)}
+                <div style={{ minWidth:0, flex:1, display:'flex', flexDirection:'column', gap:5 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                    <div style={{ color:'#f8fafc', fontSize:14, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>
+                      {player.display_name || player.user}
+                    </div>
+                    <span style={{
+                      display:'inline-flex', alignItems:'center', padding:'1px 7px', borderRadius:999,
+                      fontSize:9, fontWeight:900, letterSpacing:'0.12em', border:'1px solid', whiteSpace:'nowrap', flexShrink:0,
+                      color: pres.color,
+                      background: isLive ? 'rgba(34,211,238,0.08)' : 'rgba(100,116,139,0.06)',
+                      borderColor: isLive ? 'rgba(34,211,238,0.22)' : 'rgba(100,116,139,0.14)',
+                    }}>
+                      {pres.label}
                     </span>
                   </div>
-
-                  <div style={metaRow}>
-                    <span style={metaChip}>{gps}</span>
-                    {distance ? <span style={metaChip}>{distance}</span> : null}
-                    {player.debug_enabled ? <span style={metaChipWarn}>DEBUG</span> : null}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={chip}>📡 {gps}</span>
+                    {distance ? <span style={{ ...chip, color:'#7dd3fc', borderColor:'rgba(125,211,252,0.22)' }}>📍 {distance}</span> : null}
+                    {player.debug_enabled ? <span style={{ ...chip, color:'#fca5a5', borderColor:'rgba(252,165,165,0.22)' }}>🛠 DEBUG</span> : null}
                   </div>
                 </div>
               </article>
@@ -151,153 +153,13 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
     </SwipeableSheet>
   )
 }
-const header: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 12,
-}
 
-const eyebrow: CSSProperties = {
-  color: '#86efac',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-}
-
-const title: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1,
-  letterSpacing: '-0.03em',
-  marginTop: 6,
-}
-
-const closeButton: CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#f8fafc',
-  fontSize: 22,
-  fontWeight: 900,
-  lineHeight: 1,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const emptyState: CSSProperties = {
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  padding: 16,
-  color: 'rgba(226,232,240,.82)',
-  fontSize: 13,
-  lineHeight: 1.5,
-}
-
-const list: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
-
-const card: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '44px minmax(0, 1fr)',
-  gap: 12,
-  alignItems: 'center',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.06)',
-  padding: 12,
-}
-
-const avatar: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(59,130,246,.18)',
-  border: '1px solid rgba(96,165,250,.18)',
-  color: '#dbeafe',
-  fontSize: 13,
-  fontWeight: 900,
-  letterSpacing: '0.06em',
-}
-
-const avatarImage: CSSProperties = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-  display: 'block',
-}
-
-const content: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  gap: 8,
-}
-
-const rowTop: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-}
-
-const name: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 15,
-  fontWeight: 900,
-  lineHeight: 1.1,
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const presencePill: CSSProperties = {
-  minHeight: 24,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 8px',
-  borderRadius: 999,
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-}
-
-const metaRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-}
-
-const metaChip: CSSProperties = {
-  minHeight: 24,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 8px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(255,255,255,.08)',
-  color: 'rgba(226,232,240,.88)',
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-}
-
-const metaChipWarn: CSSProperties = {
-  ...metaChip,
-  background: 'rgba(127,29,29,.24)',
-  border: '1px solid rgba(248,113,113,.28)',
-  color: '#fecaca',
-}
+const headerRow: CSSProperties = { display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:12 }
+const eyebrow: CSSProperties = { display:'flex', alignItems:'center', gap:6, color:'#94a3b8', fontSize:10, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', marginBottom:4 }
+const title: CSSProperties = { color:'#f8fafc', fontSize:22, fontWeight:900, lineHeight:1, letterSpacing:'-0.02em' }
+const closeBtn: CSSProperties = { width:34, height:34, borderRadius:999, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.06)', color:'#94a3b8', fontSize:20, fontWeight:900, lineHeight:1, display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }
+const counterBadge: CSSProperties = { fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)' }
+const statusBar: CSSProperties = { display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }
+const sPill: CSSProperties = { display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:999, fontSize:11, fontWeight:700, border:'1px solid', letterSpacing:'0.04em' }
+const emptyState: CSSProperties = { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'32px 16px', textAlign:'center' }
+const chip: CSSProperties = { display:'inline-flex', alignItems:'center', gap:2, padding:'1px 7px', borderRadius:999, fontSize:10, fontWeight:700, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#94a3b8' }

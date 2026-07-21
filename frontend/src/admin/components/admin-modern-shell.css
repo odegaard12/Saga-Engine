@@ -486,13 +486,13 @@
   top: 28px;
   bottom: 28px;
   left: 334px;
-  width: min(860px, calc(100vw - 380px));
+  width: min(1180px, calc(100vw - 380px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 30px;
-  background: rgba(2, 6, 23, 0.9);
+  background: rgba(2, 6, 23, 0.92);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.44);
 }
 
@@ -12513,4 +12513,36 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   display: block !important;
   height: 100% !important;
   width: 100% !important;
+}
+
+/* Mobile responsive adjustments for Admin node editor header and steps */
+@media (max-width: 640px) {
+  .saga-guided-v4-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+  .saga-guided-v4-titleblock h2 {
+    font-size: 15px !important;
+  }
+  .saga-guided-v4-actions {
+    width: 100% !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+  }
+  .saga-guided-v4-actions button {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+  }
+  .saga-guided-v4-stepper {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding: 4px 8px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .saga-guided-v4-stepper button {
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    flex-shrink: 0 !important;
+  }
 }

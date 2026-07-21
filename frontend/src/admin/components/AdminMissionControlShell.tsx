@@ -18,6 +18,7 @@ import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPhysicalNodeVisual } from '../lib/physicalNodeVisuals'
 import { useI18n } from '../../i18n/useI18n'
 import ObjectsPanel from './ObjectsPanel'
+import ReleaseNotesModal from './ReleaseNotesModal'
 import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
@@ -62,6 +63,7 @@ type AdminMissionControlShellProps = {
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
   onApplyMissionTemplate: (templateId: MissionTemplateId) => void
+  onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
 }
 
 function selectedStageKey(stage: AdminReactOverviewStage | null) {
@@ -112,10 +114,12 @@ export default function AdminMissionControlShell({
   onUpdateMissionDraft,
   onSaveSettings,
   onApplyMissionTemplate,
+  onCreateNodesWithItems,
 }: AdminMissionControlShellProps) {
   const { t } = useI18n()
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false)
   const [saveValidationWarning, setSaveValidationWarning] = useState<string | null>(null)
   const [pendingCreateLocation, setPendingCreateLocation] = useState<{
     lat: number
@@ -123,6 +127,10 @@ export default function AdminMissionControlShell({
     clientX: number
     clientY: number
   } | null>(null)
+  const [pendingPinQueue, setPendingPinQueue] = useState<
+    Array<{ label: string; item: { id: string; label: string } }>
+  >([])
+  const [activePinIndex, setActivePinIndex] = useState(0)
 
   const liveSelectedStage = selectedStage
     ? stages.find((stage) => selectedStageKey(stage) === selectedStageKey(selectedStage)) ||
@@ -135,12 +143,21 @@ export default function AdminMissionControlShell({
     : -1
 
   const selectedKey = selectedStageKey(liveSelectedStage)
+
+  const hasTypeAssigned = Boolean(
+    liveSelectedStage &&
+      (getUiBoolean(liveSelectedStage, '_type_choice_done') ||
+        Boolean((liveSelectedStage as any).physical_node_kind) ||
+        (liveSelectedStage as any).game_type ||
+        (liveSelectedStage as any).config?.reward_item_id)
+  )
+
   const shouldShowTypeChooser = Boolean(
     liveSelectedStage &&
-    (typeChooserStageKey === selectedKey ||
-      (typeof liveSelectedStage.id === 'string' &&
-        liveSelectedStage.id.startsWith('local-') &&
-        !getUiBoolean(liveSelectedStage, '_type_choice_done')))
+      (typeChooserStageKey === selectedKey ||
+        (typeof liveSelectedStage.id === 'string' &&
+          liveSelectedStage.id.startsWith('local-') &&
+          !hasTypeAssigned))
   )
 
   useEffect(() => {
@@ -152,11 +169,37 @@ export default function AdminMissionControlShell({
     if (
       typeof liveSelectedStage.id === 'string' &&
       liveSelectedStage.id.startsWith('local-') &&
-      !getUiBoolean(liveSelectedStage, '_type_choice_done')
+      !hasTypeAssigned
     ) {
       setTypeChooserStageKey(selectedStageKey(liveSelectedStage))
     }
-  }, [selectedKey])
+  }, [selectedKey, hasTypeAssigned])
+
+  function handleCreateNodesWithItemsBatch(items: Array<{ id: string; label: string }>) {
+    if (!onCreateNodesWithItems || !items.length) return
+
+    setPendingPinQueue(items.map((item) => ({ label: item.label, item })))
+    setActivePinIndex(0)
+
+    // Place ONLY the 1st pin on the map
+    onCreateNodesWithItems([items[0]])
+  }
+
+  function handleConfirmCurrentPin() {
+    if (activePinIndex < pendingPinQueue.length - 1) {
+      const nextIdx = activePinIndex + 1
+      setActivePinIndex(nextIdx)
+      const nextItem = (pendingPinQueue[nextIdx] as any)?.item
+
+      if (nextItem && onCreateNodesWithItems) {
+        onCreateNodesWithItems([nextItem])
+      }
+    } else {
+      setPendingPinQueue([])
+      setActivePinIndex(0)
+      onSelectStage(null)
+    }
+  }
 
   const mappedCount = stages.filter(
     (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
@@ -209,34 +252,27 @@ export default function AdminMissionControlShell({
       }
     }
 
-    if (providedItems.has('llave_rota') && !providedItems.has('cinta_aislante')) {
-      return 'Tienes un nodo que entrega "Llave rota", pero falta otro nodo que entregue "Cinta aislante" para que el jugador pueda fabricar la Llave Maestra. ¡Añádelo antes de guardar!'
-    }
-    if (providedItems.has('cinta_aislante') && !providedItems.has('llave_rota')) {
-      return 'Tienes un nodo que entrega "Cinta aislante", pero falta otro nodo que entregue "Llave rota" para que el jugador pueda fabricar la Llave Maestra. ¡Añádelo antes de guardar!'
-    }
-
-    const empParts = ['placa_base', 'bateria_litio', 'cables_cobre']
-    const empProvided = empParts.filter((p) => providedItems.has(p))
-    if (empProvided.length > 0 && empProvided.length < 3) {
-      const missing = empParts.filter((p) => !providedItems.has(p))
-      return `Para fabricar el Dispositivo EMP faltan nodos que entreguen los siguientes ingredientes: ${missing.join(', ')}. ¡Añádelos antes de guardar!`
+    const RECIPE_DEPENDENCIES: Record<string, { label: string; inputs: string[] }> = {
+      llave_maestra: { label: 'Llave Maestra', inputs: ['llave_rota', 'cinta_aislante'] },
+      emp_device: { label: 'Dispositivo EMP', inputs: ['bateria_litio', 'cables_cobre', 'placa_base'] },
+      decodificador_cuantico: { label: 'Decodificador Cuántico', inputs: ['chip_encriptado', 'antena_frecuencia', 'bateria_litio'] },
+      escaner_biometrico: { label: 'Escáner Biométrico', inputs: ['sensor_optico', 'placa_base', 'cristal_enfoque'] },
+      amuleto_guardian: { label: 'Amuleto del Guardián', inputs: ['gemas_antiguas', 'fragmento_escudo', 'hilo_plata'] },
+      elixir_alquimia: { label: 'Elixir de Alquimia', inputs: ['hierbas_curativas', 'frasco_cristal', 'agua_purificada'] },
+      escudo_runico: { label: 'Escudo Rúnico', inputs: ['placa_hierro', 'runa_proteccion', 'hilo_plata'] },
+      orbe_fuego: { label: 'Orbe de Fuego Arcano', inputs: ['esfera_cristal', 'esencia_ignea', 'polvo_estelar'] },
+      reliquia_sagrada: { label: 'Reliquia Sagrada', inputs: ['fragmento_reliquia', 'esencia_sagrada', 'pergamino_antiguo'] },
+      amuleto_vision: { label: 'Amuleto de Visión Suprema', inputs: ['ojo_mistico', 'gemas_antiguas', 'polvo_estelar'] },
     }
 
     for (const stage of stages) {
       const reqId = (stage as any).required_item_id || ''
       if (reqId) {
-        if (reqId === 'llave_maestra') {
-          if (!providedItems.has('llave_rota') || !providedItems.has('cinta_aislante')) {
-            return `El nodo "${stage.title || 'Nodo'}" requiere "Llave maestra", pero no has colocado los ingredientes (Llave rota y Cinta aislante) en la ruta.`
-          }
-        } else if (reqId === 'emp_device') {
-          if (
-            !providedItems.has('placa_base') ||
-            !providedItems.has('bateria_litio') ||
-            !providedItems.has('cables_cobre')
-          ) {
-            return `El nodo "${stage.title || 'Nodo'}" requiere "Dispositivo EMP", pero no has colocado todos sus ingredientes en la ruta.`
+        if (RECIPE_DEPENDENCIES[reqId]) {
+          const recipe = RECIPE_DEPENDENCIES[reqId]
+          const missing = recipe.inputs.filter((inp) => !providedItems.has(inp))
+          if (missing.length > 0) {
+            return `El nodo "${stage.title || 'Nodo'}" requiere "${recipe.label}", pero faltan nodos en el mapa que entreguen los ingredientes: ${missing.join(', ')}.`
           }
         } else if (!providedItems.has(reqId)) {
           return `El nodo "${stage.title || 'Nodo'}" requiere el objeto "${reqId}", pero ningún nodo de la misión lo entrega.`
@@ -267,7 +303,7 @@ export default function AdminMissionControlShell({
     >
       <aside className="saga-left-rail" aria-label="Mission navigation">
         <div className="saga-rail-brand">
-          <span className="saga-brand-mark">S</span>
+          <span className="saga-brand-mark">⚡</span>
           <div>
             <strong>SAGA Engine</strong>
             <small>Mission Control</small>
@@ -483,6 +519,25 @@ export default function AdminMissionControlShell({
             >
               {showHeatmap ? '🔥 Ocultar Rastros' : '🔥 Ver Rastros'}
             </button>
+
+            <button
+              type="button"
+              className="saga-version-notes-btn"
+              onClick={() => setShowReleaseNotes(true)}
+              title="Ver novedades de las versiones 3.4.0 y 3.5.0"
+              style={{
+                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                color: '#7dd3fc',
+                fontWeight: 800,
+                fontSize: '11px',
+                borderRadius: 10,
+                padding: '6px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              📜 v3.5.0 Novedades
+            </button>
           </div>
 
           <div className="saga-family-chips" aria-label="Family counts">
@@ -507,6 +562,33 @@ export default function AdminMissionControlShell({
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
           />
         </div>
+
+        {pendingPinQueue.length > 0 ? (
+          <div className="saga-pin-placement-banner">
+            <div className="saga-pin-placement-info">
+              <span className="saga-pin-badge">
+                📍 Chincheta {activePinIndex + 1} de {pendingPinQueue.length}
+              </span>
+              <strong style={{ fontSize: '14px', color: '#f8fafc' }}>
+                {pendingPinQueue[activePinIndex]?.label}
+              </strong>
+              <small style={{ fontSize: '11px', color: '#94a3b8' }}>
+                Arrastra la chincheta en el mapa a su posición real
+              </small>
+            </div>
+            <button
+              type="button"
+              className="saga-pin-confirm-btn"
+              onClick={handleConfirmCurrentPin}
+            >
+              ✅ Confirmar ubicación ({activePinIndex + 1}/{pendingPinQueue.length})
+            </button>
+          </div>
+        ) : null}
+
+        {showReleaseNotes ? (
+          <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} />
+        ) : null}
         {pendingCreateLocation ? (
           <>
             <button
@@ -545,7 +627,7 @@ export default function AdminMissionControlShell({
         ) : null}
       </section>
 
-      {liveSelectedStage ? (
+      {liveSelectedStage && pendingPinQueue.length === 0 ? (
         <aside className="saga-node-editor-host is-open" aria-label="Editor de nodo">
           {shouldShowTypeChooser ? (
             <div className="saga-node-type-choice-screen">
@@ -628,7 +710,13 @@ export default function AdminMissionControlShell({
 
             {cmsPanel === 'labels' ? <FamiliesPanel /> : null}
 
-            {cmsPanel === 'objects' ? <ObjectsPanel /> : null}
+            {cmsPanel === 'objects' ? (
+              <ObjectsPanel
+                stages={stages}
+                onSelectStage={onSelectStage}
+                onCreateNodesWithItems={handleCreateNodesWithItemsBatch}
+              />
+            ) : null}
 
             {cmsPanel === 'mission' ? (
               <SettingsPanel

@@ -486,13 +486,13 @@
   top: 28px;
   bottom: 28px;
   left: 334px;
-  width: min(860px, calc(100vw - 380px));
+  width: min(1180px, calc(100vw - 380px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 30px;
-  background: rgba(2, 6, 23, 0.9);
+  background: rgba(2, 6, 23, 0.92);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.44);
 }
 
@@ -550,6 +550,75 @@
   to {
     stroke-dashoffset: -1000;
   }
+}
+
+/* =========================
+   INTERACTIVE PIN PLACEMENT BANNER
+   ========================= */
+
+.saga-pin-placement-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.2);
+  animation: sagaPinSlideDown 0.3s ease-out;
+}
+
+@keyframes sagaPinSlideDown {
+  from {
+    transform: translate(-50%, -20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.saga-pin-placement-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.saga-pin-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.saga-pin-confirm-btn {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.saga-pin-confirm-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.4);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
 /* =========================
@@ -12513,4 +12582,36 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   display: block !important;
   height: 100% !important;
   width: 100% !important;
+}
+
+/* Mobile responsive adjustments for Admin node editor header and steps */
+@media (max-width: 640px) {
+  .saga-guided-v4-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+  .saga-guided-v4-titleblock h2 {
+    font-size: 15px !important;
+  }
+  .saga-guided-v4-actions {
+    width: 100% !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+  }
+  .saga-guided-v4-actions button {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+  }
+  .saga-guided-v4-stepper {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding: 4px 8px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .saga-guided-v4-stepper button {
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    flex-shrink: 0 !important;
+  }
 }

@@ -287,7 +287,13 @@ export function gameFromStage(stage: StageLike): AdminGameCatalogItem {
 
 export function isMapCollectibleStage(stage: StageLike): boolean {
   const config = configOf(stage)
-  return Boolean(config.is_map_collectible)
+  return Boolean(
+    config.is_map_collectible ||
+      stage.is_map_collectible ||
+      stage.physical_node_kind === 'collectible' ||
+      stage.physical_item_kind === 'collectible' ||
+      Boolean(config.reward_item_id)
+  )
 }
 
 export function isQrStage(stage: StageLike): boolean {

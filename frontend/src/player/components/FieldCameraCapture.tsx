@@ -241,17 +241,7 @@ export function FieldCameraCapture({
           {preview ? (
             <img src={preview} alt="Vista previa" style={previewImage} />
           ) : (
-            <>
-              <video ref={videoRef} style={video} autoPlay muted playsInline />
-              <div className="saga-camera-grid">
-                <div className="saga-camera-center-target">
-                  <div className="saga-camera-corner saga-camera-corner--tl" />
-                  <div className="saga-camera-corner saga-camera-corner--tr" />
-                  <div className="saga-camera-corner saga-camera-corner--bl" />
-                  <div className="saga-camera-corner saga-camera-corner--br" />
-                </div>
-              </div>
-            </>
+            <video ref={videoRef} style={video} autoPlay muted playsInline />
           )}
 
           {error ? <div style={errorBox}>{error}</div> : null}
@@ -314,7 +304,7 @@ const overlay: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 12,
-  background: 'rgba(2, 6, 23, 0.85)',
+  background: 'rgba(2, 6, 23, 0.65)',
   backdropFilter: 'blur(16px)',
   WebkitBackdropFilter: 'blur(16px)',
 }
@@ -325,9 +315,11 @@ const sheet: CSSProperties = {
   margin: '0 auto',
   padding: 16,
   borderRadius: 24,
-  border: '1px solid rgba(56, 189, 248, 0.3)',
-  background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
-  boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(14,165,233,0.15)',
+  border: '1px solid rgba(255, 255, 255, 0.22)',
+  background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
+  boxShadow: '0 25px 60px rgba(15,23,42,.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+  backdropFilter: 'blur(24px) saturate(1.12)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
   color: '#fff',
   display: 'flex',
   flexDirection: 'column',
@@ -352,8 +344,8 @@ const closeBtnStyle: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.15)',
-  background: 'rgba(255,255,255,.08)',
+  border: '1px solid rgba(255,255,255,.20)',
+  background: 'rgba(255,255,255,.10)',
   color: '#f8fafc',
   fontWeight: 700,
   fontSize: 16,
@@ -368,10 +360,9 @@ const cameraFrame: CSSProperties = {
   width: '100%',
   minHeight: 280,
   borderRadius: 20,
-  background: '#020617',
-  border: '1px solid rgba(56,189,248,.30)',
+  background: 'rgba(15, 23, 42, 0.4)',
+  border: '1px solid rgba(255, 255, 255, 0.16)',
   overflow: 'hidden',
-  boxShadow: 'inset 0 0 30px rgba(0,0,0,.90)',
 }
 
 const topControlsGroup: CSSProperties = {
@@ -391,12 +382,12 @@ const pillControlBtn: CSSProperties = {
   padding: '0 14px',
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,.25)',
-  background: 'rgba(15,23,42,.80)',
+  background: 'rgba(15,23,42,.70)',
   color: '#fff',
   fontWeight: 800,
   fontSize: 12,
   backdropFilter: 'blur(10px)',
-  boxShadow: '0 2px 10px rgba(0,0,0,.5)',
+  boxShadow: '0 2px 10px rgba(0,0,0,.3)',
 }
 
 const video: CSSProperties = {
@@ -436,8 +427,8 @@ const noteInput: CSSProperties = {
   width: '100%',
   minHeight: 44,
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,.15)',
-  background: 'rgba(255,255,255,.07)',
+  border: '1px solid rgba(255, 255, 255, 0.18)',
+  background: 'rgba(15, 23, 42, 0.45)',
   color: '#fff',
   padding: '0 14px',
   fontSize: 14,
@@ -475,7 +466,7 @@ const secondaryBtnStyle: CSSProperties = {
   minHeight: 46,
   borderRadius: 16,
   border: '1px solid rgba(255,255,255,.15)',
-  background: 'rgba(255,255,255,.08)',
+  background: 'rgba(255,255,255,.10)',
   color: '#e2e8f0',
   fontSize: 14,
   fontWeight: 950,

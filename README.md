@@ -7,7 +7,7 @@
 **Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
 Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-[![Version](https://img.shields.io/badge/version-3.3.0-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.5.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)

@@ -74,6 +74,54 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
     )
   }
 
+  // Gem / Amulet / Relic / Runa / Orbe
+  if (id.includes('gema') || id.includes('amuleto') || id.includes('reliquia') || id.includes('runa') || id.includes('orbe') || id.includes('ojo') || id.includes('cristal')) {
+    return (
+      <div className={`saga-svg-icon saga-svg-icon-gem ${className}`} style={style}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#ec4899">
+          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+          <line x1="12" y1="22" x2="12" y2="15.5" />
+          <polyline points="22 8.5 12 15.5 2 8.5" />
+          <polyline points="2 15.5 12 15.5 22 15.5" />
+        </svg>
+      </div>
+    )
+  }
+
+  // Potion / Elixir / Herbs / Bottle
+  if (id.includes('elixir') || id.includes('hierbas') || id.includes('frasco') || id.includes('agua') || id.includes('posicion')) {
+    return (
+      <div className={`saga-svg-icon saga-svg-icon-potion ${className}`} style={style}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#a855f7">
+          <path d="M9 3h6M10 3v3L5 15a3 3 0 0 0 3 4h8a3 3 0 0 0 3-4L14 6V3" />
+        </svg>
+      </div>
+    )
+  }
+
+  // Shield / Armor
+  if (id.includes('escudo') || id.includes('hierro') || id.includes('armadura')) {
+    return (
+      <div className={`saga-svg-icon saga-svg-icon-shield ${className}`} style={style}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#eab308">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      </div>
+    )
+  }
+
+  // Scanner / Tech Sensor / Quantum
+  if (id.includes('escaner') || id.includes('sensor') || id.includes('cuantico') || id.includes('antena')) {
+    return (
+      <div className={`saga-svg-icon saga-svg-icon-tech ${className}`} style={style}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#06b6d4">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a14.5 14.5 0 0 0 0 20M2 12h20" />
+        </svg>
+      </div>
+    )
+  }
+
   // Default Item
   return (
     <div className={`saga-svg-icon saga-svg-icon-default ${className}`} style={style}>

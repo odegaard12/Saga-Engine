@@ -32,17 +32,19 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    gap: 2,
-    padding: 4,
-    borderRadius: 24,
-    border: '1px solid var(--saga-glass-border)',
-    background: 'var(--saga-glass-bg)',
-    boxShadow: 'var(--saga-glass-shadow)',
-    backdropFilter: 'blur(16px) saturate(120%)',
-    WebkitBackdropFilter: 'blur(16px) saturate(120%)',
+    gap: 4,
+    padding: '5px 8px',
+    borderRadius: 28,
+    // Exactamente el mismo estilo que la barra inferior (Mochila / Herramientas / Nodos)
+    background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
+    border: '1px solid rgba(255,255,255,.22)',
+    boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+    backdropFilter: 'blur(24px) saturate(1.12)',
+    WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
     pointerEvents: 'auto',
   }
 }
+
 
 export const globalPlayerEdgeFix = `
 html,

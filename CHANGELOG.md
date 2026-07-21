@@ -1,219 +1,56 @@
-# Changelog
-
-All notable changes to SAGA Engine are documented in this file.
+# 📜 SAGA Engine Changelog & Historial de Versiones
 
 ---
 
-## [2.1.0] — 2026-07-07
+## 🔮 Version 3.5.0 (21 de Julio, 2026)
 
-### 🎨 Diseño Premium (Player)
-- Añadidos efectos de cristalizado (glassmorphism) en los controles y menús del jugador usando backdrop-filter: blur().
-- Incorporadas nuevas micro-animaciones (escala al tocar, deslizamiento suave) en mobile-shell.css.
-- Actualizada la paleta visual a tonos dark blue/purple más ricos (Premium Design).
+### 🚀 Novedades y Mejoras Principales
 
-### 🛠️ Refactorización y Mantenimiento (Admin)
-- Refactorización mayor del editor guiado (GuidedNodeEditorFlow.tsx). Extraídas más de 700 líneas de lógica pura, tipos y constantes a un nuevo archivo guidedEditorUtils.ts para mejorar la mantenibilidad y reducir la deuda técnica.
-- Solucionado el bug visual en el paso 5 de 'Revisar' que mostraba erróneamente un tipo de juego cuando se configuraba un Coleccionable de Mapa.
+#### 1. 🔮 10 Recetas Temáticas Completa (Tecnología, Medieval, Místico)
+- **Tecnología / Sci-Fi:**
+  - `Llave Maestra`: Llave Rota + Cinta Aislante
+  - `Carga EMP`: Batería de Litio (x2) + Cables de Cobre (x3) + Placa Base
+  - `Decodificador Cuántico`: Chip Encriptado + Antena de Frecuencia + Batería de Litio
+  - `Escáner Biométrico`: Sensor Óptico + Placa Base + Cristal de Enfoque
+- **Medieval / Fantasía:**
+  - `Amuleto del Guardián`: Gemas Antiguas (x2) + Fragmento de Escudo + Hilo de Plata
+  - `Elixir de Alquimia`: Hierbas Curativas (x2) + Frasco de Cristal + Agua Purificada
+  - `Escudo Rúnico`: Placa de Hierro (x2) + Runa de Protección + Hilo de Plata
+- **Místico / Oculto:**
+  - `Orbe de Fuego Arcano`: Esfera de Cristal + Esencia Ígnea (x2) + Polvo Estelar
+  - `Reliquia Sagrada`: Fragmento de Reliquia (x2) + Esencia Sagrada + Pergamino Antiguo
+  - `Amuleto de Visión Suprema`: Ojo Místico + Gemas Antiguas + Polvo Estelar
 
-### 📱 PWA y Offline
-- Confirmada la disponibilidad de la PWA para instalaciones offline. *Nota: Requiere acceder mediante HTTPS (por ejemplo a través de un túnel Cloudflare) para que el navegador ofrezca la opción de instalación e inicie el Service Worker.*
+#### 2. 📍 Colocación Secuencial 1 a 1 de Chinchetas en el Mapa
+- Creación de chinchetas paso a paso (`1/3`, `2/3`, `3/3`) al pulsar **⚡ Generar chincheta(s)**.
+- Solo aparece **1 chincheta a la vez** en el mapa para situarla limpiamente. Al pulsar **`✅ Confirmar posición (1/3)`**, aparece la siguiente sin sobrecargar la pantalla ni abrir modales de selección de tipo.
 
----
+#### 3. 🎒 Editor Guiado Directo para Nodos Coleccionables GPS
+- Los nodos coleccionables creados desde la pestaña de Objetos muestran **🎒 Objeto Coleccionable en Mapa (Punto GPS)** directo sin tarjetas QR ni payloads de código QR impreso.
 
-## [2.0.1] — 2026-07-02
+#### 4. 🌐 Traducción 100% Gallego (gl) Bi-direccional
+- Traducción completa de la interfaz en gallego con puente bidireccional que permite alternar inmediatamente entre **Español y Gallego** manteniendo intacto el estado.
 
-### 🔐 Security hardening
-- Disabled public `/docs`, `/redoc`, and OpenAPI endpoints by default unless `SAGA_ENABLE_API_DOCS=1`.
-- Removed `mapbox_token` from the public `/api/config` payload.
-- Required a signed player session cookie before accepting `/api/advance` and `/api/events/sync`.
-- Added basic per-player rate limiting to `/api/advance` and `/api/events/sync`.
-- Made `/api/admin/react-overview` fail with HTTP 403 when auth is missing.
-- Required an active admin session before allowing `/api/admin/change-password`.
-- Added explicit CORS middleware and common browser security headers.
-- Persisted admin sessions in runtime storage instead of keeping them only in memory.
+#### 5. 💻 Layout Adaptativo para Pantallas PC
+- Panel flotante ampliado a **1180px** en escritorios con rejilla responsiva de 2 a 3 columnas para fichas de jugadores y objetos.
 
-### 🐳 Repo and deploy hardening
-- Docker now runs as a non-root user and copies only runtime files into the image.
-- Deploy script now uses `$HOME`-relative defaults, validates the image name, and avoids hardcoded LAN hints.
-- Removed tracked runtime data artifacts from the repository path policy and tightened `.gitignore`.
-- Added Python dependency coverage to Dependabot.
-- Removed hardcoded frontend host/domain defaults from Vite config.
-
-### 📝 Release alignment
-- Aligned repository version metadata to `2.0.1`.
-- Reworked release helper scripts to use `GITHUB_TOKEN`/`GH_TOKEN` instead of reading GitHub CLI credential files.
-- Cleaned the dead return in `player_service_worker_alias`.
+#### 6. 📜 Ventana Modal de Novedades
+- Botón **`📜 v3.5.0 Novedades`** en la barra de control del Admin para inspeccionar la lista de notas de versión.
 
 ---
 
-## [1.3.0] — 2026-06-29
+## 📍 Version 3.4.0 (20 de Julio, 2026)
 
-### 🚀 Mejoras y correcciones (Offline y Rendimiento)
-- **Map rendering (100% offline & sin parpadeos)**: Configurado `TileLayer` con `updateWhenZooming: true` y `keepBuffer: 32` para forzar que las teselas del mapa se descarguen durante la animación de zoom (en móviles) y permanezcan en RAM al desampliar, eliminando por completo los "cuadrados negros" o "flashes grises" causados por la recarga.
-- **Ampliación radical de caché regional (Offline Prep)**: El radio de precarga de teselas de nivel general (zoom 5-11) se ha aumentado drásticamente a 400-800km alrededor de la misión. De esta forma, al desampliar offline, los niveles superiores (Galicia/España entera) siempre estarán descargados, logrando una experiencia 100% inmersiva donde el mapa nunca falla fuera de cobertura.
-- **Ruta offline segura (Fallback visual)**: Corregido un bug donde entrar al modo avión hacía desaparecer la línea de ruta al fallar la petición de tráfico (OSRM). Ahora se detecta automáticamente la pérdida de conexión y se dibuja instantáneamente una ruta "a vuelo de pájaro" (línea recta punteada verde) hacia el nodo activo, para que el jugador nunca se quede sin orientación visual.
-- **Aviso UI de Entorno Seguro HTTP**: Incorporada una tarjeta de alerta persistente y muy visible si el juego detecta que se accede por IP local (HTTP). Advierte proactivamente al jugador de que el motor del navegador (Chrome/Safari) **bloqueará el GPS y los Service Workers** por seguridad, detallando exactamente cómo resolverlo activando las *flags* inseguras de Chrome o usando HTTPS.
-- **Carga de mapas superpuesta ("Centrar")**: Eliminado el autofoco forzoso no deseado que se disparaba cada vez que el usuario regresaba de otra app o sacaba el móvil del reposo, el cual obligaba al jugador a volver a orientarse después de mover la pantalla manualmente.
+### 🚀 Novedades y Mejoras Principales
 
----
-## [1.0.1] — 2026-06-24
+#### 1. 🧭 Cono de Dirección y Orientación GPS
+- Indicador visual de rumbo y orientación en tiempo real sobre el mapa para el jugador activo.
 
-### 🔧 Improvements
-- **Hardware-accelerated Map Animations**: Upgraded `MapSurface.tsx` animations (`sagaTypeBadgeFloat`, `sagaCurrentNodeHalo`, `sagaRoadFlow`, `sagaPlayerLocator`) with `translate3d` and `will-change`. This fixes map layout thrashing and blinking on iOS/Safari.
-- **Smooth Global Transitions**: Applied 3D transforms (`scale3d`, `translate3d`) and `will-change` hints to `PlayerLayout.tsx` overlays, trophies, and status cards for buttery-smooth 60/120 FPS pop-ups.
-- **iPhone Safe Area Edge Fix**: Updated `mobile-shell.css` global `body` and `html` backgrounds from light `#e8efea` to `#020617` (Slate 900) to eliminate white edge borders in iPhone safe areas.
+#### 2. 📱 PWA Cache Revamp y Persistencia Offline
+- Renovación del almacenamiento en caché service worker para permitir juego offline fluido sin conexión a red.
 
-### 📝 Documentation
-- **README updates**: Removed references to legacy "Tema de Juegos" concepts. Strictly aligned available game families to `Matriz de Circuitos`, `Código Secuencial`, `Mosaico de Lugar`, and `Laberinto de Equilibrio`.
-- **Physical QR definitions**: Unified physical QR type references in documentation to exactly `Objeto QR`, `Llave QR`, `Pista QR`, and `Bonus Oculto`.
+#### 3. 🔒 Memoria de Sesión de Jugador
+- Persistencia automática de las credenciales y el estado del jugador activo tras recargas de navegador o reconexiones.
 
----
-
-## [1.0.0] — 2026-06-23
-
-### 🎉 First stable release
-
-This release marks the transition from the feature development phase (v0.5.x) to a stable, field-tested platform. Virtually every layer of the stack was touched: new offline architecture, a complete minigame runtime system, an overhauled player UI, GPS hardening, field photo proofs with ZIP export, a redesigned login flow, a professional deploy pipeline, and much more.
-
----
-
-### ✨ New features
-
-#### Player experience
-- **New PlayerHud bar** — completely redesigned bottom HUD with glassmorphism style, matching the login palette and top bar. Clean separation of primary action, details, tools and GPS state.
-- **New PlayerShell bar** — redesigned top bar with player avatar, mission progress, GPS indicator and team access.
-- **Backpack (Mochila) panel** — inventory panel listing all collected items, next-node preview with game type description, and field context.
-- **Tools panel** — redesigned with: field photo download as ZIP, QR quick-scan launcher, field camera, offline sync, and an in-app field assistant guide.
-- **In-app assistant guide** — explains how to play each minigame family and how to use core tools (QR scan, GPS, mochila), accessible from the Tools panel.
-- **Field Photo Proofs (ZIP export)** — players can download all their geolocated field photos as a single ZIP file directly from the Tools panel.
-- **QR distance error toast** — scanning a QR node while out of range now shows a centered, auto-dismissing toast (3 seconds) below the player bars instead of a generic alert.
-- **Route overview map control** — quick-controls bar on the map now includes a route toggle button to see all nodes at once.
-- **Team presence on map** — real-time team member positions drawn as colored markers on the player map.
-- **Celebration overlay** — brief animated overlay on node clear and mission finish.
-- **Mission finish screen** — full finish screen with stats (nodes cleared, photos taken), accessible again via a floating trophy button.
-
-#### Login
-- **GPS permission request at login** — the login now asks for GPS permission before entering the player. If denied, the user enters without location and can use debug simulation.
-- **No transition animation** — removed the "Entrando como…" loading overlay between login and player for a seamless experience.
-- **Offline vault summary** — login shows each player's offline preparation state.
-
-#### Offline & PWA
-- **Mission Pack offline download** — players can download the full mission (payload, config, team profiles, field proofs, map tiles) from the Tools > Offline Prep panel before going to the field.
-- **Map tile prefetch** — before going offline, the system prefetches all OSM tile URLs needed to cover the mission route.
-- **Offline GPS storage** — last known GPS position is stored locally so the map can center correctly on first load even without a fresh fix.
-- **Offline field proof cache** — field photos are cached locally and synced when connectivity returns.
-- **Offline team presence** — team positions are cached and shown on the map even offline.
-- **Service Worker hardening** — improved SW registration, unregister helper, and cache strategy for offline-first operation.
-- **Local-first advance** — node submission falls back to local offline progression when the server is unreachable, queuing the event for sync.
-
-#### Minigames
-- **Minigame runtime system** — complete generic runtime architecture (`FamilyRuntimeHost`, `registry`, `resolver`, `runtime-bridge`) enabling any game family to run inside the player without coupling to PlayerApp.
-- **Circuit Matrix** — connect circuit paths on a configurable grid to light up nodes. Visual circuit path editor in admin.
-- **Sequence Code** — decode and replicate sequences. Admin editor with drag-and-drop sequence builder.
-- **Bearing Hunt** — navigate by compass bearing toward a target. Definition with configurable tolerance.
-- **Signal Hunt** — locate an oscillating signal source. Definition with configurable frequency and range.
-- **Motion Challenge** — physical movement reto using device motion events. Admin editor with challenge config.
-- **Place Mosaic** — reconstruct a fragmented image of a physical place. Admin editor.
-- **Tilt Maze** — accelerometer-controlled maze. Shared tiltMaze physics module. Admin editor.
-
-#### Admin panel
-- **Game Template Wizard** — step-by-step wizard to create a new mission from a template, with game family selection.
-- **Families panel** — browse and configure all available game families from a single panel.
-- **QR Studio v2** — redesigned QR card generation studio with print-ready layouts, multiple formats, and batch generation.
-- **Guided Node Editor Flow** — guided multi-step node creation flow: location → game type → physical QR → publish.
-- **Physical node types** — full support for `collectible`, `requirement`, `clue`, and `bonus` node kinds, with visual indicators on the admin map.
-- **Node physical type panel** — dedicated panel to configure physical QR parameters per node.
-- **Requirement preview panel** — players can preview required items before activating a node.
-- **Admin mission map** — improved map in admin with real-time player positions, node states, and field proof markers.
-- **i18n / locale** — admin interface locale toggle (ES/EN) with full Spanish bridge for legacy strings.
-- **Players panel** — create, edit and manage player profiles and team compositions.
-- **Settings panel** — all mission-wide configuration in one place (site name, story, GPS radius, offline settings, etc.).
-
-#### Deploy pipeline
-- **`deploy_saga_safe.sh`** — zero-downtime blue/green deploy script:
-  - Builds new Docker image
-  - Starts candidate on alternate port (18096)
-  - Runs smoke tests against candidate
-  - Promotes to production (8096) only if all smokes pass
-  - Cleans up candidate container
-- **Version + build time injection** — `SAGA_VERSION` and `SAGA_BUILD_TIME` are injected at deploy time and shown in the BuildInfoBadge in the player UI.
-- **Local timezone build time** — build time is captured in local timezone (CEST) instead of UTC to avoid confusion.
-
----
-
-### 🔧 Improvements
-
-- **PlayerApp refactor** — extracted layout primitives (`ScreenFrame`, `getViewportStyle`, `CelebrationOverlay`, `getTopOverlayStyle`, `getBottomOverlayStyle`, `getMapQuickControlsStyle`, `finishOverlayStyle`, etc.) into a dedicated `PlayerLayout.tsx` component, reducing `PlayerApp.tsx` from ~2300 lines.
-- **GPS accuracy feedback** — GPS status now shows accuracy in meters when below threshold, with a separate "imprecise GPS" warning in the HUD helper text.
-- **GPS staleness detection** — positions older than 15 seconds are marked "stale" and don't unlock nodes.
-- **Distance display** — distance to active node shown in HUD with color-coded feedback (far / approaching / in range).
-- **Map quick controls floating bar** — camera, team, route and QR buttons grouped in a pill-shaped glassmorphism bar centered above the HUD.
-- **Toast notice system** — unified `ToastNotice` component for info/warning toasts with 3-second auto-dismiss.
-- **BuildInfoBadge** — version + build time badge visible in login and player UI.
-- **ErrorBoundary** — global React error boundary to prevent full crashes from rendering errors.
-- **Collectible rewards rules** — `collectibleRules.ts` engine for evaluating unlock conditions on collected items.
-- **Manual inventory collect panel** — UI for manually collecting physical inventory items.
-- **OfflineSyncPanel** — status panel showing pending offline events and sync state.
-- **Field prep panel** — pre-field preparation checklist with offline download controls.
-- **Map surface CSS** — dedicated `map-surface.css` for Leaflet overrides and node marker styles.
-- **GPS storage utilities** — `gpsStorage.ts` for persisting and reading the last GPS fix across sessions.
-- **Stage position utilities** — `stagePosition.ts` for deriving active stage lat/lon/radius from payload.
-- **Player identity** — `playerIdentity.ts` for avatar URL, initials and color derivation.
-- **Player route** — `playerRoute.ts` for extracting player name from URL path.
-- **Offline public config** — `offlinePublicConfig.ts` for caching and reading the public configuration offline.
-- **Offline vault** — `offlineVault.ts` for persisting a cross-player offline readiness summary.
-
----
-
-### 🐛 Bug fixes
-
-- Fixed: field photo download produced a `.txt` file instead of `.zip` — corrected by using JSZip with proper MIME type and `Blob` construction.
-- Fixed: duplicate `handleDownloadFieldProofs` function caused TypeScript compilation failure.
-- Fixed: TypeScript import conflict between local declarations and imports from `PlayerLayout` (`getBottomOverlayStyle`, `getToastOverlayStyle`, `OverlayState`).
-- Fixed: orphan closing `</div>` after removing the inner viewport wrapper caused JSX parse error and broken HUD layout.
-- Fixed: `ScreenFrame` double-wrapper bug — `PlayerApp` was wrapping children in both `ScreenFrame` (which already applied `getViewportStyle`) and an additional `<div style={getViewportStyle()}>`, breaking the absolute positioning of both top and bottom HUD bars.
-- Fixed: login to player transition showed a "Preparando jugador" loading card — removed in favor of an instant dark background.
-- Fixed: second "Entrando como…" animation was playing on player load from the `StatusCard` component.
-- Fixed: `OverlayState` type mismatch between `PlayerLayout` export and internal uses (`'activate' | 'node' | 'finish'` vs `'success' | 'finish' | 'error'`).
-- Fixed: deploy script had Windows line endings (`\r\n`) causing bash `set -euo pipefail\r` error on Linux.
-
----
-
-### 🗑️ Removed
-
-- Removed "Preparando jugador" `StatusCard` from the idle/loading state — replaced with a plain dark background.
-- Removed "Entrando como…" `StatusCard` overlay that appeared during login→player transition.
-- Removed `launchingPlayer` state from `LoginApp` that triggered the transition animation.
-- Removed floating route toggle button (replaced by the quick controls bar).
-- Removed inline layout component definitions from `PlayerApp.tsx` (moved to `PlayerLayout.tsx`).
-
----
-
-## [0.5.4] — 2026-06 (previous stable)
-
-Last version before the v1.0.0 feature push. Included:
-- Offline GPS hardening
-- QR Studio initial version
-- Map marker polish
-- Universal fallback code
-- SQLite runtime strict mode
-- Audit and cleanup tooling
-
-See `reports/v051-offline-gps-hardening.md` and previous release manifests for details.
-
----
-
-## [0.5.0] — [0.5.3]
-See `reports/release-0.5.0-manifest.md`.
-
-## [0.4.0]
-See `reports/release-0.4.0-manifest.md`.
-
-## [0.3.1]
-See `reports/release-0.3.1-security-manifest.md`.
-
-## [0.3.0]
-See `reports/release-0.3.0-manifest.md`.
-
-## [0.2.0]
-See `reports/release-0.2.0-manifest.md`.
+#### 4. 🛡️ Validación Dinámica de Rutas
+- Verificación automática en el Admin de que existan los ingredientes para todas las recetas antes de guardar la misión.

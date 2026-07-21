@@ -615,6 +615,10 @@ export const MapSurface = React.memo(function MapSurface({
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
 
+  // Heading cone — dirección de marcha del jugador
+  const headingConeRef = useRef<L.SVGOverlay | null>(null)
+  const lastHeadingRef = useRef<number | null>(null)
+
   useEffect(() => {
     onNodeTapRef.current = onNodeTap
   }, [onNodeTap])
@@ -1104,6 +1108,68 @@ export const MapSurface = React.memo(function MapSurface({
     debugSimulation,
   ])
 
+  // Heading cone usando DeviceOrientationEvent
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    function updateCone(heading: number) {
+      lastHeadingRef.current = heading
+      const map = mapRef.current
+      const pos = playerMarkerRef.current?.getLatLng()
+      if (!map || !pos) return
+
+      // Calcular punto del vértice del cono ~60m hacia adelante
+      const rad = (heading * Math.PI) / 180
+      const offsetLat = 0.0003 * Math.cos(rad)
+      const offsetLon = 0.0003 * Math.sin(rad) / Math.cos((pos.lat * Math.PI) / 180)
+      const tipLat = pos.lat + offsetLat
+      const tipLon = pos.lng + offsetLon
+
+      const bounds = L.latLngBounds(
+        [pos.lat - 0.0004, pos.lng - 0.0004],
+        [pos.lat + 0.0004, pos.lng + 0.0004]
+      )
+
+      const svgNS = 'http://www.w3.org/2000/svg'
+      const svgStr = `<svg xmlns="${svgNS}" viewBox="0 0 200 200"><defs><linearGradient id="cg" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><polygon points="100,110 80,60 120,60" fill="url(#cg)"/></svg>`
+
+      const rotAngle = heading
+      if (headingConeRef.current) {
+        headingConeRef.current.remove()
+        headingConeRef.current = null
+      }
+
+      // Calcular bounds rotados alrededor del jugador
+      const _ = tipLat // suppress unused warning
+      void _
+      const el = document.createElementNS(svgNS, 'svg')
+      el.setAttribute('xmlns', svgNS)
+      el.setAttribute('viewBox', '0 0 200 200')
+      el.innerHTML = `<defs><linearGradient id="coneGrad${Date.now()}" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.75"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><polygon points="100,115 75,55 125,55" fill="url(#coneGrad${Date.now()})" transform="rotate(${rotAngle},100,115)"/>`
+      void svgStr
+      headingConeRef.current = L.svgOverlay(el, bounds, { interactive: false, zIndex: 999 }).addTo(map)
+    }
+
+    function onOrientation(e: DeviceOrientationEvent) {
+      let heading: number | null = null
+      if ((e as any).webkitCompassHeading != null) {
+        heading = (e as any).webkitCompassHeading as number
+      } else if (e.alpha != null) {
+        heading = 360 - e.alpha
+      }
+      if (heading != null) updateCone(heading)
+    }
+
+    const absEvt = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation'
+    window.addEventListener(absEvt as 'deviceorientation', onOrientation as EventListener)
+
+    return () => {
+      window.removeEventListener(absEvt as 'deviceorientation', onOrientation as EventListener)
+      headingConeRef.current?.remove()
+      headingConeRef.current = null
+    }
+  }, [mapReadyToken])
+
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -1114,6 +1180,8 @@ export const MapSurface = React.memo(function MapSurface({
       playerAuraRef.current?.remove()
       playerAuraRef.current = null
       playerAuraModeRef.current = null
+      headingConeRef.current?.remove()
+      headingConeRef.current = null
       return
     }
 

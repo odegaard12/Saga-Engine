@@ -517,6 +517,83 @@ export function PlayerHud({
                 : `🛠️ ${t('player.tools.debugMode', locale)}`}
             </button>
           </div>
+
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: 12,
+                background: 'rgba(239, 68, 68, 0.12)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+              onClick={() => {
+                onCloseTools()
+                window.location.href = '/player/'
+              }}
+            >
+              🚪 {t('player.tools.switchPlayer', locale)}
+            </button>
+          </div>
+
+          {/* Selector de Idioma (Español / Galego) */}
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.05em' }}>
+              🌐 {t('player.tools.language', locale)}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button
+                type="button"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 12,
+                  border: locale === 'es' ? '1px solid rgba(52, 211, 153, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: locale === 'es' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: locale === 'es' ? '#34d399' : 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+                onClick={() => chooseLocale('es')}
+              >
+                🇪🇸 Español {locale === 'es' ? '✓' : ''}
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 12,
+                  border: locale === 'gl' ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: locale === 'gl' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: locale === 'gl' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+                onClick={() => chooseLocale('gl')}
+              >
+                🟦 Galego {locale === 'gl' ? '✓' : ''}
+              </button>
+            </div>
+          </div>
         </section>
 
         <div style={toolsBuildRow}>

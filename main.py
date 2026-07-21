@@ -961,9 +961,13 @@ async def react_admin_shell():
 async def react_admin_shell_path(path: str):
     return react_index_or_missing()
 
+@app.head("/player", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/player", response_class=HTMLResponse)
+@app.head("/player/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/player/", response_class=HTMLResponse)
 @app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/player/{name}", response_class=HTMLResponse)
-async def react_player(name: str, request: Request):
+async def react_player(request: Request, name: str = ""):
     # Serve the React app directly. The frontend derives the player from /player/{name}.
     # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
     response = react_index_or_missing()

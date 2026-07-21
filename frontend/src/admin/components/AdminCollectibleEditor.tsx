@@ -191,9 +191,17 @@ export default function AdminCollectibleEditor({
                 }
               }}
             >
-              <option value="none">🟢 Libre: cualquier jugador puede recogerlo</option>
-              <option value="llave_maestra">🔑 Requiere Llave Maestra (fabricable)</option>
-              <option value="emp_device">⚡ Requiere Dispositivo EMP (fabricable)</option>
+              <option value="none">🟢 Libre: cualquier jugador puede acceder</option>
+              <option value="llave_maestra">🔑 Requiere Llave Maestra</option>
+              <option value="emp_device">⚡ Requiere Dispositivo EMP</option>
+              <option value="decodificador_cuantico">💻 Requiere Decodificador Cuántico</option>
+              <option value="escaner_biometrico">🔬 Requiere Escáner Biométrico</option>
+              <option value="amuleto_guardian">🛡️ Requiere Amuleto del Guardián</option>
+              <option value="elixir_alquimia">🧪 Requiere Elixir de Alquimia</option>
+              <option value="escudo_runico">🛡️ Requiere Escudo Rúnico</option>
+              <option value="orbe_fuego">🔮 Requiere Orbe de Fuego Arcano</option>
+              <option value="reliquia_sagrada">🏛️ Requiere Reliquia Sagrada</option>
+              <option value="amuleto_vision">👁️ Requiere Amuleto de Visión</option>
               {collectibleItems.map(item => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
