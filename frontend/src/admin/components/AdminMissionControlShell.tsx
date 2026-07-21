@@ -567,7 +567,7 @@ export default function AdminMissionControlShell({
           <div className="saga-pin-placement-banner">
             <div className="saga-pin-placement-info">
               <span className="saga-pin-badge">
-                📍 Chincheta {activePinIndex + 1} de {pendingPinQueue.length}
+                📍 Chincheta {activePinIndex + 1} de {pendingPinQueue.length} ({activePinIndex}/{pendingPinQueue.length} confirmadas)
               </span>
               <strong style={{ fontSize: '14px', color: '#f8fafc' }}>
                 {pendingPinQueue[activePinIndex]?.label}
@@ -581,7 +581,7 @@ export default function AdminMissionControlShell({
               className="saga-pin-confirm-btn"
               onClick={handleConfirmCurrentPin}
             >
-              ✅ Confirmar ubicación ({activePinIndex + 1}/{pendingPinQueue.length})
+              ✅ Confirmar ubicación ({activePinIndex}/{pendingPinQueue.length})
             </button>
           </div>
         ) : null}

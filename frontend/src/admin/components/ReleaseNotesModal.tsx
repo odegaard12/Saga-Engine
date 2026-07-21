@@ -1,11 +1,18 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ReleaseNotesModalProps {
   onClose: () => void
 }
 
 export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
-  return (
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const modalContent = (
     <div style={backdrop} onClick={onClose} role="dialog" aria-modal="true">
       <div style={card} onClick={(e) => e.stopPropagation()}>
         <header style={header}>
@@ -84,6 +91,10 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
       </div>
     </div>
   )
+
+  if (!mounted || typeof document === 'undefined') return null
+
+  return createPortal(modalContent, document.body)
 }
 
 const backdrop: React.CSSProperties = {
