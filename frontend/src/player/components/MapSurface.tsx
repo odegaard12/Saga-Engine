@@ -669,9 +669,9 @@ export const MapSurface = React.memo(function MapSurface({
       '/map-tiles/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
-        keepBuffer: 48,          // Keep more tiles in memory to prevent edge flickering
-        updateWhenZooming: false, // Don't re-fetch during zoom animation
-        updateWhenIdle: true,     // Only update when map is not moving
+        keepBuffer: 150,         // Mantener un buffer enorme para evitar recargas al alejar/acercar
+        updateWhenZooming: true, // Cargar teselas de forma fluida DURANTE la animación de zoom (tipo Maps)
+        updateWhenIdle: false,   // No esperar a que se pare el mapa para cargar
         crossOrigin: false,       // Same-origin proxy, no CORS needed
         attribution:
           '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',

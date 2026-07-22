@@ -201,6 +201,8 @@ export default function PlayerApp() {
   const setBrowserGpsPosition = usePlayerStore((s) => s.setGpsPosition)
   const browserGpsStatus = usePlayerStore((s) => s.gpsStatus)
   const setBrowserGpsStatus = usePlayerStore((s) => s.setGpsStatus)
+  const browserGpsStatusRef = useRef<PlayerGpsStatus>(browserGpsStatus)
+  useEffect(() => { browserGpsStatusRef.current = browserGpsStatus }, [browserGpsStatus])
   const browserGpsFresh = usePlayerStore((s) => s.gpsFresh)
   const setBrowserGpsFresh = usePlayerStore((s) => s.setGpsFresh)
   const browserGpsAccuracy = usePlayerStore((s) => s.gpsAccuracy)
@@ -1148,9 +1150,13 @@ export default function PlayerApp() {
 
     setLocalDebugEnabled(false)
     setLocalDebugPosition(null)
-    setBrowserGpsStatus('searching')
-    setBrowserGpsFresh(false)
-    setBrowserGpsCapturedAt(null)
+    
+    if (browserGpsStatusRef.current !== 'ready') {
+      setBrowserGpsStatus('searching')
+      setBrowserGpsFresh(false)
+      setBrowserGpsCapturedAt(null)
+    }
+
     if (!options.silent)
       showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
@@ -1218,8 +1224,10 @@ export default function PlayerApp() {
       const denied = error.code === error.PERMISSION_DENIED
 
       if (isTimeout) {
-        // GPS hardware still working — don't flag as error
-        setBrowserGpsStatus('searching')
+        // GPS hardware still working - don't flag as error
+        if (browserGpsStatusRef.current !== 'ready') {
+          setBrowserGpsStatus('searching')
+        }
         // Don't show any notice for silent timeout retries
         return
       }

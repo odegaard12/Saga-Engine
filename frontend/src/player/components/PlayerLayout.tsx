@@ -224,7 +224,7 @@ export function getTopOverlayStyle(mobile: boolean): CSSProperties {
 export function getToastOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 110px)' : 90,
+    top: mobile ? 'calc(env(safe-area-inset-top, 0px) + 150px)' : 130,
     left: 0,
     right: 0,
     display: 'flex',
