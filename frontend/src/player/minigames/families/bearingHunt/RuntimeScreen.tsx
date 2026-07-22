@@ -936,7 +936,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     <section className={rootClassName} style={styleVars} aria-label="Bearing hunt runtime">
       <style>{STYLES}</style>
 
-      <div className="bh-card">
+      <div className="bh-card saga-glass-panel">
         <header className="bh-top">
           <div className="bh-mode">
             <span className="bh-pulse" aria-hidden="true" />

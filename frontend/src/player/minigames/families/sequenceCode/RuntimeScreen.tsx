@@ -546,7 +546,7 @@ export function SequenceCodeRuntimeScreen({
 
   if (invalidConfig) {
     return (
-      <section className="sequence-shell" aria-label="Código secuencial">
+      <section className="sequence-shell saga-glass-panel" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result failed">
@@ -566,7 +566,7 @@ export function SequenceCodeRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section className="sequence-shell" aria-label="Código secuencial">
+      <section className="sequence-shell saga-glass-panel" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result success">
@@ -597,7 +597,7 @@ export function SequenceCodeRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section className="sequence-shell" aria-label="Código secuencial">
+      <section className="sequence-shell saga-glass-panel" aria-label="Código secuencial">
         <style>{STYLES}</style>
 
         <div className="sequence-result failed">
@@ -636,7 +636,7 @@ export function SequenceCodeRuntimeScreen({
       : rawDescription
 
   return (
-    <section className="sequence-shell" aria-label="Código secuencial">
+    <section className="sequence-shell saga-glass-panel" aria-label="Código secuencial">
       <style>{STYLES}</style>
 
       <div className="sequence-body">

@@ -344,3 +344,13 @@ html.saga-route-player .saga-tools-language-row {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+
+.saga-glass-panel {
+  border: 1px solid rgba(255,255,255,.22) !important;
+  border-radius: 28px !important;
+  background: linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34)) !important;
+  box-shadow: 0 22px 60px rgba(15,23,42,.18) !important;
+  backdrop-filter: blur(24px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.12) !important;
+  color: #f8fafc;
+}

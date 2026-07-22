@@ -819,7 +819,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (invalidConfig) {
     return (
-      <section className="mosaic-shell" aria-label="Mosaico del lugar">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico del lugar">
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
@@ -837,7 +837,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'preview') {
     return (
-      <section className="mosaic-shell" aria-label="Vista previa del mosaico">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Vista previa del mosaico">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -892,7 +892,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'completed') {
     return (
-      <section className="mosaic-shell" aria-label="Imagen completada">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Imagen completada">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -957,7 +957,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'success') {
     return (
-      <section className="mosaic-shell" aria-label="Mosaico completado">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico completado">
         <style>{STYLES}</style>
 
         <div className="mosaic-result success">
@@ -984,7 +984,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'failed') {
     return (
-      <section className="mosaic-shell" aria-label="Mosaico no completado">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico no completado">
         <style>{STYLES}</style>
 
         <div className="mosaic-result failed">
@@ -1006,7 +1006,7 @@ export function PlaceMosaicRuntimeScreen({
 
   if (phase === 'question') {
     return (
-      <section className="mosaic-shell" aria-label="Pregunta final del mosaico">
+      <section className="mosaic-shell saga-glass-panel" aria-label="Pregunta final del mosaico">
         <style>{STYLES}</style>
 
         <div className="mosaic-body">
@@ -1075,7 +1075,7 @@ export function PlaceMosaicRuntimeScreen({
   const completionPercent = Math.round((correctPieces / totalPieces) * 100)
 
   return (
-    <section className="mosaic-shell" aria-label="Mosaico del lugar">
+    <section className="mosaic-shell saga-glass-panel" aria-label="Mosaico del lugar">
       <style>{STYLES}</style>
 
       <div className="mosaic-body">

@@ -789,7 +789,7 @@ export function SignalHuntRuntimeScreen({ resolved, stage, submitting, onWin }: 
     <section className={rootClassName} style={styleVars} aria-label="Captura de señal GPS">
       <style>{STYLES}</style>
 
-      <div className="sh-card">
+      <div className="sh-card saga-glass-panel">
         <header className="sh-top">
           <div className="sh-mode">
             <span className="sh-pulse" aria-hidden="true" />

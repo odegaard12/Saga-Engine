@@ -53,7 +53,7 @@ export function TeamRelayRuntimeScreen({
   }, [holding, onWin])
 
   return (
-    <section style={container}>
+    <section className="saga-glass-panel" style={container}>
       <div style={title}>Relevo de Equipo</div>
       <p style={description}>
         {helperText || 'Esperando a que todos los miembros del equipo lleguen al punto...'}

@@ -79,7 +79,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
   }
 
   return (
-    <div style={{ padding: 16, textAlign: 'center' }}>
+    <div className="saga-glass-panel" style={{ padding: 24, textAlign: 'center' }}>
       <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Desafío de Audio</h3>
       <p style={{ color: '#cbd5e1', fontSize: 14, marginBottom: 24 }}>
         Sopla o haz ruido cerca del micrófono para cargar la barra.

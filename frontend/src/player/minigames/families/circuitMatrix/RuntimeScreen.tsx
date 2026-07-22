@@ -668,7 +668,7 @@ export function CircuitMatrixRuntimeScreen({
 
   if (fixedPatternInvalid) {
     return (
-      <section className="circuit-shell" aria-label="Matriz de circuitos">
+      <section className="circuit-shell saga-glass-panel" aria-label="Matriz de circuitos">
         <style>{STYLES}</style>
 
         <div className="circuit-body">
@@ -690,7 +690,7 @@ export function CircuitMatrixRuntimeScreen({
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
   } as CSSProperties
   return (
-    <section className="circuit-shell" aria-label="Matriz de circuitos">
+    <section className="circuit-shell saga-glass-panel" aria-label="Matriz de circuitos">
       <style>{STYLES}</style>
 
       <div className="circuit-body">

@@ -652,7 +652,7 @@ export function MotionChallengeRuntimeScreen({
       : 'motion-actions'
 
   return (
-    <section className="motion-shell" aria-label="Cargar antena">
+    <section className="motion-shell saga-glass-panel" aria-label="Cargar antena">
       <style>{STYLES}</style>
 
       <div className="motion-topbar">

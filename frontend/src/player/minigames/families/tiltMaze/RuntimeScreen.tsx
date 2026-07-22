@@ -350,7 +350,7 @@ export function TiltMazeRuntimeScreen({ resolved, stage, helperText, submitting,
 
   if (phase === 'ready') {
     return (
-      <section className="tilt-shell">
+      <section className="tilt-shell saga-glass-panel">
         <style>{CSS}</style>
 
         <div className="tilt-result">
@@ -372,7 +372,7 @@ export function TiltMazeRuntimeScreen({ resolved, stage, helperText, submitting,
 
   if (phase === 'success') {
     return (
-      <section className="tilt-shell">
+      <section className="tilt-shell saga-glass-panel">
         <style>{CSS}</style>
 
         <div className="tilt-result">
@@ -397,7 +397,7 @@ export function TiltMazeRuntimeScreen({ resolved, stage, helperText, submitting,
 
   if (phase === 'failed') {
     return (
-      <section className="tilt-shell">
+      <section className="tilt-shell saga-glass-panel">
         <style>{CSS}</style>
 
         <div className="tilt-result fail">
