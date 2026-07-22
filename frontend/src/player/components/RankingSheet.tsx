@@ -52,11 +52,11 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
       open={open}
       onClose={onClose}
       sheetStyle={{
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.92) 0%, rgba(30,41,59,0.88) 100%)',
-        border: '1px solid rgba(255,255,255,0.18)',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(28px) saturate(1.2)',
-        WebkitBackdropFilter: 'blur(28px) saturate(1.2)',
+        background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+        border: '1px solid rgba(255,255,255,.22)',
+        boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+        backdropFilter: 'blur(24px) saturate(1.12)',
+        WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
       }}
     >
       <div style={headerRow}>

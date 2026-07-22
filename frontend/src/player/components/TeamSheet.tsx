@@ -53,7 +53,7 @@ export function TeamSheet({ open, players, currentPosition, onClose }: TeamSheet
 
   return (
     <SwipeableSheet open={open} onClose={onClose} sheetStyle={{
-      background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
+      background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
       border: '1px solid rgba(255,255,255,.22)',
       boxShadow: '0 22px 60px rgba(15,23,42,.18)',
       backdropFilter: 'blur(24px) saturate(1.12)',
