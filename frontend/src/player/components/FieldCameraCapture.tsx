@@ -195,10 +195,13 @@ export function FieldCameraCapture({
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0]
     if (!track) return
+    const nextState = !torchOn
     try {
-      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] })
-      setTorchOn(!torchOn)
-    } catch {}
+      await track.applyConstraints({ advanced: [{ torch: nextState } as any] })
+      setTorchOn(nextState)
+    } catch {
+      setTorchOn(nextState)
+    }
   }
 
   return (
@@ -219,11 +222,16 @@ export function FieldCameraCapture({
               {torchSupported ? (
                 <button
                   type="button"
-                  style={pillControlBtn}
-                  onClick={toggleTorch}
+                  style={{
+                    ...pillControlBtn,
+                    background: torchOn ? '#facc15' : 'rgba(15,23,42,.70)',
+                    color: torchOn ? '#000' : '#fff',
+                    border: torchOn ? '1px solid #facc15' : '1px solid rgba(255,255,255,.25)'
+                  }}
+                  onClick={() => void toggleTorch()}
                   aria-label="Alternar Linterna"
                 >
-                  {torchOn ? '🔦 Linterna ON' : '🔦 Linterna OFF'}
+                  {torchOn ? '🔦 FLASH ON' : '🔦 FLASH OFF'}
                 </button>
               ) : <div />}
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
 import { collectInventoryItem } from './offline/inventory'
@@ -28,7 +30,7 @@ import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
-import { ToastNotice, type UiNotice } from './components/ToastNotice'
+
 import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
@@ -711,14 +713,10 @@ export default function PlayerApp() {
       : undefined
 
     return (
-      <ScreenFrame mobile={isPhone}>
-        <StatusCard
-          title="SAGA"
-          body={mapProgress ? 'Descargando mapa offline...' : 'Adquiriendo señal GPS...'}
-          progress={ratio}
-          progressDetail={mapProgress?.detail}
-        />
-      </ScreenFrame>
+      <SplashScreen 
+        progress={ratio} 
+        detail={mapProgress?.detail || (mapProgress ? 'Descargando mapa offline...' : 'Adquiriendo señal GPS...')} 
+      />
     )
   }
 
@@ -1213,9 +1211,21 @@ export default function PlayerApp() {
     }
 
     const onError = (error: GeolocationPositionError) => {
+      // TIMEOUT (code 3) while watching means the hardware GPS is still acquiring signal
+      // (e.g. airplane mode with GPS chip active, or first cold fix outdoors).
+      // Keep 'searching' so the UI shows "Buscando señal…" instead of a hard error.
+      const isTimeout = error.code === 3 // GeolocationPositionError.TIMEOUT
+      const denied = error.code === error.PERMISSION_DENIED
+
+      if (isTimeout) {
+        // GPS hardware still working — don't flag as error
+        setBrowserGpsStatus('searching')
+        // Don't show any notice for silent timeout retries
+        return
+      }
+
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
-      const denied = error.code === error.PERMISSION_DENIED
       if (!options.silent) {
         showNotice(
           denied
@@ -1226,17 +1236,20 @@ export default function PlayerApp() {
       }
     }
 
+    // getCurrentPosition: short timeout is fine for a quick first-fix attempt
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: true,
       maximumAge: 10000,
-      timeout: 4000,
+      timeout: 8000,
     })
 
     if (gpsWatchRef.current === null) {
+      // watchPosition: long timeout so the GPS chip can finish a cold fix
+      // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
         enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 4000,
+        maximumAge: 5000,
+        timeout: 20000,
       })
     }
   }
@@ -1566,6 +1579,7 @@ export default function PlayerApp() {
         refreshToken={mapRefreshToken}
         mapboxToken={state.config?.mapbox_token}
         mapboxStyle={state.config?.mapbox_style}
+        initialCenter={browserGpsPosition ?? (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)}
         onUserMapMove={() => {
           setFollowPlayer(false)
           setRouteOverviewActive(false)

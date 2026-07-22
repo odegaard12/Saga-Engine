@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
 import { RECIPES, checkCraftingPossible, craftRecipe, type Recipe } from '../offline/recipes'
+import { usePlayerStore } from '../store/usePlayerStore'
 
 interface CraftingPanelProps {
   user: string
@@ -110,7 +111,20 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
     setTimeout(() => setFeedback(null), 3_000)
   }
 
-  const readyCount = RECIPES.filter((r) => checkCraftingPossible(user, r)).length
+  // Filter recipes so we only show those relevant to the current mission route
+  const stagesStr = JSON.stringify(usePlayerStore.getState().payload?.stages || [])
+  const activeRecipes = RECIPES.filter((r) => {
+    if (stagesStr.includes(`"${r.recipe_id}"`)) return true
+    for (const out of r.outputs) {
+      if (stagesStr.includes(`"${out.item_id}"`)) return true
+    }
+    for (const inp of r.inputs) {
+      if (stagesStr.includes(`"${inp.item_id}"`)) return true
+    }
+    return false
+  })
+
+  const readyCount = activeRecipes.filter((r) => checkCraftingPossible(user, r)).length
 
   return (
     <section style={panel}>
@@ -118,7 +132,7 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
       <div style={headerRow}>
         <div style={headerLeft}>
           <span style={headerLabel}>MESA DE TRABAJO</span>
-          <span style={headerCount}>{RECIPES.length} recetas</span>
+          <span style={headerCount}>{activeRecipes.length} recetas</span>
         </div>
         {readyCount > 0 && (
           <span style={readyBadge}>
@@ -141,7 +155,7 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
 
       {/* Recipe list */}
       <div style={recipeList}>
-        {RECIPES.map((recipe) => (
+        {activeRecipes.map((recipe) => (
           <RecipeCard
             key={recipe.recipe_id}
             recipe={recipe}
@@ -151,10 +165,10 @@ export function CraftingPanel({ user }: CraftingPanelProps) {
         ))}
       </div>
 
-      {RECIPES.length === 0 && (
+      {activeRecipes.length === 0 && (
         <div style={emptyMsg}>
           <span style={{ fontSize: 32 }}>⚒</span>
-          <div>No hay recetas disponibles</div>
+          <div>No hay recetas en esta ruta</div>
         </div>
       )}
     </section>
@@ -167,6 +181,8 @@ const panel: CSSProperties = {
   flexDirection: 'column',
   gap: 12,
   padding: '10px 4px',
+  flex: 1,
+  overflowY: 'auto',
 }
 
 const infoBox: CSSProperties = {

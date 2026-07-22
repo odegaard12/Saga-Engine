@@ -239,6 +239,8 @@ export async function flushOfflineEvents(
   const snapshot = loadOfflineSnapshot(user)
 
   if (!snapshot.queued_events.length) {
+    // No events to flush - but still sync inventory silently so Admin can see it
+    void syncInventoryToServer(user, fetchImpl).catch(() => {})
     return saveOfflineSnapshot({
       ...snapshot,
       sync_status: 'online',
@@ -378,5 +380,27 @@ export async function fetchGamePayloadLocalFirst<T = unknown>(
       source: cached ? 'cache' : 'none',
       snapshot,
     }
+  }
+}
+
+/**
+ * Sync the player's inventory snapshot to the server independently of event queues.
+ * This ensures the Admin panel can always see current inventory even when offline events are empty.
+ */
+export async function syncInventoryToServer(
+  user: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  const inventorySnapshot = loadInventorySnapshot(user)
+  if (!inventorySnapshot || !inventorySnapshot.items?.length) return
+
+  try {
+    await fetchImpl('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user, events: [], inventory_snapshot: inventorySnapshot }),
+    })
+  } catch {
+    // Silent - this is a best-effort background sync
   }
 }

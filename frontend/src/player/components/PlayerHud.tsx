@@ -8,7 +8,6 @@ import { RequirementPreviewPanel } from './RequirementPreviewPanel'
 import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
-import { useGyroParallax } from '../hooks/useGyroParallax'
 import { usePlayerStore } from '../store/usePlayerStore'
 
 type BackpackTab = 'requirements' | 'inventory' | 'crafting'
@@ -221,9 +220,6 @@ export function PlayerHud({
   }, [detailsOpen, toolsOpen]) // saga-panel-control-hider-v3
 
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
-
-  const { transform } = useGyroParallax(12)
-
   const gpsDisplay = getGpsDisplay(gpsState)
   const rangeDisplay = getRangeDisplay(finished, distanceMeters, inRange)
   const distanceLabel = distanceMeters !== null ? `${distanceMeters} m` : null
@@ -254,8 +250,6 @@ export function PlayerHud({
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
           padding: compact ? 12 : 14,
-          transform,
-          transition: 'transform 0.1s ease-out',
         }}
       >
         <button

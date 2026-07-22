@@ -86,6 +86,8 @@ type MapSurfaceProps = {
   onNodeTap?: () => void
   mapboxToken?: string
   mapboxStyle?: string
+  /** Hint for the initial map position on mount. Uses player GPS or stored position if available. Falls back to node, then Galicia. */
+  initialCenter?: { lat: number; lon: number }
 }
 
 function getPhysicalNodeTooltipPrefix(stage: unknown): string {
@@ -589,6 +591,7 @@ export const MapSurface = React.memo(function MapSurface({
   onNodeTap,
   mapboxToken,
   mapboxStyle,
+  initialCenter,
 }: MapSurfaceProps) {
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const [mapReadyToken, setMapReadyToken] = useState(0)
@@ -598,6 +601,8 @@ export const MapSurface = React.memo(function MapSurface({
   const nodeMarkerRef = useRef<L.CircleMarker | null>(null)
   const nodeRadiusRef = useRef<L.Circle | null>(null)
   const playerMarkerRef = useRef<L.Marker | null>(null)
+  const headingConeMarkerRef = useRef<L.Marker | null>(null)
+  let headingGroupEl: HTMLDivElement | null = null
 
   const playerMarkerIconKeyRef = useRef<string | null>(null)
 
@@ -684,9 +689,10 @@ export const MapSurface = React.memo(function MapSurface({
     tileLayer.addTo(map)
     tileLayerRef.current = tileLayer
 
-    // Start map where the player is, or on the node, to prevent massive initial flight and black screen.
-    const startLat = playerPosition?.lat || stageMapData?.lat || 42.4333
-    const startLon = playerPosition?.lon || stageMapData?.lon || -8.65
+    // Start map at: 1) supplied initialCenter (player GPS or stored position), 2) node, 3) Galicia fallback
+    // This ensures the map does NOT start at the node when we have a known player GPS position.
+    const startLat = initialCenter?.lat || stageMapData?.lat || 42.4333
+    const startLon = initialCenter?.lon || stageMapData?.lon || -8.65
     map.setView([startLat, startLon], 16)
     mapRef.current = map
 
@@ -1118,36 +1124,55 @@ export const MapSurface = React.memo(function MapSurface({
       const pos = playerMarkerRef.current?.getLatLng()
       if (!map || !pos) return
 
-      // Calcular punto del vértice del cono ~60m hacia adelante
-      const rad = (heading * Math.PI) / 180
-      const offsetLat = 0.0003 * Math.cos(rad)
-      const offsetLon = 0.0003 * Math.sin(rad) / Math.cos((pos.lat * Math.PI) / 180)
-      const tipLat = pos.lat + offsetLat
-      const tipLon = pos.lng + offsetLon
-
-      const bounds = L.latLngBounds(
-        [pos.lat - 0.0004, pos.lng - 0.0004],
-        [pos.lat + 0.0004, pos.lng + 0.0004]
-      )
-
-      const svgNS = 'http://www.w3.org/2000/svg'
-      const svgStr = `<svg xmlns="${svgNS}" viewBox="0 0 200 200"><defs><linearGradient id="cg" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><polygon points="100,110 80,60 120,60" fill="url(#cg)"/></svg>`
-
-      const rotAngle = heading
-      if (headingConeRef.current) {
-        headingConeRef.current.remove()
-        headingConeRef.current = null
+      if (!headingConeMarkerRef.current) {
+        headingGroupEl = document.createElement('div')
+        headingGroupEl.className = 'saga-player-marker'
+        headingGroupEl.style.transform = `rotate(${heading}deg)`
+        headingGroupEl.innerHTML = `
+          <div class="saga-player-marker-aura"></div>
+          <div class="saga-player-marker-cone"></div>
+          <div class="saga-player-marker-dot"></div>
+          <div class="saga-player-marker-arrow"></div>
+        `
+        const icon = L.divIcon({
+          html: headingGroupEl,
+          className: '',
+          iconSize: [140, 140],
+          iconAnchor: [70, 70]
+        })
+        const marker = L.marker(pos, {
+          icon,
+          interactive: false,
+          zIndexOffset: 900
+        }).addTo(map)
+        
+        headingConeMarkerRef.current = marker as any
       }
 
-      // Calcular bounds rotados alrededor del jugador
-      const _ = tipLat // suppress unused warning
-      void _
-      const el = document.createElementNS(svgNS, 'svg')
-      el.setAttribute('xmlns', svgNS)
-      el.setAttribute('viewBox', '0 0 200 200')
-      el.innerHTML = `<defs><linearGradient id="coneGrad${Date.now()}" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.75"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><polygon points="100,115 75,55 125,55" fill="url(#coneGrad${Date.now()})" transform="rotate(${rotAngle},100,115)"/>`
-      void svgStr
-      headingConeRef.current = L.svgOverlay(el, bounds, { interactive: false, zIndex: 999 }).addTo(map)
+      if (headingConeMarkerRef.current) {
+        headingConeMarkerRef.current.setLatLng(pos)
+      }
+
+      if (headingGroupEl) {
+        headingGroupEl.style.transform = `rotate(${heading}deg)`
+      }
+    }
+
+    // Request iOS orientation permission if required
+    const DeviceOrientationEvt = window.DeviceOrientationEvent as any
+    if (typeof DeviceOrientationEvt?.requestPermission === 'function') {
+      const askPermission = () => {
+        DeviceOrientationEvt.requestPermission()
+          .then((state: string) => {
+            if (state === 'granted') {
+              window.addEventListener('deviceorientation', onOrientation as EventListener, true)
+            }
+          })
+          .catch(() => {})
+      }
+      window.addEventListener('click', askPermission, { once: true })
+      window.addEventListener('touchstart', askPermission, { once: true })
+      askPermission()
     }
 
     function onOrientation(e: DeviceOrientationEvent) {
@@ -1157,16 +1182,17 @@ export const MapSurface = React.memo(function MapSurface({
       } else if (e.alpha != null) {
         heading = 360 - e.alpha
       }
-      if (heading != null) updateCone(heading)
+      if (heading != null && !isNaN(heading)) updateCone(heading)
     }
 
     const absEvt = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation'
-    window.addEventListener(absEvt as 'deviceorientation', onOrientation as EventListener)
+    window.addEventListener(absEvt as 'deviceorientation', onOrientation as EventListener, true)
 
     return () => {
-      window.removeEventListener(absEvt as 'deviceorientation', onOrientation as EventListener)
-      headingConeRef.current?.remove()
-      headingConeRef.current = null
+      window.removeEventListener(absEvt as 'deviceorientation', onOrientation as EventListener, true)
+      headingConeMarkerRef.current?.remove()
+      headingConeMarkerRef.current = null
+      headingGroupEl = null
     }
   }, [mapReadyToken])
 
@@ -1175,11 +1201,11 @@ export const MapSurface = React.memo(function MapSurface({
     if (!map) return
 
     if (!playerPosition) {
-      playerMarkerRef.current?.remove()
-      playerMarkerRef.current = null
       playerAuraRef.current?.remove()
       playerAuraRef.current = null
       playerAuraModeRef.current = null
+      headingConeMarkerRef.current?.remove()
+      headingConeMarkerRef.current = null
       headingConeRef.current?.remove()
       headingConeRef.current = null
       return
@@ -1492,12 +1518,11 @@ export const MapSurface = React.memo(function MapSurface({
       window.requestAnimationFrame(() => {
         map.invalidateSize({ pan: false })
 
-        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          mapRootRef.current?.classList.remove('saga-map-offline-tiles')
-
-          if (forceRedraw) {
-            tileLayerRef.current?.redraw()
-          }
+        // Only redraw tiles when we know we went online — not on every refreshToken change.
+        // Redrawing on zoom/pan is handled by Leaflet internally; forcing it causes unnecessary
+        // network requests that make cached offline tiles disappear briefly.
+        if (forceRedraw && typeof navigator !== 'undefined' && navigator.onLine !== false) {
+          tileLayerRef.current?.redraw()
         }
       })
     }
@@ -1551,11 +1576,10 @@ export const MapSurface = React.memo(function MapSurface({
           // Snap instantly if far away or zoom difference is large to prevent tile caching/rendering bugs
           map.setView(targetLatLng, 18, { animate: false })
         } else {
-          // Fly to if close
-          map.flyTo(targetLatLng, 18, {
+          // Smooth pan to if close (prevents tile unloading flickers caused by flyTo)
+          map.setView(targetLatLng, 18, {
             animate: true,
-            duration: 1.5,
-            easeLinearity: 0.22,
+            duration: 0.6,
           })
         }
         consumed = true
