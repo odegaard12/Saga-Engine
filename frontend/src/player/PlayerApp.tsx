@@ -30,6 +30,7 @@ import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
 import { TeamSheet } from './components/TeamSheet'
+import { RankingSheet } from './components/RankingSheet'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
@@ -186,6 +187,8 @@ export default function PlayerApp() {
   const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
   const teamOpen = usePlayerStore((s) => s.teamOpen)
   const setTeamOpen = usePlayerStore((s) => s.setTeamOpen)
+  const rankingOpen = usePlayerStore((s) => s.rankingOpen)
+  const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
 
   const addTrackerPoint = useGpsTracker((s) => s.addPoint)
   const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
@@ -954,11 +957,23 @@ export default function PlayerApp() {
   function openTeam() {
     setActivePanel(null)
     setToolsOpen(false)
+    setRankingOpen(false)
     setTeamOpen(!teamOpen)
   }
 
   function closeTeam() {
     setTeamOpen(false)
+  }
+
+  function openRanking() {
+    setActivePanel(null)
+    setToolsOpen(false)
+    setTeamOpen(false)
+    setRankingOpen(!rankingOpen)
+  }
+
+  function closeRanking() {
+    setRankingOpen(false)
   }
 
   function handleOpenEntry() {
@@ -1684,7 +1699,7 @@ export default function PlayerApp() {
         onCapture={handleFieldCameraCapture}
       />
 
-      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !overlayState ? (
+      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !rankingOpen && !overlayState ? (
         <div style={getMapQuickControlsStyle(isPhone)}>
           <QuickProofPanel
             user={user}
@@ -1714,7 +1729,7 @@ export default function PlayerApp() {
           {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
             <button
               type="button"
-              style={mapRouteToggleInlineButton}
+              style={mapPrologueButton}
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -1728,6 +1743,22 @@ export default function PlayerApp() {
               </span>
             </button>
           ) : null}
+
+          <button
+            type="button"
+            style={rankingOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              openRanking()
+            }}
+            aria-label="Trofeo"
+            title="Clasificación"
+          >
+            <span aria-hidden="true" style={mapQuickIcon}>
+              🏆
+            </span>
+          </button>
 
           <button
             type="button"
@@ -1901,6 +1932,11 @@ export default function PlayerApp() {
         currentPosition={playerPosition}
         onClose={closeTeam}
       />
+      <RankingSheet
+        open={rankingOpen}
+        players={[...(teamOtherProfiles || []), { user: payload.user, display_name: payload.display_name || payload.user, presence: 'live', total_time_ms: payload.live_status?.total_time_ms, level: payload.level, finished: payload.finished }]}
+        onClose={closeRanking}
+      />
 
       <InteractionSheet
         open={interactionOpen}
@@ -1980,6 +2016,10 @@ const mapRouteToggleInlineButton: CSSProperties = {
   cursor: 'pointer',
   userSelect: 'none',
   transition: 'background 0.15s ease, border-color 0.15s ease',
+}
+
+const mapPrologueButton: CSSProperties = {
+  ...mapRouteToggleInlineButton,
 }
 
 const mapQuickButtonActive: CSSProperties = {

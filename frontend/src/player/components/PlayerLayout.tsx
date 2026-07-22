@@ -64,12 +64,12 @@ body {
 }
 
 .leaflet-container {
-  background: #020617 !important;
+  background: #1e293b !important;
   outline: none !important;
 }
 
 .saga-player-edge-fix {
-  background: #020617 !important;
+  background: #1e293b !important;
 }
 
 .saga-app-fade-in {

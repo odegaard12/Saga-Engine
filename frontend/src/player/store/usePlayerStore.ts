@@ -20,6 +20,7 @@ interface PlayerState {
   // UI State
   toolsOpen: boolean
   teamOpen: boolean
+  rankingOpen: boolean
   offlinePrepVisible: boolean
 
   // Acciones (Actions)
@@ -37,6 +38,7 @@ interface PlayerState {
   setGpsCapturedAt: (cap: number | null) => void
   setToolsOpen: (open: boolean) => void
   setTeamOpen: (open: boolean) => void
+  setRankingOpen: (open: boolean) => void
   setOfflinePrepVisible: (visible: boolean) => void
 }
 
@@ -56,6 +58,7 @@ export const usePlayerStore = create<PlayerState>()(
 
       toolsOpen: false,
       teamOpen: false,
+      rankingOpen: false,
       offlinePrepVisible: true,
 
       setStatus: (status) => set({ status }),
@@ -75,6 +78,7 @@ export const usePlayerStore = create<PlayerState>()(
 
       setToolsOpen: (toolsOpen) => set({ toolsOpen }),
       setTeamOpen: (teamOpen) => set({ teamOpen }),
+      setRankingOpen: (rankingOpen) => set({ rankingOpen }),
       setOfflinePrepVisible: (offlinePrepVisible) => set({ offlinePrepVisible }),
     }),
     {

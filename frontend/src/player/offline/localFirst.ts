@@ -239,7 +239,9 @@ export async function flushOfflineEvents(
   const snapshot = loadOfflineSnapshot(user)
 
   if (!snapshot.queued_events.length) {
-    // No events to flush - but still sync inventory silently so Admin can see it
+    // No events to flush - but check if there are offline photos
+    void flushOfflinePhotos(user, fetchImpl).catch(() => {})
+    // still sync inventory silently so Admin can see it
     void syncInventoryToServer(user, fetchImpl).catch(() => {})
     return saveOfflineSnapshot({
       ...snapshot,
@@ -298,6 +300,9 @@ export async function flushOfflineEvents(
 
       failedById.set(clientEventId, String(event.error || status || 'backend rejected event'))
     }
+
+    // After successful event sync, try flushing photos
+    void flushOfflinePhotos(user, fetchImpl).catch(() => {})
 
     if (acceptedIds.size === 0 && failedById.size === 0) {
       throw new Error('sync response could not be matched to queued events')
@@ -404,3 +409,90 @@ export async function syncInventoryToServer(
     // Silent - this is a best-effort background sync
   }
 }
+
+// ==========================================
+// OFFLINE PHOTOS (INDEXEDDB)
+// ==========================================
+
+export type OfflinePhoto = {
+  id: string
+  user: string
+  image_data_url: string
+  lat: number
+  lon: number
+  note?: string
+  stage_id?: string
+  stage_title?: string
+}
+
+function getPhotoDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('SagaOfflinePhotos', 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains('photos')) {
+        db.createObjectStore('photos', { keyPath: 'id' })
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+export async function saveOfflinePhoto(photo: Omit<OfflinePhoto, 'id'>): Promise<string> {
+  const id = createClientEventId('photo')
+  const db = await getPhotoDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', 'readwrite')
+    const store = tx.objectStore('photos')
+    store.put({ ...photo, id })
+    tx.oncomplete = () => resolve(id)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function getOfflinePhotos(user: string): Promise<OfflinePhoto[]> {
+  const db = await getPhotoDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', 'readonly')
+    const store = tx.objectStore('photos')
+    const request = store.getAll()
+    request.onsuccess = () => {
+      const all = request.result as OfflinePhoto[]
+      resolve(all.filter((p) => p.user === user))
+    }
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function deleteOfflinePhoto(id: string): Promise<void> {
+  const db = await getPhotoDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', 'readwrite')
+    const store = tx.objectStore('photos')
+    store.delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function flushOfflinePhotos(user: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const photos = await getOfflinePhotos(user).catch(() => [])
+  if (!photos.length) return
+
+  for (const photo of photos) {
+    try {
+      const response = await fetchImpl('/api/field-proofs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(photo),
+      })
+      if (response.ok) {
+        await deleteOfflinePhoto(photo.id)
+      }
+    } catch {
+      // Keep trying later
+    }
+  }
+}
+

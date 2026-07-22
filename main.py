@@ -138,6 +138,7 @@ DATA_DIR = resolve_data_dir()
 GAME_DB = os.path.join(DATA_DIR, "gamestate.json")
 STAGES_DB = os.path.join(DATA_DIR, "stages.json")
 POSITIONS_DB = os.path.join(DATA_DIR, "positions.json")
+TIMERS_DB = os.path.join(DATA_DIR, "game_timers.json")
 ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
@@ -695,12 +696,88 @@ def load_player_progress():
     return load_game_state(GAME_DB)
 
 
+def load_player_timers():
+    return load_json(TIMERS_DB, {})
+
+def save_player_timers(timers):
+    save_json(TIMERS_DB, timers)
+
+def stop_stage_timer(user, level, penalty_ms=0):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key or user_key not in timers:
+        return
+    started_at = timers[user_key].get("current_stage_started_at")
+    if started_at:
+        elapsed = int((time.time() - started_at) * 1000)
+        stage_times = timers[user_key].setdefault("stage_times_ms", {})
+        lvl_str = str(level)
+        stage_times[lvl_str] = stage_times.get(lvl_str, 0) + elapsed + penalty_ms
+        timers[user_key]["current_stage_started_at"] = None
+        save_player_timers(timers)
+
+def start_stage_timer(user, level):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key:
+        return
+    if user_key not in timers:
+        timers[user_key] = {"current_stage_started_at": time.time(), "stage_times_ms": {}}
+    timers[user_key]["current_stage_started_at"] = time.time()
+    save_player_timers(timers)
+
+def reset_stage_timer(user, level):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key or user_key not in timers:
+        return
+    timers[user_key]["current_stage_started_at"] = time.time()
+    stage_times = timers[user_key].setdefault("stage_times_ms", {})
+    stage_times[str(level)] = 0
+    save_player_timers(timers)
+
 def get_player_progress_level(user, default=0):
     return get_player_level(GAME_DB, user, default=default)
 
 
-def set_player_progress_level(user, level):
+def set_player_progress_level(user, level, penalty_ms=0):
+    old_lvl = get_player_progress_level(user)
+    if level > old_lvl:
+        stop_stage_timer(user, old_lvl, penalty_ms)
+        start_stage_timer(user, level)
+    elif level < old_lvl:
+        reset_stage_timer(user, level)
+    elif level == old_lvl and penalty_ms > 0:
+        # Just penalize the current timer
+        stop_stage_timer(user, old_lvl, penalty_ms)
+        start_stage_timer(user, level)
+
     return set_player_level(GAME_DB, user, level)
+
+def get_player_total_time_ms(user):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key or user_key not in timers:
+        return 0
+    total = sum(timers[user_key].get("stage_times_ms", {}).values())
+    started_at = timers[user_key].get("current_stage_started_at")
+    if started_at:
+        total += int((time.time() - started_at) * 1000)
+    return total
+
+def get_player_is_playing(user):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key or user_key not in timers:
+        return False
+    return bool(timers[user_key].get("current_stage_started_at"))
+
+def get_player_stage_time_ms(user, level):
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key or user_key not in timers:
+        return 0
+    return timers[user_key].get("stage_times_ms", {}).get(str(level), 0)
 
 
 def project_live_profile_status(profile, raw=None, now=None):
@@ -733,6 +810,9 @@ def project_live_profile_status(profile, raw=None, now=None):
         "lon": _as_float(raw.get("lon")),
         "source": _as_str(raw.get("source") or "player").strip() or "player",
         "debug_enabled": _as_bool(raw.get("debug_enabled"), False),
+        "total_time_ms": get_player_total_time_ms(profile.get("id")),
+        "is_playing": get_player_is_playing(profile.get("id")),
+        "level": get_player_progress_level(profile.get("id")),
     }
 
 

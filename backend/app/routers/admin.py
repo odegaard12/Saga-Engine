@@ -297,7 +297,8 @@ async def admin_profile_action(request: Request):
         
         main.save_player_inventory(profile_id, inventory)
     else:
-        main.set_player_progress_level(profile_id, new_level)
+        penalty_ms = 300000 if action in ("level_next", "mark_finished") else 0
+        main.set_player_progress_level(profile_id, new_level, penalty_ms)
 
     return {
         "status": "ok",

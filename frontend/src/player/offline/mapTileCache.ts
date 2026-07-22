@@ -266,6 +266,7 @@ async function fetchAndCacheUrls(
             total: urls.length,
             detail: `${completed}/${urls.length} teselas · ${saved} guardadas`,
           })
+          await new Promise(resolve => setTimeout(resolve, 10))
         }
       }
     }

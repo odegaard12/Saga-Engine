@@ -81,6 +81,10 @@ export interface PlayerLiveStatus {
   color?: string
   avatar_url?: string
   avatar_initials?: string
+  level?: number
+  finished?: boolean
+  total_time_ms?: number
+  is_playing?: boolean
 }
 
 export interface TeamProfileLiveStatus extends PlayerLiveStatus {
