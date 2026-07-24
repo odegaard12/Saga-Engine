@@ -43,7 +43,7 @@ interface PlayerHudProps {
   submitting?: boolean
   errorMessage?: string | null
   onShowPrologue?: () => void
-  onSubmitCode?: (code: string) => Promise<void>
+  onSubmitCode?: (code: string, timeSpentMs?: number) => Promise<void>
 }
 
 function getGpsDisplay(gpsState: string): string {
@@ -237,7 +237,8 @@ export function PlayerHud({
     const clean = toolsFallbackCode.trim().toUpperCase()
     if (!clean || !onSubmitCode || submitting) return
 
-    await onSubmitCode(clean)
+    // Si usan el código manual de respaldo (saltar nodo), aplicamos una penalización de 5 min (300000 ms)
+    await onSubmitCode(clean, 300000)
     setToolsFallbackCode('')
     setToolsFallbackOpen(false)
   }

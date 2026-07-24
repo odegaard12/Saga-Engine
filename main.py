@@ -702,55 +702,51 @@ def load_player_timers():
 def save_player_timers(timers):
     save_json(TIMERS_DB, timers)
 
-def stop_stage_timer(user, level, penalty_ms=0):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return
-    started_at = timers[user_key].get("current_stage_started_at")
-    if started_at:
-        elapsed = int((time.time() - started_at) * 1000)
-        stage_times = timers[user_key].setdefault("stage_times_ms", {})
-        lvl_str = str(level)
-        stage_times[lvl_str] = stage_times.get(lvl_str, 0) + elapsed + penalty_ms
-        timers[user_key]["current_stage_started_at"] = None
-        save_player_timers(timers)
-
-def start_stage_timer(user, level):
+def record_player_stage_time(user, level, time_ms):
     timers = load_player_timers()
     user_key = str(user or "").strip()
     if not user_key:
         return
     if user_key not in timers:
-        timers[user_key] = {"current_stage_started_at": time.time(), "stage_times_ms": {}}
-    timers[user_key]["current_stage_started_at"] = time.time()
+        timers[user_key] = {"stage_times_ms": {}}
+    
+    stage_times = timers[user_key].setdefault("stage_times_ms", {})
+    lvl_str = str(level)
+    
+    # Do not overwrite if they redo without resetting, or just accumulate.
+    # The requirement is that time is accumulated EXACTLY from client. 
+    # If they submit multiple times, we just add or set. Let's add it.
+    stage_times[lvl_str] = stage_times.get(lvl_str, 0) + time_ms
     save_player_timers(timers)
 
-def reset_stage_timer(user, level):
+def clear_player_stage_time(user, level):
     timers = load_player_timers()
     user_key = str(user or "").strip()
     if not user_key or user_key not in timers:
         return
-    timers[user_key]["current_stage_started_at"] = time.time()
     stage_times = timers[user_key].setdefault("stage_times_ms", {})
-    stage_times[str(level)] = 0
+    lvl_str = str(level)
+    if lvl_str in stage_times:
+        stage_times[lvl_str] = 0
     save_player_timers(timers)
 
 def get_player_progress_level(user, default=0):
     return get_player_level(GAME_DB, user, default=default)
 
-
 def set_player_progress_level(user, level, penalty_ms=0):
-    old_lvl = get_player_progress_level(user)
-    if level > old_lvl:
-        stop_stage_timer(user, old_lvl, penalty_ms)
-        start_stage_timer(user, level)
-    elif level < old_lvl:
-        reset_stage_timer(user, level)
-    elif level == old_lvl and penalty_ms > 0:
-        # Just penalize the current timer
-        stop_stage_timer(user, old_lvl, penalty_ms)
-        start_stage_timer(user, level)
+    if penalty_ms > 0:
+        record_player_stage_time(user, level, penalty_ms)
+
+    # If the level is explicitly set (e.g. by an admin), we should clear any future stage times
+    # to avoid the timer holding onto times from nodes they are replaying.
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if user_key and user_key in timers:
+        stage_times = timers[user_key].get("stage_times_ms", {})
+        keys_to_remove = [k for k in list(stage_times.keys()) if k.isdigit() and int(k) >= level]
+        for k in keys_to_remove:
+            del stage_times[k]
+        save_player_timers(timers)
 
     return set_player_level(GAME_DB, user, level)
 
@@ -759,18 +755,11 @@ def get_player_total_time_ms(user):
     user_key = str(user or "").strip()
     if not user_key or user_key not in timers:
         return 0
-    total = sum(timers[user_key].get("stage_times_ms", {}).values())
-    started_at = timers[user_key].get("current_stage_started_at")
-    if started_at:
-        total += int((time.time() - started_at) * 1000)
-    return total
+    return sum(timers[user_key].get("stage_times_ms", {}).values())
 
 def get_player_is_playing(user):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return False
-    return bool(timers[user_key].get("current_stage_started_at"))
+    # Sin timers en backend, podemos devolver False. El cliente gestiona su propio estado interactivo.
+    return False
 
 def get_player_stage_time_ms(user, level):
     timers = load_player_timers()
@@ -1361,6 +1350,10 @@ def apply_synced_player_event(normalized_event, user, profile):
 
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+    time_spent_ms = payload.get("time_spent_ms")
+    if time_spent_ms is not None:
+        record_player_stage_time(profile_id, current_level, int(time_spent_ms))
 
     set_player_progress_level(profile_id, current_level + 1)
 

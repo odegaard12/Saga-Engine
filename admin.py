@@ -195,7 +195,7 @@ async def reset(request: Request):
     if not user:
         raise HTTPException(status_code=400, detail="user is required")
 
-    main.set_player_progress_level(user, 0)
+    main.reset_player_level(main.GAME_DB, user)
     return {"status": "ok"}
 
 

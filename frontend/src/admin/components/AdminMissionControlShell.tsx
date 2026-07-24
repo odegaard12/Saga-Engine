@@ -536,7 +536,7 @@ export default function AdminMissionControlShell({
                 cursor: 'pointer',
               }}
             >
-              📜 v3.5.0 Novedades
+              📜 v3.9.2 Novedades
             </button>
           </div>
 

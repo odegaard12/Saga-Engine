@@ -1,18 +1,178 @@
 [
   {
-    "id": "demo-signal-node",
-    "title": "Demo Signal Node",
-    "type": "signal_hunt",
-    "lat": 40.4168,
-    "lon": -3.7038,
-    "radius": 50,
-    "description": "Demo node for the public repository. Replace it with your own mission data in runtime storage.",
+    "title": "1. O V\u00e9rtice Inicial (Parking)",
+    "lat": 42.36390658474425,
+    "lon": -8.675606236105482,
+    "type": "circuit_matrix",
+    "content": "Punto de partida y sincronizaci\u00f3n de equipos. Pulsa EMPEZAR para comenzar.",
     "config": {
-      "objective": "proximity_lock",
-      "game_id": "gps_signal_lock",
-      "source_radius_meters": 75,
-      "lock_threshold": 65,
-      "hold_ms": 1500
-    }
+      "objective": "sequence_order",
+      "game_id": "sequence_code",
+      "completion_method": "sequence",
+      "sequence": [
+        "EMPEZAR"
+      ],
+      "difficulty": "normal"
+    },
+    "id": 1,
+    "enabled": true,
+    "radius": 15
+  },
+  {
+    "title": "2. Pista Este (O Cami\u00f1o Novo)",
+    "lat": 42.361,
+    "lon": -8.667,
+    "type": "circuit_matrix",
+    "content": "Supera el circuito l\u00f3gico para restaurar la energ\u00eda.",
+    "config": {
+      "objective": "path_restore",
+      "game_id": "logic_circuit",
+      "completion_method": "puzzle",
+      "grid_cols": 5,
+      "grid_rows": 5,
+      "difficulty": "normal",
+      "pattern_mode": "random_each_game"
+    },
+    "id": 2,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "3. Chan de Casti\u00f1eiras",
+    "lat": 42.35960555353139,
+    "lon": -8.67235544713735,
+    "type": "signal_hunt",
+    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
+    "config": {
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only",
+      "game_id": "simple_checkpoint"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_id": "chip_encriptado",
+    "id": 3,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "4. O Eco dos Reis (M\u00e1moa del Rey)",
+    "lat": 42.35840656643265,
+    "lon": -8.67258908389772,
+    "type": "circuit_matrix",
+    "content": "Descifra el c\u00f3digo secuencial de la antena.",
+    "config": {
+      "objective": "sequence_order",
+      "game_id": "sequence_code",
+      "completion_method": "sequence",
+      "difficulty": "hard",
+      "pattern_mode": "random_each_game"
+    },
+    "id": 4,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "5. Frontera Sur (As Pistas Baixas)",
+    "lat": 42.3495,
+    "lon": -8.6705,
+    "type": "signal_hunt",
+    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
+    "config": {
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only",
+      "game_id": "simple_checkpoint"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_id": "antena_frecuencia",
+    "id": 5,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "6. A Visi\u00f3n (Mirador Pinga Pinga)",
+    "lat": 42.35206013317765,
+    "lon": -8.67355081121013,
+    "type": "circuit_matrix",
+    "content": "Reconstruye el mosaico para despejar el camino.",
+    "config": {
+      "objective": "path_restore",
+      "game_id": "place_mosaic",
+      "completion_method": "puzzle",
+      "difficulty": "normal",
+      "pattern_mode": "random_each_game"
+    },
+    "id": 6,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "7. O N\u00facleo (Mirador de Cotorredondo)",
+    "lat": 42.3532789139366,
+    "lon": -8.675665385750394,
+    "type": "signal_hunt",
+    "content": "Escanea el c\u00f3digo QR escondido en el mirador.",
+    "config": {
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only",
+      "game_id": "qr_collectible"
+    },
+    "physical_node_kind": "bonus",
+    "physical_item_id": "pista_bonus",
+    "entry_mode": "qr",
+    "id": 7,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "8. Sendero del Oeste (O Paso Escuro)",
+    "lat": 42.3555,
+    "lon": -8.6835,
+    "type": "signal_hunt",
+    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
+    "config": {
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only",
+      "game_id": "simple_checkpoint"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_id": "bateria_litio",
+    "id": 8,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "9. A Pedra Antiga (M\u00e1moa Penalonga)",
+    "lat": 42.35742918809162,
+    "lon": -8.677914867138098,
+    "type": "motion_challenge",
+    "content": "Inclina tu dispositivo para superar el laberinto f\u00edsico.",
+    "config": {
+      "objective": "shake_charge",
+      "game_id": "tilt_maze",
+      "completion_method": "motion",
+      "difficulty": "normal",
+      "pattern_mode": "random_each_game"
+    },
+    "id": 9,
+    "enabled": true,
+    "radius": 20
+  },
+  {
+    "title": "10. O Arsenal (Campo de Tiro)",
+    "lat": 42.35983803884877,
+    "lon": -8.680437434053916,
+    "type": "signal_hunt",
+    "content": "Escanea el QR de la puerta. (Requiere Decodificador Cu\u00e1ntico crafteado).",
+    "config": {
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only",
+      "game_id": "qr_key_gate"
+    },
+    "physical_node_kind": "requirement",
+    "physical_item_id": "decodificador_cuantico",
+    "entry_mode": "qr",
+    "id": 10,
+    "enabled": true,
+    "radius": 20
   }
 ]

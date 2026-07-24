@@ -269,6 +269,8 @@ async def advance(request: Request):
     data = await request.json()
     user = data.get("user")
     code = (data.get("code") or "").strip().upper()
+    time_spent_ms = data.get("time_spent_ms")
+
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("advance", request, user, main.ADVANCE_RATE_LIMIT_MAX)
 
@@ -294,6 +296,9 @@ async def advance(request: Request):
 
             if requirement_status["required"] and requirement_status["consume"]:
                 main.append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+            if time_spent_ms is not None:
+                main.record_player_stage_time(profile_id, lvl, int(time_spent_ms))
 
             main.set_player_progress_level(profile_id, lvl + 1)
             return {

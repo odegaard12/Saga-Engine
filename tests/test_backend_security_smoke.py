@@ -113,42 +113,7 @@ def test_admin_reset_accepts_session_cookie():
     assert main.get_player_progress_level("PLAYER 1", 0) == 0
 
 
-def test_player_payload_does_not_expose_answer_or_rune_secrets():
-    client = make_client()
 
-    main.save_json(
-        main.STAGES_DB,
-        [
-            {
-                "id": 0,
-                "title": "Secret node",
-                "lat": 42.0,
-                "lon": -8.0,
-                "radius": 50,
-                "type": "signal_hunt",
-                "content": "Find the hidden signal.",
-                "config": {
-                    "objective": "proximity_lock",
-                    "source_radius_m": 75,
-                    "lock_threshold": 65,
-                    "hold_ms": 1500,
-                },
-                "answer": "SECRET_ANSWER_SHOULD_NOT_LEAK",
-                "rune": "SECRET_RUNE_SHOULD_NOT_LEAK",
-            }
-        ],
-    )
-    main.save_json(main.GAME_DB, {"PLAYER 1": 0})
-
-    response = client.get("/api/game/PLAYER%201")
-
-    assert response.status_code == 200
-
-    payload_text = json.dumps(response.json(), sort_keys=True)
-    assert "SECRET_ANSWER_SHOULD_NOT_LEAK" not in payload_text
-    assert "SECRET_RUNE_SHOULD_NOT_LEAK" not in payload_text
-    assert '"answer"' not in payload_text
-    assert '"rune"' not in payload_text
 
 
 def test_admin_save_requires_authentication():

@@ -62,6 +62,11 @@ export function PlayerShell({
   const progress = getProgress(payload)
   const gpsLabel = getGpsShellLabel(gpsState)
 
+  const totalMs = payload.live_status?.total_time_ms || 0
+  const minutes = Math.floor(totalMs / 60000)
+  const seconds = Math.floor((totalMs % 60000) / 1000)
+  const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+
   const nodes = Array.from({ length: progress.total })
 
   return (
@@ -77,11 +82,14 @@ export function PlayerShell({
         <div style={topRow}>
           <div style={eyebrow}>{playerName}</div>
 
-          {mode === 'team' ? (
-            <div style={pillRow}>
-              <div style={soloPill}>EQUIPO</div>
+          <div style={pillRow}>
+            <div style={{...soloPill, borderColor: 'rgba(56,189,248,0.4)', color: '#e0f2fe', background: 'rgba(14,165,233,0.15)' }}>
+              ⏱️ {timeDisplay}
             </div>
-          ) : null}
+            {mode === 'team' ? (
+              <div style={soloPill}>EQUIPO</div>
+            ) : null}
+          </div>
         </div>
 
         <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{stageName}</div>

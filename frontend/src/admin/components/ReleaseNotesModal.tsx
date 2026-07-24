@@ -29,8 +29,8 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
           {/* Version 3.5.0 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
-              <span style={vTag}>v3.5.0</span>
-              <span style={vDate}>21 de Julio, 2026</span>
+              <span style={vTag}>v3.9.2</span>
+              <span style={vDate}>24 de Julio, 2026</span>
               <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
             </div>
 

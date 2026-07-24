@@ -8,8 +8,8 @@ MINIGAME_OK_CODE = "OK"
 
 SUPPORTED_MINIGAME_TYPES = {
     "circuit_matrix",
-    "bearing_hunt",
     "signal_hunt",
+    "bearing_hunt",
     "motion_challenge",
     "audio_challenge",
 }

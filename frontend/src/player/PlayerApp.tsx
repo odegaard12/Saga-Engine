@@ -153,7 +153,9 @@ export default function PlayerApp() {
       if (loginId) {
         const hasSeen = localStorage.getItem(`saga_prologue_seen_${user}`)
         if (!hasSeen) {
+          try {
           localStorage.setItem(`saga_prologue_seen_${user}`, '1')
+          } catch (e) { console.warn('Storage quota exceeded', e); }
           return true
         }
       }
@@ -748,7 +750,7 @@ export default function PlayerApp() {
   const stagePosition = getStagePosition(currentStage)
   const stageRadius = getStageRadius(currentStage)
 
-  const gpsAccuracyLimit = stageRadius !== null ? Math.max(35, Math.min(80, stageRadius * 2)) : 60
+  const gpsAccuracyLimit = stageRadius !== null ? Math.max(20, Math.min(45, stageRadius * 2)) : 35
 
   const gpsAccuracyAcceptable =
     browserGpsAccuracy === null || browserGpsAccuracy <= gpsAccuracyLimit
@@ -1461,7 +1463,7 @@ export default function PlayerApp() {
     showNotice('Este nodo no está disponible todavía.', 'info')
   }
 
-  async function handleSubmitCode(code: string) {
+  async function handleSubmitCode(code: string, timeSpentMs?: number) {
     try {
       setSubmitting(true)
       setSubmitError(null)
@@ -1494,7 +1496,7 @@ export default function PlayerApp() {
         showNotice(`⭐ ¡Recogido: ${label}!`, 'success')
       }
 
-      const result = await advancePlayer(payload.user, code)
+      const result = await advancePlayer(payload.user, code, timeSpentMs)
       if (result.status !== 'ok') {
         const missingItem = result.reason === 'missing_required_item'
         setSubmitError(
@@ -1533,6 +1535,7 @@ export default function PlayerApp() {
           payload,
           currentStage,
           code,
+          timeSpentMs,
         })
 
         if (localResult.ok) {
@@ -1949,6 +1952,7 @@ export default function PlayerApp() {
         }}
         onSubmitCode={handleSubmitCode}
         onShowHistory={currentStage?.intro_body ? () => setActiveStageIntro(true) : undefined}
+        totalTimeMs={payload.live_status?.total_time_ms || 0}
       />
 
       {payload.finished && dismissedFinishScreen ? (

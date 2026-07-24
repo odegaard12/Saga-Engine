@@ -146,8 +146,8 @@ export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> 
   }
 }
 
-export function advancePlayer(user: string, code: string) {
-  return postJson<AdvanceResponse>('/api/advance', { user, code })
+export function advancePlayer(user: string, code: string, time_spent_ms?: number) {
+  return postJson<AdvanceResponse>('/api/advance', { user, code, time_spent_ms })
 }
 
 export function sendHeartbeat(args: {

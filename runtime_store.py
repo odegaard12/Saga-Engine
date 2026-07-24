@@ -57,6 +57,7 @@ def load_document(path: str, key: str, default: Any) -> Any:
 def save_document(path: str, key: str, value: Any) -> None:
     if resolve_runtime_backend() == "sqlite":
         save_sqlite_document(resolve_runtime_db_path(path), key, value)
+        return
 
     save_json(path, value)
 
@@ -71,7 +72,7 @@ def load_stages(path: str) -> list[dict[str, Any]]:
 
     raw = load_json(path, [])
     if isinstance(raw, list) and raw:
-        if not sqlite_stages:
+        if not sqlite_stages or json.dumps(raw, sort_keys=True) != json.dumps(sqlite_stages, sort_keys=True):
             save_sqlite_stages(db_path, raw)
             return raw
 
@@ -83,5 +84,6 @@ def save_stages(path: str, stages: list[dict[str, Any]]) -> None:
 
     if resolve_runtime_backend() == "sqlite":
         save_sqlite_stages(resolve_runtime_db_path(path), safe_stages)
+        return
 
     save_json(path, safe_stages)

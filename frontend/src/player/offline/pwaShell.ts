@@ -17,7 +17,9 @@ export async function registerPlayerServiceWorker(): Promise<ServiceWorkerRegist
             return
           }
 
+          try {
           window.sessionStorage.setItem(reloadKey, '1')
+          } catch (e) { console.warn('Storage quota exceeded', e); }
         } catch {
           // Reload still works when sessionStorage is unavailable.
         }

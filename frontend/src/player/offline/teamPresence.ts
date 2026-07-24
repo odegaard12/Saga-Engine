@@ -71,7 +71,9 @@ export function cacheTeamProfiles(
   }
 
   if (hasLocalStorage()) {
+    try {
     window.localStorage.setItem(storageKey(user), JSON.stringify(payload))
+    } catch (e) { console.warn('Storage quota exceeded', e); }
   }
 
   return payload

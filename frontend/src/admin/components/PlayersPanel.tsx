@@ -179,7 +179,21 @@ export default function PlayersPanel({
                     type="button"
                     className="admin-inline-soft"
                     disabled={profileActionState[draft.id] === 'running'}
+                    onClick={() => {
+                      if (window.confirm(`¿Estás seguro de Restaurar Nodo para ${draft.display_name}? Esto restará el tiempo empleado y bajará 1 nivel.`)) {
+                        onProfileAction(draft.id, 'restore_node' as AdminProfileAction)
+                      }
+                    }}
+                    title="Baja 1 nivel y restaura el tiempo (limpia penalización)"
+                  >
+                    Restaurar Nodo
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-inline-soft"
+                    disabled={profileActionState[draft.id] === 'running'}
                     onClick={() => onProfileAction(draft.id, 'level_prev')}
+                    title="Baja 1 nivel (sin borrar el tiempo acumulado)"
                   >
                     ← 1 nodo
                   </button>

@@ -50,7 +50,9 @@ export function cacheFieldProofs(user: string, proofs: FieldProof[]): CachedFiel
   }
 
   if (hasLocalStorage()) {
+    try {
     window.localStorage.setItem(storageKey(user), JSON.stringify(payload))
+    } catch (e) { console.warn('Storage quota exceeded', e); }
   }
 
   return payload

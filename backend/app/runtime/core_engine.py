@@ -110,6 +110,15 @@ def normalize_stage(raw):
         raw_minigame.get("type") or raw.get("type")
     ).strip().lower()
 
+    if raw_interaction_type in {"sequence_code", "place_mosaic", "tilt_maze", "qr_collectible"}:
+        if isinstance(cfg, dict) and not cfg.get("game_id"):
+            cfg["game_id"] = raw_interaction_type
+        raw_interaction_type = "circuit_matrix"
+    elif raw_interaction_type == "checkpoint":
+        if isinstance(cfg, dict) and not cfg.get("game_id"):
+            cfg["game_id"] = "simple_checkpoint"
+        raw_interaction_type = "signal_hunt"
+
     interaction_type_fallback_reason = ""
     if not raw_interaction_type:
         interaction_type = "signal_hunt"

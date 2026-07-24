@@ -1,0 +1,175 @@
+[
+  {
+    "id": "node-1",
+    "title": "O Vértice Inicial (Lago)",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.364348,
+    "lon": -8.678502,
+    "intro_title": "O Vértice Inicial",
+    "intro_body": "Atopádesvos no Lago de Castiñeiras. A auga reflicte unha estraña luz no ceo. A misión comeza aquí.",
+    "config": {
+      "game_id": "simple_checkpoint"
+    },
+    "success_body": "O dispositivo está sincronizado. Seguid cara a Cotorredondo."
+  },
+  {
+    "id": "node-2",
+    "title": "A Orde Oculta",
+    "type": "circuit_matrix",
+    "radius": 40,
+    "lat": 42.371049,
+    "lon": -8.681444,
+    "intro_body": "Un panel de control ancestral bloquea a vosa ruta. Restaurade o fluxo de enerxía.",
+    "config": {
+      "game_id": "logic_circuit"
+    },
+    "grid_size": 4,
+    "time_limit_ms": 300000,
+    "success_body": "Enerxía restaurada! O panel ábrese."
+  },
+  {
+    "id": "node-3",
+    "title": "Pegadas Antigas (Mámoas)",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.37519,
+    "lon": -8.689144,
+    "intro_body": "Encontrad a Batería de Litio oculta por aquí para avanzar na vosa receita EMP.",
+    "config": {
+      "game_id": "qr_collectible",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_kind": "collectible",
+    "physical_item_id": "bateria_litio",
+    "physical_item_label": "Batería de Litio",
+    "qr_payload": "saga:item:bateria_litio",
+    "success_body": "¡Batería recolectada!"
+  },
+  {
+    "id": "node-4",
+    "title": "O Prisma de Síntese",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.37519,
+    "lon": -8.698661,
+    "intro_body": "Unha voz encriptada os fala a través do comunicador. Buscad a tarxeta coa Pista QR.",
+    "config": {
+      "game_id": "clue_card",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "clue",
+    "physical_item_kind": "clue",
+    "physical_item_id": "pista_1",
+    "physical_item_label": "Pista 1",
+    "qr_payload": "saga:item:pista_1",
+    "success_body": "Pista obtenida."
+  },
+  {
+    "id": "node-5",
+    "title": "Mosaico da Memoria",
+    "type": "circuit_matrix",
+    "radius": 40,
+    "lat": 42.371049,
+    "lon": -8.706361,
+    "intro_body": "O camiño vibra baixo os vosos pés. Mantede o equilibrio no labirinto.",
+    "config": {
+      "game_id": "tilt_maze"
+    },
+    "success_body": "Cruzastes a salvo!"
+  },
+  {
+    "id": "node-6",
+    "title": "Ascenso Crítico",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.364348,
+    "lon": -8.709303,
+    "intro_body": "No ascenso deben estar os Cables de Cobre. Buscádeos.",
+    "config": {
+      "game_id": "qr_collectible",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_kind": "collectible",
+    "physical_item_id": "cables_cobre",
+    "physical_item_label": "Cables de Cobre",
+    "qr_payload": "saga:item:cables_cobre",
+    "success_body": "¡Cables encontrados!"
+  },
+  {
+    "id": "node-7",
+    "title": "O Núcleo Selado (Miradoiro)",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.357648,
+    "lon": -8.706361,
+    "intro_body": "Unha porta mecánica corta o paso. Necesitades a Llave QR.",
+    "config": {
+      "game_id": "qr_key_gate",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "requirement",
+    "physical_item_kind": "requirement",
+    "physical_item_id": "llave_qr_1",
+    "physical_item_label": "Llave de paso",
+    "qr_payload": "saga:item:llave_qr_1",
+    "success_body": "¡Puerta desbloqueada!"
+  },
+  {
+    "id": "node-8",
+    "title": "Descenso Rápido",
+    "type": "circuit_matrix",
+    "radius": 40,
+    "lat": 42.353506,
+    "lon": -8.698661,
+    "intro_body": "Intercambiade os paneis para formar a imaxe orixinal do lugar.",
+    "config": {
+      "game_id": "place_mosaic"
+    },
+    "success_body": "Imaxe completada! A memoria foi restaurada."
+  },
+  {
+    "id": "node-9",
+    "title": "A Derradeira Chave",
+    "type": "signal_hunt",
+    "radius": 40,
+    "lat": 42.353506,
+    "lon": -8.689144,
+    "intro_body": "Última peza: a Placa Base. Escaneade o seu código QR.",
+    "config": {
+      "game_id": "qr_collectible",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_kind": "collectible",
+    "physical_item_id": "placa_base",
+    "physical_item_label": "Placa Base",
+    "qr_payload": "saga:item:placa_base",
+    "success_body": "¡Peza recolectada!"
+  },
+  {
+    "id": "node-10",
+    "title": "Fin da Ruta",
+    "type": "sequence_code",
+    "radius": 40,
+    "lat": 42.357648,
+    "lon": -8.681444,
+    "intro_body": "O último obstáculo. Introducide o código secuencial final para sellar o xogo.",
+    "solution_sequence": [
+      "LUME",
+      "SOL",
+      "LÚA"
+    ],
+    "config": {
+      "game_id": "sequence_code"
+    },
+    "success_body": "O Núcleo está selado. A misión foi un éxito."
+  }
+]

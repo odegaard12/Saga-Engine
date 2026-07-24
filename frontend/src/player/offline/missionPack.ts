@@ -525,6 +525,7 @@ export async function advanceLocalProgress(args: {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
   code: string
+  timeSpentMs?: number
 }) {
   const payload = args.payload
   const stage = args.currentStage
@@ -562,6 +563,7 @@ export async function advanceLocalProgress(args: {
       stage_title: stage.title,
       level_before: currentLevel,
       level_after: currentLevel + 1,
+      time_spent_ms: args.timeSpentMs,
       requirement: requirement
         ? { ...requirement, owned, ok: true }
         : { required: false, ok: true },

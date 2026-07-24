@@ -40,7 +40,7 @@ export type AdminReactOverviewStage = {
 
 export type AdminRawStage = Record<string, unknown>
 
-export type AdminProfileAction = 'reset_profile' | 'level_prev' | 'level_next' | 'mark_finished'
+export type AdminProfileAction = 'reset_profile' | 'level_prev' | 'level_next' | 'mark_finished' | 'restore_node'
 
 export type AdminProfileActionResponse = {
   status: 'ok' | 'error' | 'fail'

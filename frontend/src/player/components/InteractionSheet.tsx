@@ -12,8 +12,9 @@ interface InteractionSheetProps {
   helperText: string
   submitting: boolean
   onClose: () => void
-  onSubmitCode: (code: string) => Promise<void>
+  onSubmitCode: (code: string, timeSpentMs?: number) => Promise<void>
   onShowHistory?: () => void
+  totalTimeMs?: number
 }
 
 function vibrate(pattern: number | number[]) {
@@ -75,6 +76,7 @@ export function InteractionSheet({
   onClose,
   onSubmitCode,
   onShowHistory,
+  totalTimeMs = 0,
 }: InteractionSheetProps) {
   const [dragOffset, setDragOffset] = useState(0)
 
@@ -104,6 +106,9 @@ export function InteractionSheet({
 
   const compactLine = getCompactLine(currentStage)
 
+  const [activeMs, setActiveMs] = useState(0)
+  const [isCompleted, setIsCompleted] = useState(false)
+
   useEffect(() => {
     setDragOffset(0)
   }, [stageId])
@@ -114,11 +119,36 @@ export function InteractionSheet({
     }
   }, [open, stageId, currentStage])
 
+  useEffect(() => {
+    if (!open) {
+      setActiveMs(0)
+      setIsCompleted(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    // El timer arranca 300ms después de abrir (cuando la animación de UI y el puzzle es interactivo)
+    // Se detiene al hacer submit o al completarlo
+    if (open && currentStage && !submitting && !isCompleted) {
+      const timeout = setTimeout(() => {
+        const startTime = Date.now() - activeMs
+        const timer = setInterval(() => {
+          setActiveMs(Date.now() - startTime)
+        }, 100)
+        return () => clearInterval(timer)
+      }, 300)
+      return () => clearTimeout(timeout)
+    }
+  }, [open, currentStage, submitting, isCompleted, activeMs])
+
   if (!open || !currentStage) return null
 
   async function handleNativeWin() {
     vibrate([12, 20, 12])
-    await onSubmitCode('OK')
+    setIsCompleted(true)
+    setTimeout(async () => {
+      await onSubmitCode('OK', activeMs)
+    }, 2000) // Show feedback for 2 seconds
   }
 
   function handleClose() {
@@ -185,6 +215,25 @@ export function InteractionSheet({
         >
           {compactGameMode ? (
             <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 120, display: 'flex', gap: 8 }}>
+              {/* Floating Global Timer */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(15,23,42,0.65)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#e0f2fe',
+                padding: '0 12px',
+                borderRadius: '999px',
+                fontSize: 14,
+                fontWeight: 600,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                height: '38px',
+              }}>
+                ⏱️ {Math.floor((totalTimeMs + activeMs) / 60000).toString().padStart(2, '0')}:{(Math.floor(((totalTimeMs + activeMs) % 60000) / 1000)).toString().padStart(2, '0')}
+              </div>
               {onShowHistory && !isStageCollectible(currentStage) && (
                 <button
                   type="button"
@@ -302,13 +351,33 @@ export function InteractionSheet({
               onWin={handleNativeWin}
             />
           ) : minigameDefinition ? (
-            <MinigameHost
-              definition={minigameDefinition}
-              stage={currentStage}
-              helperText={helperText}
-              submitting={submitting}
-              onWin={handleNativeWin}
-            />
+            <div style={{ position: 'relative' }}>
+              {activeMs > 0 && !isCompleted && (
+                <div style={timerOverlay}>
+                  {(activeMs / 1000).toFixed(1)}s
+                </div>
+              )}
+
+              {isCompleted && (
+                <div style={completionOverlay}>
+                  <div style={completionText}>
+                    RESONANCIA COMPLETA
+                    <br />
+                    <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                      TEMPO: {(activeMs / 1000).toFixed(1)} s
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <MinigameHost
+                definition={minigameDefinition}
+                stage={currentStage}
+                helperText={helperText}
+                submitting={submitting}
+                onWin={handleNativeWin}
+              />
+            </div>
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
@@ -585,3 +654,49 @@ const sheetAnimations = `
   50% { transform: translateY(-6px); }
 }
 `
+
+const timerOverlay: CSSProperties = {
+  position: 'absolute',
+  top: 16,
+  left: 16,
+  zIndex: 130,
+  padding: '6px 14px',
+  background: 'rgba(255, 255, 255, 0.1)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  borderRadius: 12,
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: 14,
+  pointerEvents: 'none',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+}
+
+const completionOverlay: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 150,
+  background: 'rgba(20, 25, 35, 0.7)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 22,
+  animation: 'sagaFadeIn 0.3s ease-out',
+}
+
+const completionText: CSSProperties = {
+  color: '#38bdf8',
+  fontSize: 22,
+  fontWeight: 900,
+  textAlign: 'center',
+  textShadow: '0 0 20px rgba(56, 189, 248, 0.6)',
+  lineHeight: 1.5,
+  letterSpacing: '0.05em',
+  animation: 'sagaIconFloat 3s ease-in-out infinite',
+}

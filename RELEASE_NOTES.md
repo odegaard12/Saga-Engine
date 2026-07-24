@@ -1,28 +1,16 @@
-# SAGA Engine v2.0.1 — Security Hardening & Release Alignment
+# SAGA Engine v3.9.1 — Offline timers and UI Glassmorphism feedback
 
-SAGA Engine v2.0.1 focuses on repository hardening, safer runtime defaults, and release consistency across the backend, frontend, Docker image, and deployment tooling.
+SAGA Engine v3.9.1 implementa el nuevo diseño visual unificado Glassmorphism y refactoriza la gestión del tiempo y controles de administrador.
 
-## Security hardening
-- Disabled `/docs`, `/redoc`, and OpenAPI by default in production-style runs.
-- Removed `mapbox_token` from the public `/api/config` response.
-- Added signed player-session cookies for `/api/advance` and `/api/events/sync`.
-- Added basic rate limiting for `/api/advance` and `/api/events/sync`.
-- Changed `/api/admin/react-overview` to return HTTP 403 on auth failures.
-- Required an active admin session for `/api/admin/change-password`.
-- Added explicit CORS middleware plus browser security headers.
-- Persisted admin sessions in runtime storage so they survive process restarts.
+## Diseño Visual (Glassmorphism)
+- Aplicado el diseño de cristales translúcidos (Glassmorphism) a todas las interfaces.
+- Interfaz flotante de "RESONANCIA COMPLETA" mostrada al superar los nodos interactivos.
+- Reloj flotante permanente en el encabezado general (PlayerShell) mostrando el tiempo de juego acumulado.
 
-## Container and deploy safety
-- Docker now runs as a non-root user.
-- Docker copies only runtime files instead of the whole repository tree.
-- The safe deploy script now uses `$HOME`-relative defaults, validates image names, and removes hardcoded LAN/server paths from user-facing output.
-- Vite development host settings now come from environment variables instead of a hardcoded production domain.
+## Refactorización del Cronómetro y Modo Offline
+- El backend ya no suma ciegamente los deltas de tiempo. El cliente cuenta el tiempo activo real (se inicia solo cuando el nodo es jugable).
+- En el modo Offline, el tiempo empleado (`time_spent_ms`) se guarda en la IndexedDB local y se envía al recuperar la conexión, garantizando que el ranking es milimétricamente preciso sin importar la cobertura.
 
-## Repository hygiene
-- Added Python dependency coverage to Dependabot.
-- Removed unsafe GitHub token scraping patterns from release helper scripts.
-- Aligned repo, frontend, and docs version metadata to `2.0.1`.
-- Removed the dead return in the service-worker alias route.
-
-## Notes
-- Existing baseline backend failures in `tests/test_sqlite_migration_dry_run.py` remain pre-existing and are unrelated to this release hardening pass.
+## Herramientas de Administración
+- Añadido un botón **"Restaurar Nodo"** en el panel React de jugadores, permitiendo a los administradores bajar 1 nivel a un jugador y eliminar el tiempo empleado asociado para ese reto específico.
+- Al usar el avance manual de administrador (+1 nodo) o el "Código de respaldo" para saltar nodos, el sistema aplica automáticamente una penalización fija de 5 minutos al tiempo del jugador.

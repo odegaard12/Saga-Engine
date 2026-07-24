@@ -109,7 +109,9 @@ export function saveOfflineSnapshot(snapshot: SagaOfflineSnapshot): SagaOfflineS
   }
 
   if (hasLocalStorage()) {
+    try {
     window.localStorage.setItem(storageKey(cleanSnapshot.user), JSON.stringify(cleanSnapshot))
+    } catch (e) { console.warn('Storage quota exceeded', e); }
   }
 
   return cleanSnapshot
