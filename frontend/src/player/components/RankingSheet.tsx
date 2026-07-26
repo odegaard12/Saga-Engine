@@ -33,18 +33,17 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
 
   if (!open) return null
 
-  // Sort by level (descending), then time (ascending - lower time is better), then presence
   const sorted = [...players].sort((a, b) => {
     const lvlA = a.finished ? 999 : (a.level || 0)
     const lvlB = b.finished ? 999 : (b.level || 0)
     if (lvlA !== lvlB) return lvlB - lvlA
-    const timeA = (a.total_time_ms || 0) + (a.is_playing ? tick * 1000 : 0)
-    const timeB = (b.total_time_ms || 0) + (b.is_playing ? tick * 1000 : 0)
+    const timeA = a.total_time_ms || 0
+    const timeB = b.total_time_ms || 0
     if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB
     return a.display_name.localeCompare(b.display_name)
   })
 
-  const maxTime = Math.max(1, ...sorted.map((p) => (p.total_time_ms || 0) + (p.is_playing ? tick * 1000 : 0)))
+  const maxTime = Math.max(1, ...sorted.map((p) => p.total_time_ms || 0))
   const liveCount = sorted.filter((p) => p.presence === 'live').length
 
   return (
@@ -100,7 +99,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
             const pres = getPresenceConfig(player.presence)
             const isLive = player.presence === 'live'
 
-            const currentMs = (player.total_time_ms || 0) + (player.is_playing ? tick * 1000 : 0)
+            const currentMs = player.total_time_ms || 0
             const totalSecs = Math.floor(currentMs / 1000)
             const hrs = Math.floor(totalSecs / 3600)
             const mins = Math.floor((totalSecs % 3600) / 60)

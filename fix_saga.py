@@ -37,8 +37,7 @@ def generate_nodes():
             "config": None,
             "id": 1,
             "enabled": True,
-            "radius": None
-        },
+            "radius": 40},
         {
             "title": "2. Pista Este (O Camiño Novo)",
             "lat": 42.361000,
@@ -56,8 +55,7 @@ def generate_nodes():
             },
             "id": 2,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "3. Chan de Castiñeiras",
             "lat": 42.35960555353139,
@@ -73,8 +71,7 @@ def generate_nodes():
             "physical_item_id": "chip_encriptado",
             "id": 3,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "4. O Eco dos Reis (Mámoa del Rey)",
             "lat": 42.35840656643265,
@@ -90,8 +87,7 @@ def generate_nodes():
             },
             "id": 4,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "5. O Xardín (Botánico)",
             "lat": 42.361185,
@@ -107,8 +103,7 @@ def generate_nodes():
             "physical_item_id": "antena_frecuencia",
             "id": 5,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "6. A Visión (Mirador Pinga Pinga)",
             "lat": 42.35206013317765,
@@ -124,8 +119,7 @@ def generate_nodes():
             },
             "id": 6,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "7. O Núcleo (Mirador de Cotorredondo)",
             "lat": 42.3532789139366,
@@ -142,8 +136,7 @@ def generate_nodes():
             "entry_mode": "qr",
             "id": 7,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "8. Sendero del Oeste (O Paso Escuro)",
             "lat": 42.355500,
@@ -159,8 +152,7 @@ def generate_nodes():
             "physical_item_id": "bateria_litio",
             "id": 8,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "9. A Pedra Antiga (Mámoa Penalonga)",
             "lat": 42.35742918809162,
@@ -176,8 +168,7 @@ def generate_nodes():
             },
             "id": 9,
             "enabled": True,
-            "radius": 20
-        },
+            "radius": 40},
         {
             "title": "10. O Peche (Meta en el Lago)",
             "lat": 42.36296536346519,
@@ -194,8 +185,7 @@ def generate_nodes():
             "entry_mode": "qr",
             "id": 10,
             "enabled": True,
-            "radius": 20
-        }
+            "radius": 40}
     ]
 
     with open('/app/data/stages.json', 'w') as f:

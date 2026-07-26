@@ -4,12 +4,12 @@ const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.0.4'
 const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v2'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
-const MAX_TILE_URLS = 3500
+const MAX_TILE_URLS = 1500
 
-const REGIONAL_RADIUS_KM = 120 // contexto amplio, zoom bajo
-const MISSION_AREA_RADIUS_KM = 35 // zona jugable amplia, zoom medio
-const ROUTE_CORRIDOR_KM = 6 // ancho alrededor de la ruta
-const NODE_DETAIL_RADIUS_KM = 1.2 // detalle alto alrededor de nodos
+const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
+const MISSION_AREA_RADIUS_KM = 10 // zona jugable amplia, zoom medio
+const ROUTE_CORRIDOR_KM = 2 // ancho alrededor de la ruta
+const NODE_DETAIL_RADIUS_KM = 0.5 // detalle alto alrededor de nodos
 
 export type OfflineMapTileProgress = {
   label: string
@@ -259,7 +259,7 @@ async function fetchAndCacheUrls(
       } finally {
         completed += 1
 
-        if (completed === urls.length || completed % 12 === 0) {
+        if (completed === urls.length || completed % 100 === 0) {
           onProgress?.({
             label: 'Mapa offline',
             done: completed,
