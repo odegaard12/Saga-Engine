@@ -13,6 +13,10 @@ data/admin_auth.json
 data/*.bak
 data/gamestate.json
 data/positions.json
+# Route data is private per-deployment — never commit to public repo
+data/stages.json
+data/saga.sqlite3
+data/runtime_store.json
 .DS_Store
 .env
 .env.*
