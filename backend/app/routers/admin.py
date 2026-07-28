@@ -253,6 +253,8 @@ async def admin_profile_action(request: Request):
 
     if action == "reset_profile":
         new_level = 0
+        # Explicitly wipe all accumulated timer data on a full reset.
+        main.clear_all_player_timers(profile_id)
     elif action == "level_prev":
         new_level = max(0, previous_level - 1)
     elif action == "restore_node":

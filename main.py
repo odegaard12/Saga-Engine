@@ -713,11 +713,25 @@ def record_player_stage_time(user, level, time_ms):
     stage_times = timers[user_key].setdefault("stage_times_ms", {})
     lvl_str = str(level)
     
-    # Do not overwrite if they redo without resetting, or just accumulate.
-    # The requirement is that time is accumulated EXACTLY from client. 
-    # If they submit multiple times, we just add or set. Let's add it.
-    stage_times[lvl_str] = stage_times.get(lvl_str, 0) + time_ms
+    # SET the time for this level - do not accumulate across retries.
+    # The client sends the correct elapsed time; penalties are added explicitly.
+    # Using the max of existing vs new prevents regression when called multiple times.
+    existing = stage_times.get(lvl_str, 0)
+    stage_times[lvl_str] = max(existing, int(time_ms or 0))
     save_player_timers(timers)
+
+
+def clear_all_player_timers(user):
+    """Completely wipe all stage timer data for a player. Called on full profile reset."""
+    timers = load_player_timers()
+    user_key = str(user or "").strip()
+    if not user_key:
+        return
+    if user_key in timers:
+        timers[user_key]["stage_times_ms"] = {}
+        # Also clear any legacy started_at keys
+        timers[user_key].pop("current_stage_started_at", None)
+        save_player_timers(timers)
 
 def clear_player_stage_time(user, level):
     timers = load_player_timers()
@@ -1054,11 +1068,50 @@ async def admin_redirect_to_react():
 
 
 def get_runtime_version_payload():
+    # Load build env file written by the deploy script (highest priority after env vars).
+    # Format: KEY=value, one per line.
+    _build_env: dict[str, str] = {}
+    try:
+        env_file = APP_DIR / ".saga_build_env"
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    _build_env[k.strip()] = v.strip()
+    except Exception:
+        pass
+
+    def _get(key: str, fallback: str = "") -> str:
+        # .saga_build_env takes priority — it is written by the deploy script
+        # and reflects the actual deployed version, overriding any stale
+        # env vars that were baked into the container at creation time.
+        return _build_env.get(key, "").strip() or os.getenv(key, "").strip() or fallback
+
+    version = _get("SAGA_VERSION")
+    if not version:
+        try:
+            version = (APP_DIR / "VERSION").read_text().strip()
+        except Exception:
+            version = "dev"
+
+    commit = _get("SAGA_COMMIT", "unknown")
+    if commit == "unknown":
+        try:
+            import subprocess as _sp
+            r = _sp.run(["git", "rev-parse", "HEAD"], cwd=str(APP_DIR),
+                        capture_output=True, text=True, timeout=2)
+            if r.returncode == 0:
+                commit = r.stdout.strip()
+        except Exception:
+            pass
+
+    built_at = _get("SAGA_BUILD_TIME")
+
     return {
         "status": "ok",
-        "version": os.getenv("SAGA_VERSION", "dev"),
-        "commit": os.getenv("SAGA_COMMIT", "unknown"),
-        "built_at": os.getenv("SAGA_BUILD_TIME", ""),
+        "version": version or "dev",
+        "commit": commit or "unknown",
+        "built_at": built_at,
     }
 
 

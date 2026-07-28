@@ -83,6 +83,7 @@ export function InteractionSheet({
   const touchStartYRef = useRef<number | null>(null)
   const touchStartXRef = useRef<number | null>(null)
   const dragEnabledRef = useRef(false)
+  const timerStartRef = useRef<number | null>(null)
 
   const stageId = currentStage?.id ?? null
   const stageType = currentStage?.minigame?.type ?? currentStage?.type ?? null
@@ -123,23 +124,30 @@ export function InteractionSheet({
     if (!open) {
       setActiveMs(0)
       setIsCompleted(false)
+      timerStartRef.current = null
     }
   }, [open])
+
 
   useEffect(() => {
     // El timer arranca 300ms después de abrir (cuando la animación de UI y el puzzle es interactivo)
     // Se detiene al hacer submit o al completarlo
+    // NOTA: activeMs NO debe estar en las deps para evitar que el efecto
+    // se reinicie en cada tick (cancelando el setTimeout de 300ms infinitamente).
     if (open && currentStage && !submitting && !isCompleted) {
       const timeout = setTimeout(() => {
-        const startTime = Date.now() - activeMs
+        timerStartRef.current = Date.now()
         const timer = setInterval(() => {
-          setActiveMs(Date.now() - startTime)
+          if (timerStartRef.current !== null) {
+            setActiveMs(Date.now() - timerStartRef.current)
+          }
         }, 100)
         return () => clearInterval(timer)
       }, 300)
       return () => clearTimeout(timeout)
     }
-  }, [open, currentStage, submitting, isCompleted, activeMs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentStage, submitting, isCompleted])
 
   if (!open || !currentStage) return null
 

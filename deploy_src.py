@@ -1,26 +1,77 @@
 import subprocess
+import datetime
+import pathlib
+import sys
 
-print('Archiving...')
-subprocess.run(['tar', '-czf', 'deploy_src.tar.gz', 'frontend/src', 'frontend/public', 'frontend/index.html', 'frontend/package.json', 'backend/app/routers/admin.py', 'backend/app/runtime/core_engine.py', 'main.py', 'fix_saga.py'])
+# Read version from VERSION file
+version_file = pathlib.Path(__file__).parent / "VERSION"
+version = version_file.read_text().strip() if version_file.exists() else "dev"
 
-print('Sending...')
-subprocess.run(['scp', 'deploy_src.tar.gz', 'odegaard12@192.168.68.104:/home/odegaard12/saga_engine/'])
+# Build timestamp (ISO-8601 UTC)
+build_time = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-print('Deploying...')
-remote_cmd = """
+print(f"[deploy_src] SAGA Engine v{version} — build time: {build_time}")
+
+# ── 1. Create the archive ────────────────────────────────────────────────────
+print("[deploy_src] Creating archive...")
+subprocess.run([
+    "tar", "-czf", "deploy_src.tar.gz",
+    "frontend/src", "frontend/public", "frontend/index.html",
+    "frontend/package.json",
+    "backend/app/routers/admin.py",
+    "backend/app/runtime/core_engine.py",
+    "main.py",
+    "VERSION",
+], check=True)
+
+# ── 2. SCP to Raspberry Pi ───────────────────────────────────────────────────
+print("[deploy_src] Uploading archive to Pi...")
+subprocess.run([
+    "scp", "deploy_src.tar.gz",
+    "odegaard12@192.168.68.104:/home/odegaard12/saga_engine/"
+], check=True)
+
+# ── 3. Remote deploy commands ────────────────────────────────────────────────
+print("[deploy_src] Running deploy on Pi...")
+remote_cmd = f"""set -e
 cd /home/odegaard12/saga_engine
+echo "[pi] Extracting archive..."
 tar -xzf deploy_src.tar.gz
-docker run --rm -v /home/odegaard12/saga_engine/frontend:/app -w /app node:20-alpine sh -c "npm install && npm run build"
+
+echo "[pi] Building frontend (Node)..."
+docker run --rm \\
+  -v /home/odegaard12/saga_engine/frontend:/app \\
+  -w /app node:20-alpine \\
+  sh -c "npm install && npm run build"
+
+echo "[pi] Copying backend files into container..."
 docker cp backend/app/routers/admin.py saga_engine_app:/app/backend/app/routers/admin.py
 docker cp backend/app/runtime/core_engine.py saga_engine_app:/app/backend/app/runtime/core_engine.py
 docker cp main.py saga_engine_app:/app/main.py
-docker cp fix_saga.py saga_engine_app:/app/fix_saga.py
+docker cp VERSION saga_engine_app:/app/VERSION
+
+echo "[pi] Copying frontend build..."
 docker cp frontend/dist saga_engine_app:/app/frontend/
 docker cp frontend/public saga_engine_app:/app/frontend/
-docker cp frontend/index.html saga_engine_app:/app/frontend/
+docker cp frontend/index.html saga_engine_app:/app/frontend/index.html
 docker cp frontend/package.json saga_engine_app:/app/frontend/package.json
-docker exec saga_engine_app python fix_saga.py
+
+echo "[pi] Writing build-info env file inside container..."
+docker exec saga_engine_app sh -c "echo 'SAGA_VERSION={version}' > /app/.saga_build_env && echo 'SAGA_BUILD_TIME={build_time}' >> /app/.saga_build_env"
+
+echo "[pi] Restarting container..."
 docker restart saga_engine_app
+
+echo "[pi] Done — v{version} at {build_time}"
 """
-subprocess.run(['ssh', 'odegaard12@192.168.68.104', remote_cmd])
-print('Done.')
+
+result = subprocess.run(
+    ["ssh", "odegaard12@192.168.68.104", remote_cmd],
+    capture_output=False
+)
+
+if result.returncode != 0:
+    print(f"[deploy_src] ERROR: remote deploy failed (exit code {result.returncode})", file=sys.stderr)
+    sys.exit(result.returncode)
+
+print(f"[deploy_src] OK. v{version} deployed at {build_time}")
