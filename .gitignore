@@ -71,6 +71,11 @@ data/stages.json
 frontend/.env
 PR_DESCRIPTION.md
 *.zip
+*.tar.gz
 *.pyc
 __pycache__/
 release_*.md
+check_pi.py
+debug_version.py
+fix_timers.py
+tmp_test/

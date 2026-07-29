@@ -237,8 +237,8 @@ export function PlayerHud({
     const clean = toolsFallbackCode.trim().toUpperCase()
     if (!clean || !onSubmitCode || submitting) return
 
-    // Si usan el código manual de respaldo (saltar nodo), aplicamos una penalización de 5 min (300000 ms)
-    await onSubmitCode(clean, 300000)
+    // Si usan el código manual de respaldo (saltar nodo), aplicamos una penalización de 2 min (120000 ms)
+    await onSubmitCode(clean, 120000)
     setToolsFallbackCode('')
     setToolsFallbackOpen(false)
   }

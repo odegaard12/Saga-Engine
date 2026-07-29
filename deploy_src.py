@@ -18,8 +18,8 @@ subprocess.run([
     "tar", "-czf", "deploy_src.tar.gz",
     "frontend/src", "frontend/public", "frontend/index.html",
     "frontend/package.json",
-    "backend/app/routers/admin.py",
-    "backend/app/runtime/core_engine.py",
+    "backend",
+    "data/stages.json",
     "main.py",
     "VERSION",
 ], check=True)
@@ -44,9 +44,9 @@ docker run --rm \\
   -w /app node:20-alpine \\
   sh -c "npm install && npm run build"
 
-echo "[pi] Copying backend files into container..."
-docker cp backend/app/routers/admin.py saga_engine_app:/app/backend/app/routers/admin.py
-docker cp backend/app/runtime/core_engine.py saga_engine_app:/app/backend/app/runtime/core_engine.py
+echo "[pi] Copying backend and data files into container..."
+docker cp backend saga_engine_app:/app/
+docker cp data/stages.json saga_engine_app:/app/data/stages.json
 docker cp main.py saga_engine_app:/app/main.py
 docker cp VERSION saga_engine_app:/app/VERSION
 
@@ -56,8 +56,15 @@ docker cp frontend/public saga_engine_app:/app/frontend/
 docker cp frontend/index.html saga_engine_app:/app/frontend/index.html
 docker cp frontend/package.json saga_engine_app:/app/frontend/package.json
 
+echo "[pi] Fixing /app/data permissions..."
+docker exec -u 0 saga_engine_app chown -R app:app /app/data || true
+docker exec -u 0 saga_engine_app chmod -R 777 /app/data || true
+
 echo "[pi] Writing build-info env file inside container..."
 docker exec saga_engine_app sh -c "echo 'SAGA_VERSION={version}' > /app/.saga_build_env && echo 'SAGA_BUILD_TIME={build_time}' >> /app/.saga_build_env"
+
+echo "[pi] Syncing stages.json to SQLite database..."
+docker exec saga_engine_app python -c "import json, sqlite3; stages=json.load(open('/app/data/stages.json')); conn=sqlite3.connect('/app/data/saga.sqlite3'); conn.execute('CREATE TABLE IF NOT EXISTS stages (idx INTEGER PRIMARY KEY, stage_json TEXT NOT NULL, updated_at TEXT NOT NULL)'); conn.execute('DELETE FROM stages'); [conn.execute('INSERT INTO stages (idx, stage_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', (i, json.dumps(s, ensure_ascii=False))) for i, s in enumerate(stages)]; conn.commit(); conn.close(); print('[pi] Synced', len(stages), 'stages to SQLite')"
 
 echo "[pi] Restarting container..."
 docker restart saga_engine_app

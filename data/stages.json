@@ -1,178 +1,220 @@
 [
   {
-    "title": "1. O V\u00e9rtice Inicial (Parking)",
-    "lat": 42.36390658474425,
-    "lon": -8.675606236105482,
-    "type": "circuit_matrix",
-    "content": "Punto de partida y sincronizaci\u00f3n de equipos. Pulsa EMPEZAR para comenzar.",
-    "config": {
-      "objective": "sequence_order",
-      "game_id": "sequence_code",
-      "completion_method": "sequence",
-      "sequence": [
-        "EMPEZAR"
-      ],
-      "difficulty": "normal"
-    },
     "id": 1,
+    "title": "1. Aparcamiento do Lago (Checkpoint Inicial)",
+    "lat": 42.36296536346519,
+    "lon": -8.67393525063518,
+    "type": "signal_hunt",
+    "radius": 30,
     "enabled": true,
-    "radius": 15
+    "fallback_code": "VIXIA_LAGO",
+    "physical_fallback_code": "VIXIA_LAGO",
+    "success_code": "VIXIA_LAGO",
+    "content": "Benvidos á ruta mística de Cotorredondo e Lago de Castiñeiras. A Néboa espectral esténdese polas cumbres do monte. Rexistra a túa chegada no aparcamiento inicial antes de adentrarte na senda.",
+    "config": {
+      "game_id": "simple_checkpoint",
+      "objective": "Rexistrar chegada no aparcamiento do lago"
+    }
   },
   {
-    "title": "2. Pista Este (O Cami\u00f1o Novo)",
-    "lat": 42.361,
-    "lon": -8.667,
+    "id": 2,
+    "title": "2. Senda de Castiñeiras (Minijuego 1)",
+    "lat": 42.3665,
+    "lon": -8.662,
     "type": "circuit_matrix",
-    "content": "Supera el circuito l\u00f3gico para restaurar la energ\u00eda.",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "SENDA_CASTINEIRAS",
+    "physical_fallback_code": "SENDA_CASTINEIRAS",
+    "success_code": "SENDA_CASTINEIRAS",
+    "content": "Na senda cara ás mámoas, a Néboa bloqueou os circuíts de comunicación espectral. Restaura a liña conectando os nodos para abrir paso.",
     "config": {
-      "objective": "path_restore",
       "game_id": "logic_circuit",
+      "objective": "path_restore",
+      "completion_method": "puzzle",
+      "grid_cols": 4,
+      "grid_rows": 4,
+      "difficulty": "normal",
+      "pattern_mode": "random_each_game"
+    }
+  },
+  {
+    "id": 3,
+    "title": "3. Mámoas de Castiñeiras (Coleccionable 1)",
+    "lat": 42.36,
+    "lon": -8.654,
+    "type": "signal_hunt",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "ANTENA_MAMOA",
+    "physical_fallback_code": "ANTENA_MAMOA",
+    "success_code": "ANTENA_MAMOA",
+    "content": "Este conxunto megalítico milenario garda a enerxía dos antigos poboadores. Atopades a Antena de Frecuencia! Agrécase á vosa mochila para craftear máis adiante.",
+    "physical_node_kind": "collectible",
+    "physical_item_id": "antena_frecuencia",
+    "physical_item_label": "Antena de Frecuencia",
+    "config": {
+      "game_id": "simple_checkpoint",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    }
+  },
+  {
+    "id": 4,
+    "title": "4. Mirador de Tordóia (Baliza QR 1)",
+    "lat": 42.3475,
+    "lon": -8.662,
+    "type": "signal_hunt",
+    "radius": 25,
+    "enabled": true,
+    "entry_mode": "qr",
+    "qr_payload": "SAGA_01",
+    "fallback_code": "SAGA_01",
+    "physical_fallback_code": "SAGA_01",
+    "success_code": "SAGA_01",
+    "physical_node_kind": "clue",
+    "content": "Chegastes ao espectacular Mirador de Tordóia. Aquí atópase a Baliza QR 1 (SAGA_01) impresa en verde. Escanea o código QR ubicado no mirador para continuar.",
+    "config": {
+      "game_id": "qr_collectible",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    }
+  },
+  {
+    "id": 5,
+    "title": "5. Repetidores do Monte (Minijuego 2)",
+    "lat": 42.3495,
+    "lon": -8.672,
+    "type": "audio_challenge",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "REPETIDOR_SONICO",
+    "physical_fallback_code": "REPETIDOR_SONICO",
+    "success_code": "REPETIDOR_SONICO",
+    "content": "Xunto ás antenas repetidoras do monte, a onda de frecuencia emite un zumbido. Sintoniza e emite o tono adecuado co micrófono para estabilizar a onda.",
+    "config": {
+      "game_id": "audio_challenge",
+      "objective": "listen_and_repeat",
+      "completion_method": "audio",
+      "difficulty": "normal"
+    }
+  },
+  {
+    "id": 6,
+    "title": "6. Torre de Cotorredondo (Baliza QR 2)",
+    "lat": 42.3533,
+    "lon": -8.6757,
+    "type": "signal_hunt",
+    "radius": 25,
+    "enabled": true,
+    "entry_mode": "qr",
+    "qr_payload": "SAGA_02",
+    "fallback_code": "SAGA_02",
+    "physical_fallback_code": "SAGA_02",
+    "success_code": "SAGA_02",
+    "physical_node_kind": "requirement",
+    "content": "A Torre e Mirador de Cotorredondo é a cumbre da ruta (550m). Aquí atópase a Baliza QR 2 (SAGA_02). Escanea o código QR instalado na torre para avanzar.",
+    "config": {
+      "game_id": "qr_collectible",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    }
+  },
+  {
+    "id": 7,
+    "title": "7. Campo de Tiro (Coleccionable 2)",
+    "lat": 42.3515,
+    "lon": -8.687,
+    "type": "signal_hunt",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "CHIP_CAMPO_TIRO",
+    "physical_fallback_code": "CHIP_CAMPO_TIRO",
+    "success_code": "CHIP_CAMPO_TIRO",
+    "content": "Nas inmediacións do antigo Campo de Tiro de Cotorredondo, entre as ruínas das vellas pistas, atópase o Chip Encriptado. Gárdase na vosa mochila.",
+    "physical_node_kind": "collectible",
+    "physical_item_id": "chip_encriptado",
+    "physical_item_label": "Chip Encriptado",
+    "config": {
+      "game_id": "simple_checkpoint",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    }
+  },
+  {
+    "id": 8,
+    "title": "8. Senda Forestal Norte (Coleccionable 3)",
+    "lat": 42.3585,
+    "lon": -8.685,
+    "type": "signal_hunt",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "BATERIA_NORTE",
+    "physical_fallback_code": "BATERIA_NORTE",
+    "success_code": "BATERIA_NORTE",
+    "content": "Na pista de regreso pola ladeira norte do monte, atopades a Batería de Litio. Coa Antena + Chip + Batería na mochila, podedes craftear o Decodificador Cuántico!",
+    "physical_node_kind": "collectible",
+    "physical_item_id": "bateria_litio",
+    "physical_item_label": "Batería de Litio",
+    "config": {
+      "game_id": "simple_checkpoint",
+      "objective": "physical_collectible",
+      "completion_method": "inventory_only"
+    }
+  },
+  {
+    "id": 9,
+    "title": "9. Baixada ao Botánico (Minijuego 3)",
+    "lat": 42.362,
+    "lon": -8.679,
+    "type": "motion_challenge",
+    "radius": 25,
+    "enabled": true,
+    "fallback_code": "NIVEL_BOTANICO",
+    "physical_fallback_code": "NIVEL_BOTANICO",
+    "success_code": "NIVEL_BOTANICO",
+    "content": "Na baixada cara ao Xardín Botánico, a turbulencia espectral tenta desestabilizar o camiño. Mantén o teléfono nivelado 10 segundos para descender con seguridade.",
+    "config": {
+      "game_id": "motion_challenge",
+      "objective": "keep_level",
+      "completion_method": "motion",
+      "duration_seconds": 10,
+      "tolerance_degrees": 15,
+      "difficulty": "normal"
+    }
+  },
+  {
+    "id": 10,
+    "title": "10. Xardín Botánico (Meta Final)",
+    "lat": 42.3635,
+    "lon": -8.675,
+    "type": "circuit_matrix",
+    "radius": 30,
+    "enabled": true,
+    "fallback_code": "META_BOTANICO_FINAL",
+    "physical_fallback_code": "META_BOTANICO_FINAL",
+    "success_code": "META_BOTANICO_FINAL",
+    "required_item_id": "decodificador_cuantico",
+    "requirements": {
+      "items": [
+        {
+          "item_id": "decodificador_cuantico",
+          "quantity": 1,
+          "consume": true,
+          "label": "Decodificador Cuántico"
+        }
+      ]
+    },
+    "content": "Chegastes á meta final no Xardín Botánico de Cotorredondo! Para activar o sello final necesitas ter crafteado o Decodificador Cuántico na Mochila.\n\nResolve o circuíto final para disolver a Néboa e completar a misión!",
+    "config": {
+      "game_id": "logic_circuit",
+      "objective": "path_restore",
       "completion_method": "puzzle",
       "grid_cols": 5,
       "grid_rows": 5,
-      "difficulty": "normal",
-      "pattern_mode": "random_each_game"
-    },
-    "id": 2,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "3. Chan de Casti\u00f1eiras",
-    "lat": 42.35960555353139,
-    "lon": -8.67235544713735,
-    "type": "signal_hunt",
-    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
-    "config": {
-      "objective": "physical_collectible",
-      "completion_method": "inventory_only",
-      "game_id": "simple_checkpoint"
-    },
-    "physical_node_kind": "collectible",
-    "physical_item_id": "chip_encriptado",
-    "id": 3,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "4. O Eco dos Reis (M\u00e1moa del Rey)",
-    "lat": 42.35840656643265,
-    "lon": -8.67258908389772,
-    "type": "circuit_matrix",
-    "content": "Descifra el c\u00f3digo secuencial de la antena.",
-    "config": {
-      "objective": "sequence_order",
-      "game_id": "sequence_code",
-      "completion_method": "sequence",
       "difficulty": "hard",
-      "pattern_mode": "random_each_game"
-    },
-    "id": 4,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "5. Frontera Sur (As Pistas Baixas)",
-    "lat": 42.3495,
-    "lon": -8.6705,
-    "type": "signal_hunt",
-    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
-    "config": {
-      "objective": "physical_collectible",
-      "completion_method": "inventory_only",
-      "game_id": "simple_checkpoint"
-    },
-    "physical_node_kind": "collectible",
-    "physical_item_id": "antena_frecuencia",
-    "id": 5,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "6. A Visi\u00f3n (Mirador Pinga Pinga)",
-    "lat": 42.35206013317765,
-    "lon": -8.67355081121013,
-    "type": "circuit_matrix",
-    "content": "Reconstruye el mosaico para despejar el camino.",
-    "config": {
-      "objective": "path_restore",
-      "game_id": "place_mosaic",
-      "completion_method": "puzzle",
-      "difficulty": "normal",
-      "pattern_mode": "random_each_game"
-    },
-    "id": 6,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "7. O N\u00facleo (Mirador de Cotorredondo)",
-    "lat": 42.3532789139366,
-    "lon": -8.675665385750394,
-    "type": "signal_hunt",
-    "content": "Escanea el c\u00f3digo QR escondido en el mirador.",
-    "config": {
-      "objective": "physical_collectible",
-      "completion_method": "inventory_only",
-      "game_id": "qr_collectible"
-    },
-    "physical_node_kind": "bonus",
-    "physical_item_id": "pista_bonus",
-    "entry_mode": "qr",
-    "id": 7,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "8. Sendero del Oeste (O Paso Escuro)",
-    "lat": 42.3555,
-    "lon": -8.6835,
-    "type": "signal_hunt",
-    "content": "Has encontrado un objeto abandonado. Rec\u00f3gelo.",
-    "config": {
-      "objective": "physical_collectible",
-      "completion_method": "inventory_only",
-      "game_id": "simple_checkpoint"
-    },
-    "physical_node_kind": "collectible",
-    "physical_item_id": "bateria_litio",
-    "id": 8,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "9. A Pedra Antiga (M\u00e1moa Penalonga)",
-    "lat": 42.35742918809162,
-    "lon": -8.677914867138098,
-    "type": "motion_challenge",
-    "content": "Inclina tu dispositivo para superar el laberinto f\u00edsico.",
-    "config": {
-      "objective": "shake_charge",
-      "game_id": "tilt_maze",
-      "completion_method": "motion",
-      "difficulty": "normal",
-      "pattern_mode": "random_each_game"
-    },
-    "id": 9,
-    "enabled": true,
-    "radius": 20
-  },
-  {
-    "title": "10. O Arsenal (Campo de Tiro)",
-    "lat": 42.35983803884877,
-    "lon": -8.680437434053916,
-    "type": "signal_hunt",
-    "content": "Escanea el QR de la puerta. (Requiere Decodificador Cu\u00e1ntico crafteado).",
-    "config": {
-      "objective": "physical_collectible",
-      "completion_method": "inventory_only",
-      "game_id": "qr_key_gate"
-    },
-    "physical_node_kind": "requirement",
-    "physical_item_id": "decodificador_cuantico",
-    "entry_mode": "qr",
-    "id": 10,
-    "enabled": true,
-    "radius": 20
+      "pattern_mode": "random_each_game",
+      "required_item_id": "decodificador_cuantico"
+    }
   }
 ]

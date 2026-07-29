@@ -26,12 +26,34 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
         </header>
 
         <div style={content}>
-          {/* Version 3.5.0 */}
+          {/* Version 3.9.4 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
-              <span style={vTag}>v3.9.2</span>
-              <span style={vDate}>24 de Julio, 2026</span>
+              <span style={vTag}>v3.9.4</span>
+              <span style={vDate}>29 de Julio, 2026</span>
               <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
+            </div>
+
+            <h3 style={releaseTitle}>🌲 Ruta Oficial Cotorredondo, Pegatinas QR Personalizables y Sincronización SQLite</h3>
+
+            <ul style={featureList}>
+              <li>
+                <strong>🗺️ Ruta de 10 Nodos en Cotorredondo:</strong> Configuración mística con 3 coleccionables de mochila, crafteo del Decodificador Cuántico y 4 minijuegos activos.
+              </li>
+              <li>
+                <strong>🖨️ Pegatinas QR Personalizables:</strong> Generador ultra-limpio con selector de multiplicador (1x, 2x, 4x, 6x, 8x copias) y códigos independientes del orden (SAGA_01, SAGA_02).
+              </li>
+              <li>
+                <strong>🗄️ Persistencia SQLite en Producción:</strong> Sincronización bi-direccional en tiempo real y corrección de permisos de archivo en la Raspberry Pi.
+              </li>
+            </ul>
+          </article>
+
+          {/* Version 3.9.2 */}
+          <article style={versionBlock}>
+            <div style={versionHeader}>
+              <span style={vTagMuted}>v3.9.2</span>
+              <span style={vDate}>24 de Julio, 2026</span>
             </div>
 
             <h3 style={releaseTitle}>🔮 10 Recetas Temáticas, Colocación de Chinchetas e i18n Gallego 100%</h3>

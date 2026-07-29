@@ -119,7 +119,7 @@ export default function AdminApp() {
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
   const [localNotice, setLocalNotice] = useState<string | null>(null)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'dirty'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
@@ -639,7 +639,7 @@ export default function AdminApp() {
     })
 
     setSelectedStage(null)
-    setSaveState('idle')
+    setSaveState('dirty')
     setLocalNotice('Node removed locally. Pulsa Guardar para persistir el borrado.')
   }
 
@@ -684,7 +684,7 @@ export default function AdminApp() {
 
     if (movedStage) {
       setSelectedStage(movedStage)
-      setSaveState('idle')
+      setSaveState('dirty')
       setLocalNotice('Orden de ruta actualizado en local. Pulsa Guardar para persistir.')
     }
   }
@@ -834,7 +834,7 @@ export default function AdminApp() {
 
     setSelectedStage(nextStages[0] || null)
     setCmsPanel('none')
-    setSaveState('idle')
+    setSaveState('dirty')
     setLocalNotice(
       `Plantilla "${template.title}" creada en local. Revisa los nodos y pulsa Guardar.`
     )
@@ -884,7 +884,7 @@ export default function AdminApp() {
     }
 
     setCmsPanel('none')
-    setSaveState('idle')
+    setSaveState('dirty')
     syncLocalStage(nextStage)
     setSelectedStage(nextStage)
     setLocalNotice(

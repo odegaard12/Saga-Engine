@@ -23,7 +23,8 @@ import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
 type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects'
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
+type MissionSaveState = StandardSaveState | 'dirty'
 
 type AdminMissionControlShellProps = {
   title: string
@@ -34,16 +35,16 @@ type AdminMissionControlShellProps = {
   selectedStage: AdminReactOverviewStage | null
   cmsPanel: CmsPanel
   localNotice: string | null
-  saveState: SaveState
+  saveState: MissionSaveState
   saveError: string | null
   playerDrafts: PlayerDraft[]
-  playerSaveState: SaveState
+  playerSaveState: StandardSaveState
   playerSaveError: string | null
   profileProgress: Record<string, { level: number | null; finished: boolean }>
   profileActionState: Record<string, string>
   profileActionError: Record<string, string>
   missionDraft: Record<string, string>
-  settingsSaveState: SaveState
+  settingsSaveState: StandardSaveState
   settingsSaveError: string | null
   onRefresh: () => void
   onSelectStage: (stage: AdminReactOverviewStage | null) => void
@@ -536,7 +537,7 @@ export default function AdminMissionControlShell({
                 cursor: 'pointer',
               }}
             >
-              📜 v3.9.2 Novedades
+              📜 Novedades
             </button>
           </div>
 
@@ -769,12 +770,12 @@ function isPhysicalNode(stage: AdminReactOverviewStage | null) {
   return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
 }
 
-function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {
+function SaveStatus({ state, error }: { state: MissionSaveState; error: string | null }) {
   if (state === 'error') {
     return (
       <div className="saga-save-status error">
         <b>Error al guardar</b>
-        <span>{error || 'Unknown error'}</span>
+        <span>{error || 'Error desconocido'}</span>
       </div>
     )
   }
@@ -782,25 +783,25 @@ function SaveStatus({ state, error }: { state: SaveState; error: string | null }
   if (state === 'saving') {
     return (
       <div className="saga-save-status saving">
-        <b>Saving</b>
-        <span>Writing mission data…</span>
+        <b>Guardando</b>
+        <span>Enviando cambios al servidor…</span>
       </div>
     )
   }
 
-  if (state === 'saved') {
+  if (state === 'dirty') {
     return (
-      <div className="saga-save-status saved">
-        <b>Guardado</b>
-        <span>Backend reloaded</span>
+      <div className="saga-save-status dirty">
+        <b>Sin guardar</b>
+        <span>Cambios locales pendientes</span>
       </div>
     )
   }
 
   return (
-    <div className="saga-save-status idle">
-      <b>Sin guardar</b>
-      <span>Local changes only</span>
+    <div className="saga-save-status saved">
+      <b>Guardado</b>
+      <span>Sincronizado con servidor</span>
     </div>
   )
 }

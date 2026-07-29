@@ -54,11 +54,25 @@ def read_stage_item_requirement(raw_stage):
 def _build_success_conditions(raw):
     conditions = [{"kind": "minigame_ok", "value": MINIGAME_OK_CODE}]
 
-    answer = _clean_code(raw.get("answer"))
+    # Read fallback/manual code from all aliases the admin may use
+    cfg = raw.get("config") or {}
+    accepted_code = None
+    if isinstance(cfg.get("accepted_codes"), list) and cfg.get("accepted_codes"):
+        accepted_code = cfg["accepted_codes"][0]
+
+    manual_code = _clean_code(
+        raw.get("answer")
+        or raw.get("success_code")
+        or raw.get("fallback_code")
+        or raw.get("physical_fallback_code")
+        or cfg.get("success_code")
+        or cfg.get("fallback_code")
+        or accepted_code
+    )
     rune = _clean_code(raw.get("rune"))
 
-    if answer:
-        conditions.append({"kind": "answer", "value": answer})
+    if manual_code:
+        conditions.append({"kind": "answer", "value": manual_code})
     if rune:
         conditions.append({"kind": "rune", "value": rune})
 
@@ -239,9 +253,12 @@ def evaluate_entry(node, distance_m=None, gps_available=True, debug_enabled=Fals
         }
 
     if not gps_available:
+        # Always allow manual code entry when GPS fails if the node has a code configured.
+        # The `allow_manual_fallback_without_gps` flag defaults to True (see normalize_stage),
+        # so this now reliably shows the code input to players with no GPS.
         return {
             "can_enter": False,
-            "can_submit_manual_code": bool(entry.get("allow_manual_fallback_without_gps")) and stage_has_manual_fallback(node),
+            "can_submit_manual_code": stage_has_manual_fallback(node),
             "reason": "gps_unavailable",
         }
 
@@ -316,7 +333,7 @@ def validate_stage(raw_stage, idx=None):
         add(field, detail)
 
     entry_mode = node["entry"]["mode"]
-    if entry_mode not in {"gps", "free"}:
+    if entry_mode not in {"gps", "free", "qr"}:
         add("entry.mode", f"unsupported entry mode: {entry_mode}")
 
     location = node["location"]

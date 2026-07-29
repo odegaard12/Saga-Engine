@@ -7,7 +7,7 @@ def main():
     url = 'http://192.168.68.104:8096'
     admin_key = 'Pelochito13'
     
-    with open('cotorredondo_expanded_route.json', 'r', encoding='utf-8') as f:
+    with open('data/stages.json', 'r', encoding='utf-8') as f:
         stages = json.load(f)
 
     # 1. Login

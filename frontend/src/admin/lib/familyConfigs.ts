@@ -21,9 +21,9 @@ export const familyCards: Array<{
   },
   {
     id: 'signal_hunt',
-    icon: '📡',
-    title: 'Signal Hunt',
-    detail: 'GPS proximity, signal strength and source capture.',
+    icon: '📍',
+    title: 'Checkpoints GPS',
+    detail: 'Puntos de control, mensajes rápidos y captura de zona GPS.',
   },
   {
     id: 'bearing_hunt',
@@ -50,7 +50,7 @@ export function getAdminFamilyLabel(type: string) {
   if (type === 'bearing_hunt') return 'Bearing Hunt'
   if (type === 'circuit_matrix') return 'Matriz de circuitos'
   if (type === 'audio_challenge') return 'Desafío de audio'
-  return 'Signal Hunt'
+  return 'Checkpoint GPS'
 }
 
 export function getAdminFamilyIcon(type: string) {
@@ -58,7 +58,7 @@ export function getAdminFamilyIcon(type: string) {
   if (type === 'bearing_hunt') return '🧭'
   if (type === 'circuit_matrix') return '🧩'
   if (type === 'audio_challenge') return '🎤'
-  return '📡'
+  return '📍'
 }
 
 export function buildAdminMinigameBlock(type: string, config: Record<string, unknown>) {

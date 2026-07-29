@@ -109,9 +109,14 @@ export function InteractionSheet({
 
   const [activeMs, setActiveMs] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [fallbackOpen, setFallbackOpen] = useState(false)
+  const [fallbackInputCode, setFallbackInputCode] = useState('')
+  const [fallbackSubmitting, setFallbackSubmitting] = useState(false)
 
   useEffect(() => {
     setDragOffset(0)
+    setFallbackOpen(false)
+    setFallbackInputCode('')
   }, [stageId])
 
   useEffect(() => {
@@ -157,6 +162,23 @@ export function InteractionSheet({
     setTimeout(async () => {
       await onSubmitCode('OK', activeMs)
     }, 2000) // Show feedback for 2 seconds
+  }
+
+  async function handleSheetFallbackSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const clean = fallbackInputCode.trim().toUpperCase()
+    if (!clean || submitting || fallbackSubmitting) return
+
+    try {
+      setFallbackSubmitting(true)
+      vibrate([12, 20, 12])
+      // Apply 2-minute penalty (+120,000 ms) for using manual fallback code
+      await onSubmitCode(clean, (activeMs || 0) + 120000)
+      setFallbackInputCode('')
+      setFallbackOpen(false)
+    } finally {
+      setFallbackSubmitting(false)
+    }
   }
 
   function handleClose() {
@@ -392,6 +414,69 @@ export function InteractionSheet({
                 {helperText || 'Este nodo no tiene un juego configurado aún. El administrador debe asignarle un tipo de minijuego.'}
               </div>
             </section>
+          )}
+
+          {!isStageCollectible(currentStage) && (
+            <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <button
+                type="button"
+                onClick={() => setFallbackOpen(!fallbackOpen)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fbbf24',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  margin: '0 auto',
+                }}
+              >
+                🔑 {fallbackOpen ? 'Ocultar código de rescate' : '¿Problemas? Código de rescate (+2m)'}
+              </button>
+
+              {fallbackOpen && (
+                <form onSubmit={handleSheetFallbackSubmit} style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <input
+                    type="text"
+                    value={fallbackInputCode}
+                    onChange={(e) => setFallbackInputCode(e.target.value)}
+                    placeholder="Código (ej. SAGA_01)..."
+                    disabled={submitting || fallbackSubmitting}
+                    style={{
+                      background: 'rgba(15,23,42,0.85)',
+                      border: '1px solid rgba(251,191,36,0.4)',
+                      color: '#ffffff',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      fontSize: 13,
+                      textTransform: 'uppercase',
+                      outline: 'none',
+                      width: '180px',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting || fallbackSubmitting || !fallbackInputCode.trim()}
+                    style={{
+                      background: '#d97706',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '6px 14px',
+                      fontWeight: 800,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      opacity: (submitting || fallbackSubmitting || !fallbackInputCode.trim()) ? 0.6 : 1,
+                    }}
+                  >
+                    {fallbackSubmitting ? '...' : 'Validar (+2m)'}
+                  </button>
+                </form>
+              )}
+            </div>
           )}
         </section>
       </div>

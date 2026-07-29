@@ -1,6 +1,6 @@
-const CACHE_NAME = 'saga-player-shell-v3.9.1'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.1'
-const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.1'
+const CACHE_NAME = 'saga-player-shell-v3.9.4'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.4'
+const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.4'
 
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
@@ -164,6 +164,7 @@ self.addEventListener('activate', (event) => {
             .filter((key) => {
               if (key.startsWith('saga-player-shell-') && key !== CACHE_NAME) return true
               if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
+              if (key.startsWith('saga-field-proof-assets-') && key !== FIELD_PROOF_ASSET_CACHE) return true
               return false
             })
             .map((key) => caches.delete(key))
