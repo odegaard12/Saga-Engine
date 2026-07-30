@@ -138,6 +138,7 @@ export default function AdminMissionMap({
   const mapRootRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
+  const routeLayersRef = useRef<L.Layer[]>([])
   const heatmapLayerRef = useRef<L.Layer[]>([])
   const dragClickSuppressUntilRef = useRef(0)
   const [localShowHeatmap, setLocalShowHeatmap] = useState(false)
@@ -153,7 +154,7 @@ export default function AdminMissionMap({
   const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
   const tileLayerRef = useRef<L.LayerGroup | null>(null)
-  const [mapTileMode, setMapTileMode] = useState<'satellite' | 'topo'>('satellite')
+  const [mapTileMode, setMapTileMode] = useState<'satellite' | 'satellite-osm' | 'topo'>('satellite-osm')
 
   useEffect(() => {
     if (!mapRootRef.current || mapRef.current) return
@@ -186,27 +187,36 @@ export default function AdminMissionMap({
 
     tileGroup.clearLayers()
 
-    if (mapTileMode === 'satellite') {
+    if (mapTileMode === 'satellite' || mapTileMode === 'satellite-osm') {
       const esriSat = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         { maxNativeZoom: 18, maxZoom: 21 }
       )
-      const waymarkedTrails = L.tileLayer(
-        'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
-        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.85 }
-      )
-      const esriRoads = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
-      )
-      const esriPlaces = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
-      )
       tileGroup.addLayer(esriSat)
-      tileGroup.addLayer(waymarkedTrails)
-      tileGroup.addLayer(esriRoads)
-      tileGroup.addLayer(esriPlaces)
+
+      if (mapTileMode === 'satellite-osm') {
+        const osmOverlay = L.tileLayer(
+          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          { maxNativeZoom: 19, maxZoom: 21, opacity: 0.45 }
+        )
+        tileGroup.addLayer(osmOverlay)
+      } else {
+        const waymarkedTrails = L.tileLayer(
+          'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
+          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.85 }
+        )
+        const esriRoads = L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
+        )
+        const esriPlaces = L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
+        )
+        tileGroup.addLayer(waymarkedTrails)
+        tileGroup.addLayer(esriRoads)
+        tileGroup.addLayer(esriPlaces)
+      }
     } else {
       const topoMap = L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
         maxNativeZoom: 18,
@@ -223,6 +233,9 @@ export default function AdminMissionMap({
     layersRef.current.forEach((layer) => layer.remove())
     layersRef.current = []
 
+    const oldRouteLayers = routeLayersRef.current
+    routeLayersRef.current = []
+
     const orderedStages = [...mappedStages].sort((a, b) => a.index - b.index)
     const waypoints: [number, number][] = []
 
@@ -238,6 +251,7 @@ export default function AdminMissionMap({
       fetch(osrmUrl)
         .then((res) => res.json())
         .then((data) => {
+          oldRouteLayers.forEach((layer) => layer.remove())
           if (data && data.routes && data.routes[0] && data.routes[0].legs) {
             const route = data.routes[0]
             const distanceKm = route.distance / 1000.0
@@ -387,13 +401,14 @@ export default function AdminMissionMap({
               innerLine.on('mousedown', handleMouseDown)
               outerLine.on('mousedown', handleMouseDown)
 
-              layersRef.current.push(outerLine, innerLine)
+              routeLayersRef.current.push(outerLine, innerLine)
             })
           } else {
             fallbackLines(map)
           }
         })
         .catch(() => {
+          oldRouteLayers.forEach((layer) => layer.remove())
           fallbackLines(map)
         })
     }
@@ -405,7 +420,7 @@ export default function AdminMissionMap({
         opacity: 0.9,
         dashArray: '8, 8',
       }).addTo(m)
-      layersRef.current.push(fallbackLine)
+      routeLayersRef.current.push(fallbackLine)
       window.dispatchEvent(new CustomEvent('saga-route-metrics', { 
         detail: { distanceKm: 0, elevationM: 0, mappedCount: waypoints.length, routeCoords: [] } 
       }))
@@ -719,10 +734,16 @@ export default function AdminMissionMap({
     const coords = selectedStage ? getStageCoords(selectedStage) : null
     if (!map || !coords) return
 
-    map.flyTo(coords, Math.max(map.getZoom(), 16), {
-      animate: true,
-      duration: 0.35,
-    })
+    const currentCenter = map.getCenter()
+    const targetLatLng = L.latLng(coords)
+    
+    // Only fly if it's far away (more than 10 meters) to avoid jumping when dragging
+    if (currentCenter.distanceTo(targetLatLng) > 10) {
+      map.flyTo(coords, Math.max(map.getZoom(), 16), {
+        animate: true,
+        duration: 0.35,
+      })
+    }
   }, [selectedStage])
 
   return (
@@ -772,9 +793,13 @@ export default function AdminMissionMap({
         <div style={legend}>
           <button
             type="button"
-            onClick={() => setMapTileMode(mapTileMode === 'satellite' ? 'topo' : 'satellite')}
+            onClick={() => {
+              if (mapTileMode === 'satellite-osm') setMapTileMode('satellite')
+              else if (mapTileMode === 'satellite') setMapTileMode('topo')
+              else setMapTileMode('satellite-osm')
+            }}
             style={{
-              background: mapTileMode === 'satellite' ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : 'rgba(15, 23, 42, 0.75)',
+              background: mapTileMode.startsWith('satellite') ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : 'rgba(15, 23, 42, 0.75)',
               border: '1px solid rgba(56, 189, 248, 0.4)',
               color: '#ffffff',
               fontWeight: 800,
@@ -786,7 +811,7 @@ export default function AdminMissionMap({
               pointerEvents: 'auto',
             }}
           >
-            {mapTileMode === 'satellite' ? '📡 Satélite Híbrido' : '🗺️ Senderos Topo'}
+            {mapTileMode === 'satellite-osm' ? '📡 Satélite + Caminos' : mapTileMode === 'satellite' ? '📡 Satélite Limpio' : '🗺️ Mapa Base'}
           </button>
           <button type="button" onClick={toggleHeatmap} style={heatmapBtn}>
             {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros'}

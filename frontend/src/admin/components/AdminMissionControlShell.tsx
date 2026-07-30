@@ -531,11 +531,12 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Subir nodo"
                       disabled={routeIndex === 0}
-                      onClick={(event) => {
+                      onPointerDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
                         onReorderStage(stage, 'up')
                       }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
                     >
                       ↑
                     </button>
@@ -543,11 +544,12 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Bajar nodo"
                       disabled={routeIndex >= stages.length - 1}
-                      onClick={(event) => {
+                      onPointerDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
                         onReorderStage(stage, 'down')
                       }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
                     >
                       ↓
                     </button>
@@ -636,7 +638,9 @@ export default function AdminMissionControlShell({
             ))}
           </div>
 
-          <SaveStatus state={saveState} error={saveError} />        </div>
+          <SaveStatus state={saveState} error={saveError} />
+        </div>
+      </header>
 
         <div className="saga-map-frame">
           <AdminMissionMap
