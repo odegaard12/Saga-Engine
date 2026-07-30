@@ -67,6 +67,15 @@ type AdminMissionControlShellProps = {
   onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
 }
 
+export type RouteMetrics = {
+  distanceKm: number
+  trailKm: number
+  elevationM: number
+  durationMin: number
+  mappedCount: number
+  routeCoords: [number, number][]
+}
+
 function selectedStageKey(stage: AdminReactOverviewStage | null) {
   if (!stage) return ''
   return String(stage.id ?? stage.index)
@@ -121,7 +130,27 @@ export default function AdminMissionControlShell({
   const [typeChooserStageKey, setTypeChooserStageKey] = useState<string | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [saveValidationWarning, setSaveValidationWarning] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saveState === 'dirty') {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [saveState])
+
+  const handleRefreshClick = () => {
+    if (saveState === 'dirty') {
+      setShowUnsavedDialog(true)
+    } else {
+      onRefresh()
+    }
+  }
   const [pendingCreateLocation, setPendingCreateLocation] = useState<{
     lat: number
     lon: number
@@ -206,52 +235,50 @@ export default function AdminMissionControlShell({
     (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
   ).length
 
-  const [metrics, setMetrics] = useState({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0 })
+  const fallbackMetrics = useMemo(() => {
+    const validStages = [...stages]
+      .filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number')
+      .sort((a, b) => a.index - b.index)
+
+    if (validStages.length < 2) return { dist: 0, time: 0, elev: 0 }
+
+    let haversineDist = 0
+    for (let k = 0; k < validStages.length - 1; k++) {
+      const lat1 = validStages[k].lat as number
+      const lon1 = validStages[k].lon as number
+      const lat2 = validStages[k + 1].lat as number
+      const lon2 = validStages[k + 1].lon as number
+      const R = 6371.0
+      const dlat = ((lat2 - lat1) * Math.PI) / 180
+      const dlon = ((lon2 - lon1) * Math.PI) / 180
+      const a =
+        Math.sin(dlat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dlon / 2) ** 2
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      haversineDist += R * c
+    }
+    const estTrailKm = parseFloat((haversineDist * 1.32).toFixed(2))
+    return { 
+      dist: estTrailKm, 
+      time: Math.round(estTrailKm * 15), 
+      elev: Math.round(haversineDist * 48) 
+    }
+  }, [stages])
+
+  const [metrics, setMetrics] = useState<RouteMetrics>({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0, mappedCount: 0, routeCoords: [] })
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
 
-  useEffect(() => {
-    function handleRouteMetrics(event: Event) {
-      const e = event as CustomEvent
-      const { distanceKm, elevationM, durationMin, routeCoords: coords } = e.detail
-      
-      if (coords && coords.length > 0) {
-        setRouteCoords(coords)
-      } else {
-        const mapped = stages.filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number').sort((a, b) => a.index - b.index)
-        const straightCoords: [number, number][] = mapped.map((s) => [s.lat!, s.lon!])
-        setRouteCoords(straightCoords)
+  const handleRouteMetricsUpdate = (newMetrics: Partial<RouteMetrics>) => {
+    setMetrics(prev => {
+      const updated = { ...prev, ...newMetrics }
+      if (updated.routeCoords && updated.routeCoords.length > 0) {
+        setRouteCoords(updated.routeCoords)
       }
-
-      // If OSRM returned 0 (fallback), let's calculate straight distance
-      if (distanceKm === 0) {
-        const mapped = stages.filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number').sort((a, b) => a.index - b.index)
-        let straightKm = 0
-        for (let i = 0; i < mapped.length - 1; i++) {
-          const lat1 = mapped[i].lat!
-          const lon1 = mapped[i].lon!
-          const lat2 = mapped[i + 1].lat!
-          const lon2 = mapped[i + 1].lon!
-
-          const R = 6371.0
-          const dlat = ((lat2 - lat1) * Math.PI) / 180
-          const dlon = ((lon2 - lon1) * Math.PI) / 180
-          const a = Math.sin(dlat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dlon / 2) ** 2
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-          straightKm += R * c
-        }
-        const trailKm = straightKm * 1.3
-        setMetrics({ distanceKm: straightKm, trailKm, elevationM: Math.round(straightKm * 48), durationMin: Math.round(trailKm * 15) })
-      } else {
-        // Here distanceKm is already the real trail distance
-        const trailKm = distanceKm
-        const calcDur = durationMin || Math.round(trailKm * 15)
-        setMetrics({ distanceKm: distanceKm / 1.3, trailKm, elevationM, durationMin: calcDur })
-      }
-    }
-    
-    window.addEventListener('saga-route-metrics', handleRouteMetrics)
-    return () => window.removeEventListener('saga-route-metrics', handleRouteMetrics)
-  }, [stages])
+      return updated
+    })
+  }
 
   function handleExportGpx() {
     if (routeCoords.length === 0) return
@@ -414,13 +441,13 @@ export default function AdminMissionControlShell({
             onClick={handleSaveStages}
           >
             {saveState === 'saving'
-              ? t('admin.saving')
-              : saveState === 'saved'
-                ? t('admin.saved')
-                : t('common.save')}
+              ? '⏳ Guardando...'
+              : saveState === 'dirty'
+                ? '✏️ Sin guardar'
+                : '✓ Guardado'}
           </button>
 
-          <button type="button" onClick={onRefresh}>
+          <button type="button" onClick={handleRefreshClick}>
             {t('admin.refresh')}
           </button>
         </nav>
@@ -575,10 +602,20 @@ export default function AdminMissionControlShell({
             >
               {t('admin.addNode')}
             </button>
-            <button type="button" onClick={onSaveStages} disabled={saveState === 'saving'}>
-              {saveState === 'saving' ? t('admin.saving') : t('common.save')}
+            <button 
+              type="button" 
+              onClick={onSaveStages} 
+              disabled={saveState === 'saving'}
+              style={{
+                backgroundColor: saveState === 'dirty' ? 'rgba(234, 179, 8, 0.15)' : saveState === 'saved' ? 'rgba(34, 197, 94, 0.15)' : '',
+                borderColor: saveState === 'dirty' ? 'rgba(234, 179, 8, 0.4)' : saveState === 'saved' ? 'rgba(34, 197, 94, 0.4)' : '',
+                color: saveState === 'dirty' ? '#fde047' : saveState === 'saved' ? '#86efac' : '',
+                fontWeight: 800
+              }}
+            >
+              {saveState === 'saving' ? '⏳ Guardando...' : saveState === 'dirty' ? '✏️ Sin guardar' : '✓ Guardado'}
             </button>
-            <button type="button" onClick={onRefresh}>
+            <button type="button" onClick={handleRefreshClick}>
               {t('admin.refresh')}
             </button>
             <button
@@ -623,7 +660,7 @@ export default function AdminMissionControlShell({
                 borderRadius: 10,
                 padding: '6px 12px',
                 cursor: 'pointer',
-                marginLeft: 'auto'
+                marginLeft: 'auto',
               }}
             >
               ⬇️ Exportar GPX
@@ -637,8 +674,42 @@ export default function AdminMissionControlShell({
               </span>
             ))}
           </div>
+        </div>
 
-          <SaveStatus state={saveState} error={saveError} />
+        {/* Centered Route Metrics HUD Bar Floating Below Command Bar */}
+        <div
+          className="saga-centered-route-hud"
+          style={{
+            position: 'absolute',
+            top: 75,
+            left: '50%',
+            zIndex: 90,
+            background: 'rgba(2, 6, 23, 0.52)',
+            backdropFilter: 'blur(28px) saturate(140%)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 18px 48px rgba(0, 0, 0, 0.24)',
+            borderRadius: 24,
+            padding: '8px 20px',
+            color: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            fontSize: 12,
+            fontWeight: 800,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'auto',
+          }}
+        >
+          <span style={{ color: '#38bdf8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            🟢 RUTA SENDEROS
+          </span>
+          <span>📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{(metrics.trailKm || metrics.distanceKm || fallbackMetrics.dist || 0).toFixed(2)} km</strong></span>
+          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+          <span>⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{(metrics.durationMin || fallbackMetrics.time) >= 60 ? `${Math.floor((metrics.durationMin || fallbackMetrics.time) / 60)}h ${(metrics.durationMin || fallbackMetrics.time) % 60}m` : `${metrics.durationMin || fallbackMetrics.time || 0} min`}</strong></span>
+          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+          <span>⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{(metrics.elevationM || fallbackMetrics.elev || 0)}m</strong></span>
+          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+          <span>📍 <strong style={{ color: '#e2e8f0', fontSize: 13 }}>{stages.length} Nodos</strong></span>
         </div>
 
         <div className="saga-map-frame">
@@ -650,6 +721,7 @@ export default function AdminMissionControlShell({
             onMoveStage={onMoveStage}
             showHeatmap={showHeatmap}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
+            onMetricsUpdate={handleRouteMetricsUpdate}
           />
         </div>
 
@@ -835,6 +907,46 @@ export default function AdminMissionControlShell({
           {t('admin.settings')}
         </button>
       </nav>
+
+      {showUnsavedDialog && (
+        <div className="saga-modal-overlay" style={{ zIndex: 99999 }}>
+          <div className="saga-modal" style={{ maxWidth: 400, padding: 24, textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0, color: '#fde047' }}>⚠️ Cambios sin guardar</h3>
+            <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.5, marginBottom: 24 }}>
+              Tienes nodos movidos o cambios en la misión que no han sido guardados. Si refrescas la página, se perderán.
+            </p>
+            <div className="saga-modal-actions" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button 
+                type="button" 
+                className="saga-action-btn primary"
+                onClick={() => {
+                  setShowUnsavedDialog(false)
+                  onSaveStages()
+                }}
+              >
+                💾 Guardar cambios
+              </button>
+              <button 
+                type="button" 
+                className="saga-action-btn danger"
+                onClick={() => {
+                  setShowUnsavedDialog(false)
+                  onRefresh()
+                }}
+              >
+                Marcharte y continuar sin guardar
+              </button>
+              <button 
+                type="button" 
+                className="saga-action-btn ghost"
+                onClick={() => setShowUnsavedDialog(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -857,42 +969,6 @@ function isPhysicalNode(stage: AdminReactOverviewStage | null) {
   const kind = record.physical_node_kind || record.physical_item_kind || record.physical_qr?.kind
 
   return kind === 'collectible' || kind === 'requirement' || kind === 'clue' || kind === 'bonus'
-}
-
-function SaveStatus({ state, error }: { state: MissionSaveState; error: string | null }) {
-  if (state === 'error') {
-    return (
-      <div className="saga-save-status error">
-        <b>Error al guardar</b>
-        <span>{error || 'Error desconocido'}</span>
-      </div>
-    )
-  }
-
-  if (state === 'saving') {
-    return (
-      <div className="saga-save-status saving">
-        <b>Guardando</b>
-        <span>Enviando cambios al servidor…</span>
-      </div>
-    )
-  }
-
-  if (state === 'dirty') {
-    return (
-      <div className="saga-save-status dirty">
-        <b>Sin guardar</b>
-        <span>Cambios locales pendientes</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="saga-save-status saved">
-      <b>Guardado</b>
-      <span>Sincronizado con servidor</span>
-    </div>
-  )
 }
 
 function cleanAdminCopy(value: string, fallback: string) {

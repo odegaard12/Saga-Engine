@@ -10,9 +10,10 @@ type AdminMissionMapProps = {
   selectedStage: AdminReactOverviewStage | null
   onSelectStage: (stage: AdminReactOverviewStage) => void
   onCreateStageAt?: (lat: number, lon: number, clientPoint?: { x: number; y: number }) => void
-  onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
+  onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number, options?: { select?: boolean }) => void
   showHeatmap?: boolean
   onToggleHeatmap?: () => void
+  onMetricsUpdate?: (metrics: any) => void
 }
 
 function hasCoords(stage: AdminReactOverviewStage) {
@@ -134,8 +135,9 @@ export default function AdminMissionMap({
   onMoveStage,
   showHeatmap: propShowHeatmap,
   onToggleHeatmap,
+  onMetricsUpdate,
 }: AdminMissionMapProps) {
-  const mapRootRef = useRef<HTMLDivElement | null>(null)
+  const mapRootRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
   const routeLayersRef = useRef<L.Layer[]>([])
@@ -154,7 +156,9 @@ export default function AdminMissionMap({
   const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
   const tileLayerRef = useRef<L.LayerGroup | null>(null)
-  const [mapTileMode, setMapTileMode] = useState<'satellite' | 'satellite-osm' | 'topo'>('satellite-osm')
+  const nearbyPathsLayerRef = useRef<L.LayerGroup | null>(null)
+  const nearbyPathsControllerRef = useRef<AbortController | null>(null)
+  const [mapTileMode, setMapTileMode] = useState<'satellite-osm' | 'cyclosm' | 'topo' | 'satellite'>('satellite-osm')
 
   useEffect(() => {
     if (!mapRootRef.current || mapRef.current) return
@@ -163,10 +167,14 @@ export default function AdminMissionMap({
       zoomControl: false,
       attributionControl: false,
       doubleClickZoom: false,
+      preferCanvas: false,
     })
 
     const tileGroup = L.layerGroup().addTo(map)
     tileLayerRef.current = tileGroup
+
+    const pathsGroup = L.layerGroup().addTo(map)
+    nearbyPathsLayerRef.current = pathsGroup
 
     map.setView([42.36, -8.67], 14)
     mapRef.current = map
@@ -179,6 +187,7 @@ export default function AdminMissionMap({
     }
   }, [])
 
+  const hasInitialFitRef = useRef(false)
   const [routeMetricsHUD, setRouteMetricsHUD] = useState({ distanceKm: 0, durationMin: 0, elevationM: 0 })
 
   useEffect(() => {
@@ -187,44 +196,107 @@ export default function AdminMissionMap({
 
     tileGroup.clearLayers()
 
-    if (mapTileMode === 'satellite' || mapTileMode === 'satellite-osm') {
+    if (mapTileMode === 'satellite-osm') {
       const esriSat = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 21 }
+        { maxNativeZoom: 18, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
+      )
+      const waymarkedTrails = L.tileLayer(
+        'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
+        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.95, updateWhenIdle: false, keepBuffer: 4 }
+      )
+      const esriRoads = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(esriSat)
-
-      if (mapTileMode === 'satellite-osm') {
-        const osmOverlay = L.tileLayer(
-          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          { maxNativeZoom: 19, maxZoom: 21, opacity: 0.45 }
-        )
-        tileGroup.addLayer(osmOverlay)
-      } else {
-        const waymarkedTrails = L.tileLayer(
-          'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
-          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.85 }
-        )
-        const esriRoads = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
-        )
-        const esriPlaces = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-          { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
-        )
-        tileGroup.addLayer(waymarkedTrails)
-        tileGroup.addLayer(esriRoads)
-        tileGroup.addLayer(esriPlaces)
-      }
+      tileGroup.addLayer(waymarkedTrails)
+      tileGroup.addLayer(esriRoads)
+    } else if (mapTileMode === 'cyclosm') {
+      const cyclosmMap = L.tileLayer(
+        'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+        { maxNativeZoom: 17, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
+      )
+      tileGroup.addLayer(cyclosmMap)
+    } else if (mapTileMode === 'topo') {
+      const openTopo = L.tileLayer(
+        'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        { maxNativeZoom: 17, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
+      )
+      tileGroup.addLayer(openTopo)
     } else {
-      const topoMap = L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
-        maxNativeZoom: 18,
-        maxZoom: 21,
-      })
-      tileGroup.addLayer(topoMap)
+      const esriSat = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxNativeZoom: 18, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
+      )
+      tileGroup.addLayer(esriSat)
     }
   }, [mapTileMode])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const pathsGroup = nearbyPathsLayerRef.current
+    const coords = selectedStage ? getStageCoords(selectedStage) : null
+    
+    if (!map || !pathsGroup) return
+    
+    pathsGroup.clearLayers()
+    if (nearbyPathsControllerRef.current) {
+      nearbyPathsControllerRef.current.abort()
+      nearbyPathsControllerRef.current = null
+    }
+
+    if (!coords) return
+
+    const [lat, lon] = coords
+    const controller = new AbortController()
+    nearbyPathsControllerRef.current = controller
+
+    const query = `
+      [out:json];
+      (
+        way["highway"](around:500,${lat},${lon});
+      );
+      out geom;
+    `
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query.trim())}`
+
+    fetch(url, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (!data || !data.elements) return
+        data.elements.forEach((el: any) => {
+          if (el.type === 'way' && el.geometry) {
+            const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
+            
+            // Halo sutil
+            L.polyline(latlngs, { 
+              color: '#ffffff', 
+              weight: 8, 
+              opacity: 0.2, 
+              lineCap: 'round', 
+              lineJoin: 'round',
+              interactive: false
+            }).addTo(pathsGroup)
+            
+            // Línea de sendero
+            L.polyline(latlngs, { 
+              color: '#38bdf8', 
+              weight: 2, 
+              opacity: 0.8,
+              dashArray: '3 6',
+              lineCap: 'round', 
+              lineJoin: 'round',
+              interactive: false
+            }).addTo(pathsGroup)
+          }
+        })
+      })
+      .catch(e => {
+        if (e.name !== 'AbortError') console.error('Overpass fetch error:', e)
+      })
+
+  }, [selectedStage])
 
   useEffect(() => {
     const map = mapRef.current
@@ -245,8 +317,43 @@ export default function AdminMissionMap({
     })
 
     if (waypoints.length >= 2) {
+      // Calculate immediate Haversine trail distance estimate so HUD is NEVER 0
+      let haversineDist = 0
+      for (let k = 0; k < waypoints.length - 1; k++) {
+        const [lat1, lon1] = waypoints[k]
+        const [lat2, lon2] = waypoints[k + 1]
+        const R = 6371.0
+        const dlat = ((lat2 - lat1) * Math.PI) / 180
+        const dlon = ((lon2 - lon1) * Math.PI) / 180
+        const a =
+          Math.sin(dlat / 2) ** 2 +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dlon / 2) ** 2
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        haversineDist += R * c
+      }
+      const estTrailKm = parseFloat((haversineDist * 1.32).toFixed(2))
+      const estDurationMin = Math.round(estTrailKm * 16)
+      const estElevationM = Math.round(haversineDist * 48)
+
+      setRouteMetricsHUD({
+        distanceKm: estTrailKm,
+        durationMin: estDurationMin,
+        elevationM: estElevationM,
+      })
+
+      onMetricsUpdate?.({
+        distanceKm: estTrailKm,
+        trailKm: estTrailKm,
+        elevationM: estElevationM,
+        durationMin: estDurationMin,
+        mappedCount: waypoints.length,
+        routeCoords: waypoints,
+      })
+
       const coordString = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';')
-      const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=false&geometries=geojson&steps=true`
+      const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson&steps=true`
 
       fetch(osrmUrl)
         .then((res) => res.json())
@@ -273,17 +380,22 @@ export default function AdminMissionMap({
             }
 
             // Dispatch metrics back to parent
-            window.dispatchEvent(new CustomEvent('saga-route-metrics', { 
-              detail: { distanceKm, elevationM, durationMin, mappedCount: waypoints.length, routeCoords: allCoords } 
-            }))
+            onMetricsUpdate?.({ distanceKm, trailKm: distanceKm, elevationM, durationMin, mappedCount: waypoints.length, routeCoords: allCoords })
 
             route.legs.forEach((leg: any, i: number) => {
-              const legCoords: [number, number][] = []
-              leg.steps.forEach((step: any) => {
-                step.geometry.coordinates.forEach(([lon, lat]: [number, number]) => {
-                  legCoords.push([lat, lon])
+              const legCoords: [number, number][] = leg.geometry?.coordinates
+                ? leg.geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
+                : []
+
+              if (legCoords.length === 0 && leg.steps) {
+                leg.steps.forEach((step: any) => {
+                  if (step.geometry?.coordinates) {
+                    step.geometry.coordinates.forEach(([lon, lat]: [number, number]) => {
+                      legCoords.push([lat, lon])
+                    })
+                  }
                 })
-              })
+              }
 
               const fromNode = orderedStages[i]
               const toNode = orderedStages[i + 1]
@@ -403,6 +515,33 @@ export default function AdminMissionMap({
 
               routeLayersRef.current.push(outerLine, innerLine)
             })
+
+            // Fetch & draw nearby footpaths/tracks within 500m of mapped waypoints
+            if (waypoints.length > 0) {
+              waypoints.slice(0, 3).forEach(([wLat, wLon]) => {
+                const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];way(around:500,${wLat},${wLon})["highway"~"footway|path|track|steps"];out geom;`
+                fetch(overpassUrl)
+                  .then((res) => res.json())
+                  .then((data) => {
+                    if (data && data.elements) {
+                      data.elements.forEach((element: any) => {
+                        if (element.geometry && element.geometry.length >= 2) {
+                          const pathPts: [number, number][] = element.geometry.map((pt: any) => [pt.lat, pt.lon])
+                          const trailHintLine = L.polyline(pathPts, {
+                            color: '#38bdf8',
+                            weight: 3.5,
+                            opacity: 0.75,
+                            dashArray: '6, 6',
+                          }).addTo(map)
+                          trailHintLine.bindTooltip(`🌲 Sendero en 500m: ${element.tags?.name || element.tags?.highway || 'Camino de monte'}`, { sticky: true })
+                          routeLayersRef.current.push(trailHintLine)
+                        }
+                      })
+                    }
+                  })
+                  .catch(() => {})
+              })
+            }
           } else {
             fallbackLines(map)
           }
@@ -421,9 +560,6 @@ export default function AdminMissionMap({
         dashArray: '8, 8',
       }).addTo(m)
       routeLayersRef.current.push(fallbackLine)
-      window.dispatchEvent(new CustomEvent('saga-route-metrics', { 
-        detail: { distanceKm: 0, elevationM: 0, mappedCount: waypoints.length, routeCoords: [] } 
-      }))
     }
 
     const bounds: L.LatLngExpression[] = []
@@ -524,13 +660,88 @@ export default function AdminMissionMap({
         map.getContainer().classList.add('admin-map-dragging-node')
       })
 
+      let previewNodeLine: L.Polyline | null = null
+      let lastNodeFetchTime = 0
+
       marker.on('drag', () => {
         dragClickSuppressUntilRef.current = Date.now() + 700
+        const now = Date.now()
         const next = marker.getLatLng()
         ring.setLatLng(next)
+
+        // Live calculation of route distance as node is dragged across map
+        const currentWaypoints = mappedStages.map((s) => {
+          if (s.index === stage.index) return [next.lat, next.lng] as [number, number]
+          return getStageCoords(s)
+        }).filter((c): c is [number, number] => c !== null)
+
+        if (currentWaypoints.length >= 2) {
+          let straightDist = 0
+          for (let k = 0; k < currentWaypoints.length - 1; k++) {
+            const [lat1, lon1] = currentWaypoints[k]
+            const [lat2, lon2] = currentWaypoints[k + 1]
+            const R = 6371.0
+            const dlat = ((lat2 - lat1) * Math.PI) / 180
+            const dlon = ((lon2 - lon1) * Math.PI) / 180
+            const a =
+              Math.sin(dlat / 2) ** 2 +
+              Math.cos((lat1 * Math.PI) / 180) *
+                Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dlon / 2) ** 2
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            straightDist += R * c
+          }
+          const estTrailKm = straightDist * 1.3
+          const estDuration = Math.round(estTrailKm * 15)
+          const estElev = Math.round(straightDist * 48)
+
+          onMetricsUpdate?.({
+            distanceKm: estTrailKm,
+            durationMin: estDuration,
+            elevationM: estElev,
+          })
+        }
+
+        if (now - lastNodeFetchTime > 150) {
+          lastNodeFetchTime = now
+          const idx = orderedStages.findIndex((s) => s.index === stage.index)
+          const waypointsList: [number, number][] = []
+          if (idx > 0) {
+            const c = getStageCoords(orderedStages[idx - 1])
+            if (c) waypointsList.push(c)
+          }
+          waypointsList.push([next.lat, next.lng])
+          if (idx < orderedStages.length - 1) {
+            const c = getStageCoords(orderedStages[idx + 1])
+            if (c) waypointsList.push(c)
+          }
+
+          if (waypointsList.length >= 2) {
+            const coordString = waypointsList.map(([lat, lon]) => `${lon},${lat}`).join(';')
+            const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson`
+            fetch(osrmUrl)
+              .then((r) => r.json())
+              .then((data) => {
+                if (map.getContainer().classList.contains('admin-map-dragging-node') && data.routes?.[0]?.geometry?.coordinates) {
+                  const pts = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
+                  if (!previewNodeLine) {
+                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
+                  } else {
+                    previewNodeLine.setLatLngs(pts)
+                  }
+                }
+              })
+              .catch(() => {})
+          }
+        }
       })
 
       marker.on('dragend', (event: L.LeafletEvent) => {
+        if (previewNodeLine) {
+          map.removeLayer(previewNodeLine)
+          previewNodeLine = null
+        }
+        
         const original = (event as L.LeafletEvent & { originalEvent?: Event }).originalEvent
         if (original) {
           L.DomEvent.stopPropagation(original)
@@ -540,7 +751,7 @@ export default function AdminMissionMap({
         dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
-        onMoveStage?.(stage, next.lat, next.lng)
+        onMoveStage?.(stage, next.lat, next.lng, { select: false })
       })
 
       layersRef.current.push(ring, marker)
@@ -640,7 +851,8 @@ export default function AdminMissionMap({
       })
     })
 
-    if (!selectedStage) {
+    if (!hasInitialFitRef.current && bounds.length > 0) {
+      hasInitialFitRef.current = true
       if (bounds.length > 1) {
         map.fitBounds(L.latLngBounds(bounds), {
           padding: [56, 56],
@@ -734,12 +946,11 @@ export default function AdminMissionMap({
     const coords = selectedStage ? getStageCoords(selectedStage) : null
     if (!map || !coords) return
 
-    const currentCenter = map.getCenter()
     const targetLatLng = L.latLng(coords)
-    
-    // Only fly if it's far away (more than 10 meters) to avoid jumping when dragging
-    if (currentCenter.distanceTo(targetLatLng) > 10) {
-      map.flyTo(coords, Math.max(map.getZoom(), 16), {
+
+    // Only pan if the selected node is outside current visible map bounds, avoiding flyTo zoom-out animations
+    if (!map.getBounds().contains(targetLatLng)) {
+      map.panTo(coords, {
         animate: true,
         duration: 0.35,
       })
@@ -750,71 +961,104 @@ export default function AdminMissionMap({
     <section style={shell}>
       <style>{mapCss}</style>
 
-      <div style={mapChrome}>
-        <div>
-          <div style={kicker}>Mapa de Misión</div>
-          <div style={title}>{mappedStages.length} Nodos Mapeados</div>
-          <div style={helper}>
-            Haz clic o arrastra la línea roja por el mapa para cambiar la ruta por el monte
-          </div>
-        </div>
-
-        {/* Floating High-Contrast Route HUD Widget */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
-          border: '1.5px solid rgba(239, 68, 68, 0.7)',
-          borderRadius: 12,
-          padding: '6px 14px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 12px rgba(239, 68, 68, 0.3)',
-          color: '#ffffff',
+      {/* Compact Top-Right Floating Control Box (Distance HUD + Map Layers) */}
+      <div
+        className="saga-floating-map-controls"
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          zIndex: 100,
           display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 12,
-          fontWeight: 800,
-          pointerEvents: 'auto',
-        }}>
-          <span style={{ color: '#ef4444', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
-            🟢 RUTA SENDEROS
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 6,
+          pointerEvents: 'none',
+        }}
+      >
+        {/* Compact Route Metrics Widget */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+            backdropFilter: 'blur(16px)',
+            border: '1.5px solid rgba(16, 185, 129, 0.8)',
+            borderRadius: 12,
+            padding: '5px 12px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(16, 185, 129, 0.25)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: 11,
+            fontWeight: 800,
+            pointerEvents: 'auto',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span style={{ color: '#10b981', fontWeight: 900, fontSize: 10, letterSpacing: '0.05em' }}>
+            🟢 RUTA
           </span>
-          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
-            📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{routeMetricsHUD.distanceKm.toFixed(2)} km</strong>
+          <span style={{ color: '#ffffff' }}>
+            📏 <strong style={{ color: '#facc15', fontSize: 12 }}>{routeMetricsHUD.distanceKm.toFixed(2)} km</strong>
           </span>
           <span style={{ color: '#475569' }}>|</span>
-          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
-            ⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{routeMetricsHUD.durationMin >= 60 ? `${Math.floor(routeMetricsHUD.durationMin / 60)}h ${routeMetricsHUD.durationMin % 60}m` : `${routeMetricsHUD.durationMin} min`}</strong>
+          <span style={{ color: '#ffffff' }}>
+            ⏱️ <strong style={{ color: '#38bdf8', fontSize: 12 }}>{routeMetricsHUD.durationMin >= 60 ? `${Math.floor(routeMetricsHUD.durationMin / 60)}h ${routeMetricsHUD.durationMin % 60}m` : `${routeMetricsHUD.durationMin} min`}</strong>
           </span>
           <span style={{ color: '#475569' }}>|</span>
-          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
-            ⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{routeMetricsHUD.elevationM}m</strong>
+          <span style={{ color: '#ffffff' }}>
+            ⛰️ <strong style={{ color: '#4ade80', fontSize: 12 }}>+{routeMetricsHUD.elevationM}m</strong>
           </span>
         </div>
 
-        <div style={legend}>
+        {/* Layer Mode & Heatmap Buttons */}
+        <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
           <button
             type="button"
             onClick={() => {
-              if (mapTileMode === 'satellite-osm') setMapTileMode('satellite')
-              else if (mapTileMode === 'satellite') setMapTileMode('topo')
+              if (mapTileMode === 'satellite-osm') setMapTileMode('cyclosm')
+              else if (mapTileMode === 'cyclosm') setMapTileMode('topo')
+              else if (mapTileMode === 'topo') setMapTileMode('satellite')
               else setMapTileMode('satellite-osm')
             }}
             style={{
-              background: mapTileMode.startsWith('satellite') ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : 'rgba(15, 23, 42, 0.75)',
+              background: mapTileMode === 'satellite-osm' || mapTileMode === 'cyclosm'
+                ? 'linear-gradient(135deg, #0ea5e9, #2563eb)'
+                : 'rgba(15, 23, 42, 0.85)',
               border: '1px solid rgba(56, 189, 248, 0.4)',
               color: '#ffffff',
               fontWeight: 800,
-              fontSize: '11px',
-              padding: '6px 14px',
-              borderRadius: '10px',
+              fontSize: '10px',
+              padding: '4px 10px',
+              borderRadius: '8px',
               cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              pointerEvents: 'auto',
             }}
           >
-            {mapTileMode === 'satellite-osm' ? '📡 Satélite + Caminos' : mapTileMode === 'satellite' ? '📡 Satélite Limpio' : '🗺️ Mapa Base'}
+            {mapTileMode === 'satellite-osm'
+              ? '📡 Satélite + Caminos'
+              : mapTileMode === 'cyclosm'
+                ? '🧭 Senderos (CyclOSM)'
+                : mapTileMode === 'topo'
+                  ? '🗺️ Mapa Topográfico'
+                  : '📡 Satélite Limpio'}
           </button>
-          <button type="button" onClick={toggleHeatmap} style={heatmapBtn}>
-            {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros'}
+          <button
+            type="button"
+            onClick={toggleHeatmap}
+            style={{
+              background: showHeatmap ? 'rgba(244,63,94,0.3)' : 'rgba(15,23,42,0.85)',
+              border: '1px solid rgba(244,63,94,0.4)',
+              color: '#f43f5e',
+              fontWeight: 800,
+              fontSize: '10px',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            {showHeatmap ? '🔥 Ocultar' : '🔥 Rastros'}
           </button>
         </div>
       </div>
@@ -843,20 +1087,17 @@ const mapCanvas: React.CSSProperties = {
 
 const mapChrome: React.CSSProperties = {
   position: 'absolute',
-  top: 14,
-  left: 14,
-  right: 14,
-  zIndex: 2,
+  top: 12,
+  left: 12,
+  zIndex: 10,
   display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: 14,
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,0.16)',
-  background: 'rgba(2,6,23,0.58)',
-  backdropFilter: 'blur(18px)',
-  boxShadow: '0 14px 36px rgba(0,0,0,0.24)',
+  alignItems: 'center',
+  padding: '6px 14px',
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'rgba(2,6,23,0.65)',
+  backdropFilter: 'blur(14px)',
+  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
   pointerEvents: 'none',
 }
 
@@ -924,6 +1165,11 @@ const emptyState: React.CSSProperties = {
 }
 
 const mapCss = `
+.admin-osm-multiply-layer {
+  mix-blend-mode: multiply !important;
+  filter: contrast(150%) brightness(92%);
+}
+
 .admin-node-ring {
   cursor: pointer;
   filter: drop-shadow(0 8px 18px rgba(15,23,42,.24));

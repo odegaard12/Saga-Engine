@@ -959,7 +959,7 @@ export default function AdminApp() {
 
     setCmsPanel('none')
     setSelectedStage(null)
-    setSaveState('idle')
+    setSaveState('dirty')
     setLocalNotice(
       itemsToCreate.length === 1
         ? `📍 Chincheta colocada en el mapa para "${itemsToCreate[0].label}". Arrástrala a su posición final.`
@@ -967,7 +967,7 @@ export default function AdminApp() {
     )
   }
 
-  function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number) {
+  function moveLocalStage(stageToMove: AdminReactOverviewStage, lat: number, lon: number, options: { select?: boolean } = {}) {
     const movedStage: AdminReactOverviewStage = {
       ...stageToMove,
       lat,
@@ -975,9 +975,11 @@ export default function AdminApp() {
     }
 
     suppressStageSelectUntilRef.current = Date.now() + 700
-    setSaveState('idle')
+    setSaveState('dirty')
     syncLocalStage(movedStage, { select: false, notice: false })
-    setSelectedStage(null)
+    if (options.select !== false) {
+      setSelectedStage(movedStage)
+    }
     setLocalNotice('Nodo movido en el mapa. Pulsa Guardar para persistir la nueva posición.')
   }
 

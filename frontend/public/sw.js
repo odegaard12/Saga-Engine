@@ -1,6 +1,6 @@
-const CACHE_NAME = 'saga-player-shell-v3.9.5'
-const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.5'
-const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.5'
+const CACHE_NAME = 'saga-player-shell-v3.9.6'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
 
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
