@@ -703,6 +703,7 @@ export default function AdminMissionMap({
 
           onMetricsUpdate?.({
             distanceKm: estTrailKm,
+            trailKm: estTrailKm,
             durationMin: estDuration,
             elevationM: estElev,
           })
