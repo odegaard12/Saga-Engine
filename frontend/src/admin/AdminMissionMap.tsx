@@ -14,6 +14,7 @@ type AdminMissionMapProps = {
   showHeatmap?: boolean
   onToggleHeatmap?: () => void
   onMetricsUpdate?: (metrics: any) => void
+  playRouteTrigger?: number
 }
 
 function hasCoords(stage: AdminReactOverviewStage) {
@@ -136,12 +137,14 @@ export default function AdminMissionMap({
   showHeatmap: propShowHeatmap,
   onToggleHeatmap,
   onMetricsUpdate,
+  playRouteTrigger,
 }: AdminMissionMapProps) {
   const mapRootRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.Layer[]>([])
   const routeLayersRef = useRef<L.Layer[]>([])
   const heatmapLayerRef = useRef<L.Layer[]>([])
+  const lastRouteCoordsRef = useRef<[number, number][]>([])
   const dragClickSuppressUntilRef = useRef(0)
   const [localShowHeatmap, setLocalShowHeatmap] = useState(false)
   const [heatmapStatus, setHeatmapStatus] = useState<'idle' | 'loading' | 'ok' | 'empty' | 'error'>(
@@ -378,6 +381,8 @@ export default function AdminMissionMap({
                 })
               })
             }
+            
+            lastRouteCoordsRef.current = allCoords
 
             // Dispatch metrics back to parent
             onMetricsUpdate?.({ distanceKm, trailKm: distanceKm, elevationM, durationMin, mappedCount: waypoints.length, routeCoords: allCoords })
@@ -560,6 +565,7 @@ export default function AdminMissionMap({
         dashArray: '8, 8',
       }).addTo(m)
       routeLayersRef.current.push(fallbackLine)
+      lastRouteCoordsRef.current = waypoints
     }
 
     const bounds: L.LatLngExpression[] = []
@@ -940,6 +946,69 @@ export default function AdminMissionMap({
         setHeatmapStatus('error')
       })
   }, [showHeatmap, mappedStages])
+
+  // --- Route Play Animation ---
+  useEffect(() => {
+    if (!playRouteTrigger || playRouteTrigger === 0) return
+    const map = mapRef.current
+    const coords = lastRouteCoordsRef.current
+    if (!map || coords.length < 2) return
+
+    const arrowIcon = L.divIcon({
+      className: 'saga-route-animator',
+      html: '<div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;"><div style="font-size:32px; color:#ffffff; font-weight:900; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8)); transform-origin: center;">➤</div></div>',
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    })
+    
+    const marker = L.marker(coords[0], { icon: arrowIcon, zIndexOffset: 9999, interactive: false }).addTo(map)
+
+    let startTime: number | null = null
+    const durationMs = 8000 // 8s duration for smoother, slower playback
+    
+    const totalDist = coords.reduce((acc, c, i) => {
+      if (i === 0) return 0
+      return acc + map.distance(coords[i - 1], c)
+    }, 0)
+
+    function animate(time: number) {
+      if (!startTime) startTime = time
+      const elapsed = time - startTime
+      const progress = Math.min(elapsed / durationMs, 1)
+
+      if (progress >= 1) {
+        marker.remove()
+        return
+      }
+
+      const targetDist = progress * totalDist
+      let accumulated = 0
+      for (let i = 0; i < coords.length - 1; i++) {
+        const segDist = map!.distance(coords[i], coords[i+1])
+        if (accumulated + segDist >= targetDist) {
+          const segProgress = (targetDist - accumulated) / segDist
+          const lat = coords[i][0] + (coords[i+1][0] - coords[i][0]) * segProgress
+          const lon = coords[i][1] + (coords[i+1][1] - coords[i][1]) * segProgress
+          marker.setLatLng([lat, lon])
+
+          const p1 = map!.latLngToLayerPoint(coords[i])
+          const p2 = map!.latLngToLayerPoint(coords[i+1])
+          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI)
+          
+          const iconEl = marker.getElement()
+          if (iconEl && iconEl.firstElementChild && iconEl.firstElementChild.firstElementChild) {
+            (iconEl.firstElementChild.firstElementChild as HTMLElement).style.transform = `rotate(${angle}deg)`
+          }
+
+          break
+        }
+        accumulated += segDist
+      }
+
+      requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
+  }, [playRouteTrigger])
 
   useEffect(() => {
     const map = mapRef.current

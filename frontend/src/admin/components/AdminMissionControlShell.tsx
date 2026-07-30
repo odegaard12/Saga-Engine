@@ -269,6 +269,7 @@ export default function AdminMissionControlShell({
 
   const [metrics, setMetrics] = useState<RouteMetrics>({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0, mappedCount: 0, routeCoords: [] })
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
+  const [playCounter, setPlayCounter] = useState(0)
 
   const handleRouteMetricsUpdate = (newMetrics: Partial<RouteMetrics>) => {
     setMetrics(prev => {
@@ -683,6 +684,7 @@ export default function AdminMissionControlShell({
             position: 'absolute',
             top: 75,
             left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 90,
             background: 'rgba(2, 6, 23, 0.52)',
             backdropFilter: 'blur(28px) saturate(140%)',
@@ -710,6 +712,14 @@ export default function AdminMissionControlShell({
           <span>⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{(metrics.elevationM || fallbackMetrics.elev || 0)}m</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
           <span>📍 <strong style={{ color: '#e2e8f0', fontSize: 13 }}>{stages.length} Nodos</strong></span>
+          <button 
+            type="button" 
+            onClick={() => setPlayCounter(c => c + 1)}
+            style={{ marginLeft: 10, background: '#38bdf8', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 16, padding: '4px 12px', color: '#0f172a', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, boxShadow: '0 4px 12px rgba(56, 189, 248, 0.4)' }}
+            title="Reproducir recorrido"
+          >
+            ▶️ PLAY
+          </button>
         </div>
 
         <div className="saga-map-frame">
@@ -722,6 +732,7 @@ export default function AdminMissionControlShell({
             showHeatmap={showHeatmap}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}
             onMetricsUpdate={handleRouteMetricsUpdate}
+            playRouteTrigger={playCounter}
           />
         </div>
 
