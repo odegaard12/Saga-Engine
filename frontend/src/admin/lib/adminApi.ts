@@ -102,6 +102,15 @@ export type AdminReactOverviewResponse = {
     player_theme?: string
     map_center?: [number, number]
     map_zoom?: number
+    login_title?: string
+    login_subtitle?: string
+    login_instructions?: string
+    prologue_title?: string
+    prologue_subtitle?: string
+    prologue_image_url?: string
+    prologue_body?: string
+    mapbox_token?: string
+    mapbox_style?: string
   }
   counts?: {
     players: number

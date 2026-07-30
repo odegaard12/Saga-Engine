@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
@@ -205,6 +205,74 @@ export default function AdminMissionControlShell({
   const mappedCount = stages.filter(
     (stage) => typeof stage.lat === 'number' && typeof stage.lon === 'number'
   ).length
+
+  const [metrics, setMetrics] = useState({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0 })
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
+
+  useEffect(() => {
+    function handleRouteMetrics(event: Event) {
+      const e = event as CustomEvent
+      const { distanceKm, elevationM, durationMin, routeCoords: coords } = e.detail
+      
+      if (coords && coords.length > 0) {
+        setRouteCoords(coords)
+      } else {
+        const mapped = stages.filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number').sort((a, b) => a.index - b.index)
+        const straightCoords: [number, number][] = mapped.map((s) => [s.lat!, s.lon!])
+        setRouteCoords(straightCoords)
+      }
+
+      // If OSRM returned 0 (fallback), let's calculate straight distance
+      if (distanceKm === 0) {
+        const mapped = stages.filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number').sort((a, b) => a.index - b.index)
+        let straightKm = 0
+        for (let i = 0; i < mapped.length - 1; i++) {
+          const lat1 = mapped[i].lat!
+          const lon1 = mapped[i].lon!
+          const lat2 = mapped[i + 1].lat!
+          const lon2 = mapped[i + 1].lon!
+
+          const R = 6371.0
+          const dlat = ((lat2 - lat1) * Math.PI) / 180
+          const dlon = ((lon2 - lon1) * Math.PI) / 180
+          const a = Math.sin(dlat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dlon / 2) ** 2
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+          straightKm += R * c
+        }
+        const trailKm = straightKm * 1.3
+        setMetrics({ distanceKm: straightKm, trailKm, elevationM: Math.round(straightKm * 48), durationMin: Math.round(trailKm * 15) })
+      } else {
+        // Here distanceKm is already the real trail distance
+        const trailKm = distanceKm
+        const calcDur = durationMin || Math.round(trailKm * 15)
+        setMetrics({ distanceKm: distanceKm / 1.3, trailKm, elevationM, durationMin: calcDur })
+      }
+    }
+    
+    window.addEventListener('saga-route-metrics', handleRouteMetrics)
+    return () => window.removeEventListener('saga-route-metrics', handleRouteMetrics)
+  }, [stages])
+
+  function handleExportGpx() {
+    if (routeCoords.length === 0) return
+    let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    gpx += '<gpx version="1.1" creator="SAGA Engine" xmlns="http://www.topografix.com/GPX/1/1">\n'
+    gpx += '  <trk>\n    <name>Ruta SAGA</name>\n    <trkseg>\n'
+    routeCoords.forEach(([lat, lon]) => {
+      gpx += `      <trkpt lat="${lat}" lon="${lon}"></trkpt>\n`
+    })
+    gpx += '    </trkseg>\n  </trk>\n</gpx>'
+
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ruta_saga.gpx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   function togglePanel(panel: CmsPanel) {
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
@@ -463,11 +531,12 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Subir nodo"
                       disabled={routeIndex === 0}
-                      onClick={(event) => {
+                      onPointerDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
                         onReorderStage(stage, 'up')
                       }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
                     >
                       ↑
                     </button>
@@ -475,11 +544,12 @@ export default function AdminMissionControlShell({
                       type="button"
                       title="Bajar nodo"
                       disabled={routeIndex >= stages.length - 1}
-                      onClick={(event) => {
+                      onPointerDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
                         onReorderStage(stage, 'down')
                       }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
                     >
                       ↓
                     </button>
@@ -538,6 +608,25 @@ export default function AdminMissionControlShell({
               }}
             >
               📜 Novedades
+            </button>
+            <button
+              type="button"
+              onClick={handleExportGpx}
+              disabled={routeCoords.length === 0}
+              title="Descargar ruta en formato GPX"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(21, 128, 61, 0.2) 100%)',
+                border: '1px solid rgba(74, 222, 128, 0.35)',
+                color: '#86efac',
+                fontWeight: 800,
+                fontSize: '11px',
+                borderRadius: 10,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                marginLeft: 'auto'
+              }}
+            >
+              ⬇️ Exportar GPX
             </button>
           </div>
 

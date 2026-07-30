@@ -173,6 +173,7 @@ export default function AdminApp() {
     } as PublicConfig
 
     setPlayerDrafts(buildPlayerDrafts(overview?.profiles || profiles || [], sourceConfig))
+    setMissionDraft(buildMissionDraft(sourceConfig as unknown as Record<string, unknown>))
   }, [overviewReady, overview, profiles, config])
 
   useMemo(() => {
@@ -213,11 +214,14 @@ export default function AdminApp() {
       site_name: getConfigTextValue(source, 'site_name', config?.site_name || ''),
       admin_title: getConfigTextValue(source, 'admin_title', config?.admin_title || ''),
       admin_subtitle: getConfigTextValue(source, 'admin_subtitle', config?.admin_subtitle || ''),
+      login_title: getConfigTextValue(source, 'login_title', ''),
       login_subtitle: getConfigTextValue(source, 'login_subtitle', ''),
+      login_instructions: getConfigTextValue(source, 'login_instructions', ''),
       story_title: getConfigTextValue(source, 'story_title', ''),
       story_text: getConfigTextValue(source, 'story_text', ''),
       prologue_title: getConfigTextValue(source, 'prologue_title', ''),
       prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
+      prologue_image_url: getConfigTextValue(source, 'prologue_image_url', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
       player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || 'classic'),
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
@@ -267,11 +271,14 @@ export default function AdminApp() {
       site_name: missionDraft.site_name || 'SAGA Engine',
       admin_title: missionDraft.admin_title || 'Mission editor',
       admin_subtitle: missionDraft.admin_subtitle || 'Map-first control panel',
+      login_title: missionDraft.login_title || '',
       login_subtitle: missionDraft.login_subtitle || '',
+      login_instructions: missionDraft.login_instructions || '',
       story_title: missionDraft.story_title || '',
       story_text: missionDraft.story_text || '',
       prologue_title: missionDraft.prologue_title || '',
       prologue_subtitle: missionDraft.prologue_subtitle || '',
+      prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
       player_theme: missionDraft.player_theme || 'classic',
       mapbox_token: missionDraft.mapbox_token || '',
@@ -683,7 +690,6 @@ export default function AdminApp() {
     })
 
     if (movedStage) {
-      setSelectedStage(movedStage)
       setSaveState('dirty')
       setLocalNotice('Orden de ruta actualizado en local. Pulsa Guardar para persistir.')
     }

@@ -14,10 +14,13 @@ SUPPORTED_MINIGAME_TYPES = {
     "audio_challenge",
 }
 
+import unicodedata
+
 def _as_str(value, default=""):
     if value is None:
         return default
-    return str(value)
+    s = str(value)
+    return unicodedata.normalize("NFC", s)
 
 def _clean_code(value):
     return _as_str(value).strip().upper()

@@ -533,7 +533,8 @@ export default function NodeDetailDrawer({
           <div className="admin-node-editor-title-row">
             <div className="admin-node-editor-title-copy">
               <h2>
-                {draft.index + 1}. {draft.title || 'Nodo sin título'}
+                <span style={{ opacity: 0.65, marginRight: 8 }}>#{draft.index + 1}</span>
+                {draft.title ? draft.title.replace(/^\d+\.\s*/, '') : 'Nodo sin título'}
               </h2>
 
               <div className="admin-drawer-meta admin-node-editor-meta">
