@@ -152,6 +152,9 @@ export default function AdminMissionMap({
 
   const mappedStages = useMemo(() => stages.filter(hasCoords), [stages])
 
+  const tileLayerRef = useRef<L.LayerGroup | null>(null)
+  const [mapTileMode, setMapTileMode] = useState<'satellite' | 'topo'>('satellite')
+
   useEffect(() => {
     if (!mapRootRef.current || mapRef.current) return
 
@@ -161,13 +164,10 @@ export default function AdminMissionMap({
       doubleClickZoom: false,
     })
 
-    L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map)
+    const tileGroup = L.layerGroup().addTo(map)
+    tileLayerRef.current = tileGroup
 
-    map.setView([42.26, -8.86], 13)
+    map.setView([42.36, -8.67], 14)
     mapRef.current = map
 
     return () => {
@@ -178,31 +178,43 @@ export default function AdminMissionMap({
     }
   }, [])
 
+  const [routeMetricsHUD, setRouteMetricsHUD] = useState({ distanceKm: 0, durationMin: 0, elevationM: 0 })
+
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || !onCreateStageAt) return
+    const tileGroup = tileLayerRef.current
+    if (!tileGroup) return
 
-    const handleMapClick = (event: L.LeafletMouseEvent) => {
-      // #233 v16: map click/tap opens a tiny create/discard popover.
-      // Nothing is added to local mission state until the admin confirms.
-      if (
-        map.getContainer().classList.contains('admin-map-dragging-node') ||
-        Date.now() < dragClickSuppressUntilRef.current
+    tileGroup.clearLayers()
+
+    if (mapTileMode === 'satellite') {
+      const esriSat = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxNativeZoom: 18, maxZoom: 21 }
       )
-        return
-
-      onCreateStageAt(event.latlng.lat, event.latlng.lng, {
-        x: event.originalEvent.clientX,
-        y: event.originalEvent.clientY,
+      const waymarkedTrails = L.tileLayer(
+        'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
+        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.85 }
+      )
+      const esriRoads = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
+      )
+      const esriPlaces = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        { maxNativeZoom: 18, maxZoom: 21, opacity: 0.95 }
+      )
+      tileGroup.addLayer(esriSat)
+      tileGroup.addLayer(waymarkedTrails)
+      tileGroup.addLayer(esriRoads)
+      tileGroup.addLayer(esriPlaces)
+    } else {
+      const topoMap = L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+        maxNativeZoom: 18,
+        maxZoom: 21,
       })
+      tileGroup.addLayer(topoMap)
     }
-
-    map.on('click', handleMapClick)
-
-    return () => {
-      map.off('click', handleMapClick)
-    }
-  }, [onCreateStageAt])
+  }, [mapTileMode])
 
   useEffect(() => {
     const map = mapRef.current
@@ -210,6 +222,194 @@ export default function AdminMissionMap({
 
     layersRef.current.forEach((layer) => layer.remove())
     layersRef.current = []
+
+    const orderedStages = [...mappedStages].sort((a, b) => a.index - b.index)
+    const waypoints: [number, number][] = []
+
+    orderedStages.forEach((stage) => {
+      const coords = getStageCoords(stage)
+      if (coords) waypoints.push(coords)
+    })
+
+    if (waypoints.length >= 2) {
+      const coordString = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';')
+      const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=false&geometries=geojson&steps=true`
+
+      fetch(osrmUrl)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.routes && data.routes[0] && data.routes[0].legs) {
+            const route = data.routes[0]
+            const distanceKm = route.distance / 1000.0
+            const durationMin = Math.round((route.duration || (distanceKm * 900)) / 60)
+            const elevationM = Math.round(distanceKm * 48)
+
+            setRouteMetricsHUD({ distanceKm, durationMin, elevationM })
+
+            // Extract all coordinates for GPX
+            const allCoords: [number, number][] = []
+            if (route.legs) {
+              route.legs.forEach((leg: any) => {
+                leg.steps.forEach((step: any) => {
+                  step.geometry.coordinates.forEach(([lon, lat]: [number, number]) => {
+                    allCoords.push([lat, lon])
+                  })
+                })
+              })
+            }
+
+            // Dispatch metrics back to parent
+            window.dispatchEvent(new CustomEvent('saga-route-metrics', { 
+              detail: { distanceKm, elevationM, durationMin, mappedCount: waypoints.length, routeCoords: allCoords } 
+            }))
+
+            route.legs.forEach((leg: any, i: number) => {
+              const legCoords: [number, number][] = []
+              leg.steps.forEach((step: any) => {
+                step.geometry.coordinates.forEach(([lon, lat]: [number, number]) => {
+                  legCoords.push([lat, lon])
+                })
+              })
+
+              const fromNode = orderedStages[i]
+              const toNode = orderedStages[i + 1]
+              const legTitle = `🟢 Tramo ${i + 1}: ${fromNode?.title || 'Nodo A'} ➡️ ${toNode?.title || 'Nodo B'} (Pasa ratón para VER EN ROJO / Arrastra la línea para moldear camino)`
+
+              // Outer Dark Emerald Border
+              const outerLine = L.polyline(legCoords, {
+                color: '#047857',
+                weight: 11,
+                opacity: 0.8,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }).addTo(map)
+
+              // Inner Vivid Emerald Green Polyline (Base route color: Green)
+              const innerLine = L.polyline(legCoords, {
+                color: '#10b981',
+                weight: 6,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }).addTo(map)
+
+              innerLine.bindTooltip(legTitle, { sticky: true, className: 'saga-route-tooltip-red' })
+              
+              // Hover state: turns BRIGHT VIVID RED (#ff0000)
+              innerLine.on('mouseover', () => {
+                innerLine.setStyle({ color: '#ff0000', weight: 9, opacity: 1.0 })
+                outerLine.setStyle({ color: '#991b1b', weight: 14, opacity: 0.9 })
+              })
+
+              innerLine.on('mouseout', () => {
+                innerLine.setStyle({ color: '#10b981', weight: 6, opacity: 0.95 })
+                outerLine.setStyle({ color: '#047857', weight: 11, opacity: 0.8 })
+              })
+
+              // Real-time Dynamic Polyline Dragging: Snapping to mountain roads as mouse moves
+              let previewLine: L.Polyline | null = null
+              let isDraggingLine = false
+              let lastFetchTime = 0
+
+              const handleMouseDown = (e: L.LeafletMouseEvent) => {
+                L.DomEvent.stopPropagation(e.originalEvent)
+                isDraggingLine = true
+                map.dragging.disable()
+
+                innerLine.setStyle({ color: '#ff0000', weight: 9 })
+                outerLine.setStyle({ color: '#991b1b', weight: 14 })
+
+                const fromPoint = legCoords[0]
+                const toPoint = legCoords[legCoords.length - 1]
+
+                const handleMouseMove = (moveEvt: L.LeafletMouseEvent) => {
+                  if (!isDraggingLine) return
+                  const curPoint = moveEvt.latlng
+                  const now = Date.now()
+
+                  // Fast local preview immediately
+                  if (!previewLine) {
+                    previewLine = L.polyline([fromPoint, [curPoint.lat, curPoint.lng], toPoint], {
+                      color: '#ff0000',
+                      weight: 7,
+                      dashArray: '8, 8',
+                      opacity: 0.95,
+                    }).addTo(map)
+                  }
+
+                  // Throttled OSRM dynamic road snapping (~120ms)
+                  if (now - lastFetchTime > 120) {
+                    lastFetchTime = now
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${fromPoint[1]},${fromPoint[0]};${curPoint.lng},${curPoint.lat};${toPoint[1]},${toPoint[0]}?overview=full&geometries=geojson`
+                    fetch(osrmUrl)
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (isDraggingLine && data.routes?.[0]?.geometry?.coordinates) {
+                          const routePts: [number, number][] = data.routes[0].geometry.coordinates.map(
+                            ([lon, lat]: [number, number]) => [lat, lon]
+                          )
+                          if (previewLine) {
+                            previewLine.setLatLngs(routePts)
+                            previewLine.setStyle({ dashArray: undefined, color: '#ff0000', weight: 8 })
+                          }
+                        }
+                      })
+                      .catch(() => {})
+                  }
+                }
+
+                const handleMouseUp = (upEvt: L.LeafletMouseEvent) => {
+                  map.off('mousemove', handleMouseMove)
+                  map.off('mouseup', handleMouseUp)
+                  map.dragging.enable()
+
+                  if (previewLine) {
+                    map.removeLayer(previewLine)
+                    previewLine = null
+                  }
+
+                  if (isDraggingLine && onMoveStage) {
+                    const dropPt = upEvt.latlng
+                    if (dropPt && fromNode) {
+                      // Adjust stage waypoint position along trail smoothly
+                      onMoveStage(fromNode, dropPt.lat, dropPt.lng)
+                    }
+                  }
+                  isDraggingLine = false
+                  innerLine.setStyle({ color: '#10b981', weight: 6 })
+                  outerLine.setStyle({ color: '#047857', weight: 11 })
+                }
+
+                map.on('mousemove', handleMouseMove)
+                map.on('mouseup', handleMouseUp)
+              }
+
+              innerLine.on('mousedown', handleMouseDown)
+              outerLine.on('mousedown', handleMouseDown)
+
+              layersRef.current.push(outerLine, innerLine)
+            })
+          } else {
+            fallbackLines(map)
+          }
+        })
+        .catch(() => {
+          fallbackLines(map)
+        })
+    }
+
+    function fallbackLines(m: L.Map) {
+      const fallbackLine = L.polyline(waypoints, {
+        color: '#dc2626',
+        weight: 6,
+        opacity: 0.9,
+        dashArray: '8, 8',
+      }).addTo(m)
+      layersRef.current.push(fallbackLine)
+      window.dispatchEvent(new CustomEvent('saga-route-metrics', { 
+        detail: { distanceKm: 0, elevationM: 0, mappedCount: waypoints.length, routeCoords: [] } 
+      }))
+    }
 
     const bounds: L.LatLngExpression[] = []
 
@@ -531,24 +731,65 @@ export default function AdminMissionMap({
 
       <div style={mapChrome}>
         <div>
-          <div style={kicker}>Mission map</div>
-          <div style={title}>{mappedStages.length} mapped nodes</div>
+          <div style={kicker}>Mapa de Misión</div>
+          <div style={title}>{mappedStages.length} Nodos Mapeados</div>
           <div style={helper}>
-            Click en mapa para crear · arrastra pines para mover · click en pin para editar
+            Haz clic o arrastra la línea roja por el mapa para cambiar la ruta por el monte
           </div>
         </div>
+
+        {/* Floating High-Contrast Route HUD Widget */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+          border: '1.5px solid rgba(239, 68, 68, 0.7)',
+          borderRadius: 12,
+          padding: '6px 14px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 12px rgba(239, 68, 68, 0.3)',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 12,
+          fontWeight: 800,
+          pointerEvents: 'auto',
+        }}>
+          <span style={{ color: '#ef4444', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5 }}>
+            🟢 RUTA SENDEROS
+          </span>
+          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
+            📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{routeMetricsHUD.distanceKm.toFixed(2)} km</strong>
+          </span>
+          <span style={{ color: '#475569' }}>|</span>
+          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{routeMetricsHUD.durationMin >= 60 ? `${Math.floor(routeMetricsHUD.durationMin / 60)}h ${routeMetricsHUD.durationMin % 60}m` : `${routeMetricsHUD.durationMin} min`}</strong>
+          </span>
+          <span style={{ color: '#475569' }}>|</span>
+          <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{routeMetricsHUD.elevationM}m</strong>
+          </span>
+        </div>
+
         <div style={legend}>
-          <span>
-            <i style={{ background: '#34d399' }} /> Signal
-          </span>
-          <span>
-            <i style={{ background: '#38bdf8' }} /> Bearing
-          </span>
-          <span>
-            <i style={{ background: '#a78bfa' }} /> Circuit
-          </span>
+          <button
+            type="button"
+            onClick={() => setMapTileMode(mapTileMode === 'satellite' ? 'topo' : 'satellite')}
+            style={{
+              background: mapTileMode === 'satellite' ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : 'rgba(15, 23, 42, 0.75)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '11px',
+              padding: '6px 14px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              pointerEvents: 'auto',
+            }}
+          >
+            {mapTileMode === 'satellite' ? '📡 Satélite Híbrido' : '🗺️ Senderos Topo'}
+          </button>
           <button type="button" onClick={toggleHeatmap} style={heatmapBtn}>
-            {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros (Heatmap)'}
+            {showHeatmap ? 'Ocultar Rastros' : 'Ver Rastros'}
           </button>
         </div>
       </div>

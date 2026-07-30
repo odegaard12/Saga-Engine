@@ -130,7 +130,7 @@ export default function PlayersPanel({
           {playerDrafts.map((draft, index) => (
             <section
               className="admin-player-editor-card admin-player-card-modern"
-              key={`${draft.id}-${index}`}
+              key={`player-draft-card-${index}`}
             >
               <div className="admin-player-editor-head admin-player-head-modern">
                 <div

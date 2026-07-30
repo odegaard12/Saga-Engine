@@ -464,7 +464,29 @@ export default function AdminGameEditor({
       <header className="saga-guided-v4-header">
         <div className="saga-guided-v4-titleblock">
           <span>EDITOR GUIADO</span>
-          <h2>{title}</h2>
+          <div style={{ margin: '6px 0 8px 0', width: '100%', maxWidth: '540px' }}>
+            <label style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              ✏️ Nombre del nodo / Ubicación
+            </label>
+            <input
+              type="text"
+              value={String(stage.title || '').replace(/^\d+\.\s*/, '')}
+              onChange={(event) => onPatch({ title: event.target.value })}
+              placeholder="Escribe el nombre de esta ubicación (ej. Senda Forestal Norte)..."
+              style={{
+                width: '100%',
+                fontSize: 18,
+                fontWeight: 800,
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1.5px solid rgba(251, 191, 36, 0.5)',
+                borderRadius: 10,
+                padding: '8px 14px',
+                color: '#ffffff',
+                outline: 'none',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            />
+          </div>
           <div className="saga-guided-v4-chips">
             <b>
               {mode === 'qr'
@@ -722,11 +744,11 @@ export default function AdminGameEditor({
                       onChange={(event) => {
                         const val = event.target.value
                         if (val === 'custom') {
-                          onPatch({ physical_item_id: 'objeto_personalizado', physical_item_label: 'Objeto Personalizado', title: 'Objeto Personalizado', config: { ...config, collectible_purpose: 'standalone' } })
+                          onPatch({ physical_item_id: 'objeto_personalizado', physical_item_label: 'Objeto Personalizado', config: { ...config, collectible_purpose: 'standalone' } })
                         } else {
                           const labels: Record<string, string> = { placa_base: 'Placa base', cables_cobre: 'Cables de cobre', bateria_litio: 'Batería de litio', cinta_aislante: 'Cinta aislante', llave_rota: 'Llave rota' }
                           const purposes: Record<string, string> = { placa_base: 'crafting', cables_cobre: 'crafting', bateria_litio: 'crafting', cinta_aislante: 'crafting', llave_rota: 'crafting' }
-                          onPatch({ physical_item_id: val, physical_item_label: labels[val], title: labels[val], config: { ...config, collectible_purpose: purposes[val] || 'standalone' } })
+                          onPatch({ physical_item_id: val, physical_item_label: labels[val], config: { ...config, collectible_purpose: purposes[val] || 'standalone' } })
                         }
                       }}
                     >

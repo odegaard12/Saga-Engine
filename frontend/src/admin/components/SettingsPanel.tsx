@@ -167,33 +167,84 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>{t('admin.settingsPanel.prologue')}</strong>
-          <span>{t('admin.settingsPanel.prologueSubtitle')}</span>
+          <strong style={{ color: '#38bdf8' }}>📜 Editor de Prólogo e Historia Inicial</strong>
+          <span>Configura el título, subtítulo e historia del prólogo que ven los jugadores al iniciar la misión</span>
         </div>
 
         <div className="admin-settings-grid-modern">
           <label>
-            {t('admin.settingsPanel.prologueTitle')}
+            Título del Prólogo
             <input
               value={missionDraft.prologue_title || ''}
+              placeholder="Ej: O Ocaso de Cristal"
               onChange={(event) => onUpdateMissionDraft('prologue_title', event.target.value)}
             />
           </label>
 
           <label>
-            {t('admin.settingsPanel.prologueSubtitle2')}
+            Subtítulo del Prólogo
             <input
               value={missionDraft.prologue_subtitle || ''}
+              placeholder="Ej: Misión en Cotorredondo e Lago de Castiñeiras"
               onChange={(event) => onUpdateMissionDraft('prologue_subtitle', event.target.value)}
             />
           </label>
 
           <label className="admin-wide-field">
-            {t('admin.settingsPanel.prologueBody')}
+            URL Imagen de Portada del Prólogo (Opcional)
+            <input
+              value={missionDraft.prologue_image_url || ''}
+              placeholder="https://ejemplo.com/imagen-prologo.jpg"
+              onChange={(event) => onUpdateMissionDraft('prologue_image_url', event.target.value)}
+            />
+          </label>
+
+          <label className="admin-wide-field">
+            Cuerpo / Texto Completo de la Historia del Prólogo
             <textarea
+              rows={6}
               value={missionDraft.prologue_body || ''}
               onChange={(event) => onUpdateMissionDraft('prologue_body', event.target.value)}
-              placeholder="Puedes usar Markdown para imágenes: ![Descripción de la imagen](https://url-de-la-imagen.jpg)"
+              placeholder="Escribe aquí la historia inicial. Puedes usar Markdown para dar formato: **texto en negrita**, *cursiva*, o imágenes ![Descripción](https://url-de-la-imagen.jpg)..."
+              style={{ minHeight: '120px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.5' }}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong style={{ color: '#22c55e' }}>🔐 Pantalla de Inicio de Sesión (Login de Jugador)</strong>
+          <span>Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al entrar</span>
+        </div>
+
+        <div className="admin-settings-grid-modern">
+          <label>
+            Título de Bienvenida (Login)
+            <input
+              value={missionDraft.login_title || ''}
+              placeholder="Ej: Benvidos a SAGA Engine"
+              onChange={(event) => onUpdateMissionDraft('login_title', event.target.value)}
+            />
+          </label>
+
+          <label>
+            Subtítulo de Login
+            <input
+              value={missionDraft.login_subtitle || ''}
+              placeholder="Ej: Selecciona o teu equipo ou introduce a túa clave"
+              onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
+            />
+          </label>
+
+          <label className="admin-wide-field">
+            Instrucciones o Mensaje de Login
+            <textarea
+              rows={3}
+              value={missionDraft.login_instructions || ''}
+              onChange={(event) => onUpdateMissionDraft('login_instructions', event.target.value)}
+              placeholder="Mensaje o aviso para los jugadores al iniciar sesión..."
+              style={{ minHeight: '80px', fontFamily: 'inherit', fontSize: '13px' }}
             />
           </label>
         </div>

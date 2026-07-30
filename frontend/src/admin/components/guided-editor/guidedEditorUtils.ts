@@ -215,10 +215,8 @@ export function nodeNumber(stage: StageLike) {
 }
 
 export function displayTitle(stage: StageLike) {
-  const n = nodeNumber(stage)
   const title = titleOf(stage)
-  if (n && !title.trim().startsWith(`${n}.`)) return `${n}. ${title}`
-  return title
+  return title.replace(/^\d+\.\s*/, '')
 }
 
 export function normalizeQrKind(value: unknown): PhysicalQrKind {
