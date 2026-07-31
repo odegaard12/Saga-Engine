@@ -522,7 +522,7 @@ export default function NodePhysicalTypePanel({
             Nombre visible
             <input
               value={stage.title || ''}
-              onChange={(event) => patchStage({ title: event.target.value })}
+              onChange={(event) => patchStage({ title: event.target.value, physical_item_label: event.target.value })}
               placeholder="Buscar a tu enemigo"
               style={input}
             />
