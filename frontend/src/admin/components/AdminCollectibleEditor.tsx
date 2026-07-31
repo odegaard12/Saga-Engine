@@ -70,7 +70,24 @@ export default function AdminCollectibleEditor({
       <header className="saga-guided-v4-header">
         <div className="saga-guided-v4-titleblock">
           <span>COLECCIONABLE DE MAPA</span>
-          <h2>{stage.title || 'Objeto Coleccionable'}</h2>
+          <input
+            value={stage.title || stage.physical_item_label || ''}
+            onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
+            placeholder="Objeto Coleccionable"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '2px dashed rgba(255,255,255,0.2)',
+              color: '#fff',
+              fontSize: '22px',
+              fontWeight: 800,
+              padding: '2px 0',
+              margin: '4px 0',
+              outline: 'none',
+              width: '100%',
+              fontFamily: 'inherit'
+            }}
+          />
           <div className="saga-guided-v4-chips">
             <b>⭐ Coleccionable</b>
             <b>Jugable</b>
@@ -125,15 +142,6 @@ export default function AdminCollectibleEditor({
             <p className="saga-guided-v4-dep-box__desc">
               Cómo se verá este coleccionable en la mochila del jugador.
             </p>
-            <label>
-              <span>Nombre visible del objeto</span>
-              <input 
-                type="text" 
-                value={stage.title || stage.physical_item_label || ''} 
-                onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
-                placeholder="Ej. Batería agotada, Reliquia Antigua..."
-              />
-            </label>
             <label>
               <span>ID interno (para lógica)</span>
               <input 

@@ -161,7 +161,7 @@ export default function AdminMissionMap({
   const tileLayerRef = useRef<L.LayerGroup | null>(null)
   const nearbyPathsLayerRef = useRef<L.LayerGroup | null>(null)
   const nearbyPathsControllerRef = useRef<AbortController | null>(null)
-  const [mapTileMode, setMapTileMode] = useState<'satellite-osm' | 'cyclosm' | 'topo' | 'satellite'>('satellite-osm')
+  const [mapTileMode, setMapTileMode] = useState<'satellite-osm' | 'cyclosm' | 'osm' | 'satellite'>('satellite-osm')
 
   useEffect(() => {
     if (!mapRootRef.current || mapRef.current) return
@@ -170,6 +170,7 @@ export default function AdminMissionMap({
       zoomControl: false,
       attributionControl: false,
       doubleClickZoom: false,
+      renderer: L.canvas(),
     })
 
     map.on('click', (e) => {
@@ -232,10 +233,10 @@ export default function AdminMissionMap({
         { maxNativeZoom: 17, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(cyclosmMap)
-    } else if (mapTileMode === 'topo') {
+    } else if (mapTileMode === 'osm') {
       const openTopo = L.tileLayer(
-        'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        { maxNativeZoom: 17, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxNativeZoom: 19, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(openTopo)
     } else {
@@ -255,78 +256,85 @@ export default function AdminMissionMap({
 
     if (!map || !pathsGroup) return
 
-    // Find center coordinate from selectedStage or mappedStages
-    let centerLat = 42.36
-    let centerLon = -8.67
-    let searchRadius = 1200
+    function fetchTrails() {
+      const currentMap = mapRef.current
+      const currentPathsGroup = nearbyPathsLayerRef.current
+      if (!currentMap || !currentPathsGroup) return
+      
+      if (currentMap.getZoom() < 13) return
+      
+      const bounds = currentMap.getBounds().pad(0.2)
+      const s = bounds.getSouth()
+      const w = bounds.getWest()
+      const n = bounds.getNorth()
+      const e = bounds.getEast()
 
-    if (selectedStage && hasCoords(selectedStage)) {
-      centerLat = selectedStage.lat as number
-      centerLon = selectedStage.lon as number
-      searchRadius = 1000
-    } else if (mappedStages.length > 0) {
-      const avgLat = mappedStages.reduce((sum, s) => sum + (s.lat as number), 0) / mappedStages.length
-      const avgLon = mappedStages.reduce((sum, s) => sum + (s.lon as number), 0) / mappedStages.length
-      centerLat = avgLat
-      centerLon = avgLon
-      searchRadius = 2000
-    }
+      if (nearbyPathsControllerRef.current) {
+        nearbyPathsControllerRef.current.abort()
+      }
 
-    if (nearbyPathsControllerRef.current) {
-      nearbyPathsControllerRef.current.abort()
-      nearbyPathsControllerRef.current = null
-    }
+      const controller = new AbortController()
+      nearbyPathsControllerRef.current = controller
 
-    const controller = new AbortController()
-    nearbyPathsControllerRef.current = controller
+      const query = `
+        [out:json];
+        (
+          way["highway"](${s},${w},${n},${e});
+        );
+        out geom;
+      `
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query.trim())}`
 
-    const query = `
-      [out:json];
-      (
-        way["highway"](around:${searchRadius},${centerLat},${centerLon});
-      );
-      out geom;
-    `
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query.trim())}`
+      fetch(url, { signal: controller.signal })
+        .then(r => r.json())
+        .then(data => {
+          if (!data || !data.elements) return
+          data.elements.forEach((el: any) => {
+            if (el.type === 'way' && el.geometry && !fetchedWayIdsRef.current.has(el.id)) {
+              fetchedWayIdsRef.current.add(el.id)
+              const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
 
-    fetch(url, { signal: controller.signal })
-      .then(r => r.json())
-      .then(data => {
-        if (!data || !data.elements) return
-        data.elements.forEach((el: any) => {
-          if (el.type === 'way' && el.geometry && !fetchedWayIdsRef.current.has(el.id)) {
-            fetchedWayIdsRef.current.add(el.id)
-            const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
+              L.polyline(latlngs, {
+                color: '#ffffff',
+                weight: 7,
+                opacity: 0.35,
+                lineCap: 'round',
+                lineJoin: 'round', 
+                interactive: false
+              }).addTo(currentPathsGroup)
 
-            // Halo blanco brillante para contraste sobre satélite
-            L.polyline(latlngs, {
-              color: '#ffffff',
-              weight: 7,
-              opacity: 0.35,
-              lineCap: 'round',
-              lineJoin: 'round', 
-              interactive: false
-            }).addTo(pathsGroup)
-
-            // Línea de sendero en amarillo brillante (#f59e0b) siempre visible
-            L.polyline(latlngs, {
-              color: '#f59e0b',
-              weight: 4,
-              opacity: 0.95,
-              dashArray: '5 7',
-              lineCap: 'round',
-              lineJoin: 'round', 
-              interactive: false,
-              
-            }).addTo(pathsGroup)
-          }
+              L.polyline(latlngs, {
+                color: '#f59e0b',
+                weight: 4,
+                opacity: 0.95,
+                dashArray: '5 7',
+                lineCap: 'round',
+                lineJoin: 'round', 
+                interactive: false,
+              }).addTo(currentPathsGroup)
+            }
+          })
         })
-      })
-      .catch(e => {
-        if (e.name !== 'AbortError') console.error('Overpass fetch error:', e)
-      })
+        .catch(e => {
+          if (e.name !== 'AbortError') console.error('Overpass fetch error:', e)
+        })
+    }
 
-  }, [selectedStage, mappedStages])
+    let timeoutId: number
+    function onMoveEnd() {
+      clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(fetchTrails, 600)
+    }
+
+    map.on('moveend', onMoveEnd)
+    // Initial fetch after a slight delay to ensure bounds are ready
+    setTimeout(fetchTrails, 200)
+
+    return () => {
+      map.off('moveend', onMoveEnd)
+      clearTimeout(timeoutId)
+    }
+  }, [mapRef.current])
 
   useEffect(() => {
     const map = mapRef.current
@@ -383,7 +391,7 @@ export default function AdminMissionMap({
       })
 
       const coordString = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';')
-      const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson&steps=true`
+      const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${coordString}?overview=full&geometries=geojson&steps=true`
 
       fetch(osrmUrl)
         .then((res) => res.json())
@@ -434,7 +442,7 @@ export default function AdminMissionMap({
               const legTitle = `🟢 Tramo ${i + 1}: ${fromNode?.title || 'Nodo A'} ➡️ ${toNode?.title || 'Nodo B'} (Pasa ratón para VER EN ROJO / Arrastra la línea para moldear camino)`
 
               // Outer Dark Emerald Border
-              const outerLine = L.polyline(legCoords, { noClip: true, 
+              const outerLine = L.polyline(legCoords, { 
                 color: '#047857',
                 weight: 11,
                 opacity: 0.8,
@@ -443,7 +451,7 @@ export default function AdminMissionMap({
               }).addTo(map)
 
               // Inner Vivid Emerald Green Polyline (Base route color: Green)
-              const innerLine = L.polyline(legCoords, { noClip: true, 
+              const innerLine = L.polyline(legCoords, { 
                 color: '#10b981',
                 weight: 6,
                 opacity: 0.95,
@@ -518,7 +526,7 @@ export default function AdminMissionMap({
                   // Throttled OSRM dynamic road snapping (~120ms)
                   if (now - lastFetchTime > 120) {
                     lastFetchTime = now
-                    const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${fromPoint[1]},${fromPoint[0]};${curPoint.lng},${curPoint.lat};${toPoint[1]},${toPoint[0]}?overview=full&geometries=geojson`
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${fromPoint[1]},${fromPoint[0]};${curPoint.lng},${curPoint.lat};${toPoint[1]},${toPoint[0]}?overview=full&geometries=geojson`
                     fetch(osrmUrl)
                       .then((res) => res.json())
                       .then((data) => {
@@ -580,7 +588,7 @@ export default function AdminMissionMap({
                       data.elements.forEach((element: any) => {
                         if (element.geometry && element.geometry.length >= 2) {
                           const pathPts: [number, number][] = element.geometry.map((pt: any) => [pt.lat, pt.lon])
-                          const trailHintLine = L.polyline(pathPts, { noClip: true, 
+                          const trailHintLine = L.polyline(pathPts, { 
                             color: '#38bdf8',
                             weight: 3.5,
                             opacity: 0.75,
@@ -606,7 +614,7 @@ export default function AdminMissionMap({
     }
 
     function fallbackLines(m: L.Map) {
-      const fallbackLine = L.polyline(waypoints, { noClip: true, 
+      const fallbackLine = L.polyline(waypoints, { 
         color: '#dc2626',
         weight: 6,
         opacity: 0.9,
@@ -773,14 +781,14 @@ export default function AdminMissionMap({
 
           if (waypointsList.length >= 2) {
             const coordString = waypointsList.map(([lat, lon]) => `${lon},${lat}`).join(';')
-            const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson`
+            const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${coordString}?overview=full&geometries=geojson`
             fetch(osrmUrl)
               .then((r) => r.json())
               .then((data) => {
                 if (map.getContainer().classList.contains('admin-map-dragging-node') && data.routes?.[0]?.geometry?.coordinates) {
                   const pts = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
                   if (!previewNodeLine) {
-                    previewNodeLine = L.polyline(pts, { noClip: true,  color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
+                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
                   } else {
                     previewNodeLine.setLatLngs(pts)
                   }
@@ -1134,32 +1142,24 @@ export default function AdminMissionMap({
           <button
             type="button"
             onClick={() => {
-              if (mapTileMode === 'satellite-osm') setMapTileMode('cyclosm')
-              else if (mapTileMode === 'cyclosm') setMapTileMode('topo')
-              else if (mapTileMode === 'topo') setMapTileMode('satellite')
+              if (mapTileMode === 'satellite-osm') setMapTileMode('satellite')
+              else if (mapTileMode === 'satellite') setMapTileMode('osm')
               else setMapTileMode('satellite-osm')
             }}
             style={{
-              background: mapTileMode === 'satellite-osm' || mapTileMode === 'cyclosm'
-                ? 'linear-gradient(135deg, #0ea5e9, #2563eb)'
-                : 'rgba(15, 23, 42, 0.85)',
+              background: mapTileMode.startsWith('satellite') ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : 'rgba(15, 23, 42, 0.75)',
               border: '1px solid rgba(56, 189, 248, 0.4)',
               color: '#ffffff',
               fontWeight: 800,
-              fontSize: '10px',
-              padding: '4px 10px',
-              borderRadius: '8px',
+              fontSize: '11px',
+              padding: '6px 14px',
+              borderRadius: '10px',
               cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              pointerEvents: 'auto',
             }}
           >
-            {mapTileMode === 'satellite-osm'
-              ? '📡 Satélite + Caminos'
-              : mapTileMode === 'cyclosm'
-                ? '🧭 Senderos (CyclOSM)'
-                : mapTileMode === 'topo'
-                  ? '🗺️ Mapa Topográfico'
-                  : '📡 Satélite Limpio'}
+            {mapTileMode === 'satellite-osm' ? '📡 Satélite + Caminos' : mapTileMode === 'satellite' ? '📡 Satélite Limpio' : '🗺️ OpenStreetMap'}
           </button>
           <button
             type="button"

@@ -43,7 +43,24 @@ export default function AdminQrEditor({
       <header className="saga-guided-v4-header">
         <div className="saga-guided-v4-titleblock">
           <span>QR FÍSICO</span>
-          <h2>{stage.title || 'Objeto Escaneable'}</h2>
+          <input
+            value={stage.title || stage.physical_item_label || ''}
+            onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
+            placeholder="Objeto Escaneable"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '2px dashed rgba(255,255,255,0.2)',
+              color: '#fff',
+              fontSize: '22px',
+              fontWeight: 800,
+              padding: '2px 0',
+              margin: '4px 0',
+              outline: 'none',
+              width: '100%',
+              fontFamily: 'inherit'
+            }}
+          />
           <div className="saga-guided-v4-chips">
             <b>▣ QR Físico</b>
             <b>Jugable</b>
@@ -99,16 +116,6 @@ export default function AdminQrEditor({
               Personaliza el nombre de este objeto y genera el QR para imprimir.
             </p>
             <div style={{ padding: '0 12px' }}>
-              <label>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Nombre visible del objeto</span>
-                <input 
-                  type="text" 
-                  value={stage.title || stage.physical_item_label || ''} 
-                  onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
-                  placeholder="Ej. Batería agotada, Reliquia..."
-                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 6, color: '#f8fafc', marginBottom: 12, marginTop: 4 }}
-                />
-              </label>
               
               <PhysicalQrCardsPanel
                 initialLabel={stage.physical_item_label || stage.title || 'Buscar a tu enemigo'}
