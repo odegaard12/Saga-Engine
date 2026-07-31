@@ -17,15 +17,21 @@ function getCardData(stage: AdminReactOverviewStage) {
     stage.entry_mode === 'qr' ||
     stage.type === 'qr_scan' ||
     Boolean(stage.qr_payload) ||
-    Boolean(stage.physical_qr)
+    Boolean(stage.physical_qr) ||
+    stage.physical_node_kind === 'qr'
 
   if (!isQr) return null
 
+  let physQrObj: Record<string, unknown> | null = null
+  if (typeof stage.physical_qr === 'string') {
+    try { physQrObj = JSON.parse(stage.physical_qr) } catch (e) {}
+  } else if (typeof stage.physical_qr === 'object' && stage.physical_qr !== null) {
+    physQrObj = stage.physical_qr as Record<string, unknown>
+  }
+
   const payloadStr =
     stage.qr_payload ??
-    (typeof stage.physical_qr === 'object' && stage.physical_qr !== null
-      ? (stage.physical_qr as Record<string, unknown>).payload
-      : null)
+    (physQrObj ? physQrObj.payload : null)
 
   const label = stage.title || 'Nodo QR'
 
