@@ -948,7 +948,6 @@ export default function AdminApp() {
 
     setCmsPanel('none')
     setSaveState('dirty')
-    setSelectedStage(nextStage)
     setLocalNotice('Waypoint de ruta insertado. Guarda los cambios.')
   }
 

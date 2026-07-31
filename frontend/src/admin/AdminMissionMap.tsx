@@ -173,7 +173,6 @@ export default function AdminMissionMap({
       zoomControl: false,
       attributionControl: false,
       doubleClickZoom: false,
-      renderer: L.canvas(),
     })
 
     map.on('click', (e) => {
