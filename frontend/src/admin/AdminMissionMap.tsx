@@ -345,6 +345,7 @@ export default function AdminMissionMap({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    const canvasRenderer = (map as any)._canvasRenderer
 
     layersRef.current.forEach((layer) => layer.remove())
     layersRef.current = []
