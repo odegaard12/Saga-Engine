@@ -175,6 +175,10 @@ export default function AdminMissionMap({
       doubleClickZoom: false,
     })
 
+    const canvasRenderer = L.canvas()
+    // store renderer on map object so it can be used elsewhere in the component
+    ;(map as any)._canvasRenderer = canvasRenderer
+
     map.on('click', (e) => {
       if (Date.now() < dragClickSuppressUntilRef.current) return
       if (onCreateStageAt) {
@@ -450,6 +454,7 @@ export default function AdminMissionMap({
                 opacity: 0.8,
                 lineCap: 'round',
                 lineJoin: 'round', 
+                renderer: canvasRenderer
               }).addTo(map)
 
               // Inner Vivid Emerald Green Polyline (Base route color: Green)
@@ -459,6 +464,7 @@ export default function AdminMissionMap({
                 opacity: 0.95,
                 lineCap: 'round',
                 lineJoin: 'round', 
+                renderer: canvasRenderer
               }).addTo(map)
 
               let fromConnLine: L.Polyline | null = null
@@ -470,6 +476,7 @@ export default function AdminMissionMap({
                   weight: 3,
                   dashArray: '5, 8',
                   opacity: 0.8,
+                  renderer: canvasRenderer
                 }).addTo(map)
               }
               if (toNode && legCoords.length > 0) {
@@ -478,6 +485,7 @@ export default function AdminMissionMap({
                   weight: 3,
                   dashArray: '5, 8',
                   opacity: 0.8,
+                  renderer: canvasRenderer
                 }).addTo(map)
               }
 
@@ -522,6 +530,7 @@ export default function AdminMissionMap({
                       weight: 7,
                       dashArray: '8, 8',
                       opacity: 0.95,
+                      renderer: canvasRenderer
                     }).addTo(map)
                   }
 
@@ -599,6 +608,7 @@ export default function AdminMissionMap({
                             weight: 3.5,
                             opacity: 0.75,
                             dashArray: '6, 6',
+                            renderer: canvasRenderer
                           }).addTo(map)
                           trailHintLine.bindTooltip(`🌲 Sendero en 500m: ${element.tags?.name || element.tags?.highway || 'Camino de monte'}`, { sticky: true })
                           routeLayersRef.current.push(trailHintLine)
@@ -625,6 +635,7 @@ export default function AdminMissionMap({
         weight: 6,
         opacity: 0.9,
         dashArray: '8, 8',
+        renderer: canvasRenderer,
       }).addTo(m)
       routeLayersRef.current.push(fallbackLine)
       lastRouteCoordsRef.current = waypoints
@@ -651,6 +662,7 @@ export default function AdminMissionMap({
         fillOpacity: visual.ringOpacity,
         className: selected ? 'admin-node-ring admin-node-ring--selected' : 'admin-node-ring',
         bubblingMouseEvents: false,
+        renderer: canvasRenderer,
       }).addTo(map)
 
       const markerSize = selected ? 74 : 62
@@ -794,7 +806,7 @@ export default function AdminMissionMap({
                 if (map.getContainer().classList.contains('admin-map-dragging-node') && data.routes?.[0]?.geometry?.coordinates) {
                   const pts = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
                   if (!previewNodeLine) {
-                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
+                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95, renderer: canvasRenderer }).addTo(map)
                   } else {
                     previewNodeLine.setLatLngs(pts)
                   }
@@ -836,6 +848,7 @@ export default function AdminMissionMap({
         weight: 1.5,
         opacity: 0.7,
         dashArray: '4 8',
+        renderer: canvasRenderer
       }).addTo(map)
       layersRef.current.push(routeLine)
     }
