@@ -16,6 +16,7 @@ type PhysicalQrCardsPanelProps = {
   initialLabel?: string
   initialKind: PhysicalQrKind
   compact?: boolean
+  hideInputs?: boolean
   onSaveToNode: (card: SavedPhysicalQrCard) => void
 }
 
@@ -70,6 +71,7 @@ export default function PhysicalQrCardsPanel({
   initialLabel = 'Buscar a tu enemigo',
   initialKind,
   compact = false,
+  hideInputs = false,
   onSaveToNode,
 }: PhysicalQrCardsPanelProps) {
   const [label, setLabel] = useState(initialLabel)
@@ -130,16 +132,18 @@ export default function PhysicalQrCardsPanel({
 
   return (
     <section style={compact ? compactPanel : panel} aria-label="Generador QR del nodo">
-      <div style={header}>
-        <div>
-          <div style={eyebrow}>TARJETA QR</div>
-          <h2 style={compact ? compactTitle : title}>QR imprimible</h2>
-          <p style={copy}>Escanéalo para guardar este objeto físico en la mochila del jugador.</p>
+      {!compact && (
+        <div style={header}>
+          <div>
+            <div style={eyebrow}>TARJETA QR</div>
+            <h2 style={compact ? compactTitle : title}>QR imprimible</h2>
+            <p style={copy}>Escanéalo para guardar este objeto físico en la mochila del jugador.</p>
+          </div>
+          <span style={badge}>
+            {kindIcons[kind]} {kindLabels[kind]}
+          </span>
         </div>
-        <span style={badge}>
-          {kindIcons[kind]} {kindLabels[kind]}
-        </span>
-      </div>
+      )}
 
       <div style={layout}>
         <div style={qrCardWrapper}>
@@ -160,27 +164,29 @@ export default function PhysicalQrCardsPanel({
           </div>
         </div>
 
-        <div style={formGrid}>
-          <label style={field}>
-            Nombre visible
-            <input
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-              placeholder="Buscar a tu enemigo"
-              style={input}
-            />
-          </label>
+        {!hideInputs && (
+          <div style={formGrid}>
+            <label style={field}>
+              Nombre visible
+              <input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="Buscar a tu enemigo"
+                style={input}
+              />
+            </label>
 
-          <label style={field}>
-            ID interno
-            <input
-              value={manualId}
-              onChange={(event) => setManualId(event.target.value)}
-              placeholder={itemId}
-              style={input}
-            />
-          </label>
-        </div>
+            <label style={field}>
+              ID interno
+              <input
+                value={manualId}
+                onChange={(event) => setManualId(event.target.value)}
+                placeholder={itemId}
+                style={input}
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <div style={payloadBox}>
@@ -213,11 +219,6 @@ const panel: CSSProperties = { display: 'grid', gap: 14 }
 const compactPanel: CSSProperties = {
   display: 'grid',
   gap: 12,
-  padding: 12,
-  borderRadius: 22,
-  border: '1px solid rgba(187,247,208,.16)',
-  background:
-    'radial-gradient(circle at top right, rgba(187,247,208,.13), transparent 42%), rgba(15,23,42,.28)',
 }
 
 const header: CSSProperties = {

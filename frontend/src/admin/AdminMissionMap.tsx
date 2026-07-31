@@ -299,7 +299,7 @@ export default function AdminMissionMap({
             const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
 
             // Halo blanco brillante para contraste sobre satélite
-            L.polyline(latlngs, { noClip: true, 
+            L.polyline(latlngs, {
               color: '#ffffff',
               weight: 7,
               opacity: 0.35,
@@ -309,7 +309,7 @@ export default function AdminMissionMap({
             }).addTo(pathsGroup)
 
             // Línea de sendero en amarillo brillante (#f59e0b) siempre visible
-            L.polyline(latlngs, { noClip: true, 
+            L.polyline(latlngs, {
               color: '#f59e0b',
               weight: 4,
               opacity: 0.95,
