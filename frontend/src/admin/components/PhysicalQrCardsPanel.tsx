@@ -87,12 +87,11 @@ export default function PhysicalQrCardsPanel({
   }, [initialLabel, initialKind])
 
   const itemId = useMemo(() => {
-    const chosen = manualId.trim() || label.trim()
-    return slugify(chosen) || 'objeto_saga'
+    return (manualId.trim() || label.trim()).toUpperCase().replace(/\s+/g, '_')
   }, [label, manualId])
 
   const cleanLabel = label.trim() || 'Objeto SAGA'
-  const payload = `SAGA1:ITEM:${itemId}:${cleanLabel}`
+  const payload = manualId.trim() || itemId
   const cardText = `${kindIcons[kind]} ${cleanLabel}\n${kindLabels[kind]}\nEscanea esta tarjeta en SAGA.`
 
   function showNotice(value: string) {

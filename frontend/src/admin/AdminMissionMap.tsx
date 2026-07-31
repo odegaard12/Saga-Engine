@@ -8,9 +8,11 @@ import { getPhysicalNodeMapLabel, getPhysicalNodeVisual } from './lib/physicalNo
 type AdminMissionMapProps = {
   stages: AdminReactOverviewStage[]
   selectedStage: AdminReactOverviewStage | null
-  onSelectStage: (stage: AdminReactOverviewStage) => void
-  onCreateStageAt?: (lat: number, lon: number, clientPoint?: { x: number; y: number }) => void
-  onMoveStage?: (stage: AdminReactOverviewStage, lat: number, lon: number, options?: { select?: boolean }) => void
+  onSelectStage?: (stage: AdminReactOverviewStage) => void
+  onCreateStageAt?: (lat: number, lon: number, pos: { x: number; y: number }) => void
+  onInsertStageAt?: (lat: number, lon: number, index: number) => void
+  onMoveStage?: (
+    stage: AdminReactOverviewStage, lat: number, lon: number, options?: { select?: boolean }) => void
   showHeatmap?: boolean
   onToggleHeatmap?: () => void
   onMetricsUpdate?: (metrics: any) => void
@@ -133,6 +135,7 @@ export default function AdminMissionMap({
   selectedStage,
   onSelectStage,
   onCreateStageAt,
+  onInsertStageAt,
   onMoveStage,
   showHeatmap: propShowHeatmap,
   onToggleHeatmap,
@@ -562,6 +565,10 @@ export default function AdminMissionMap({
                   isDraggingLine = false
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
+
+                  if (onInsertStageAt) {
+                    onInsertStageAt(upEvt.latlng.lat, upEvt.latlng.lng, i + 1)
+                  }
                 }
 
                 map.on('mousemove', handleMouseMove)
@@ -682,7 +689,7 @@ export default function AdminMissionMap({
         if (editBtn) {
           editBtn.addEventListener('click', (e) => {
             e.stopPropagation()
-            onSelectStage(stage)
+            onSelectStage?.(stage)
           })
         }
       })
@@ -698,7 +705,7 @@ export default function AdminMissionMap({
           return
         }
 
-        onSelectStage(stage)
+        onSelectStage?.(stage)
         marker.openPopup()
       })
 
@@ -713,7 +720,7 @@ export default function AdminMissionMap({
           return
         }
 
-        onSelectStage(stage)
+        onSelectStage?.(stage)
         marker.openPopup()
       })
 

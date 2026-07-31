@@ -50,6 +50,7 @@ type AdminMissionControlShellProps = {
   onSelectStage: (stage: AdminReactOverviewStage | null) => void
   onCreateNode: () => void
   onCreateNodeAt: (lat: number, lon: number) => void
+  onInsertNodeAt?: (lat: number, lon: number, index: number) => void
   onMoveStage: (stage: AdminReactOverviewStage, lat: number, lon: number) => void
   onApplyStage: (stage: AdminReactOverviewStage) => void
   onDeleteStage: (stage: AdminReactOverviewStage) => void
@@ -110,6 +111,7 @@ export default function AdminMissionControlShell({
   onSelectStage,
   onCreateNode,
   onCreateNodeAt,
+  onInsertNodeAt,
   onMoveStage,
   onApplyStage,
   onDeleteStage,
@@ -728,6 +730,7 @@ export default function AdminMissionControlShell({
             selectedStage={selectedStage}
             onSelectStage={onSelectStage}
             onCreateStageAt={requestCreateNodeAt}
+            onInsertStageAt={onInsertNodeAt}
             onMoveStage={onMoveStage}
             showHeatmap={showHeatmap}
             onToggleHeatmap={() => setShowHeatmap(!showHeatmap)}

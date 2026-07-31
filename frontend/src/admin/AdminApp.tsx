@@ -55,7 +55,7 @@ function buildTemplatePhysicalFields(
   label: string
 ) {
   const itemId = slugifyMissionItemId(label) || 'objeto_qr'
-  const payload = `saga:item:${itemId}`
+  const payload = itemId
 
   return {
     physical_node_kind: kind,
@@ -900,6 +900,58 @@ export default function AdminApp() {
     )
   }
 
+  function insertLocalNodeAt(lat: number, lon: number, index: number) {
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+
+    const nextStage: EditableAdminStage = {
+      id: `local-${Date.now()}`,
+      index: index,
+      title: `NEW NODE ${index + 1}`,
+      type: defaultGamePatch.type,
+      label: defaultGamePatch.label,
+      lat,
+      lon,
+      radius: 50,
+      entry_mode: 'free',
+      require_proximity: false,
+      has_hint: false,
+      has_manual_fallback: false,
+      content: defaultGamePatch.content,
+      objective: defaultGamePatch.objective,
+      config: defaultGamePatch.config,
+      config_summary: defaultGamePatch.config_summary,
+      messages: defaultGamePatch.messages,
+    }
+
+    setOverview((current) => {
+      if (!current) return current
+      const nextStages = [...(current.stages || [])]
+      nextStages.splice(index, 0, nextStage)
+      const reindexedStages = nextStages.map((s, idx) => ({ ...s, index: idx }))
+      
+      const familyCounts = reindexedStages.reduce<Record<string, number>>((acc, stage) => {
+        const family = stage.type || 'signal_hunt'
+        acc[family] = (acc[family] || 0) + 1
+        return acc
+      }, {})
+
+      return {
+        ...current,
+        stages: reindexedStages,
+        counts: current.counts ? {
+          ...current.counts,
+          stages: reindexedStages.length,
+          family_counts: familyCounts
+        } : current.counts
+      }
+    })
+
+    setCmsPanel('none')
+    setSaveState('dirty')
+    setSelectedStage(nextStage)
+    setLocalNotice('Waypoint de ruta insertado. Guarda los cambios.')
+  }
+
   function createLocalNodesWithItems(itemsToCreate: Array<{ id: string; label: string }>) {
     if (!itemsToCreate.length) return
 
@@ -1085,6 +1137,7 @@ export default function AdminApp() {
         onSelectStage={selectLocalStage}
         onCreateNode={() => createLocalNodeAt()}
         onCreateNodeAt={createLocalNodeAt}
+        onInsertNodeAt={insertLocalNodeAt}
         onMoveStage={moveLocalStage}
         onApplyStage={syncLocalStage}
         onDeleteStage={deleteLocalStage}
