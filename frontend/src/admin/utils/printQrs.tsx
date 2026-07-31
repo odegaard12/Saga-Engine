@@ -13,7 +13,12 @@ function slugify(value: string): string {
 }
 
 function getCardData(stage: AdminReactOverviewStage) {
-  const isQr = stage.entry_mode === 'qr' || stage.type === 'qr_scan' || Boolean(stage.qr_payload)
+  const isQr =
+    stage.entry_mode === 'qr' ||
+    stage.type === 'qr_scan' ||
+    Boolean(stage.qr_payload) ||
+    Boolean(stage.physical_qr)
+
   if (!isQr) return null
 
   const payloadStr =
@@ -29,7 +34,7 @@ function getCardData(stage: AdminReactOverviewStage) {
   }
 
   const itemId = slugify(label) || 'objeto_saga'
-  const payload = `SAGA1:ITEM:${itemId}:${label}`
+  const payload = itemId // Matched to new custom format
   return { label, payload }
 }
 

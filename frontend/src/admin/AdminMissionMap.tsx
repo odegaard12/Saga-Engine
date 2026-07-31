@@ -393,7 +393,7 @@ export default function AdminMissionMap({
       })
 
       const coordString = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';')
-      const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${coordString}?overview=full&geometries=geojson&steps=true`
+      const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson&steps=true`
 
       fetch(osrmUrl)
         .then((res) => res.json())
@@ -528,7 +528,7 @@ export default function AdminMissionMap({
                   // Throttled OSRM dynamic road snapping (~120ms)
                   if (now - lastFetchTime > 120) {
                     lastFetchTime = now
-                    const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${fromPoint[1]},${fromPoint[0]};${curPoint.lng},${curPoint.lat};${toPoint[1]},${toPoint[0]}?overview=full&geometries=geojson`
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${fromPoint[1]},${fromPoint[0]};${curPoint.lng},${curPoint.lat};${toPoint[1]},${toPoint[0]}?overview=full&geometries=geojson`
                     fetch(osrmUrl)
                       .then((res) => res.json())
                       .then((data) => {
@@ -787,7 +787,7 @@ export default function AdminMissionMap({
 
           if (waypointsList.length >= 2) {
             const coordString = waypointsList.map(([lat, lon]) => `${lon},${lat}`).join(';')
-            const osrmUrl = `https://router.project-osrm.org/route/v1/bike/${coordString}?overview=full&geometries=geojson`
+            const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson`
             fetch(osrmUrl)
               .then((r) => r.json())
               .then((data) => {
