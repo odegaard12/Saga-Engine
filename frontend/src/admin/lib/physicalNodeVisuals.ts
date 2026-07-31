@@ -12,13 +12,13 @@ const physicalNodeVisuals: Record<PhysicalNodeKind, PhysicalNodeVisual> = {
   collectible: {
     kind: 'collectible',
     icon: '⭐',
-    label: 'Objeto QR',
-    shortLabel: 'Objeto QR',
+    label: 'Coleccionable',
+    shortLabel: 'Coleccionable',
     tone: 'collectible',
   },
   qr: {
     kind: 'qr',
-    icon: '⭐',
+    icon: '🖨️',
     label: 'Objeto QR',
     shortLabel: 'Objeto QR',
     tone: 'collectible',

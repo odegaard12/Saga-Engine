@@ -314,6 +314,7 @@ export function isQrStage(stage: StageLike): boolean {
 export function gameOptions(showExperimental = false): AdminGameCatalogItem[] {
   return adminGameCatalog.filter((game) => {
     if (game.category === 'physical') return false
+    if (game.id === 'simple_checkpoint') return false
     if (showExperimental) return true
     return isPlayableNow(game)
   })

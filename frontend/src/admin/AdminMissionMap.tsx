@@ -170,7 +170,7 @@ export default function AdminMissionMap({
       zoomControl: false,
       attributionControl: false,
       doubleClickZoom: false,
-      preferCanvas: false,
+      preferCanvas: true,
     })
 
     map.on('click', (e) => {
@@ -300,24 +300,25 @@ export default function AdminMissionMap({
             const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
 
             // Halo blanco brillante para contraste sobre satélite
-            L.polyline(latlngs, {
+            L.polyline(latlngs, { noClip: true, 
               color: '#ffffff',
               weight: 7,
               opacity: 0.35,
               lineCap: 'round',
-              lineJoin: 'round',
+              lineJoin: 'round', 
               interactive: false
             }).addTo(pathsGroup)
 
             // Línea de sendero en amarillo brillante (#f59e0b) siempre visible
-            L.polyline(latlngs, {
+            L.polyline(latlngs, { noClip: true, 
               color: '#f59e0b',
               weight: 4,
               opacity: 0.95,
               dashArray: '5 7',
               lineCap: 'round',
-              lineJoin: 'round',
-              interactive: false
+              lineJoin: 'round', 
+              interactive: false,
+              
             }).addTo(pathsGroup)
           }
         })
@@ -434,21 +435,21 @@ export default function AdminMissionMap({
               const legTitle = `🟢 Tramo ${i + 1}: ${fromNode?.title || 'Nodo A'} ➡️ ${toNode?.title || 'Nodo B'} (Pasa ratón para VER EN ROJO / Arrastra la línea para moldear camino)`
 
               // Outer Dark Emerald Border
-              const outerLine = L.polyline(legCoords, {
+              const outerLine = L.polyline(legCoords, { noClip: true, 
                 color: '#047857',
                 weight: 11,
                 opacity: 0.8,
                 lineCap: 'round',
-                lineJoin: 'round',
+                lineJoin: 'round', 
               }).addTo(map)
 
               // Inner Vivid Emerald Green Polyline (Base route color: Green)
-              const innerLine = L.polyline(legCoords, {
+              const innerLine = L.polyline(legCoords, { noClip: true, 
                 color: '#10b981',
                 weight: 6,
                 opacity: 0.95,
                 lineCap: 'round',
-                lineJoin: 'round',
+                lineJoin: 'round', 
               }).addTo(map)
 
               let fromConnLine: L.Polyline | null = null
@@ -580,7 +581,7 @@ export default function AdminMissionMap({
                       data.elements.forEach((element: any) => {
                         if (element.geometry && element.geometry.length >= 2) {
                           const pathPts: [number, number][] = element.geometry.map((pt: any) => [pt.lat, pt.lon])
-                          const trailHintLine = L.polyline(pathPts, {
+                          const trailHintLine = L.polyline(pathPts, { noClip: true, 
                             color: '#38bdf8',
                             weight: 3.5,
                             opacity: 0.75,
@@ -606,7 +607,7 @@ export default function AdminMissionMap({
     }
 
     function fallbackLines(m: L.Map) {
-      const fallbackLine = L.polyline(waypoints, {
+      const fallbackLine = L.polyline(waypoints, { noClip: true, 
         color: '#dc2626',
         weight: 6,
         opacity: 0.9,
@@ -780,7 +781,7 @@ export default function AdminMissionMap({
                 if (map.getContainer().classList.contains('admin-map-dragging-node') && data.routes?.[0]?.geometry?.coordinates) {
                   const pts = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
                   if (!previewNodeLine) {
-                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
+                    previewNodeLine = L.polyline(pts, { noClip: true,  color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
                   } else {
                     previewNodeLine.setLatLngs(pts)
                   }

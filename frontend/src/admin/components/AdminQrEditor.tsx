@@ -30,6 +30,7 @@ export default function AdminQrEditor({
       physical_item_id: card.item_id,
       physical_item_label: card.label,
       physical_item_kind: card.kind,
+      title: card.label,
       config: {
         ...config,
         success_code: String(config.success_code || config.fallback_code || `SAGA-${String(stage.index + 1).padStart(2, '0')}`)

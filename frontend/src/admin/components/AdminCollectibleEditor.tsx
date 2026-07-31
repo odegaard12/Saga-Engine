@@ -109,7 +109,7 @@ export default function AdminCollectibleEditor({
       <div className="saga-guided-v4-page" style={{ paddingTop: 20 }}>
         <div className="saga-guided-v4-pagehead">
           <span>Coleccionable de Mapa</span>
-          <h3>Configura tu objeto GPS</h3>
+          <h3>Configura tu objeto coleccionable</h3>
           <p>
             Los jugadores recogerán este objeto automáticamente al acercarse con su GPS. 
             A diferencia de los nodos normales, no requiere jugar a un minijuego, solo estar en la ubicación.
@@ -129,8 +129,8 @@ export default function AdminCollectibleEditor({
               <span>Nombre visible del objeto</span>
               <input 
                 type="text" 
-                value={stage.physical_item_label || ''} 
-                onChange={(e) => onPatch({ physical_item_label: e.target.value })}
+                value={stage.title || stage.physical_item_label || ''} 
+                onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
                 placeholder="Ej. Batería agotada, Reliquia Antigua..."
               />
             </label>

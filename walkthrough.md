@@ -1,25 +1,20 @@
-# Walkthrough: SAGA Engine v3.9.2 Final Polish
+# Walkthrough: SAGA Engine v3.9.3 Bug Fixes
 
-## 1. 10-Node Route & Minigame Variety
-- Rewrote the route configuration to contain **exactly 10 nodes**, matching the user's requested layout for the Cotorredondo area.
-- Injected the new 10 nodes directly into `stages.json` and `saga.sqlite3` on the Raspberry Pi.
+## 1. Corrección de Iconos y Nombres (Objeto QR vs Coleccionable)
+- Se ha corregido la confusión de tipos de nodo. Ahora el "Coleccionable de mapa" (Minijuego coleccionable) muestra el nombre **Coleccionable** y su icono `⭐`.
+- La tarjeta QR física vuelve a ser correctamente **Objeto QR** con su icono `🖨️`.
 
-## 2. Recipe & Crafting System Integrated
-- Implementada la petición de crafteo de 3 partes.
-- **Nodo 2 (Pista Este)**: Matriz de circuitos que da el `chip_encriptado` (Coleccionable).
-- **Nodo 3 (Chan de Castiñeiras)**: Objeto QR oculto que da la `antena_frecuencia` (Coleccionable).
-- **Nodo 4 (Eco dos Reis)**: Desafío de audio que revela la `bateria_litio` (Coleccionable).
-- **Nodo 10 (Arsenal)**: Nodo final que **requiere** entrar habiendo crafteado el `decodificador_cuantico` en la mochila (Mesa de trabajo).
+## 2. Checkpoint Pista retirado de la lista de minijuegos
+- Se ha eliminado la duplicidad del **Checkpoint / Pista** en el panel de cambio de tipo de nodo. 
+- Ahora, si pulsas "Minijuego o Desafío", el *Checkpoint* ya no aparece en la lista interna de minijuegos, dejando exclusivamente los minijuegos reales (Laberinto, Audio, etc.), y conservando su botón principal en el selector para cuando solo quieras texto/pista normal.
 
-## 3. QRs and Minigames Correctly Tagged
-- Se han generado **2 Nodos QR**: uno en el Nodo 3 (Coleccionable) y otro en el Nodo 5 (Bonus oculto).
-- Se han eliminado todos los `signal_hunt` y `bearing_hunt` no deseados. En su lugar, hay una mezcla perfecta de *Matriz de Circuitos*, *Desafío de Audio*, y *Laberinto de Equilibrio*.
-- Se ha configurado el `pattern_mode` a `random_each_game` en todos los minijuegos de puzzle para arreglar el problema visual en el editor ("espacios vacíos / recuadros no llenos") que aparecía por defecto.
+## 3. Líneas del Mapa (Zoom)
+- Se ha corregido el error por el cual las líneas del sendero (Overpass) desaparecían al hacer zoom extremo.
+- Leaflet ha sido configurado para renderizar los trazados internamente usando Canvas en lugar de SVG y evitar el clipping indeseado (`noClip: true` y `preferCanvas: true`). Ahora las líneas amarillas estarán visibles independientemente de la ampliación.
 
-## 4. Git Tags Restored
-- Se han forzado todos los tags antiguos y recientes a origin (`v3.7.0`, `v3.8.0`, `v3.8.1`, `v3.9.0`, `v3.9.2`). Nota: antes algunos tags no llevaban la 'v' (ej. `3.6.4`), pero los nuevos sí la llevan siguiendo el estándar correcto de versionado.
+## 4. Despliegue en Raspberry Pi
+- Se comprobó que el script de despliegue usado en la anterior ocasión (`deploy_frontend.py`) no incluía los archivos del Admin, por lo que tus cambios nunca llegaban a la Raspberry.
+- Hemos lanzado el script completo (`deploy_src.py`) que reempaqueta todo el motor y el frontend, reconstruye en el contenedor de la Raspberry, e inyecta la versión actualizada.
 
 > [!TIP]
-> Todo lo que pediste en tu último audio ya está integrado y funcionando. Haz un **F5 / Recargar** en tu navegador para ver la lista de 10 nodos actualizada en tu panel de control, con sus objetos Coleccionables, QRs y puzles listos.
-
-![Sidebar Nodes](/C:/Users/oscar/.gemini/antigravity-ide/brain/70df9591-4d0c-486b-8677-a9e901bf402a/sidebar_nodes_top_1784896137264.png)
+> Por favor, entra al panel de administrador en la Raspberry y prueba hacer zoom en el mapa y comprueba los nombres y los selectores de los nodos.
