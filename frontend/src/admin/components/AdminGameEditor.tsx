@@ -492,7 +492,7 @@ export default function AdminGameEditor({
               {mode === 'qr'
                 ? `${selectedQr.icon} ${selectedQr.title}`
                 : mode === 'map_collectible'
-                  ? '⭐ Coleccionable'
+                  ? '⭐ Objeto QR'
                   : `${selectedGame.icon} ${selectedGame.title}`}
             </b>
             <b>

@@ -68,7 +68,6 @@ export const RECIPES: Recipe[] = [
     recipe_id: 'guardian_amulet',
     label: 'Amuleto del Guardián',
     inputs: [
-      { item_id: 'gemas_antiguas', quantity: 2 },
       { item_id: 'fragmento_escudo', quantity: 1 },
       { item_id: 'hilo_plata', quantity: 1 },
     ],

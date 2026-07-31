@@ -685,7 +685,10 @@ export function getAdminGameForStage(
   config?: Record<string, unknown> | null
 ): AdminGameCatalogItem {
   const gameId = typeof config?.game_id === 'string' ? config.game_id : ''
-  const explicit = adminGameCatalog.find((game) => game.id === gameId)
+  let explicit = adminGameCatalog.find((game) => game.id === gameId)
+  if (explicit) return explicit
+
+  explicit = adminGameCatalog.find((game) => game.id === type)
   if (explicit) return explicit
 
   // Legacy: signal_hunt sin game_id ya no debe caer en QR físico.

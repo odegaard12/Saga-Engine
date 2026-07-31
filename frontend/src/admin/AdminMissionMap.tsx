@@ -173,6 +173,13 @@ export default function AdminMissionMap({
       preferCanvas: false,
     })
 
+    map.on('click', (e) => {
+      if (Date.now() < dragClickSuppressUntilRef.current) return
+      if (onCreateStageAt) {
+        onCreateStageAt(e.latlng.lat, e.latlng.lng, { x: e.originalEvent.clientX, y: e.originalEvent.clientY })
+      }
+    })
+
     const tileGroup = L.layerGroup().addTo(map)
     tileLayerRef.current = tileGroup
 
@@ -212,9 +219,14 @@ export default function AdminMissionMap({
         'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
         { maxNativeZoom: 18, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
       )
+      const cartoLabels = L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.95, subdomains: 'abcd', updateWhenIdle: false, keepBuffer: 4 }
+      )
       tileGroup.addLayer(esriSat)
       tileGroup.addLayer(waymarkedTrails)
       tileGroup.addLayer(esriRoads)
+      tileGroup.addLayer(cartoLabels)
     } else if (mapTileMode === 'cyclosm') {
       const cyclosmMap = L.tileLayer(
         'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
@@ -236,29 +248,43 @@ export default function AdminMissionMap({
     }
   }, [mapTileMode])
 
+  const fetchedWayIdsRef = useRef<Set<number>>(new Set())
+
   useEffect(() => {
     const map = mapRef.current
     const pathsGroup = nearbyPathsLayerRef.current
-    const coords = selectedStage ? getStageCoords(selectedStage) : null
-    
+
     if (!map || !pathsGroup) return
-    
-    pathsGroup.clearLayers()
+
+    // Find center coordinate from selectedStage or mappedStages
+    let centerLat = 42.36
+    let centerLon = -8.67
+    let searchRadius = 1200
+
+    if (selectedStage && hasCoords(selectedStage)) {
+      centerLat = selectedStage.lat as number
+      centerLon = selectedStage.lon as number
+      searchRadius = 1000
+    } else if (mappedStages.length > 0) {
+      const avgLat = mappedStages.reduce((sum, s) => sum + (s.lat as number), 0) / mappedStages.length
+      const avgLon = mappedStages.reduce((sum, s) => sum + (s.lon as number), 0) / mappedStages.length
+      centerLat = avgLat
+      centerLon = avgLon
+      searchRadius = 2000
+    }
+
     if (nearbyPathsControllerRef.current) {
       nearbyPathsControllerRef.current.abort()
       nearbyPathsControllerRef.current = null
     }
 
-    if (!coords) return
-
-    const [lat, lon] = coords
     const controller = new AbortController()
     nearbyPathsControllerRef.current = controller
 
     const query = `
       [out:json];
       (
-        way["highway"](around:500,${lat},${lon});
+        way["highway"](around:${searchRadius},${centerLat},${centerLon});
       );
       out geom;
     `
@@ -269,26 +295,27 @@ export default function AdminMissionMap({
       .then(data => {
         if (!data || !data.elements) return
         data.elements.forEach((el: any) => {
-          if (el.type === 'way' && el.geometry) {
+          if (el.type === 'way' && el.geometry && !fetchedWayIdsRef.current.has(el.id)) {
+            fetchedWayIdsRef.current.add(el.id)
             const latlngs = el.geometry.map((pt: any) => [pt.lat, pt.lon] as [number, number])
-            
-            // Halo sutil
-            L.polyline(latlngs, { 
-              color: '#ffffff', 
-              weight: 8, 
-              opacity: 0.2, 
-              lineCap: 'round', 
+
+            // Halo blanco brillante para contraste sobre satélite
+            L.polyline(latlngs, {
+              color: '#ffffff',
+              weight: 7,
+              opacity: 0.35,
+              lineCap: 'round',
               lineJoin: 'round',
               interactive: false
             }).addTo(pathsGroup)
-            
-            // Línea de sendero
-            L.polyline(latlngs, { 
-              color: '#38bdf8', 
-              weight: 2, 
-              opacity: 0.8,
-              dashArray: '3 6',
-              lineCap: 'round', 
+
+            // Línea de sendero en amarillo brillante (#f59e0b) siempre visible
+            L.polyline(latlngs, {
+              color: '#f59e0b',
+              weight: 4,
+              opacity: 0.95,
+              dashArray: '5 7',
+              lineCap: 'round',
               lineJoin: 'round',
               interactive: false
             }).addTo(pathsGroup)
@@ -299,7 +326,7 @@ export default function AdminMissionMap({
         if (e.name !== 'AbortError') console.error('Overpass fetch error:', e)
       })
 
-  }, [selectedStage])
+  }, [selectedStage, mappedStages])
 
   useEffect(() => {
     const map = mapRef.current
@@ -424,6 +451,26 @@ export default function AdminMissionMap({
                 lineJoin: 'round',
               }).addTo(map)
 
+              let fromConnLine: L.Polyline | null = null
+              let toConnLine: L.Polyline | null = null
+
+              if (fromNode && legCoords.length > 0) {
+                fromConnLine = L.polyline([[fromNode.lat as number, fromNode.lon as number], legCoords[0]], {
+                  color: '#10b981',
+                  weight: 3,
+                  dashArray: '5, 8',
+                  opacity: 0.8,
+                }).addTo(map)
+              }
+              if (toNode && legCoords.length > 0) {
+                toConnLine = L.polyline([legCoords[legCoords.length - 1], [toNode.lat as number, toNode.lon as number]], {
+                  color: '#10b981',
+                  weight: 3,
+                  dashArray: '5, 8',
+                  opacity: 0.8,
+                }).addTo(map)
+              }
+
               innerLine.bindTooltip(legTitle, { sticky: true, className: 'saga-route-tooltip-red' })
               
               // Hover state: turns BRIGHT VIVID RED (#ff0000)
@@ -490,22 +537,20 @@ export default function AdminMissionMap({
                 }
 
                 const handleMouseUp = (upEvt: L.LeafletMouseEvent) => {
+                  if (upEvt.originalEvent) {
+                    L.DomEvent.stopPropagation(upEvt.originalEvent)
+                  }
                   map.off('mousemove', handleMouseMove)
                   map.off('mouseup', handleMouseUp)
                   map.dragging.enable()
+
+                  dragClickSuppressUntilRef.current = Date.now() + 800
 
                   if (previewLine) {
                     map.removeLayer(previewLine)
                     previewLine = null
                   }
 
-                  if (isDraggingLine && onMoveStage) {
-                    const dropPt = upEvt.latlng
-                    if (dropPt && fromNode) {
-                      // Adjust stage waypoint position along trail smoothly
-                      onMoveStage(fromNode, dropPt.lat, dropPt.lng)
-                    }
-                  }
                   isDraggingLine = false
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
@@ -518,7 +563,10 @@ export default function AdminMissionMap({
               innerLine.on('mousedown', handleMouseDown)
               outerLine.on('mousedown', handleMouseDown)
 
-              routeLayersRef.current.push(outerLine, innerLine)
+              const layersToPush = [outerLine, innerLine]
+              if (fromConnLine) layersToPush.push(fromConnLine)
+              if (toConnLine) layersToPush.push(toConnLine)
+              routeLayersRef.current.push(...layersToPush)
             })
 
             // Fetch & draw nearby footpaths/tracks within 500m of mapped waypoints

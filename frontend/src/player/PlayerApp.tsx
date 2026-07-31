@@ -35,6 +35,7 @@ import { RankingSheet } from './components/RankingSheet'
 import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
+import { OfflineVideoPlayer } from './components/OfflineVideoPlayer'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
@@ -163,6 +164,7 @@ export default function PlayerApp() {
     return false
   })
   const [activeStageIntro, setActiveStageIntro] = useState(false)
+  const [offlineVideoUrl, setOfflineVideoUrl] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null)
   const [interactionOpen, setInteractionOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -413,7 +415,7 @@ export default function PlayerApp() {
       cancelled = true
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refreshAfterReconnect)
-      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('visibilitychange', refresh)
       window.clearInterval(intervalId)
     }
   }, [user, interactionOpen, submitting])
@@ -1390,12 +1392,19 @@ export default function PlayerApp() {
 
     if (!runtime.canEnter) return
 
-
-
     setFocusRequest({ target: 'node', token: Date.now() })
     vibrate([10, 16, 10])
     showOverlay('activate')
     
+    // Play video if exists, otherwise proceed
+    if (currentStage?.id) {
+      setOfflineVideoUrl(`/media/${currentStage.id}-historia.mp4`)
+    } else {
+      proceedToInteraction()
+    }
+  }
+
+  function proceedToInteraction() {
     if (currentStage?.intro_body && !isMapCollectible) {
       setActiveStageIntro(true)
     } else {
@@ -1701,6 +1710,16 @@ export default function PlayerApp() {
         onClose={() => setFieldCameraOpen(false)}
         onCapture={handleFieldCameraCapture}
       />
+
+      {offlineVideoUrl && (
+        <OfflineVideoPlayer
+          videoUrl={offlineVideoUrl}
+          onComplete={() => {
+            setOfflineVideoUrl(null)
+            proceedToInteraction()
+          }}
+        />
+      )}
 
       {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !rankingOpen && !overlayState ? (
         <div style={getMapQuickControlsStyle(isPhone)}>

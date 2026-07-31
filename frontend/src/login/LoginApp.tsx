@@ -244,6 +244,8 @@ export default function LoginApp() {
   const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() =>
     getOfflineVaultSummary()
   )
+  const [playerInput, setPlayerInput] = useState('')
+  const [loggingInId, setLoggingInId] = useState<string | null>(null)
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
@@ -520,8 +522,10 @@ export default function LoginApp() {
                 <div style={playerRight}>
                   <button
                     type="button"
-                    style={enterButton}
+                    style={{ ...enterButton, opacity: loggingInId === profile.id ? 0.7 : 1 }}
+                    disabled={loggingInId !== null}
                     onClick={() => {
+                      setLoggingInId(profile.id)
                       const label = profile.display_name || profile.id
                       const loginId = Date.now()
                       const href = `/player/${encodeURIComponent(profile.id)}?login=${loginId}`
@@ -540,11 +544,11 @@ export default function LoginApp() {
                           )
                           proceed()
                         },
-                        { enableHighAccuracy: true, timeout: 5000 }
+                        { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
                       )
                     }}
                   >
-                    {copy.enter}
+                    {loggingInId === profile.id ? '⏳' : copy.enter}
                   </button>
                 </div>
               </article>

@@ -82,6 +82,7 @@ export const QR_GAME_BY_KIND: Record<PhysicalQrKind, AdminGameId> = {
   requirement: 'qr_key_gate',
   clue: 'clue_card',
   bonus: 'bonus_cache',
+  qr: 'qr_collectible',
 }
 
 export const CONFIG_FIELD_META: Record<

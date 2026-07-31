@@ -10,6 +10,8 @@ _backups/
 *.bak.*
 *.broken_now
 data/admin_auth.json
+data/admin_sessions.json
+data/game_timers.json
 data/*.bak
 data/gamestate.json
 data/positions.json

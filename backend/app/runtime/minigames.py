@@ -12,6 +12,10 @@ SUPPORTED_MINIGAME_TYPES = {
     "bearing_hunt",
     "motion_challenge",
     "audio_challenge",
+    "sequence_code",
+    "tilt_maze",
+    "place_mosaic",
+    "checkpoint",
 }
 
 import unicodedata

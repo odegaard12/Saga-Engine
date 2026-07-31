@@ -40,34 +40,69 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
     alert('No hay nodos QR físicos configurados en esta misión.')
     return
   }
-
-  const sagaLogoDataUrl =
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='42' viewBox='0 0 100 42'>" +
-    "<rect width='100' height='42' rx='10' fill='%23047857' stroke='%23059669' stroke-width='2'/>" +
-    "<text x='50' y='28' font-family='system-ui, Arial Black, sans-serif' font-weight='900' font-size='20' fill='%23ffffff' text-anchor='middle' letter-spacing='2.5'>SAGA</text>" +
-    "</svg>"
-
   const renderedCardsJson = JSON.stringify(
     cards.map((c) => ({
       label: c.label,
       payload: c.payload,
       qrSvg: renderToString(
-        <QRCodeSVG
-          value={c.payload}
-          size={200}
-          level="H"
-          fgColor="#047857"
-          bgColor="#ffffff"
-          includeMargin
-          imageSettings={{
-            src: sagaLogoDataUrl,
-            x: undefined,
-            y: undefined,
-            height: 38,
-            width: 80,
-            excavate: true,
-          }}
-        />
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '16px',
+          background: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          width: 'fit-content'
+        }}>
+          <div style={{
+            position: 'relative',
+            padding: '8px',
+            background: '#ffffff',
+            borderRadius: '8px',
+          }}>
+            <QRCodeSVG
+              value={c.payload}
+              size={160}
+              level="H"
+              fgColor="#007f4f"
+              includeMargin={false}
+            />
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: '#007f4f',
+              color: '#ffffff',
+              fontWeight: 900,
+              fontSize: '14px',
+              letterSpacing: '2px',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '2px solid #ffffff',
+              fontFamily: 'system-ui, Arial Black, sans-serif',
+            }}>SAGA</div>
+          </div>
+          <div style={{
+            marginTop: '12px',
+            background: '#f1f5f9',
+            color: '#0f172a',
+            padding: '4px 12px',
+            borderRadius: '9999px',
+            fontSize: '14px',
+            fontWeight: 700,
+            border: '1px solid #cbd5e1',
+            maxWidth: '180px',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {c.label}
+          </div>
+        </div>
       ),
     }))
   )
@@ -157,51 +192,21 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
           padding: 24px;
         }
         .sticker-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+          display: flex;
+          flex-wrap: wrap;
           gap: 16px;
-          justify-items: center;
+          justify-content: center;
         }
         .sticker-card {
-          width: 210px;
-          height: 220px;
-          background: #ffffff;
-          border: 1px dashed #cbd5e1;
-          border-radius: 12px;
-          padding: 12px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
-          text-align: center;
           page-break-inside: avoid;
         }
         .qr-wrap {
-          width: 165px;
-          height: 165px;
           display: flex;
           align-items: center;
           justify-content: center;
-        }
-        .qr-wrap svg {
-          width: 100%;
-          height: 100%;
-        }
-        .sticker-code {
-          margin-top: 6px;
-          font-size: 16px;
-          font-weight: 800;
-          font-family: monospace;
-          color: #000000;
-          letter-spacing: 0.5px;
-          background: #f1f5f9;
-          padding: 4px 10px;
-          border-radius: 6px;
-          border: 1px solid #e2e8f0;
-          width: 100%;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
 
         /* Print Override */
@@ -218,9 +223,6 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
           }
           .sticker-grid {
             gap: 10px;
-          }
-          .sticker-card {
-            border: 1px dashed #94a3b8;
           }
         }
       </style>
@@ -246,7 +248,7 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
       </div>
 
       <script>
-        const cardsData = ${renderedCardsJson};
+        const cardsData = \${renderedCardsJson};
 
         function renderGrid(multiplier) {
           const grid = document.getElementById('grid');
@@ -257,7 +259,6 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
               htmlStr += \`
                 <div class="sticker-card">
                   <div class="qr-wrap">\${c.qrSvg}</div>
-                  <div class="sticker-code">\${c.payload}</div>
                 </div>
               \`;
             }

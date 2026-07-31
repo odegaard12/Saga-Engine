@@ -27,21 +27,44 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
 
         <div style={content}>
           {/* Version 3.9.4 */}
+          {/* Version 3.9.7 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
-              <span style={vTag}>v3.9.4</span>
-              <span style={vDate}>29 de Julio, 2026</span>
+              <span style={vTag}>v3.9.7</span>
+              <span style={vDate}>31 de Julio, 2026</span>
               <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
             </div>
 
-            <h3 style={releaseTitle}>🌲 Ruta Oficial Cotorredondo, Pegatinas QR Personalizables y Sincronización SQLite</h3>
+            <h3 style={releaseTitle}>🏷️ Rediseño de Tarjetas QR Físicas, Capas de Mapas y Mejoras UI</h3>
 
             <ul style={featureList}>
               <li>
-                <strong>🗺️ Ruta de 10 Nodos en Cotorredondo:</strong> Configuración mística con 3 coleccionables de mochila, crafteo del Decodificador Cuántico y 4 minijuegos activos.
+                <strong>🏷️ Tarjetas y Objetos QR Físicos:</strong> Soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR con badges visuales distintivos.
               </li>
               <li>
-                <strong>🖨️ Pegatinas QR Personalizables:</strong> Generador ultra-limpio con selector de multiplicador (1x, 2x, 4x, 6x, 8x copias) y códigos independientes del orden (SAGA_01, SAGA_02).
+                <strong>🗺️ Rastros y Senderos OSM:</strong> Renderizado persistente de senderos a cualquier nivel de zoom en el editor de misiones.
+              </li>
+              <li>
+                <strong>⚡ Sincronización Real-Time:</strong> HUD de métricas actualizado al instante durante el arrastre de nodos.
+              </li>
+            </ul>
+          </article>
+
+          {/* Version 3.9.4 */}
+          <article style={versionBlock}>
+            <div style={versionHeader}>
+              <span style={vTagMuted}>v3.9.4</span>
+              <span style={vDate}>29 de Julio, 2026</span>
+            </div>
+
+            <h3 style={releaseTitle}>🌲 Motor de Rutas Multinodo, Pegatinas QR Personalizables y Sincronización SQLite</h3>
+
+            <ul style={featureList}>
+              <li>
+                <strong>🗺️ Motor de Rutas Multinodo:</strong> Configuración mística con coleccionables de mochila y minijuegos activos.
+              </li>
+              <li>
+                <strong>🖨️ Pegatinas QR Personalizables:</strong> Generador ultra-limpio con selector de multiplicador (1x, 2x, 4x, 6x, 8x copias) y códigos independientes del orden.
               </li>
               <li>
                 <strong>🗄️ Persistencia SQLite en Producción:</strong> Sincronización bi-direccional en tiempo real y corrección de permisos de archivo en la Raspberry Pi.

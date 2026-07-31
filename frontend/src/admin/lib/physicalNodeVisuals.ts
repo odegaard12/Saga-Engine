@@ -1,4 +1,4 @@
-export type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+export type PhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus' | 'qr'
 
 export type PhysicalNodeVisual = {
   kind: PhysicalNodeKind
@@ -12,8 +12,15 @@ const physicalNodeVisuals: Record<PhysicalNodeKind, PhysicalNodeVisual> = {
   collectible: {
     kind: 'collectible',
     icon: '⭐',
-    label: 'Coleccionable',
-    shortLabel: 'Coleccionable',
+    label: 'Objeto QR',
+    shortLabel: 'Objeto QR',
+    tone: 'collectible',
+  },
+  qr: {
+    kind: 'qr',
+    icon: '⭐',
+    label: 'Objeto QR',
+    shortLabel: 'Objeto QR',
     tone: 'collectible',
   },
   requirement: {
@@ -40,7 +47,7 @@ const physicalNodeVisuals: Record<PhysicalNodeKind, PhysicalNodeVisual> = {
 }
 
 export function normalizePhysicalKind(value: unknown): PhysicalNodeKind | null {
-  if (value === 'collectible' || value === 'requirement' || value === 'clue' || value === 'bonus') {
+  if (value === 'collectible' || value === 'requirement' || value === 'clue' || value === 'bonus' || value === 'qr') {
     return value
   }
 

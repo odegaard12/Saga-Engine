@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 
-export type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
+export type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus' | 'qr'
 
 export type SavedPhysicalQrCard = {
   item_id: string
@@ -20,10 +20,11 @@ type PhysicalQrCardsPanelProps = {
 }
 
 const kindLabels: Record<PhysicalQrKind, string> = {
-  collectible: 'Coleccionable',
+  collectible: 'Objeto QR',
   requirement: 'Llave QR',
   clue: 'Pista QR',
   bonus: 'Bonus QR',
+  qr: 'QR Físico',
 }
 
 const kindIcons: Record<PhysicalQrKind, string> = {
@@ -31,6 +32,7 @@ const kindIcons: Record<PhysicalQrKind, string> = {
   requirement: '🔑',
   clue: '🧩',
   bonus: '🎁',
+  qr: '📍',
 }
 
 function slugify(value: string): string {
@@ -140,12 +142,22 @@ export default function PhysicalQrCardsPanel({
       </div>
 
       <div style={layout}>
-        <div style={qrCard}>
-          <div ref={qrWrapRef} style={qrImage}>
-            <QRCodeSVG value={payload} size={154} level="M" includeMargin />
+        <div style={qrCardWrapper}>
+          <div ref={qrWrapRef} style={qrCardPdfStyle}>
+            <div style={qrCodeBox}>
+              <QRCodeSVG 
+                value={payload} 
+                size={160} 
+                level="H" 
+                fgColor="#007f4f" 
+                includeMargin={false} 
+              />
+              <div style={qrSagaLogo}>SAGA</div>
+            </div>
+            <div style={qrLabelCapsule}>
+              {cleanLabel}
+            </div>
           </div>
-          <strong>{cleanLabel}</strong>
-          <small>{itemId}</small>
         </div>
 
         <div style={formGrid}>
@@ -264,91 +276,139 @@ const layout: CSSProperties = {
   alignItems: 'stretch',
 }
 
-const qrCard: CSSProperties = {
-  display: 'grid',
-  justifyItems: 'center',
-  alignContent: 'center',
-  gap: 8,
-  padding: 12,
-  borderRadius: 20,
-  border: '1px solid rgba(255,255,255,.13)',
-  background: 'rgba(15,23,42,.32)',
+const qrCardWrapper: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '16px',
+}
+
+const qrCardPdfStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '20px',
+  background: '#ffffff',
+  border: '1px dashed #cbd5e1',
+  borderRadius: '16px',
+  gap: '16px',
+}
+
+const qrCodeBox: CSSProperties = {
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: '#ffffff',
+  padding: '4px',
+}
+
+const qrSagaLogo: CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  backgroundColor: '#007f4f',
+  color: '#ffffff',
+  fontSize: '12px',
+  fontWeight: 900,
+  letterSpacing: '0.05em',
+  padding: '4px 10px',
+  borderRadius: '12px',
+  border: '3px solid #ffffff',
+  boxShadow: '0 0 0 1px #007f4f',
+}
+
+const qrLabelCapsule: CSSProperties = {
+  color: '#007f4f',
+  fontSize: '14px',
+  fontWeight: 800,
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  border: '2px solid #007f4f',
+  borderRadius: '20px',
+  padding: '4px 24px',
+  background: '#ffffff',
+  minWidth: '140px',
   textAlign: 'center',
 }
 
-const qrImage: CSSProperties = {
-  width: 166,
-  height: 166,
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: 18,
-  background: '#ffffff',
-  overflow: 'hidden',
+const formGrid: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 16,
 }
 
-const formGrid: CSSProperties = { display: 'grid', gap: 10 }
-
 const field: CSSProperties = {
-  display: 'grid',
+  display: 'flex',
+  flexDirection: 'column',
   gap: 6,
-  color: 'rgba(241,245,249,.88)',
-  fontSize: 10,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  color: 'rgba(226,232,240,.7)',
+  fontSize: 12,
+  fontWeight: 700,
 }
 
 const input: CSSProperties = {
   width: '100%',
-  minHeight: 42,
-  borderRadius: 15,
-  border: '1px solid rgba(255,255,255,.13)',
-  background: 'rgba(15,23,42,.44)',
-  color: '#ffffff',
-  padding: '0 12px',
-  fontSize: 13,
-  fontWeight: 850,
-  outline: 'none',
+  height: 44,
+  background: 'rgba(15,23,42,.4)',
+  border: '1px solid rgba(255,255,255,.1)',
+  borderRadius: 12,
+  padding: '0 14px',
+  color: '#fff',
+  fontSize: 15,
+  fontFamily: 'inherit',
+  transition: 'border-color .15s',
 }
 
 const payloadBox: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-  padding: 12,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,.11)',
-  background: 'rgba(15,23,42,.30)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  padding: 16,
+  background: 'rgba(0,0,0,.15)',
+  border: '1px solid rgba(255,255,255,.05)',
+  borderRadius: 12,
+  color: 'rgba(255,255,255,.5)',
+  fontSize: 11,
 }
 
 const actions: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr',
-  gap: 8,
+  display: 'flex',
+  gap: 12,
+  marginTop: 6,
 }
 
 const button: CSSProperties = {
-  minHeight: 40,
-  borderRadius: 15,
-  border: '1px solid rgba(187,247,208,.18)',
-  background: 'rgba(34,197,94,.14)',
-  color: '#dcfce7',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
+  flex: 1,
+  height: 44,
+  border: 'none',
+  borderRadius: 12,
+  background: 'rgba(255,255,255,.08)',
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
 }
 
 const primaryButton: CSSProperties = {
   ...button,
-  background: 'linear-gradient(180deg, rgba(187,247,208,.28), rgba(34,197,94,.18))',
+  background: '#10b981',
+  color: '#022c22',
 }
 
 const noticeBox: CSSProperties = {
-  padding: 10,
-  borderRadius: 14,
-  background: 'rgba(34,197,94,.12)',
-  border: '1px solid rgba(187,247,208,.16)',
-  color: '#dcfce7',
-  fontSize: 12,
-  fontWeight: 900,
+  position: 'absolute',
+  bottom: 24,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: '#10b981',
+  color: '#064e3b',
+  padding: '8px 16px',
+  borderRadius: 20,
+  fontSize: 13,
+  fontWeight: 700,
+  boxShadow: '0 8px 24px rgba(16,185,129,.4)',
+  animation: 'fadeUp 0.2s ease-out',
 }
