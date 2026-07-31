@@ -17,8 +17,7 @@ function getCardData(stage: AdminReactOverviewStage) {
     stage.entry_mode === 'qr' ||
     stage.type === 'qr_scan' ||
     Boolean(stage.qr_payload) ||
-    Boolean(stage.physical_qr) ||
-    stage.physical_node_kind === 'qr'
+    Boolean(stage.physical_qr)
 
   if (!isQr) return null
 
