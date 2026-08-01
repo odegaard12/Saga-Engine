@@ -285,14 +285,26 @@ export function gameFromStage(stage: StageLike): AdminGameCatalogItem {
 }
 
 export function isMapCollectibleStage(stage: StageLike): boolean {
-  // Nodes with an explicit QR payload are QR stages, not map collectibles
-  if (stage.physical_qr || stage.qr_payload) return false
   const config = configOf(stage)
+
+  // Checkpoints and QR-based nodes must never be treated as map collectibles.
+  if (
+    stage.type === 'signal_hunt' ||
+    String(stage.game_type || '') === 'simple_checkpoint' ||
+    String(stage.game_template_id || '') === 'simple_checkpoint' ||
+    String(config.game_id || '') === 'simple_checkpoint' ||
+    String(stage.game_type || '').startsWith('qr_') ||
+    String(stage.game_template_id || '').startsWith('qr_') ||
+    String(config.game_id || '').startsWith('qr_') ||
+    stage.physical_qr ||
+    stage.qr_payload
+  ) {
+    return false
+  }
+
   return Boolean(
     config.is_map_collectible ||
       stage.is_map_collectible ||
-      stage.physical_node_kind === 'collectible' ||
-      stage.physical_item_kind === 'collectible' ||
       Boolean(config.reward_item_id)
   )
 }

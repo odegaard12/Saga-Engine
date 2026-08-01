@@ -617,6 +617,11 @@ export default function AdminMissionMap({
                   isDraggingRef.current = false
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
+
+                    // Keep route change by moving existing destination node.
+                    if (movedDuringDrag && toNode && onMoveStage) {
+                      onMoveStage(toNode, upEvt.latlng.lat, upEvt.latlng.lng, { select: true })
+                    }
                 }
 
                 map.on('mousemove', handleMouseMove)

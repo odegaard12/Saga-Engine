@@ -348,26 +348,40 @@ export default function NodePhysicalTypePanel({
           <button
             type="button"
             className={mode === 'none' && ((stage as any).game_type === 'simple_checkpoint' || (stage as any).config?.game_id === 'simple_checkpoint') ? 'active' : ''}
-            onClick={() => {
+              onClick={() => {
                 const baseCheckpoint = getDefaultAdminStagePatchForGame('simple_checkpoint')
-              onApplyLocal({
-                ...stage,
+                const cleared = clearPhysicalFields(stage) as unknown as Record<string, unknown>
+
+                onApplyLocal({
+                  ...cleared,
+                  ...baseCheckpoint,
                   type: baseCheckpoint.type,
-                  label: baseCheckpoint.label,
+                  label: 'Checkpoint',
                   icon: baseCheckpoint.icon,
-                game_type: 'simple_checkpoint',
-                game_template_id: 'simple_checkpoint',
-                title: stage.title || 'Checkpoint / Texto Rápido',
-                config: {
-                  ...((stage as any).config || {}),
-                  game_id: 'simple_checkpoint',
-                  objective: 'checkpoint',
+                  title: stage.title || 'Checkpoint / Texto Rápido',
+                  game_type: 'simple_checkpoint',
+                  game_template_id: 'simple_checkpoint',
+                  game_family: baseCheckpoint.type,
+                  entry_mode: 'gps',
                   completion_method: 'proximity',
-                },
-                _type_choice_done: true,
-              } as AdminReactOverviewStage)
-              onFinishChoice?.()
-            }}
+                  requires_proximity: true,
+                  content:
+                    String((stage as any).content || '').trim() ||
+                    'Escribe aquí el texto o pista que se mostrará al jugador en este checkpoint.',
+                  config: {
+                    ...((cleared.config as Record<string, unknown>) || {}),
+                    ...((baseCheckpoint.config as Record<string, unknown>) || {}),
+                    is_map_collectible: false,
+                    game_id: 'simple_checkpoint',
+                    game_title: 'Checkpoint',
+                    objective: 'checkpoint',
+                    completion_method: 'proximity',
+                  },
+                  _clear_physical_fields: true,
+                  _type_choice_done: true,
+                } as AdminReactOverviewStage)
+                onFinishChoice?.()
+              }}
           >
             <i>📍</i>
             <strong>Checkpoint / Pista</strong>
