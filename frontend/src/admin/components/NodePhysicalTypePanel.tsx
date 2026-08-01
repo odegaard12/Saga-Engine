@@ -379,7 +379,7 @@ export default function NodePhysicalTypePanel({
                   },
                   _clear_physical_fields: true,
                   _type_choice_done: true,
-                } as AdminReactOverviewStage)
+                } as unknown as AdminReactOverviewStage)
                 onFinishChoice?.()
               }}
           >
