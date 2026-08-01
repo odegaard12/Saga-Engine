@@ -12,6 +12,30 @@ function shortCommit(commit?: string) {
   return clean.slice(0, 7)
 }
 
+function formatAbsoluteDeployTime(builtAt?: string): string {
+  const raw = String(builtAt || '').trim()
+  if (!raw) return ''
+
+  let date: Date | null = null
+  const asNum = Number(raw)
+  if (!isNaN(asNum) && asNum > 0) {
+    date = new Date(asNum > 1e10 ? asNum : asNum * 1000)
+  } else {
+    date = new Date(raw)
+  }
+
+  if (!date || isNaN(date.getTime())) return ''
+
+  return date.toLocaleString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
 function formatDeployTime(builtAt?: string): string {
   const raw = String(builtAt || '').trim()
   if (!raw) return ''
@@ -52,6 +76,7 @@ function formatDeployTime(builtAt?: string): string {
 export function BuildInfoBadge({ mode = 'floating' }: BuildInfoBadgeProps) {
   const [info, setInfo] = useState<BuildInfoPayload | null>(null)
   const [tick, setTick] = useState(0)
+  const [loadedAt] = useState(() => new Date())
 
   useEffect(() => {
     let cancelled = false
@@ -93,6 +118,14 @@ export function BuildInfoBadge({ mode = 'floating' }: BuildInfoBadgeProps) {
   const commit = shortCommit(info.commit)
   const version = info.version && info.version !== 'dev' ? `v${info.version}` : null
   const deployTime = formatDeployTime(info.built_at)
+  const deployAbsolute = formatAbsoluteDeployTime(info.built_at)
+  const loadedAtText = loadedAt.toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 
   if (mode === 'inline') {
     return (
@@ -105,6 +138,7 @@ export function BuildInfoBadge({ mode = 'floating' }: BuildInfoBadgeProps) {
         {version ? <strong>{version}</strong> : <strong>dev</strong>}
         {commit ? <code style={{ fontSize: '0.65rem', color: 'rgba(186,230,253,0.8)', fontFamily: 'monospace' }}>{commit}</code> : null}
         {deployTime ? <em>· {deployTime}</em> : null}
+        {deployAbsolute ? <em>· build {deployAbsolute}</em> : <em>· cargado {loadedAtText}</em>}
       </aside>
     )
   }

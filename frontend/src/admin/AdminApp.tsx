@@ -627,7 +627,7 @@ export default function AdminApp() {
         }))
 
       const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
-        const family = stage.type || 'signal_hunt'
+        const family = stage.type || 'motion_challenge'
         acc[family] = (acc[family] || 0) + 1
         return acc
       }, {})
@@ -716,7 +716,7 @@ export default function AdminApp() {
         : [...currentStages, nextStage]
 
       const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
-        const family = stage.type || 'signal_hunt'
+        const family = stage.type || 'motion_challenge'
         acc[family] = (acc[family] || 0) + 1
         return acc
       }, {})
@@ -817,7 +817,7 @@ export default function AdminApp() {
     })
 
     const familyCounts = nextStages.reduce<Record<string, number>>((acc, stage) => {
-      const family = stage.type || 'signal_hunt'
+      const family = stage.type || 'motion_challenge'
       acc[family] = (acc[family] || 0) + 1
       return acc
     }, {})
@@ -930,7 +930,7 @@ export default function AdminApp() {
       const reindexedStages = nextStages.map((s, idx) => ({ ...s, index: idx }))
       
       const familyCounts = reindexedStages.reduce<Record<string, number>>((acc, stage) => {
-        const family = stage.type || 'signal_hunt'
+        const family = stage.type || 'motion_challenge'
         acc[family] = (acc[family] || 0) + 1
         return acc
       }, {})

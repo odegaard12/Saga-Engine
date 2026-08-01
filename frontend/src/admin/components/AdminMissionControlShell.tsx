@@ -292,6 +292,15 @@ export default function AdminMissionControlShell({
   const [metrics, setMetrics] = useState<RouteMetrics>({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0, mappedCount: 0, routeCoords: [] })
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [playCounter, setPlayCounter] = useState(0)
+  const localStageCount = stages.length
+
+  const displayDistanceKm =
+    liveGeodesicDistanceKm > 0
+      ? liveGeodesicDistanceKm
+      : metrics.trailKm || metrics.distanceKm || fallbackMetrics.dist || 0
+
+  const displayDurationMin = metrics.durationMin || fallbackMetrics.time || 0
+  const displayElevationM = metrics.elevationM || fallbackMetrics.elev || 0
 
   const handleRouteMetricsUpdate = (newMetrics: Partial<RouteMetrics>) => {
     setMetrics(prev => {
@@ -727,13 +736,13 @@ export default function AdminMissionControlShell({
           <span style={{ color: '#38bdf8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             🟢 RUTA SENDEROS
           </span>
-          <span>📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{(metrics.trailKm || metrics.distanceKm || liveGeodesicDistanceKm || fallbackMetrics.dist || 0).toFixed(2)} km</strong></span>
+          <span>📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{displayDistanceKm.toFixed(2)} km</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{(metrics.durationMin || fallbackMetrics.time) >= 60 ? `${Math.floor((metrics.durationMin || fallbackMetrics.time) / 60)}h ${(metrics.durationMin || fallbackMetrics.time) % 60}m` : `${metrics.durationMin || fallbackMetrics.time || 0} min`}</strong></span>
+          <span>⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{displayDurationMin >= 60 ? `${Math.floor(displayDurationMin / 60)}h ${displayDurationMin % 60}m` : `${displayDurationMin} min`}</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{(metrics.elevationM || fallbackMetrics.elev || 0)}m</strong></span>
+          <span>⛰️ Desnivel: <strong style={{ color: '#4ade80', fontSize: 13 }}>+{displayElevationM}m</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span>📍 <strong style={{ color: '#e2e8f0', fontSize: 13 }}>{stages.length} Nodos</strong></span>
+          <span>📍 <strong style={{ color: '#e2e8f0', fontSize: 13 }}>{localStageCount} Nodos</strong></span>
           <button 
             type="button" 
             onClick={() => setPlayCounter(c => c + 1)}

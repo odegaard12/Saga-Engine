@@ -392,9 +392,10 @@ export default function AdminGameEditor({
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function applyMapCollectible() {
+    const baseCheckpoint = getDefaultAdminStagePatchForGame('simple_checkpoint')
     setEditorMode('map_collectible')
     onPatch({
-      type: 'signal_hunt',
+      type: baseCheckpoint.type,
       label: 'Coleccionable de mapa',
       title: 'Objeto Coleccionable',
       physical_qr: null,

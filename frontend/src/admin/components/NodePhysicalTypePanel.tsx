@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
+import { getDefaultAdminStagePatchForGame } from '../lib/gameCatalog'
 import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import PhysicalQrCardsPanel, {
   type PhysicalQrKind,
@@ -85,13 +86,6 @@ function clearPhysicalFields(stage: AdminReactOverviewStage): AdminReactOverview
   delete config.fallback_code
 
   next.config = config
-  next.type = 'shake_antenna_charge' // Default simple game template
-  next.game_family = 'signal_hunt'
-  next.game_type = 'shake_antenna_charge'
-  next.game_template_id = 'shake_antenna_charge'
-  next.entry_mode = 'free'
-  next.completion_method = 'free'
-  next.requires_proximity = false
   next._type_choice_done = true
   next._clear_physical_fields = true
 
@@ -210,9 +204,10 @@ export default function NodePhysicalTypePanel({
     }
 
     if (nextMode === 'map_collectible') {
+      const baseCheckpoint = getDefaultAdminStagePatchForGame('simple_checkpoint')
       onApplyLocal({
         ...(stage as unknown as Record<string, unknown>),
-        type: 'signal_hunt',
+        type: baseCheckpoint.type,
         label: 'Coleccionable de mapa',
         title: 'Objeto Coleccionable',
         physical_qr: null,
@@ -354,8 +349,12 @@ export default function NodePhysicalTypePanel({
             type="button"
             className={mode === 'none' && ((stage as any).game_type === 'simple_checkpoint' || (stage as any).config?.game_id === 'simple_checkpoint') ? 'active' : ''}
             onClick={() => {
+                const baseCheckpoint = getDefaultAdminStagePatchForGame('simple_checkpoint')
               onApplyLocal({
                 ...stage,
+                  type: baseCheckpoint.type,
+                  label: baseCheckpoint.label,
+                  icon: baseCheckpoint.icon,
                 game_type: 'simple_checkpoint',
                 game_template_id: 'simple_checkpoint',
                 title: stage.title || 'Checkpoint / Texto Rápido',
@@ -365,8 +364,9 @@ export default function NodePhysicalTypePanel({
                   objective: 'checkpoint',
                   completion_method: 'proximity',
                 },
+                _type_choice_done: true,
               } as AdminReactOverviewStage)
-              setMode('none')
+              onFinishChoice?.()
             }}
           >
             <i>📍</i>

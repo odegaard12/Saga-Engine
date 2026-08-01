@@ -619,6 +619,8 @@ export const MapSurface = React.memo(function MapSurface({
   const lastNodeFrameRef = useRef<string | null>(null)
   const lastPlayerFrameRef = useRef<string | null>(null)
   const lastFocusTokenRef = useRef<number | null>(null)
+  const offlineTilesHideTimerRef = useRef<number | null>(null)
+  const offlineTilesVisibleSinceRef = useRef<number>(0)
 
   // Heading cone — dirección de marcha del jugador
   const headingConeRef = useRef<L.SVGOverlay | null>(null)
@@ -680,10 +682,37 @@ export const MapSurface = React.memo(function MapSurface({
 
     tileLayer
       .on('tileerror', () => {
-        mapRootRef.current?.classList.add('saga-map-offline-tiles')
+        if (offlineTilesHideTimerRef.current !== null) {
+          window.clearTimeout(offlineTilesHideTimerRef.current)
+          offlineTilesHideTimerRef.current = null
+        }
+
+        const root = mapRootRef.current
+        if (!root) return
+
+        if (!root.classList.contains('saga-map-offline-tiles')) {
+          offlineTilesVisibleSinceRef.current = Date.now()
+        }
+
+        root.classList.add('saga-map-offline-tiles')
       })
       .on('load', () => {
-        mapRootRef.current?.classList.remove('saga-map-offline-tiles')
+        if (offlineTilesHideTimerRef.current !== null) {
+          window.clearTimeout(offlineTilesHideTimerRef.current)
+          offlineTilesHideTimerRef.current = null
+        }
+
+        const root = mapRootRef.current
+        if (!root) return
+
+        const shownForMs = Date.now() - offlineTilesVisibleSinceRef.current
+        const minVisibleMs = 300
+        const delayMs = Math.max(0, minVisibleMs - shownForMs)
+
+        offlineTilesHideTimerRef.current = window.setTimeout(() => {
+          mapRootRef.current?.classList.remove('saga-map-offline-tiles')
+          offlineTilesHideTimerRef.current = null
+        }, delayMs)
       })
 
     tileLayer.addTo(map)
@@ -732,6 +761,10 @@ export const MapSurface = React.memo(function MapSurface({
       roadRouteAbortRef.current?.abort()
       roadRouteLayersRef.current.forEach((layer) => layer.remove())
       roadRouteLayersRef.current = []
+      if (offlineTilesHideTimerRef.current !== null) {
+        window.clearTimeout(offlineTilesHideTimerRef.current)
+        offlineTilesHideTimerRef.current = null
+      }
       otherPlayerMarkersRef.current.forEach((marker) => marker.remove())
       otherPlayerMarkersRef.current.clear()
       fieldProofLayersRef.current.forEach((layer) => layer.remove())

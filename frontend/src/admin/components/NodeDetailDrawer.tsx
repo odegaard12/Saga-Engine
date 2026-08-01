@@ -248,7 +248,7 @@ export default function NodeDetailDrawer({
 
   const family =
     familyCards.find((item) => item.id === draft.type) ||
-    familyCards.find((item) => item.id === 'signal_hunt')
+    familyCards[0]
 
   const _messages = draft.messages || {}
   const isLocalNew = typeof draft.id === 'string' && draft.id.startsWith('local-')

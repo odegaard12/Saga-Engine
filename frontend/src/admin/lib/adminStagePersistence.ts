@@ -9,6 +9,11 @@ import {
 
 export function stageSaveIdentity(stage: AdminReactOverviewStage) {
   if (typeof stage.id === 'number') return String(stage.id)
+  if (typeof stage.id === 'string' && stage.id.trim()) return stage.id.trim()
+
+  const localId = (stage as unknown as { localId?: unknown }).localId
+  if (typeof localId === 'string' && localId.trim()) return localId.trim()
+
   return String(stage.index)
 }
 
@@ -72,7 +77,7 @@ export function mergeStageForSave(
         ? rawMinigame.type
         : ''
 
-  const saveType = stage.type || 'signal_hunt'
+  const saveType = stage.type || 'motion_challenge'
   const safeRawConfig = rawType === saveType ? rawConfig : {}
   const saveConfig = normalizeAdminConfigForFamily(saveType, {
     ...safeRawConfig,
@@ -120,7 +125,7 @@ export function buildRawStageFromOverview(
 ): AdminRawStage {
   const messages = stage.messages || {}
 
-  const saveType = stage.type || 'signal_hunt'
+  const saveType = stage.type || 'motion_challenge'
   const saveConfig = normalizeAdminConfigForFamily(
     saveType,
     typeof (stage as EditableAdminStage).config === 'object' &&

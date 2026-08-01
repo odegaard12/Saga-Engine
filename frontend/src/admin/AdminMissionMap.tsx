@@ -177,7 +177,7 @@ export default function AdminMissionMap({
       attributionControl: false,
       doubleClickZoom: false,
     })
-    polylineRendererRef.current = L.svg()
+    polylineRendererRef.current = L.svg({ padding: 0.5 })
 
     map.on('click', (e) => {
       if (isDraggingRef.current || Date.now() < dragClickSuppressUntilRef.current) return
@@ -519,6 +519,7 @@ export default function AdminMissionMap({
               // Real-time Dynamic Polyline Dragging: Snapping to mountain roads as mouse moves
               let previewLine: L.Polyline | null = null
               let isDraggingLine = false
+              let movedDuringDrag = false
               let lastFetchTime = 0
               const handleLineClick = (evt: L.LeafletMouseEvent) => {
                 L.DomEvent.stopPropagation(evt.originalEvent)
@@ -534,6 +535,7 @@ export default function AdminMissionMap({
                   window.clearTimeout(dragResetTimeoutRef.current)
                 }
                 isDraggingLine = true
+                movedDuringDrag = false
                 map.dragging.disable()
 
                 innerLine.setStyle({ color: '#ff0000', weight: 9 })
@@ -544,6 +546,7 @@ export default function AdminMissionMap({
 
                 const handleMouseMove = (moveEvt: L.LeafletMouseEvent) => {
                   if (!isDraggingLine) return
+                  movedDuringDrag = true
                   const curPoint = moveEvt.latlng
                   const now = Date.now()
 
@@ -612,10 +615,11 @@ export default function AdminMissionMap({
                   }
 
                   isDraggingLine = false
+                  isDraggingRef.current = false
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
 
-                  if (onInsertStageAt && !isDraggingRef.current) {
+                  if (onInsertStageAt && movedDuringDrag) {
                     onInsertStageAt(upEvt.latlng.lat, upEvt.latlng.lng, i + 1)
                   }
                 }

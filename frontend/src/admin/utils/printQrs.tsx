@@ -24,7 +24,14 @@ function hasPersistedStageId(stage: AdminReactOverviewStage) {
 }
 
 function getCardData(stage: AdminReactOverviewStage) {
-  if (String((stage as { physical_node_kind?: unknown }).physical_node_kind ?? '') !== 'qr') return null
+  const stageType = String(stage.type ?? '').trim().toLowerCase()
+  const physicalKind = String((stage as { physical_node_kind?: unknown }).physical_node_kind ?? '')
+    .trim()
+    .toLowerCase()
+  const qrPayload = typeof stage.qr_payload === 'string' ? stage.qr_payload.trim() : ''
+  const hasQrMarker = stageType === 'qr_scan' || physicalKind === 'qr' || Boolean(qrPayload)
+
+  if (!hasQrMarker) return null
   if (!hasPersistedStageId(stage)) return null
 
   let physQrObj: Record<string, unknown> | null = null
@@ -35,7 +42,7 @@ function getCardData(stage: AdminReactOverviewStage) {
   }
 
   const payloadStr =
-    stage.qr_payload ??
+    (qrPayload || null) ??
     (physQrObj?.payload as string | null | undefined) ??
     null
 
