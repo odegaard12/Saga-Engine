@@ -20,16 +20,18 @@ function getPresenceConfig(value?: string) {
 }
 
 function readNumericStat(player: TeamProfileLiveStatus, keys: string[]) {
+  const raw = player as unknown as Record<string, unknown>
   for (const key of keys) {
-    const value = (player as Record<string, unknown>)[key]
+    const value = raw[key]
     if (typeof value === 'number' && Number.isFinite(value)) return value
   }
   return 0
 }
 
 function readTimestamp(player: TeamProfileLiveStatus, keys: string[]) {
+  const raw = player as unknown as Record<string, unknown>
   for (const key of keys) {
-    const value = (player as Record<string, unknown>)[key]
+    const value = raw[key]
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
     if (typeof value === 'string') {
       const parsed = Date.parse(value)

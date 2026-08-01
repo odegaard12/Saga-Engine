@@ -24,7 +24,7 @@ function hasPersistedStageId(stage: AdminReactOverviewStage) {
 }
 
 function getCardData(stage: AdminReactOverviewStage) {
-  if (stage.physical_node_kind !== 'qr') return null
+  if (String((stage as { physical_node_kind?: unknown }).physical_node_kind ?? '') !== 'qr') return null
   if (!hasPersistedStageId(stage)) return null
 
   let physQrObj: Record<string, unknown> | null = null
