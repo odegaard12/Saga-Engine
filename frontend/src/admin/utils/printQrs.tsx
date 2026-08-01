@@ -12,14 +12,20 @@ function slugify(value: string): string {
     .slice(0, 80)
 }
 
-function getCardData(stage: AdminReactOverviewStage) {
-  const isQr =
-    stage.entry_mode === 'qr' ||
-    stage.type === 'qr_scan' ||
-    Boolean(stage.qr_payload) ||
-    Boolean(stage.physical_qr)
+function hasPersistedStageId(stage: AdminReactOverviewStage) {
+  const id = stage.id
+  if (typeof id === 'number') return Number.isFinite(id) && id > 0
+  if (typeof id === 'string') {
+    const normalized = id.trim()
+    if (!normalized) return false
+    return !/^temp[-_:]|^new[-_:]|^draft[-_:]/i.test(normalized)
+  }
+  return false
+}
 
-  if (!isQr) return null
+function getCardData(stage: AdminReactOverviewStage) {
+  if (String((stage as { physical_node_kind?: unknown }).physical_node_kind ?? '') !== 'qr') return null
+  if (!hasPersistedStageId(stage)) return null
 
   let physQrObj: Record<string, unknown> | null = null
   if (typeof stage.physical_qr === 'string') {
@@ -30,17 +36,18 @@ function getCardData(stage: AdminReactOverviewStage) {
 
   const payloadStr =
     stage.qr_payload ??
-    (physQrObj ? physQrObj.payload : null)
+    (physQrObj?.payload as string | null | undefined) ??
+    null
 
-  const label = stage.title || 'Nodo QR'
+  const label = String(stage.title ?? '').trim()
+  const payload = typeof payloadStr === 'string' ? payloadStr.trim() : ''
+  if (!label && !payload) return null
 
-  if (typeof payloadStr === 'string' && payloadStr.trim()) {
-    return { label, payload: payloadStr.trim() }
+  if (payload) {
+    return { label: label || 'Nodo QR', payload }
   }
 
-  const itemId = slugify(label) || 'objeto_saga'
-  const payload = itemId // Matched to new custom format
-  return { label, payload }
+  return { label, payload: slugify(label) || 'objeto_saga' }
 }
 
 export function printAllQrs(stages: AdminReactOverviewStage[]) {
@@ -297,4 +304,3 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
     alert('Permite las ventanas emergentes (pop-ups) para imprimir los QRs.')
   }
 }
-

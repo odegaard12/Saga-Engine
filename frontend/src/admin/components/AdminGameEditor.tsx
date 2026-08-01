@@ -107,7 +107,7 @@ export default function AdminGameEditor({
   const selectedQr =
     mode === 'qr' && selected.category === 'physical'
       ? selected
-      : qrGameForKind(normalizeQrKind(stage.physical_node_kind || stage.physical_item_kind))
+      : qrGameForKind(normalizeQrKind(stage.physical_node_kind ?? stage.physical_item_kind))
   const selectedGame =
     mode === 'game' && selected.category !== 'physical'
       ? selected
@@ -119,7 +119,7 @@ export default function AdminGameEditor({
 
   const qrDesignSignature = getQrDesignSignature(qrPayload(stage), qrDesign)
 
-  const _qrValidated = String(config.qr_validation_signature || '') === qrDesignSignature
+  const _qrValidated = String(config.qr_validation_signature ?? '') === qrDesignSignature
 
   const _customGameEditor = mode === 'game' && hasCustomGameEditor(selectedGame)
 
@@ -127,12 +127,12 @@ export default function AdminGameEditor({
     return stages
       .filter((s) => {
         if (s.id === stage.id) return false
-        const sId = s.physical_item_id || s.physical_qr?.item_id || s.config?.physical_item_id || ''
+        const sId = s.physical_item_id ?? s.physical_qr?.item_id ?? s.config?.physical_item_id ?? ''
         return Boolean(sId)
       })
       .map((s) => {
-        const sId = s.physical_item_id || s.physical_qr?.item_id || s.config?.physical_item_id || ''
-        const sLabel = s.physical_item_label || s.physical_qr?.label || s.title || `Nodo ${s.index + 1}`
+        const sId = s.physical_item_id ?? s.physical_qr?.item_id ?? s.config?.physical_item_id ?? ''
+        const sLabel = s.physical_item_label ?? s.physical_qr?.label ?? s.title ?? `Nodo ${s.index + 1}`
         const icon = (s.physical_node_kind === 'collectible' || s.is_map_collectible || s.config?.is_map_collectible) ? '🎁' : '🔑'
         return {
           id: sId,

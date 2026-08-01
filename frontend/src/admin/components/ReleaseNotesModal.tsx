@@ -26,26 +26,56 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
         </header>
 
         <div style={content}>
-          {/* Version 3.9.4 */}
-          {/* Version 3.9.7 */}
+          {/* Version 3.9.8 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
-              <span style={vTag}>v3.9.7</span>
+              <span style={vTag}>v3.9.8</span>
               <span style={vDate}>31 de Julio, 2026</span>
               <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
             </div>
 
-            <h3 style={releaseTitle}>🏷️ Rediseño de Tarjetas QR Físicas, Capas de Mapas y Mejoras UI</h3>
+            <h3 style={releaseTitle}>🚀 Consolidación de mejoras QR físicas, Leaflet, rutas OSM y HUD</h3>
 
             <ul style={featureList}>
               <li>
-                <strong>🏷️ Tarjetas y Objetos QR Físicos:</strong> Soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR con badges visuales distintivos.
+                <strong>🏷️ QR físicos y edición unificada:</strong> Rediseño de tarjetas QR físicas, títulos editables desde el editor principal y correcciones de impresión para que payloads y nodos físicos coincidan.
               </li>
               <li>
-                <strong>🗺️ Rastros y Senderos OSM:</strong> Renderizado persistente de senderos a cualquier nivel de zoom en el editor de misiones.
+                <strong>🗺️ Leaflet, zoom y senderos OSM:</strong> Correcciones de clipping, uso de renderer específico y <code>noClip</code> para estabilizar rutas, senderos amarillos y capas base a cualquier zoom.
               </li>
               <li>
-                <strong>⚡ Sincronización Real-Time:</strong> HUD de métricas actualizado al instante durante el arrastre de nodos.
+                <strong>📍 Edición de rutas más precisa:</strong> Inserción correcta de waypoints al arrastrar líneas, actualización dinámica de rutas al hacer pan y basemap OSM estándar en el admin.
+              </li>
+              <li>
+                <strong>⚡ HUD y playback en tiempo real:</strong> Reproducción animada de ruta con marcador Leaflet y sincronización instantánea de distancia y métricas mientras se arrastran nodos.
+              </li>
+              <li>
+                <strong>🌐 Contenido y robustez:</strong> Texto narrativo en gallego para stages, perfil OSRM en modo peatón y fixes TypeScript en impresión QR y canvas renderer.
+              </li>
+            </ul>
+          </article>
+
+          {/* Version 3.9.5 */}
+          <article style={versionBlock}>
+            <div style={versionHeader}>
+              <span style={vTagMuted}>v3.9.5</span>
+              <span style={vDate}>30 de Julio, 2026</span>
+            </div>
+
+            <h3 style={releaseTitle}>✨ Resolución de PRs, lockfile auto-sync, mapa 60 FPS y HUD compacto</h3>
+
+            <ul style={featureList}>
+              <li>
+                <strong>🔁 Resolución de PRs y estabilidad general:</strong> Integración de correcciones pendientes para dejar la rama alineada tras la tanda de pull requests.
+              </li>
+              <li>
+                <strong>📦 Lockfile auto-sync:</strong> Sincronización automática del lockfile para evitar desajustes entre dependencias instaladas y despliegues.
+              </li>
+              <li>
+                <strong>🗺️ Mapa más fluido:</strong> Ajustes de rendimiento para acercar el editor a 60 FPS y soporte visual para senderos OSM.
+              </li>
+              <li>
+                <strong>🧭 HUD compacto:</strong> Refinamiento del HUD para mostrar mejor la información clave ocupando menos espacio en pantalla.
               </li>
             </ul>
           </article>
@@ -260,26 +290,23 @@ const vBadgeCurrent: React.CSSProperties = {
 
 const releaseTitle: React.CSSProperties = {
   margin: '0 0 14px',
-  fontSize: '15px',
-  fontWeight: 700,
+  fontSize: '18px',
+  fontWeight: 800,
   color: '#e2e8f0',
 }
 
 const featureList: React.CSSProperties = {
   margin: 0,
   paddingLeft: 18,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  fontSize: '13px',
   color: '#cbd5e1',
-  lineHeight: 1.5,
+  display: 'grid',
+  gap: 8,
+  lineHeight: 1.55,
 }
 
 const subList: React.CSSProperties = {
-  marginTop: 6,
+  marginTop: 8,
   paddingLeft: 18,
-  display: 'flex',
-  flexDirection: 'column',
+  display: 'grid',
   gap: 4,
 }

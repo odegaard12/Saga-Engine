@@ -2,6 +2,51 @@
 
 ---
 
+## 🚀 Version 3.9.8 (31 de Julio, 2026)
+
+### 🚀 Novedades y Mejoras Principales
+
+#### 1. 🏷️ QR Físicos y Edición Unificada
+- Rediseño de tarjetas QR físicas con soporte visual para Objeto QR, Llave QR, Pista QR y Bonus QR.
+- Los títulos de QR, coleccionables y nodos se editan desde el editor principal y el panel queda alineado con esos mismos campos.
+- La impresión QR ahora valida mejor los nodos físicos y hace coincidir payloads y pegatinas reales.
+
+#### 2. 🗺️ Leaflet, Zoom y Senderos OSM Estables
+- Correcciones de clipping para evitar desapariciones de rutas, senderos y polilíneas al cambiar el zoom.
+- Uso de renderer específico y `noClip` para estabilizar líneas sin romper tiles, capas base ni senderos amarillos.
+- Añadido basemap OSM estándar y refresco dinámico de rutas al hacer pan.
+
+#### 3. 📍 Edición de Rutas y HUD en Tiempo Real
+- El arrastre de líneas vuelve a insertar waypoints correctamente y evita seleccionar puntos intermedios no deseados.
+- La distancia y métricas del HUD se recalculan en directo al mover nodos.
+- Nuevo playback de ruta con marcador animado sobre Leaflet.
+
+#### 4. 🌐 Robustez y Contenido
+- Restaurado el perfil OSRM peatonal para cálculo de rutas.
+- Añadido texto narrativo en gallego a los stages.
+- Resueltos errores TypeScript en `printQrs` y en el scope del canvas renderer.
+
+---
+
+## ✨ Version 3.9.5 (30 de Julio, 2026)
+
+### 🚀 Novedades y Mejoras Principales
+
+#### 1. 🔁 Resolución de Pull Requests
+- Integración y cierre de correcciones pendientes procedentes de PRs recientes para estabilizar la rama.
+
+#### 2. 📦 Lockfile Auto-Sync
+- Sincronización automática del lockfile para evitar desajustes entre dependencias, instalaciones locales y despliegues.
+
+#### 3. 🗺️ Mapa a 60 FPS y Senderos OSM
+- Ajustes de rendimiento para acercar el editor a 60 FPS.
+- Inclusión de senderos OSM como apoyo visual en el mapa.
+
+#### 4. 🧭 HUD Compacto
+- Refinamiento del HUD para presentar información clave con menor ocupación de espacio en pantalla.
+
+---
+
 ## 🔮 Version 3.5.0 (21 de Julio, 2026)
 
 ### 🚀 Novedades y Mejoras Principales

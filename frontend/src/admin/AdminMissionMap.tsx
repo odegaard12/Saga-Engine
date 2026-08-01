@@ -149,6 +149,9 @@ export default function AdminMissionMap({
   const heatmapLayerRef = useRef<L.Layer[]>([])
   const lastRouteCoordsRef = useRef<[number, number][]>([])
   const dragClickSuppressUntilRef = useRef(0)
+  const isDraggingRef = useRef(false)
+  const dragResetTimeoutRef = useRef<number | null>(null)
+  const polylineRendererRef = useRef<L.SVG | null>(null)
   const [localShowHeatmap, setLocalShowHeatmap] = useState(false)
   const [heatmapStatus, setHeatmapStatus] = useState<'idle' | 'loading' | 'ok' | 'empty' | 'error'>(
     'idle'
@@ -174,9 +177,10 @@ export default function AdminMissionMap({
       attributionControl: false,
       doubleClickZoom: false,
     })
+    polylineRendererRef.current = L.svg()
 
     map.on('click', (e) => {
-      if (Date.now() < dragClickSuppressUntilRef.current) return
+      if (isDraggingRef.current || Date.now() < dragClickSuppressUntilRef.current) return
       if (onCreateStageAt) {
         onCreateStageAt(e.latlng.lat, e.latlng.lng, { x: e.originalEvent.clientX, y: e.originalEvent.clientY })
       }
@@ -192,6 +196,9 @@ export default function AdminMissionMap({
     mapRef.current = map
 
     return () => {
+      if (dragResetTimeoutRef.current) {
+        window.clearTimeout(dragResetTimeoutRef.current)
+      }
       layersRef.current.forEach((layer) => layer.remove())
       layersRef.current = []
       map.remove()
@@ -211,19 +218,19 @@ export default function AdminMissionMap({
     if (mapTileMode === 'satellite-osm') {
       const esriSat = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 20, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
       )
       const waymarkedTrails = L.tileLayer(
         'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
-        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.95, updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 19, maxZoom: 22, opacity: 0.95, updateWhenIdle: false, keepBuffer: 4 }
       )
       const esriRoads = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 19, maxZoom: 22, opacity: 0.90, updateWhenIdle: false, keepBuffer: 4 }
       )
       const cartoLabels = L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-        { maxNativeZoom: 18, maxZoom: 22, opacity: 0.95, subdomains: 'abcd', updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 20, maxZoom: 22, opacity: 0.95, subdomains: 'abcd', updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(esriSat)
       tileGroup.addLayer(waymarkedTrails)
@@ -232,7 +239,7 @@ export default function AdminMissionMap({
     } else if (mapTileMode === 'cyclosm') {
       const cyclosmMap = L.tileLayer(
         'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-        { maxNativeZoom: 17, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 19, maxZoom: 22, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(cyclosmMap)
     } else if (mapTileMode === 'osm') {
@@ -244,7 +251,7 @@ export default function AdminMissionMap({
     } else {
       const esriSat = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxNativeZoom: 18, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
+        { maxNativeZoom: 20, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4 }
       )
       tileGroup.addLayer(esriSat)
     }
@@ -302,7 +309,9 @@ export default function AdminMissionMap({
                 opacity: 0.35,
                 lineCap: 'round',
                 lineJoin: 'round', 
-                interactive: false
+                interactive: false,
+                noClip: true,
+                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(currentPathsGroup)
 
               L.polyline(latlngs, {
@@ -313,6 +322,8 @@ export default function AdminMissionMap({
                 lineCap: 'round',
                 lineJoin: 'round', 
                 interactive: false,
+                noClip: true,
+                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(currentPathsGroup)
             }
           })
@@ -453,7 +464,8 @@ export default function AdminMissionMap({
                 opacity: 0.8,
                 lineCap: 'round',
                 lineJoin: 'round', 
-                noClip: true
+                noClip: true,
+                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(map)
 
               // Inner Vivid Emerald Green Polyline (Base route color: Green)
@@ -463,7 +475,8 @@ export default function AdminMissionMap({
                 opacity: 0.95,
                 lineCap: 'round',
                 lineJoin: 'round', 
-                noClip: true
+                noClip: true,
+                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(map)
 
               let fromConnLine: L.Polyline | null = null
@@ -475,6 +488,8 @@ export default function AdminMissionMap({
                   weight: 3,
                   dashArray: '5, 8',
                   opacity: 0.8,
+                  noClip: true,
+                  renderer: polylineRendererRef.current ?? undefined,
                 }).addTo(map)
               }
               if (toNode && legCoords.length > 0) {
@@ -483,6 +498,8 @@ export default function AdminMissionMap({
                   weight: 3,
                   dashArray: '5, 8',
                   opacity: 0.8,
+                  noClip: true,
+                  renderer: polylineRendererRef.current ?? undefined,
                 }).addTo(map)
               }
 
@@ -503,9 +520,19 @@ export default function AdminMissionMap({
               let previewLine: L.Polyline | null = null
               let isDraggingLine = false
               let lastFetchTime = 0
+              const handleLineClick = (evt: L.LeafletMouseEvent) => {
+                L.DomEvent.stopPropagation(evt.originalEvent)
+                L.DomEvent.preventDefault(evt.originalEvent)
+                if (isDraggingRef.current || Date.now() < dragClickSuppressUntilRef.current) return
+                onInsertStageAt?.(evt.latlng.lat, evt.latlng.lng, i + 1)
+              }
 
               const handleMouseDown = (e: L.LeafletMouseEvent) => {
                 L.DomEvent.stopPropagation(e.originalEvent)
+                isDraggingRef.current = true
+                if (dragResetTimeoutRef.current) {
+                  window.clearTimeout(dragResetTimeoutRef.current)
+                }
                 isDraggingLine = true
                 map.dragging.disable()
 
@@ -527,6 +554,8 @@ export default function AdminMissionMap({
                       weight: 7,
                       dashArray: '8, 8',
                       opacity: 0.95,
+                      noClip: true,
+                      renderer: polylineRendererRef.current ?? undefined,
                     }).addTo(map)
                   }
 
@@ -570,6 +599,12 @@ export default function AdminMissionMap({
                   map.dragging.enable()
 
                   dragClickSuppressUntilRef.current = Date.now() + 800
+                  if (dragResetTimeoutRef.current) {
+                    window.clearTimeout(dragResetTimeoutRef.current)
+                  }
+                  dragResetTimeoutRef.current = window.setTimeout(() => {
+                    isDraggingRef.current = false
+                  }, 120)
 
                   if (previewLine) {
                     map.removeLayer(previewLine)
@@ -580,7 +615,7 @@ export default function AdminMissionMap({
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
 
-                  if (onInsertStageAt) {
+                  if (onInsertStageAt && !isDraggingRef.current) {
                     onInsertStageAt(upEvt.latlng.lat, upEvt.latlng.lng, i + 1)
                   }
                 }
@@ -591,6 +626,8 @@ export default function AdminMissionMap({
 
               innerLine.on('mousedown', handleMouseDown)
               outerLine.on('mousedown', handleMouseDown)
+              innerLine.on('click', handleLineClick)
+              outerLine.on('click', handleLineClick)
 
               const layersToPush = [outerLine, innerLine]
               if (fromConnLine) layersToPush.push(fromConnLine)
@@ -613,7 +650,9 @@ export default function AdminMissionMap({
                             color: '#eab308',
                             weight: 3.5,
                             opacity: 0.75,
-                            dashArray: '6, 6'
+                            dashArray: '6, 6',
+                            noClip: true,
+                            renderer: polylineRendererRef.current ?? undefined,
                           }).addTo(map)
                           trailHintLine.bindTooltip(`🌲 Sendero en 500m: ${element.tags?.name || element.tags?.highway || 'Camino de monte'}`, { sticky: true })
                           routeLayersRef.current.push(trailHintLine)
@@ -640,7 +679,8 @@ export default function AdminMissionMap({
         weight: 6,
         opacity: 0.9,
         dashArray: '8, 8',
-        noClip: true
+        noClip: true,
+        renderer: polylineRendererRef.current ?? undefined,
       }).addTo(m)
       routeLayersRef.current.push(fallbackLine)
       lastRouteCoordsRef.current = waypoints
@@ -740,6 +780,10 @@ export default function AdminMissionMap({
       })
 
       marker.on('dragstart', () => {
+        isDraggingRef.current = true
+        if (dragResetTimeoutRef.current) {
+          window.clearTimeout(dragResetTimeoutRef.current)
+        }
         dragClickSuppressUntilRef.current = Date.now() + 700
         map.getContainer().classList.add('admin-map-dragging-node')
       })
@@ -810,7 +854,14 @@ export default function AdminMissionMap({
                 if (map.getContainer().classList.contains('admin-map-dragging-node') && data.routes?.[0]?.geometry?.coordinates) {
                   const pts = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])
                   if (!previewNodeLine) {
-                    previewNodeLine = L.polyline(pts, { color: '#ff0000', weight: 8, dashArray: '8, 8', opacity: 0.95 }).addTo(map)
+                    previewNodeLine = L.polyline(pts, {
+                      color: '#ff0000',
+                      weight: 8,
+                      dashArray: '8, 8',
+                      opacity: 0.95,
+                      noClip: true,
+                      renderer: polylineRendererRef.current ?? undefined,
+                    }).addTo(map)
                   } else {
                     previewNodeLine.setLatLngs(pts)
                   }
@@ -834,6 +885,12 @@ export default function AdminMissionMap({
         }
 
         dragClickSuppressUntilRef.current = Date.now() + 700
+        if (dragResetTimeoutRef.current) {
+          window.clearTimeout(dragResetTimeoutRef.current)
+        }
+        dragResetTimeoutRef.current = window.setTimeout(() => {
+          isDraggingRef.current = false
+        }, 120)
         map.getContainer().classList.remove('admin-map-dragging-node')
         const next = marker.getLatLng()
         onMoveStage?.(stage, next.lat, next.lng, { select: false })
@@ -852,6 +909,8 @@ export default function AdminMissionMap({
         weight: 1.5,
         opacity: 0.7,
         dashArray: '4 8',
+        noClip: true,
+        renderer: polylineRendererRef.current ?? undefined,
       }).addTo(map)
       layersRef.current.push(routeLine)
     }
@@ -873,10 +932,10 @@ export default function AdminMissionMap({
 
     mappedStages.forEach((targetStage) => {
       const target = targetStage as any
-      const targetConfig = target.config && typeof target.config === 'object' ? target.config : {}
+      const targetConfig = target?.config && typeof target.config === 'object' ? target.config : {}
       // Leer required_item_id desde múltiples posibles ubicaciones
       const reqId = normId(
-        target.required_item_id || targetConfig.required_item_id || targetConfig.item_id || ''
+        target?.required_item_id ?? targetConfig?.required_item_id ?? targetConfig?.item_id ?? ''
       )
       if (!reqId) return
 
@@ -893,15 +952,15 @@ export default function AdminMissionMap({
           if (sourceStage === targetStage) return
           const source = sourceStage as any
           const sourceConfig =
-            source.config && typeof source.config === 'object' ? source.config : {}
+            source?.config && typeof source.config === 'object' ? source.config : {}
 
           // Buscar en múltiples campos donde puede estar el ID del objeto generado
           const sourceItemId = normId(
             source.physical_item_id ||
-              sourceConfig.physical_item_id ||
-              (source.physical_qr &&
+            sourceConfig?.physical_item_id ||
+            (source?.physical_qr &&
                 typeof source.physical_qr === 'object' &&
-                (source.physical_qr as any).item_id) ||
+              (source.physical_qr as any)?.item_id) ||
               ''
           )
 
@@ -916,6 +975,8 @@ export default function AdminMissionMap({
               weight: 3,
               opacity: 0.9,
               className: 'admin-dependency-polyline',
+              noClip: true,
+              renderer: polylineRendererRef.current ?? undefined,
             }).addTo(map)
 
             const srcLabel =
