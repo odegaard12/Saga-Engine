@@ -26,7 +26,28 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
         </header>
 
         <div style={content}>
-          {/* Version 3.9.4 */}
+          {/* Version 3.9.7.1 */}
+          <article style={versionBlock}>
+            <div style={versionHeader}>
+              <span style={vTagMuted}>v3.9.7.1</span>
+              <span style={vDate}>31 de Julio, 2026</span>
+            </div>
+
+            <h3 style={releaseTitle}>🛠️ Hotfix de rutas Leaflet, nodos físicos QR y edición en mapa</h3>
+
+            <ul style={featureList}>
+              <li>
+                <strong>🗺️ Zoom y render estable:</strong> Ajustes de <code>noClip</code> y renderer específico para mantener visibles las rutas sin romper tiles ni senderos amarillos.
+              </li>
+              <li>
+                <strong>📍 Edición de rutas más precisa:</strong> Inserción correcta de waypoints al arrastrar líneas, refresco dinámico de rutas al mover el mapa y HUD de distancia sincronizado en tiempo real.
+              </li>
+              <li>
+                <strong>🏷️ QR físicos coherentes:</strong> Correcciones en impresión, payload y validaciones para que las tarjetas QR físicas coincidan con sus nodos reales, junto con fixes TypeScript en impresión y canvas.
+              </li>
+            </ul>
+          </article>
+
           {/* Version 3.9.7 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
@@ -39,13 +60,41 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
 
             <ul style={featureList}>
               <li>
-                <strong>🏷️ Tarjetas y Objetos QR Físicos:</strong> Soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR con badges visuales distintivos.
+                <strong>🏷️ Tarjetas y Objetos QR Físicos:</strong> Rediseño de tarjetas con soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR, además de títulos editables y panel QR unificado con el editor principal.
               </li>
               <li>
-                <strong>🗺️ Rastros y Senderos OSM:</strong> Renderizado persistente de senderos a cualquier nivel de zoom en el editor de misiones.
+                <strong>🗺️ Rastros y Senderos OSM:</strong> Correcciones de clipping en Leaflet para mantener visibles senderos, coleccionables y trazados del mapa en distintos niveles de zoom.
               </li>
               <li>
-                <strong>⚡ Sincronización Real-Time:</strong> HUD de métricas actualizado al instante durante el arrastre de nodos.
+                <strong>⚡ HUD y reproducción de ruta:</strong> Animación de playback sobre Leaflet y sincronización en tiempo real de métricas del HUD durante el arrastre de nodos.
+              </li>
+              <li>
+                <strong>🌐 Contenido y edición de misión:</strong> Texto narrativo en gallego añadido a stages y edición directa de títulos de nodo desde las cabeceras del panel admin.
+              </li>
+            </ul>
+          </article>
+
+          {/* Version 3.9.5 */}
+          <article style={versionBlock}>
+            <div style={versionHeader}>
+              <span style={vTagMuted}>v3.9.5</span>
+              <span style={vDate}>30 de Julio, 2026</span>
+            </div>
+
+            <h3 style={releaseTitle}>✨ Resolución de PRs, lockfile auto-sync, mapa 60 FPS y HUD compacto</h3>
+
+            <ul style={featureList}>
+              <li>
+                <strong>🔁 Resolución de PRs y estabilidad general:</strong> Integración de correcciones pendientes para dejar la rama alineada tras la tanda de pull requests.
+              </li>
+              <li>
+                <strong>📦 Lockfile auto-sync:</strong> Sincronización automática del lockfile para evitar desajustes entre dependencias instaladas y despliegues.
+              </li>
+              <li>
+                <strong>🗺️ Mapa más fluido:</strong> Ajustes de rendimiento para acercar el editor a 60 FPS y soporte visual para senderos OSM.
+              </li>
+              <li>
+                <strong>🧭 HUD compacto:</strong> Refinamiento del HUD para mostrar mejor la información clave ocupando menos espacio en pantalla.
               </li>
             </ul>
           </article>

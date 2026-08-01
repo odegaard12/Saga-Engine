@@ -2,6 +2,67 @@
 
 ---
 
+## 🧭 Version 3.9.7.1 (31 de Julio, 2026)
+
+### 🚀 Hotfixes Principales
+
+#### 1. 🗺️ Leaflet — Zoom y Rutas Estables
+- Ajustado el renderizado de líneas con `noClip` y renderer específico para mantener visibles las rutas al hacer zoom sin romper tiles ni senderos amarillos.
+- Revertidos cambios globales de canvas que afectaban a capas no relacionadas.
+
+#### 2. 📍 Editor de Rutas — Waypoints y HUD en Tiempo Real
+- El arrastre de líneas vuelve a insertar waypoints correctamente.
+- La distancia y métricas del HUD se recalculan en directo al arrastrar nodos.
+- Las rutas del editor se refrescan dinámicamente al hacer pan sobre el mapa.
+
+#### 3. 🏷️ QR Físicos — Impresión y Validación Coherente
+- Corregida la lógica de `printQrs` para que payloads y tarjetas coincidan con nodos físicos reales.
+- Añadidas comprobaciones físicas más robustas al imprimir QR.
+- Resueltos errores TypeScript en `printQrs` y en el scope del canvas renderer.
+
+---
+
+## ✨ Version 3.9.7 (31 de Julio, 2026)
+
+### 🚀 Novedades y Mejoras Principales
+
+#### 1. 🏷️ Rediseño de Tarjetas QR Físicas
+- Soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR con badges visuales distintivos.
+- Los títulos de QR y coleccionables ahora se editan desde los encabezados principales del editor y el panel de tarjetas QR.
+
+#### 2. 🗺️ Senderos OSM y Rutas Leaflet Más Estables
+- Correcciones de clipping para evitar desapariciones de rutas, senderos y elementos del mapa al cambiar el zoom.
+- Uso refinado de capas vectoriales para mantener consistencia visual en el editor.
+
+#### 3. ⚡ HUD y Playback de Ruta
+- Nuevo playback de ruta con marcador animado sobre Leaflet.
+- Sincronización en tiempo real de métricas del HUD mientras se mueven nodos.
+
+#### 4. 🌐 Contenido y UX del Admin
+- Añadido texto narrativo en gallego a los stages.
+- Mejorada la edición inline de títulos para nodos y tarjetas desde la UI principal.
+
+---
+
+## ✨ Version 3.9.5 (30 de Julio, 2026)
+
+### 🚀 Novedades y Mejoras Principales
+
+#### 1. 🔁 Resolución de Pull Requests
+- Integración y cierre de correcciones pendientes procedentes de PRs recientes para estabilizar la rama.
+
+#### 2. 📦 Lockfile Auto-Sync
+- Sincronización automática del lockfile para evitar desajustes entre dependencias, instalaciones locales y despliegues.
+
+#### 3. 🗺️ Mapa a 60 FPS y Senderos OSM
+- Ajustes de rendimiento para acercar el editor a 60 FPS.
+- Inclusión de senderos OSM como apoyo visual en el mapa.
+
+#### 4. 🧭 HUD Compacto
+- Refinamiento del HUD para presentar información clave con menor ocupación de espacio en pantalla.
+
+---
+
 ## 🔮 Version 3.5.0 (21 de Julio, 2026)
 
 ### 🚀 Novedades y Mejoras Principales
