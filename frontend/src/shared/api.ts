@@ -102,7 +102,7 @@ export async function fetchPlayerGame(
 }
 
 export async function fetchPublicConfig(): Promise<PublicConfig> {
-  const timeout = withTimeoutSignal(3500)
+  const timeout = withTimeoutSignal(7000)
 
   try {
     const res = await fetch(`/api/config?_=${Date.now()}`, {

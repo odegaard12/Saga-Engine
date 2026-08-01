@@ -44,8 +44,8 @@ export type FamilyConfigValidationResult = {
 export const FAMILY_SCHEMA_CONTRACTS: Record<FamilyId, FamilySchemaContract> = {
   signal_hunt: {
     id: 'signal_hunt',
-    label: 'Signal Hunt',
-    icon: '📡',
+    label: 'Checkpoint',
+    icon: '📍',
     description: 'Proximity and signal-search mechanics for GPS, hot/cold, audio and haptic hunts.',
     defaultPreset: 'proximity_lock',
     defaultConfig: {

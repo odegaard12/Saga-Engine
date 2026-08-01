@@ -295,9 +295,7 @@ export default function AdminMissionControlShell({
   const localStageCount = stages.length
 
   const displayDistanceKm =
-    liveGeodesicDistanceKm > 0
-      ? liveGeodesicDistanceKm
-      : metrics.trailKm || metrics.distanceKm || fallbackMetrics.dist || 0
+    metrics.trailKm || metrics.distanceKm || liveGeodesicDistanceKm || fallbackMetrics.dist || 0
 
   const displayDurationMin = metrics.durationMin || fallbackMetrics.time || 0
   const displayElevationM = metrics.elevationM || fallbackMetrics.elev || 0

@@ -36,7 +36,9 @@ function getRadius(stage: AdminReactOverviewStage) {
 function getFamilyLabel(stage: AdminReactOverviewStage) {
   if (stage.type === 'bearing_hunt') return 'Bearing'
   if (stage.type === 'circuit_matrix') return 'Circuit'
-  return 'Signal'
+  if (stage.type === 'motion_challenge') return 'Motion'
+  if (stage.type === 'audio_challenge') return 'Audio'
+  return 'Checkpoint'
 }
 
 function getMarkerConfig(stage: AdminReactOverviewStage, selected: boolean) {
@@ -177,7 +179,7 @@ export default function AdminMissionMap({
       attributionControl: false,
       doubleClickZoom: false,
     })
-    polylineRendererRef.current = L.svg({ padding: 0.5 })
+    polylineRendererRef.current = L.svg({ padding: 1.0 })
 
     map.on('click', (e) => {
       if (isDraggingRef.current || Date.now() < dragClickSuppressUntilRef.current) return
@@ -311,7 +313,6 @@ export default function AdminMissionMap({
                 lineJoin: 'round', 
                 interactive: false,
                 noClip: true,
-                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(currentPathsGroup)
 
               L.polyline(latlngs, {
@@ -323,7 +324,6 @@ export default function AdminMissionMap({
                 lineJoin: 'round', 
                 interactive: false,
                 noClip: true,
-                renderer: polylineRendererRef.current ?? undefined,
               }).addTo(currentPathsGroup)
             }
           })
@@ -524,8 +524,6 @@ export default function AdminMissionMap({
               const handleLineClick = (evt: L.LeafletMouseEvent) => {
                 L.DomEvent.stopPropagation(evt.originalEvent)
                 L.DomEvent.preventDefault(evt.originalEvent)
-                if (isDraggingRef.current || Date.now() < dragClickSuppressUntilRef.current) return
-                onInsertStageAt?.(evt.latlng.lat, evt.latlng.lng, i + 1)
               }
 
               const handleMouseDown = (e: L.LeafletMouseEvent) => {
@@ -586,6 +584,7 @@ export default function AdminMissionMap({
                             const newTotalDurMin = Math.round(newTotalDistKm * 900 / 60)
                             const newTotalElevM = Math.round(newTotalDistKm * 48)
                             setRouteMetricsHUD({ distanceKm: newTotalDistKm, durationMin: newTotalDurMin, elevationM: newTotalElevM })
+                            onMetricsUpdate?.({ distanceKm: newTotalDistKm, trailKm: newTotalDistKm, durationMin: newTotalDurMin, elevationM: newTotalElevM, mappedCount: waypoints.length, routeCoords: [] })
                           }
                         }
                       })
@@ -618,10 +617,6 @@ export default function AdminMissionMap({
                   isDraggingRef.current = false
                   innerLine.setStyle({ color: '#10b981', weight: 6 })
                   outerLine.setStyle({ color: '#047857', weight: 11 })
-
-                  if (onInsertStageAt && movedDuringDrag) {
-                    onInsertStageAt(upEvt.latlng.lat, upEvt.latlng.lng, i + 1)
-                  }
                 }
 
                 map.on('mousemove', handleMouseMove)

@@ -5,6 +5,10 @@ import AdminGameEditor from './AdminGameEditor'
 import AdminCollectibleEditor from './AdminCollectibleEditor'
 import AdminQrEditor from './AdminQrEditor'
 
+function isCheckpointStage(stage: StageLike): boolean {
+  return stage.type === 'simple_checkpoint' || stage.type === 'signal_hunt'
+}
+
 export interface GuidedNodeEditorFlowProps {
   stage: StageLike
   onPatch: (updates: Record<string, any>) => void
@@ -23,14 +27,14 @@ export default function GuidedNodeEditorFlow({
   stages = [],
 }: GuidedNodeEditorFlowProps) {
   const [editorMode, setEditorMode] = useState<'map_collectible' | 'qr' | 'game'>(() =>
-    isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
+    isCheckpointStage(stage) || isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
   )
 
   useEffect(() => {
     setEditorMode(
-      isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
+      isCheckpointStage(stage) || isMapCollectibleStage(stage) ? 'map_collectible' : isQrStage(stage) ? 'qr' : 'game'
     )
-  }, [stage.id, stage.index, (stage as any).config?.is_map_collectible, stage.physical_node_kind, stage.entry_mode])
+  }, [stage.id, stage.index, stage.type, (stage as any).config?.is_map_collectible, stage.physical_node_kind, stage.entry_mode])
 
   return (
     <div className="saga-guided-v4-flow-container">

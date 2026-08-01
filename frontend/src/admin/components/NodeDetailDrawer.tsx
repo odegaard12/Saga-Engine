@@ -395,7 +395,7 @@ export default function NodeDetailDrawer({
             ? 'Bearing Hunt'
             : nextType === 'circuit_matrix'
               ? 'Circuit Matrix'
-              : 'Signal Hunt',
+              : 'Checkpoint',
       icon: getAdminFamilyIcon(nextType),
       objective: String(nextConfig.objective || ''),
       config: nextConfig,

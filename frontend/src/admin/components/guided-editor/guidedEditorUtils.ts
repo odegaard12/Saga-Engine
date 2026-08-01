@@ -285,6 +285,8 @@ export function gameFromStage(stage: StageLike): AdminGameCatalogItem {
 }
 
 export function isMapCollectibleStage(stage: StageLike): boolean {
+  // Nodes with an explicit QR payload are QR stages, not map collectibles
+  if (stage.physical_qr || stage.qr_payload) return false
   const config = configOf(stage)
   return Boolean(
     config.is_map_collectible ||

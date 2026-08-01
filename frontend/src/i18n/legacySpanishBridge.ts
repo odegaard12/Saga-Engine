@@ -156,7 +156,7 @@ const ES: Record<string, string> = {
   'Disable local debug': 'Desactivar debug local',
   'Classic runtime': 'Runtime clásico',
 
-  'Signal Hunt': 'Búsqueda de señal',
+  'Signal Hunt': 'Checkpoint',
   'SIGNAL HUNT TEST NODE': 'NODO DE PRUEBA BÚSQUEDA DE SEÑAL',
   'Bearing Hunt': 'Búsqueda por rumbo',
   'Circuit Matrix': 'Matriz de circuitos',
