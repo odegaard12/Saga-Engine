@@ -26,50 +26,31 @@ export default function ReleaseNotesModal({ onClose }: ReleaseNotesModalProps) {
         </header>
 
         <div style={content}>
-          {/* Version 3.9.7.1 */}
+          {/* Version 3.9.8 */}
           <article style={versionBlock}>
             <div style={versionHeader}>
-              <span style={vTagMuted}>v3.9.7.1</span>
-              <span style={vDate}>31 de Julio, 2026</span>
-            </div>
-
-            <h3 style={releaseTitle}>🛠️ Hotfix de rutas Leaflet, nodos físicos QR y edición en mapa</h3>
-
-            <ul style={featureList}>
-              <li>
-                <strong>🗺️ Zoom y render estable:</strong> Ajustes de <code>noClip</code> y renderer específico para mantener visibles las rutas sin romper tiles ni senderos amarillos.
-              </li>
-              <li>
-                <strong>📍 Edición de rutas más precisa:</strong> Inserción correcta de waypoints al arrastrar líneas, refresco dinámico de rutas al mover el mapa y HUD de distancia sincronizado en tiempo real.
-              </li>
-              <li>
-                <strong>🏷️ QR físicos coherentes:</strong> Correcciones en impresión, payload y validaciones para que las tarjetas QR físicas coincidan con sus nodos reales, junto con fixes TypeScript en impresión y canvas.
-              </li>
-            </ul>
-          </article>
-
-          {/* Version 3.9.7 */}
-          <article style={versionBlock}>
-            <div style={versionHeader}>
-              <span style={vTag}>v3.9.7</span>
+              <span style={vTag}>v3.9.8</span>
               <span style={vDate}>31 de Julio, 2026</span>
               <span style={vBadgeCurrent}>VERSIÓN ACTUAL</span>
             </div>
 
-            <h3 style={releaseTitle}>🏷️ Rediseño de Tarjetas QR Físicas, Capas de Mapas y Mejoras UI</h3>
+            <h3 style={releaseTitle}>🚀 Consolidación de mejoras QR físicas, Leaflet, rutas OSM y HUD</h3>
 
             <ul style={featureList}>
               <li>
-                <strong>🏷️ Tarjetas y Objetos QR Físicos:</strong> Rediseño de tarjetas con soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR, además de títulos editables y panel QR unificado con el editor principal.
+                <strong>🏷️ QR físicos y edición unificada:</strong> Rediseño de tarjetas QR físicas, títulos editables desde el editor principal y correcciones de impresión para que payloads y nodos físicos coincidan.
               </li>
               <li>
-                <strong>🗺️ Rastros y Senderos OSM:</strong> Correcciones de clipping en Leaflet para mantener visibles senderos, coleccionables y trazados del mapa en distintos niveles de zoom.
+                <strong>🗺️ Leaflet, zoom y senderos OSM:</strong> Correcciones de clipping, uso de renderer específico y <code>noClip</code> para estabilizar rutas, senderos amarillos y capas base a cualquier zoom.
               </li>
               <li>
-                <strong>⚡ HUD y reproducción de ruta:</strong> Animación de playback sobre Leaflet y sincronización en tiempo real de métricas del HUD durante el arrastre de nodos.
+                <strong>📍 Edición de rutas más precisa:</strong> Inserción correcta de waypoints al arrastrar líneas, actualización dinámica de rutas al hacer pan y basemap OSM estándar en el admin.
               </li>
               <li>
-                <strong>🌐 Contenido y edición de misión:</strong> Texto narrativo en gallego añadido a stages y edición directa de títulos de nodo desde las cabeceras del panel admin.
+                <strong>⚡ HUD y playback en tiempo real:</strong> Reproducción animada de ruta con marcador Leaflet y sincronización instantánea de distancia y métricas mientras se arrastran nodos.
+              </li>
+              <li>
+                <strong>🌐 Contenido y robustez:</strong> Texto narrativo en gallego para stages, perfil OSRM en modo peatón y fixes TypeScript en impresión QR y canvas renderer.
               </li>
             </ul>
           </article>
@@ -309,26 +290,23 @@ const vBadgeCurrent: React.CSSProperties = {
 
 const releaseTitle: React.CSSProperties = {
   margin: '0 0 14px',
-  fontSize: '15px',
-  fontWeight: 700,
+  fontSize: '18px',
+  fontWeight: 800,
   color: '#e2e8f0',
 }
 
 const featureList: React.CSSProperties = {
   margin: 0,
   paddingLeft: 18,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  fontSize: '13px',
   color: '#cbd5e1',
-  lineHeight: 1.5,
+  display: 'grid',
+  gap: 8,
+  lineHeight: 1.55,
 }
 
 const subList: React.CSSProperties = {
-  marginTop: 6,
+  marginTop: 8,
   paddingLeft: 18,
-  display: 'flex',
-  flexDirection: 'column',
+  display: 'grid',
   gap: 4,
 }

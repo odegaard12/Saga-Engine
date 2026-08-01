@@ -2,45 +2,29 @@
 
 ---
 
-## 🧭 Version 3.9.7.1 (31 de Julio, 2026)
-
-### 🚀 Hotfixes Principales
-
-#### 1. 🗺️ Leaflet — Zoom y Rutas Estables
-- Ajustado el renderizado de líneas con `noClip` y renderer específico para mantener visibles las rutas al hacer zoom sin romper tiles ni senderos amarillos.
-- Revertidos cambios globales de canvas que afectaban a capas no relacionadas.
-
-#### 2. 📍 Editor de Rutas — Waypoints y HUD en Tiempo Real
-- El arrastre de líneas vuelve a insertar waypoints correctamente.
-- La distancia y métricas del HUD se recalculan en directo al arrastrar nodos.
-- Las rutas del editor se refrescan dinámicamente al hacer pan sobre el mapa.
-
-#### 3. 🏷️ QR Físicos — Impresión y Validación Coherente
-- Corregida la lógica de `printQrs` para que payloads y tarjetas coincidan con nodos físicos reales.
-- Añadidas comprobaciones físicas más robustas al imprimir QR.
-- Resueltos errores TypeScript en `printQrs` y en el scope del canvas renderer.
-
----
-
-## ✨ Version 3.9.7 (31 de Julio, 2026)
+## 🚀 Version 3.9.8 (31 de Julio, 2026)
 
 ### 🚀 Novedades y Mejoras Principales
 
-#### 1. 🏷️ Rediseño de Tarjetas QR Físicas
-- Soporte completo para Objeto QR, Llave QR, Pista QR y Bonus QR con badges visuales distintivos.
-- Los títulos de QR y coleccionables ahora se editan desde los encabezados principales del editor y el panel de tarjetas QR.
+#### 1. 🏷️ QR Físicos y Edición Unificada
+- Rediseño de tarjetas QR físicas con soporte visual para Objeto QR, Llave QR, Pista QR y Bonus QR.
+- Los títulos de QR, coleccionables y nodos se editan desde el editor principal y el panel queda alineado con esos mismos campos.
+- La impresión QR ahora valida mejor los nodos físicos y hace coincidir payloads y pegatinas reales.
 
-#### 2. 🗺️ Senderos OSM y Rutas Leaflet Más Estables
-- Correcciones de clipping para evitar desapariciones de rutas, senderos y elementos del mapa al cambiar el zoom.
-- Uso refinado de capas vectoriales para mantener consistencia visual en el editor.
+#### 2. 🗺️ Leaflet, Zoom y Senderos OSM Estables
+- Correcciones de clipping para evitar desapariciones de rutas, senderos y polilíneas al cambiar el zoom.
+- Uso de renderer específico y `noClip` para estabilizar líneas sin romper tiles, capas base ni senderos amarillos.
+- Añadido basemap OSM estándar y refresco dinámico de rutas al hacer pan.
 
-#### 3. ⚡ HUD y Playback de Ruta
+#### 3. 📍 Edición de Rutas y HUD en Tiempo Real
+- El arrastre de líneas vuelve a insertar waypoints correctamente y evita seleccionar puntos intermedios no deseados.
+- La distancia y métricas del HUD se recalculan en directo al mover nodos.
 - Nuevo playback de ruta con marcador animado sobre Leaflet.
-- Sincronización en tiempo real de métricas del HUD mientras se mueven nodos.
 
-#### 4. 🌐 Contenido y UX del Admin
+#### 4. 🌐 Robustez y Contenido
+- Restaurado el perfil OSRM peatonal para cálculo de rutas.
 - Añadido texto narrativo en gallego a los stages.
-- Mejorada la edición inline de títulos para nodos y tarjetas desde la UI principal.
+- Resueltos errores TypeScript en `printQrs` y en el scope del canvas renderer.
 
 ---
 
