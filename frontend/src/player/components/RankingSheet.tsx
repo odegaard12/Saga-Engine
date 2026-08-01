@@ -1,7 +1,6 @@
 import { useState, useEffect, type CSSProperties } from 'react'
 import type { TeamProfileLiveStatus } from '../../types/player'
 import {
-  getPlayerAvatarInitials,
   getPlayerAvatarUrl,
   getPlayerColor,
 } from '../../shared/playerIdentity'
@@ -20,6 +19,26 @@ function getPresenceConfig(value?: string) {
   return { label: 'OFFLINE', color: '#64748b', glow: 'rgba(100,116,139,0.1)', dot: '#475569' }
 }
 
+function readNumericStat(player: TeamProfileLiveStatus, keys: string[]) {
+  for (const key of keys) {
+    const value = (player as Record<string, unknown>)[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return 0
+}
+
+function readTimestamp(player: TeamProfileLiveStatus, keys: string[]) {
+  for (const key of keys) {
+    const value = (player as Record<string, unknown>)[key]
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return Number.MAX_SAFE_INTEGER
+}
+
 export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
   const [tick, setTick] = useState(0)
 
@@ -34,12 +53,22 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
   if (!open) return null
 
   const sorted = [...players].sort((a, b) => {
+    const pointsA = readNumericStat(a, ['score', 'points', 'total_points'])
+    const pointsB = readNumericStat(b, ['score', 'points', 'total_points'])
+    if (pointsA !== pointsB) return pointsB - pointsA
+
     const lvlA = a.finished ? 999 : (a.level || 0)
     const lvlB = b.finished ? 999 : (b.level || 0)
     if (lvlA !== lvlB) return lvlB - lvlA
+
     const timeA = a.total_time_ms || 0
     const timeB = b.total_time_ms || 0
     if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB
+
+    const dateA = readTimestamp(a, ['finished_at', 'completed_at', 'updated_at', 'last_seen'])
+    const dateB = readTimestamp(b, ['finished_at', 'completed_at', 'updated_at', 'last_seen'])
+    if (dateA !== dateB) return dateA - dateB
+
     return a.display_name.localeCompare(b.display_name)
   })
 
@@ -98,6 +127,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
           {sorted.map((player, idx) => {
             const pres = getPresenceConfig(player.presence)
             const isLive = player.presence === 'live'
+            const avatarSrc = getPlayerAvatarUrl(player) || '/default-avatar.png'
 
             const currentMs = player.total_time_ms || 0
             const totalSecs = Math.floor(currentMs / 1000)
@@ -171,17 +201,16 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                         boxShadow: isLive ? `0 0 0 2px ${pres.color}, 0 0 10px ${pres.glow}` : '0 0 0 1px rgba(255,255,255,0.1)',
                       }}
                     >
-                      {getPlayerAvatarUrl(player) ? (
-                        <img
-                          src={getPlayerAvatarUrl(player)}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.05em' }}>
-                          {getPlayerAvatarInitials(player)}
-                        </span>
-                      )}
+                      <img
+                        src={avatarSrc}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onError={(event) => {
+                          const target = event.currentTarget
+                          if (target.src.endsWith('/default-avatar.png')) return
+                          target.src = '/default-avatar.png'
+                        }}
+                      />
                     </div>
                     <span
                       style={{

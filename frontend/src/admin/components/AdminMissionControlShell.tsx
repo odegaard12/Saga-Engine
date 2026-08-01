@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
@@ -267,6 +268,25 @@ export default function AdminMissionControlShell({
       time: Math.round(estTrailKm * 15), 
       elev: Math.round(haversineDist * 48) 
     }
+  }, [stages])
+
+  const liveGeodesicDistanceKm = useMemo(() => {
+    const ordered = [...stages]
+      .filter(
+        (stage): stage is AdminReactOverviewStage & { lat: number; lon: number } =>
+          typeof stage.lat === 'number' && typeof stage.lon === 'number'
+      )
+      .sort((a, b) => a.index - b.index)
+
+    if (ordered.length < 2) return 0
+
+    let totalMeters = 0
+    for (let i = 0; i < ordered.length - 1; i += 1) {
+      const from = L.latLng(ordered[i].lat, ordered[i].lon)
+      const to = L.latLng(ordered[i + 1].lat, ordered[i + 1].lon)
+      totalMeters += from.distanceTo(to)
+    }
+    return totalMeters / 1000
   }, [stages])
 
   const [metrics, setMetrics] = useState<RouteMetrics>({ distanceKm: 0, trailKm: 0, elevationM: 0, durationMin: 0, mappedCount: 0, routeCoords: [] })
@@ -707,7 +727,7 @@ export default function AdminMissionControlShell({
           <span style={{ color: '#38bdf8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             🟢 RUTA SENDEROS
           </span>
-          <span>📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{(metrics.trailKm || metrics.distanceKm || fallbackMetrics.dist || 0).toFixed(2)} km</strong></span>
+          <span>📏 Distancia: <strong style={{ color: '#facc15', fontSize: 13 }}>{(metrics.trailKm || metrics.distanceKm || liveGeodesicDistanceKm || fallbackMetrics.dist || 0).toFixed(2)} km</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
           <span>⏱️ Tiempo: <strong style={{ color: '#38bdf8', fontSize: 13 }}>{(metrics.durationMin || fallbackMetrics.time) >= 60 ? `${Math.floor((metrics.durationMin || fallbackMetrics.time) / 60)}h ${(metrics.durationMin || fallbackMetrics.time) % 60}m` : `${metrics.durationMin || fallbackMetrics.time || 0} min`}</strong></span>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>

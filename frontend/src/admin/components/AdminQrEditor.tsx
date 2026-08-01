@@ -20,7 +20,7 @@ export default function AdminQrEditor({
   stages: _stages = [],
 }: AdminQrEditorProps) {
   const config = configOf(stage)
-  const mode = (stage.physical_node_kind || 'collectible') as PhysicalQrKind
+  const mode = (stage.physical_node_kind ?? 'collectible') as PhysicalQrKind
 
   function handleSaveQr(card: SavedPhysicalQrCard) {
     onPatch({
@@ -33,7 +33,7 @@ export default function AdminQrEditor({
       title: card.label,
       config: {
         ...config,
-        success_code: String(config.success_code || config.fallback_code || `SAGA-${String(stage.index + 1).padStart(2, '0')}`)
+        success_code: String(config.success_code ?? config.fallback_code ?? `SAGA-${String(stage.index + 1).padStart(2, '0')}`)
       }
     })
   }
@@ -44,7 +44,7 @@ export default function AdminQrEditor({
         <div className="saga-guided-v4-titleblock">
           <span>QR FÍSICO</span>
           <input
-            value={stage.title || stage.physical_item_label || ''}
+            value={stage.title ?? stage.physical_item_label ?? ''}
             onChange={(e) => onPatch({ title: e.target.value, physical_item_label: e.target.value })}
             placeholder="Objeto Escaneable"
             style={{
@@ -118,7 +118,7 @@ export default function AdminQrEditor({
             <div style={{ padding: '0 12px' }}>
               
               <PhysicalQrCardsPanel
-                initialLabel={stage.physical_item_label || stage.title || 'Buscar a tu enemigo'}
+                initialLabel={stage.physical_item_label ?? stage.title ?? 'Buscar a tu enemigo'}
                 initialKind={mode}
                 compact
                 hideInputs
@@ -168,7 +168,7 @@ export default function AdminQrEditor({
               <span>Código Alfanumérico Corto</span>
               <input 
                 type="text" 
-                value={String(config.success_code || config.fallback_code || `SAGA-${String(stage.index + 1).padStart(2, '0')}`)} 
+                value={String(config.success_code ?? config.fallback_code ?? `SAGA-${String(stage.index + 1).padStart(2, '0')}`)} 
                 onChange={(e) => {
                   const val = e.target.value.trim().toUpperCase()
                   onPatch({

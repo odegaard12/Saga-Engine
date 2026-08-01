@@ -11233,15 +11233,15 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 .saga-guided-v4-formgrid {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 8px !important;
+  gap: 16px !important;
   min-height: 0 !important;
   overflow-y: auto !important;
-  padding-right: 4px !important;
+  padding: 16px !important;
 }
 
 .saga-guided-v4-formgrid label {
   display: grid !important;
-  gap: 4px !important;
+  gap: 8px !important;
   min-width: 0 !important;
 }
 
@@ -11272,12 +11272,35 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   width: 100% !important;
   min-height: 31px !important;
   border: 1px solid rgba(148, 163, 184, 0.16) !important;
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   background: rgba(15, 23, 42, 0.72) !important;
   color: #f8fafc !important;
   padding: 6px 8px !important;
   font: inherit !important;
   font-size: 13px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.saga-guided-v4-formgrid input:focus,
+.saga-guided-v4-formgrid select:focus,
+.saga-guided-v4-formgrid textarea:focus,
+.saga-guided-v4-qrside input:focus {
+  outline: none !important;
+  border-color: rgb(16, 185, 129) !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.42) !important;
+}
+
+.saga-guided-v4-formgrid input[aria-invalid='true'],
+.saga-guided-v4-formgrid select[aria-invalid='true'],
+.saga-guided-v4-formgrid textarea[aria-invalid='true'],
+.saga-guided-v4-formgrid input.border-red-500,
+.saga-guided-v4-formgrid select.border-red-500,
+.saga-guided-v4-formgrid textarea.border-red-500,
+.saga-guided-v4-formgrid input:invalid,
+.saga-guided-v4-formgrid select:invalid,
+.saga-guided-v4-formgrid textarea:invalid {
+  border-color: rgb(239, 68, 68) !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3) !important;
 }
 
 .saga-guided-v4-formgrid textarea {
@@ -12227,11 +12250,12 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
 
 .saga-guided-v4-dep-box {
   display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 18px;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 8px;
   border: 1px solid rgba(125, 211, 252, 0.18);
   background: rgba(14, 165, 233, 0.07);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.24);
 }
 
 .saga-guided-v4-dep-box__title {

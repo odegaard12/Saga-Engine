@@ -25,12 +25,12 @@ export default function AdminCollectibleEditor({
     return stages
       .filter((s) => {
         if (s.id === stage.id) return false
-        const sId = s.physical_item_id || s.physical_qr?.item_id || s.config?.physical_item_id || ''
+        const sId = s.physical_item_id ?? s.physical_qr?.item_id ?? s.config?.physical_item_id ?? ''
         return Boolean(sId)
       })
       .map((s) => {
-        const sId = s.physical_item_id || s.physical_qr?.item_id || s.config?.physical_item_id || ''
-        const sLabel = s.physical_item_label || s.physical_qr?.label || s.title || `Nodo ${s.index + 1}`
+        const sId = s.physical_item_id ?? s.physical_qr?.item_id ?? s.config?.physical_item_id ?? ''
+        const sLabel = s.physical_item_label ?? s.physical_qr?.label ?? s.title ?? `Nodo ${s.index + 1}`
         const icon = (s.physical_node_kind === 'collectible' || s.is_map_collectible || s.config?.is_map_collectible) ? '🎁' : '🔑'
         return {
           id: sId,
@@ -44,7 +44,7 @@ export default function AdminCollectibleEditor({
       .filter(s => s.id !== stage.id)
       .map(s => ({
         id: s.id,
-        label: `Nodo ${s.index + 1}: ${s.title || 'Sin título'}`,
+        label: `Nodo ${s.index + 1}: ${s.title ?? 'Sin título'}`,
       }))
   }, [stages, stage.id])
 
