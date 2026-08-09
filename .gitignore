@@ -1,0 +1,108 @@
+
+*~
+*.backup
+*.backup.*
+**/.backup_chatgpt_*/
+.backup_chatgpt_*/
+**/_backups/
+_backups/
+*.bak
+*.bak.*
+*.broken_now
+data/admin_auth.json
+data/admin_sessions.json
+data/game_timers.json
+data/*.bak
+data/gamestate.json
+data/positions.json
+# Route data is private per-deployment — never commit to public repo
+data/stages.json
+data/saga.sqlite3
+data/runtime_store.json
+.DS_Store
+.env
+.env.*
+env/
+!.env.example
+eslint_report.json
+# Frontend artifacts
+frontend/dist/
+frontend/node_modules/
+frontend/src/*.bak.*
+frontend_src.zip
+frontend/tsconfig.tsbuildinfo
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*.mjs
+frontend.zip
+.husky/
+.idea/
+# Local/AI/generated backups
+# Local backups / temporary files
+# Local/dev
+*.log
+# Logs
+*.orig
+# OS / editor
+PR_DESCRIPTION.md
+*.pyc
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+# Python
+*.rej
+release_v*.md
+# Runtime data that must not be committed
+# Secrets / local environment
+*.swo
+*.swp
+_SYNC_FROM_CONTAINER/
+# Sync / local import artifacts
+*.temp
+Thumbs.db
+*.tmp
+*.tsbuildinfo
+.venv/
+venv/
+.vscode/
+*.zip
+
+# Protecciones extra de seguridad y basura
+data/*.sqlite3
+data/stages.json
+frontend/.env
+PR_DESCRIPTION.md
+*.zip
+*.tar.gz
+*.pyc
+__pycache__/
+release_*.md
+check_pi.py
+debug_version.py
+fix_timers.py
+tmp_test/
+
+# ── Datos privados de ESTE despliegue ────────────────────────────────────────
+# Coordenadas reales de la ruta, generadores con la ruta dentro y fotos de
+# campo. El motor es público; la ruta y las fotos del sitio no.
+#
+# Los patrones son genericos a proposito: nombrar aqui los ficheros reales
+# revelaba el sitio del evento en un repositorio publico.
+stages.json
+*_route.json
+*_data.py
+generate_*.py
+fix_*.py
+update_stages.*
+frontend/public/qr-selftest/
+*.gpx
+*.heic
+*.HEIC
+
+# Guion de la mision: contenido del evento, no del motor (spoilers)
+HISTORIA_*.md
+
+# Palabras propias de tu despliegue (nombres de jugadores, toponimos, codigos).
+# Las lee scripts/check_repo_privacy.py para avisarte si se te cuela alguna en
+# el codigo. Nunca debe subirse: meterla en el repo la filtraria igual.
+.saga-privacidad-local.txt

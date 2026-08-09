@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.bak
+*.fixbak
+
+.backup_chatgpt_*

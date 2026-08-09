@@ -1,0 +1,63 @@
+.git
+.github
+.gitignore
+
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+frontend/node_modules
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+*.log
+logs
+*.bak
+*.backup
+*.tmp
+tmp
+temp
+
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+saga_engine_backups
+backups
+
+# Build anterior del frontend.
+#
+# El Dockerfile hace COPY frontend/ y arrastraba el dist que hubiera en la
+# maquina: la imagen acababa con DOS paquetes index-*.js, el bueno y un huerfano
+# de una compilacion vieja, 1,3 MB de peso muerto que ademas se quedaba
+# cacheado. El build genera el suyo dentro, no hace falta traerlo.
+frontend/dist
+dist
+
+# Pagina de pruebas del lector de pegatinas y sus fotos de ejemplo.
+# Son una herramienta de desarrollo: en produccion son mas de 1 MB publicado
+# que ningun jugador pide.
+frontend/public/qr-selftest
+frontend/public/qr-selftest.html
+
+# Paquetes y volcados sueltos.
+*.tar.gz
+deploy.tar.gz
