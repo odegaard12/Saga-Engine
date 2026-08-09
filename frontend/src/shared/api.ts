@@ -23,9 +23,20 @@ export type BuildInfoPayload = {
   built_at?: string
 }
 
-type AdvanceResponse = {
-  status: 'ok' | 'fail'
+export type AdvanceResponse = {
+  /**
+   * `behind` es el servidor diciendo "no he avanzado, voy por detrás de ti":
+   * el móvil completó nodos sin cobertura y todavía no los ha sincronizado.
+   * Antes esto llegaba como `ok` y el nodo se perdía sin que nadie se enterase.
+   */
+  status: 'ok' | 'fail' | 'behind'
   user: string
+  /** Nivel real del servidor. Viene siempre, pase lo que pase. */
+  level?: number
+  /** Igual que `level`, en las respuestas `behind`. */
+  server_level?: number
+  /** El servidor ya tenía este nodo hecho: no ha vuelto a avanzar. */
+  duplicate?: boolean
   reason?: string
   requirement?: Record<string, unknown>
 }
@@ -182,7 +193,13 @@ export async function advancePlayer(
    * reconoce el eco y no avanza dos veces: sin él, el jugador se saltaba un
    * nodo entero.
    */
-  level_before?: number
+  level_before?: number,
+  /**
+   * Cómo vaciar la cola de nodos completados sin cobertura.
+   *
+   * Se inyecta desde arriba para no atar este módulo al almacén del jugador.
+   */
+  vaciarCola?: () => Promise<unknown>
 ) {
   const cuerpo = {
     user,
@@ -194,7 +211,21 @@ export async function advancePlayer(
   }
 
   try {
-    return await postJson<AdvanceResponse>('/api/advance', cuerpo)
+    const respuesta = await postJson<AdvanceResponse>('/api/advance', cuerpo)
+
+    /**
+     * "Voy por detrás de ti": hay nodos hechos sin cobertura sin sincronizar.
+     *
+     * El servidor no puede avanzar sin ellos —no sabe por qué nodo va el
+     * jugador—, así que se vacía la cola y se vuelve a intentar una vez. Si
+     * después sigue por detrás, se devuelve tal cual y quien llame decide.
+     */
+    if (respuesta.status === 'behind' && vaciarCola) {
+      await vaciarCola().catch(() => undefined)
+      return await postJson<AdvanceResponse>('/api/advance', cuerpo)
+    }
+
+    return respuesta
   } catch (error) {
     if (!esSesionCaducada(error)) throw error
 

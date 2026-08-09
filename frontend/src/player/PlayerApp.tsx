@@ -47,6 +47,8 @@ import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
 import {
   advanceLocalProgress,
+  borrarColaOffline,
+  contarAvancesPendentes,
   getOfflineMissionSummary,
   getStoredMissionPack,
   saveMissionPack,
@@ -162,16 +164,38 @@ function isPhysicalQrStage(stage: PlayerStage | null): boolean {
  * olvida, de modo que un reset hecho desde administracion entra sin pelear. Lo
  * unico que impide es que la partida se deshaga en pantalla mientras se juega.
  */
-function mantenerNivel(anterior: PlayerGamePayload | null, siguiente: PlayerGamePayload) {
+/**
+ * El nivel del jugador no baja por una respuesta del servidor.
+ *
+ * Hay dos verdades sobre en qué nodo estás: la del móvil, que avanza aunque no
+ * haya cobertura, y la del servidor, que sólo se entera al sincronizar. Cuando
+ * el servidor contesta con un nivel más bajo puede ser por tres motivos muy
+ * distintos, y tratarlos igual es lo que mandaba a la gente a repetir juegos:
+ *
+ *  - respuesta vieja que llega tarde  → hay que ignorarla
+ *  - nodos hechos sin cobertura       → hay que esperar a que suba la cola
+ *  - reseteo desde administración     → hay que obedecer
+ *
+ * `permitirBajar` es lo único que distingue el tercero. Se pasa `true` sólo
+ * cuando la cola está vacía —no hay nada que justifique ir por delante— y no
+ * acaba de llegar un reseteo.
+ */
+function mantenerNivel(
+  anterior: PlayerGamePayload | null,
+  siguiente: PlayerGamePayload,
+  permitirBajar = false
+) {
   if (!anterior) return siguiente
 
   const nivelAnterior = Number(anterior.level || 0)
   const nivelSiguiente = Number(siguiente.level || 0)
 
   if (!Number.isFinite(nivelAnterior) || nivelSiguiente >= nivelAnterior) return siguiente
+  if (permitirBajar) return siguiente
 
-  // Llega un nivel menor del que ya se veia: respuesta vieja o rebote. Se
-  // conserva lo alcanzado y se aprovecha el resto de datos nuevos.
+  // Llega un nivel menor del que ya se veia: respuesta vieja, rebote, o
+  // progreso que todavia no ha subido. Se conserva lo alcanzado y se aprovecha
+  // el resto de datos nuevos.
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
@@ -182,6 +206,15 @@ export default function PlayerApp() {
   // refresco periódico NO debe promover a 'ready': hacerlo mostraba la pantalla
   // de juego unos segundos y después volvía a la de carga.
   const initialLoadDoneRef = useRef(false)
+
+  /**
+   * La partida que se está viendo ahora mismo, legible desde los efectos.
+   *
+   * Los ciclos de refresco viven en efectos con sus propias dependencias, así
+   * que el `state` que ven es el del momento en que se montaron. Para decidir
+   * si un nivel que llega es un avance o un retroceso hace falta el de verdad.
+   */
+  const payloadRef = useRef<PlayerGamePayload | null>(null)
   const [showPrologue, setShowPrologue] = useState(false)
 
   /**
@@ -533,19 +566,42 @@ export default function PlayerApp() {
           status: 'loading',
           mapProgress: { done: 0, total: 0, detail: 'Conectando con la misión…' },
         })
-        const payload = await fetchPlayerGame(user, { offlinePack: true })
+        const delServidor = await fetchPlayerGame(user, { offlinePack: true })
 
         // Objetos que el servidor conoce y la mochila local no (típicamente
         // entregados a mano desde administración como rescate). Sin esto no
         // llegaban nunca al jugador.
-        hydrateInventoryFromServer(payload.user || user, payload.inventory_snapshot)
+        hydrateInventoryFromServer(delServidor.user || user, delServidor.inventory_snapshot)
 
         // El mismo reset que vacía la mochila tiene que parar los cronómetros:
         // si no, un jugador reseteado volvía al nodo 1 con el reloj de la
         // partida anterior corriendo y empezaba con minutos de más.
-        aplicarResetDeRelojes(
-          payload.user || user,
-          Number((payload.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
+        const huboReset = aplicarResetDeRelojes(
+          delServidor.user || user,
+          Number((delServidor.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
+        )
+        if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+
+        /**
+         * Abrir la app no puede borrar lo que se hizo sin cobertura.
+         *
+         * Aquí se pedía la partida al servidor y se guardaba ese nivel encima
+         * del paquete local —que era el que llevaba los nodos hechos en modo
+         * avión—. Al volver a abrir, el jugador aparecía en un nodo que ya
+         * había superado y lo tenía que repetir; y si lo repetía con red, el
+         * avance viejo subía después y se saltaba otro nodo. Es la causa del
+         * salto del 5 al 7.
+         *
+         * Mientras queden nodos por sincronizar, manda el móvil. Cuando la cola
+         * está vacía, manda el servidor.
+         */
+        const pendientes = huboReset ? 0 : await contarAvancesPendentes(user).catch(() => 0)
+        const guardado = pendientes > 0 ? await getStoredMissionPack(user).catch(() => null) : null
+
+        const payload = mantenerNivel(
+          guardado?.payload || null,
+          delServidor,
+          huboReset || pendientes === 0
         )
 
         const config = await fetchPublicConfig()
@@ -638,8 +694,18 @@ export default function PlayerApp() {
       running = true
 
       try {
+        /**
+         * Primero los nodos completados, y de uno en uno.
+         *
+         * Estas dos colas iban lanzadas a la vez contra el mismo endpoint. El
+         * servidor aplica los avances en el orden en que le llegan, asi que dos
+         * peticiones simultaneas se pisaban: el nivel que salia dependia de
+         * cual contestase antes. La de IndexedDB es la que lleva los nodos
+         * superados, asi que va primera y se espera a que termine.
+         */
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          await Promise.allSettled([flushOfflineEvents(user), syncPendingOfflineEvents(user)])
+          await syncPendingOfflineEvents(user).catch(() => undefined)
+          await flushOfflineEvents(user).catch(() => undefined)
         }
 
         /**
@@ -657,6 +723,24 @@ export default function PlayerApp() {
 
         const nextPayload = await fetchPlayerGame(user, { offlinePack: true })
 
+        // Un reseteo desde administración es la única vez que el servidor puede
+        // mandar un nivel más bajo y tener razón.
+        const huboReset = aplicarResetDeRelojes(
+          nextPayload.user || user,
+          Number((nextPayload.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
+        )
+        if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+
+        /**
+         * En plena partida el nivel no baja salvo por un reseteo.
+         *
+         * Este ciclo corre cada 30 s, al volver a la app y al recuperar la red:
+         * justo los momentos en los que llega una respuesta vieja o a medias.
+         * La reconciliación hacia abajo se hace al arrancar la aplicación, que
+         * es cuando una respuesta no puede venir atrasada.
+         */
+        const permitirBajar = huboReset
+
         const nextConfig = await fetchPublicConfig()
           .then((config) => {
             cachePublicConfig(config)
@@ -664,18 +748,19 @@ export default function PlayerApp() {
           })
           .catch(() => buildFallbackPublicConfig(user))
 
+        const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
+
+        // Se guarda lo reconciliado, no lo que dijo el servidor: si no, el
+        // paquete offline perdia los nodos hechos sin cobertura y al arrancar
+        // la app mandaba a repetirlos.
         await saveMissionPack({
-          user: nextPayload.user || user,
+          user: reconciliado.user || user,
           config: nextConfig,
-          payload: nextPayload,
+          payload: reconciliado,
         }).catch(() => undefined)
 
         if (!cancelled) {
-          setState((prev) => ({
-            status: 'ready',
-            payload: mantenerNivel(prev.status === 'ready' ? prev.payload : null, nextPayload),
-            config: nextConfig,
-          }))
+          setState({ status: 'ready', payload: reconciliado, config: nextConfig })
           setMapRefreshToken((value) => value + 1)
         }
       } catch {
@@ -1152,6 +1237,7 @@ export default function PlayerApp() {
   }
 
   const payload = state.payload
+  payloadRef.current = payload
   const currentStage = getCurrentStage(payload)
   const currentStageIsPhysicalQr = isPhysicalQrStage(currentStage)
 
@@ -1334,7 +1420,18 @@ export default function PlayerApp() {
   const todasAsFotos = [...fotosPendentes, ...fieldProofs]
 
   async function refreshPayload() {
-    const nextPayload = await fetchPlayerGame(user)
+    /**
+     * Con `offlinePack`, siempre.
+     *
+     * Sin él el servidor sólo manda el contenido jugable del nodo actual: los
+     * demás llegan con el título y las coordenadas y nada más. Como esta
+     * respuesta se guardaba tal cual como paquete de la misión, completar un
+     * nodo con cobertura DEJABA SIN JUEGO a todos los siguientes. Después, sin
+     * red, el nodo no tenía ni configuración del minijuego —la foto del
+     * mosaico del botánico vive ahí— ni código que aceptar: el juego no
+     * cargaba y el código de respaldo se rechazaba.
+     */
+    const nextPayload = await fetchPlayerGame(user, { offlinePack: true })
 
     // También al refrescar: así un objeto dado desde administración en plena
     // partida llega sin tener que recargar la aplicación entera.
@@ -1354,7 +1451,27 @@ export default function PlayerApp() {
      * linea de aqui arriba, y para cuando contesta ya tiene el tiempo anotado
      * en disco. Lo que llegaba tarde era el pintar.
      */
-    setState((prev) => (prev.status === 'ready' ? { ...prev, payload: nextPayload } : prev))
+    /**
+     * También aquí el nivel se reconcilia, no se acepta a ciegas.
+     *
+     * Esta función corre justo después de superar un nodo, que es el peor
+     * momento posible para hacer caso a una respuesta lenta: si llega con el
+     * nivel de antes, el jugador acababa de vuelta en el nodo que ya había
+     * completado. El refresco de fondo sí lo protegía; éste no.
+     *
+     * En plena partida lo único que puede bajar el nivel es un reseteo desde
+     * administración. Bajarlo por cualquier otra cosa es un error: el servidor
+     * acaba de confirmar el avance.
+     */
+    const huboReset = aplicarResetDeRelojes(
+      nextPayload.user || user,
+      Number((nextPayload.inventory_snapshot as { reset_at?: unknown } | undefined)?.reset_at) || 0
+    )
+    if (huboReset) await borrarColaOffline(user).catch(() => undefined)
+
+    const reconciliado = mantenerNivel(payloadRef.current, nextPayload, huboReset)
+
+    setState((prev) => (prev.status === 'ready' ? { ...prev, payload: reconciliado } : prev))
 
     const config = await fetchPublicConfig()
       .then((nextConfig) => {
@@ -1365,21 +1482,21 @@ export default function PlayerApp() {
 
     setState((prev) => ({
       status: 'ready',
-      payload: nextPayload,
+      payload: reconciliado,
       config: prev.status === 'ready' ? prev.config : config,
     }))
 
     // Guardar la mision para jugar sin cobertura sigue haciendose, pero por
     // detras: es para dentro de un rato, no para esta pantalla.
     void saveMissionPack({
-      user: nextPayload.user || user,
+      user: reconciliado.user || user,
       config,
-      payload: nextPayload,
+      payload: reconciliado,
     }).catch(() => undefined)
 
     setMapRefreshToken((value) => value + 1)
 
-    return nextPayload
+    return reconciliado
   }
 
   async function refreshFieldProofs() {
@@ -2225,7 +2342,35 @@ export default function PlayerApp() {
         await syncInventoryToServer(payload.user).catch(() => undefined)
       }
 
-      const result = await advancePlayer(payload.user, code, timeSpentMs, penaltyMs, aMano, payload.level)
+      const result = await advancePlayer(
+        payload.user,
+        code,
+        timeSpentMs,
+        penaltyMs,
+        aMano,
+        payload.level,
+        // Si el servidor dice que va por detrás, se le suben los nodos que le
+        // faltan y se reintenta. Los avances primero, en orden.
+        async () => {
+          await syncPendingOfflineEvents(payload.user).catch(() => undefined)
+          await flushOfflineEvents(payload.user).catch(() => undefined)
+        }
+      )
+
+      /**
+       * Sigue por detrás después de subirle la cola.
+       *
+       * Ni ha avanzado ni va a avanzar hasta que se ponga al día, y darlo por
+       * bueno es perder el nodo: eso es lo que pasaba antes, porque el servidor
+       * contestaba «ok» en este caso y aquí sólo se miraba `status`. Se guarda
+       * en local para no bloquear al jugador y se avisa de que falta subirlo.
+       */
+      if (result.status === 'behind') {
+        throw new Error(
+          `el servidor va por el nodo ${result.server_level ?? result.level ?? '?'} y el móvil por el ${payload.level}`
+        )
+      }
+
       if (result.status !== 'ok') {
         const missingItem = result.reason === 'missing_required_item'
         setSubmitError(

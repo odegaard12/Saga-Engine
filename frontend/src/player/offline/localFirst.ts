@@ -11,7 +11,15 @@ export type SagaQueuedEvent = {
   source?: string
   payload?: Record<string, unknown>
   created_at: string
+  /** Envíos hechos, incluidos los que se perdieron por no haber cobertura. */
   attempts: number
+  /**
+   * Veces que el SERVIDOR contestó rechazando este evento.
+   *
+   * Va aparte de `attempts` a propósito: quedarse sin red no es que el evento
+   * esté mal, y tirar la cola por eso sería romper justo el modo sin conexión.
+   */
+  rejections?: number
   last_attempt_at?: string
   last_error?: string
 }
@@ -233,6 +241,39 @@ export function buildEventSyncPayload(user: string): {
   }
 }
 
+/**
+ * Motivos por los que el servidor no va a aceptar un evento nunca.
+ *
+ * Sin esto la cola no bajaba jamás: un evento rechazado seguía entrando en cada
+ * ciclo, sumaba un intento más y dejaba el estado en 'error' para siempre.
+ */
+const RECHAZOS_DEFINITIVOS = [
+  'invalid_completion_code',
+  'missing_required_item',
+  'mission_already_complete',
+  'already_advanced',
+  'unknown player',
+]
+
+/**
+ * Máximo de RECHAZOS del servidor antes de dejar de insistir.
+ *
+ * Cuenta rechazos, no intentos. Los intentos suben también cuando no hay
+ * cobertura, y tirar la cola por estar seis minutos sin red sería justo lo
+ * contrario de lo que tiene que hacer el modo sin conexión.
+ */
+const RECHAZOS_MAXIMOS = 5
+
+function hayQueRendirse(event: SagaQueuedEvent): boolean {
+  const motivo = String(event.last_error || '')
+    .trim()
+    .toLowerCase()
+
+  if (RECHAZOS_DEFINITIVOS.some((rechazo) => motivo.includes(rechazo))) return true
+
+  return (event.rejections || 0) >= RECHAZOS_MAXIMOS
+}
+
 export async function flushOfflineEvents(
   user: string,
   syncEndpoint = '/api/events/sync',
@@ -343,10 +384,12 @@ export async function flushOfflineEvents(
         return {
           ...event,
           attempts: event.attempts + 1,
+          rejections: (event.rejections || 0) + 1,
           last_attempt_at: attemptTime,
           last_error: errorMessage,
         }
       })
+      .filter((event) => !hayQueRendirse(event))
 
     return saveOfflineSnapshot({
       ...snapshot,

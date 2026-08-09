@@ -318,21 +318,40 @@ async def advance(request: Request):
     # uno entero sin enterarse —medido: mandando dos veces el nodo 1 se acababa
     # en el 3—.
     #
-    # Si el número no cuadra, es un eco de algo ya hecho: se contesta que sí,
-    # con el nivel real, y no se toca nada. Los móviles viejos que no lo manden
-    # siguen funcionando igual que antes.
+    # Los móviles viejos que no manden el número siguen funcionando igual que
+    # antes: sin él no se puede distinguir nada y se procesa la petición.
     try:
         nivel_de_partida = data.get("level_before")
         nivel_de_partida = int(nivel_de_partida) if nivel_de_partida is not None else None
     except (TypeError, ValueError):
         nivel_de_partida = None
 
-    if nivel_de_partida is not None and nivel_de_partida != lvl:
+    # Va por DETRÁS del servidor: es el eco de algo que ya llegó. Se contesta
+    # que sí, con el nivel real, y no se toca nada.
+    if nivel_de_partida is not None and nivel_de_partida < lvl:
         return {
             "status": "ok",
             "user": profile_id,
             "level": lvl,
             "duplicate": True,
+        }
+
+    # Va por DELANTE del servidor, que es un caso muy distinto: el móvil
+    # completó nodos sin cobertura y esos avances siguen en su cola sin
+    # sincronizar. Antes esto contestaba "ok" con el nivel del servidor: el
+    # móvil lo daba por bueno —sólo mira `status`—, el nodo no quedaba anotado
+    # en ninguna parte, y a la siguiente lectura el jugador aparecía varios
+    # nodos atrás. Eso es el "lo completé y me mandó a repetirlo".
+    #
+    # Ahora se dice la verdad: no he avanzado, voy por aquí. El móvil vacía su
+    # cola contra /api/events/sync y lo vuelve a intentar.
+    if nivel_de_partida is not None and nivel_de_partida > lvl:
+        return {
+            "status": "behind",
+            "user": profile_id,
+            "level": lvl,
+            "server_level": lvl,
+            "level_before": nivel_de_partida,
         }
 
     if lvl < len(stages):
@@ -345,6 +364,7 @@ async def advance(request: Request):
                 return {
                     "status": "fail",
                     "user": profile_id,
+                    "level": lvl,
                     "reason": "missing_required_item",
                     "requirement": requirement_status,
                 }
@@ -373,4 +393,6 @@ async def advance(request: Request):
                 "level": lvl + 1,
             }
 
-    return {"status": "fail", "user": profile_id}
+    # El nivel va también en el fallo: el móvil lo necesita para saber si el
+    # rechazo es "ese código no vale" o "estamos en nodos distintos".
+    return {"status": "fail", "user": profile_id, "level": lvl}
