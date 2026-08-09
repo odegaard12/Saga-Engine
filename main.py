@@ -66,11 +66,12 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game, assets
+from backend.app.routers import field_proofs, admin, game, assets, public
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
 app.include_router(assets.router)
+app.include_router(public.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1361,83 +1362,9 @@ def get_runtime_version_payload():
     }
 
 
-@app.get("/api/version")
-async def get_version():
-    return get_runtime_version_payload()
+# /api/version, /api/config, /api/player-avatar, las teselas del mapa y el
+# service worker viven ahora en backend/app/routers/public.py.
 
-
-# ---------------------------------------------------------------------------
-# Map Satellite tile proxy – serves tiles from the same HTTP origin
-# ---------------------------------------------------------------------------
-_MAP_TILE_BASE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
-_TILE_PROXY_HEADERS = {
-    "User-Agent": "SAGA-Engine/2.x tile-proxy",
-}
-
-@app.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def map_tile_proxy(z: int, x: int, y: int):
-    """Proxy Map raster tiles so they are served from the same HTTP origin,
-    avoiding iOS Safari mixed-content (HTTPS tile ← HTTP page) restrictions."""
-    if z < 0 or z > 19:
-        raise HTTPException(status_code=400, detail="Invalid zoom")
-    
-    # ESRI expects /tile/z/y/x (level/row/column)
-    url = f"{_MAP_TILE_BASE}/{z}/{y}/{x}"
-    
-    if _HTTPX_AVAILABLE:
-        try:
-            async with _httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(url, headers=_TILE_PROXY_HEADERS, follow_redirects=True)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
-            
-            content_type = resp.headers.get("Content-Type", "image/jpeg")
-            return Response(
-                content=resp.content,
-                media_type=content_type,
-                headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except _httpx.RequestError as exc:
-            raise HTTPException(status_code=502, detail=f"Tile proxy error: {exc}")
-    else:
-        raise HTTPException(status_code=500, detail="httpx not available for proxying")
-
-
-@app.get("/api/config")
-async def get_config():
-    cfg = load_config()
-    return {
-        "site_name": cfg.get("site_name", "PUT TITLE HERE"),
-        "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
-        "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
-        "ui_lang": normalize_ui_lang(cfg.get("ui_lang", "es")),
-        "player_theme": normalize_player_theme(cfg.get("player_theme", "classic")),
-        "story_title": cfg.get("story_title", ""),
-        "story_text": cfg.get("story_text", ""),
-        "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
-        "prologue_subtitle": cfg.get("prologue_subtitle", ""),
-        "prologue_body": cfg.get("prologue_body", ""),
-        "map_center": cfg.get("map_center", [40.4168, -3.7038]),
-        "map_zoom": cfg.get("map_zoom", 13),
-        "mapbox_style": cfg.get("mapbox_style", ""),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        # Sin las fotos dentro.
-        #
-        # Aquí iban los perfiles crudos, y cada uno lleva su foto incrustada en
-        # base64: 14 perfiles son 134 KB de los 135 KB de esta respuesta, y el
-        # jugador la pide cada 30 segundos. Medido en la Raspberry: 16 MB por
-        # hora y por móvil mandando una y otra vez las mismas caras, en el monte
-        # y con una barra de cobertura.
-        #
-        # aligerar_avatar existía ya para la tabla de equipo; a este endpoint no
-        # se le aplicó nunca. La foto pasa a ser una URL que el navegador y el
-        # service worker cachean, y que cambia sola si la cambias en
-        # administración.
-        "player_profiles": [aligerar_avatar(perfil) for perfil in get_player_profiles(cfg)]
-    }
 
 def validate_stages(raw_stages):
     if not isinstance(raw_stages, list):
@@ -2083,80 +2010,3 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
     )
 
 
-@app.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])
-def player_avatar(profile_id: str, request: Request):
-    """Sirve la foto de un jugador como imagen, cacheable.
-
-    Va aparte de la tabla de equipo a propósito: esa se pide cada 5 segundos y
-    llevaba las fotos dentro, repitiéndolas enteras cada vez. Aquí se descargan
-    una vez y el navegador —y el service worker— se las quedan. La URL trae el
-    hash de la imagen, así que cambiar una foto en administración invalida la
-    caché sola.
-    """
-    foto = buscar_avatar_de(profile_id)
-    if not foto:
-        raise HTTPException(status_code=404, detail="sin foto")
-
-    try:
-        cabecera, datos = foto.split(",", 1)
-        tipo = cabecera.split(";")[0].removeprefix("data:") or "image/png"
-        binario = base64.b64decode(datos)
-    except (ValueError, TypeError, base64.binascii.Error):
-        raise HTTPException(status_code=404, detail="foto ilegible")
-
-    etag = f'"{_hash_corto(foto)}"'
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-
-    return Response(
-        content=binario,
-        media_type=tipo,
-        headers={
-            # Inmutable: la URL cambia si cambia la foto, así que el móvil puede
-            # quedarse esta para siempre.
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "ETag": etag,
-        },
-    )
-
-
-@app.api_route("/sw.js", methods=["GET", "HEAD"])
-def player_service_worker():
-    # El nombre de la caché del shell debe cambiar en cada versión desplegada;
-    # si queda fijo, los jugadores siguen recibiendo el shell antiguo cacheado
-    # aunque el admin haya publicado cambios.
-    for sw_file in (REACT_DIST_DIR / "sw.js", Path("frontend/public/sw.js")):
-        if not sw_file.exists():
-            continue
-        try:
-            content = sw_file.read_text(encoding="utf-8")
-            version = get_runtime_version_payload().get("version", "dev")
-            content = re.sub(
-                r"saga-player-shell-v[0-9A-Za-z.\-]+",
-                f"saga-player-shell-v{version}",
-                content,
-            )
-            return Response(
-                content=content,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-        except Exception:
-            return FileResponse(
-                sw_file,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-
-    return JSONResponse({"status": "missing_service_worker"}, status_code=404)
-
-
-@app.get("/service-worker.js")
-def player_service_worker_alias():
-    return player_service_worker()
