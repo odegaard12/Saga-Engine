@@ -66,10 +66,13 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game
+from backend.app.routers import field_proofs, admin, game, assets, public, shell
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
+app.include_router(assets.router)
+app.include_router(public.router)
+app.include_router(shell.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1203,9 +1206,6 @@ def saga_asset_file_response(filename: str, media_type: str):
     return JSONResponse({"status": "error", "message": f"{filename} not found"}, status_code=404)
 
 
-@app.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_svg():
-    return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
 
 
 # Aqui vivian /opencv.js (11 MB), /qr-worker.js y el autotest /qr-selftest.
@@ -1214,28 +1214,6 @@ async def saga_app_icon_svg():
 # son codigos legales y las lee el propio movil: ver frontend/src/player/
 # offline/qrReader.ts y frontend/src/shared/qrCard.tsx.
 
-
-@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_favicon_ico():
-    return saga_asset_file_response("saga-app-icon-192.png", "image/png")
-
-@app.api_route("/manifest.webmanifest", methods=["GET", "HEAD"])
-def react_manifest_webmanifest():
-    if REACT_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    if REACT_PUBLIC_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_PUBLIC_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    return JSONResponse({"status": "missing_manifest"}, status_code=404)
 
 
 def react_index_or_missing():
@@ -1265,89 +1243,10 @@ def react_index_or_missing():
     )
 
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def saga_favicon_ico():
-    dist_file = REACT_DIST_DIR / "saga-app-icon-192.png"
-    public_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    target = dist_file if dist_file.exists() else public_file
+# Los iconos, las marcas y el manifiesto viven ahora en
+# backend/app/routers/assets.py. Aqui habia ademas DOS manejadores de
+# /favicon.ico con el mismo nombre de funcion: solo respondia el primero.
 
-    if not target.exists():
-        return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-    return FileResponse(
-        target,
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-
-
-@app.api_route("/saga-app-icon-180.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_180_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_192_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_512_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-512.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon-precomposed.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_precomposed_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-brand-final.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_brand_final_svg():
-    public_file = APP_DIR / "frontend" / "public" / "saga-brand-final.svg"
-    if public_file.exists():
-        return FileResponse(public_file, media_type="image/svg+xml", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "brand asset not found"}, status_code=404)
-
-
-@app.api_route("/saga-header-mark.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_header_mark_svg():
-    dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
-    public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
-
-    if dist_file.exists():
-        return FileResponse(
-            dist_file,
-            media_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    return FileResponse(
-        public_file,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
 
 @app.middleware("http")
 async def saga_no_cache_html(request, call_next):
@@ -1378,42 +1277,9 @@ async def saga_no_cache_html(request, call_next):
 
     return apply_security_headers(response, request)
 
-@app.head("/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/", response_class=HTMLResponse)
-async def react_entry():
-    return react_index_or_missing()
-
-@app.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react", response_class=HTMLResponse)
-async def react_admin_shell():
-    return react_index_or_missing()
-
-@app.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react/{path:path}", response_class=HTMLResponse)
-async def react_admin_shell_path(path: str):
-    return react_index_or_missing()
-
-@app.head("/player", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player", response_class=HTMLResponse)
-@app.head("/player/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/", response_class=HTMLResponse)
-@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/{name}", response_class=HTMLResponse)
-async def react_player(request: Request, name: str = ""):
-    # Serve the React app directly. The frontend derives the player from /player/{name}.
-    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
-    response = react_index_or_missing()
-    profile = resolve_known_player_profile(name)
-    if profile:
-        set_player_session_cookie(response, request, profile.get("id") or name)
-    else:
-        clear_player_session_cookie(response, request)
-    return response
-
-@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin")
-async def admin_redirect_to_react():
-    return Response(status_code=307, headers={"Location": "/admin-react"})
+# Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
+# backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo
+# el ensamblado de la aplicacion y los ayudantes que usan los routers.
 
 
 def get_runtime_version_payload():
@@ -1464,83 +1330,9 @@ def get_runtime_version_payload():
     }
 
 
-@app.get("/api/version")
-async def get_version():
-    return get_runtime_version_payload()
+# /api/version, /api/config, /api/player-avatar, las teselas del mapa y el
+# service worker viven ahora en backend/app/routers/public.py.
 
-
-# ---------------------------------------------------------------------------
-# Map Satellite tile proxy – serves tiles from the same HTTP origin
-# ---------------------------------------------------------------------------
-_MAP_TILE_BASE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
-_TILE_PROXY_HEADERS = {
-    "User-Agent": "SAGA-Engine/2.x tile-proxy",
-}
-
-@app.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def map_tile_proxy(z: int, x: int, y: int):
-    """Proxy Map raster tiles so they are served from the same HTTP origin,
-    avoiding iOS Safari mixed-content (HTTPS tile ← HTTP page) restrictions."""
-    if z < 0 or z > 19:
-        raise HTTPException(status_code=400, detail="Invalid zoom")
-    
-    # ESRI expects /tile/z/y/x (level/row/column)
-    url = f"{_MAP_TILE_BASE}/{z}/{y}/{x}"
-    
-    if _HTTPX_AVAILABLE:
-        try:
-            async with _httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(url, headers=_TILE_PROXY_HEADERS, follow_redirects=True)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
-            
-            content_type = resp.headers.get("Content-Type", "image/jpeg")
-            return Response(
-                content=resp.content,
-                media_type=content_type,
-                headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except _httpx.RequestError as exc:
-            raise HTTPException(status_code=502, detail=f"Tile proxy error: {exc}")
-    else:
-        raise HTTPException(status_code=500, detail="httpx not available for proxying")
-
-
-@app.get("/api/config")
-async def get_config():
-    cfg = load_config()
-    return {
-        "site_name": cfg.get("site_name", "PUT TITLE HERE"),
-        "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
-        "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
-        "ui_lang": normalize_ui_lang(cfg.get("ui_lang", "es")),
-        "player_theme": normalize_player_theme(cfg.get("player_theme", "classic")),
-        "story_title": cfg.get("story_title", ""),
-        "story_text": cfg.get("story_text", ""),
-        "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
-        "prologue_subtitle": cfg.get("prologue_subtitle", ""),
-        "prologue_body": cfg.get("prologue_body", ""),
-        "map_center": cfg.get("map_center", [40.4168, -3.7038]),
-        "map_zoom": cfg.get("map_zoom", 13),
-        "mapbox_style": cfg.get("mapbox_style", ""),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        # Sin las fotos dentro.
-        #
-        # Aquí iban los perfiles crudos, y cada uno lleva su foto incrustada en
-        # base64: 14 perfiles son 134 KB de los 135 KB de esta respuesta, y el
-        # jugador la pide cada 30 segundos. Medido en la Raspberry: 16 MB por
-        # hora y por móvil mandando una y otra vez las mismas caras, en el monte
-        # y con una barra de cobertura.
-        #
-        # aligerar_avatar existía ya para la tabla de equipo; a este endpoint no
-        # se le aplicó nunca. La foto pasa a ser una URL que el navegador y el
-        # service worker cachean, y que cambia sola si la cambias en
-        # administración.
-        "player_profiles": [aligerar_avatar(perfil) for perfil in get_player_profiles(cfg)]
-    }
 
 def validate_stages(raw_stages):
     if not isinstance(raw_stages, list):
@@ -2186,80 +1978,3 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
     )
 
 
-@app.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])
-def player_avatar(profile_id: str, request: Request):
-    """Sirve la foto de un jugador como imagen, cacheable.
-
-    Va aparte de la tabla de equipo a propósito: esa se pide cada 5 segundos y
-    llevaba las fotos dentro, repitiéndolas enteras cada vez. Aquí se descargan
-    una vez y el navegador —y el service worker— se las quedan. La URL trae el
-    hash de la imagen, así que cambiar una foto en administración invalida la
-    caché sola.
-    """
-    foto = buscar_avatar_de(profile_id)
-    if not foto:
-        raise HTTPException(status_code=404, detail="sin foto")
-
-    try:
-        cabecera, datos = foto.split(",", 1)
-        tipo = cabecera.split(";")[0].removeprefix("data:") or "image/png"
-        binario = base64.b64decode(datos)
-    except (ValueError, TypeError, base64.binascii.Error):
-        raise HTTPException(status_code=404, detail="foto ilegible")
-
-    etag = f'"{_hash_corto(foto)}"'
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-
-    return Response(
-        content=binario,
-        media_type=tipo,
-        headers={
-            # Inmutable: la URL cambia si cambia la foto, así que el móvil puede
-            # quedarse esta para siempre.
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "ETag": etag,
-        },
-    )
-
-
-@app.api_route("/sw.js", methods=["GET", "HEAD"])
-def player_service_worker():
-    # El nombre de la caché del shell debe cambiar en cada versión desplegada;
-    # si queda fijo, los jugadores siguen recibiendo el shell antiguo cacheado
-    # aunque el admin haya publicado cambios.
-    for sw_file in (REACT_DIST_DIR / "sw.js", Path("frontend/public/sw.js")):
-        if not sw_file.exists():
-            continue
-        try:
-            content = sw_file.read_text(encoding="utf-8")
-            version = get_runtime_version_payload().get("version", "dev")
-            content = re.sub(
-                r"saga-player-shell-v[0-9A-Za-z.\-]+",
-                f"saga-player-shell-v{version}",
-                content,
-            )
-            return Response(
-                content=content,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-        except Exception:
-            return FileResponse(
-                sw_file,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-
-    return JSONResponse({"status": "missing_service_worker"}, status_code=404)
-
-
-@app.get("/service-worker.js")
-def player_service_worker_alias():
-    return player_service_worker()
