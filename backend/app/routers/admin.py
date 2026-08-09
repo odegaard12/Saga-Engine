@@ -210,6 +210,17 @@ async def admin_react_overview(request: Request):
         ],
         "stages": stage_summaries,
         "profiles": profile_summaries,
+        # Los perfiles completos, con la foto incrustada.
+        #
+        # El panel las sacaba de /api/config, que es público. Dos motivos para
+        # traerlas por aquí: allí eran 134 KB de los 135 KB que el jugador se
+        # bajaba cada 30 segundos —16 MB por hora y por móvil mandando las
+        # mismas caras—, y además dejaban los retratos de los catorce al alcance
+        # de cualquiera que pidiese la URL.
+        #
+        # El panel las necesita enteras para editarlas: si le llegan vacías,
+        # guardar borra las fotos de todo el mundo.
+        "player_profiles": profiles,
     }
 
 

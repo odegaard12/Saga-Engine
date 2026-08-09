@@ -55,7 +55,8 @@ import {
   syncPendingOfflineEvents,
   type OfflineMissionSummary,
 } from './offline/missionPack'
-import { prefetchMissionMapTiles } from './offline/mapTileCache'
+import { pedirPartida } from './offline/missionSync'
+import { getOfflineMapTileSummary, prefetchMissionMapTiles } from './offline/mapTileCache'
 import { cachePlayerShell, registerPlayerServiceWorker } from './offline/pwaShell'
 import {
   borrarFotoPendente,
@@ -566,7 +567,7 @@ export default function PlayerApp() {
           status: 'loading',
           mapProgress: { done: 0, total: 0, detail: 'Conectando con la misión…' },
         })
-        const delServidor = await fetchPlayerGame(user, { offlinePack: true })
+        const delServidor = await pedirPartida(user)
 
         // Objetos que el servidor conoce y la mochila local no (típicamente
         // entregados a mano desde administración como rescate). Sin esto no
@@ -617,22 +618,27 @@ export default function PlayerApp() {
           payload,
         }).catch(() => undefined)
 
-        // Descarga de tiles offline automatizada al entrar (con pantalla de carga)
-        if (
-          typeof window !== 'undefined' &&
-          window.navigator.onLine &&
-          Array.isArray(payload.stages) &&
-          payload.stages.length > 0
-        ) {
-          if (!cancelled) {
-            setState({
-              status: 'loading',
-              mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
-            })
-          }
+        /**
+         * El mapa se guarda al entrar, pero sólo la PRIMERA vez se espera.
+         *
+         * Esto tenía al jugador delante de una pantalla de carga en cada
+         * arranque —medido en sagagia.es con el mapa entero ya guardado: 22
+         * segundos— y encima con el cartel de "Primera vez: se guarda el mapa"
+         * puesto siempre. Las teselas no llegaban ni a la red: el service
+         * worker las servía de su caché. Lo único que se estaba haciendo era
+         * esperar.
+         *
+         * Con el mapa ya guardado se entra directo y el repaso se hace por
+         * detrás. Sin mapa —la primera vez, o después de vaciar el navegador—
+         * sí se espera: entrar al monte sin mapa es peor que esperar un rato,
+         * y para eso está la pantalla.
+         */
+        const hayMapa = Boolean(getOfflineMapTileSummary()?.saved)
+
+        const guardarMapa = async () => {
           try {
             await prefetchMissionMapTiles(payload.stages, (progress) => {
-              if (!cancelled) {
+              if (!cancelled && !hayMapa) {
                 setState({
                   status: 'loading',
                   mapProgress: {
@@ -644,14 +650,33 @@ export default function PlayerApp() {
               }
             })
           } catch (err) {
-            console.error('Failed to prefetch map tiles automatically', err)
+            console.error('No se pudo guardar el mapa para jugar sin cobertura', err)
           }
+        }
+
+        const puedeGuardarMapa =
+          typeof window !== 'undefined' &&
+          window.navigator.onLine &&
+          Array.isArray(payload.stages) &&
+          payload.stages.length > 0
+
+        if (puedeGuardarMapa && !hayMapa) {
+          if (!cancelled) {
+            setState({
+              status: 'loading',
+              mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
+            })
+          }
+          await guardarMapa()
         }
 
         if (!cancelled) {
           initialLoadDoneRef.current = true
           setState({ status: 'ready', payload, config })
         }
+
+        // Ya se está jugando: lo que falte del mapa se completa por detrás.
+        if (puedeGuardarMapa && hayMapa) void guardarMapa()
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
 
@@ -721,7 +746,7 @@ export default function PlayerApp() {
          */
         void repasarFotosPendentes(user)
 
-        const nextPayload = await fetchPlayerGame(user, { offlinePack: true })
+        const nextPayload = await pedirPartida(user)
 
         // Un reseteo desde administración es la única vez que el servidor puede
         // mandar un nivel más bajo y tener razón.
@@ -1421,17 +1446,21 @@ export default function PlayerApp() {
 
   async function refreshPayload() {
     /**
-     * Con `offlinePack`, siempre.
+     * Con los nodos enteros, siempre.
      *
-     * Sin él el servidor sólo manda el contenido jugable del nodo actual: los
-     * demás llegan con el título y las coordenadas y nada más. Como esta
-     * respuesta se guardaba tal cual como paquete de la misión, completar un
-     * nodo con cobertura DEJABA SIN JUEGO a todos los siguientes. Después, sin
-     * red, el nodo no tenía ni configuración del minijuego —la foto del
-     * mosaico del botánico vive ahí— ni código que aceptar: el juego no
-     * cargaba y el código de respaldo se rechazaba.
+     * Aquí se pedía la partida sin el paquete offline, y entonces el servidor
+     * sólo manda el contenido jugable del nodo actual: los demás llegan con el
+     * título y las coordenadas y nada más. Como esa respuesta se guardaba tal
+     * cual como paquete de la misión, completar un nodo con cobertura DEJABA
+     * SIN JUEGO a todos los siguientes. Después, sin red, el nodo no tenía ni
+     * configuración del minijuego —la foto del mosaico del botánico vive ahí—
+     * ni código que aceptar: el juego no cargaba y el código de respaldo se
+     * rechazaba.
+     *
+     * Medido en la Raspberry sobre la misión real: sin paquete, 1 de 10 nodos
+     * traía minijuego; con paquete, 10 de 10.
      */
-    const nextPayload = await fetchPlayerGame(user, { offlinePack: true })
+    const nextPayload = await pedirPartida(user)
 
     // También al refrescar: así un objeto dado desde administración en plena
     // partida llega sin tener que recargar la aplicación entera.

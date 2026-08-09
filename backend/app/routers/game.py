@@ -35,6 +35,11 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         for i, stage in enumerate(runtime_stages)
     ]
 
+    # Huella del contenido de la misión. El móvil la guarda con su paquete
+    # offline y así sabe si lo que tiene sigue valiendo: mientras no cambie, se
+    # ahorra bajar 200 KB de nodos, fotos incluidas, cada treinta segundos.
+    stages_rev = main.stages_revision(runtime_stages)
+
     inventory_state = main.load_inventory_state()
     inventory_snapshot = inventory_state.get(profile_id, {"items": []})
 
@@ -49,6 +54,8 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         "level": lvl,
         "finished": finished,
         "stages": stages,
+        "stages_rev": stages_rev,
+        "offline_pack": bool(offline_pack),
         "current_stage": current_stage,
         "inventory_snapshot": inventory_snapshot,
     }
