@@ -10,7 +10,6 @@ import {
   fetchFieldProofs,
   fetchPlayerGame,
   fetchPublicConfig,
-  fetchTeamStatus,
   getFieldProofsDownloadUrl,
   sendHeartbeat,
   uploadFieldProof,
@@ -44,7 +43,11 @@ import { QrScanClock } from './components/QrScanClock'
 import { adoptarIdiomaDeLaMision } from '../i18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
-import { buildFallbackPublicConfig, cachePublicConfig } from '../shared/offlinePublicConfig'
+import {
+  buildFallbackPublicConfig,
+  cachePublicConfig,
+  pedirConfigConCache,
+} from '../shared/offlinePublicConfig'
 import {
   advanceLocalProgress,
   borrarColaOffline,
@@ -766,12 +769,11 @@ export default function PlayerApp() {
          */
         const permitirBajar = huboReset
 
-        const nextConfig = await fetchPublicConfig()
-          .then((config) => {
-            cachePublicConfig(config)
-            return config
-          })
-          .catch(() => buildFallbackPublicConfig(user))
+        // La configuración de la misión no cambia mientras se camina, así que
+        // no se vuelve a pedir en cada refresco: ver pedirConfigConCache.
+        const nextConfig = await pedirConfigConCache(fetchPublicConfig).catch(() =>
+          buildFallbackPublicConfig(user)
+        )
 
         const reconciliado = mantenerNivel(payloadRef.current, nextPayload, permitirBajar)
 
@@ -822,57 +824,50 @@ export default function PlayerApp() {
     }
   }, [user, interactionOpen, submitting])
 
-  useEffect(() => {
-    let cancelled = false
-    let intervalId: number | null = null
+  /**
+   * Pinta la tabla de equipo. La trae el latido, no una petición aparte.
+   *
+   * Aquí había un ciclo propio pidiendo /api/team cada 5 segundos, en paralelo
+   * al latido que ya iba cada 5 segundos: «aquí estoy yo» y «dónde están los
+   * demás» son la misma conversación. Medido sobre la misión real: 1 440
+   * peticiones por hora y por móvil, tres cuartas partes de todo lo que le
+   * llegaba a la Raspberry. Ahora el latido devuelve las dos cosas.
+   */
+  const aplicarEquipo = (profiles: TeamProfileLiveStatus[]) => {
+    cacheTeamProfiles(user, profiles)
 
-    async function loadTeam() {
-      try {
-        const team = await fetchTeamStatus(user)
-        const profiles = Array.isArray(team.profiles) ? team.profiles : []
-        cacheTeamProfiles(user, profiles)
-
-        if (!cancelled) {
-          const prevStatuses = prevTeamStatusRef.current
-          profiles.forEach((p) => {
-            const oldStatus = prevStatuses[p.user]
-            if (oldStatus && oldStatus !== p.status && p.status && !p.is_self) {
-              setUiNotice({
-                id: Date.now() + Math.random(),
-                title: 'Progreso de Equipo',
-                message: `${p.display_name || p.user} » ${p.status}`,
-                tone: 'success',
-              })
-              vibrate([10, 30, 10])
-            }
-            prevStatuses[p.user] = p.status || ''
-          })
-          setTeamProfiles(profiles)
-        }
-      } catch {
-        const cachedTeam = getCachedTeamProfiles(user)
-        if (!cancelled) {
-          setTeamProfiles(cachedTeam.profiles)
-        }
+    const prevStatuses = prevTeamStatusRef.current
+    profiles.forEach((p) => {
+      const oldStatus = prevStatuses[p.user]
+      if (oldStatus && oldStatus !== p.status && p.status && !p.is_self) {
+        setUiNotice({
+          id: Date.now() + Math.random(),
+          title: 'Progreso de Equipo',
+          message: `${p.display_name || p.user} » ${p.status}`,
+          tone: 'success',
+        })
+        vibrate([10, 30, 10])
       }
-    }
+      prevStatuses[p.user] = p.status || ''
+    })
 
-    loadTeam()
-    intervalId = window.setInterval(loadTeam, 5000)
+    setTeamProfiles(profiles)
+  }
 
-    return () => {
-      cancelled = true
-      if (intervalId !== null) {
-        window.clearInterval(intervalId)
-      }
-    }
-  }, [user])
+  const aplicarEquipoRef = useRef(aplicarEquipo)
+  aplicarEquipoRef.current = aplicarEquipo
 
   useEffect(() => {
     let cancelled = false
     let intervalId: number | null = null
 
     async function loadFieldProofs() {
+      // Con la pantalla apagada no se piden: son fotos que nadie está mirando,
+      // y en una ruta de tres horas eso son 240 peticiones por hora tiradas.
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+
       try {
         const payload = await fetchFieldProofs(user)
         const proofs = Array.isArray(payload.proofs) ? payload.proofs : []
@@ -944,10 +939,23 @@ export default function PlayerApp() {
     let intervalId: number | null = null
 
     async function publishHeartbeat() {
+      /**
+       * Con la pantalla apagada no se late.
+       *
+       * En una ruta de tres horas el móvil pasa la mayor parte del tiempo en el
+       * bolsillo. El navegador ya frena los temporizadores de fondo, pero no
+       * siempre ni en todos: decirlo aquí quita peticiones que no sirven para
+       * nada, porque nadie está mirando el mapa. Al volver a la pantalla se
+       * manda una enseguida.
+       */
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+
       try {
         const effectivePosition = heartbeatPositionRef.current
 
-        await sendHeartbeat({
+        const respuesta = await sendHeartbeat({
           user,
           ...(effectivePosition
             ? {
@@ -959,16 +967,35 @@ export default function PlayerApp() {
                 gps_status: 'unavailable',
               }),
           source: heartbeatSourceRef.current,
+          // Que traiga de vuelta dónde va el resto del grupo.
+          equipo: true,
         })
+
+        const profiles = respuesta?.team?.profiles
+        if (Array.isArray(profiles)) {
+          aplicarEquipoRef.current(profiles)
+        }
       } catch {
-        // ignore heartbeat errors in the UI loop
+        // Sin cobertura se pinta el último equipo conocido en vez de vaciar la
+        // pantalla: los compañeros siguen donde estaban, que es más útil que
+        // un mapa en blanco.
+        const guardado = getCachedTeamProfiles(user)
+        if (guardado.profiles.length) aplicarEquipoRef.current(guardado.profiles)
       }
     }
 
     publishHeartbeat()
     intervalId = window.setInterval(publishHeartbeat, 5000)
 
+    // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
+    // no esperar al siguiente ciclo.
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void publishHeartbeat()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+
     return () => {
+      document.removeEventListener('visibilitychange', alVolver)
       if (intervalId !== null) {
         window.clearInterval(intervalId)
       }
@@ -1502,12 +1529,9 @@ export default function PlayerApp() {
 
     setState((prev) => (prev.status === 'ready' ? { ...prev, payload: reconciliado } : prev))
 
-    const config = await fetchPublicConfig()
-      .then((nextConfig) => {
-        cachePublicConfig(nextConfig)
-        return nextConfig
-      })
-      .catch(() => buildFallbackPublicConfig(user))
+    const config = await pedirConfigConCache(fetchPublicConfig).catch(() =>
+      buildFallbackPublicConfig(user)
+    )
 
     setState((prev) => ({
       status: 'ready',
