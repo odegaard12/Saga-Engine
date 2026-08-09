@@ -188,6 +188,61 @@ export async function getQueuedOfflineEvents(user: string) {
   return events.filter((event) => event.user === user && event.status !== 'synced')
 }
 
+/**
+ * Cuántos nodos hay completados en el móvil que el servidor todavía no sabe.
+ *
+ * Es la única razón legítima para que el móvil vaya por delante del servidor.
+ * Mientras haya alguno, una respuesta con un nivel más bajo no significa que el
+ * jugador tenga que repetir nada: significa que falta sincronizar. Cuando la
+ * cola se vacía, el servidor vuelve a ser la única verdad —incluido un reseteo
+ * hecho desde administración, que SÍ tiene que poder devolver al nodo 0—.
+ */
+export async function contarAvancesPendentes(user: string): Promise<number> {
+  const events = await getQueuedOfflineEvents(user).catch(() => [])
+  return events.filter((event) => event.type === 'node_completed').length
+}
+
+/** Tira la cola entera de este jugador. Se usa al resetearlo desde administración. */
+export async function borrarColaOffline(user: string): Promise<void> {
+  const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+  const mios = events.filter((event) => event.user === user)
+  if (!mios.length) return
+
+  const db = await openOfflineDb()
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE_EVENT_QUEUE, 'readwrite')
+    const store = tx.objectStore(STORE_EVENT_QUEUE)
+    mios.forEach((event) => store.delete(event.id))
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      resolve()
+    }
+  })
+}
+
+/**
+ * Motivos por los que el servidor no va a aceptar un evento por mucho que se
+ * insista. Reintentarlos es dejar la cola atascada para siempre y el aviso de
+ * "pendientes" encendido toda la travesía.
+ */
+const RECHAZOS_DEFINITIVOS = [
+  'invalid_completion_code',
+  'missing_required_item',
+  'mission_already_complete',
+  'already_advanced',
+]
+
+function esRechazoDefinitivo(motivo: string | undefined): boolean {
+  const limpio = String(motivo || '')
+    .trim()
+    .toLowerCase()
+  return RECHAZOS_DEFINITIVOS.some((rechazo) => limpio.includes(rechazo))
+}
+
 export async function syncPendingOfflineEvents(user: string) {
   const events = await getQueuedOfflineEvents(user)
   const syncable = events.filter((event) => event.status === 'pending' || event.status === 'failed')
@@ -266,13 +321,21 @@ export async function syncPendingOfflineEvents(user: string) {
         if (isSynced) syncedCount += 1
         else failedCount += 1
 
+        const motivo =
+          backendEvent?.error || backendStatus || 'Backend did not accept this event.'
+
+        /**
+         * Un rechazo definitivo se marca como cerrado, no como fallo.
+         *
+         * Con `failed` volvía a entrar en la siguiente sincronización, y otra
+         * vez, y otra: la cola no bajaba nunca y el aviso de "pendientes" se
+         * quedaba encendido toda la travesía aunque no hubiera nada que hacer.
+         */
         return updateOfflineEvent({
           ...event,
-          status: isSynced ? 'synced' : 'failed',
+          status: isSynced || esRechazoDefinitivo(motivo) ? 'synced' : 'failed',
           backend_event_id: backendEvent?.id,
-          last_error: isSynced
-            ? undefined
-            : backendEvent?.error || backendStatus || 'Backend did not accept this event.',
+          last_error: isSynced ? undefined : motivo,
         })
       })
     )

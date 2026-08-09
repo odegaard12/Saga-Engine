@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
@@ -77,6 +78,16 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "HEAD", "OPTIONS"],
     allow_headers=["Accept", "Content-Type", "X-Requested-With"],
 )
+
+# Comprimir lo que sale. No estaba puesto: todas las respuestas viajaban en
+# JSON crudo. Es texto muy repetitivo —los mismos nombres de campo por cada
+# nodo y por cada jugador— y encoge entre cinco y diez veces. En el monte, con
+# una barra de cobertura, eso es la diferencia entre que un refresco entre y que
+# se quede a medias.
+#
+# El umbral evita gastar en comprimir respuestas diminutas, y va DESPUÉS de CORS
+# para que las cabeceras se pongan igual.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 
@@ -1151,98 +1162,11 @@ async def saga_app_icon_svg():
     return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
 
 
-@app.api_route("/opencv.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_opencv_js():
-    """Motor de visión para reconocer las pegatinas QR con el logo encima.
-
-    Son ~11 MB, así que se sirve con caché larga: el service worker lo guarda
-    en el shell offline y el jugador lo necesita en el monte sin cobertura.
-    """
-    for candidate in (REACT_DIST_DIR / "opencv.js", APP_DIR / "frontend" / "public" / "opencv.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                headers={"Cache-Control": "public, max-age=31536000, immutable"},
-            )
-    return JSONResponse({"status": "error", "message": "opencv.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-worker.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_worker_js():
-    """Worker que aisla OpenCV: si se queda sin memoria muere el worker, no la app."""
-    for candidate in (REACT_DIST_DIR / "qr-worker.js", APP_DIR / "frontend" / "public" / "qr-worker.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                # Cloudflare cachea los .js por delante del backend y llegó a
-                # servir el worker antiguo tras desplegar, dejando el arranque
-                # colgado para siempre. Se le pide expresamente que no lo haga;
-                # el cliente además versiona la URL.
-                headers={
-                    "Cache-Control": "no-store, must-revalidate",
-                    "CDN-Cache-Control": "no-store",
-                },
-            )
-    return JSONResponse({"status": "error", "message": "qr-worker.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-selftest", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest():
-    """Autotest del lector de pegatinas sobre fotos reales de campo.
-
-    Sirve para comprobar en un móvil concreto, antes de salir al monte, que el
-    motor de visión arranca y reconoce las pegatinas ya pegadas.
-    """
-    return saga_asset_file_response("qr-selftest.html", "text/html; charset=utf-8")
-
-
-SELFTEST_ASSET_SUFFIXES = (".jpg", ".json")
-
-
-def is_safe_selftest_asset(asset):
-    r"""¿Es un nombre de fichero simple y seguro?
-
-    Se comprueba con operaciones de cadena en vez de una expresión regular.
-    La regex anterior, [A-Za-z0-9_.-]+\.(jpg|json), tenía retroceso
-    polinómico: el punto estaba dentro de la clase de caracteres Y además se
-    exigía literal después, así que una entrada con muchos puntos o guiones
-    disparaba el tiempo de análisis. Como el nombre viene de la URL, eso es
-    una vía de denegación de servicio (CodeQL py/polynomial-redos).
-    """
-    name = str(asset or "")
-
-    if not name or len(name) > 64:
-        return False
-
-    # Nada de rutas: esto sólo sirve nombres sueltos de un directorio fijo.
-    if "/" in name or "\\" in name or ".." in name:
-        return False
-
-    suffix = next((s for s in SELFTEST_ASSET_SUFFIXES if name.endswith(s)), None)
-    if suffix is None:
-        return False
-
-    stem = name[: -len(suffix)]
-    if not stem:
-        return False
-
-    return all(c.isalnum() or c in "_-" for c in stem)
-
-
-@app.api_route("/qr-selftest/{asset}", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest_asset(asset: str):
-    """Fotos de referencia y matrices esperadas del autotest."""
-    if not is_safe_selftest_asset(asset):
-        return JSONResponse({"status": "error", "message": "invalid asset"}, status_code=404)
-
-    media = "image/jpeg" if asset.endswith(".jpg") else "application/json"
-    for base in (REACT_DIST_DIR, APP_DIR / "frontend" / "public"):
-        candidate = base / "qr-selftest" / asset
-        if candidate.exists():
-            return FileResponse(candidate, media_type=media)
-    return JSONResponse({"status": "error", "message": "asset not found"}, status_code=404)
+# Aqui vivian /opencv.js (11 MB), /qr-worker.js y el autotest /qr-selftest.
+# Existian para reconocer las pegatinas que se imprimieron con el logo
+# encima del codigo, ilegibles para cualquier escaner. Las pegatinas nuevas
+# son codigos legales y las lee el propio movil: ver frontend/src/player/
+# offline/qrReader.ts y frontend/src/shared/qrCard.tsx.
 
 
 @app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
@@ -1557,7 +1481,19 @@ async def get_config():
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
         "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        "player_profiles": get_player_profiles(cfg)
+        # Sin las fotos dentro.
+        #
+        # Aquí iban los perfiles crudos, y cada uno lleva su foto incrustada en
+        # base64: 14 perfiles son 134 KB de los 135 KB de esta respuesta, y el
+        # jugador la pide cada 30 segundos. Medido en la Raspberry: 16 MB por
+        # hora y por móvil mandando una y otra vez las mismas caras, en el monte
+        # y con una barra de cobertura.
+        #
+        # aligerar_avatar existía ya para la tabla de equipo; a este endpoint no
+        # se le aplicó nunca. La foto pasa a ser una URL que el navegador y el
+        # service worker cachean, y que cambia sola si la cambias en
+        # administración.
+        "player_profiles": [aligerar_avatar(perfil) for perfil in get_player_profiles(cfg)]
     }
 
 def validate_stages(raw_stages):
@@ -1577,6 +1513,32 @@ def get_runtime_stages():
     if not isinstance(raw_stages, list):
         return []
     return [normalize_stage(stage) for stage in raw_stages]
+
+
+def stages_revision(runtime_stages=None):
+    """Huella del contenido de la misión: cambia sólo si cambian los nodos.
+
+    El móvil necesita los nodos ENTEROS para jugar sin cobertura: el minijuego,
+    su configuración, la foto del mosaico y el código que acepta. Eso son 200 KB,
+    y el jugador pedía la partida cada 30 segundos, al volver a la aplicación y
+    al recuperar la red. En el monte, con una barra de cobertura, eso es la
+    misma foto bajándose una y otra vez durante tres horas: lento, caro y para
+    nada, porque la misión no cambia mientras se juega.
+
+    Con esta huella el móvil pide lo pesado UNA vez y después sólo pregunta por
+    su estado —nivel, tiempo, mochila—, que son 28 KB. Si la huella cambia
+    (has tocado algo en administración), se vuelve a bajar todo.
+    """
+    stages = runtime_stages if runtime_stages is not None else get_runtime_stages()
+
+    try:
+        serializado = json.dumps(stages, sort_keys=True, default=str, ensure_ascii=False)
+    except (TypeError, ValueError):
+        # Antes que dar una huella falsa —que dejaría al jugador con nodos
+        # viejos para siempre—, se declara "no sé": el móvil bajará todo.
+        return ""
+
+    return hashlib.sha1(serializado.encode("utf-8")).hexdigest()[:16]
 
 def project_stage_for_player(raw_stage, include_runtime=False):
     node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
@@ -2041,198 +2003,11 @@ def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=
     }
 
 
-@app.post("/api/admin/react-overview")
-async def admin_react_overview(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    if admin_password_change_required():
-        return {
-            "status": "password_change_required",
-            "message": "Admin password change required before using the React admin overview.",
-        }
-
-    cfg = load_config()
-    stages = get_runtime_stages()
-    profiles = get_player_profiles(cfg)
-    gamestate = load_player_progress()
-    positions = load_live_positions()
-    inventory_state = load_inventory_state()
-
-    stage_summaries = [
-        _admin_react_stage_summary(stage, idx)
-        for idx, stage in enumerate(stages)
-    ]
-
-    family_counts = {
-        "signal_hunt": 0,
-        "bearing_hunt": 0,
-        "circuit_matrix": 0,
-    }
-    for stage in stage_summaries:
-        stage_type = stage.get("type")
-        if stage_type in family_counts:
-            family_counts[stage_type] += 1
-
-    profile_summaries = [
-        _admin_react_profile_summary(profile, gamestate, positions, inventory_state)
-        for profile in profiles
-    ]
-
-    return {
-        "status": "ok",
-        "config": {
-            "site_name": cfg.get("site_name"),
-            "admin_title": cfg.get("admin_title"),
-            "admin_subtitle": cfg.get("admin_subtitle"),
-            "player_theme": cfg.get("player_theme"),
-            "map_center": cfg.get("map_center"),
-            "map_zoom": cfg.get("map_zoom"),
-        },
-        "counts": {
-            "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
-            "profiles": len(profiles),
-            "stages": len(stage_summaries),
-            "finished_profiles": sum(1 for item in profile_summaries if item.get("finished")),
-            "family_counts": family_counts,
-        },
-        "families": [
-            {"id": "signal_hunt", "label": "Signal Hunt"},
-            {"id": "bearing_hunt", "label": "Bearing Hunt"},
-            {"id": "circuit_matrix", "label": "Circuit Matrix"},
-        ],
-        "stages": stage_summaries,
-        "profiles": profile_summaries,
-    }
-
-
-@app.post("/api/admin/mission-status")
-async def admin_mission_status(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
-
-    cfg = load_config()
-    runtime_stages = get_runtime_stages()
-    state = load_player_progress()
-    positions = load_live_positions()
-    now = int(time.time())
-
-    items = []
-    for profile in get_player_profiles(cfg):
-        profile_id = profile.get("id")
-        lvl = state.get(profile_id, 0)
-        finished = lvl >= len(runtime_stages)
-
-        current_stage = ""
-        if not finished and 0 <= lvl < len(runtime_stages):
-            current_stage = runtime_stages[lvl]["presentation"]["title"]
-
-        items.append({
-            **project_live_profile_status(profile, positions.get(profile_id), now),
-            "level": lvl,
-            "finished": finished,
-            "current_stage": current_stage,
-        })
-
-    return {
-        "status": "ok",
-        "server_ts": now,
-        "profiles": items
-    }
-
-@app.post("/api/admin/stages")
-async def get_stages(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "bad password"}
-        )
-
-    if admin_password_change_required():
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "password change required"}
-        )
-
-    return load_stages(STAGES_DB)
-
-@app.post("/api/admin/save-config")
-async def save_config_endpoint(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
-
-    if admin_password_change_required():
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
-
-    incoming = data.get("config") or {}
-    cfg = load_config()
-
-    if "players" in incoming:
-        players = parse_player_entries(incoming.get("players"))
-    else:
-        players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
-
-    ui_lang = normalize_ui_lang(incoming.get("ui_lang", cfg.get("ui_lang", "es")))
-
-    player_theme = normalize_player_theme(incoming.get("player_theme", cfg.get("player_theme", "classic")))
-
-    cfg["site_name"] = incoming.get("site_name", cfg.get("site_name", "PUT TITLE HERE")).strip() or "PUT TITLE HERE"
-    cfg["admin_title"] = incoming.get("admin_title", cfg.get("admin_title", "PUT ADMIN TITLE HERE")).strip() or "PUT ADMIN TITLE HERE"
-    cfg["admin_subtitle"] = incoming.get("admin_subtitle", cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE")).strip()
-    cfg["ui_lang"] = ui_lang
-    cfg["player_theme"] = player_theme
-    cfg["story_title"] = incoming.get("story_title", cfg.get("story_title", "")).strip()
-    cfg["story_text"] = incoming.get("story_text", cfg.get("story_text", "")).strip()
-    cfg["prologue_title"] = incoming.get("prologue_title", cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE")).strip()
-    cfg["prologue_subtitle"] = incoming.get("prologue_subtitle", cfg.get("prologue_subtitle", "")).strip()
-    cfg["prologue_body"] = incoming.get("prologue_body", cfg.get("prologue_body", "")).strip()
-
-    map_center = incoming.get("map_center", cfg.get("map_center", [40.4168, -3.7038]))
-    if isinstance(map_center, list) and len(map_center) == 2:
-        try:
-            cfg["map_center"] = [float(map_center[0]), float(map_center[1])]
-        except Exception:
-            pass
-
-    try:
-        cfg["map_zoom"] = int(incoming.get("map_zoom", cfg.get("map_zoom", 13)))
-    except Exception:
-        pass
-
-    cfg["mapbox_token"] = incoming.get("mapbox_token", cfg.get("mapbox_token", "")).strip()
-    cfg["mapbox_style"] = incoming.get("mapbox_style", cfg.get("mapbox_style", "")).strip()
-
-    incoming_profiles = incoming.get("player_profiles")
-    if isinstance(incoming_profiles, list) and incoming_profiles:
-        normalized_profiles = [
-            normalize_player_profile(profile, index=i)
-            for i, profile in enumerate(incoming_profiles)
-        ]
-        cfg["player_profiles"] = normalized_profiles
-        cfg["players"] = [
-            profile.get("id") or profile.get("display_name") or f"PLAYER {i + 1}"
-            for i, profile in enumerate(normalized_profiles)
-        ]
-    else:
-        cfg["players"] = players
-        if "player_profiles" in incoming:
-            cfg["player_profiles"] = [
-                normalize_player_profile(player, index=i)
-                for i, player in enumerate(players)
-            ]
-
-    save_config(cfg)
-    return {"status": "ok", "config": cfg}
-
-
+# Las cuatro rutas de administracion que vivian aqui (react-overview,
+# mission-status, stages y save-config) estaban escritas TAMBIEN en
+# backend/app/routers/admin.py, que es el que responde: los routers se
+# incluyen en la primera linea de este fichero, asi que estas copias no se
+# ejecutaban nunca. Editarlas no cambiaba nada. Ver tests/test_rutas_duplicadas.py.
 
 def _event_payload(event):
     payload = event.get("payload") if isinstance(event, dict) else {}

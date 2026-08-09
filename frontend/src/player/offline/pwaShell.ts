@@ -142,10 +142,9 @@ function collectShellUrls(playerUrl: string): string[] {
     '/manifest.webmanifest',
     '/sw.js',
     '/service-worker.js',
-    // Motor de visión para reconocer las pegatinas QR: sin él, en el monte y
-    // sin cobertura, los nodos QR no se pueden completar con la cámara.
-    '/opencv.js',
-    '/qr-worker.js',
+    // Aquí se precargaban opencv.js (11 MB) y su worker, que era lo más pesado
+    // que tenía que bajarse un jugador antes de salir al monte. El lector nuevo
+    // va dentro del propio paquete de la aplicación.
   ])
 
   document.querySelectorAll<HTMLScriptElement>('script[src]').forEach((script) => {
@@ -187,131 +186,6 @@ async function cacheUrlsDirectly(urls: string[]): Promise<void> {
   )
 }
 
-export type OfflineMapTileResult = {
-  requested: number
-  cached: number
-  failed: number
-}
-
-type OfflineMapStage = {
-  lat?: unknown
-  lon?: unknown
-}
-
-function tileX(lon: number, zoom: number): number {
-  const count = 2 ** zoom
-
-  return Math.floor(((lon + 180) / 360) * count)
-}
-
-function tileY(lat: number, zoom: number): number {
-  const safeLat = Math.max(-85.0511, Math.min(85.0511, lat))
-
-  const radians = (safeLat * Math.PI) / 180
-
-  const count = 2 ** zoom
-
-  return Math.floor(
-    ((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2) * count
-  )
-}
-
-function collectMissionTileUrls(stages: OfflineMapStage[]): string[] {
-  const urls = new Set<string>()
-
-  for (const stage of stages) {
-    const lat = Number(stage?.lat)
-    const lon = Number(stage?.lon)
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      continue
-    }
-
-    for (const zoom of [15, 16, 17, 18]) {
-      const count = 2 ** zoom
-      const centerX = tileX(lon, zoom)
-      const centerY = tileY(lat, zoom)
-
-      for (let dx = -1; dx <= 1; dx += 1) {
-        for (let dy = -1; dy <= 1; dy += 1) {
-          const x = (((centerX + dx) % count) + count) % count
-
-          const y = Math.max(0, Math.min(count - 1, centerY + dy))
-
-          urls.add(
-            'https://server.arcgisonline.com/' +
-              'ArcGIS/rest/services/' +
-              'World_Imagery/MapServer/tile/' +
-              `${zoom}/${y}/${x}`
-          )
-        }
-      }
-    }
-  }
-
-  return Array.from(urls).slice(0, 240)
-}
-
-export async function cacheMissionMapTiles(
-  stages: OfflineMapStage[]
-): Promise<OfflineMapTileResult> {
-  if (typeof window === 'undefined' || !('caches' in window)) {
-    return {
-      requested: 0,
-      cached: 0,
-      failed: 0,
-    }
-  }
-
-  const urls = collectMissionTileUrls(stages)
-
-  const cache = await caches.open(PLAYER_SHELL_CACHE)
-
-  let cursor = 0
-  let cached = 0
-  let failed = 0
-
-  async function worker() {
-    while (cursor < urls.length) {
-      const index = cursor
-      cursor += 1
-
-      const url = urls[index]
-
-      try {
-        const request = new Request(url, {
-          method: 'GET',
-          mode: 'no-cors',
-          credentials: 'omit',
-          cache: 'reload',
-        })
-
-        const response = await fetch(request)
-
-        if (response.ok || response.type === 'opaque') {
-          await cache.put(request, response.clone())
-
-          cached += 1
-        } else {
-          failed += 1
-        }
-      } catch {
-        failed += 1
-      }
-    }
-  }
-
-  const workers = Math.min(6, Math.max(1, urls.length))
-
-  await Promise.all(Array.from({ length: workers }, () => worker()))
-
-  return {
-    requested: urls.length,
-    cached,
-    failed,
-  }
-}
-
 export async function cachePlayerShell(playerUrl: string): Promise<void> {
   if (typeof window === 'undefined') return
 
@@ -325,16 +199,4 @@ export async function cachePlayerShell(playerUrl: string): Promise<void> {
     type: 'SAGA_CACHE_PLAYER_SHELL',
     urls,
   })
-}
-
-export async function isPlayerShellCached(playerUrl: string): Promise<boolean> {
-  if (typeof window === 'undefined') return false
-  if (!('caches' in window)) return false
-
-  const path = sameOriginPath(playerUrl)
-  if (!path) return false
-
-  return Boolean(
-    await caches.match(path, { ignoreSearch: true, ignoreMethod: true, ignoreVary: true })
-  )
 }
