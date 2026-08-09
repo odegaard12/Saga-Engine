@@ -1,8 +1,6 @@
 ﻿import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
-import { resolveMinigameDefinition } from '../minigames/registry'
-import { MinigameHost } from './MinigameHost'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, tiempoDelNodo } from '../nodeClock'
 
@@ -121,12 +119,6 @@ export function InteractionSheet({
   const xogoAvisaElMesmo = XOGOS_QUE_AVISAN.includes(
     String((resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || '')
   )
-  const resolvedSourceType = resolvedStageMinigame?.source.type ?? stageType
-
-  const minigameDefinition = resolvedSourceType
-    ? resolveMinigameDefinition(resolvedSourceType)
-    : null
-
   const shouldRenderFamilyRuntime = Boolean(
     resolvedRuntime && resolvedRuntime.compatibility === 'native'
   )
@@ -134,7 +126,7 @@ export function InteractionSheet({
   // Cualquier minijuego ya contiene su propio título,
   // instrucciones, estado y botones. El contenedor exterior
   // no debe repetir esa información.
-  const compactGameMode = shouldRenderFamilyRuntime || Boolean(minigameDefinition)
+  const compactGameMode = shouldRenderFamilyRuntime
 
   const compactLine = getCompactLine(currentStage)
 
@@ -438,8 +430,6 @@ export function InteractionSheet({
                   <div style={subRow}>
                     {resolvedRuntime ? (
                       <span style={miniBadge}>{resolvedRuntime.label}</span>
-                    ) : minigameDefinition ? (
-                      <span style={miniBadge}>{minigameDefinition.label}</span>
                     ) : null}
 
                     <span style={userText}>{user}</span>
@@ -516,34 +506,6 @@ export function InteractionSheet({
               onComezar={comezarOReloxo}
               appPosition={appPosition}
             />
-          ) : minigameDefinition ? (
-            <div style={{ position: 'relative' }}>
-              {activeMs > 0 && !isCompleted && !isStageCollectible(currentStage) && (
-                <div style={timerOverlay}>
-                  {(activeMs / 1000).toFixed(1)}s
-                </div>
-              )}
-
-              {isCompleted && (
-                <div style={completionOverlay}>
-                  <div style={completionText}>
-                    RESONANCIA COMPLETA
-                    <br />
-                    <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
-                      TEMPO: {(activeMs / 1000).toFixed(1)} s
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <MinigameHost
-                definition={minigameDefinition}
-                stage={currentStage}
-                helperText={helperText}
-                submitting={submitting}
-                onWin={handleNativeWin}
-              />
-            </div>
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
