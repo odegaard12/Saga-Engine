@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="SAGA">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="900" y2="980" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f302b"/>
+      <stop offset=".52" stop-color="#0d211d"/>
+      <stop offset="1" stop-color="#071411"/>
+    </linearGradient>
+    <linearGradient id="green" x1="240" y1="170" x2="760" y2="850" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86efac"/>
+      <stop offset=".45" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#0f7a3a"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="340" y1="350" x2="680" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset=".55" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000000" flood-opacity=".42"/>
+    </filter>
+    <pattern id="topo" width="150" height="150" patternUnits="userSpaceOnUse">
+      <path d="M-30 55C15 15 60 20 105 55S185 95 230 55M-30 120C25 80 75 82 125 120S205 160 250 120" fill="none" stroke="#d1fae5" stroke-opacity=".055" stroke-width="6"/>
+    </pattern>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#topo)"/>
+  <circle cx="512" cy="508" r="340" fill="none" stroke="#7dd3fc" stroke-opacity=".20" stroke-width="18"/>
+  <circle cx="512" cy="508" r="260" fill="none" stroke="#86efac" stroke-opacity=".08" stroke-width="4"/>
+
+  <g filter="url(#shadow)">
+    <path d="M668 194H430c-108 0-185 65-185 158 0 75 52 125 139 142l198 38c56 11 86 36 86 75 0 51-46 86-112 86H286l-70 137h338c136 0 231-80 231-194 0-86-57-140-163-160l-188-35c-47-9-72-29-72-60 0-37 35-60 89-60h151z"
+      fill="url(#green)"/>
+    <path d="M604 186l202-68-70 198-42-72z" fill="#86efac"/>
+    <path d="M365 748a126 126 0 0 0 294 0h-96a37 37 0 0 1-74 0z" fill="#052e16" opacity=".35"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <path d="M512 322l43 145 145 43-145 43-43 145-43-145-145-43 145-43z" fill="url(#blue)"/>
+    <circle cx="512" cy="510" r="58" fill="#f8fafc"/>
+    <circle cx="512" cy="510" r="28" fill="#0f3028"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <path d="M512 705c66 0 120 54 120 120 0 90-120 186-120 186s-120-96-120-186c0-66 54-120 120-120z" fill="#0f3f36"/>
+    <circle cx="512" cy="824" r="54" fill="#86efac"/>
+    <circle cx="512" cy="824" r="28" fill="#22c55e"/>
+    <ellipse cx="512" cy="948" rx="105" ry="24" fill="#38bdf8" opacity=".35"/>
+  </g>
+</svg>

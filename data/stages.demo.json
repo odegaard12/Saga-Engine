@@ -1,0 +1,111 @@
+[
+  {
+    "id": 0,
+    "title": "PUNTO DE PARTIDA",
+    "lat": 0.0,
+    "lon": 0.0,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "Checkpoint de proximidad. Llega al punto y mantente dentro del radio hasta que la señal se estabilice.",
+    "config": {
+      "objective": "proximity_lock",
+      "source_radius_m": 50,
+      "lock_threshold": 65,
+      "hold_ms": 1500
+    },
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 1,
+    "title": "NODO DE OBJETO",
+    "lat": 0.0006,
+    "lon": -0.0007,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "Nodo coleccionable: al entrar en el radio se recoge una pieza que hará falta más adelante.",
+    "config": {
+      "objective": "physical_collectible",
+      "source_radius_m": 50,
+      "lock_threshold": 85,
+      "hold_ms": 1500,
+      "game_id": "qr_collectible",
+      "is_map_collectible": true,
+      "completion_method": "proximity"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_id": "pieza_demo",
+    "physical_item_label": "Pieza de ejemplo",
+    "answer": "",
+    "rune": ""
+  },
+  {
+    "id": 2,
+    "title": "NODO CON PEGATINA QR",
+    "lat": 0.0012,
+    "lon": -0.0011,
+    "radius": 50,
+    "type": "signal_hunt",
+    "content": "Hay una pegatina QR escondida en el punto. Búscala y escanéala con la cámara de la app.",
+    "config": {
+      "objective": "physical_collectible",
+      "source_radius_m": 50,
+      "lock_threshold": 85,
+      "hold_ms": 1500,
+      "game_id": "qr_collectible",
+      "completion_method": "inventory_only"
+    },
+    "physical_node_kind": "collectible",
+    "physical_item_id": "llave_demo",
+    "physical_item_label": "Llave de ejemplo",
+    "qr_payload": "DEMO_01",
+    "answer": "DEMO_01",
+    "rune": ""
+  },
+  {
+    "id": 3,
+    "title": "NODO DE MINIJUEGO",
+    "lat": 0.0019,
+    "lon": -0.0017,
+    "radius": 50,
+    "type": "circuit_matrix",
+    "content": "Reto de destreza. Se juega en el móvil una vez abierto el nodo.",
+    "config": {
+      "objective": "balance_maze",
+      "game_id": "tilt_maze",
+      "completion_method": "motion",
+      "difficulty": "normal",
+      "grid_rows": 9,
+      "grid_cols": 9,
+      "time_limit_s": 90,
+      "lives": 3,
+      "hole_count": 4,
+      "collectible_count": 2,
+      "sensor_enabled": true
+    },
+    "answer": "DEMO_LABERINTO",
+    "rune": ""
+  },
+  {
+    "id": 4,
+    "title": "NODO FINAL",
+    "lat": 0.0025,
+    "lon": -0.0023,
+    "radius": 50,
+    "type": "circuit_matrix",
+    "content": "Cierre de la ruta. Exige llevar encima un objeto fabricado en la mesa de trabajo.",
+    "config": {
+      "objective": "image_mosaic",
+      "game_id": "place_mosaic",
+      "completion_method": "puzzle"
+    },
+    "required_item_id": "objeto_demo",
+    "required_item_label": "Objeto de ejemplo",
+    "required_item_quantity": 1,
+    "messages": {
+      "locked": "Necesitas el Objeto de ejemplo. Fabrícalo en Mochila › Mesa de trabajo."
+    },
+    "answer": "DEMO_FINAL",
+    "rune": ""
+  }
+]
