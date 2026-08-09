@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SAGA · Autotest del lector de pegatinas</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #0b2f26, #020617 60%);
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.02em; }
+  .sub { color: #94a3b8; font-size: 13px; margin-bottom: 18px; }
+  .status {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 14px;
+    background: rgba(15,23,42,.75); border: 1px solid rgba(148,163,184,.22);
+    font-weight: 700; font-size: 13.5px;
+  }
+  .spin {
+    width: 16px; height: 16px; border-radius: 50%; flex: none;
+    border: 2px solid rgba(74,222,128,.25); border-top-color: #4ade80;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .card {
+    margin-top: 12px; padding: 12px 14px; border-radius: 16px;
+    background: rgba(15,23,42,.7); border: 1px solid rgba(148,163,184,.18);
+    display: grid; gap: 8px;
+  }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+  .name { font-weight: 800; font-size: 14px; }
+  .detail { color: #94a3b8; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .tag { font-weight: 900; font-size: 12px; padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+  .ok   { background: rgba(74,222,128,.16);  color: #4ade80;  border: 1px solid rgba(74,222,128,.4); }
+  .warn { background: rgba(251,191,36,.14);  color: #fbbf24;  border: 1px solid rgba(251,191,36,.4); }
+  .bad  { background: rgba(248,113,113,.16); color: #f87171;  border: 1px solid rgba(248,113,113,.45); }
+  .verdict { margin-top: 16px; padding: 16px; border-radius: 18px; font-weight: 900; font-size: 16px; text-align: center; }
+  .bar { height: 6px; border-radius: 999px; background: rgba(148,163,184,.18); overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#34d399,#4ade80); width: 0; transition: width .3s; }
+  code { background: rgba(2,6,23,.6); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Autotest del lector de pegatinas</h1>
+  <div class="sub">
+    Ejecuta el motor real de la app (<code>/qr-worker.js</code> + OpenCV) sobre fotos de
+    las pegatinas ya pegadas en el monte. Sirve para comprobar en ESTE móvil que
+    el reconocimiento funciona antes de salir al campo.
+  </div>
+
+  <div class="status"><span class="spin" id="spin"></span><span id="status">Arrancando…</span></div>
+  <div class="bar" style="margin-top:10px"><i id="bar"></i></div>
+
+  <div class="card" id="results"></div>
+  <div class="verdict" id="verdict" style="display:none"></div>
+</div>
+
+<script>
+const MODULES = 21
+const LOGO_ROWS = [7, 14]
+const LOGO_COLS = [2, 20]
+// Mismos umbrales que el jugador (ver qrLogoRecovery.ts).
+const MIN_AGREEMENT = 0.88
+const MIN_MARGIN = 0.06
+
+// Las fotos de referencia y qué pegatina lleva cada una se leen del
+// manifiesto del despliegue. NO se listan aquí: ni los códigos de las
+// pegatinas ni los nombres de los ficheros son cosa del motor.
+let PHOTOS = []
+
+// Mismos recortes que la app: de fotograma completo a más cerrado.
+const CROPS = [1, 0.85, 0.72]
+
+const $ = (id) => document.getElementById(id)
+const setStatus = (t) => { $('status').textContent = t }
+const setBar = (p) => { $('bar').style.width = Math.round(p * 100) + '%' }
+
+// ---------------------------------------------------- worker (igual que la app)
+let worker = null, nextId = 1
+const pending = new Map()
+
+function ensureWorker() {
+  if (worker) return worker
+  // Siempre fresco: si el CDN sirviera un worker viejo el diagnostico mentiria.
+  worker = new Worker('/qr-worker.js?selftest=' + Date.now())
+  worker.onmessage = (e) => {
+    const entry = pending.get(e.data.id)
+    if (!entry) return
+    pending.delete(e.data.id)
+    clearTimeout(entry.timer)
+    entry.resolve(e.data)
+  }
+  worker.onerror = (e) => {
+    pending.forEach((p) => { clearTimeout(p.timer); p.resolve(null) })
+    pending.clear()
+    try { worker.terminate() } catch (err) {}
+    worker = null
+    fail('El worker de visión falló: ' + (e.message || 'error desconocido'))
+  }
+  return worker
+}
+
+function ask(msg, transfer, timeoutMs) {
+  const w = ensureWorker()
+  return new Promise((resolve) => {
+    const id = nextId++
+    const timer = setTimeout(() => { pending.delete(id); resolve(null) }, timeoutMs)
+    pending.set(id, { resolve, timer })
+    w.postMessage(Object.assign({ id }, msg), transfer || [])
+  })
+}
+
+// -------------------------------------------------- comparación (qrLogoRecovery)
+const rotate = (m) => m.map((_, r) => m.map((row) => row[m.length - 1 - r]))
+const mirror = (m) => m.map((row) => [...row].reverse())
+function* orientations(m) { let cur = m; for (let i = 0; i < 4; i++) { yield cur; yield mirror(cur); cur = rotate(cur) } }
+const inLogo = (r, c) => r >= LOGO_ROWS[0] && r < LOGO_ROWS[1] && c >= LOGO_COLS[0] && c < LOGO_COLS[1]
+function agreement(a, b) {
+  let same = 0, total = 0
+  for (let r = 0; r < MODULES; r++) for (let c = 0; c < MODULES; c++) {
+    if (inLogo(r, c)) continue
+    total++
+    if (a[r][c] === b[r][c]) same++
+  }
+  return same / total
+}
+
+// Matriz esperada: se genera con la MISMA librería que imprimió las pegatinas.
+async function expectedMatrix(payload) {
+  const res = await fetch('/qr-selftest/expected.json')
+  const all = await res.json()
+  return all[payload]
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('no se pudo cargar ' + src))
+    img.src = src
+  })
+}
+
+function toImageData(img, fraction) {
+  // Mismo recorte que QuickProofPanel: cuadrado central, tope de 900 px.
+  const side = Math.floor(Math.min(img.naturalWidth, img.naturalHeight) * fraction)
+  const out = Math.min(900, side)
+  const canvas = document.createElement('canvas')
+  canvas.width = out; canvas.height = out
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out)
+  return ctx.getImageData(0, 0, out, out)
+}
+
+function classify(found, expected, payloads) {
+  const scored = payloads.map((p) => {
+    let best = 0
+    for (const v of orientations(found)) best = Math.max(best, agreement(v, expected[p]))
+    return { p, best }
+  }).sort((a, b) => b.best - a.best)
+  const [first, second] = scored
+  return { first, second, margin: first.best - second.best,
+           accepted: first.best >= MIN_AGREEMENT && (first.best - second.best) >= MIN_MARGIN }
+}
+
+function addRow(name, detail, tag, cls) {
+  const div = document.createElement('div')
+  div.className = 'row'
+  div.innerHTML = '<div><div class="name">' + name + '</div><div class="detail">' + detail + '</div></div>' +
+                  '<span class="tag ' + cls + '">' + tag + '</span>'
+  $('results').appendChild(div)
+}
+
+function fail(msg) {
+  $('spin').style.display = 'none'
+  setStatus(msg)
+  $('verdict').style.display = 'block'
+  $('verdict').className = 'verdict bad'
+  $('verdict').textContent = 'FALLO: ' + msg
+}
+
+;(async () => {
+  const expected = await (await fetch('/qr-selftest/expected.json')).json()
+  const payloads = Object.keys(expected)
+
+  // manifest.json: [["/qr-selftest/FOTO.jpg", "PAYLOAD_ESPERADO"], ...]
+  try {
+    PHOTOS = await (await fetch('/qr-selftest/manifest.json')).json()
+  } catch {
+    fail('falta /qr-selftest/manifest.json en este despliegue')
+    return
+  }
+  if (!Array.isArray(PHOTOS) || PHOTOS.length === 0) {
+    fail('el manifiesto del autotest está vacío')
+    return
+  }
+
+  setStatus('Cargando el motor de visión (11 MB, sólo la primera vez)…')
+  const t0 = performance.now()
+  const warm = await ask({ type: 'warmup' }, null, 180000)
+  const warmSecs = ((performance.now() - t0) / 1000).toFixed(1)
+
+  if (!warm || warm.ok === false) {
+    fail('el motor de visión no arrancó en este navegador')
+    return
+  }
+  addRow('Motor de visión', 'OpenCV cargado en el worker', warmSecs + ' s', 'ok')
+  setBar(0.15)
+
+  let ok = 0, rejected = 0, wrong = 0
+  for (let i = 0; i < PHOTOS.length; i++) {
+    const [src, truth] = PHOTOS[i]
+    setStatus('Analizando foto ' + (i + 1) + ' de ' + PHOTOS.length + '…')
+
+    let img
+    try {
+      img = await loadImage(src)
+    } catch (e) {
+      addRow(src.split('/').pop(), 'no se pudo cargar la foto', 'ERROR', 'bad')
+      rejected++
+      setBar(0.15 + 0.85 * ((i + 1) / PHOTOS.length))
+      continue
+    }
+
+    // Se prueban los recortes en orden y se para en el primero que convence.
+    let outcome = null
+    let ms = 0
+    for (const fraction of CROPS) {
+      const image = toImageData(img, fraction)
+      const copy = new Uint8ClampedArray(image.data)
+      const t = performance.now()
+      const res = await ask(
+        { type: 'detect', buffer: copy.buffer, width: image.width, height: image.height },
+        [copy.buffer],
+        120000
+      )
+      ms += Math.round(performance.now() - t)
+      const found = res && Array.isArray(res.matrix) ? res.matrix : null
+      if (!found) continue
+      const verdict = classify(found, expected, payloads)
+      if (verdict.accepted) { outcome = Object.assign({ fraction }, verdict); break }
+      if (!outcome) outcome = Object.assign({ fraction }, verdict)
+    }
+
+    const name = src.split('/').pop()
+    if (!outcome) {
+      addRow(name, 'no se localizó el código en ningún recorte · ' + ms + ' ms', 'NO LEÍDA', 'warn')
+      rejected++
+    } else {
+      const detail = (outcome.first.best * 100).toFixed(1) + '% vs ' +
+                     (outcome.second.best * 100).toFixed(1) + '% · margen ' +
+                     (outcome.margin * 100).toFixed(1) + ' pts · recorte ' +
+                     Math.round(outcome.fraction * 100) + '% · ' + ms + ' ms'
+      if (!outcome.accepted) {
+        addRow(name, detail, 'NO LEÍDA', 'warn')
+        rejected++
+      } else if (truth && truth !== outcome.first.p) {
+        addRow(name, 'leyó ' + outcome.first.p + ', era ' + truth + ' · ' + detail, 'ERRÓNEA', 'bad')
+        wrong++
+      } else {
+        addRow(name + ' → ' + outcome.first.p, detail, 'CORRECTA', 'ok')
+        ok++
+      }
+    }
+
+    setBar(0.15 + 0.85 * ((i + 1) / PHOTOS.length))
+  }
+
+  $('spin').style.display = 'none'
+  setStatus('Terminado.')
+  const total = ok + rejected + wrong
+  const v = $('verdict')
+  v.style.display = 'block'
+  if (wrong > 0) {
+    v.className = 'verdict bad'
+    v.textContent = '⛔ ' + wrong + ' lectura(s) ERRÓNEA(S) de ' + total + '. No usar.'
+  } else if (ok === total) {
+    v.className = 'verdict ok'
+    v.textContent = '✅ ' + ok + ' de ' + total + ' correctas. El lector funciona en este móvil.'
+  } else {
+    v.className = 'verdict warn'
+    v.textContent = '⚠️ ' + ok + ' correctas y ' + rejected + ' no leídas de ' + total +
+                    '. Ninguna errónea: en el peor caso pedirá el código de respaldo.'
+  }
+})().catch((e) => fail(e.message))
+</script>
+</body>
+</html>

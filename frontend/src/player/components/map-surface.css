@@ -1,0 +1,148 @@
+.map-surface {
+  position: relative;
+  min-height: 100%;
+  height: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(223, 232, 221, 1), rgba(220, 231, 218, 1));
+  box-shadow: 0 22px 54px rgba(2, 6, 23, 0.14);
+}
+
+.map-surface__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-surface .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font: inherit;
+}
+
+.map-surface .leaflet-control-attribution {
+  display: none !important;
+}
+
+.map-surface .leaflet-tooltip {
+  display: none !important;
+}
+
+@media (max-width: 560px) {
+  .map-surface {
+    min-height: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+/* Custom Player Icon Aura */
+.saga-player-marker {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.3s ease-out, height 0.3s ease-out;
+  will-change: transform;
+}
+
+/* El punto azul del centro se quito: la capa de direccion va con zIndexOffset
+   900, por encima del avatar, asi que ese circulo de 16 px caia justo sobre la
+   foto de cada jugador y la tapaba. La flecha, el cono y el halo se quedan: son
+   los que dicen hacia donde miras. */
+
+.saga-player-marker-aura {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.2) 30%, transparent 60%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.saga-player-marker-cone {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  background: conic-gradient(
+    from 315deg at 50% 50%,
+    rgba(59, 130, 246, 0) 0deg,
+    rgba(59, 130, 246, 0.3) 45deg,
+    rgba(59, 130, 246, 0) 90deg,
+    transparent 90deg
+  );
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.saga-player-marker-arrow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="rgba(59, 130, 246, 0.95)" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 16L2 20Z"/></svg>');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  transform: translate(-50%, -140%);
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6));
+}
+
+/* ---------------------------------------------------------------------------
+   Los globos del mapa, del color de la aplicación.
+
+   Venían blancos —el color por defecto de Leaflet— sobre una aplicación entera
+   oscura: al tocar a un compañero saltaba un rectángulo blanco que deslumbraba
+   de noche y no parecía parte del juego.
+   --------------------------------------------------------------------------- */
+.leaflet-popup-content-wrapper {
+  background: linear-gradient(180deg, rgba(22, 30, 46, .97), rgba(8, 12, 24, .97));
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(2, 6, 23, .5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+/* El pico que apunta al marcador, del mismo color que el globo. */
+.leaflet-popup-tip {
+  background: rgba(8, 12, 24, .97);
+  border: 1px solid rgba(255, 255, 255, .13);
+  box-shadow: none;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: rgba(148, 163, 184, .8);
+  padding: 8px 8px 0 0;
+  font-size: 18px;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #f8fafc;
+  background: transparent;
+}
