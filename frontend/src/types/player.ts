@@ -100,6 +100,17 @@ export interface TeamStatusPayload {
   status: 'ok'
   user: string
   profiles: TeamProfileLiveStatus[]
+  /** Cuántos nodos tiene la misión. */
+  total_nodes?: number
+  /**
+   * Cuántos del grupo han terminado.
+   *
+   * ⚠️ El servidor lo manda desde hace tiempo y **no lo lee nadie**. Está para
+   * que la pantalla final pueda esperar a que acabe el grupo entero, pero esa
+   * parte no llegó a conectarse. O se usa, o se quita del servidor: mandar algo
+   * que nadie mira es la forma de que un día alguien lo crea al revés.
+   */
+  finished_count?: number
 }
 
 export interface PlayerGamePayload {

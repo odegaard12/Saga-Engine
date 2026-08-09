@@ -35,6 +35,8 @@ export type AdvanceResponse = {
   level?: number
   /** Igual que `level`, en las respuestas `behind`. */
   server_level?: number
+  /** Desde qué nodo dijo el móvil que avanzaba. Vuelve en las respuestas `behind`. */
+  level_before?: number
   /** El servidor ya tenía este nodo hecho: no ha vuelto a avanzar. */
   duplicate?: boolean
   reason?: string
