@@ -66,12 +66,13 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game, assets, public
+from backend.app.routers import field_proofs, admin, game, assets, public, shell
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
 app.include_router(assets.router)
 app.include_router(public.router)
+app.include_router(shell.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1276,42 +1277,9 @@ async def saga_no_cache_html(request, call_next):
 
     return apply_security_headers(response, request)
 
-@app.head("/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/", response_class=HTMLResponse)
-async def react_entry():
-    return react_index_or_missing()
-
-@app.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react", response_class=HTMLResponse)
-async def react_admin_shell():
-    return react_index_or_missing()
-
-@app.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react/{path:path}", response_class=HTMLResponse)
-async def react_admin_shell_path(path: str):
-    return react_index_or_missing()
-
-@app.head("/player", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player", response_class=HTMLResponse)
-@app.head("/player/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/", response_class=HTMLResponse)
-@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/{name}", response_class=HTMLResponse)
-async def react_player(request: Request, name: str = ""):
-    # Serve the React app directly. The frontend derives the player from /player/{name}.
-    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
-    response = react_index_or_missing()
-    profile = resolve_known_player_profile(name)
-    if profile:
-        set_player_session_cookie(response, request, profile.get("id") or name)
-    else:
-        clear_player_session_cookie(response, request)
-    return response
-
-@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin")
-async def admin_redirect_to_react():
-    return Response(status_code=307, headers={"Location": "/admin-react"})
+# Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
+# backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo
+# el ensamblado de la aplicacion y los ayudantes que usan los routers.
 
 
 def get_runtime_version_payload():
