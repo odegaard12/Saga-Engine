@@ -35,6 +35,8 @@ export type AdvanceResponse = {
   level?: number
   /** Igual que `level`, en las respuestas `behind`. */
   server_level?: number
+  /** Desde qué nodo dijo el móvil que avanzaba. Vuelve en las respuestas `behind`. */
+  level_before?: number
   /** El servidor ya tenía este nodo hecho: no ha vuelto a avanzar. */
   duplicate?: boolean
   reason?: string
@@ -246,16 +248,32 @@ export async function advancePlayer(
   }
 }
 
+export type HeartbeatResponse = {
+  status: string
+  user: string
+  live_status?: Record<string, unknown>
+  /** La tabla de equipo, si se pidió con `equipo: true`. */
+  team?: TeamStatusPayload
+}
+
 export function sendHeartbeat(args: {
   user: string
   lat?: number
   lon?: number
   gps_status?: string
   source?: string
+  /**
+   * Que el latido traiga de vuelta la tabla de equipo.
+   *
+   * Antes eran dos peticiones cada 5 segundos —«aquí estoy yo» y «dónde están
+   * los demás»— cuando es la misma conversación: 1 440 por hora y por móvil,
+   * tres cuartas partes de todo lo que recibía la Raspberry.
+   */
+  equipo?: boolean
 }) {
   // Se manda cada 5 s: más de 5 s esperando sólo sirve para encadenar latidos
   // colgados. Si se pierde uno, el siguiente lleva la posición buena igual.
-  return postJson('/api/heartbeat', args, 5000)
+  return postJson<HeartbeatResponse>('/api/heartbeat', args, 5000)
 }
 
 export async function fetchFieldProofs(user: string): Promise<FieldProofsPayload> {

@@ -1,0 +1,68 @@
+name: Limpiar releases
+
+# Borra TODAS las releases del repositorio, incluidas las que están en borrador.
+#
+# Los borradores sólo los ve quien tiene permiso: desde fuera, sin
+# identificarse, la API dice que hay cero aunque en la web se vean nueve. Al
+# limpiar la historia se fueron los tags y sus releases publicadas, pero los
+# borradores que había dejado el flujo de publicación se quedaron.
+#
+# Corre aquí y no en tu portátil a propósito: Actions ya trae su propio token
+# con permiso para hacerlo, así que no hace falta crear ninguno personal.
+#
+# Actions -> Limpiar releases -> Run workflow, y escribe BORRAR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribe BORRAR para confirmar. Cualquier otra cosa sólo cuenta.'
+        type: string
+        required: true
+        default: 'contar'
+
+permissions:
+  contents: write
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Contar y borrar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CONFIRMACION: ${{ inputs.confirmacion }}
+        run: |
+          set -euo pipefail
+
+          # --paginate porque con muchas releases una sola página no llega.
+          gh api --paginate "repos/$REPO/releases" \
+            --jq '.[] | [.id, (if .draft then "borrador" else "publicada" end), .name] | @tsv' \
+            > releases.tsv || true
+
+          total=$(wc -l < releases.tsv)
+          echo "Releases en $REPO: $total"
+          echo
+          cut -f2,3 releases.tsv || true
+          echo
+
+          if [ "$total" -eq 0 ]; then
+            echo "No hay nada que borrar."
+            exit 0
+          fi
+
+          if [ "$CONFIRMACION" != "BORRAR" ]; then
+            echo "No se ha borrado nada."
+            echo "Para borrarlas de verdad, vuelve a lanzarlo escribiendo BORRAR."
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r id resto; do
+            [ -n "$id" ] || continue
+            gh api -X DELETE "repos/$REPO/releases/$id" && echo "borrada $id"
+          done < releases.tsv
+
+          echo
+          echo "Quedan: $(gh api --paginate "repos/$REPO/releases" --jq 'length' | paste -sd+ | bc 2>/dev/null || echo 0)"

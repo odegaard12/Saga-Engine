@@ -769,3 +769,161 @@ async def admin_restore_node(request: Request):
         return {"status": "ok", "new_level": new_level, "restored_node_index": new_level}
     
     return {"status": "fail", "reason": "already_at_start"}
+
+
+CONFIRMACION_BORRADO = "BORRAR"
+
+
+def _contar_datos_personales():
+    """Qué hay guardado de personas ahora mismo.
+
+    Se cuenta antes de borrar para que el panel pueda decir exactamente qué se
+    va a perder. Un borrado que no dice lo que se lleva no se usa nunca, o se
+    usa una vez y da un susto.
+    """
+    import main
+    from backend.app.routers import field_proofs as fotos
+
+    fotos.init_field_proof_schema()
+    conn = fotos.connect_runtime_sqlite()
+    try:
+        total_fotos = conn.execute("SELECT COUNT(*) AS n FROM field_proofs").fetchone()["n"]
+    finally:
+        conn.close()
+
+    posiciones = main.load_live_positions()
+    n_posiciones = sum(
+        1 for v in (posiciones or {}).values()
+        if isinstance(v, dict) and (v.get("lat") is not None or v.get("lon") is not None)
+    )
+
+    ficheros = 0
+    base = fotos.resolve_field_proofs_dir()
+    if base.exists():
+        ficheros = sum(1 for f in base.iterdir() if f.is_file())
+
+    return {
+        "fotos": int(total_fotos),
+        "ficheros_de_imagen": ficheros,
+        "posiciones_gps": n_posiciones,
+    }
+
+
+@router.post("/api/admin/datos-personales")
+async def admin_datos_personales(request: Request):
+    """Ver y borrar lo que SAGA guarda de personas.
+
+    SAGA guarda nombres, fotos hechas por los jugadores y rastros GPS: la
+    posición de cada latido y las coordenadas exactas de cada foto con su hora
+    y su nodo. Todo eso se quedaba para siempre y no había forma de limpiarlo.
+
+    Contra los datos de personas, lo que protege de verdad no es el permiso
+    firmado —que cubre hacer la foto, no guardarla dos años— sino no tener lo
+    que no hace falta. Esto es lo que permite pasar una ruta con menores y
+    dejarlo limpio al acabar.
+
+    NO toca la misión: los nodos, la configuración y las fichas de jugador se
+    quedan. Tampoco los tiempos ni el progreso, que son el resultado del juego
+    y no llevan nada que no sea el nombre; para eso está el reseteo de siempre.
+
+    Sin `confirmacion` sólo cuenta, no borra.
+    """
+    import main
+    from backend.app.routers import field_proofs as fotos
+
+    data = await request.json()
+
+    if not main.admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    antes = _contar_datos_personales()
+
+    if _as_str(data.get("confirmacion")).strip() != CONFIRMACION_BORRADO:
+        return {
+            "status": "ok",
+            "accion": "contar",
+            "datos": antes,
+            "para_borrar": (
+                "Repite la llamada con confirmacion='%s'. Se borran las fotos y "
+                "las posiciones GPS. La misión y los tiempos se quedan."
+                % CONFIRMACION_BORRADO
+            ),
+        }
+
+    borrar_fotos = _as_bool(data.get("fotos", True))
+    borrar_posiciones = _as_bool(data.get("posiciones", True))
+
+    imagenes_borradas = 0
+    filas_borradas = 0
+
+    if borrar_fotos:
+        fotos.init_field_proof_schema()
+        conn = fotos.connect_runtime_sqlite()
+        try:
+            nombres = [
+                _as_str(row["image_filename"]).strip()
+                for row in conn.execute("SELECT image_filename FROM field_proofs").fetchall()
+            ]
+            filas_borradas = conn.execute("DELETE FROM field_proofs").rowcount or 0
+            conn.commit()
+        finally:
+            conn.close()
+
+        base = fotos.resolve_field_proofs_dir().resolve()
+        for nombre in nombres:
+            if not nombre:
+                continue
+            destino = (base / nombre).resolve()
+            # Sin salirse del directorio de fotos, por si un nombre viniera con
+            # sorpresa desde una versión antigua.
+            if not str(destino).startswith(str(base)):
+                continue
+            try:
+                if destino.is_file():
+                    destino.unlink()
+                    imagenes_borradas += 1
+            except OSError:
+                pass
+
+        # Y las que quedaran sueltas sin fila que las nombre.
+        if base.exists():
+            for suelto in base.iterdir():
+                try:
+                    if suelto.is_file():
+                        suelto.unlink()
+                        imagenes_borradas += 1
+                except OSError:
+                    pass
+
+    posiciones_borradas = 0
+    if borrar_posiciones:
+        posiciones = main.load_live_positions() or {}
+        posiciones_borradas = len(posiciones)
+        main.save_live_positions({})
+
+    main.append_event(
+        main.EVENT_LOG_DB,
+        {
+            "type": "personal_data_purged",
+            "status": "synced",
+            "source": "admin",
+            "user": "admin",
+            "payload": {
+                "fotos_borradas": filas_borradas,
+                "imagenes_borradas": imagenes_borradas,
+                "posiciones_borradas": posiciones_borradas,
+            },
+        },
+    )
+
+    return {
+        "status": "ok",
+        "accion": "borrar",
+        "antes": antes,
+        "borrado": {
+            "fotos": filas_borradas,
+            "imagenes": imagenes_borradas,
+            "posiciones_gps": posiciones_borradas,
+        },
+        "queda": _contar_datos_personales(),
+    }

@@ -65,9 +65,16 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
     return response
 
 
-@router.get("/api/team/{user}")
-async def get_team_payload(user: str):
+def construir_tabla_de_equipo(user):
+    """La tabla de equipo: dónde va cada jugador y cuánto lleva.
+
+    Vive aparte del endpoint porque el latido la devuelve también. El jugador
+    pedía las dos cosas cada 5 segundos —«aquí estoy yo» y «dónde están los
+    demás»— y son la misma conversación: 1 440 peticiones por hora y por móvil,
+    el 75 % de todo lo que recibía la Raspberry.
+    """
     import main
+
     cfg = main.load_config()
     current_profile = main.get_player_profile(user, cfg)
     current_profile_id = current_profile.get("id") or _as_str(user).strip() or "PLAYER 1"
@@ -103,6 +110,11 @@ async def get_team_payload(user: str):
         "finished_count": sum(1 for item in profiles if item.get("finished")),
         "profiles": profiles
     }
+
+
+@router.get("/api/team/{user}")
+async def get_team_payload(user: str):
+    return construir_tabla_de_equipo(user)
 
 
 @router.post("/api/events/sync")
@@ -282,11 +294,26 @@ async def heartbeat(request: Request):
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
 
-    return {
+    respuesta = {
         "status": "ok",
         "user": profile_id,
         "live_status": main.project_live_profile_status(profile, current)
     }
+
+    # La tabla de equipo viaja de vuelta en el mismo latido.
+    #
+    # El jugador mandaba «aquí estoy» y acto seguido preguntaba «¿dónde están
+    # los demás?», los dos cada 5 segundos: 1 440 peticiones por hora y por
+    # móvil, tres cuartas partes de todo lo que le llegaba a la Raspberry, para
+    # una conversación que es una sola. Al devolverla aquí, el móvil deja de
+    # pedirla aparte.
+    #
+    # Se pide con ?equipo=1 para que un cliente viejo -o el panel- siga
+    # recibiendo exactamente lo de antes.
+    if _as_bool(data.get("equipo")) or request.query_params.get("equipo") == "1":
+        respuesta["team"] = construir_tabla_de_equipo(profile_id)
+
+    return respuesta
 
 
 

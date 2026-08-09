@@ -230,8 +230,13 @@ def decode_field_proof_image(data_url):
 
 
 @router.get("/api/field-proofs")
-async def get_field_proofs(user: str = "", limit: int = 180):
-    from main import resolve_known_player_profile
+async def get_field_proofs(request: Request, user: str = "", limit: int = 180):
+    from main import exigir_ser_del_grupo, resolve_known_player_profile
+
+    # Esto estaba abierto a internet: devolvía las fotos de la ruta con el
+    # nombre de quien las hizo y sus coordenadas exactas, sin pedir nada.
+    exigir_ser_del_grupo(request)
+
     user_text = _as_str(user).strip()
 
     if user_text and not resolve_known_player_profile(user_text):
@@ -244,8 +249,12 @@ async def get_field_proofs(user: str = "", limit: int = 180):
 
 
 @router.get("/api/field-proofs/download")
-async def download_field_proofs(user: str = ""):
-    from main import resolve_known_player_profile
+async def download_field_proofs(request: Request, user: str = ""):
+    from main import exigir_ser_del_grupo, resolve_known_player_profile
+
+    # Un zip con TODAS las fotos de la ruta, que se servía a cualquiera.
+    exigir_ser_del_grupo(request)
+
     user_text = _as_str(user).strip()
 
     if user_text and not resolve_known_player_profile(user_text):
@@ -332,7 +341,13 @@ async def download_field_proofs(user: str = ""):
 
 
 @router.get("/api/field-proofs/{proof_id}/image")
-async def get_field_proof_image(proof_id: str):
+async def get_field_proof_image(request: Request, proof_id: str):
+    from main import exigir_ser_del_grupo
+
+    # La foto en sí. Se descargaba entera desde su URL sin pedir nada, así que
+    # con la lista de arriba en la mano cualquiera se las llevaba todas.
+    exigir_ser_del_grupo(request)
+
     safe_id = _as_str(proof_id).strip()
     if not safe_id:
         raise HTTPException(status_code=404, detail="proof not found")
@@ -368,7 +383,11 @@ async def get_field_proof_image(proof_id: str):
     return FileResponse(
         target,
         media_type=media_type,
-        headers={"Cache-Control": "public, max-age=86400"},
+        # `private`: es una foto de una persona, no un icono. Con `public`,
+        # Cloudflare la guardaba en su borde y podía servirla sin volver a
+        # preguntar aquí, que es justo saltarse la puerta que acabamos de poner.
+        # El service worker del móvil la sigue cacheando igual.
+        headers={"Cache-Control": "private, max-age=86400"},
     )
 
 
