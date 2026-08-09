@@ -66,10 +66,11 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game
+from backend.app.routers import field_proofs, admin, game, assets
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
+app.include_router(assets.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1203,9 +1204,6 @@ def saga_asset_file_response(filename: str, media_type: str):
     return JSONResponse({"status": "error", "message": f"{filename} not found"}, status_code=404)
 
 
-@app.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_svg():
-    return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
 
 
 # Aqui vivian /opencv.js (11 MB), /qr-worker.js y el autotest /qr-selftest.
@@ -1214,28 +1212,6 @@ async def saga_app_icon_svg():
 # son codigos legales y las lee el propio movil: ver frontend/src/player/
 # offline/qrReader.ts y frontend/src/shared/qrCard.tsx.
 
-
-@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_favicon_ico():
-    return saga_asset_file_response("saga-app-icon-192.png", "image/png")
-
-@app.api_route("/manifest.webmanifest", methods=["GET", "HEAD"])
-def react_manifest_webmanifest():
-    if REACT_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    if REACT_PUBLIC_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_PUBLIC_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    return JSONResponse({"status": "missing_manifest"}, status_code=404)
 
 
 def react_index_or_missing():
@@ -1265,89 +1241,10 @@ def react_index_or_missing():
     )
 
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def saga_favicon_ico():
-    dist_file = REACT_DIST_DIR / "saga-app-icon-192.png"
-    public_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    target = dist_file if dist_file.exists() else public_file
+# Los iconos, las marcas y el manifiesto viven ahora en
+# backend/app/routers/assets.py. Aqui habia ademas DOS manejadores de
+# /favicon.ico con el mismo nombre de funcion: solo respondia el primero.
 
-    if not target.exists():
-        return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-    return FileResponse(
-        target,
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-
-
-@app.api_route("/saga-app-icon-180.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_180_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_192_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_512_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-512.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon-precomposed.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_precomposed_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-brand-final.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_brand_final_svg():
-    public_file = APP_DIR / "frontend" / "public" / "saga-brand-final.svg"
-    if public_file.exists():
-        return FileResponse(public_file, media_type="image/svg+xml", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "brand asset not found"}, status_code=404)
-
-
-@app.api_route("/saga-header-mark.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_header_mark_svg():
-    dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
-    public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
-
-    if dist_file.exists():
-        return FileResponse(
-            dist_file,
-            media_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    return FileResponse(
-        public_file,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
 
 @app.middleware("http")
 async def saga_no_cache_html(request, call_next):
