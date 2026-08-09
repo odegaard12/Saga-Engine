@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { marcarInicioQr, pecharQr } from '../qrClock'
 import { createPortal } from 'react-dom'
-import jsQR from 'jsqr'
-import { recognizeSagaSticker } from '../offline/qrLogoRecovery'
-import { warmUpQrEngine } from '../offline/qrWorkerClient'
+import { ENCUADRES, leerQr, recortarCuadrado } from '../offline/qrReader'
 import { collectInventoryItem } from '../offline/inventory'
 import { sounds, haptics } from '../utils/haptics'
 
@@ -13,8 +11,6 @@ interface QuickProofPanelProps {
   hidden: boolean
   openSignal?: number
   showLauncher?: boolean
-  /** Payloads QR de la misión, para reconocer pegatinas tapadas por el logo. */
-  knownPayloads?: string[]
   /** Envía el código de respaldo del nodo con el tiempo de cámara, sin penalización. */
   onRescueCode?: (code: string, timeSpentMs: number) => Promise<boolean> | boolean | void
   /** Código impreso en la pegatina del nodo que toca ahora, si lo tiene. */
@@ -135,13 +131,10 @@ export function QuickProofPanel({
   hidden,
   openSignal = 0,
   showLauncher = true,
-  knownPayloads = [],
   onRescueCode,
   activeQrPayload = null,
   onQrValidated,
 }: QuickProofPanelProps) {
-  const knownPayloadsRef = useRef<string[]>(knownPayloads)
-  knownPayloadsRef.current = knownPayloads
   const activePayloadRef = useRef<string | null>(activeQrPayload)
   activePayloadRef.current = activeQrPayload
   const recoveryBusyRef = useRef(false)
@@ -337,128 +330,52 @@ export function QuickProofPanel({
     return () => window.clearInterval(id)
   }, [scanning])
 
+  /**
+   * Hacer una foto y leer el código.
+   *
+   * Antes esto tenía dos mitades: una lectura normal y, si fallaba, un motor
+   * de visión de 11 MB que reconocía las pegatinas viejas —las del logo
+   * encima— comparando matrices de módulos. Con las pegatinas nuevas eso sobra:
+   * son códigos legales, con su margen blanco y sin nada encima, y los lee
+   * cualquier móvil. Ver offline/qrReader.ts.
+   *
+   * Ya no hace falta parar la cámara para liberar memoria, ni esperar cinco
+   * segundos a un worker: la lectura son milisegundos y la cámara sigue viva,
+   * así que si la primera foto no sale se reintenta al momento.
+   */
   async function captureAndAnalyse() {
     const video = videoRef.current
     if (!video || !streamRef.current || analysing) return
 
-    const vw = video.videoWidth || 1280
-    const vh = video.videoHeight || 720
-
-    /**
-     * Recorte cuadrado centrado a una fracción del fotograma.
-     *
-     * Se prueban varias: medido sobre las fotos reales de campo, la misma
-     * pegatina que a fotograma completo daba 100% de coincidencia NO se
-     * localizaba siquiera recortando al 72%. El encuadre del jugador no va a
-     * ser perfecto, así que se le dan varias oportunidades en vez de una.
-     */
-    function cropSquare(fraction: number): ImageData | null {
-      const side = Math.floor(Math.min(vw, vh) * fraction)
-      const cx = Math.floor((vw - side) / 2)
-      const cy = Math.floor((vh - side) / 2)
-
-      const shot = document.createElement('canvas')
-      // Por encima de ~900 px no se gana lectura y sí se gasta memoria.
-      const work = Math.min(side, 900)
-      shot.width = work
-      shot.height = work
-      const ctx = shot.getContext('2d', { willReadFrequently: true })
-      if (!ctx) return null
-
-      ctx.drawImage(video!, cx, cy, side, side, 0, 0, work, work)
-      return ctx.getImageData(0, 0, work, work)
-    }
-
-    const image = cropSquare(0.72)
-    if (!image) return
-
-    // OJO: los recortes se toman AHORA, con la cámara viva. Más abajo se para
-    // el vídeo para liberar memoria antes de cargar el motor, y a partir de ahí
-    // el elemento <video> ya no entrega fotogramas.
-    const candidates = [cropSquare(1), cropSquare(0.85), image].filter(
-      (candidate): candidate is ImageData => candidate !== null
-    )
-
-    // 1) Lectura normal: si el código es sano, se resuelve aquí sin más.
-    const direct = jsQR(image.data, image.width, image.height, {
-      inversionAttempts: 'attemptBoth',
-    })
-    if (direct?.data) {
-      void saveQrItem(direct.data)
-      return
-    }
-
-    if (knownPayloadsRef.current.length === 0) {
-      setMessage('No se pudo leer el código. Usa el código de respaldo.')
-      haptics.error()
-      return
-    }
-
-    // 2) Pegatinas con el logo encima: hace falta el motor de visión. Se para
-    //    la cámara ANTES de cargarlo; con el vídeo activo el móvil se queda
-    //    sin memoria y la página se cierra.
     setAnalysing(true)
-    setMessage('Analizando la foto... un momento.')
-    stopCamera()
 
     try {
-      /**
-       * Cinco segundos y se vuelve a la camara.
-       *
-       * Si la foto sale movida o la pegatina no se ve entera, el motor de
-       * vision puede tirarse mucho rato buscando algo que no esta, y la
-       * pantalla se quedaba en "Analizando..." sin salida: el jugador no sabia
-       * si esperar o no. Cinco segundos es de sobra para una foto buena.
-       *
-       * El reloj del nodo sigue corriendo mientras tanto, que para eso es la
-       * prueba: no se para por reintentar.
-       */
-      const reconocer = (async () => {
-        // De más ancho a más cerrado: el fotograma completo es el que mejor
-        // funciona cuando la pegatina no queda perfectamente centrada.
-        for (const candidate of candidates) {
-          const encontrado = await recognizeSagaSticker(candidate, knownPayloadsRef.current)
-          if (encontrado) return encontrado
+      // De más abierto a más cerrado: el encuadre del jugador no va a ser
+      // perfecto y conviene darle varias oportunidades a la misma foto.
+      for (const encuadre of ENCUADRES) {
+        const imagen = recortarCuadrado(video, encuadre)
+        if (!imagen) continue
+
+        const lectura = await leerQr(imagen)
+        if (lectura) {
+          void saveQrItem(lectura.texto)
+          return
         }
-        return null
-      })()
-
-      const seAcabouOTempo = Symbol('tarde')
-      const resultado = await Promise.race([
-        reconocer,
-        new Promise<typeof seAcabouOTempo>((resolve) =>
-          window.setTimeout(() => resolve(seAcabouOTempo), 5000)
-        ),
-      ])
-
-      if (resultado === seAcabouOTempo || !resultado) {
-        /**
-         * Foto descartada: una X un segundo y otra vez a la camara.
-         *
-         * Sin la X el jugador no sabia si la foto habia fallado o si la
-         * camara se habia reabierto sola por otra cosa. Un segundo es lo justo
-         * para verla sin que estorbe: la prueba sigue corriendo.
-         */
-        setMessage(
-          resultado === seAcabouOTempo
-            ? 'No se ve bien. Otra foto, más cerca y sin mover.'
-            : 'Esa no es. Otra foto.'
-        )
-        haptics.error()
-        setAnalysing(false)
-        setFotoFallida(true)
-        window.setTimeout(() => {
-          setFotoFallida(false)
-          void startQrScan()
-        }, 1000)
-        return
       }
 
-      setMessage('Pegatina reconocida.')
-      void saveQrItem(resultado as string)
-      return
+      /**
+       * No se ve: una X un segundo y otra vez a la cámara.
+       *
+       * Sin la X el jugador no sabía si la foto había fallado o si la cámara se
+       * había reabierto sola por otra cosa. El reloj del nodo sigue corriendo
+       * mientras tanto, que para eso es la prueba.
+       */
+      setMessage('No se ve bien. Otra foto, más cerca y sin mover.')
+      haptics.error()
+      setFotoFallida(true)
+      window.setTimeout(() => setFotoFallida(false), 1000)
     } catch {
-      setMessage('Fallo al analizar. Escribe el código abajo.')
+      setMessage('Fallo al leer. Escribe el código abajo.')
     } finally {
       setAnalysing(false)
     }
@@ -608,9 +525,6 @@ export function QuickProofPanel({
     setTorchOn(false)
     setMessage('Apunta la cámara a la tarjeta QR de SAGA.')
     setScanning(true)
-    // El motor de visión se calienta en un WORKER aparte: aislado así, aunque
-    // se quede sin memoria muere el worker y la app sigue en pie.
-    warmUpQrEngine()
     /**
      * El reloj de la pegatina se guarda por nodo y NO vuelve a cero.
      *
@@ -655,86 +569,64 @@ export function QuickProofPanel({
         await videoRef.current.play()
       }
 
-      // Bucle de escaneo con presupuesto de CPU.
-      //
-      // Antes esto corría en CADA fotograma y llamaba a jsQR hasta 4 veces
-      // sobre imágenes de 1920x1080. Cada pasada son millones de píxeles: el
-      // hilo principal se quedaba bloqueado y la app se petaba al abrir la
-      // cámara. Ahora se remuestrea a un lienzo pequeño, se limita a ~8
-      // análisis por segundo y las pasadas caras se alternan.
-      const WORK = 480
-      const work = document.createElement('canvas')
-      work.width = WORK
-      work.height = WORK
-      const workCtx = work.getContext('2d', { willReadFrequently: true })
-
-      let lastScanAt = 0
-      let pass = 0
+      /**
+       * Bucle de escaneo con presupuesto de CPU.
+       *
+       * Esto llegó a correr en CADA fotograma llamando al decodificador hasta
+       * cuatro veces sobre imágenes de 1920×1080: millones de píxeles por
+       * pasada, el hilo principal bloqueado y la app cerrándose al abrir la
+       * cámara. Se remuestrea a un lienzo pequeño y se limita a ~8 análisis por
+       * segundo, que de sobra para leer una pegatina.
+       *
+       * La decisión de con qué leer ya no está aquí: la toma qrReader.ts, que
+       * usa el lector nativo del móvil cuando lo hay.
+       */
+      let ultimaLectura = 0
+      let ocupado = false
 
       const scan = () => {
         const video = videoRef.current
 
-        if (!video || !workCtx || !streamRef.current) {
+        if (!video || !streamRef.current) {
           frameRef.current = window.requestAnimationFrame(scan)
           return
         }
 
-        const now = performance.now()
-        if (now - lastScanAt < 120 || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        const ahora = performance.now()
+        if (
+          ocupado ||
+          ahora - ultimaLectura < 120 ||
+          video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+        ) {
           frameRef.current = window.requestAnimationFrame(scan)
           return
         }
-        lastScanAt = now
-        pass += 1
 
-        const vw = video.videoWidth || 640
-        const vh = video.videoHeight || 480
-        const side = Math.floor(Math.min(vw, vh) * 0.72)
-        const cx = Math.floor((vw - side) / 2)
-        const cy = Math.floor((vh - side) / 2)
+        ultimaLectura = ahora
+        ocupado = true
 
-        // Recorte central remuestreado: mucha resolución efectiva sobre el QR
-        // sin procesar el fotograma entero.
-        workCtx.drawImage(video, cx, cy, side, side, 0, 0, WORK, WORK)
-        const image = workCtx.getImageData(0, 0, WORK, WORK)
+        const imagen = recortarCuadrado(video, 0.85)
 
-        let result = jsQR(image.data, image.width, image.height, {
-          inversionAttempts: 'dontInvert',
-        })
-
-        // Pasadas caras alternadas para no saturar el móvil
-        if (!result?.data && pass % 2 === 0) {
-          result = jsQR(image.data, image.width, image.height, {
-            inversionAttempts: 'attemptBoth',
-          })
-        }
-
-        if (!result?.data && pass % 3 === 0) {
-          const data = image.data
-          let sum = 0
-          for (let i = 0; i < data.length; i += 4) {
-            sum += (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000
-          }
-          const mean = sum / (data.length / 4)
-          const boosted = new Uint8ClampedArray(data)
-          for (let i = 0; i < boosted.length; i += 4) {
-            const lum = (boosted[i] * 299 + boosted[i + 1] * 587 + boosted[i + 2] * 114) / 1000
-            const v = lum > mean ? 255 : 0
-            boosted[i] = v
-            boosted[i + 1] = v
-            boosted[i + 2] = v
-          }
-          result = jsQR(boosted, image.width, image.height, {
-            inversionAttempts: 'attemptBoth',
-          })
-        }
-
-        if (result?.data) {
-          void saveQrItem(result.data)
+        if (!imagen) {
+          ocupado = false
+          frameRef.current = window.requestAnimationFrame(scan)
           return
         }
 
-        frameRef.current = window.requestAnimationFrame(scan)
+        void leerQr(imagen)
+          .then((lectura) => {
+            if (lectura) {
+              void saveQrItem(lectura.texto)
+              return
+            }
+            frameRef.current = window.requestAnimationFrame(scan)
+          })
+          .catch(() => {
+            frameRef.current = window.requestAnimationFrame(scan)
+          })
+          .finally(() => {
+            ocupado = false
+          })
       }
 
       frameRef.current = window.requestAnimationFrame(scan)

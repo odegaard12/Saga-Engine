@@ -142,10 +142,9 @@ function collectShellUrls(playerUrl: string): string[] {
     '/manifest.webmanifest',
     '/sw.js',
     '/service-worker.js',
-    // Motor de visión para reconocer las pegatinas QR: sin él, en el monte y
-    // sin cobertura, los nodos QR no se pueden completar con la cámara.
-    '/opencv.js',
-    '/qr-worker.js',
+    // Aquí se precargaban opencv.js (11 MB) y su worker, que era lo más pesado
+    // que tenía que bajarse un jugador antes de salir al monte. El lector nuevo
+    // va dentro del propio paquete de la aplicación.
   ])
 
   document.querySelectorAll<HTMLScriptElement>('script[src]').forEach((script) => {

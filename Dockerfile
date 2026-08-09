@@ -2,16 +2,17 @@
 FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
-# VERSION entra en esta etapa porque vite.config.ts la inyecta en el bundle
-# para versionar la URL del worker de visión. Sin este COPY quedaba en "dev"
-# y el CDN seguía sirviendo el worker antiguo entre despliegues.
+# `ci` y no `install`: instala exactamente lo que dice package-lock.json.
+# Sin fichero de bloqueo, cada construccion traia lo ultimo que hubiera ese dia
+# y dos imagenes de la misma version podian llevar dependencias distintas.
+RUN npm ci --no-audit --no-fund
+# VERSION entra en esta etapa porque vite.config.ts la inyecta en el bundle.
 COPY VERSION /app/VERSION
 COPY frontend/ ./
-# opencv.js (11 MB) no esta en git: se coloca a mano en el despliegue. Sin el,
-# el reconocimiento de las pegatinas QR con logo falla EN SILENCIO en el monte.
-# Mejor que la imagen no llegue a construirse.
-RUN test -s public/opencv.js || (       echo "ERROR: falta frontend/public/opencv.js (motor de vision del QR)." &&       echo "Colocalo antes de construir la imagen." &&       exit 1 )
+# Aqui habia una puerta que abortaba la construccion si faltaba
+# frontend/public/opencv.js: 11 MB que no estaban en git y habia que copiar a
+# mano en cada maquina, asi que un clon limpio del repositorio no compilaba.
+# El motor de vision ya no existe; el lector de QR va dentro del paquete.
 RUN npm run build
 
 # Stage 2: Python Application Server

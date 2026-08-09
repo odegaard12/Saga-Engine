@@ -16,8 +16,6 @@ function shouldBypass(url) {
 function isShellAsset(url) {
   return (
     url.pathname.startsWith('/assets/') ||
-    url.pathname === '/opencv.js' ||
-    url.pathname === '/qr-worker.js' ||
     url.pathname.startsWith('/player/') ||
     url.pathname === '/manifest.webmanifest' ||
     url.pathname === '/sw.js' ||

@@ -1162,98 +1162,11 @@ async def saga_app_icon_svg():
     return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
 
 
-@app.api_route("/opencv.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_opencv_js():
-    """Motor de visión para reconocer las pegatinas QR con el logo encima.
-
-    Son ~11 MB, así que se sirve con caché larga: el service worker lo guarda
-    en el shell offline y el jugador lo necesita en el monte sin cobertura.
-    """
-    for candidate in (REACT_DIST_DIR / "opencv.js", APP_DIR / "frontend" / "public" / "opencv.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                headers={"Cache-Control": "public, max-age=31536000, immutable"},
-            )
-    return JSONResponse({"status": "error", "message": "opencv.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-worker.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_worker_js():
-    """Worker que aisla OpenCV: si se queda sin memoria muere el worker, no la app."""
-    for candidate in (REACT_DIST_DIR / "qr-worker.js", APP_DIR / "frontend" / "public" / "qr-worker.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                # Cloudflare cachea los .js por delante del backend y llegó a
-                # servir el worker antiguo tras desplegar, dejando el arranque
-                # colgado para siempre. Se le pide expresamente que no lo haga;
-                # el cliente además versiona la URL.
-                headers={
-                    "Cache-Control": "no-store, must-revalidate",
-                    "CDN-Cache-Control": "no-store",
-                },
-            )
-    return JSONResponse({"status": "error", "message": "qr-worker.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-selftest", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest():
-    """Autotest del lector de pegatinas sobre fotos reales de campo.
-
-    Sirve para comprobar en un móvil concreto, antes de salir al monte, que el
-    motor de visión arranca y reconoce las pegatinas ya pegadas.
-    """
-    return saga_asset_file_response("qr-selftest.html", "text/html; charset=utf-8")
-
-
-SELFTEST_ASSET_SUFFIXES = (".jpg", ".json")
-
-
-def is_safe_selftest_asset(asset):
-    r"""¿Es un nombre de fichero simple y seguro?
-
-    Se comprueba con operaciones de cadena en vez de una expresión regular.
-    La regex anterior, [A-Za-z0-9_.-]+\.(jpg|json), tenía retroceso
-    polinómico: el punto estaba dentro de la clase de caracteres Y además se
-    exigía literal después, así que una entrada con muchos puntos o guiones
-    disparaba el tiempo de análisis. Como el nombre viene de la URL, eso es
-    una vía de denegación de servicio (CodeQL py/polynomial-redos).
-    """
-    name = str(asset or "")
-
-    if not name or len(name) > 64:
-        return False
-
-    # Nada de rutas: esto sólo sirve nombres sueltos de un directorio fijo.
-    if "/" in name or "\\" in name or ".." in name:
-        return False
-
-    suffix = next((s for s in SELFTEST_ASSET_SUFFIXES if name.endswith(s)), None)
-    if suffix is None:
-        return False
-
-    stem = name[: -len(suffix)]
-    if not stem:
-        return False
-
-    return all(c.isalnum() or c in "_-" for c in stem)
-
-
-@app.api_route("/qr-selftest/{asset}", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest_asset(asset: str):
-    """Fotos de referencia y matrices esperadas del autotest."""
-    if not is_safe_selftest_asset(asset):
-        return JSONResponse({"status": "error", "message": "invalid asset"}, status_code=404)
-
-    media = "image/jpeg" if asset.endswith(".jpg") else "application/json"
-    for base in (REACT_DIST_DIR, APP_DIR / "frontend" / "public"):
-        candidate = base / "qr-selftest" / asset
-        if candidate.exists():
-            return FileResponse(candidate, media_type=media)
-    return JSONResponse({"status": "error", "message": "asset not found"}, status_code=404)
+# Aqui vivian /opencv.js (11 MB), /qr-worker.js y el autotest /qr-selftest.
+# Existian para reconocer las pegatinas que se imprimieron con el logo
+# encima del codigo, ilegibles para cualquier escaner. Las pegatinas nuevas
+# son codigos legales y las lee el propio movil: ver frontend/src/player/
+# offline/qrReader.ts y frontend/src/shared/qrCard.tsx.
 
 
 @app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)

@@ -2703,9 +2703,6 @@ export default function PlayerApp() {
             hidden={false}
             openSignal={quickQrOpenSignal}
             showLauncher={false}
-            knownPayloads={(payload.stages || [])
-              .map((stage) => String((stage as any).qr_payload || '').trim())
-              .filter(Boolean)}
             // El escáner manda sólo el tiempo de cámara; la penalización de 2
             // minutos por usar el respaldo se suma aquí, una sola vez.
             onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
