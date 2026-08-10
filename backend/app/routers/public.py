@@ -6,7 +6,7 @@ Segunda tajada de sacar las rutas de `main.py`. Estas ya no son sólo ficheros
 tocar la partida de nadie: ninguna cambia el estado del juego.
 """
 import base64
-import re
+
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -145,36 +145,30 @@ async def map_tile_proxy(z: int, x: int, y: int):
 
 @router.api_route("/sw.js", methods=["GET", "HEAD"])
 def player_service_worker():
-    """El service worker, con el nombre de su caché reescrito por versión.
+    """El service worker, tal cual está en el disco.
 
-    Si el nombre queda fijo, los jugadores siguen recibiendo el shell antiguo
-    cacheado aunque se haya desplegado otra cosa.
+    Aquí se le reescribía el nombre de la caché para meterle la versión, de
+    modo que cada despliegue estrenase caché. El efecto real era el contrario
+    del buscado: al activarse, el service worker tiraba la caché anterior en el
+    mismo instante en que estrenaba la nueva, vacía. Con red no se nota; sin
+    red, el jugador que abría la aplicación después de un despliegue se quedaba
+    sin nada.
+
+    El nombre es fijo ahora, y los ficheros de la aplicación llevan su hash en
+    la URL, así que dos versiones conviven en la misma caché sin pisarse. No
+    hay nada que reescribir.
     """
     import main
 
     cabeceras = {
+        # Sin caché: es el fichero que decide si el jugador recibe una versión
+        # nueva. Si se cachea, un cambio puede tardar días en llegar.
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         "Service-Worker-Allowed": "/",
     }
 
     for fichero in (main.REACT_DIST_DIR / "sw.js", Path("frontend/public/sw.js")):
-        if not fichero.exists():
-            continue
-
-        try:
-            contenido = fichero.read_text(encoding="utf-8")
-            version = main.get_runtime_version_payload().get("version", "dev")
-            contenido = re.sub(
-                r"saga-player-shell-v[0-9A-Za-z.\-]+",
-                "saga-player-shell-v%s" % version,
-                contenido,
-            )
-            return Response(
-                content=contenido, media_type="application/javascript", headers=cabeceras
-            )
-        except Exception:
-            # Antes que quedarse sin service worker, se sirve tal cual: el
-            # jugador tendrá el shell viejo, pero tendrá aplicación.
+        if fichero.exists():
             return FileResponse(
                 fichero, media_type="application/javascript", headers=cabeceras
             )

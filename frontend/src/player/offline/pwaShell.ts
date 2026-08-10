@@ -1,37 +1,48 @@
 /**
- * Nombre de la caché de la aplicación, atado a la versión del build.
+ * Nombre FIJO, el mismo que usa public/sw.js.
  *
- * Estaba fijo en 'saga-player-shell-v3.9.4' desde hacía muchas versiones, así
- * que la app escribía en una caché con un nombre y el service worker en otro:
- * la vieja no la borraba nadie y se quedaba en el móvil para siempre.
+ * Llevaba la versión del build dentro, así que cada despliegue estrenaba caché
+ * vacía y el service worker tiraba la anterior en el mismo instante. Con red no
+ * se nota. Sin red —abrir la aplicación en el aparcamiento el día después de un
+ * despliegue— dejaba al jugador sin aplicación: la vieja borrada y la nueva sin
+ * llenar. Los ficheros llevan su hash en la URL, así que dos versiones conviven
+ * aquí sin pisarse.
  */
-const PLAYER_SHELL_CACHE = `saga-player-shell-v${__SAGA_VERSION__}`
+const PLAYER_SHELL_CACHE = 'saga-player-shell'
+
+/** La caché de teselas, que va por su cuenta. Igual que en public/sw.js. */
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+
+/** La de fotos de campo y avatares. Igual que en public/sw.js. */
+const FIELD_PROOF_CACHE_NAME = 'saga-field-proof-assets-v3.9.6'
 
 /**
- * Borra las cachés de SAGA que ya no corresponden a esta versión.
+ * Tira las cachés de SAGA que ya no usa nadie.
  *
- * La limpieza del service worker sólo corre cuando se instala uno nuevo, y eso
- * no siempre pasa. Medido en el móvil: quedaban 1161 teselas duplicadas de una
- * versión antigua además de las actuales. En un teléfono justo de espacio, el
+ * La limpieza del service worker sólo corre al instalarse uno nuevo, y eso no
+ * siempre pasa. Medido en el móvil: quedaban 1161 teselas duplicadas de una
+ * versión antigua además de las actuales. En un teléfono justo de espacio el
  * navegador acaba tirando cachés enteras —incluida la buena— y el jugador se
  * queda sin mapa en el monte.
+ *
+ * ⚠️ Las viejas del shell NO se tocan aquí: de mudarlas se encarga el service
+ * worker al activarse, copiando antes de borrar. Borrarlas desde aquí sería
+ * volver al fallo de dejar a alguien sin aplicación.
  */
 export async function purgeStaleCaches(): Promise<number> {
   if (typeof window === 'undefined' || !('caches' in window)) return 0
 
   try {
     const nombres = await caches.keys()
-    const version = String(__SAGA_VERSION__)
 
     const sobran = nombres.filter((nombre) => {
       if (!nombre.startsWith('saga-')) return false
-      // Las teselas del mapa NO llevan la versión de la app: cuestan mucho de
-      // descargar y no cambian entre releases. Sólo se borran las de nombres
-      // antiguos que ya nadie usa.
-      if (nombre.startsWith('saga-route-tile-coverage-')) {
-        return !nombre.endsWith('-v3.9.6')
-      }
-      return !nombre.endsWith(`-v${version}`)
+      if (nombre === PLAYER_SHELL_CACHE) return false
+      if (nombre === TILE_CACHE_NAME) return false
+      if (nombre === FIELD_PROOF_CACHE_NAME) return false
+      // Las del shell con versión las muda el service worker.
+      if (nombre.startsWith('saga-player-shell')) return false
+      return true
     })
 
     await Promise.all(sobran.map((nombre) => caches.delete(nombre)))

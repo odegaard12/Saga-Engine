@@ -1,4 +1,13 @@
-const CACHE_NAME = 'saga-player-shell-v4.0.0'
+/**
+ * Nombre FIJO a propósito.
+ *
+ * Llevaba la versión dentro, y el servidor se la reescribía en cada
+ * despliegue. Eso significaba estrenar caché vacía y tirar la anterior a la
+ * vez: quien abriera la aplicación sin cobertura justo después de un
+ * despliegue se quedaba sin nada. Los ficheros llevan su hash en la URL, así
+ * que dos versiones conviven aquí sin pisarse.
+ */
+const CACHE_NAME = 'saga-player-shell'
 const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
 
@@ -181,20 +190,68 @@ self.addEventListener('install', (event) => {
   )
 })
 
+/**
+ * Al activarse: primero MUDAR, y sólo después tirar la caché vieja.
+ *
+ * Aquí se borraba de golpe cualquier caché de shell que no fuera la de esta
+ * versión. Como el nombre llevaba la versión dentro, cada despliegue estrenaba
+ * caché vacía y tiraba la anterior en el mismo instante. Con red no se nota:
+ * se vuelve a bajar todo. Sin red —un jugador que abre la aplicación en el
+ * aparcamiento el día después de un despliegue— se queda literalmente sin
+ * aplicación, con la anterior ya borrada y la nueva sin llenar.
+ *
+ * Ahora el nombre es fijo. Los ficheros de la aplicación llevan su hash en la
+ * URL, así que dos versiones pueden convivir en la misma caché sin pisarse y
+ * ya no hace falta vaciarla para estrenar. Lo que quede de las cachés viejas se
+ * copia antes de borrarlas, y si la copia falla no se borra nada: es preferible
+ * gastar unos megas de más a dejar a alguien sin juego en el monte.
+ */
+async function mudarCachesViejas() {
+  const nombres = await caches.keys()
+  const viejas = nombres.filter(
+    (n) => n.startsWith('saga-player-shell-v') && n !== CACHE_NAME
+  )
+
+  if (!viejas.length) return
+
+  const destino = await caches.open(CACHE_NAME)
+
+  for (const nombre of viejas) {
+    try {
+      const origen = await caches.open(nombre)
+      const claves = await origen.keys()
+
+      for (const peticion of claves) {
+        // Lo que ya está no se pisa: lo de la caché nueva es más reciente.
+        if (await destino.match(peticion, MATCH_OPTIONS)) continue
+        const respuesta = await origen.match(peticion)
+        if (respuesta) await destino.put(peticion, respuesta)
+      }
+
+      await caches.delete(nombre)
+    } catch {
+      // Se queda donde está. Ocupa, pero no deja a nadie sin aplicación.
+    }
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => {
-              if (key.startsWith('saga-player-shell-') && key !== CACHE_NAME) return true
-              if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
-              if (key.startsWith('saga-field-proof-assets-') && key !== FIELD_PROOF_ASSET_CACHE) return true
-              return false
-            })
-            .map((key) => caches.delete(key))
+    mudarCachesViejas()
+      .catch(() => undefined)
+      .then(() =>
+        caches.keys().then((keys) =>
+          Promise.all(
+            keys
+              .filter((key) => {
+                // Las teselas y las fotos siguen su propio ciclo: cuestan mucho
+                // de descargar y no cambian entre versiones.
+                if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
+                if (key.startsWith('saga-field-proof-assets-') && key !== FIELD_PROOF_ASSET_CACHE) return true
+                return false
+              })
+              .map((key) => caches.delete(key))
+          )
         )
       )
       .then(() => self.clients.claim())
