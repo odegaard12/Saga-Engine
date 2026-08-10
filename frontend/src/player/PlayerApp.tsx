@@ -75,6 +75,7 @@ import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/tea
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
+import { estadoDelGps, margenQueSePerdona, precisionAceptable } from './gps/decisiones'
 import {
   readStoredGpsPosition,
   rememberGpsPosition,
@@ -1136,7 +1137,7 @@ export default function PlayerApp() {
 
     // Mismo criterio que para abrir el nodo: se descuenta el margen del GPS,
     // que en el monte anda por los 30-80 m.
-    const margen = Math.min(Math.max(browserGpsAccuracy ?? 0, 0), 35)
+    const margen = margenQueSePerdona(browserGpsAccuracy)
     const distancia = getDistanceMeters(
       { lat: posicion.lat, lon: posicion.lon },
       { lat, lon }
@@ -1230,29 +1231,33 @@ export default function PlayerApp() {
   const stagePosition = getStagePosition(currentStage)
   const stageRadius = getStageRadius(currentStage)
 
-  // En monte y bajo arbolado la precisión suele ser de 30-80 m. El límite
-  // anterior (45 m como mucho) descartaba la posición entera, y el HUD se
-  // quedaba sin distancia o congelado en el último valor bueno.
-  const gpsAccuracyLimit = Math.max(60, stageRadius ?? 50)
-
-  const gpsAccuracyAcceptable =
-    browserGpsAccuracy === null || browserGpsAccuracy <= gpsAccuracyLimit
+  // Las reglas de GPS viven en gps/decisiones.ts, con pruebas. En el monte se
+  // equivocan de las dos maneras: estrictas, y quien está encima del nodo no
+  // entra; laxas, y se abre desde el coche.
+  const gpsAccuracyAcceptable = precisionAceptable(browserGpsAccuracy, stageRadius)
 
   const hasFreshBrowserGps = Boolean(browserGpsPosition) && browserGpsFresh && gpsAccuracyAcceptable
 
-  const gpsState: PlayerGpsStatus = localDebugPosition
-    ? 'ready'
-    : hasFreshBrowserGps
-      ? 'ready'
-      : browserGpsPosition && !browserGpsFresh
-        ? 'stale'
-        : browserGpsPosition && !gpsAccuracyAcceptable
-          ? 'searching'
-          : browserGpsStatus === 'searching'
-            ? 'searching'
-            : browserGpsStatus === 'error'
-              ? 'error'
-              : 'unavailable'
+  const estadoCalculado = estadoDelGps(
+    {
+      hayPosicion: Boolean(browserGpsPosition),
+      fresca: browserGpsFresh,
+      precision: browserGpsAccuracy,
+      simulada: Boolean(localDebugPosition),
+    },
+    stageRadius
+  )
+
+  // Si no hay posición, lo que sabe el navegador manda: distingue "buscando" de
+  // "denegado", y eso cambia lo que se le dice al jugador.
+  const gpsState: PlayerGpsStatus =
+    estadoCalculado !== 'unavailable'
+      ? estadoCalculado
+      : browserGpsStatus === 'searching'
+        ? 'searching'
+        : browserGpsStatus === 'error'
+          ? 'error'
+          : 'unavailable'
 
   // El HUD y el botón deben mirar la MISMA posición.
   //
@@ -1284,8 +1289,8 @@ export default function PlayerApp() {
 
   // "Si estoy dentro, estoy dentro": se descuenta el margen de error del GPS,
   // porque con 40 m de precisión el punto puede caer fuera del radio estando
-  // el jugador físicamente encima del nodo.
-  const accuracyMargin = Math.min(Math.max(browserGpsAccuracy ?? 0, 0), 35)
+  // el jugador físicamente encima del nodo. Ver gps/decisiones.ts.
+  const accuracyMargin = margenQueSePerdona(browserGpsAccuracy)
 
   const inRange =
     stageRadius !== null && distanceMeters !== null
