@@ -75,6 +75,7 @@ import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/tea
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
+import { usePermisos } from './hooks/usePermisos'
 import { estadoDelGps, margenQueSePerdona, precisionAceptable } from './gps/decisiones'
 import {
   readStoredGpsPosition,
@@ -375,82 +376,13 @@ export default function PlayerApp() {
    * cámara cuando lo que acababas de conceder era el movimiento. Separados, cada
    * uno se pide con su botón y se apaga en cuanto está.
    */
-  const [permisoCamara, setPermisoCamara] = useState<EstadoPermiso>('idle')
-  const [permisoMovimiento, setPermisoMovimiento] = useState<EstadoPermiso>('idle')
-
-  /** El jugador cerró la tarjeta de preparación: no vuelve a salir sola. */
-  const [prepCerrada, setPrepCerrada] = useState(false)
-
-  async function pedirCamara() {
-    setPermisoCamara('pidiendo')
-    try {
-      const stream = await navigator.mediaDevices?.getUserMedia({
-        video: { facingMode: 'environment' },
-      })
-      if (!stream) throw new Error('sin cámara')
-      // Sólo se quería el permiso: la cámara se suelta en el acto.
-      stream.getTracks().forEach((track) => track.stop())
-      setPermisoCamara('ok')
-    } catch {
-      setPermisoCamara('error')
-    }
-  }
-
-  async function pedirMovimiento() {
-    setPermisoMovimiento('pidiendo')
-
-    const Orientation = window.DeviceOrientationEvent as
-      | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> })
-      | undefined
-
-    // Android y escritorio: no hay permiso que pedir, va directo.
-    if (!Orientation || typeof Orientation.requestPermission !== 'function') {
-      setPermisoMovimiento('ok')
-      window.dispatchEvent(new CustomEvent('saga:motion-granted'))
-      return
-    }
-
-    try {
-      const concedido = (await Orientation.requestPermission()) === 'granted'
-      setPermisoMovimiento(concedido ? 'ok' : 'error')
-      if (concedido) {
-        // El mapa engancha la brújula al oír esto.
-        window.dispatchEvent(new CustomEvent('saga:motion-granted'))
-      }
-    } catch {
-      setPermisoMovimiento('error')
-    }
-  }
-
-  // Si ya estaban concedidos de antes, no se molesta al jugador.
-  useEffect(() => {
-    let cancelado = false
-
-    async function comprobar() {
-      const necesitaTocar =
-        typeof (window.DeviceOrientationEvent as { requestPermission?: unknown } | undefined)
-          ?.requestPermission === 'function'
-
-      // Donde no hace falta permiso de movimiento, se da por hecho y se engancha.
-      if (!necesitaTocar && !cancelado) {
-        setPermisoMovimiento('ok')
-        window.dispatchEvent(new CustomEvent('saga:motion-granted'))
-      }
-
-      if (typeof navigator === 'undefined' || !navigator.permissions?.query) return
-      try {
-        const camara = await navigator.permissions.query({ name: 'camera' as PermissionName })
-        if (!cancelado && camara.state === 'granted') setPermisoCamara('ok')
-      } catch {
-        // Navegador sin Permissions API para la cámara: se queda pendiente.
-      }
-    }
-
-    void comprobar()
-    return () => {
-      cancelado = true
-    }
-  }, [])
+  const permisos = usePermisos()
+  const permisoCamara = permisos.camara
+  const permisoMovimiento = permisos.movimiento
+  const prepCerrada = permisos.prepCerrada
+  const setPrepCerrada = permisos.setPrepCerrada
+  const pedirCamara = permisos.pedirCamara
+  const pedirMovimiento = permisos.pedirMovimiento
 
   // El idioma de la misión lo decide el admin en la configuración. Sin esto la
   // app arrancaba siempre en castellano: la historia salía en gallego y los
