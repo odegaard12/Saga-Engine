@@ -1365,6 +1365,26 @@ export default function PlayerApp() {
   void inventoryTick
   const stageItemGate = checkStageItemGate(payload.user, currentStage)
 
+  /**
+   * Desde cuándo se está esperando una posición en este nodo.
+   *
+   * En el monte la precisión suele ser de 30 a 80 metros y a veces no llega
+   * ninguna posición. Sin esto el nodo se queda en "LOCALIZANDO..." para
+   * siempre; con esto, pasado un rato, se puede abrir igual y jugar el reto,
+   * que es la prueba de verdad.
+   */
+  const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
+  const nodoActualId = String(currentStage?.id ?? '')
+  const hayPosicion = unlockDistanceMeters !== null
+
+  if (!nodoActualId || hayPosicion) {
+    esperandoGpsRef.current = null
+  } else if (esperandoGpsRef.current?.nodo !== nodoActualId) {
+    esperandoGpsRef.current = { nodo: nodoActualId, desde: Date.now() }
+  }
+
+  const esperandoGpsDesde = esperandoGpsRef.current?.desde ?? null
+
   const runtime = deriveStageRuntime({
     currentStage,
     finished: payload.finished,
@@ -1381,6 +1401,7 @@ export default function PlayerApp() {
           quantity: stageItemGate.requirement.quantity,
         }
       : null,
+    esperandoGpsMs: esperandoGpsDesde ? Date.now() - esperandoGpsDesde : null,
   })
 
   // Sólo se pide activar el GPS cuando NO hay ninguna posición. Antes bastaba
@@ -1388,7 +1409,13 @@ export default function PlayerApp() {
   // clavado en "Activar GPS" aunque ya se estuviera viendo la distancia: de ahí
   // que a veces quedase raro. El desbloqueo real sigue exigiendo unlockPosition.
   const gpsActionRequired =
-    !payload.finished && Boolean(currentStage) && !unlockPosition && !displayPosition
+    !payload.finished &&
+    Boolean(currentStage) &&
+    !unlockPosition &&
+    !displayPosition &&
+    // Si ya se ha esperado bastante y el nodo se abre igual, pedir GPS otra vez
+    // es dejar al jugador en el mismo callejón por la puerta de al lado.
+    runtime.reason !== 'gps_rendido'
 
   const gpsQualityWarning = Boolean(browserGpsPosition) && browserGpsFresh && !gpsAccuracyAcceptable
 
@@ -2392,7 +2419,11 @@ export default function PlayerApp() {
       // clasificación y el panel de administración se quedaban en el nodo
       // anterior. Se empuja el inventario justo antes de validar.
       if (readStageItemRequirement(currentStage)) {
-        await syncInventoryToServer(payload.user).catch(() => undefined)
+        // Forzada: el servidor va a validar CON esta mochila, así que aquí no
+        // vale el atajo de "no ha cambiado desde la última vez".
+        await syncInventoryToServer(payload.user, fetch, { forzar: true }).catch(
+          () => undefined
+        )
       }
 
       const result = await advancePlayer(
@@ -2510,6 +2541,25 @@ export default function PlayerApp() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown submit error'
 
+      /**
+       * Un fallo del servidor NO es lo mismo que quedarse sin cobertura.
+       *
+       * Todo caía aquí junto —un 500, un pase caducado, o el monte sin
+       * antena— y el jugador leía siempre "sin conexión". Así se escondió un
+       * error de backend durante una partida entera: en el móvil todo iba
+       * bien, y en el servidor no existía. Un fallo invisible cuesta la ruta.
+       *
+       * El avance local sigue igual, que es lo que hace que se pueda seguir
+       * jugando. Lo que cambia es lo que se cuenta y lo que queda apuntado.
+       */
+      const estado = (error as { status?: number } | null)?.status
+      const culpaDelServidor = typeof estado === 'number' && estado >= 500
+      const paseCaducado = estado === 401 || estado === 403
+
+      if (culpaDelServidor || paseCaducado) {
+        console.error('[SAGA] el servidor rechazó el avance', { estado, message })
+      }
+
       try {
         const localResult = await advanceLocalProgress({
           payload,
@@ -2561,12 +2611,31 @@ export default function PlayerApp() {
 
           setMapRefreshToken((value) => value + 1)
 
+          /**
+           * Se dice lo que ha pasado de verdad.
+           *
+           * El nodo queda superado igual en los tres casos —el móvil manda
+           * mientras no haya servidor— pero no es lo mismo estar sin cobertura
+           * que tener un servidor caído: lo primero se arregla caminando, lo
+           * segundo hay que mirarlo. Antes todo decía "sin conexión".
+           */
+          const aviso = culpaDelServidor
+            ? '⚡ Nodo superado. El servidor ha fallado: se guarda aquí y sube cuando responda.'
+            : paseCaducado
+              ? '⚡ Nodo superado. Se ha renovado el pase: sube en la próxima sincronización.'
+              : '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.'
+
           if (payloadLocal.finished) {
             showOverlay('finish')
-            showNotice('¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.', 'success')
+            showNotice(
+              culpaDelServidor
+                ? '🏆 Misión completada. El servidor ha fallado: sube en cuanto responda.'
+                : '¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.',
+              'success'
+            )
           } else {
             showOverlay('node')
-            showNotice('¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.', 'success')
+            showNotice(aviso, culpaDelServidor ? 'warn' : 'success')
           }
 
           return true
@@ -2584,7 +2653,19 @@ export default function PlayerApp() {
           return false
         }
 
-        const snapshot = queueManualCode({
+        /**
+         * Aquí no hay nodo activo, así que no hay nada que completar.
+         *
+         * Se llega cuando el avance falló y la comprobación local dice
+         * `missing_stage`. El código se apunta para que quede constancia, pero
+         * NO avanza a nadie: el servidor sólo hace progresar con un nodo
+         * completado, y no se sabe cuál sería.
+         *
+         * El mensaje decía "se sincronizará cuando vuelva la red", que es
+         * mentira y de las caras: el jugador se queda tranquilo esperando algo
+         * que no va a pasar en vez de volver a intentarlo.
+         */
+        await queueManualCode({
           user: payload.user,
           node_id: currentStage?.id ? String(currentStage.id) : undefined,
           code,
@@ -2592,9 +2673,13 @@ export default function PlayerApp() {
             stage_title: currentStage?.title || '',
             reason: 'advance_sync_failed',
           },
-        })
-        setSubmitError('Sin conexión. El código se ha guardado localmente y se sincronizará cuando vuelva la red.')
-        showNotice(`Código guardado offline (${snapshot.queued_events.length} pendientes). ¡Sigue jugando!`, 'warn')
+        }).catch(() => undefined)
+
+        setSubmitError(
+          'No se ha podido registrar el código y no hay nodo activo donde aplicarlo. ' +
+            'Vuelve a intentarlo; queda anotado para el organizador.'
+        )
+        showNotice('El código no se ha aplicado. Inténtalo otra vez.', 'warn')
         return false
       } catch {
         setSubmitError(message)

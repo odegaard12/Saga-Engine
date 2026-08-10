@@ -105,9 +105,10 @@ def construir_tabla_de_equipo(user):
         "status": "ok",
         "user": current_profile_id,
         "total_nodes": total_nodes,
-        # La pantalla final espera a que acabe el grupo entero, así que
-        # necesita saber cuántos son y cuántos van terminados.
-        "finished_count": sum(1 for item in profiles if item.get("finished")),
+        # Aquí iba `finished_count`. La pantalla final lo cuenta ella misma a
+        # partir de esta misma lista de perfiles, así que era un duplicado que
+        # sólo podía desviarse: dos formas de contar lo mismo acaban dando
+        # números distintos el día que una de las dos cambia.
         "profiles": profiles
     }
 

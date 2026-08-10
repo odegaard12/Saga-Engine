@@ -37,6 +37,7 @@ from backend.app.storage.positions_store import (
     load_live_positions_state,
     save_live_positions_state,
     upsert_live_position as upsert_live_position_state,
+    guardar_posicion_sin_leer_todas,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
@@ -811,7 +812,14 @@ def get_live_position(user):
 
 
 def upsert_live_position_for_user(user, position):
-    return upsert_live_position_state(POSITIONS_DB, user, position)
+    """Guarda dónde está un jugador.
+
+    No devuelve nada: quien llama a esto —el latido, trece móviles cada cinco
+    segundos— no usaba el resultado, y calcularlo obligaba a leer la tabla
+    entera de posiciones cada vez. Para la tabla del grupo está
+    `load_live_positions`.
+    """
+    return guardar_posicion_sin_leer_todas(POSITIONS_DB, user, position)
 
 
 def _hash_corto(texto: str) -> str:
@@ -1175,72 +1183,22 @@ from backend.app.runtime.core_engine import (
     read_stage_item_requirement,
 )
 
-APP_DIR = Path(__file__).resolve().parent
-REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
-REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
-REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
-REACT_MANIFEST_FILE = REACT_DIST_DIR / "manifest.webmanifest"
-REACT_PUBLIC_MANIFEST_FILE = APP_DIR / "frontend" / "public" / "manifest.webmanifest"
+# Las rutas del frontend compilado, el servidor de estaticos y la version
+# viven ahora en backend/app/build_frontend.py. Se reexportan aqui porque
+# los routers todavia las piden por main mientras se rompe el ciclo.
+from backend.app.build_frontend import (  # noqa: E402
+    APP_DIR,
+    REACT_ASSETS_DIR,
+    REACT_DIST_DIR,
+    REACT_INDEX_FILE,
+    REACT_MANIFEST_FILE,
+    REACT_PUBLIC_MANIFEST_FILE,
+    get_runtime_version_payload,
+    react_index_or_missing,
+    saga_asset_file_response,
+)
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
-
-
-def saga_asset_file_response(filename: str, media_type: str):
-    dist_file = REACT_DIST_DIR / filename
-    public_file = APP_DIR / "frontend" / "public" / filename
-
-    if dist_file.exists():
-        return FileResponse(
-            dist_file,
-            media_type=media_type,
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    if public_file.exists():
-        return FileResponse(
-            public_file,
-            media_type=media_type,
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    return JSONResponse({"status": "error", "message": f"{filename} not found"}, status_code=404)
-
-
-
-
-# Aqui vivian /opencv.js (11 MB), /qr-worker.js y el autotest /qr-selftest.
-# Existian para reconocer las pegatinas que se imprimieron con el logo
-# encima del codigo, ilegibles para cualquier escaner. Las pegatinas nuevas
-# son codigos legales y las lee el propio movil: ver frontend/src/player/
-# offline/qrReader.ts y frontend/src/shared/qrCard.tsx.
-
-
-
-def react_index_or_missing():
-    if REACT_INDEX_FILE.exists():
-        return FileResponse(
-            REACT_INDEX_FILE,
-            headers={
-                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                "Pragma": "no-cache",
-                "Expires": "0",
-            }
-        )
-
-    return HTMLResponse(
-        """
-        <!doctype html>
-        <html>
-          <head><title>SAGA React build missing</title></head>
-          <body style="font-family: system-ui; padding: 24px;">
-            <h1>SAGA React build missing</h1>
-            <p>Run <code>cd frontend && npm run build</code> before serving the React player from FastAPI.</p>
-            <p>Build the React frontend with <code>cd frontend && npm run build</code>, then restart FastAPI.</p>
-          </body>
-        </html>
-        """,
-        status_code=503,
-    )
 
 
 # Los iconos, las marcas y el manifiesto viven ahora en
@@ -1280,54 +1238,6 @@ async def saga_no_cache_html(request, call_next):
 # Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
 # backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo
 # el ensamblado de la aplicacion y los ayudantes que usan los routers.
-
-
-def get_runtime_version_payload():
-    # Load build env file written by the deploy script (highest priority after env vars).
-    # Format: KEY=value, one per line.
-    _build_env: dict[str, str] = {}
-    try:
-        env_file = APP_DIR / ".saga_build_env"
-        if env_file.exists():
-            for line in env_file.read_text().splitlines():
-                if "=" in line:
-                    k, _, v = line.partition("=")
-                    _build_env[k.strip()] = v.strip()
-    except Exception:
-        pass
-
-    def _get(key: str, fallback: str = "") -> str:
-        # .saga_build_env takes priority — it is written by the deploy script
-        # and reflects the actual deployed version, overriding any stale
-        # env vars that were baked into the container at creation time.
-        return _build_env.get(key, "").strip() or os.getenv(key, "").strip() or fallback
-
-    version = _get("SAGA_VERSION")
-    if not version:
-        try:
-            version = (APP_DIR / "VERSION").read_text().strip()
-        except Exception:
-            version = "dev"
-
-    commit = _get("SAGA_COMMIT", "unknown")
-    if commit == "unknown":
-        try:
-            import subprocess as _sp
-            r = _sp.run(["git", "rev-parse", "HEAD"], cwd=str(APP_DIR),
-                        capture_output=True, text=True, timeout=2)
-            if r.returncode == 0:
-                commit = r.stdout.strip()
-        except Exception:
-            pass
-
-    built_at = _get("SAGA_BUILD_TIME")
-
-    return {
-        "status": "ok",
-        "version": version or "dev",
-        "commit": commit or "unknown",
-        "built_at": built_at,
-    }
 
 
 # /api/version, /api/config, /api/player-avatar, las teselas del mapa y el

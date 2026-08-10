@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { BloqueoVertical } from './BloqueoVertical'
 
 export type OverlayState = 'activate' | 'node' | 'finish' | null
 
@@ -112,6 +113,10 @@ export function ScreenFrame({
       >
         {children}
       </div>
+
+      {/* Va aquí y no dentro de cada pantalla: así tapa también la cámara, los
+          minijuegos y las hojas, que es justo donde el horizontal descuadra. */}
+      <BloqueoVertical />
     </>
   )
 }
