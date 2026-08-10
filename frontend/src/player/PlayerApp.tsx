@@ -7,7 +7,6 @@ import { collectInventoryItem, hydrateInventoryFromServer } from './offline/inve
 import {
   advancePlayer,
   deleteFieldProof,
-  fetchFieldProofs,
   fetchPlayerGame,
   fetchPublicConfig,
   getFieldProofsDownloadUrl,
@@ -66,19 +65,16 @@ import {
   eFotoPendente,
   encolarBorradoDeFoto,
   flushOfflineEvents,
-  listarFotosPendentes,
   saveOfflinePhoto,
   syncInventoryToServer,
 } from './offline/localFirst'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
 import {
-  cacheFieldProofAssets,
-  cacheFieldProofs,
-  getCachedFieldProofs,
 } from './offline/fieldProofCache'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
 import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
+import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import {
   readStoredGpsPosition,
   rememberGpsPosition,
@@ -329,39 +325,20 @@ export default function PlayerApp() {
   // Nodos cuya historia ya se enseñó. En el nodo final el texto volvía a
   // saltar cada vez que se entraba al mosaico, tapando el juego una y otra vez.
   const introMostradaRef = useRef<Set<string>>(new Set())
-  const [fieldProofs, setFieldProofs] = useState<FieldProof[]>([])
-
   /**
-   * Las fotos que aun no han subido, pintadas como las demas.
+   * Las fotos de campo, con su propio ciclo. Ver hooks/useFotosDeCampo.ts.
    *
-   * Sin esto el jugador hace la foto en el monte, no aparece por ningun lado
-   * hasta que vuelve la cobertura, y da por hecho que ha fallado. Se ven desde
-   * el primer momento -en el mapa y en la galeria- con la marca de que van
-   * camino del servidor.
+   * Eran cuatro estados, un ciclo de 15 s, un escuchador y tres funciones
+   * repartidos por este fichero. Aparte se leen de un vistazo, y de paso se ve
+   * lo que hacen: llevan DOS listas, las que ya subieron y las que van de
+   * camino, y las pintan juntas.
    */
-  const [fotosPendentes, setFotosPendentes] = useState<FieldProof[]>([])
+  const fotos = useFotosDeCampo(user)
+  const fieldProofs = fotos.delServidor
+  const fotosPendentes = fotos.pendientes
+  const repasarFotosPendentes = fotos.repasarPendientes
+  const setFieldProofs = fotos.setDelServidor
 
-  // `refreshFieldProofs` se declara mas abajo; el aviso necesita llamarla y los
-  // hooks tienen que quedar por encima de cualquier return.
-  const refreshFieldProofsRef = useRef<(() => Promise<unknown>) | null>(null)
-
-  const repasarFotosPendentes = useCallback(async (quen: string) => {
-    const gardadas = await listarFotosPendentes(quen).catch(() => [])
-    setFotosPendentes(
-      gardadas.map((f) => ({
-        id: f.id,
-        user: quen,
-        stage_id: f.stage_id,
-        stage_title: f.stage_title,
-        lat: f.lat,
-        lon: f.lon,
-        note: f.note,
-        image_url: f.image_data_url,
-        created_at: Date.now(),
-        status: 'subindo',
-      }))
-    )
-  }, [])
   const [fieldCameraOpen, setFieldCameraOpen] = useState(false)
   const [selectedFieldProofs, setSelectedFieldProofs] = useState<FieldProof[]>([])
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
@@ -868,46 +845,7 @@ export default function PlayerApp() {
   const aplicarEquipoRef = useRef(aplicarEquipo)
   aplicarEquipoRef.current = aplicarEquipo
 
-  useEffect(() => {
-    let cancelled = false
-    let intervalId: number | null = null
-
-    async function loadFieldProofs() {
-      // Con la pantalla apagada no se piden: son fotos que nadie está mirando,
-      // y en una ruta de tres horas eso son 240 peticiones por hora tiradas.
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
-
-      try {
-        const payload = await fetchFieldProofs(user)
-        const proofs = Array.isArray(payload.proofs) ? payload.proofs : []
-
-        cacheFieldProofs(user, proofs)
-        void cacheFieldProofAssets(proofs)
-
-        if (!cancelled) {
-          setFieldProofs(proofs)
-        }
-      } catch {
-        const cached = getCachedFieldProofs(user)
-
-        if (!cancelled) {
-          setFieldProofs(cached.proofs)
-        }
-      }
-    }
-
-    void loadFieldProofs()
-    intervalId = window.setInterval(loadFieldProofs, 15000)
-
-    return () => {
-      cancelled = true
-      if (intervalId !== null) {
-        window.clearInterval(intervalId)
-      }
-    }
-  }, [user])
+  // El ciclo de las fotos vive en useFotosDeCampo.
 
   useEffect(() => {
     if (state.status !== 'ready') return
@@ -1227,22 +1165,7 @@ export default function PlayerApp() {
     setQuickQrOpenSignal(0)
   }, [nivelActual])
 
-  /**
-   * Cuando una foto guardada termina de subir, se quitan las dos listas.
-   *
-   * Se pintaba la copia local mientras esperaba y la del servidor cuando
-   * llegaba: sin este aviso quedaban las dos a la vez, la misma foto contada
-   * dos veces.
-   */
-  useEffect(() => {
-    function aoSubir() {
-      void repasarFotosPendentes(user)
-      void refreshFieldProofsRef.current?.()
-    }
-
-    window.addEventListener('saga:foto-subida', aoSubir)
-    return () => window.removeEventListener('saga:foto-subida', aoSubir)
-  }, [user, repasarFotosPendentes])
+  // El aviso de foto subida lo escucha useFotosDeCampo.
 
   const [qrMs, setQrMs] = useState(0)
 
@@ -1506,7 +1429,7 @@ export default function PlayerApp() {
   const primaryDisabled = gpsActionRequired ? false : !runtime.canEnter
 
   // Lo que ve el jugador: lo del servidor mas lo suyo que va de camino.
-  const todasAsFotos = [...fotosPendentes, ...fieldProofs]
+  const todasAsFotos = fotos.todas
 
   async function refreshPayload() {
     /**
@@ -1589,16 +1512,7 @@ export default function PlayerApp() {
     return reconciliado
   }
 
-  async function refreshFieldProofs() {
-    const nextProofs = await fetchFieldProofs(user)
-    setFieldProofs(Array.isArray(nextProofs.proofs) ? nextProofs.proofs : [])
-    // Las que ya subieron se borran del almacen local, asi que esto las quita
-    // de la lista de pendientes sin tener que emparejarlas con nada.
-    void repasarFotosPendentes(user)
-    return nextProofs
-  }
-
-  refreshFieldProofsRef.current = refreshFieldProofs
+  const refreshFieldProofs = fotos.refrescar
 
   function handleOpenFieldCamera() {
     if (fieldPhotoUploading) {
