@@ -1244,19 +1244,24 @@ async def saga_no_cache_html(request, call_next):
 # service worker viven ahora en backend/app/routers/public.py.
 
 
-def validate_stages(raw_stages):
-    if not isinstance(raw_stages, list):
-        return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
+# Los nodos de la mision -leerlos, validarlos y prepararlos para el jugador-
+# viven ahora en backend/app/runtime/mision.py. Se reexportan porque los routers
+# todavia los piden por main mientras se rompe el import circular.
+from backend.app.runtime.mision import (  # noqa: E402
+    project_stage_for_player,
+    stage_accepts_code,
+    stage_qr_payloads as _stage_qr_payloads,
+    validate_stages,
+)
+from backend.app.runtime import mision as _mision  # noqa: E402
 
-    errors = []
-    for idx, stage in enumerate(raw_stages):
-        if not isinstance(stage, dict):
-            errors.append({"index": idx, "field": "node", "detail": "each node must be an object"})
-            continue
-        errors.extend(validate_stage(stage, idx=idx))
-    return errors
 
 def get_runtime_stages():
+    """Los nodos de la mision, normalizados.
+
+    Se queda aqui porque necesita saber DONDE estan guardados, y eso lo decide
+    la configuracion del despliegue.
+    """
     raw_stages = load_stages(STAGES_DB)
     if not isinstance(raw_stages, list):
         return []
@@ -1264,105 +1269,9 @@ def get_runtime_stages():
 
 
 def stages_revision(runtime_stages=None):
-    """Huella del contenido de la misión: cambia sólo si cambian los nodos.
-
-    El móvil necesita los nodos ENTEROS para jugar sin cobertura: el minijuego,
-    su configuración, la foto del mosaico y el código que acepta. Eso son 200 KB,
-    y el jugador pedía la partida cada 30 segundos, al volver a la aplicación y
-    al recuperar la red. En el monte, con una barra de cobertura, eso es la
-    misma foto bajándose una y otra vez durante tres horas: lento, caro y para
-    nada, porque la misión no cambia mientras se juega.
-
-    Con esta huella el móvil pide lo pesado UNA vez y después sólo pregunta por
-    su estado —nivel, tiempo, mochila—, que son 28 KB. Si la huella cambia
-    (has tocado algo en administración), se vuelve a bajar todo.
-    """
+    """Huella del contenido de la mision. Ver runtime/mision.py."""
     stages = runtime_stages if runtime_stages is not None else get_runtime_stages()
-
-    try:
-        serializado = json.dumps(stages, sort_keys=True, default=str, ensure_ascii=False)
-    except (TypeError, ValueError):
-        # Antes que dar una huella falsa —que dejaría al jugador con nodos
-        # viejos para siempre—, se declara "no sé": el móvil bajará todo.
-        return ""
-
-    return hashlib.sha1(serializado.encode("utf-8")).hexdigest()[:16]
-
-def project_stage_for_player(raw_stage, include_runtime=False):
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
-
-    out = {
-        "id": node["id"],
-        "title": node["presentation"]["title"],
-        "lat": node["location"]["lat"],
-        "lon": node["location"]["lon"],
-        "radius": node["location"]["radius_m"],
-    }
-
-    if include_runtime:
-        out.update({
-            "content": node["presentation"]["content"],
-            "type": node["interaction"]["type"],
-            "config": node["interaction"]["config"],
-            "minigame": build_stage_minigame_runtime(node),
-            "entry": node["entry"],
-            "success": node["success"],
-            "requirements": node.get("requirements", {"items": []}),
-            "messages": node["messages"],
-        })
-
-    out = preserve_physical_stage_fields(node, out)
-    return out
-
-def stage_accepts_code(raw_stage, code, manual=False):
-    """¿Este código supera el nodo?
-
-    `manual` marca que viene de una casilla escrita a mano —el código de
-    respaldo—, no de un minijuego ganado. Importa porque el motor añade a todos
-    los nodos una condición interna con la que los minijuegos avisan de que se
-    han superado. Esa palabra la acepta CUALQUIER nodo: escrita en la casilla de
-    respaldo saltaba el que fuera, sin los dos minutos de penalización y sin
-    jugar. Desde una casilla de texto ya no vale.
-    """
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
-    submitted = _clean_code(code)
-
-    if not submitted:
-        return False
-
-    for condition in node["success"]["conditions"]:
-        if manual and condition.get("kind") == "minigame_ok":
-            continue
-        expected = _clean_code(condition.get("value"))
-        if expected and submitted == expected:
-            return True
-
-    # El código impreso en la pegatina ES el código del nodo. Sin esto,
-    # escanear el QR correcto guardaba el objeto pero no completaba el nodo, y
-    # teclear "SAGA_01" como respaldo tampoco valía.
-    for expected in _stage_qr_payloads(raw_stage):
-        if expected and submitted == expected:
-            return True
-
-    return False
-
-
-def _stage_qr_payloads(raw_stage):
-    """Códigos impresos en las pegatinas QR de un nodo."""
-    if not isinstance(raw_stage, dict):
-        return []
-
-    values = [raw_stage.get("qr_payload")]
-
-    config = raw_stage.get("config")
-    if isinstance(config, dict):
-        values.append(config.get("qr_payload"))
-
-    physical = raw_stage.get("physical_qr")
-    if isinstance(physical, dict):
-        values.append(physical.get("payload"))
-
-    return [_clean_code(value) for value in values if value]
+    return _mision.stages_revision(stages)
 
 
 PLAYER_EVENT_TYPES = {
@@ -1757,111 +1666,50 @@ def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=
 # incluyen en la primera linea de este fichero, asi que estas copias no se
 # ejecutaban nunca. Editarlas no cambiaba nada. Ver tests/test_rutas_duplicadas.py.
 
-def _event_payload(event):
-    payload = event.get("payload") if isinstance(event, dict) else {}
-    return payload if isinstance(payload, dict) else {}
+# La mochila -que objetos lleva un jugador y si le sirven para abrir un nodo-
+# vive ahora en backend/app/runtime/mochila.py. Aqui se quedan las dos funciones
+# que necesitan saber DONDE estan guardados los eventos y el inventario.
+from backend.app.runtime import mochila as _mochila  # noqa: E402
 
-
-def _event_inventory_item_id(event):
-    payload = _event_payload(event)
-    return _as_str(
-        payload.get("inventory_item_id")
-        or payload.get("item_id")
-        or payload.get("id")
-    ).strip()
-
-
-def _event_inventory_quantity(event, default=1):
-    payload = _event_payload(event)
-    for key in ("inventory_quantity", "quantity", "delta"):
-        if key in payload:
-            return _positive_int(payload.get(key), default)
-    return default
+_event_payload = _mochila.payload_del_evento
+_event_inventory_item_id = _mochila.item_del_evento
+_event_inventory_quantity = _mochila.cantidad_del_evento
 
 
 def count_player_inventory_item(user, item_id):
+    """Cuantas unidades de un objeto tiene alguien.
+
+    La mochila no se guarda como una lista: se reconstruye sumando los eventos
+    y contrastandolos con la copia que sube el movil. Los eventos cubren lo que
+    se recoge en un nodo; la copia cubre lo que se forja en la mesa de trabajo,
+    que pasa entero en el telefono y no deja evento. Ver runtime/mochila.py.
+    """
     user_key = _as_str(user).strip()
-    item_key = _as_str(item_id).strip()
-    if not user_key or not item_key:
+    if not user_key:
         return 0
 
-    collected = 0
-    used = 0
-    events = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
+    eventos = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
 
-    for event in events:
-        event_type = _as_str(event.get("type")).strip()
-        payload = _event_payload(event)
-        current_item = _event_inventory_item_id(event)
-
-        if current_item != item_key:
-            continue
-
-        action = _as_str(payload.get("inventory_action")).strip().lower()
-
-        if event_type == "inventory_item_used" or action in {"used", "spent", "consumed"}:
-            used += _event_inventory_quantity(event, 1)
-        elif event_type == "inventory_item_collected":
-            collected += _event_inventory_quantity(event, 1)
-        elif action == "collected":
-            # Los escaneos QR/NFC del jugador llegan como qr_scanned/nfc_url_opened
-            # con inventory_action=collected en el payload.
-            collected += _event_inventory_quantity(event, 1)
-
-    # El snapshot de inventario sincronizado por el jugador cubre los objetos
-    # creados en la mesa de trabajo (crafteo local), que no generan eventos.
-    snapshot_quantity = 0
     try:
-        inventory_state = load_inventory_state()
-        snapshot = inventory_state.get(user_key)
-        if not isinstance(snapshot, dict):
-            snapshot = inventory_state.get(_as_str(user))
-        items = snapshot.get("items") if isinstance(snapshot, dict) else None
-        if isinstance(items, list):
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                if _as_str(item.get("item_id")).strip() != item_key:
-                    continue
-                if _as_str(item.get("state")).strip().lower() == "used":
-                    continue
-                snapshot_quantity += _positive_int(item.get("quantity"), 1)
+        inventario = load_inventory_state()
+        copia = inventario.get(user_key)
+        if not isinstance(copia, dict):
+            copia = inventario.get(_as_str(user))
     except Exception:
-        snapshot_quantity = 0
+        copia = {}
 
-    return max(0, max(collected, snapshot_quantity) - used)
+    return _mochila.contar_objeto(eventos, copia, user_key, item_id)
 
 
 def evaluate_stage_item_requirement(raw_stage, user):
-    requirement = read_stage_item_requirement(raw_stage)
-    if not requirement:
-        return {
-            "required": False,
-            "ok": True,
-            "owned": 0,
-            "required_quantity": 0,
-            "item_id": "",
-            "label": "",
-            "consume": False,
-        }
-
-    # Con .get() en lugar de indexar: un requisito al que le falte una clave
-    # debe poder bloquear el nodo, nunca tumbar /api/advance con un 500. Un
-    # error aquí es invisible para el jugador, porque el cliente cae a su copia
-    # local y sigue como si nada mientras el servidor se queda atrás.
-    item_id = str(requirement.get("item_id") or "").strip()
-    owned = count_player_inventory_item(user, item_id)
-    required_quantity = _positive_int(requirement.get("quantity"), 1)
-
-    return {
-        "required": True,
-        "ok": owned >= required_quantity,
-        "owned": owned,
-        "required_quantity": required_quantity,
-        "item_id": item_id,
-        "label": str(requirement.get("label") or item_id),
-        "consume": bool(requirement.get("consume", False)),
-    }
+    """Puede abrirse este nodo con lo que lleva encima."""
+    requisito = read_stage_item_requirement(raw_stage)
+    tiene = (
+        count_player_inventory_item(user, str(requisito.get("item_id") or "").strip())
+        if requisito
+        else 0
+    )
+    return _mochila.evaluar_requisito(raw_stage, tiene)
 
 
 def append_inventory_item_used_event(user, profile_id, current_node, requirement_status):

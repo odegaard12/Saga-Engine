@@ -219,6 +219,17 @@ export default function PlayerApp() {
    * si un nivel que llega es un avance o un retroceso hace falta el de verdad.
    */
   const payloadRef = useRef<PlayerGamePayload | null>(null)
+
+  /**
+   * Desde cuándo se espera una posición en el nodo actual.
+   *
+   * ⚠️ Va AQUÍ, con el resto de hooks y antes de cualquier `return` temprano.
+   * Estuvo un rato más abajo, después de los returns de carga y error, y eso
+   * hace que el número de hooks cambie entre un render y otro: React tira la
+   * aplicación entera con el error 310 y el jugador ve la pantalla de fallo.
+   * Cualquier hook nuevo va arriba, sin excepción.
+   */
+  const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
   const [showPrologue, setShowPrologue] = useState(false)
 
   /**
@@ -1373,7 +1384,6 @@ export default function PlayerApp() {
    * siempre; con esto, pasado un rato, se puede abrir igual y jugar el reto,
    * que es la prueba de verdad.
    */
-  const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
   const nodoActualId = String(currentStage?.id ?? '')
   const hayPosicion = unlockDistanceMeters !== null
 
