@@ -261,12 +261,46 @@ export async function fetchGamePayloadLocalFirst<T = unknown>(
  * Sync the player's inventory snapshot to the server independently of event queues.
  * This ensures the Admin panel can always see current inventory even when offline events are empty.
  */
+/**
+ * Huella de la mochila ya subida, para no volver a mandar lo mismo.
+ *
+ * Vive en memoria a propósito: tras recargar la aplicación se sube una vez y
+ * ya, que es barato y evita depender de que el servidor y el móvil coincidan
+ * en algo guardado.
+ */
+const mochilaYaSubida = new Map<string, string>()
+
+function huellaDeLaMochila(snapshot: unknown): string {
+  try {
+    return JSON.stringify(snapshot)
+  } catch {
+    // Si no se puede serializar, se manda: más vale de sobra que de menos.
+    return `sin-huella-${Date.now()}`
+  }
+}
+
+/**
+ * Sube la mochila, y sólo si ha cambiado.
+ *
+ * Esto salía en CADA vuelta del ciclo de sincronización —cada 30 segundos— con
+ * la mochila entera dentro, cambiara o no. Una mochila no cambia sola: cambia
+ * al recoger un objeto o al forjar, y eso pasa un puñado de veces en toda la
+ * ruta. El resto eran 120 peticiones por hora y por móvil para decirle al
+ * servidor exactamente lo que ya sabía.
+ *
+ * `forzar` lo usa el avance de un nodo que exige objeto: ahí sí hay que
+ * asegurarse de que el servidor tiene la última, porque valida con ella.
+ */
 export async function syncInventoryToServer(
   user: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  { forzar = false }: { forzar?: boolean } = {}
 ): Promise<void> {
   const inventorySnapshot = loadInventorySnapshot(user)
   if (!inventorySnapshot || !inventorySnapshot.items?.length) return
+
+  const huella = huellaDeLaMochila(inventorySnapshot)
+  if (!forzar && mochilaYaSubida.get(user) === huella) return
 
   // Un nodo que exige objeto espera a que esto termine antes de validar, así
   // que si se cuelga se cuelga el avance. Se corta pronto: la mochila vuelve a
@@ -275,14 +309,19 @@ export async function syncInventoryToServer(
   const corte = setTimeout(() => abortar.abort(), 6000)
 
   try {
-    await fetchImpl('/api/events/sync', {
+    const respuesta = await fetchImpl('/api/events/sync', {
       method: 'POST',
       signal: abortar.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user, events: [], inventory_snapshot: inventorySnapshot }),
     })
+
+    // Sólo se da por subida si el servidor dijo que sí. Con un fallo se
+    // reintenta en la siguiente vuelta, que es justo lo que hace falta cuando
+    // se forja algo sin cobertura.
+    if (respuesta.ok) mochilaYaSubida.set(user, huella)
   } catch {
-    // Silent - this is a best-effort background sync
+    // Silencio a propósito: es de fondo y se reintenta.
   } finally {
     clearTimeout(corte)
   }

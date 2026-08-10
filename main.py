@@ -37,6 +37,7 @@ from backend.app.storage.positions_store import (
     load_live_positions_state,
     save_live_positions_state,
     upsert_live_position as upsert_live_position_state,
+    guardar_posicion_sin_leer_todas,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
@@ -811,7 +812,14 @@ def get_live_position(user):
 
 
 def upsert_live_position_for_user(user, position):
-    return upsert_live_position_state(POSITIONS_DB, user, position)
+    """Guarda dónde está un jugador.
+
+    No devuelve nada: quien llama a esto —el latido, trece móviles cada cinco
+    segundos— no usaba el resultado, y calcularlo obligaba a leer la tabla
+    entera de posiciones cada vez. Para la tabla del grupo está
+    `load_live_positions`.
+    """
+    return guardar_posicion_sin_leer_todas(POSITIONS_DB, user, position)
 
 
 def _hash_corto(texto: str) -> str:
