@@ -1,4 +1,5 @@
-import { createClientEventId, queueOfflineEvent, type SagaOfflineSnapshot } from './localFirst'
+import { createClientEventId } from './localFirst'
+import { queueOfflineEvent } from './missionPack'
 
 export type PhysicalEventSource = 'qr' | 'nfc' | 'manual'
 
@@ -64,37 +65,45 @@ function physicalPayload(input: QueuePhysicalEventInput): Record<string, unknown
   }
 }
 
-export function queuePhysicalEvent(input: QueuePhysicalEventInput): SagaOfflineSnapshot {
+/**
+ * Encola un evento físico —escaneo, NFC, código a mano— en LA cola.
+ *
+ * Antes había dos: ésta escribía en `localStorage` y los nodos completados en
+ * IndexedDB, y las dos se vaciaban contra el mismo endpoint. Dos almacenes
+ * significan dos verdades sobre lo que falta por subir, y de ahí salieron los
+ * nodos que se repetían. Ahora todo va al mismo sitio, en orden.
+ *
+ * Es asíncrono porque IndexedDB lo es. Quien encola no necesita esperar: puede
+ * soltar la promesa y seguir.
+ */
+export function queuePhysicalEvent(input: QueuePhysicalEventInput) {
   const user = cleanText(input.user, 120)
 
   if (!user) {
     throw new Error('user is required to queue a physical event')
   }
 
-  return queueOfflineEvent(user, {
-    client_event_id: createClientEventId(`physical_${input.source}`),
+  return queueOfflineEvent({
+    user,
     type: eventTypeForSource(input.source),
     source: input.source,
     node_id: cleanText(input.node_id, 120),
-    payload: physicalPayload(input),
+    payload: {
+      ...physicalPayload(input),
+      client_event_id: createClientEventId(`physical_${input.source}`),
+    },
   })
 }
 
-export function queueQrScan(input: QueueQrScanInput): SagaOfflineSnapshot {
-  return queuePhysicalEvent({
-    ...input,
-    source: 'qr',
-  })
+export function queueQrScan(input: QueueQrScanInput) {
+  return queuePhysicalEvent({ ...input, source: 'qr' })
 }
 
-export function queueNfcOpen(input: QueueNfcOpenInput): SagaOfflineSnapshot {
-  return queuePhysicalEvent({
-    ...input,
-    source: 'nfc',
-  })
+export function queueNfcOpen(input: QueueNfcOpenInput) {
+  return queuePhysicalEvent({ ...input, source: 'nfc' })
 }
 
-export function queueManualCode(input: QueueManualCodeInput): SagaOfflineSnapshot {
+export function queueManualCode(input: QueueManualCodeInput) {
   return queuePhysicalEvent({
     ...input,
     source: 'manual',

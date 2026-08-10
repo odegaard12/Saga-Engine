@@ -185,7 +185,18 @@ function eventToSyncPayload(event: OfflineEvent) {
 
 export async function getQueuedOfflineEvents(user: string) {
   const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE)
-  return events.filter((event) => event.user === user && event.status !== 'synced')
+
+  // Ordenados por cuándo se crearon, siempre.
+  //
+  // El servidor aplica los avances en el orden en que le llegan, así que el
+  // orden aquí ES el progreso del jugador. IndexedDB devuelve por clave, y la
+  // clave empieza por usuario y TIPO antes que por la fecha: mientras la cola
+  // sólo llevaba nodos completados daba igual, pero al meter en ella también
+  // los escaneos y la mochila, un evento posterior de otro tipo puede colarse
+  // delante. Ordenar por fecha lo deja como pasó de verdad.
+  return events
+    .filter((event) => event.user === user && event.status !== 'synced')
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
 }
 
 /**
@@ -200,6 +211,12 @@ export async function getQueuedOfflineEvents(user: string) {
 export async function contarAvancesPendentes(user: string): Promise<number> {
   const events = await getQueuedOfflineEvents(user).catch(() => [])
   return events.filter((event) => event.type === 'node_completed').length
+}
+
+/** Todo lo que falta por subir, del tipo que sea. Es lo que se le enseña. */
+export async function contarPendientes(user: string): Promise<number> {
+  const events = await getQueuedOfflineEvents(user).catch(() => [])
+  return events.length
 }
 
 /** Tira la cola entera de este jugador. Se usa al resetearlo desde administración. */
@@ -243,18 +260,50 @@ function esRechazoDefinitivo(motivo: string | undefined): boolean {
   return RECHAZOS_DEFINITIVOS.some((rechazo) => limpio.includes(rechazo))
 }
 
+/**
+ * Una sincronización cada vez, y con espera creciente tras fallar.
+ *
+ * Esto lo llaman el ciclo de refresco, el reintento del avance y la vuelta de
+ * la cobertura, y a veces los tres a la vez. Sin candado se mandaban colas
+ * solapadas al mismo endpoint y el servidor aplicaba los avances en el orden en
+ * que llegaran: el nivel resultante dependía de cuál contestase antes.
+ *
+ * Y con cobertura intermitente —la del monte— reintentar cada ciclo contra una
+ * red que no va es gastar batería y llenar el registro. Tras un fallo se espera,
+ * doblando hasta un minuto.
+ */
+let sincronizando = false
+let esperaTrasFallo = 0
+let siguienteIntento = 0
+
+const ESPERA_MINIMA_MS = 3_000
+const ESPERA_MAXIMA_MS = 60_000
+
 export async function syncPendingOfflineEvents(user: string) {
+  const nada = { status: 'ok' as const, attempted: 0, synced: 0, failed: 0 }
+
+  if (sincronizando) return nada
+  if (Date.now() < siguienteIntento) return nada
+
   const events = await getQueuedOfflineEvents(user)
   const syncable = events.filter((event) => event.status === 'pending' || event.status === 'failed')
 
   if (syncable.length === 0) {
-    return {
-      status: 'ok' as const,
-      attempted: 0,
-      synced: 0,
-      failed: 0,
-    }
+    // Sin nada que mandar no hay por qué seguir castigando la espera.
+    esperaTrasFallo = 0
+    return nada
   }
+
+  sincronizando = true
+
+  try {
+    return await enviarCola(user, syncable)
+  } finally {
+    sincronizando = false
+  }
+}
+
+async function enviarCola(user: string, syncable: OfflineEvent[]) {
 
   const syncing = await Promise.all(
     syncable.map((event) =>
@@ -340,6 +389,10 @@ export async function syncPendingOfflineEvents(user: string) {
       })
     )
 
+    // Llegó y contestó: se vuelve a intentar en cuanto haga falta.
+    esperaTrasFallo = 0
+    siguienteIntento = 0
+
     return {
       status: failedCount ? ('error' as const) : ('ok' as const),
       attempted: syncing.length,
@@ -348,6 +401,12 @@ export async function syncPendingOfflineEvents(user: string) {
       message: failedCount ? `${failedCount} offline event(s) need review.` : undefined,
     }
   } catch (error) {
+    // No llegó: se espera antes de volver a intentarlo, doblando hasta un
+    // minuto. Con la cobertura del monte, insistir cada ciclo contra una red
+    // que no va sólo gasta batería.
+    esperaTrasFallo = esperaTrasFallo ? Math.min(esperaTrasFallo * 2, ESPERA_MAXIMA_MS) : ESPERA_MINIMA_MS
+    siguienteIntento = Date.now() + esperaTrasFallo
+
     const message = error instanceof Error ? error.message : 'Unknown sync error'
 
     await Promise.all(

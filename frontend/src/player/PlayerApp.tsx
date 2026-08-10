@@ -52,6 +52,7 @@ import {
   advanceLocalProgress,
   borrarColaOffline,
   contarAvancesPendentes,
+  contarPendientes,
   getOfflineMissionSummary,
   getStoredMissionPack,
   saveMissionPack,
@@ -2584,7 +2585,7 @@ export default function PlayerApp() {
           return false
         }
 
-        const snapshot = queueManualCode({
+        await queueManualCode({
           user: payload.user,
           node_id: currentStage?.id ? String(currentStage.id) : undefined,
           code,
@@ -2592,9 +2593,12 @@ export default function PlayerApp() {
             stage_title: currentStage?.title || '',
             reason: 'advance_sync_failed',
           },
-        })
+        }).catch(() => undefined)
+
+        const pendientes = await contarPendientes(payload.user).catch(() => 0)
+
         setSubmitError('Sin conexión. El código se ha guardado localmente y se sincronizará cuando vuelva la red.')
-        showNotice(`Código guardado offline (${snapshot.queued_events.length} pendientes). ¡Sigue jugando!`, 'warn')
+        showNotice(`Código guardado offline (${pendientes} pendientes). ¡Sigue jugando!`, 'warn')
         return false
       } catch {
         setSubmitError(message)
