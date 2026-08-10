@@ -3,6 +3,8 @@ import type { PlayerStage } from '../../types/player'
 import { FamilyRuntimeHost, resolveStageMinigame } from '../minigames/core'
 import { renderMarkdown } from '../utils/formatMarkdown'
 import { abrirNodo, tiempoDelNodo } from '../nodeClock'
+import { useAntiTrampas } from '../hooks/useAntiTrampas'
+import { queuePhysicalEvent } from '../offline/physicalEvents'
 
 interface InteractionSheetProps {
   open: boolean
@@ -129,6 +131,18 @@ export function InteractionSheet({
   const compactGameMode = shouldRenderFamilyRuntime
 
   const compactLine = getCompactLine(currentStage)
+
+  /**
+   * Salir de la aplicación en medio de un reto tiene consecuencia.
+   *
+   * Sólo se vigila mientras hay un minijuego delante: en un coleccionable o en
+   * un nodo de cámara no hay nada que memorizar fuera, y penalizar por mirar el
+   * mapa sería castigar el uso normal.
+   */
+  const antiTrampas = useAntiTrampas(
+    shouldRenderFamilyRuntime && !isStageCollectible(currentStage),
+    String(stageId ?? '')
+  )
 
   const [activeMs, setActiveMs] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
@@ -269,7 +283,32 @@ export function InteractionSheet({
         ? Math.max(0, Math.round(tempoDaPartidaMs))
         : activeMs
 
-    await onSubmitCode('OK', tempo, Math.max(0, Math.round(penaltyMs || 0)))
+    // La penalización del reto y la de haber salido de la aplicación van
+    // juntas: las dos son tiempo que se suma al total, no al reloj del nodo.
+    const castigo =
+      Math.max(0, Math.round(penaltyMs || 0)) + antiTrampas.penalizacionMs
+
+    /**
+     * Que quede constancia de las salidas.
+     *
+     * En el marcador sólo se ve tiempo de más, y eso no distingue a quien tardó
+     * de quien salió cuatro veces. Va como evento aparte para que en el panel se
+     * pueda mirar quién, en qué nodo y cuántas veces.
+     */
+    if (antiTrampas.salidas > 0) {
+      void queuePhysicalEvent({
+        user,
+        source: 'manual',
+        node_id: String(currentStage?.id ?? ''),
+        payload: {
+          salidas_da_aplicacion: antiTrampas.salidas,
+          penalizacion_ms: antiTrampas.penalizacionMs,
+          stage_title: currentStage?.title || '',
+        },
+      }).catch(() => undefined)
+    }
+
+    await onSubmitCode('OK', tempo, castigo)
   }
 
   async function handleSheetFallbackSubmit(e: React.FormEvent) {
@@ -497,15 +536,30 @@ export function InteractionSheet({
               </button>
             </div>
           ) : shouldRenderFamilyRuntime && resolvedRuntime ? (
-            <FamilyRuntimeHost
-              resolved={resolvedRuntime}
-              stage={currentStage}
-              helperText={helperText}
-              submitting={submitting}
-              onWin={handleNativeWin}
-              onComezar={comezarOReloxo}
-              appPosition={appPosition}
-            />
+            <>
+              {antiTrampas.acabaDeVolver ? (
+                <div style={avisoAntiTrampas}>
+                  Saíches da aplicación: o reto empeza de novo e súmanse 30 s.
+                </div>
+              ) : null}
+
+              {/*
+                La `key` cambia en cada salida, así que React rearma el juego
+                entero: patrón nuevo, piezas revueltas otra vez. Es la parte que
+                de verdad quita la ventaja de haber mirado fuera; el tiempo es
+                sólo el recargo.
+              */}
+              <FamilyRuntimeHost
+                key={`reto-${stageId}-${antiTrampas.reinicios}`}
+                resolved={resolvedRuntime}
+                stage={currentStage}
+                helperText={helperText}
+                submitting={submitting}
+                onWin={handleNativeWin}
+                onComezar={comezarOReloxo}
+                appPosition={appPosition}
+              />
+            </>
           ) : (
             <section style={bridgeCard}>
               <div style={bridgeText}>
@@ -976,4 +1030,16 @@ const completionText: CSSProperties = {
   lineHeight: 1.5,
   letterSpacing: '0.05em',
   animation: 'sagaIconFloat 3s ease-in-out infinite',
+}
+
+const avisoAntiTrampas: CSSProperties = {
+  background: 'rgba(216, 122, 42, 0.16)',
+  border: '1px solid rgba(216, 122, 42, 0.45)',
+  color: '#ffd7ab',
+  borderRadius: 10,
+  padding: '8px 12px',
+  fontSize: 13,
+  fontWeight: 600,
+  marginBottom: 10,
+  textAlign: 'center',
 }
