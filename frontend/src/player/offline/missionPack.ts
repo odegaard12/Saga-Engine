@@ -1,6 +1,7 @@
 import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
 import { markInventoryItemUsed } from './inventory'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
+import { configDelNodo } from '../configDelNodo'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -545,12 +546,9 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
+/** La configuración del nodo. Ver player/configDelNodo.ts para el porqué. */
 function readStageConfig(stage: PlayerStage | null): Record<string, unknown> {
-  const raw = asRecord(stage)
-  return {
-    ...asRecord(raw.config),
-    ...asRecord(asRecord(raw.minigame).config),
-  }
+  return configDelNodo(stage)
 }
 
 /**
