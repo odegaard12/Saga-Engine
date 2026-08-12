@@ -1,0 +1,320 @@
+/**
+ * Nombre FIJO a propósito.
+ *
+ * Llevaba la versión dentro, y el servidor se la reescribía en cada
+ * despliegue. Eso significaba estrenar caché vacía y tirar la anterior a la
+ * vez: quien abriera la aplicación sin cobertura justo después de un
+ * despliegue se quedaba sin nada. Los ficheros llevan su hash en la URL, así
+ * que dos versiones conviven aquí sin pisarse.
+ */
+const CACHE_NAME = 'saga-player-shell'
+const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
+
+const DEFAULT_SHELL_URL = '/'
+const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
+
+function shouldBypass(url) {
+  return (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/admin') ||
+    url.pathname.startsWith('/admin-react')
+  )
+}
+
+function isShellAsset(url) {
+  return (
+    url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/player/') ||
+    url.pathname === '/manifest.webmanifest' ||
+    url.pathname === '/sw.js' ||
+    url.pathname === '/service-worker.js' ||
+    url.pathname === '/saga-app-icon.svg' ||
+    url.pathname === '/apple-touch-icon-precomposed.png' ||
+    url.pathname === '/apple-touch-icon.png' ||
+    url.pathname === '/saga-app-icon-180.png' ||
+    url.pathname === '/saga-app-icon-192.png' ||
+    url.pathname === '/saga-app-icon-512.png' ||
+    url.pathname === '/saga-header-mark.svg' ||
+    url.pathname === '/favicon.ico'
+  )
+}
+
+async function putCache(request, response) {
+  if (!response || (!response.ok && response.type !== 'opaque')) return response
+  const cache = await caches.open(CACHE_NAME)
+  await cache.put(request, response.clone())
+  return response
+}
+
+const MATCH_OPTIONS = { ignoreSearch: true, ignoreMethod: true, ignoreVary: true };
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request, MATCH_OPTIONS)
+  if (cached) return cached
+  const response = await fetch(request)
+  await putCache(request, response)
+  return response
+}
+
+async function putCustomCache(cacheName, request, response) {
+  if (!response || (!response.ok && response.type !== 'opaque')) return response
+  const cache = await caches.open(cacheName)
+  await cache.put(request, response.clone())
+  return response
+}
+
+async function customCacheFirst(cacheName, request) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request, MATCH_OPTIONS)
+  if (cached) {
+    console.log(`[SW] Cache HIT [${cacheName}]:`, request.url)
+    return cached
+  }
+  console.log(`[SW] Cache MISS [${cacheName}]:`, request.url)
+  const response = await fetch(request)
+  await putCustomCache(cacheName, request, response)
+  return response
+}
+
+async function fetchWithTimeout(request, timeoutMs = 2500) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(request, { signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+async function networkFirst(request) {
+  try {
+    const response = await fetchWithTimeout(request)
+
+    if (esCaidaDelServidor(response)) {
+      const guardada = await caches.match(request, MATCH_OPTIONS)
+      if (guardada) return guardada
+      return response
+    }
+
+    await putCache(request, response)
+    return response
+  } catch {
+    return (
+      (await caches.match(request, MATCH_OPTIONS)) ||
+      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
+      new Response('SAGA offline shell is not cached yet. Open SAGA online once and press Prepare offline.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
+    )
+  }
+}
+
+/**
+ * Un 5xx del servidor cuenta como "no hay servidor".
+ *
+ * Con la Raspberry caída, Cloudflare devuelve su propia página de error 502.
+ * Para el service worker eso es una respuesta correcta —la petición no falla—,
+ * así que se la pasaba tal cual al jugador: en vez del juego descargado salía
+ * "Bad gateway". Justo el caso para el que existe el modo offline.
+ */
+function esCaidaDelServidor(response) {
+  return Boolean(response) && response.status >= 500 && response.status <= 599
+}
+
+async function navigationNetworkFirst(request) {
+  try {
+    const response = await fetchWithTimeout(
+      request,
+      5000,
+    )
+
+    if (esCaidaDelServidor(response)) {
+      const guardada =
+        (await caches.match(request, MATCH_OPTIONS)) ||
+        (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS))
+      if (guardada) return guardada
+      return response
+    }
+
+    await putCache(request, response)
+    return response
+  } catch {
+    return (
+      (await caches.match(request, MATCH_OPTIONS)) ||
+      (await caches.match(DEFAULT_SHELL_URL, MATCH_OPTIONS)) ||
+      new Response(
+        'SAGA offline shell is not cached yet.',
+        {
+          status: 503,
+          headers: {
+            'Content-Type':
+              'text/plain; charset=utf-8',
+          },
+        },
+      )
+    )
+  }
+}
+
+async function cacheUrls(urls) {
+  const cache = await caches.open(CACHE_NAME)
+
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const request = new Request(url, { method: 'GET', credentials: 'same-origin' })
+        const parsed = new URL(request.url)
+        if (parsed.origin !== self.location.origin) return
+        if (shouldBypass(parsed)) return
+
+        const response = await fetch(request)
+        if (response.ok) {
+          await cache.put(request, response.clone())
+        }
+      } catch {
+        // Best-effort cache warmup.
+      }
+    })
+  )
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => Promise.all(CORE_URLS.map((url) => cache.add(url).catch(() => undefined))))
+      .then(() => self.skipWaiting())
+  )
+})
+
+/**
+ * Al activarse: primero MUDAR, y sólo después tirar la caché vieja.
+ *
+ * Aquí se borraba de golpe cualquier caché de shell que no fuera la de esta
+ * versión. Como el nombre llevaba la versión dentro, cada despliegue estrenaba
+ * caché vacía y tiraba la anterior en el mismo instante. Con red no se nota:
+ * se vuelve a bajar todo. Sin red —un jugador que abre la aplicación en el
+ * aparcamiento el día después de un despliegue— se queda literalmente sin
+ * aplicación, con la anterior ya borrada y la nueva sin llenar.
+ *
+ * Ahora el nombre es fijo. Los ficheros de la aplicación llevan su hash en la
+ * URL, así que dos versiones pueden convivir en la misma caché sin pisarse y
+ * ya no hace falta vaciarla para estrenar. Lo que quede de las cachés viejas se
+ * copia antes de borrarlas, y si la copia falla no se borra nada: es preferible
+ * gastar unos megas de más a dejar a alguien sin juego en el monte.
+ */
+async function mudarCachesViejas() {
+  const nombres = await caches.keys()
+  const viejas = nombres.filter(
+    (n) => n.startsWith('saga-player-shell-v') && n !== CACHE_NAME
+  )
+
+  if (!viejas.length) return
+
+  const destino = await caches.open(CACHE_NAME)
+
+  for (const nombre of viejas) {
+    try {
+      const origen = await caches.open(nombre)
+      const claves = await origen.keys()
+
+      for (const peticion of claves) {
+        // Lo que ya está no se pisa: lo de la caché nueva es más reciente.
+        if (await destino.match(peticion, MATCH_OPTIONS)) continue
+        const respuesta = await origen.match(peticion)
+        if (respuesta) await destino.put(peticion, respuesta)
+      }
+
+      await caches.delete(nombre)
+    } catch {
+      // Se queda donde está. Ocupa, pero no deja a nadie sin aplicación.
+    }
+  }
+}
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    mudarCachesViejas()
+      .catch(() => undefined)
+      .then(() =>
+        caches.keys().then((keys) =>
+          Promise.all(
+            keys
+              .filter((key) => {
+                // Las teselas y las fotos siguen su propio ciclo: cuestan mucho
+                // de descargar y no cambian entre versiones.
+                if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
+                if (key.startsWith('saga-field-proof-assets-') && key !== FIELD_PROOF_ASSET_CACHE) return true
+                return false
+              })
+              .map((key) => caches.delete(key))
+          )
+        )
+      )
+      .then(() => self.clients.claim())
+  )
+})
+
+self.addEventListener('message', (event) => {
+  const data = event.data || {}
+
+  // La app pide tomar el control cuando detecta que hay un worker esperando.
+  // El skipWaiting del install no siempre basta: se ha visto quedarse en
+  // 'waiting' con el viejo al mando, y el jugador seguía con la versión antigua.
+  if (data.type === 'SAGA_SKIP_WAITING') {
+    self.skipWaiting()
+    return
+  }
+
+  if (data.type !== 'SAGA_CACHE_PLAYER_SHELL') return
+  const urls = Array.isArray(data.urls) ? data.urls : []
+  event.waitUntil(cacheUrls(urls))
+})
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request
+  if (request.method !== 'GET') return
+
+  const url = new URL(request.url)
+
+  // Map tiles are now served via a same-origin proxy (/map-tiles/...)
+  if (url.pathname.startsWith('/map-tiles/')) {
+    event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
+    return
+  }
+
+  if (url.origin !== self.location.origin) return
+
+  if (url.pathname.startsWith('/api/field-proofs/') && request.method === 'GET') {
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    return
+  }
+
+  /**
+   * Fotos de los jugadores.
+   *
+   * Van por su propio endpoint en vez de dentro de la tabla de equipo, que se
+   * pide cada 5 segundos. Se cachean como las fotos de ruta: se bajan una vez y
+   * siguen ahí sin cobertura, así que en el monte las caras del equipo se ven
+   * igual. La URL trae el hash de la imagen, así que cambiar una foto desde
+   * administración genera otra URL y se baja sola.
+   */
+  if (url.pathname.startsWith('/api/player-avatar/') && request.method === 'GET') {
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    return
+  }
+
+  if (shouldBypass(url)) return
+
+  if (request.mode === 'navigate') {
+    event.respondWith(navigationNetworkFirst(request))
+    return
+  }
+
+  if (isShellAsset(url)) {
+    event.respondWith(cacheFirst(request))
+  }
+})
