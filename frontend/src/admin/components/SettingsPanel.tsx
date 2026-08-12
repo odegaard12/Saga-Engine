@@ -49,6 +49,18 @@ export default function SettingsPanel({
           </label>
 
           <label>
+            {t('admin.settingsPanel.themeLabel')} (Apariencia)
+            <select
+              value={missionDraft.player_theme || 'classic'}
+              onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
+            >
+              <option value="classic">Clásico (Oscuro)</option>
+              <option value="glass">Cristal (Glass)</option>
+              <option value="flame-red">Rojo (Fuego)</option>
+            </select>
+          </label>
+
+          <label>
             {t('admin.settingsPanel.adminTitle')}
             <input
               value={missionDraft.admin_title || ''}
@@ -108,20 +120,6 @@ export default function SettingsPanel({
             />
           </label>
 
-          <label>
-            {t('admin.settingsPanel.themeLabel')}
-            <select
-              value={missionDraft.player_theme || 'classic'}
-              onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
-            >
-              <option value="classic">Clásico (Classic)</option>
-              <option value="glass">Cristal (Glass)</option>
-              <option value="glass-green">Bosque (Glass Green)</option>
-              <option value="flame-red">Fuego (Flame Red)</option>
-              <option value="crimson">Carmesí (Crimson)</option>
-              <option value="ocean">Océano (Ocean)</option>
-            </select>
-          </label>
         </div>
       </section>
 

@@ -1006,7 +1006,7 @@ export default function PlayerApp() {
     }
 
     publishHeartbeat()
-    intervalId = window.setInterval(publishHeartbeat, 5000)
+    intervalId = window.setInterval(publishHeartbeat, 30000)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
@@ -2019,13 +2019,9 @@ export default function PlayerApp() {
         })
       }
 
-      void sendHeartbeat({
-        user,
-        lat: next.lat,
-        lon: next.lon,
-        gps_status: 'ok',
-        source: 'browser_gps',
-      }).catch(() => undefined)
+      // Debouncing: el latido ('ok') se acumulará en heartbeatPositionRef
+      // y se enviará agrupado cada 30 segundos mediante publishHeartbeat(),
+      // ahorrando batería al no despertar la antena de red en cada paso.
 
       if (!options.silent && !gpsNoticeShownRef.current) {
         gpsNoticeShownRef.current = true
@@ -2065,7 +2061,7 @@ export default function PlayerApp() {
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: true,
       maximumAge: 10000,
-      timeout: 8000,
+      timeout: 15000,
     })
 
     if (gpsWatchRef.current === null) {

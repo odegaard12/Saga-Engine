@@ -95,7 +95,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 
-VALID_PLAYER_THEMES = {"classic", "glass", "glass-green", "flame-red", "crimson", "ocean"}
+VALID_PLAYER_THEMES = {"classic", "glass", "flame-red"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
