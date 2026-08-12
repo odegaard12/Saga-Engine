@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
@@ -186,6 +187,15 @@ function mantenerNivel(
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
+  
+  // Apply theme immediately on boot from cache
+  const initialConfig = getCachedPublicConfig()
+  if (initialConfig?.player_theme) {
+    document.body.className = `theme-${initialConfig.player_theme}`
+  } else {
+    document.body.className = 'theme-classic'
+  }
+
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
   // refresco periódico NO debe promover a 'ready': hacerlo mostraba la pantalla
@@ -233,6 +243,17 @@ export default function PlayerApp() {
 
     prologoLanzadoRef.current = true
     setShowPrologue(true)
+  }, [state])
+
+  useEffect(() => {
+    if (state.status === 'ready') {
+      const config = getCachedPublicConfig()
+      if (config?.player_theme) {
+        document.body.className = `theme-${config.player_theme}`
+      } else {
+        document.body.className = 'theme-classic'
+      }
+    }
   }, [state])
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)

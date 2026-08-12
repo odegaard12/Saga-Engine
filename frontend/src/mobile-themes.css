@@ -1,0 +1,92 @@
+/* mobile-themes.css */
+
+/* Variables por defecto (classic) */
+:root {
+  --theme-bg: #1f302b;
+  --theme-text: #ffffff;
+  --theme-primary: #10b981;
+  --theme-primary-hover: #059669;
+  --theme-panel-bg: rgba(0, 0, 0, 0.4);
+  --theme-panel-border: rgba(255, 255, 255, 0.1);
+  --theme-backdrop: blur(12px);
+}
+
+/* Tema: Glass */
+body.theme-glass {
+  --theme-bg: #0f172a;
+  --theme-primary: #38bdf8;
+  --theme-primary-hover: #0284c7;
+  --theme-panel-bg: rgba(255, 255, 255, 0.05);
+  --theme-panel-border: rgba(255, 255, 255, 0.15);
+  --theme-backdrop: blur(20px);
+}
+
+/* Tema: Bosque (glass-green) */
+body.theme-glass-green {
+  --theme-bg: #064e3b;
+  --theme-primary: #34d399;
+  --theme-primary-hover: #10b981;
+  --theme-panel-bg: rgba(255, 255, 255, 0.08);
+  --theme-panel-border: rgba(255, 255, 255, 0.2);
+  --theme-backdrop: blur(16px);
+}
+
+/* Tema: Fuego (flame-red) */
+body.theme-flame-red {
+  --theme-bg: #450a0a;
+  --theme-primary: #f87171;
+  --theme-primary-hover: #ef4444;
+  --theme-panel-bg: rgba(255, 255, 255, 0.05);
+  --theme-panel-border: rgba(255, 255, 255, 0.15);
+  --theme-backdrop: blur(12px);
+}
+
+/* Tema: Carmesí (crimson) */
+body.theme-crimson {
+  --theme-bg: #881337;
+  --theme-primary: #fb7185;
+  --theme-primary-hover: #f43f5e;
+  --theme-panel-bg: rgba(0, 0, 0, 0.2);
+  --theme-panel-border: rgba(255, 255, 255, 0.1);
+  --theme-backdrop: blur(12px);
+}
+
+/* Tema: Océano (ocean) */
+body.theme-ocean {
+  --theme-bg: #1e3a8a;
+  --theme-primary: #60a5fa;
+  --theme-primary-hover: #3b82f6;
+  --theme-panel-bg: rgba(0, 0, 0, 0.3);
+  --theme-panel-border: rgba(255, 255, 255, 0.1);
+  --theme-backdrop: blur(16px);
+}
+
+/* Aplicación global al login y player */
+body {
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+  transition: background-color 0.3s ease;
+}
+
+.saga-mobile-shell,
+#root {
+  background-color: var(--theme-bg) !important;
+}
+
+button.primary, 
+.admin-cms-side-action--save,
+button[type="button"][style*="backgroundColor"] {
+  background-color: var(--theme-primary) !important;
+}
+
+button.primary:hover,
+.admin-cms-side-action--save:hover {
+  background-color: var(--theme-primary-hover) !important;
+}
+
+.player-panel, .login-panel {
+  background: var(--theme-panel-bg) !important;
+  border-color: var(--theme-panel-border) !important;
+  backdrop-filter: var(--theme-backdrop) !important;
+  -webkit-backdrop-filter: var(--theme-backdrop) !important;
+}
