@@ -114,8 +114,12 @@ export default function SettingsPanel({
               value={missionDraft.player_theme || 'classic'}
               onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
             >
-              <option value="classic">classic</option>
-              <option value="glass">glass</option>
+              <option value="classic">Clásico (Classic)</option>
+              <option value="glass">Cristal (Glass)</option>
+              <option value="glass-green">Bosque (Glass Green)</option>
+              <option value="flame-red">Fuego (Flame Red)</option>
+              <option value="crimson">Carmesí (Crimson)</option>
+              <option value="ocean">Océano (Ocean)</option>
             </select>
           </label>
         </div>

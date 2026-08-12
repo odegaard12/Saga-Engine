@@ -268,12 +268,21 @@ async function warmOfflineProfiles(
     total: 100,
     detail: `${summary.ready_count}/${summary.profile_count} jugadores preparados`,
   })
-
   return summary
 }
 
 export default function LoginApp() {
-  const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [state, setState] = useState<LoadState>({ status: 'loading' })
+
+  // Apply theme immediately on boot from cache
+  useEffect(() => {
+    const initialConfig = getCachedPublicConfig()
+    if (initialConfig?.player_theme) {
+      document.body.className = `theme-${initialConfig.player_theme}`
+    } else {
+      document.body.className = 'theme-classic'
+    }
+  }, [])
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   )
@@ -344,6 +353,14 @@ export default function LoginApp() {
   const profiles = useMemo(() => {
     if (state.status !== 'ready') return []
     return normalizeProfiles(state.config)
+  }, [state])
+
+  useEffect(() => {
+    if (state.status === 'ready' && state.config.player_theme) {
+      document.body.className = `theme-${state.config.player_theme}`
+    } else {
+      document.body.className = 'theme-classic'
+    }
   }, [state])
 
   async function handlePrepareOffline() {
