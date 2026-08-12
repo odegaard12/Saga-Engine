@@ -1,36 +1,35 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { PlayerGamePayload, PublicConfig, PlayerGpsStatus } from '../../types/player'
-import { saveInventorySnapshot } from '../offline/inventory'
+import type { PlayerGpsStatus } from '../../types/player'
 
+/**
+ * Lo que comparten las pantallas del jugador: dónde está y qué tiene abierto.
+ *
+ * Aquí NO va la partida. Esto guardaba también `status`, `payload`, `config` y
+ * `errorMessage`, pero la partida de verdad es el `useState<LoadState>` de
+ * `PlayerApp` y nadie llamaba nunca a `setGamePayload`: esos cuatro campos se
+ * quedaban en su valor inicial para siempre, pareciendo datos.
+ *
+ * Ya costó una vez. La mesa de trabajo leía `getState().payload`, encontraba
+ * `null`, y le decía "No hay recetas" a un jugador que llevaba los
+ * ingredientes en la mochila.
+ *
+ * El GPS y los paneles sí viven aquí porque los cruzan varias pantallas.
+ */
 interface PlayerState {
-  // Estado base de la misión
-  status: 'idle' | 'loading' | 'error' | 'ready'
-  payload: PlayerGamePayload | null
-  config: PublicConfig | null
-  errorMessage: string | null
-
-  // Estado del GPS
+  // Dónde está
   gpsPosition: { lat: number; lon: number } | null
   gpsStatus: PlayerGpsStatus
   gpsAccuracy: number | null
   gpsFresh: boolean
   gpsCapturedAt: number | null
 
-  // UI State
+  // Qué tiene abierto
   toolsOpen: boolean
   teamOpen: boolean
   rankingOpen: boolean
   offlinePrepVisible: boolean
 
-  // Acciones (Actions)
-  setStatus: (status: PlayerState['status']) => void
-  setGamePayload: (payload: PlayerGamePayload, config: PublicConfig) => void
-  updateGps: (
-    position: { lat: number; lon: number },
-    accuracy: number | null,
-    fresh: boolean
-  ) => void
   setGpsStatus: (status: PlayerGpsStatus) => void
   setGpsPosition: (pos: { lat: number; lon: number } | null) => void
   setGpsAccuracy: (acc: number | null) => void
@@ -45,11 +44,6 @@ interface PlayerState {
 export const usePlayerStore = create<PlayerState>()(
   persist(
     (set) => ({
-      status: 'idle',
-      payload: null,
-      config: null,
-      errorMessage: null,
-
       gpsPosition: null,
       gpsStatus: 'unavailable',
       gpsAccuracy: null,
@@ -61,15 +55,6 @@ export const usePlayerStore = create<PlayerState>()(
       rankingOpen: false,
       offlinePrepVisible: true,
 
-      setStatus: (status) => set({ status }),
-      setGamePayload: (payload, config) => {
-        if (payload.inventory_snapshot) {
-          saveInventorySnapshot(payload.inventory_snapshot)
-        }
-        set({ payload, config, status: 'ready' })
-      },
-      updateGps: (gpsPosition, gpsAccuracy, gpsFresh) =>
-        set({ gpsPosition, gpsAccuracy, gpsFresh, gpsCapturedAt: Date.now(), gpsStatus: 'active' }),
       setGpsStatus: (gpsStatus) => set({ gpsStatus }),
       setGpsPosition: (gpsPosition) => set({ gpsPosition }),
       setGpsAccuracy: (gpsAccuracy) => set({ gpsAccuracy }),
@@ -83,7 +68,9 @@ export const usePlayerStore = create<PlayerState>()(
     }),
     {
       name: 'saga-player-store',
-      // Solo persistimos los datos que tienen sentido tras reiniciar
+      // Solo se guarda entre arranques lo que tiene sentido recordar: la
+      // última posición, para no abrir el mapa en blanco, y si el panel de
+      // preparar la misión sin cobertura estaba visible.
       partialize: (state) => ({
         gpsPosition: state.gpsPosition,
         offlinePrepVisible: state.offlinePrepVisible,
