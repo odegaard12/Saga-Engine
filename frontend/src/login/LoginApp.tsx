@@ -280,7 +280,7 @@ export default function LoginApp() {
     if (initialConfig?.player_theme) {
       document.body.className = `theme-${initialConfig.player_theme}`
     } else {
-      document.body.className = 'theme-classic'
+      document.body.className = 'theme-glass'
     }
   }, [])
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
@@ -359,7 +359,7 @@ export default function LoginApp() {
     if (state.status === 'ready' && state.config.player_theme) {
       document.body.className = `theme-${state.config.player_theme}`
     } else {
-      document.body.className = 'theme-classic'
+      document.body.className = 'theme-glass'
     }
   }, [state])
 

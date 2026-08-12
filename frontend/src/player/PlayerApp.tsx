@@ -212,7 +212,7 @@ export default function PlayerApp() {
   if (initialConfig?.player_theme) {
     document.body.className = `theme-${initialConfig.player_theme}`
   } else {
-    document.body.className = 'theme-classic'
+    document.body.className = 'theme-glass'
   }
 
   const [state, setState] = useState<LoadState>({ status: 'idle' })
@@ -259,7 +259,7 @@ export default function PlayerApp() {
       if (config?.player_theme) {
         document.body.className = `theme-${config.player_theme}`
       } else {
-        document.body.className = 'theme-classic'
+        document.body.className = 'theme-glass'
       }
     }
   }, [state])
