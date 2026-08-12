@@ -3,6 +3,7 @@ import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus }
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { aplicarTema } from '../shared/tema'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
@@ -257,18 +258,12 @@ async function warmOfflineProfiles(
   return summary
 }
 
+// El tema al cargar el modulo: una vez, antes de pintar, y sin borrar las
+// clases que ponen otros en el body.
+aplicarTema(getCachedPublicConfig()?.player_theme)
+
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
-
-  // Apply theme immediately on boot from cache
-  useEffect(() => {
-    const initialConfig = getCachedPublicConfig()
-    if (initialConfig?.player_theme) {
-      document.body.className = `theme-${initialConfig.player_theme}`
-    } else {
-      document.body.className = 'theme-glass'
-    }
-  }, [])
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   )
@@ -342,11 +337,7 @@ export default function LoginApp() {
   }, [state])
 
   useEffect(() => {
-    if (state.status === 'ready' && state.config.player_theme) {
-      document.body.className = `theme-${state.config.player_theme}`
-    } else {
-      document.body.className = 'theme-glass'
-    }
+    aplicarTema(state.status === 'ready' ? state.config.player_theme : null)
   }, [state])
 
   async function handlePrepareOffline() {

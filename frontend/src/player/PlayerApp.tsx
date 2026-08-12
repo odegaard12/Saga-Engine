@@ -1,4 +1,5 @@
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { aplicarTema } from '../shared/tema'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { SplashScreen } from './components/SplashScreen'
@@ -185,16 +186,18 @@ function mantenerNivel(
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
+/**
+ * El tema, antes de que React pinte nada.
+ *
+ * Aqui, al cargar el modulo: una sola vez y sin parpadeo. Estaba dentro del
+ * componente, o sea que corria con cada render -y este se repinta con cada
+ * lectura del GPS-, y ademas asignaba `className` entero, que borraba las
+ * clases del escaner de QR.
+ */
+aplicarTema(getCachedPublicConfig()?.player_theme)
+
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
-  
-  // Apply theme immediately on boot from cache
-  const initialConfig = getCachedPublicConfig()
-  if (initialConfig?.player_theme) {
-    document.body.className = `theme-${initialConfig.player_theme}`
-  } else {
-    document.body.className = 'theme-glass'
-  }
 
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
@@ -246,14 +249,8 @@ export default function PlayerApp() {
   }, [state])
 
   useEffect(() => {
-    if (state.status === 'ready') {
-      const config = getCachedPublicConfig()
-      if (config?.player_theme) {
-        document.body.className = `theme-${config.player_theme}`
-      } else {
-        document.body.className = 'theme-glass'
-      }
-    }
+    if (state.status !== 'ready') return
+    aplicarTema(getCachedPublicConfig()?.player_theme)
   }, [state])
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)
