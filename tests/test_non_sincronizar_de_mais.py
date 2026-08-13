@@ -47,8 +47,9 @@ def test_pero_si_se_forza_cando_o_nodo_esixe_obxecto():
 
     assert "forzar" in codigo
 
-    jugador = sin_comentarios(FRONT / "player" / "PlayerApp.tsx")
-    assert "forzar: true" in jugador, (
+    # Quien lo fuerza es el avance del nodo, que antes vivía en PlayerApp.tsx.
+    avance = sin_comentarios(FRONT / "player" / "avance" / "enviarCodigo.ts")
+    assert "forzar: true" in avance, (
         "al validar un nodo que exige objeto hay que subir la mochila sí o sí"
     )
 

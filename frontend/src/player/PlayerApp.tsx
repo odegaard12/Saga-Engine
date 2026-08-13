@@ -3,13 +3,11 @@ import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
-import { collectInventoryItem, hydrateInventoryFromServer } from './offline/inventory'
+import { hydrateInventoryFromServer } from './offline/inventory'
 import {
-  advancePlayer,
   deleteFieldProof,
   fetchPlayerGame,
   fetchPublicConfig,
-  getFieldProofsDownloadUrl,
   sendHeartbeat,
   uploadFieldProof,
 } from '../shared/api'
@@ -32,23 +30,18 @@ import { RankingSheet } from './components/RankingSheet'
 import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
-import { FieldPrepPanel, type EstadoPermiso } from './components/FieldPrepPanel'
+import { FieldPrepPanel } from './components/FieldPrepPanel'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
-import { aplicarResetDeRelojes, cerrarNodo, tiempoDelNodo } from './nodeClock'
+import { aplicarResetDeRelojes, tiempoDelNodo } from './nodeClock'
 import { marcarInicioQr, tempoDoQr } from './qrClock'
 import { QrScanClock } from './components/QrScanClock'
 import { adoptarIdiomaDeLaMision } from '../i18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
+import { buildFallbackPublicConfig, cachePublicConfig, pedirConfigConCache } from '../shared/offlinePublicConfig'
 import {
-  buildFallbackPublicConfig,
-  cachePublicConfig,
-  pedirConfigConCache,
-} from '../shared/offlinePublicConfig'
-import {
-  advanceLocalProgress,
   borrarColaOffline,
   contarAvancesPendentes,
   getOfflineMissionSummary,
@@ -66,30 +59,22 @@ import {
   encolarBorradoDeFoto,
   flushOfflineEvents,
   saveOfflinePhoto,
-  syncInventoryToServer,
 } from './offline/localFirst'
 import { cacheTeamProfiles, getCachedTeamProfiles } from './offline/teamPresence'
-import {
-} from './offline/fieldProofCache'
 import { countVisibleTeamMarkers, teamProfilesToMapMarkers } from './offline/teamMapPresence'
-import { queueManualCode } from './offline/physicalEvents'
 import { getDistanceMeters } from './utils/geo'
 import { useFotosDeCampo } from './hooks/useFotosDeCampo'
 import { usePermisos } from './hooks/usePermisos'
 import { estadoDelGps, margenQueSePerdona, precisionAceptable } from './gps/decisiones'
+import { enviarCodigo } from './avance/enviarCodigo'
 import {
   readStoredGpsPosition,
   rememberGpsPosition,
   rememberGpsReady,
   hasRememberedGpsReady,
 } from './utils/gpsStorage'
-import { haptics, sounds } from './utils/haptics'
+import { haptics } from './utils/haptics'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../shared/playerIdentity'
 import {
   CelebrationOverlay,
   ScreenFrame,
@@ -99,8 +84,6 @@ import {
   getTopOverlayStyle,
   getTopScrimStyle,
   getToastOverlayStyle,
-  getViewportStyle,
-  finishOverlayStyle,
   floatingTrophyButton,
   type OverlayState,
 } from './components/PlayerLayout'
@@ -2209,6 +2192,9 @@ export default function PlayerApp() {
    * mirar: si esta llamada se descartaba —el candado ocupado por otro envío en
    * marcha—, el jugador leía "nodo completado" y no había avanzado. Tenía que
    * escanear una segunda vez.
+   *
+   * Lo que decide vive en `avance/`: aquí sólo se conectan los cables que esa
+   * decisión necesita del componente. Eran 341 líneas en medio de este fichero.
    */
   async function handleSubmitCode(
     code: string,
@@ -2217,340 +2203,49 @@ export default function PlayerApp() {
     /** Escrito a mano en una casilla de respaldo. */
     aMano?: boolean
   ): Promise<boolean> {
-    // Candado de reentrada. `submitting` es estado y React lo actualiza de
-    // forma asíncrona, así que no frena dos llamadas dentro del mismo tick: con
-    // 'OK' — que lo acepta cualquier nodo — eso completaba varios nodos
-    // seguidos. Un ref sí es inmediato.
-    //
-    // Si está ocupado se espera un poco en vez de descartar: el envío que lo
-    // tiene cogido dura décimas de segundo y descartar era perder la lectura.
-    if (submitLockRef.current) {
-      const hasta = Date.now() + 4000
-      while (submitLockRef.current && Date.now() < hasta) {
-        await new Promise((resolve) => setTimeout(resolve, 120))
-      }
-      if (submitLockRef.current) return false
-    }
+    return enviarCodigo(
+      {
+        payload,
+        currentStage,
+        esColeccionable: isMapCollectible,
+        claveDelNodo: claveDelNodo(),
+        candado: submitLockRef,
+        setSubmitting,
+        setSubmitError,
+        cerrarHoja: () => setInteractionOpen(false),
 
-    submitLockRef.current = true
-
-    try {
-      setSubmitting(true)
-      setSubmitError(null)
-
-      if (isMapCollectible && currentStage && code === 'OK') {
-        const itemId = (currentStage as any).physical_item_id || `item_${currentStage.id}`
-        const label = (currentStage as any).physical_item_label || currentStage.title || 'Objeto Coleccionable'
-        const icon = (currentStage as any).physical_icon ||
-          (currentStage as any).config?.physical_icon ||
-          (currentStage as any).icon ||
-          '⭐'
-
-        // Algunos nodos entregan varias unidades (p. ej. 2 gemas para el amuleto).
-        const rawQuantity =
-          (currentStage as any).physical_item_quantity ??
-          (currentStage as any).config?.physical_item_quantity ??
-          1
-        const quantity = Math.max(1, Math.min(99, Number(rawQuantity) || 1))
-
-        collectInventoryItem({
-          user: payload.user,
-          item_id: itemId,
-          label: label,
-          quantity,
-          source: 'manual',
-          node_id: String(currentStage.id),
-          metadata: {
-            physical_icon: icon,
-            node_title: currentStage.title || '',
-            node_id: String(currentStage.id),
-          },
-          queue_event: true,
-        })
-
-        sounds.collect()
-        haptics.collect()
-        showNotice(`⭐ ¡Recogido: ${label}!`, 'success')
-      }
-
-      // La mochila es local: fabricar en la mesa de trabajo no llega al
-      // servidor hasta la siguiente sincronización de fondo. El servidor
-      // validaba el nodo con un inventario viejo, respondía
-      // "missing_required_item" y la partida sólo avanzaba en el móvil: la
-      // clasificación y el panel de administración se quedaban en el nodo
-      // anterior. Se empuja el inventario justo antes de validar.
-      if (readStageItemRequirement(currentStage)) {
-        // Forzada: el servidor va a validar CON esta mochila, así que aquí no
-        // vale el atajo de "no ha cambiado desde la última vez".
-        await syncInventoryToServer(payload.user, fetch, { forzar: true }).catch(
-          () => undefined
-        )
-      }
-
-      const result = await advancePlayer(
-        payload.user,
-        code,
-        timeSpentMs,
-        penaltyMs,
-        aMano,
-        payload.level,
-        // Si el servidor dice que va por detrás, se le suben los nodos que le
-        // faltan y se reintenta. Los avances primero, en orden.
-        async () => {
-          await syncPendingOfflineEvents(payload.user).catch(() => undefined)
-          await flushOfflineEvents(payload.user).catch(() => undefined)
-        }
-      )
-
-      /**
-       * Sigue por detrás después de subirle la cola.
-       *
-       * Ni ha avanzado ni va a avanzar hasta que se ponga al día, y darlo por
-       * bueno es perder el nodo: eso es lo que pasaba antes, porque el servidor
-       * contestaba «ok» en este caso y aquí sólo se miraba `status`. Se guarda
-       * en local para no bloquear al jugador y se avisa de que falta subirlo.
-       */
-      if (result.status === 'behind') {
-        throw new Error(
-          `el servidor va por el nodo ${result.server_level ?? result.level ?? '?'} y el móvil por el ${payload.level}`
-        )
-      }
-
-      if (result.status !== 'ok') {
-        const missingItem = result.reason === 'missing_required_item'
-        setSubmitError(
-          missingItem
-            ? 'Te falta un objeto requerido. Recógelo antes de continuar.'
-            : 'Código incorrecto para este nodo.'
-        )
-        showNotice(
-          missingItem
-            ? '¡Necesitas un objeto! Revisa tu mochila.'
-            : 'Código no aceptado. Inténtalo de nuevo.',
-          'warn'
-        )
-        return false
-      }
-
-      // Nodo superado: su reloj ya no hace falta y no debe arrastrarse.
-      cerrarNodo(payload.user, claveDelNodo())
-
-      setInteractionOpen(false)
-
-      /**
-       * El marcador sube AQUI, antes de esperar a nadie.
-       *
-       * El servidor ya ha anotado el tiempo -cuando contesta al avance, ya esta
-       * en disco-, y volver a preguntarselo devuelve el numero bueno. Pero eso
-       * es un viaje mas, y sin cobertura no vuelve. Se suma aqui para que el
-       * jugador vea su tiempo en el momento de superar el nodo, pase lo que
-       * pase con la red.
-       *
-       * Lo de abajo lo corrige un instante despues con el total del servidor,
-       * que es el que manda. Si sale un numero de mas durante esa decima de
-       * segundo, se corrige solo; lo que no puede salir es 00:00.
-       */
-      const sumado = Math.max(0, Math.round(timeSpentMs || 0)) + Math.max(0, Math.round(penaltyMs || 0))
-
-      if (sumado > 0) {
-        setState((prev) => {
-          if (prev.status !== 'ready') return prev
-          const vivo = prev.payload.live_status || {}
-          return {
-            ...prev,
-            payload: {
-              ...prev.payload,
-              live_status: {
-                ...vivo,
-                total_time_ms: Number(vivo.total_time_ms || 0) + sumado,
-              },
-            },
-          }
-        })
-      }
-
-      const nextPayload = await refreshPayload()
-
-
-      /**
-       * Un segundo repaso, un instante despues.
-       *
-       * El marcador de arriba sale del servidor, y esta primera lectura se pide
-       * en el mismo momento en que el servidor esta anotando el tiempo del nodo
-       * recien superado: llegaba el total de ANTES, o sea 00:00 en el primer
-       * nodo, y no se corregia hasta el refresco de los treinta segundos. Por
-       * eso al salir del modo de pruebas -que fuerza una lectura- aparecia de
-       * golpe el 00:29 que llevaba ahi todo el rato.
-       */
-      window.setTimeout(() => {
-        void refreshPayload().catch(() => undefined)
-      }, 1500)
-
-      if (nextPayload.finished) {
-        showOverlay('finish')
-        sounds.success()
-        haptics.success()
-        showNotice('¡Misión completada! 🏆', 'success')
-      } else {
-        showOverlay('node')
-        sounds.success()
-        haptics.success()
-        showNotice('¡Nodo superado! ⚡', 'success')
-      }
-
-      return true
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown submit error'
-
-      /**
-       * Un fallo del servidor NO es lo mismo que quedarse sin cobertura.
-       *
-       * Todo caía aquí junto —un 500, un pase caducado, o el monte sin
-       * antena— y el jugador leía siempre "sin conexión". Así se escondió un
-       * error de backend durante una partida entera: en el móvil todo iba
-       * bien, y en el servidor no existía. Un fallo invisible cuesta la ruta.
-       *
-       * El avance local sigue igual, que es lo que hace que se pueda seguir
-       * jugando. Lo que cambia es lo que se cuenta y lo que queda apuntado.
-       */
-      const estado = (error as { status?: number } | null)?.status
-      const culpaDelServidor = typeof estado === 'number' && estado >= 500
-      const paseCaducado = estado === 401 || estado === 403
-
-      if (culpaDelServidor || paseCaducado) {
-        console.error('[SAGA] el servidor rechazó el avance', { estado, message })
-      }
-
-      try {
-        const localResult = await advanceLocalProgress({
-          payload,
-          currentStage,
-          code,
-          timeSpentMs,
-          aMano,
-        })
-
-        if (localResult.ok) {
-          // Superado sin conexión: el reloj de este nodo también se cierra.
-          cerrarNodo(payload.user, claveDelNodo())
-          setInteractionOpen(false)
-
-          /**
-           * Sin cobertura el marcador tambien sube.
-           *
-           * El total de arriba sale de `live_status`, y el que trae la partida
-           * guardada en el movil es el ultimo que dio el servidor: sin red no
-           * hay servidor, asi que se quedaba clavado. Probado en el monte en
-           * modo avion: se completaban los nodos pero el reloj no se movia, y
-           * al volver los datos aparecia de golpe el tiempo bueno.
-           *
-           * El movil sabe perfectamente lo que acaba de tardar. Se suma aqui, y
-           * cuando vuelva la cobertura el total del servidor lo corrige.
-           */
-          const sumadoLocal =
-            Math.max(0, Math.round(timeSpentMs || 0)) + Math.max(0, Math.round(penaltyMs || 0))
-
-          const totalPrevio = Number(
-            (payload.live_status as { total_time_ms?: unknown } | undefined)?.total_time_ms || 0
-          )
-
-          const payloadLocal = sumadoLocal > 0
-            ? {
-                ...localResult.payload,
+        sumarAlMarcador: (ms) => {
+          setState((prev) => {
+            if (prev.status !== 'ready') return prev
+            const vivo = prev.payload.live_status || {}
+            return {
+              ...prev,
+              payload: {
+                ...prev.payload,
                 live_status: {
-                  ...(localResult.payload.live_status || {}),
-                  total_time_ms: totalPrevio + sumadoLocal,
+                  ...vivo,
+                  total_time_ms: Number(vivo.total_time_ms || 0) + ms,
                 },
-              }
-            : localResult.payload
+              },
+            }
+          })
+        },
 
+        ponerPartidaSinServidor: (payloadLocal) => {
           setState((prev) => ({
             status: 'ready',
             payload: payloadLocal,
             config: prev.status === 'ready' ? prev.config : { map_zoom: 16 },
           }))
-
           setMapRefreshToken((value) => value + 1)
+        },
 
-          /**
-           * Se dice lo que ha pasado de verdad.
-           *
-           * El nodo queda superado igual en los tres casos —el móvil manda
-           * mientras no haya servidor— pero no es lo mismo estar sin cobertura
-           * que tener un servidor caído: lo primero se arregla caminando, lo
-           * segundo hay que mirarlo. Antes todo decía "sin conexión".
-           */
-          const aviso = culpaDelServidor
-            ? '⚡ Nodo superado. El servidor ha fallado: se guarda aquí y sube cuando responda.'
-            : paseCaducado
-              ? '⚡ Nodo superado. Se ha renovado el pase: sube en la próxima sincronización.'
-              : '¡Nodo superado sin conexión! ⚡ El progreso se sincronizará pronto.'
-
-          if (payloadLocal.finished) {
-            showOverlay('finish')
-            showNotice(
-              culpaDelServidor
-                ? '🏆 Misión completada. El servidor ha fallado: sube en cuanto responda.'
-                : '¡Misión completada en modo offline! 🏆 Se sincronizará al recuperar conexión.',
-              'success'
-            )
-          } else {
-            showOverlay('node')
-            showNotice(aviso, culpaDelServidor ? 'warn' : 'success')
-          }
-
-          return true
-        }
-
-        if (localResult.reason === 'missing_required_item') {
-          setSubmitError('Te falta un objeto requerido. Recógelo antes de continuar.')
-          showNotice('¡Necesitas un objeto! Revisa tu mochila.', 'warn')
-          return false
-        }
-
-        if (localResult.reason === 'invalid_code') {
-          setSubmitError('Código incorrecto para la misión offline descargada.')
-          showNotice('Código no aceptado en modo offline.', 'warn')
-          return false
-        }
-
-        /**
-         * Aquí no hay nodo activo, así que no hay nada que completar.
-         *
-         * Se llega cuando el avance falló y la comprobación local dice
-         * `missing_stage`. El código se apunta para que quede constancia, pero
-         * NO avanza a nadie: el servidor sólo hace progresar con un nodo
-         * completado, y no se sabe cuál sería.
-         *
-         * El mensaje decía "se sincronizará cuando vuelva la red", que es
-         * mentira y de las caras: el jugador se queda tranquilo esperando algo
-         * que no va a pasar en vez de volver a intentarlo.
-         */
-        await queueManualCode({
-          user: payload.user,
-          node_id: currentStage?.id ? String(currentStage.id) : undefined,
-          code,
-          payload: {
-            stage_title: currentStage?.title || '',
-            reason: 'advance_sync_failed',
-          },
-        }).catch(() => undefined)
-
-        setSubmitError(
-          'No se ha podido registrar el código y no hay nodo activo donde aplicarlo. ' +
-            'Vuelve a intentarlo; queda anotado para el organizador.'
-        )
-        showNotice('El código no se ha aplicado. Inténtalo otra vez.', 'warn')
-        return false
-      } catch {
-        setSubmitError(message)
-        showNotice('Error al enviar. Comprueba tu conexión.', 'warn')
-        return false
-      }
-    } finally {
-      setSubmitting(false)
-      submitLockRef.current = false
-    }
+        refrescarPartida: refreshPayload,
+        aviso: showNotice,
+        pantalla: showOverlay,
+      },
+      { code, timeSpentMs, penaltyMs, aMano }
+    )
   }
 
   return (
