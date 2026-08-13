@@ -4,21 +4,6 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 interface PlayerShellProps {
   payload: PlayerGamePayload
   currentStage: PlayerStage | null
-  teamOpen?: boolean
-  teamCount?: number
-  teamLiveCount?: number
-  gpsState?: string
-  onOpenTeam?: () => void
-  onShowPrologue?: () => void
-}
-
-function getGpsShellLabel(gpsState?: string): string {
-  const value = String(gpsState || '').toLowerCase()
-  if (value === 'ready') return 'GPS activo'
-  if (value === 'searching') return 'Buscando GPS'
-  if (value === 'stale') return 'GPS reciente'
-  if (value === 'error') return 'Error GPS'
-  return 'Sin GPS'
 }
 
 function getProgress(payload: PlayerGamePayload) {
@@ -43,16 +28,7 @@ function getProgress(payload: PlayerGamePayload) {
   }
 }
 
-export function PlayerShell({
-  payload,
-  currentStage,
-  teamOpen = false,
-  teamCount = 0,
-  teamLiveCount = 0,
-  gpsState,
-  onOpenTeam,
-  onShowPrologue,
-}: PlayerShellProps) {
+export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
@@ -60,7 +36,6 @@ export function PlayerShell({
   const stageName =
     currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
-  const gpsLabel = getGpsShellLabel(gpsState)
 
   const totalMs = payload.live_status?.total_time_ms || 0
   const minutes = Math.floor(totalMs / 60000)
@@ -208,14 +183,6 @@ const soloPill: CSSProperties = {
   letterSpacing: '0.08em',
 }
 
-const bookPill: CSSProperties = {
-  ...soloPill,
-  background: 'rgba(255,255,255,0.1)',
-  cursor: 'pointer',
-  border: 'none',
-  padding: '0 8px',
-  fontSize: 14,
-}
 
 const playerTitle: CSSProperties = {
   fontWeight: 900,
