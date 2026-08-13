@@ -1,7 +1,6 @@
-import React, { type CSSProperties } from 'react'
+import { type CSSProperties } from 'react'
 import type { PlayerStage } from '../../types/player'
 import ItemIconSvg from './ItemIconSvg'
-import { renderMarkdown } from '../utils/formatMarkdown'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 
 interface RequirementPreviewPanelProps {

@@ -1,27 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import {
-  fetchFieldProofs,
-  fetchPlayerGame,
-  fetchPublicConfig,
-  fetchTeamStatus,
-} from '../shared/api'
+import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../shared/playerIdentity'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
-import {
-  prefetchMissionMapTiles,
-  type OfflineMapTileProgress,
-} from '../player/offline/mapTileCache'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
 import {
-  formatOfflineVaultAge,
   getOfflineVaultSummary,
   makeOfflineVaultPlayer,
   saveOfflineVaultSummary,
