@@ -208,14 +208,6 @@ const soloPill: CSSProperties = {
   letterSpacing: '0.08em',
 }
 
-const bookPill: CSSProperties = {
-  ...soloPill,
-  background: 'rgba(255,255,255,0.1)',
-  cursor: 'pointer',
-  border: 'none',
-  padding: '0 8px',
-  fontSize: 14,
-}
 
 const playerTitle: CSSProperties = {
   fontWeight: 900,

@@ -1199,12 +1199,6 @@ const hintText: CSSProperties = {
   textAlign: 'center',
 }
 
-const helpText: CSSProperties = {
-  color: 'rgba(241,245,249,.78)',
-  fontSize: 12,
-  lineHeight: 1.42,
-  fontWeight: 820,
-}
 
 function noticeBox(tone: 'success' | 'info'): CSSProperties {
   const accent = tone === 'success' ? '#4ade80' : '#94a3b8'

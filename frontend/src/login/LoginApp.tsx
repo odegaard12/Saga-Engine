@@ -790,68 +790,12 @@ const fondoVelo: CSSProperties = {
   pointerEvents: 'none',
 }
 
-const offlineVaultCard: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-  padding: 13,
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,.32), rgba(15,23,42,.22))',
-  boxShadow: '0 16px 34px rgba(15,23,42,.12), inset 0 1px 0 rgba(255,255,255,.08)',
-  backdropFilter: 'blur(18px) saturate(130%)',
-  WebkitBackdropFilter: 'blur(18px) saturate(130%)',
-}
 
-const offlineVaultTop: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  gap: 10,
-  alignItems: 'center',
-}
 
-const offlineVaultEyebrow: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 9,
-  fontWeight: 1000,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-}
 
-const offlineVaultTitle: CSSProperties = {
-  marginTop: 3,
-  color: '#ffffff',
-  fontSize: 15,
-  fontWeight: 1000,
-  letterSpacing: '-0.03em',
-}
 
-const offlineVaultText: CSSProperties = {
-  marginTop: 4,
-  color: 'rgba(255,255,255,.76)',
-  fontSize: 11,
-  lineHeight: 1.35,
-  fontWeight: 700,
-}
 
-const offlineVaultButton: CSSProperties = {
-  minHeight: 38,
-  padding: '0 12px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(187,247,208,.18)',
-  color: '#ffffff',
-  fontSize: 11,
-  fontWeight: 1000,
-}
 
-const offlineVaultStatus: CSSProperties = {
-  display: 'flex',
-  gap: 7,
-  alignItems: 'center',
-  color: 'rgba(255,255,255,.82)',
-  fontSize: 11,
-  fontWeight: 800,
-}
 
 const offlineDotOk: CSSProperties = {
   width: 8,
@@ -862,62 +806,13 @@ const offlineDotOk: CSSProperties = {
   flex: '0 0 auto',
 }
 
-const offlineDotPending: CSSProperties = {
-  ...offlineDotOk,
-  background: '#60a5fa',
-  boxShadow: '0 0 0 4px rgba(96,165,250,.14)',
-}
 
-const offlineProgressWrap: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-  padding: '9px 10px',
-  borderRadius: 16,
-  background: 'rgba(255,255,255,.075)',
-  border: '1px solid rgba(255,255,255,.10)',
-}
 
-const offlineProgressTop: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  color: 'rgba(255,255,255,.90)',
-  fontSize: 11,
-  fontWeight: 950,
-}
 
-const offlineProgressTrack: CSSProperties = {
-  height: 8,
-  overflow: 'hidden',
-  borderRadius: 999,
-  background: 'rgba(15,23,42,.36)',
-  boxShadow: 'inset 0 1px 2px rgba(0,0,0,.20)',
-}
 
-const offlineProgressFill: CSSProperties = {
-  height: '100%',
-  borderRadius: 999,
-  background:
-    'linear-gradient(90deg, rgba(34,197,94,.98), rgba(132,204,22,.98), rgba(187,247,208,.98))',
-  transition: 'width 180ms ease',
-}
 
-const offlineProgressDetails: CSSProperties = {
-  color: 'rgba(255,255,255,.72)',
-  fontSize: 10,
-  fontWeight: 750,
-}
 
-const offlineProgressSummary: CSSProperties = {
-  cursor: 'pointer',
-  listStyle: 'none',
-}
 
-const offlineProgressDetailText: CSSProperties = {
-  marginTop: 4,
-  lineHeight: 1.35,
-}
 
 const offlineVaultSuccess: CSSProperties = {
   padding: '8px 10px',
@@ -928,80 +823,13 @@ const offlineVaultSuccess: CSSProperties = {
   fontWeight: 800,
 }
 
-const offlineVaultError: CSSProperties = {
-  ...offlineVaultSuccess,
-  background: 'rgba(251,191,36,.14)',
-  color: '#fef3c7',
-}
 
-const launchOverlay: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 9900,
-  display: 'grid',
-  placeItems: 'center',
-  padding: 18,
-  background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.12), #020617 85%)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  animation: 'sagaFadeIn 0.3s ease-out forwards',
-}
 
-const launchCard: CSSProperties = {
-  width: 'min(340px, calc(100vw - 36px))',
-  display: 'grid',
-  justifyItems: 'center',
-  gap: 16,
-  padding: '24px 20px',
-  borderRadius: 28,
-  border: '1px solid rgba(52, 211, 153, 0.25)',
-  background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.99))',
-  boxShadow:
-    '0 0 35px rgba(52, 211, 153, 0.12), 0 24px 54px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
-  color: '#ffffff',
-  animation: 'sagaFadeIn 0.4s ease-out forwards',
-}
 
-const launchSpinner: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: '50%',
-  border: '3px solid rgba(16,185,129,.12)',
-  borderTopColor: '#34d399',
-  animation: 'sagaSpin 800ms linear infinite',
-}
 
-const launchTitle: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 15,
-  fontWeight: 1000,
-  letterSpacing: '0.06em',
-  textAlign: 'center',
-}
 
-const launchText: CSSProperties = {
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 11,
-  fontWeight: 800,
-  textAlign: 'center',
-}
 
-const launchProgressTrack: CSSProperties = {
-  width: '100%',
-  height: 6,
-  background: 'rgba(15,23,42,.6)',
-  borderRadius: 99,
-  overflow: 'hidden',
-  border: '1px solid rgba(255,255,255,.06)',
-  marginTop: 4,
-}
 
-const launchProgressFill: CSSProperties = {
-  height: '100%',
-  background: 'linear-gradient(90deg, #10b981, #34d399)',
-  borderRadius: 99,
-  transition: 'width 80ms ease-out',
-}
 
 const insecureLoginBanner: CSSProperties = {
   display: 'flex',
