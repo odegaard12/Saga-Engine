@@ -947,7 +947,10 @@ const enterButton: CSSProperties = {
   minWidth: 88,
   border: 0,
   borderRadius: 10,
-  background: 'linear-gradient(180deg, #35d86e 0%, #16a34a 100%)',
+  // Del tema: es el boton mas pulsado de esta pantalla y con el tema de fuego
+  // salia verde. Los otros dos verdes de aqui NO se tocan: el punto y el aviso
+  // del paquete offline son senal de "listo", no color de marca.
+  background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
   color: '#ffffff',
   fontSize: 11,
   fontWeight: 1000,
