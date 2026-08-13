@@ -83,12 +83,19 @@ body {
   top: auto !important;
   right: max(10px, env(safe-area-inset-right, 0px)) !important;
   bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
-  transform: scale(0.92);
+  /* 0.88, que es lo que se aplicaba: habia otra copia de esta regla mas abajo
+     con 0.92 y otra con 0.88, y en CSS gana la ultima. */
+  transform: scale(0.88);
   transform-origin: bottom right;
 }
 
+/* El conmutador global de idioma no pinta nada en las rutas del jugador: el
+   idioma vive dentro de Herramientas. Se esconde de las tres maneras porque
+   `display: none` solo no bastaba con algunos navegadores. */
 .saga-admin-locale-toggle--player-hidden {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .saga-tools-language-row {
@@ -126,37 +133,14 @@ body {
 }
 
 .saga-tools-language-row button.active {
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+  /* Del color del tema, no de un verde fijo: con el tema de fuego puesto, un
+     verde aqui es lo que se ve mal desde lejos. */
+  background: color-mix(in srgb, var(--theme-primary) 16%, transparent);
+  color: var(--theme-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-primary) 24%, transparent);
 }
 
 /* i18n adjustment: player language selector lives inside Tools only */
-.saga-admin-locale-toggle--player-hidden {
-  display: none !important;
-}
-
-.saga-admin-locale-toggle--admin {
-  top: auto !important;
-  right: max(10px, env(safe-area-inset-right, 0px)) !important;
-  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
-  transform: scale(0.88);
-  transform-origin: bottom right;
-}
-
-.saga-admin-locale-toggle--entry {
-  top: auto !important;
-  right: max(10px, env(safe-area-inset-right, 0px)) !important;
-  bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
-}
-
-/* Hard hide global language toggle on player routes; player language lives inside Tools. */
-.saga-admin-locale-toggle--player-hidden {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
 /* Hard block floating language selectors on player routes. Player language lives inside Tools only. */
 html.saga-route-player #saga-admin-locale-toggle,
 html.saga-route-player #saga-global-language-toggle,
@@ -185,45 +169,6 @@ html.saga-route-player .saga-tools-language-row {
   pointer-events: none !important;
 }
 
-.saga-tools-language-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.saga-tools-language-row span {
-  color: rgba(226, 232, 240, 0.82);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.saga-tools-language-row button {
-  flex: 1;
-  text-align: center;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.saga-tools-language-row button.active {
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
-}
 
 .saga-admin-settings-language-menu {
   display: flex;
@@ -271,19 +216,29 @@ html.saga-route-player .saga-tools-language-row {
 /* --- PREMIUM DESIGN UTILITIES (v2.1.0) --- */
 
 :root {
-  --saga-glass-bg: rgba(15, 23, 42, 0.65);
+  /* Degradado, no color plano: es lo que le da relieve al panel. Sin tema
+     puesto -el panel de administracion- sale exactamente como antes. */
+  --saga-glass-bg: linear-gradient(180deg, rgba(100, 116, 139, 0.46), rgba(71, 85, 105, 0.34));
   --saga-glass-border: rgba(255, 255, 255, 0.08);
   --saga-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --saga-accent-glow: 0 0 20px rgba(34, 197, 94, 0.4);
 }
 
 .saga-glass-panel {
+  /* Estaba declarado DOS veces. La segunda copia pisaba esta con un degradado
+     gris a pelo y seis !important, asi que el tema no llegaba nunca a los
+     paneles: solo al fondo de la pagina. Los !important estaban para ganarle a
+     esa copia, que ya no existe.
+
+     Se conserva lo que la segunda mejoraba -radio de 28 y el desenfoque con
+     saturacion- y el color pasa a venir del tema. */
   background: var(--saga-glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--saga-glass-border);
+  border-radius: 28px;
   box-shadow: var(--saga-glass-shadow);
-  border-radius: 24px;
+  backdrop-filter: blur(24px) saturate(1.12);
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+  color: #f8fafc;
 }
 
 /* --- MAP SMOOTHNESS UTILITIES (v2.1.0) ---
@@ -319,12 +274,3 @@ html.saga-route-player .saga-tools-language-row {
   -webkit-backface-visibility: hidden;
 }
 
-.saga-glass-panel {
-  border: 1px solid rgba(255,255,255,.22) !important;
-  border-radius: 28px !important;
-  background: linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34)) !important;
-  box-shadow: 0 22px 60px rgba(15,23,42,.18) !important;
-  backdrop-filter: blur(24px) saturate(1.12) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.12) !important;
-  color: #f8fafc;
-}
