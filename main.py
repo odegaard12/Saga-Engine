@@ -95,7 +95,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 
-VALID_PLAYER_THEMES = {"classic", "glass"}
+VALID_PLAYER_THEMES = {"glass", "flame-red"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
@@ -111,8 +111,8 @@ def normalize_ui_lang(value):
 
 
 def normalize_player_theme(value):
-    theme = str(value or "classic").strip().lower()
-    return theme if theme in VALID_PLAYER_THEMES else "classic"
+    theme = str(value or "glass").strip().lower()
+    return theme if theme in VALID_PLAYER_THEMES else "glass"
 
 def resolve_config_db_path():
     data_dir = (
@@ -134,13 +134,13 @@ def load_config():
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
         "ui_lang": "es",
-        "player_theme": "classic",
+        "player_theme": "glass",
         "data_dir": "data"
     })
     if not isinstance(cfg, dict):
         cfg = {}
     
-    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "classic"))
+    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "glass"))
     
     # Fallback to env if Mapbox token is missing
     if not cfg.get("mapbox_token"):

@@ -1,4 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { aplicarTema } from '../shared/tema'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
@@ -184,8 +186,19 @@ function mantenerNivel(
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
+/**
+ * El tema, antes de que React pinte nada.
+ *
+ * Aqui, al cargar el modulo: una sola vez y sin parpadeo. Estaba dentro del
+ * componente, o sea que corria con cada render -y este se repinta con cada
+ * lectura del GPS-, y ademas asignaba `className` entero, que borraba las
+ * clases del escaner de QR.
+ */
+aplicarTema(getCachedPublicConfig()?.player_theme)
+
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
+
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
   // refresco periódico NO debe promover a 'ready': hacerlo mostraba la pantalla
@@ -233,6 +246,11 @@ export default function PlayerApp() {
 
     prologoLanzadoRef.current = true
     setShowPrologue(true)
+  }, [state])
+
+  useEffect(() => {
+    if (state.status !== 'ready') return
+    aplicarTema(getCachedPublicConfig()?.player_theme)
   }, [state])
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)
@@ -850,7 +868,7 @@ export default function PlayerApp() {
     }
 
     publishHeartbeat()
-    intervalId = window.setInterval(publishHeartbeat, 5000)
+    intervalId = window.setInterval(publishHeartbeat, 30000)
 
     // Volver a la aplicación tiene que refrescar el mapa del grupo al momento,
     // no esperar al siguiente ciclo.
@@ -1842,13 +1860,9 @@ export default function PlayerApp() {
         })
       }
 
-      void sendHeartbeat({
-        user,
-        lat: next.lat,
-        lon: next.lon,
-        gps_status: 'ok',
-        source: 'browser_gps',
-      }).catch(() => undefined)
+      // Debouncing: el latido ('ok') se acumulará en heartbeatPositionRef
+      // y se enviará agrupado cada 30 segundos mediante publishHeartbeat(),
+      // ahorrando batería al no despertar la antena de red en cada paso.
 
       if (!options.silent && !gpsNoticeShownRef.current) {
         gpsNoticeShownRef.current = true
@@ -1888,7 +1902,7 @@ export default function PlayerApp() {
     window.navigator.geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: true,
       maximumAge: 10000,
-      timeout: 8000,
+      timeout: 15000,
     })
 
     if (gpsWatchRef.current === null) {

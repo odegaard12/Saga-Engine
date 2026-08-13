@@ -163,30 +163,44 @@ export function getCachedGamePayload(user: string): SagaCachedGamePayload | unde
 // Lo que queda de este fichero es el estado de sincronizacion que se pinta
 // en pantalla, la partida guardada y las fotos pendientes.
 
+let nextAllowedSyncTime = 0;
 
 export async function flushOfflineEvents(
   user: string,
   _syncEndpoint = '/api/events/sync',
   fetchImpl: typeof fetch = fetch
 ): Promise<SagaOfflineSnapshot> {
+  const snapshot = loadOfflineSnapshot(user)
+
+  // Debouncing: si estamos en cooldown por fallo de red, no reintentar
+  if (Date.now() < nextAllowedSyncTime) {
+    return snapshot
+  }
+
   await mudarColaVieja(user).catch(() => undefined)
 
   const resultado = await syncPendingOfflineEvents(user).catch(() => ({
     status: 'error' as const,
   }))
 
+  if (resultado.status === 'error') {
+    nextAllowedSyncTime = Date.now() + 15000 // Cooldown de 15 segundos
+  } else {
+    nextAllowedSyncTime = 0
+  }
+
   // Las fotos y la mochila van por su cuenta y no bloquean: si fallan, se
   // reintentan en el siguiente ciclo.
   void flushOfflinePhotos(user, fetchImpl).catch(() => {})
   void syncInventoryToServer(user, fetchImpl).catch(() => {})
 
-  const snapshot = loadOfflineSnapshot(user)
+  const updatedSnapshot = loadOfflineSnapshot(user)
 
   return saveOfflineSnapshot({
-    ...snapshot,
+    ...updatedSnapshot,
     sync_status: resultado.status === 'ok' ? 'online' : 'error',
     last_successful_sync_at:
-      resultado.status === 'ok' ? nowIso() : snapshot.last_successful_sync_at,
+      resultado.status === 'ok' ? nowIso() : updatedSnapshot.last_successful_sync_at,
   })
 }
 
