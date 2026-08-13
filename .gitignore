@@ -106,3 +106,12 @@ HISTORIA_*.md
 # Las lee scripts/check_repo_privacy.py para avisarte si se te cuela alguna en
 # el codigo. Nunca debe subirse: meterla en el repo la filtraria igual.
 .saga-privacidad-local.txt
+
+# Lo construido no se guarda: lo genera el Dockerfile con `npm run build`, y
+# tener ademas una copia en el repositorio son dos verdades sobre lo mismo
+# —la del repositorio no es nunca la que se sirve—.
+frontend/dist/
+
+# Y ninguna distribucion de Node dentro del repositorio: son 85 MB que paga
+# cada clon para siempre. Si hace falta Node en Windows, se instala en Windows.
+node-v*/
