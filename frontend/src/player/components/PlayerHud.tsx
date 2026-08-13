@@ -168,22 +168,50 @@ export function PlayerHud({
       hiddenElements.push(element)
     }
 
+    /**
+     * Compara sin acentos: `Ubicacion`, `ubicacion` y `UBICACION` son lo mismo.
+     *
+     * Aqui habia dos listas, una con tilde y otra sin. La de con tilde estaba
+     * rota —alguna herramienta convirtio lo no-ASCII en interrogantes— y no
+     * casaba con nada, asi que los botones con tilde en la etiqueta no se
+     * escondian y se quedaban encima del panel. Quitando el acento hace falta
+     * una sola lista.
+     */
+    function sinAcentos(valor: string) {
+      return valor
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        // Con escapes a proposito: poner aqui las marcas de acento literales es
+        // volver a meter no-ASCII en el sitio donde ya se rompio una vez.
+        .replace(/[\u0300-\u036f]/g, '')
+    }
+
+    /**
+     * Una etiqueta de un solo caracter que no es letra ni numero.
+     *
+     * Antes esto eran cuatro comparaciones identicas contra un interrogante:
+     * eran cuatro simbolos distintos y la misma herramienta se los comio a los
+     * cuatro. Los originales no estan en ninguna parte de la historia -el dano
+     * viene del commit raiz-, asi que se reconocen por su forma en vez de por
+     * una lista que ya no existe. Y asi vale para cualquier boton de simbolo,
+     * no solo para aquellos cuatro.
+     */
+    function esSimbolo(valor: string) {
+      return valor.length > 0 && valor.length <= 2 && !/[\p{L}\p{N}]/u.test(valor)
+    }
+
     function shouldHideButton(button: HTMLButtonElement) {
-      const text = (button.textContent || '').trim().toLowerCase()
-      const label = (button.getAttribute('aria-label') || '').trim().toLowerCase()
-      const title = (button.getAttribute('title') || '').trim().toLowerCase()
+      const text = sinAcentos(button.textContent || '')
+      const label = sinAcentos(button.getAttribute('aria-label') || '')
+      const title = sinAcentos(button.getAttribute('title') || '')
       const combined = `${text} ${label} ${title}`
 
-      if (text === '?' || text === '?' || text === '?' || text === '?') return true
-      if (combined.includes('ampliar')) return true
-      if (combined.includes('expand')) return true
-      if (combined.includes('centrar')) return true
-      if (combined.includes('ubicacion')) return true
-      if (combined.includes('ubicaci?n')) return true
-      if (combined.includes('mi posicion')) return true
-      if (combined.includes('mi posici?n')) return true
+      if (esSimbolo(text)) return true
 
-      return false
+      return ['ampliar', 'expand', 'centrar', 'ubicacion', 'mi posicion'].some((aguja) =>
+        combined.includes(aguja)
+      )
     }
 
     function hideMapControls() {
