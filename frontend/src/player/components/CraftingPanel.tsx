@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
 import { RECIPES, checkCraftingPossible, craftRecipe, type Recipe } from '../offline/recipes'
-import { usePlayerStore } from '../store/usePlayerStore'
 import { syncInventoryToServer } from '../offline/localFirst'
 
 interface CraftingPanelProps {
@@ -132,14 +131,16 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
 
   // Recetas relevantes para esta misión.
   //
-  // Antes esto leía usePlayerStore.getState().payload, pero setGamePayload no
-  // se llama en ninguna parte: el store estaba siempre vacío, el filtro no
-  // encajaba con nada y la mesa de trabajo decía "No hay recetas" aunque el
-  // jugador llevase los ingredientes en la mochila.
+  // Antes esto leía usePlayerStore.getState().payload, pero la partida nunca
+  // llegó a ese store: estaba siempre vacío, el filtro no encajaba con nada y
+  // la mesa de trabajo decía "No hay recetas" aunque el jugador llevase los
+  // ingredientes en la mochila.
   //
   // Ahora se cruzan las etapas reales (por prop) con lo que el jugador lleva
   // encima, así que una receta que YA puedes fabricar nunca puede desaparecer.
-  const stagesStr = JSON.stringify(stages ?? usePlayerStore.getState().payload?.stages ?? [])
+  // El respaldo al store se ha quitado: siempre devolvía [], o sea que no era
+  // un respaldo, era ruido que hacía pensar que había una segunda vía.
+  const stagesStr = JSON.stringify(stages ?? [])
   const ownedIds = new Set(
     loadInventorySnapshot(user)
       .items.filter((item) => item.state !== 'used' && item.quantity > 0)
