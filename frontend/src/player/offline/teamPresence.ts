@@ -1,4 +1,5 @@
 import type { TeamProfileLiveStatus } from '../../types/player'
+import { leerMarcaDeTiempo } from '../../shared/fechas'
 
 export type CachedTeamPresencePayload = {
   user: string
@@ -37,8 +38,8 @@ function safeJsonParse<T>(value: string | null, fallback: T): T {
 }
 
 function cacheAgeMs(cachedAt: string): number {
-  const timestamp = Date.parse(cachedAt)
-  if (!Number.isFinite(timestamp)) return Number.POSITIVE_INFINITY
+  const timestamp = leerMarcaDeTiempo(cachedAt)
+  if (timestamp === null) return Number.POSITIVE_INFINITY
   return Math.max(0, Date.now() - timestamp)
 }
 
