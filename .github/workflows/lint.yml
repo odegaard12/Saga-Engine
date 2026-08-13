@@ -25,9 +25,11 @@ jobs:
         working-directory: ./frontend
         run: npm install
 
+      # Sin banderas: la que seleccionaba extensiones ya no existe desde
+      # eslint 9, y qué ficheros se miran lo decide `files` en eslint.config.js.
       - name: Run ESLint
         working-directory: ./frontend
-        run: npx eslint src --ext .ts,.tsx,.js,.jsx
+        run: npx eslint src
 
       # - name: Run Prettier check
       #   working-directory: ./frontend

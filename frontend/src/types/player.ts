@@ -43,13 +43,6 @@ export interface StageMinigameRuntime {
   config?: StageConfig
 }
 
-export interface StageMinigameRuntime {
-  type: string
-  label?: string
-  version?: string
-  config?: StageConfig
-}
-
 export interface PlayerStage {
   id?: number | string
   title: string
