@@ -22,10 +22,8 @@ interface PlayerHudProps {
   distanceMeters: number | null
   inRange: boolean
   debugEnabled: boolean
-  followPlayer: boolean
   toolsOpen: boolean
   playerHref: string
-  loginHref: string
   adminHref: string
   primaryLabel: string
   primaryTone: PrimaryActionTone
@@ -39,12 +37,10 @@ interface PlayerHudProps {
   onOpenTools: () => void
   onCloseTools: () => void
   onToggleDebug: () => void
-  onRequestGps: () => void
   onDownloadFieldProofs?: () => void
   fieldPhotoCount?: number
   submitting?: boolean
   errorMessage?: string | null
-  onShowPrologue?: () => void
   onSubmitCode?: (
     code: string,
     timeSpentMs?: number,
@@ -82,9 +78,7 @@ export function PlayerHud({
   distanceMeters,
   inRange,
   debugEnabled,
-  followPlayer,
   toolsOpen,
-  loginHref,
   primaryLabel,
   primaryTone,
   primaryDisabled,
@@ -96,13 +90,11 @@ export function PlayerHud({
   onOpenTools,
   onCloseTools,
   onToggleDebug,
-  onRequestGps,
   onDownloadFieldProofs,
   fieldPhotoCount = 0,
   submitting = false,
   errorMessage = null,
   onSubmitCode,
-  onShowPrologue,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
