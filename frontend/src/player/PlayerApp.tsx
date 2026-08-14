@@ -547,6 +547,17 @@ export default function PlayerApp() {
         const config = await fetchPublicConfig()
           .then((nextConfig) => {
             cachePublicConfig(nextConfig)
+            /**
+             * El tema, AQUI, en cuanto se sabe cual es.
+             *
+             * Lo que viene despues -guardar la mision entera y las teselas del
+             * mapa- tarda minutos la primera vez: la propia pantalla lo avisa.
+             * Hasta ahora el tema no se ponia hasta el final de todo eso, asi
+             * que la primera apertura se pasaba entera con el equivocado.
+             * Medido en el banco de ensayo: al 77% de las teselas el cuerpo
+             * seguia en `theme-glass` con la mision puesta en `flame-red`.
+             */
+            aplicarTema(nextConfig.player_theme)
             return nextConfig
           })
           .catch(() => buildFallbackPublicConfig(user))

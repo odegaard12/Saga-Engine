@@ -96,21 +96,12 @@
   }
 }
 
-/* #235b — no floating version badge on phone/coarse pointer */
-@media (max-width: 760px), (pointer: coarse) {
-  .saga-build-info--floating {
-    display: none !important;
-  }
-}
-
-/* #235c — hide floating version badge on phone/coarse pointer */
-@media (max-width: 760px), (pointer: coarse) {
-  .saga-build-info--floating {
-    display: none !important;
-  }
-}
-
-/* #235d — never show floating build badge on phone/coarse pointer or modal-like narrow admin views */
+/* Sin distintivo de version flotante en movil ni con dedo.
+ *
+ * Esto estaba escrito CUATRO veces, en bloques numerados #235b a #235e: dos
+ * pares identicos, y el de 760 px se lo tragaba entero el de 900. Cuatro
+ * intentos de tapar lo mismo, porque desde fuera no se ve si el anterior
+ * funciono. Con este basta. */
 @media (max-width: 900px), (pointer: coarse) {
   .saga-build-info--floating {
     display: none !important;
@@ -121,9 +112,3 @@ body:has(.admin-game-guide-backdrop) .saga-build-info--floating {
   display: none !important;
 }
 
-/* #235e — hide floating build badge on mobile and during admin editing */
-@media (max-width: 900px), (pointer: coarse) {
-  .saga-build-info--floating {
-    display: none !important;
-  }
-}
