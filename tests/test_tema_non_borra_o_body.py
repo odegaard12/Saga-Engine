@@ -115,3 +115,26 @@ def test_o_contrato_do_escaner_segue_ahi():
 
     assert "saga-qr-scanner-open" in codigo
     assert "body.saga-qr-scanner-open" in codigo
+
+
+def test_o_tema_sae_da_configuracion_cargada_non_so_da_cache():
+    """La primera visita no tiene nada guardado.
+
+    El efecto que aplica el tema leía `getCachedPublicConfig()`, o sea la copia
+    guardada en el móvil. Un jugador que abre la aplicación por primera vez no
+    tiene esa copia todavía, así que se quedaba con el tema de respaldo aunque
+    la misión dijera otro. Comprobado en el banco de ensayo, en una carga
+    limpia: `body.className` salía `theme-glass` con la misión puesta en
+    `flame-red`.
+
+    La configuración recién traída del servidor está en `state.config`. Esa es
+    la que manda; la copia guardada sólo vale como respaldo.
+    """
+    codigo = sin_comentarios(JUGADOR)
+
+    assert "aplicarTema(state.config?.player_theme" in codigo, (
+        "el tema tiene que salir de la configuración cargada, no sólo de la caché"
+    )
+    assert "getCachedPublicConfig()?.player_theme" in codigo, (
+        "la copia guardada se queda como respaldo, para abrir sin cobertura"
+    )
