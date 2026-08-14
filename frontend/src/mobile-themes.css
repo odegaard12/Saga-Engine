@@ -29,6 +29,8 @@
   --theme-glass: rgba(15, 23, 42, 0.68);
   --theme-glass-soft: rgba(30, 41, 59, 0.5);
   --theme-glass-border: rgba(255, 255, 255, 0.08);
+  /* Lo que se ve entre tesela y tesela del mapa mientras cargan. */
+  --theme-surface: #1e293b;
   --theme-glow: rgba(34, 197, 94, 0.4);
   --theme-tint: rgba(34, 197, 94, 0.12);
   --theme-tint-strong: rgba(34, 197, 94, 0.2);
@@ -52,6 +54,7 @@ body.theme-glass {
   --theme-glass: rgba(15, 23, 42, 0.72);
   --theme-glass-soft: rgba(30, 58, 95, 0.52);
   --theme-glass-border: rgba(56, 189, 248, 0.18);
+  --theme-surface: #1b2b45;
   --theme-glow: rgba(56, 189, 248, 0.4);
   --theme-tint: rgba(56, 189, 248, 0.12);
   --theme-tint-strong: rgba(56, 189, 248, 0.2);
@@ -68,6 +71,7 @@ body.theme-flame-red {
   --theme-glass: rgba(60, 12, 12, 0.74);
   --theme-glass-soft: rgba(94, 22, 22, 0.52);
   --theme-glass-border: rgba(248, 113, 113, 0.22);
+  --theme-surface: #3b1414;
   --theme-glow: rgba(248, 113, 113, 0.42);
   --theme-tint: rgba(248, 113, 113, 0.13);
   --theme-tint-strong: rgba(248, 113, 113, 0.21);
