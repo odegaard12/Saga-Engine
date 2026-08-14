@@ -322,9 +322,24 @@ export function InteractionSheet({
       // Los 2 minutos van como penalización, no dentro del tiempo del nodo.
       // El cuarto argumento marca que lo ha escrito el jugador: así el aviso
       // interno de los minijuegos no vale escrito aquí.
-      await onSubmitCode(clean, activeMs || 0, 120000, true)
-      setFallbackInputCode('')
-      setFallbackOpen(false)
+      /**
+       * Sólo se cierra la casilla si el código se aceptó.
+       *
+       * `onSubmitCode` devuelve si el nodo llegó a superarse —el escáner de QR
+       * ya mira ese valor para no cantar victoria en falso—, y aquí se
+       * ignoraba: con un código equivocado salía el aviso, el nodo no avanzaba,
+       * y la casilla se cerraba y se vaciaba igual.
+       *
+       * Lo mas probable en un código escrito a mano es una errata. Cerrar tira
+       * lo tecleado y obliga a reabrir y reescribirlo entero, de noche y con el
+       * móvil en una mano. Si no se acepta, se deja ahí para corregir una letra.
+       */
+      const superado = await onSubmitCode(clean, activeMs || 0, 120000, true)
+
+      if (superado) {
+        setFallbackInputCode('')
+        setFallbackOpen(false)
+      }
     } finally {
       setFallbackSubmitting(false)
     }
