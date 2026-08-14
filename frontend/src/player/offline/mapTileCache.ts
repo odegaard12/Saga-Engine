@@ -28,6 +28,18 @@ export type OfflineMapTileSummary = {
   requested: number
   saved: number
   zooms: number[]
+  /**
+   * El plan pedia mas teselas de las que caben en el tope y se corto.
+   *
+   * Importa mucho mas de lo que parece: el detalle de los nodos -zoom 18, lo
+   * que se ve plantado en el nodo con el mapa ampliado- se anade el ULTIMO, asi
+   * que es lo primero que se pierde. Sin este dato, el panel de "antes de
+   * salir" contaba las que pidio -no las que hacian falta- y decia que el mapa
+   * estaba listo igual.
+   */
+  recortado: boolean
+  descartadas: number
+  detalle_de_nodos: number
   route_points: number
   regional_radius_km: number
   mission_area_radius_km: number
@@ -96,8 +108,19 @@ function routeCenter(points: Point[]): Point | null {
   }
 }
 
+/**
+ * Cuantas teselas se han quedado fuera del tope, y de que capa.
+ *
+ * Antes esto se descartaba en silencio. Como el detalle de los nodos se anade
+ * el ultimo, es lo primero que se pierde, y el jugador se enteraba en el monte.
+ */
+let descartadasEnEstaVuelta = 0
+
 function addTile(urls: Map<string, string>, zoom: number, x: number, y: number, priority: string) {
-  if (urls.size >= MAX_TILE_URLS) return
+  if (urls.size >= MAX_TILE_URLS) {
+    descartadasEnEstaVuelta += 1
+    return
+  }
   const url = tileUrl(zoom, x, y)
   if (!urls.has(url)) urls.set(url, priority)
 }
@@ -420,11 +443,16 @@ export async function prefetchMissionMapTiles(
   // saltarse las que ya estaban no puede parecer que se han perdido.
   const saved = await contarTeselasGuardadas(orderedUrls)
 
+  const detalleDeNodos = Array.from(urls.values()).filter((p) => p === 'node-z18').length
+
   const summary: OfflineMapTileSummary = {
     cached_at: new Date().toISOString(),
     requested: orderedUrls.length,
     saved,
     zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    recortado: descartadasEnEstaVuelta > 0,
+    descartadas: descartadasEnEstaVuelta,
+    detalle_de_nodos: detalleDeNodos,
     route_points: routePoints.length,
     regional_radius_km: REGIONAL_RADIUS_KM,
     mission_area_radius_km: MISSION_AREA_RADIUS_KM,
@@ -439,10 +467,14 @@ export async function prefetchMissionMapTiles(
   }
 
   onProgress?.({
-    label: 'Mapa listo',
+    // No se anuncia "listo" sin mirar si se corto: prometer un mapa completo
+    // que no lo esta es peor que decir que falta detalle.
+    label: summary.recortado ? 'Mapa guardado, sin todo el detalle' : 'Mapa listo',
     done: orderedUrls.length,
     total: orderedUrls.length || 1,
-    detail: `${saved}/${orderedUrls.length} teselas guardadas`,
+    detail: summary.recortado
+      ? `${saved} teselas guardadas; ${summary.descartadas} no caben en esta ruta`
+      : `${saved}/${orderedUrls.length} teselas guardadas`,
   })
 
   return summary
