@@ -27,16 +27,16 @@ def test_un_pase_recen_dado_vale():
 
     segredo = "sal:hash-de-proba"
     token = player_session.create_player_session_token(
-        "Odi", ttl_seconds=main.PLAYER_SESSION_TTL_SECONDS, secret=segredo
+        "Abeleira", ttl_seconds=main.PLAYER_SESSION_TTL_SECONDS, secret=segredo
     )
 
-    assert player_session.verify_player_session_token(token, user="Odi", secret=segredo)
+    assert player_session.verify_player_session_token(token, user="Abeleira", secret=segredo)
 
 
 def test_un_pase_caducado_non_vale():
     from backend.app.security import player_session
 
     segredo = "sal:hash-de-proba"
-    token = player_session.create_player_session_token("Odi", ttl_seconds=-1, secret=segredo)
+    token = player_session.create_player_session_token("Abeleira", ttl_seconds=-1, secret=segredo)
 
-    assert not player_session.verify_player_session_token(token, user="Odi", secret=segredo)
+    assert not player_session.verify_player_session_token(token, user="Abeleira", secret=segredo)
