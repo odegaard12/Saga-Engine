@@ -84,8 +84,8 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
         background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
         border: '1px solid rgba(255,255,255,.22)',
         boxShadow: '0 22px 60px rgba(15,23,42,.18)',
-        backdropFilter: 'blur(24px) saturate(1.12)',
-        WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+        backdropFilter: 'var(--theme-blur)',
+        WebkitBackdropFilter: 'var(--theme-blur)',
       }}
     >
       <div style={headerRow}>
@@ -157,7 +157,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                   flexDirection: 'column',
                   gap: 8,
                   padding: '12px 14px',
-                  borderRadius: 18,
+                  borderRadius: 'var(--theme-radius-card)',
                   border: '1px solid',
                   borderColor: isFirst
                     ? 'rgba(251,191,36,0.4)'
@@ -193,7 +193,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                       style={{
                         width: 42,
                         height: 42,
-                        borderRadius: 999,
+                        borderRadius: 'var(--theme-radius-pill)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -262,7 +262,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                           color: finished ? '#10b981' : '#38bdf8',
                           background: finished ? 'rgba(16,185,129,0.15)' : 'rgba(56,189,248,0.12)',
                           padding: '2px 8px',
-                          borderRadius: 999,
+                          borderRadius: 'var(--theme-radius-pill)',
                           border: `1px solid ${finished ? 'rgba(16,185,129,0.3)' : 'rgba(56,189,248,0.25)'}`,
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
@@ -288,7 +288,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                     style={{
                       width: '100%',
                       height: 7,
-                      borderRadius: 999,
+                      borderRadius: 'var(--theme-radius-pill)',
                       background: 'rgba(255,255,255,0.06)',
                       overflow: 'hidden',
                       position: 'relative',
@@ -298,7 +298,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                       style={{
                         height: '100%',
                         width: `${timePercent}%`,
-                        borderRadius: 999,
+                        borderRadius: 'var(--theme-radius-pill)',
                         background: finished
                           ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
                           : isFirst
@@ -347,7 +347,7 @@ const title: CSSProperties = {
 const closeBtn: CSSProperties = {
   width: 36,
   height: 36,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.15)',
   background: 'rgba(255,255,255,.08)',
   color: '#cbd5e1',
@@ -363,7 +363,7 @@ const counterBadge: CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   padding: '4px 10px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,0.12)',
   background: 'rgba(255,255,255,0.06)',
 }

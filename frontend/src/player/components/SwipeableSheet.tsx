@@ -117,8 +117,8 @@ const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
   background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
   transition: 'opacity 0.3s ease',
 }
@@ -127,15 +127,15 @@ const sheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
   width: 'min(100%, 520px)',
-  borderRadius: 28,
+  borderRadius: 'var(--theme-radius-panel)',
   background: 'rgba(2,6,23,.95)',
   padding: '8px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'flex',
   flexDirection: 'column',
   maxHeight: '85vh',
   color: '#f8fafc',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
 }
 
@@ -149,6 +149,6 @@ const dragHandleWrapper: CSSProperties = {
 const dragHandle: CSSProperties = {
   width: 40,
   height: 5,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.25)',
 }

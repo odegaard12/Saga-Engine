@@ -132,8 +132,8 @@ const overlay: CSSProperties = {
   alignItems: 'center',
   padding: '16px 12px',
   background: 'rgba(2,6,23,.75)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 const sheet: CSSProperties = {
@@ -141,7 +141,7 @@ const sheet: CSSProperties = {
   margin: '0 auto',
   maxHeight: '92vh',
   padding: 16,
-  borderRadius: 24,
+  borderRadius: 'var(--theme-radius-panel)',
   background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
   color: '#f8fafc',
   display: 'grid',
@@ -170,7 +170,7 @@ const counter: CSSProperties = {
   minHeight: 21,
   padding: '0 8px',
   alignItems: 'center',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.12)',
   color: '#fff',
   fontSize: 11,
@@ -180,7 +180,7 @@ const counter: CSSProperties = {
 const closeButton: CSSProperties = {
   width: 38,
   height: 38,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.08)',
   color: '#e2e8f0',
@@ -193,7 +193,7 @@ const imageFrame: CSSProperties = {
   width: '100%',
   height: 'min(62vh, 560px)',
   minHeight: 260,
-  borderRadius: 20,
+  borderRadius: 'var(--theme-radius-panel)',
   overflow: 'hidden',
   background: '#020617',
   display: 'grid',
@@ -223,7 +223,7 @@ const nav: CSSProperties = {
 
 const navButton: CSSProperties = {
   minHeight: 38,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
   background: 'rgba(255,255,255,.08)',
   color: '#f8fafc',
@@ -233,7 +233,7 @@ const navButton: CSSProperties = {
 
 const deleteButton: CSSProperties = {
   minHeight: 42,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(248,113,113,.24)',
   background: 'rgba(127,29,29,.32)',
   color: '#fecaca',
@@ -244,7 +244,7 @@ const deleteButton: CSSProperties = {
 const downloadButton: CSSProperties = {
   width: 38,
   height: 38,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(74,222,128,.30)',
   background: 'rgba(34,197,94,.16)',
   color: '#4ade80',
