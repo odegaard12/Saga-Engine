@@ -27,7 +27,6 @@ import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
-import { TeamSheet } from './components/TeamSheet'
 import { RankingSheet } from './components/RankingSheet'
 import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
@@ -293,8 +292,6 @@ export default function PlayerApp() {
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
   const toolsOpen = usePlayerStore((s) => s.toolsOpen)
   const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
-  const teamOpen = usePlayerStore((s) => s.teamOpen)
-  const setTeamOpen = usePlayerStore((s) => s.setTeamOpen)
   const rankingOpen = usePlayerStore((s) => s.rankingOpen)
   const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
 
@@ -1620,13 +1617,11 @@ export default function PlayerApp() {
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
-    setTeamOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
   function openTools() {
     setActivePanel(null)
-    setTeamOpen(false)
     setToolsOpen(!toolsOpen)
   }
 
@@ -1634,21 +1629,9 @@ export default function PlayerApp() {
     setToolsOpen(false)
   }
 
-  function openTeam() {
-    setActivePanel(null)
-    setToolsOpen(false)
-    setRankingOpen(false)
-    setTeamOpen(!teamOpen)
-  }
-
-  function closeTeam() {
-    setTeamOpen(false)
-  }
-
   function openRanking() {
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setRankingOpen(!rankingOpen)
   }
 
@@ -1812,7 +1795,6 @@ export default function PlayerApp() {
     setSubmitError(null)
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setInteractionOpen(true)
   }
 
@@ -2438,7 +2420,7 @@ export default function PlayerApp() {
       />
 
 
-      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !rankingOpen && !overlayState ? (
+      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
         <div style={getMapQuickControlsStyle(isPhone)}>
           <QuickProofPanel
             user={user}
@@ -2509,22 +2491,6 @@ export default function PlayerApp() {
             <span aria-hidden="true" style={mapQuickIcon}>
               🏆
             </span>
-          </button>
-
-          <button
-            type="button"
-            style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              openTeam()
-            }}
-            aria-label="Jugadores"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              👥
-            </span>
-            <span style={mapQuickCountPill}>{teamVisibleCount}</span>
           </button>
 
           <button
@@ -2687,12 +2653,6 @@ export default function PlayerApp() {
         />
       </div>
 
-      <TeamSheet
-        open={teamOpen}
-        players={teamOtherProfiles}
-        currentPosition={playerPosition}
-        onClose={closeTeam}
-      />
       <RankingSheet open={rankingOpen} players={rankingPlayers} onClose={closeRanking} />
 
       <InteractionSheet

@@ -26,7 +26,6 @@ interface PlayerState {
 
   // Qué tiene abierto
   toolsOpen: boolean
-  teamOpen: boolean
   rankingOpen: boolean
   offlinePrepVisible: boolean
 
@@ -36,7 +35,6 @@ interface PlayerState {
   setGpsFresh: (fresh: boolean) => void
   setGpsCapturedAt: (cap: number | null) => void
   setToolsOpen: (open: boolean) => void
-  setTeamOpen: (open: boolean) => void
   setRankingOpen: (open: boolean) => void
   setOfflinePrepVisible: (visible: boolean) => void
 }
@@ -51,7 +49,6 @@ export const usePlayerStore = create<PlayerState>()(
       gpsCapturedAt: null,
 
       toolsOpen: false,
-      teamOpen: false,
       rankingOpen: false,
       offlinePrepVisible: true,
 
@@ -62,7 +59,6 @@ export const usePlayerStore = create<PlayerState>()(
       setGpsCapturedAt: (gpsCapturedAt) => set({ gpsCapturedAt }),
 
       setToolsOpen: (toolsOpen) => set({ toolsOpen }),
-      setTeamOpen: (teamOpen) => set({ teamOpen }),
       setRankingOpen: (rankingOpen) => set({ rankingOpen }),
       setOfflinePrepVisible: (offlinePrepVisible) => set({ offlinePrepVisible }),
     }),
