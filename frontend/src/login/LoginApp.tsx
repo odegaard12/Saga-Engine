@@ -536,7 +536,7 @@ export default function LoginApp() {
                           width: '100%',
                           height: '100%',
                           objectFit: 'cover',
-                          borderRadius: 999,
+                          borderRadius: 'var(--theme-radius-pill)',
                           display: 'block',
                         }}
                       />
@@ -632,7 +632,7 @@ const backGlowTop: CSSProperties = {
   width: 420,
   height: 420,
   transform: 'translateX(-50%)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(74,222,128,.12)',
   filter: 'blur(34px)',
   pointerEvents: 'none',
@@ -644,7 +644,7 @@ const backGlowBottom: CSSProperties = {
   width: 520,
   height: 520,
   transform: 'translateX(-50%)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(15,23,42,.24)',
   filter: 'blur(44px)',
   pointerEvents: 'none',
@@ -660,12 +660,12 @@ const backVignette: CSSProperties = {
 
 const heroCard: CSSProperties = {
   padding: '22px 18px 24px',
-  borderRadius: 30,
+  borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(255,255,255,.14)',
   background: 'linear-gradient(180deg, rgba(78,92,90,.86) 0%, rgba(60,74,70,.76) 100%)',
   boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
-  backdropFilter: 'blur(18px) saturate(135%)',
-  WebkitBackdropFilter: 'blur(18px) saturate(135%)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   animation: 'sagaFadeIn 260ms ease-out',
 }
 
@@ -687,7 +687,7 @@ const adminButton: CSSProperties = {
   justifyContent: 'center',
   minHeight: 28,
   padding: '0 11px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.16)',
   background: 'rgba(255,255,255,.10)',
   color: '#ffffff',
@@ -800,7 +800,7 @@ const fondoVelo: CSSProperties = {
 const offlineDotOk: CSSProperties = {
   width: 8,
   height: 8,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: '#22c55e',
   boxShadow: '0 0 0 4px rgba(34,197,94,.14)',
   flex: '0 0 auto',
@@ -816,7 +816,7 @@ const offlineDotOk: CSSProperties = {
 
 const offlineVaultSuccess: CSSProperties = {
   padding: '8px 10px',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'rgba(34,197,94,.13)',
   color: '#dcfce7',
   fontSize: 11,
@@ -836,7 +836,7 @@ const insecureLoginBanner: CSSProperties = {
   gap: 10,
   alignItems: 'start',
   padding: 12,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'rgba(239, 68, 68, 0.15)',
   border: '1px solid rgba(239, 68, 68, 0.3)',
   color: '#fca5a5',
@@ -854,12 +854,12 @@ const playerCard: CSSProperties = {
   gap: 10,
   alignItems: 'center',
   padding: '12px 12px',
-  borderRadius: 22,
+  borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(255,255,255,.14)',
   background: 'linear-gradient(180deg, rgba(78,92,90,.76) 0%, rgba(62,78,73,.66) 100%)',
   boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
-  backdropFilter: 'blur(18px) saturate(130%)',
-  WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   animation: 'sagaFadeIn 260ms ease-out',
   animationFillMode: 'both',
 }
@@ -875,7 +875,7 @@ const playerLeft: CSSProperties = {
 const avatar: CSSProperties = {
   width: 40,
   height: 40,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -917,7 +917,7 @@ const modePill: CSSProperties = {
   alignItems: 'center',
   minHeight: 18,
   padding: '0 7px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.14)',
   color: 'rgba(255,255,255,.92)',
   fontSize: 9,
@@ -946,7 +946,7 @@ const enterButton: CSSProperties = {
   minHeight: 32,
   minWidth: 88,
   border: 0,
-  borderRadius: 10,
+  borderRadius: 'var(--theme-radius-card)',
   // Del tema: es el boton mas pulsado de esta pantalla y con el tema de fuego
   // salia verde. Los otros dos verdes de aqui NO se tocan: el punto y el aviso
   // del paquete offline son senal de "listo", no color de marca.

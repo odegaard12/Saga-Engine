@@ -562,7 +562,7 @@ export function PlayerHud({
               style={{
                 width: '100%',
                 padding: '10px 14px',
-                borderRadius: 12,
+                borderRadius: 'var(--theme-radius-card)',
                 background: 'rgba(239, 68, 68, 0.12)',
                 color: '#ef4444',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -593,7 +593,7 @@ export function PlayerHud({
                 type="button"
                 style={{
                   padding: '8px 12px',
-                  borderRadius: 12,
+                  borderRadius: 'var(--theme-radius-card)',
                   border: locale === 'es' ? '1px solid rgba(52, 211, 153, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
                   background: locale === 'es' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                   color: locale === 'es' ? '#34d399' : 'rgba(255, 255, 255, 0.7)',
@@ -614,7 +614,7 @@ export function PlayerHud({
                 type="button"
                 style={{
                   padding: '8px 12px',
-                  borderRadius: 12,
+                  borderRadius: 'var(--theme-radius-card)',
                   border: locale === 'gl' ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
                   background: locale === 'gl' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                   color: locale === 'gl' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
@@ -694,12 +694,12 @@ const card: CSSProperties = {
   margin: '0 auto',
   display: 'grid',
   gap: 10,
-  borderRadius: 28,
+  borderRadius: 'var(--theme-radius-panel)',
   background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
   border: '1px solid rgba(255,255,255,.22)',
   boxShadow: '0 22px 60px rgba(15,23,42,.18)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 
@@ -711,7 +711,7 @@ const chipBase: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.12)',
   fontSize: 10,
   fontWeight: 900,
@@ -726,7 +726,7 @@ const chipBase: CSSProperties = {
 const primaryBase: CSSProperties = {
   width: '100%',
   minHeight: 48,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 14,
   fontWeight: 900,
   letterSpacing: '0.10em',
@@ -749,7 +749,7 @@ const ghostButton: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(15,23,42,.32)',
   color: '#ffffff',
@@ -795,8 +795,8 @@ function getSheetStyle(compact: boolean): CSSProperties {
     background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
     color: '#f8fafc',
     boxShadow: '0 -15px 35px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.6)',
-    backdropFilter: 'blur(20px) saturate(1.2)',
-    WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
+    backdropFilter: 'var(--theme-blur)',
+    WebkitBackdropFilter: 'var(--theme-blur)',
     padding: 14,
     paddingBottom: compact
       ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
@@ -840,7 +840,7 @@ const tabs: CSSProperties = {
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 6,
   padding: 4,
-  borderRadius: 18,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'rgba(0,0,0,.2)',
   border: '1px solid rgba(255,255,255,.05)',
 }
@@ -848,7 +848,7 @@ const tabs: CSSProperties = {
 const tabButton: CSSProperties = {
   minHeight: 40,
   border: 'none',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'transparent',
   color: 'rgba(226,232,240,.70)',
   fontSize: 11,
@@ -870,7 +870,7 @@ const statusRow: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 8,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.10)',
   color: 'rgba(248,250,252,.82)',
   padding: '8px 12px',
@@ -936,7 +936,7 @@ const toolsActionGrid: CSSProperties = {
 const toolsButton: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
   background: 'linear-gradient(180deg, rgba(100,116,139,.54), rgba(71,85,105,.54))',
   color: '#f8fafc',
@@ -961,7 +961,7 @@ const toolsLoginLink: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 14px',
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(187,247,208,.18)',
   background: 'var(--theme-tint)',
   color: '#dcfce7',
@@ -990,7 +990,7 @@ const closeButton: CSSProperties = {
   height: 40,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.14)',
   background: 'rgba(15,23,42,.70)',
   color: '#f8fafc',
@@ -1012,7 +1012,7 @@ const fallbackToolHead: CSSProperties = {
 const fallbackToolButton: CSSProperties = {
   minHeight: 40,
   width: '100%',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(251,191,36,.24)',
   background: 'rgba(251,191,36,.13)',
   color: '#fef3c7',
@@ -1037,7 +1037,7 @@ const fallbackToolForm: CSSProperties = {
 const fallbackToolInput: CSSProperties = {
   width: '100%',
   minHeight: 42,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.16)',
   background: 'rgba(15,23,42,.52)',
   color: '#ffffff',
@@ -1049,7 +1049,7 @@ const fallbackToolInput: CSSProperties = {
 
 const fallbackToolSubmit: CSSProperties = {
   minHeight: 42,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(187,247,208,.22)',
   background: 'var(--theme-tint-strong)',
   color: '#dcfce7',
@@ -1086,7 +1086,7 @@ const toolsCardGroupLabel: CSSProperties = {
 const toolsGreenButton: CSSProperties = {
   minHeight: 40,
   padding: '0 12px',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(52, 211, 153, 0.3)',
   background: 'rgba(16, 185, 129, 0.12)',
   color: '#34d399',

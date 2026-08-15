@@ -39,6 +39,14 @@
      la pantalla entera. Subirlo de aqui tiñe el mundo. */
   --theme-wash: rgba(34, 197, 94, 0.05);
   --theme-backdrop: blur(16px);
+
+  /* --- Las FORMAS, que es lo que hace que un tema sea otro diseño --- */
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+  --theme-blur: blur(22px) saturate(1.12);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
 }
 
 /* --- Los temas ------------------------------------------------------------
@@ -64,6 +72,13 @@ body.theme-glass {
   --theme-primary-border: rgba(56, 189, 248, 0.26);
   --theme-wash: rgba(56, 189, 248, 0.06);
   --theme-backdrop: blur(20px);
+
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+  --theme-blur: blur(22px) saturate(1.12);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
 }
 
 /* Fuego: rojo brasa. El fondo es muy oscuro a propósito —el texto va en
@@ -81,7 +96,17 @@ body.theme-flame-red {
   --theme-tint-strong: rgba(248, 113, 113, 0.21);
   --theme-primary-border: rgba(248, 113, 113, 0.28);
   --theme-wash: rgba(248, 113, 113, 0.07);
-  --theme-backdrop: blur(16px);
+  --theme-backdrop: none;
+
+  /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
+     marcado y una esquina cortada. Se distingue de un vistazo desde lejos, que
+     es justo lo que un tema tiene que hacer. */
+  --theme-radius-panel: 3px;
+  --theme-radius-card: 2px;
+  --theme-radius-pill: 4px;
+  --theme-blur: none;
+  --theme-border-w: 2px;
+  --theme-panel-cut: 16px;
 }
 
 /* --- Y esto es lo que pinta ---------------------------------------------- */
@@ -116,4 +141,36 @@ body[class*='theme-'] .admin-cms-side-action--save {
 body[class*='theme-'] button.primary:hover,
 body[class*='theme-'] .admin-cms-side-action--save:hover {
   background-color: var(--theme-primary-hover);
+}
+
+/* --- Rasgos propios del tema de fuego -------------------------------------
+ *
+ * Un tema no es una paleta. Esto es lo que hace que, con la misma pantalla,
+ * `fuego` no se parezca a `cristal`: placas con una esquina cortada, una linea
+ * de brasa arriba, y los titulos en versalitas separadas.
+ *
+ * Todo bajo `body.theme-flame-red`, asi que `cristal` no se entera.
+ */
+
+body.theme-flame-red .saga-glass-panel {
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+  border-top: var(--theme-border-w) solid var(--theme-primary);
+}
+
+body.theme-flame-red h1,
+body.theme-flame-red h2,
+body.theme-flame-red h3 {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body.theme-flame-red button {
+  letter-spacing: 0.08em;
 }
