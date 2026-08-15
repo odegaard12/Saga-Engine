@@ -258,10 +258,6 @@ async function warmOfflineProfiles(
   return summary
 }
 
-// El tema al cargar el modulo: una vez, antes de pintar, y sin borrar las
-// clases que ponen otros en el body.
-aplicarTema(getCachedPublicConfig()?.player_theme)
-
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(

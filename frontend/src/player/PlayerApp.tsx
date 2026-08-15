@@ -185,16 +185,6 @@ function mantenerNivel(
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
-/**
- * El tema, antes de que React pinte nada.
- *
- * Aqui, al cargar el modulo: una sola vez y sin parpadeo. Estaba dentro del
- * componente, o sea que corria con cada render -y este se repinta con cada
- * lectura del GPS-, y ademas asignaba `className` entero, que borraba las
- * clases del escaner de QR.
- */
-aplicarTema(getCachedPublicConfig()?.player_theme)
-
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
 
