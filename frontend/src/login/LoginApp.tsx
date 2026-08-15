@@ -607,7 +607,7 @@ const pageWrap: CSSProperties = {
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
   background:
-    'radial-gradient(circle at 50% 0%, rgba(74,222,128,.15), transparent 34%), linear-gradient(180deg, #253530 0%, #34433e 45%, #25322e 100%)',
+    'radial-gradient(circle at 50% 0%, var(--theme-tint-strong), transparent 34%), linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-surface) 45%, var(--theme-bg) 100%)',
   color: '#ffffff',
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
 }
@@ -629,7 +629,7 @@ const backGlowTop: CSSProperties = {
   height: 420,
   transform: 'translateX(-50%)',
   borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(74,222,128,.12)',
+  background: 'var(--theme-tint)',
   filter: 'blur(34px)',
   pointerEvents: 'none',
 }
@@ -657,8 +657,8 @@ const backVignette: CSSProperties = {
 const heroCard: CSSProperties = {
   padding: '22px 18px 24px',
   borderRadius: 'var(--theme-radius-panel)',
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(78,92,90,.86) 0%, rgba(60,74,70,.76) 100%)',
+  border: 'var(--theme-border-w) solid var(--saga-glass-border)',
+  background: 'var(--saga-glass-bg)',
   boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
@@ -782,7 +782,7 @@ const fondoVelo: CSSProperties = {
   position: 'fixed',
   inset: 0,
   background:
-    'linear-gradient(180deg, rgba(9,17,15,.72) 0%, rgba(9,17,15,.52) 30%, rgba(9,17,15,.78) 62%, rgba(6,12,11,.94) 100%)',
+    'linear-gradient(180deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.44) 30%, rgba(0,0,0,.70) 62%, rgba(0,0,0,.90) 100%)',
   pointerEvents: 'none',
 }
 
@@ -851,8 +851,8 @@ const playerCard: CSSProperties = {
   alignItems: 'center',
   padding: '12px 12px',
   borderRadius: 'var(--theme-radius-panel)',
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'linear-gradient(180deg, rgba(78,92,90,.76) 0%, rgba(62,78,73,.66) 100%)',
+  border: 'var(--theme-border-w) solid var(--saga-glass-border)',
+  background: 'var(--saga-glass-bg)',
   boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
