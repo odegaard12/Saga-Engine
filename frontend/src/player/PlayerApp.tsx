@@ -861,7 +861,22 @@ export default function PlayerApp() {
       }
 
       try {
-        const effectivePosition = heartbeatPositionRef.current
+        /**
+         * Con la mision terminada NO se manda donde esta la gente.
+         *
+         * Medido sobre la mision real: de 14 posiciones guardadas, 9 estaban a
+         * mas de 3 km de la ruta -hasta 70 km-, y una de hacia poco mas de un
+         * dia, con la ruta jugada una semana antes. No eran posiciones de
+         * juego: eran casas y trabajos, de gente que abrio la aplicacion para
+         * mirar la clasificacion.
+         *
+         * El latido sigue yendo, porque es lo que trae la tabla del grupo. Lo
+         * que deja de ir son las coordenadas. Contra los datos de personas lo
+         * que protege de verdad no es el permiso firmado, sino no tener lo que
+         * no hace falta.
+         */
+        const misionRematada = Boolean(payloadRef.current?.finished)
+        const effectivePosition = misionRematada ? null : heartbeatPositionRef.current
 
         const respuesta = await sendHeartbeat({
           user,
