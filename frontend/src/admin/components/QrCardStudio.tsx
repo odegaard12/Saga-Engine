@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import jsQR from 'jsqr'
-import { QRCodeSVG } from 'qrcode.react'
+import { leerQr } from '../../player/offline/qrReader'
+import { SagaQrCode } from '../../shared/qrCard'
 
 export type QrCardPreset = 'clean' | 'dark' | 'photo'
 export type QrCardShape = 'rounded' | 'square'
@@ -242,24 +242,32 @@ export default function QrCardStudio({
         if (!context) return
         context.drawImage(currentVideo, 0, 0, width, height)
         const image = context.getImageData(0, 0, width, height)
-        const code = jsQR(image.data, width, height, {
-          inversionAttempts: 'attemptBoth',
-        })
 
-        if (code?.data) {
-          if (code.data === payload) {
-            onValidated(signature)
-            setScanState('valid')
-            setScanMessage('QR correcto. Ya puedes descargar la tarjeta.')
-            stopStream(streamRef.current)
-            streamRef.current = null
-            return
-          }
-          setScanState('wrong')
-          setScanMessage('Ese QR no corresponde a este nodo. Prueba de nuevo.')
-        }
+        // Se lee con el MISMO lector que lleva el jugador en el monte: si la
+        // tarjeta pasa aquí, pasa allí. Comprobarla con otro decodificador era
+        // dar por buena una pegatina que luego no se leía.
+        void leerQr(image)
+          .then((lectura) => {
+            if (lectura?.texto === payload) {
+              onValidated(signature)
+              setScanState('valid')
+              setScanMessage('QR correcto. Ya puedes descargar la tarjeta.')
+              stopStream(streamRef.current)
+              streamRef.current = null
+              return
+            }
 
-        frameRef.current = requestAnimationFrame(scan)
+            if (lectura?.texto) {
+              setScanState('wrong')
+              setScanMessage('Ese QR no corresponde a este nodo. Prueba de nuevo.')
+            }
+
+            frameRef.current = requestAnimationFrame(scan)
+          })
+          .catch(() => {
+            frameRef.current = requestAnimationFrame(scan)
+          })
+        return
       }
 
       frameRef.current = requestAnimationFrame(scan)
@@ -390,14 +398,10 @@ export default function QrCardStudio({
         <div style={cardStyle}>
           {design.preset === 'photo' && design.imageDataUrl ? <div style={photoShade} /> : null}
           <div ref={qrWrapRef} style={qrPanel}>
-            <QRCodeSVG
-              value={payload}
-              size={184}
-              level="H"
-              includeMargin
-              fgColor="#0f172a"
-              bgColor="#ffffff"
-            />
+            {/* La misma pieza que imprime y que se previsualiza en el editor:
+                así lo que valida la cámara de aquí abajo es exactamente lo que
+                se va a pegar en la piedra. Ver shared/qrCard.tsx. */}
+            <SagaQrCode payload={payload} size={184} />
           </div>
           <strong style={previewTitle}>{label || 'Objeto SAGA'}</strong>
           <span style={previewType}>{typeLabel}</span>

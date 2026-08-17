@@ -1,4 +1,18 @@
-fastapi
-uvicorn[standard]
-Jinja2>=3.1.6,<4
-httpx>=0.28.1
+# Versiones fijas a propósito.
+#
+# Esto decía sólo "fastapi" y "uvicorn[standard]", así que cada imagen que se
+# construía traía lo último que hubiera ese día. El 2026-08-09 el contenedor
+# corría FastAPI 0.141.1 mientras el portátil tenía la 0.138.0, y el árbol de
+# rutas no se comportaba igual en los dos sitios: un test podía pasar en local
+# y no probar lo mismo que hay desplegado.
+#
+# Estas son exactamente las versiones con las que la ruta de campo funcionó.
+# Para subirlas: cambiarlas aquí, construir, pasar los tests y probar el
+# jugador y el panel. Nunca sin querer.
+
+fastapi==0.141.1
+starlette==1.6.0
+pydantic==2.13.4
+uvicorn[standard]==0.52.1
+Jinja2==3.1.6
+httpx==0.28.1

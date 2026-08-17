@@ -1,27 +1,14 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import {
-  fetchFieldProofs,
-  fetchPlayerGame,
-  fetchPublicConfig,
-  fetchTeamStatus,
-} from '../shared/api'
+import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
-import {
-  getPlayerAvatarInitials,
-  getPlayerAvatarUrl,
-  getPlayerColor,
-} from '../shared/playerIdentity'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
+import { aplicarTema } from '../shared/tema'
 import { saveMissionPack } from '../player/offline/missionPack'
 import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
-import {
-  prefetchMissionMapTiles,
-  type OfflineMapTileProgress,
-} from '../player/offline/mapTileCache'
 import { cacheTeamProfiles } from '../player/offline/teamPresence'
 import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
 import {
-  formatOfflineVaultAge,
   getOfflineVaultSummary,
   makeOfflineVaultPlayer,
   saveOfflineVaultSummary,
@@ -268,12 +255,15 @@ async function warmOfflineProfiles(
     total: 100,
     detail: `${summary.ready_count}/${summary.profile_count} jugadores preparados`,
   })
-
   return summary
 }
 
+// El tema al cargar el modulo: una vez, antes de pintar, y sin borrar las
+// clases que ponen otros en el body.
+aplicarTema(getCachedPublicConfig()?.player_theme)
+
 export default function LoginApp() {
-  const [state, setState] = useState<LoadState>({ status: 'idle' })
+  const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   )
@@ -344,6 +334,10 @@ export default function LoginApp() {
   const profiles = useMemo(() => {
     if (state.status !== 'ready') return []
     return normalizeProfiles(state.config)
+  }, [state])
+
+  useEffect(() => {
+    aplicarTema(state.status === 'ready' ? state.config.player_theme : null)
   }, [state])
 
   async function handlePrepareOffline() {

@@ -1,4 +1,5 @@
 import { loadInventorySnapshot } from './inventory'
+import { queueOfflineEvent, syncPendingOfflineEvents } from './missionPack'
 
 export type SagaSyncStatus = 'online' | 'offline' | 'syncing' | 'error'
 
@@ -11,7 +12,15 @@ export type SagaQueuedEvent = {
   source?: string
   payload?: Record<string, unknown>
   created_at: string
+  /** Envíos hechos, incluidos los que se perdieron por no haber cobertura. */
   attempts: number
+  /**
+   * Veces que el SERVIDOR contestó rechazando este evento.
+   *
+   * Va aparte de `attempts` a propósito: quedarse sin red no es que el evento
+   * esté mal, y tirar la cola por eso sería romper justo el modo sin conexión.
+   */
+  rejections?: number
   last_attempt_at?: string
   last_error?: string
 }
@@ -149,229 +158,78 @@ export function getCachedGamePayload(user: string): SagaCachedGamePayload | unde
   return loadOfflineSnapshot(user).cached_game
 }
 
-export function queueOfflineEvent(
-  user: string,
-  event: Omit<Partial<SagaQueuedEvent>, 'user' | 'created_at' | 'attempts'> & {
-    type: string
-  }
-): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
+// Aqui vivian el encolado, los reintentos y el armado del envio de la
+// SEGUNDA cola, la de localStorage. La cola es una y vive en missionPack.ts.
+// Lo que queda de este fichero es el estado de sincronizacion que se pinta
+// en pantalla, la partida guardada y las fotos pendientes.
 
-  const queuedEvent: SagaQueuedEvent = {
-    client_event_id: event.client_event_id || createClientEventId('offline'),
-    type: event.type,
-    user,
-    node_id: event.node_id,
-    team_id: event.team_id,
-    source: event.source || 'offline_queue',
-    payload: event.payload || {},
-    created_at: nowIso(),
-    attempts: 0,
-  }
-
-  const existingIds = new Set(snapshot.queued_events.map((item) => item.client_event_id))
-  const queued_events = existingIds.has(queuedEvent.client_event_id)
-    ? snapshot.queued_events
-    : [...snapshot.queued_events, queuedEvent].slice(-QUEUE_LIMIT)
-
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status:
-      typeof navigator !== 'undefined' && navigator.onLine === false
-        ? 'offline'
-        : snapshot.sync_status,
-    queued_events,
-  })
-}
-
-export function markEventAttempt(
-  user: string,
-  clientEventId: string,
-  errorMessage?: string
-): SagaOfflineSnapshot {
-  const snapshot = loadOfflineSnapshot(user)
-
-  return saveOfflineSnapshot({
-    ...snapshot,
-    queued_events: snapshot.queued_events.map((event) => {
-      if (event.client_event_id !== clientEventId) return event
-
-      return {
-        ...event,
-        attempts: event.attempts + 1,
-        last_attempt_at: nowIso(),
-        last_error: errorMessage,
-      }
-    }),
-  })
-}
-
-export function removeQueuedEvents(user: string, clientEventIds: string[]): SagaOfflineSnapshot {
-  const ids = new Set(clientEventIds)
-  const snapshot = loadOfflineSnapshot(user)
-
-  return saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: 'online',
-    last_successful_sync_at: nowIso(),
-    queued_events: snapshot.queued_events.filter((event) => !ids.has(event.client_event_id)),
-  })
-}
-
-export function buildEventSyncPayload(user: string): {
-  user: string
-  events: SagaQueuedEvent[]
-  inventory_snapshot?: unknown
-} {
-  const snapshot = loadOfflineSnapshot(user)
-  const inventorySnapshot = loadInventorySnapshot(user)
-
-  return {
-    user,
-    events: snapshot.queued_events,
-    inventory_snapshot: inventorySnapshot,
-  }
-}
+let nextAllowedSyncTime = 0;
 
 export async function flushOfflineEvents(
   user: string,
-  syncEndpoint = '/api/events/sync',
+  _syncEndpoint = '/api/events/sync',
   fetchImpl: typeof fetch = fetch
 ): Promise<SagaOfflineSnapshot> {
   const snapshot = loadOfflineSnapshot(user)
 
-  if (!snapshot.queued_events.length) {
-    // No events to flush - but check if there are offline photos
-    void flushOfflinePhotos(user, fetchImpl).catch(() => {})
-    // still sync inventory silently so Admin can see it
-    void syncInventoryToServer(user, fetchImpl).catch(() => {})
-    return saveOfflineSnapshot({
-      ...snapshot,
-      sync_status: 'online',
-      last_successful_sync_at: snapshot.last_successful_sync_at || nowIso(),
-    })
+  // Debouncing: si estamos en cooldown por fallo de red, no reintentar
+  if (Date.now() < nextAllowedSyncTime) {
+    return snapshot
   }
 
-  saveOfflineSnapshot({
-    ...snapshot,
-    sync_status: 'syncing',
+  await mudarColaVieja(user).catch(() => undefined)
+
+  const resultado = await syncPendingOfflineEvents(user).catch(() => ({
+    status: 'error' as const,
+  }))
+
+  if (resultado.status === 'error') {
+    nextAllowedSyncTime = Date.now() + 15000 // Cooldown de 15 segundos
+  } else {
+    nextAllowedSyncTime = 0
+  }
+
+  // Las fotos y la mochila van por su cuenta y no bloquean: si fallan, se
+  // reintentan en el siguiente ciclo.
+  void flushOfflinePhotos(user, fetchImpl).catch(() => {})
+  void syncInventoryToServer(user, fetchImpl).catch(() => {})
+
+  const updatedSnapshot = loadOfflineSnapshot(user)
+
+  return saveOfflineSnapshot({
+    ...updatedSnapshot,
+    sync_status: resultado.status === 'ok' ? 'online' : 'error',
+    last_successful_sync_at:
+      resultado.status === 'ok' ? nowIso() : updatedSnapshot.last_successful_sync_at,
   })
+}
 
-  // Con cobertura mala esta petición se queda colgada, y como el refresco de la
-  // misión la espera antes de seguir, el juego dejaba de actualizarse hasta
-  // recargar. Mejor abandonar y reintentar en el siguiente ciclo.
-  const abortar = new AbortController()
-  const corte = setTimeout(() => abortar.abort(), 12000)
+/**
+ * Pasa a la cola buena lo que un jugador tuviera en la vieja.
+ *
+ * Sin esto, quien estuviera a mitad de ruta con escaneos sin subir los perdería
+ * al actualizar la aplicación: se quedarían en `localStorage` sin que nadie los
+ * volviera a mirar. Corre una vez y deja la cola vieja vacía.
+ */
+async function mudarColaVieja(user: string): Promise<void> {
+  const snapshot = loadOfflineSnapshot(user)
+  if (!snapshot.queued_events.length) return
 
-  try {
-    const mandar = () =>
-      fetchImpl(syncEndpoint, {
-        method: 'POST',
-        signal: abortar.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(buildEventSyncPayload(user)),
-      })
-
-    let response = await mandar()
-
-    // Igual que el avance: si el pase de jugador ha caducado el servidor
-    // rechaza con 403 y la cola se quedaba atascada para siempre, reintentando
-    // cada ciclo contra una puerta cerrada. Pedir la partida vuelve a
-    // entregar el pase.
-    if (response.status === 401 || response.status === 403) {
-      await fetchImpl(`/api/game/${encodeURIComponent(user)}`, {
-        signal: abortar.signal,
-      }).catch(() => undefined)
-      response = await mandar()
-    }
-
-    if (!response.ok) {
-      throw new Error(`sync failed with HTTP ${response.status}`)
-    }
-
-    const payload = await response.json().catch(() => ({}))
-    const responseEvents: unknown[] = Array.isArray(payload.events) ? payload.events : []
-
-    if (responseEvents.length === 0) {
-      throw new Error('sync response did not include event results')
-    }
-
-    const acceptedIds = new Set<string>()
-    const failedById = new Map<string, string>()
-
-    for (const rawEvent of responseEvents) {
-      if (!rawEvent || typeof rawEvent !== 'object') continue
-
-      const event = rawEvent as Record<string, unknown>
-
-      const clientEventId = typeof event.client_event_id === 'string' ? event.client_event_id : ''
-
-      if (!clientEventId) continue
-
-      const status = String(event.status || '')
-        .trim()
-        .toLowerCase()
-
-      const duplicate = event.duplicate === true
-
-      if (duplicate || ['pending', 'synced', 'ok', 'applied', 'ignored'].includes(status)) {
-        acceptedIds.add(clientEventId)
-        continue
-      }
-
-      failedById.set(clientEventId, String(event.error || status || 'backend rejected event'))
-    }
-
-    // After successful event sync, try flushing photos
-    void flushOfflinePhotos(user, fetchImpl).catch(() => {})
-
-    if (acceptedIds.size === 0 && failedById.size === 0) {
-      throw new Error('sync response could not be matched to queued events')
-    }
-
-    const attemptTime = nowIso()
-
-    const queuedEvents = snapshot.queued_events
-      .filter((event) => !acceptedIds.has(event.client_event_id))
-      .map((event) => {
-        const errorMessage = failedById.get(event.client_event_id)
-
-        if (!errorMessage) return event
-
-        return {
-          ...event,
-          attempts: event.attempts + 1,
-          last_attempt_at: attemptTime,
-          last_error: errorMessage,
-        }
-      })
-
-    return saveOfflineSnapshot({
-      ...snapshot,
-      sync_status: failedById.size > 0 ? 'error' : 'online',
-      last_successful_sync_at: acceptedIds.size > 0 ? nowIso() : snapshot.last_successful_sync_at,
-      queued_events: queuedEvents,
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'sync failed'
-
-    const attemptTime = nowIso()
-
-    return saveOfflineSnapshot({
-      ...snapshot,
-      sync_status: 'error',
-      queued_events: snapshot.queued_events.map((event) => ({
-        ...event,
-        attempts: event.attempts + 1,
-        last_attempt_at: attemptTime,
-        last_error: message,
-      })),
-    })
-  } finally {
-    clearTimeout(corte)
+  for (const evento of snapshot.queued_events) {
+    await queueOfflineEvent({
+      user,
+      type: evento.type,
+      source: evento.source,
+      node_id: evento.node_id,
+      payload: {
+        ...(evento.payload || {}),
+        client_event_id: evento.client_event_id,
+        mudado_de_la_cola_vieja: true,
+      },
+    }).catch(() => undefined)
   }
+
+  saveOfflineSnapshot({ ...snapshot, queued_events: [] })
 }
 
 export async function fetchGamePayloadLocalFirst<T = unknown>(
@@ -417,12 +275,46 @@ export async function fetchGamePayloadLocalFirst<T = unknown>(
  * Sync the player's inventory snapshot to the server independently of event queues.
  * This ensures the Admin panel can always see current inventory even when offline events are empty.
  */
+/**
+ * Huella de la mochila ya subida, para no volver a mandar lo mismo.
+ *
+ * Vive en memoria a propósito: tras recargar la aplicación se sube una vez y
+ * ya, que es barato y evita depender de que el servidor y el móvil coincidan
+ * en algo guardado.
+ */
+const mochilaYaSubida = new Map<string, string>()
+
+function huellaDeLaMochila(snapshot: unknown): string {
+  try {
+    return JSON.stringify(snapshot)
+  } catch {
+    // Si no se puede serializar, se manda: más vale de sobra que de menos.
+    return `sin-huella-${Date.now()}`
+  }
+}
+
+/**
+ * Sube la mochila, y sólo si ha cambiado.
+ *
+ * Esto salía en CADA vuelta del ciclo de sincronización —cada 30 segundos— con
+ * la mochila entera dentro, cambiara o no. Una mochila no cambia sola: cambia
+ * al recoger un objeto o al forjar, y eso pasa un puñado de veces en toda la
+ * ruta. El resto eran 120 peticiones por hora y por móvil para decirle al
+ * servidor exactamente lo que ya sabía.
+ *
+ * `forzar` lo usa el avance de un nodo que exige objeto: ahí sí hay que
+ * asegurarse de que el servidor tiene la última, porque valida con ella.
+ */
 export async function syncInventoryToServer(
   user: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  { forzar = false }: { forzar?: boolean } = {}
 ): Promise<void> {
   const inventorySnapshot = loadInventorySnapshot(user)
   if (!inventorySnapshot || !inventorySnapshot.items?.length) return
+
+  const huella = huellaDeLaMochila(inventorySnapshot)
+  if (!forzar && mochilaYaSubida.get(user) === huella) return
 
   // Un nodo que exige objeto espera a que esto termine antes de validar, así
   // que si se cuelga se cuelga el avance. Se corta pronto: la mochila vuelve a
@@ -431,14 +323,19 @@ export async function syncInventoryToServer(
   const corte = setTimeout(() => abortar.abort(), 6000)
 
   try {
-    await fetchImpl('/api/events/sync', {
+    const respuesta = await fetchImpl('/api/events/sync', {
       method: 'POST',
       signal: abortar.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user, events: [], inventory_snapshot: inventorySnapshot }),
     })
+
+    // Sólo se da por subida si el servidor dijo que sí. Con un fallo se
+    // reintenta en la siguiente vuelta, que es justo lo que hace falta cuando
+    // se forja algo sin cobertura.
+    if (respuesta.ok) mochilaYaSubida.set(user, huella)
   } catch {
-    // Silent - this is a best-effort background sync
+    // Silencio a propósito: es de fondo y se reintenta.
   } finally {
     clearTimeout(corte)
   }

@@ -100,6 +100,8 @@ export interface TeamStatusPayload {
   status: 'ok'
   user: string
   profiles: TeamProfileLiveStatus[]
+  /** Cuántos nodos tiene la misión. */
+  total_nodes?: number
 }
 
 export interface PlayerGamePayload {
@@ -113,6 +115,15 @@ export interface PlayerGamePayload {
   level: number
   finished: boolean
   stages: PlayerStage[]
+  /**
+   * Huella del contenido de la misión.
+   *
+   * Mientras no cambie, los nodos que ya tiene el móvil siguen valiendo y no
+   * hace falta volver a bajarlos. Ver `pedirPartida` en offline/missionSync.ts.
+   */
+  stages_rev?: string
+  /** La respuesta trae los nodos enteros, no sólo el título y las coordenadas. */
+  offline_pack?: boolean
   current_stage: PlayerStage | null
   inventory_snapshot?: any
 }

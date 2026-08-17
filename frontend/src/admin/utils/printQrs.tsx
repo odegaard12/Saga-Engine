@@ -1,5 +1,5 @@
 import { renderToString } from 'react-dom/server'
-import { QRCodeSVG } from 'qrcode.react'
+import { SagaQrCard } from '../../shared/qrCard'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 
 function slugify(value: string): string {
@@ -69,74 +69,22 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
     alert('No hay nodos QR físicos configurados en esta misión.')
     return
   }
+  /**
+   * Las tarjetas salen de la pieza compartida, no de un diseño escrito aquí.
+   *
+   * Aquí había una copia con sus propios ajustes: el logo SAGA encima del
+   * código —que tapa la información de formato y lo deja ilegible para
+   * cualquier escáner—, verde sobre blanco, y la zona de silencio a cero, que
+   * es lo que trae el generador por defecto y lo que la norma prohíbe.
+   *
+   * Ahora imprime exactamente lo mismo que se ve en el panel. Ver
+   * shared/qrCard.tsx para el porqué de cada ajuste.
+   */
   const renderedCardsJson = JSON.stringify(
     cards.map((c) => ({
       label: c.label,
       payload: c.payload,
-      qrSvg: renderToString(
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '16px',
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          width: 'fit-content'
-        }}>
-          <div style={{
-            position: 'relative',
-            padding: '8px',
-            background: '#ffffff',
-            borderRadius: '8px',
-          }}>
-            <QRCodeSVG
-              value={c.payload}
-              size={160}
-              level="H"
-              fgColor="#007f4f"
-              includeMargin={false}
-            />
-            {/* El logo se mantiene pequeño y centrado a propósito: el diseño
-                anterior tapaba la fila de información de formato y las pautas
-                de temporización del QR, que no tienen corrección de errores, y
-                dejaba las pegatinas ilegibles para cualquier escáner. */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: '#ffffff',
-              color: '#007f4f',
-              fontWeight: 900,
-              fontSize: '9px',
-              letterSpacing: '0.5px',
-              padding: '2px 3px',
-              borderRadius: '3px',
-              lineHeight: 1,
-              fontFamily: 'system-ui, Arial Black, sans-serif',
-            }}>SAGA</div>
-          </div>
-          <div style={{
-            marginTop: '12px',
-            background: '#f1f5f9',
-            color: '#0f172a',
-            padding: '4px 12px',
-            borderRadius: '9999px',
-            fontSize: '14px',
-            fontWeight: 700,
-            border: '1px solid #cbd5e1',
-            maxWidth: '180px',
-            textAlign: 'center',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}>
-            {c.label}
-          </div>
-        </div>
-      ),
+      qrSvg: renderToString(<SagaQrCard data={c} paraImprimir />),
     }))
   )
 
@@ -224,6 +172,19 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
         .page-container {
           padding: 24px;
         }
+        .aviso {
+          max-width: 560px;
+          margin: 0 auto 20px;
+          padding: 12px 16px;
+          background: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          border-left: 3px solid #059669;
+          border-radius: 8px;
+          font-size: 13px;
+          line-height: 1.5;
+          color: #064e3b;
+        }
+        .aviso b { display: block; margin-bottom: 4px; }
         .sticker-grid {
           display: flex;
           flex-wrap: wrap;
@@ -235,27 +196,35 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
           flex-direction: column;
           align-items: center;
           page-break-inside: avoid;
-        }
-        .qr-wrap {
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          break-inside: avoid;
+          /* Marca de corte: por donde pasar la tijera sin comerse la zona de
+             silencio del codigo, que es justo lo que lo hace legible. */
+          padding: 3mm;
+          outline: 1px dashed #94a3b8;
+          outline-offset: -1px;
         }
 
         /* Print Override */
         @media print {
+          /* Tamano real, no "lo que quepa". Un QR reescalado por la impresora
+             deja de tener el tamano de modulo que se calculo para leerse a un
+             brazo de distancia. */
+          @page { margin: 8mm; }
           body {
             background: #ffffff;
             color: #000000;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-          .toolbar {
+          .toolbar, .aviso {
             display: none !important;
           }
           .page-container {
             padding: 0;
           }
           .sticker-grid {
-            gap: 10px;
+            gap: 0;
+            justify-content: flex-start;
           }
         }
       </style>
@@ -277,6 +246,13 @@ export function printAllQrs(stages: AdminReactOverviewStage[]) {
       </div>
 
       <div class="page-container">
+        <div class="aviso">
+          <b>Imprime a tamaño real (100 %), sin «ajustar a la página».</b>
+          El código mide 38 mm de lado a propósito: es lo que hace que se lea a un
+          brazo de distancia y con luz mala. Si la impresora lo encoge, deja de
+          leerse. La línea de puntos es por donde cortar sin comerse el margen
+          blanco del código, que es parte del código.
+        </div>
         <div class="sticker-grid" id="grid"></div>
       </div>
 

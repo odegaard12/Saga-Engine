@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import json
@@ -36,6 +37,7 @@ from backend.app.storage.positions_store import (
     load_live_positions_state,
     save_live_positions_state,
     upsert_live_position as upsert_live_position_state,
+    guardar_posicion_sin_leer_todas,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
@@ -65,10 +67,13 @@ API_REDOC_URL = "/redoc" if ENABLE_API_DOCS else None
 API_OPENAPI_URL = "/openapi.json" if ENABLE_API_DOCS else None
 
 app = FastAPI(docs_url=API_DOCS_URL, redoc_url=API_REDOC_URL, openapi_url=API_OPENAPI_URL)
-from backend.app.routers import field_proofs, admin, game
+from backend.app.routers import field_proofs, admin, game, assets, public, shell
 app.include_router(field_proofs.router)
 app.include_router(admin.router)
 app.include_router(game.router)
+app.include_router(assets.router)
+app.include_router(public.router)
+app.include_router(shell.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,9 +83,19 @@ app.add_middleware(
     allow_headers=["Accept", "Content-Type", "X-Requested-With"],
 )
 
+# Comprimir lo que sale. No estaba puesto: todas las respuestas viajaban en
+# JSON crudo. Es texto muy repetitivo —los mismos nombres de campo por cada
+# nodo y por cada jugador— y encoge entre cinco y diez veces. En el monte, con
+# una barra de cobertura, eso es la diferencia entre que un refresco entre y que
+# se quede a medias.
+#
+# El umbral evita gastar en comprimir respuestas diminutas, y va DESPUÉS de CORS
+# para que las cabeceras se pongan igual.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
-VALID_PLAYER_THEMES = {"classic", "glass"}
+
+VALID_PLAYER_THEMES = {"glass", "flame-red"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
@@ -96,8 +111,8 @@ def normalize_ui_lang(value):
 
 
 def normalize_player_theme(value):
-    theme = str(value or "classic").strip().lower()
-    return theme if theme in VALID_PLAYER_THEMES else "classic"
+    theme = str(value or "glass").strip().lower()
+    return theme if theme in VALID_PLAYER_THEMES else "glass"
 
 def resolve_config_db_path():
     data_dir = (
@@ -119,13 +134,13 @@ def load_config():
         "map_zoom": 13,
         "players": ["PLAYER 1", "PLAYER 2"],
         "ui_lang": "es",
-        "player_theme": "classic",
+        "player_theme": "glass",
         "data_dir": "data"
     })
     if not isinstance(cfg, dict):
         cfg = {}
     
-    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "classic"))
+    cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "glass"))
     
     # Fallback to env if Mapbox token is missing
     if not cfg.get("mapbox_token"):
@@ -405,6 +420,52 @@ def verify_player_session(request: Request, user: str):
 def require_player_session(request: Request, user: str):
     if not verify_player_session(request, user):
         raise HTTPException(status_code=403, detail="player session required")
+
+
+def hay_sesion_de_algun_jugador(request: Request):
+    """¿Quien pregunta es un jugador de esta misión, sea cual sea?
+
+    Distinto de `require_player_session`, que ata la petición a UN jugador
+    concreto. Hay cosas que un jugador ve de todo el grupo —las fotos de campo
+    salen en el mapa de todos— y ahí lo que hay que comprobar es que sea alguien
+    de dentro, no quién.
+    """
+    datos = player_session_security.read_player_session_token(
+        request.cookies.get(PLAYER_SESSION_COOKIE),
+        secret=get_session_signing_secret(),
+    )
+
+    if not datos:
+        return False
+
+    return bool(resolve_known_player_profile(datos.get("user")))
+
+
+def exigir_ser_del_grupo(request: Request):
+    """Cierra la puerta a quien no esté jugando.
+
+    Estos datos estaban abiertos a internet. Sin sesión, sin contraseña y sin
+    saber nada, `GET /api/field-proofs` devolvía las 17 fotos de la ruta con el
+    NOMBRE de quien la hizo, las COORDENADAS exactas y el nodo, y la imagen se
+    descargaba entera desde su URL. Comprobado contra sagagia.es el 2026-08-09.
+
+    Para una ruta entre amigos ya era feo. Para vender esto a un colegio es
+    inaceptable, por muchos permisos firmados que haya: el consentimiento cubre
+    hacer la foto, no publicarla.
+
+    El pase de jugador no es una identificación fuerte —se consigue entrando en
+    la misión—, pero corta a los buscadores, a los rastreadores y a cualquiera
+    que no sepa un nombre de jugador. Contra eso, lo que protege de verdad es no
+    guardar lo que no hace falta y borrarlo al acabar la ruta.
+    """
+    if hay_sesion_de_algun_jugador(request):
+        return
+
+    # El panel también entra: desde ahí se revisan y se descargan las fotos.
+    if verify_admin_session_token(request.cookies.get(ADMIN_SESSION_COOKIE)):
+        return
+
+    raise HTTPException(status_code=403, detail="player session required")
 
 
 def apply_security_headers(response: Response, request: Request):
@@ -751,7 +812,14 @@ def get_live_position(user):
 
 
 def upsert_live_position_for_user(user, position):
-    return upsert_live_position_state(POSITIONS_DB, user, position)
+    """Guarda dónde está un jugador.
+
+    No devuelve nada: quien llama a esto —el latido, trece móviles cada cinco
+    segundos— no usaba el resultado, y calcularlo obligaba a leer la tabla
+    entera de posiciones cada vez. Para la tabla del grupo está
+    `load_live_positions`.
+    """
+    return guardar_posicion_sin_leer_todas(POSITIONS_DB, user, position)
 
 
 def _hash_corto(texto: str) -> str:
@@ -1115,269 +1183,28 @@ from backend.app.runtime.core_engine import (
     read_stage_item_requirement,
 )
 
-APP_DIR = Path(__file__).resolve().parent
-REACT_DIST_DIR = APP_DIR / "frontend" / "dist"
-REACT_INDEX_FILE = REACT_DIST_DIR / "index.html"
-REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
-REACT_MANIFEST_FILE = REACT_DIST_DIR / "manifest.webmanifest"
-REACT_PUBLIC_MANIFEST_FILE = APP_DIR / "frontend" / "public" / "manifest.webmanifest"
+# Las rutas del frontend compilado, el servidor de estaticos y la version
+# viven ahora en backend/app/build_frontend.py. Se reexportan aqui porque
+# los routers todavia las piden por main mientras se rompe el ciclo.
+from backend.app.build_frontend import (  # noqa: E402
+    APP_DIR,
+    REACT_ASSETS_DIR,
+    REACT_DIST_DIR,
+    REACT_INDEX_FILE,
+    REACT_MANIFEST_FILE,
+    REACT_PUBLIC_MANIFEST_FILE,
+    get_runtime_version_payload,
+    react_index_or_missing,
+    saga_asset_file_response,
+)
 
 app.mount("/assets", StaticFiles(directory=str(REACT_ASSETS_DIR), check_dir=False), name="react_assets")
 
 
-def saga_asset_file_response(filename: str, media_type: str):
-    dist_file = REACT_DIST_DIR / filename
-    public_file = APP_DIR / "frontend" / "public" / filename
+# Los iconos, las marcas y el manifiesto viven ahora en
+# backend/app/routers/assets.py. Aqui habia ademas DOS manejadores de
+# /favicon.ico con el mismo nombre de funcion: solo respondia el primero.
 
-    if dist_file.exists():
-        return FileResponse(
-            dist_file,
-            media_type=media_type,
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    if public_file.exists():
-        return FileResponse(
-            public_file,
-            media_type=media_type,
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    return JSONResponse({"status": "error", "message": f"{filename} not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_svg():
-    return saga_asset_file_response("saga-app-icon.svg", "image/svg+xml")
-
-
-@app.api_route("/opencv.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_opencv_js():
-    """Motor de visión para reconocer las pegatinas QR con el logo encima.
-
-    Son ~11 MB, así que se sirve con caché larga: el service worker lo guarda
-    en el shell offline y el jugador lo necesita en el monte sin cobertura.
-    """
-    for candidate in (REACT_DIST_DIR / "opencv.js", APP_DIR / "frontend" / "public" / "opencv.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                headers={"Cache-Control": "public, max-age=31536000, immutable"},
-            )
-    return JSONResponse({"status": "error", "message": "opencv.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-worker.js", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_worker_js():
-    """Worker que aisla OpenCV: si se queda sin memoria muere el worker, no la app."""
-    for candidate in (REACT_DIST_DIR / "qr-worker.js", APP_DIR / "frontend" / "public" / "qr-worker.js"):
-        if candidate.exists():
-            return FileResponse(
-                candidate,
-                media_type="application/javascript",
-                # Cloudflare cachea los .js por delante del backend y llegó a
-                # servir el worker antiguo tras desplegar, dejando el arranque
-                # colgado para siempre. Se le pide expresamente que no lo haga;
-                # el cliente además versiona la URL.
-                headers={
-                    "Cache-Control": "no-store, must-revalidate",
-                    "CDN-Cache-Control": "no-store",
-                },
-            )
-    return JSONResponse({"status": "error", "message": "qr-worker.js not found"}, status_code=404)
-
-
-@app.api_route("/qr-selftest", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest():
-    """Autotest del lector de pegatinas sobre fotos reales de campo.
-
-    Sirve para comprobar en un móvil concreto, antes de salir al monte, que el
-    motor de visión arranca y reconoce las pegatinas ya pegadas.
-    """
-    return saga_asset_file_response("qr-selftest.html", "text/html; charset=utf-8")
-
-
-SELFTEST_ASSET_SUFFIXES = (".jpg", ".json")
-
-
-def is_safe_selftest_asset(asset):
-    r"""¿Es un nombre de fichero simple y seguro?
-
-    Se comprueba con operaciones de cadena en vez de una expresión regular.
-    La regex anterior, [A-Za-z0-9_.-]+\.(jpg|json), tenía retroceso
-    polinómico: el punto estaba dentro de la clase de caracteres Y además se
-    exigía literal después, así que una entrada con muchos puntos o guiones
-    disparaba el tiempo de análisis. Como el nombre viene de la URL, eso es
-    una vía de denegación de servicio (CodeQL py/polynomial-redos).
-    """
-    name = str(asset or "")
-
-    if not name or len(name) > 64:
-        return False
-
-    # Nada de rutas: esto sólo sirve nombres sueltos de un directorio fijo.
-    if "/" in name or "\\" in name or ".." in name:
-        return False
-
-    suffix = next((s for s in SELFTEST_ASSET_SUFFIXES if name.endswith(s)), None)
-    if suffix is None:
-        return False
-
-    stem = name[: -len(suffix)]
-    if not stem:
-        return False
-
-    return all(c.isalnum() or c in "_-" for c in stem)
-
-
-@app.api_route("/qr-selftest/{asset}", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_qr_selftest_asset(asset: str):
-    """Fotos de referencia y matrices esperadas del autotest."""
-    if not is_safe_selftest_asset(asset):
-        return JSONResponse({"status": "error", "message": "invalid asset"}, status_code=404)
-
-    media = "image/jpeg" if asset.endswith(".jpg") else "application/json"
-    for base in (REACT_DIST_DIR, APP_DIR / "frontend" / "public"):
-        candidate = base / "qr-selftest" / asset
-        if candidate.exists():
-            return FileResponse(candidate, media_type=media)
-    return JSONResponse({"status": "error", "message": "asset not found"}, status_code=404)
-
-
-@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_favicon_ico():
-    return saga_asset_file_response("saga-app-icon-192.png", "image/png")
-
-@app.api_route("/manifest.webmanifest", methods=["GET", "HEAD"])
-def react_manifest_webmanifest():
-    if REACT_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    if REACT_PUBLIC_MANIFEST_FILE.exists():
-        return FileResponse(
-            REACT_PUBLIC_MANIFEST_FILE,
-            media_type="application/manifest+json",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
-        )
-
-    return JSONResponse({"status": "missing_manifest"}, status_code=404)
-
-
-def react_index_or_missing():
-    if REACT_INDEX_FILE.exists():
-        return FileResponse(
-            REACT_INDEX_FILE,
-            headers={
-                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                "Pragma": "no-cache",
-                "Expires": "0",
-            }
-        )
-
-    return HTMLResponse(
-        """
-        <!doctype html>
-        <html>
-          <head><title>SAGA React build missing</title></head>
-          <body style="font-family: system-ui; padding: 24px;">
-            <h1>SAGA React build missing</h1>
-            <p>Run <code>cd frontend && npm run build</code> before serving the React player from FastAPI.</p>
-            <p>Build the React frontend with <code>cd frontend && npm run build</code>, then restart FastAPI.</p>
-          </body>
-        </html>
-        """,
-        status_code=503,
-    )
-
-
-@app.get("/favicon.ico", include_in_schema=False)
-async def saga_favicon_ico():
-    dist_file = REACT_DIST_DIR / "saga-app-icon-192.png"
-    public_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    target = dist_file if dist_file.exists() else public_file
-
-    if not target.exists():
-        return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-    return FileResponse(
-        target,
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-
-
-@app.api_route("/saga-app-icon-180.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_180_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_192_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-192.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-app-icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_app_icon_512_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-512.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/apple-touch-icon-precomposed.png", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_apple_touch_icon_precomposed_png():
-    icon_file = APP_DIR / "frontend" / "public" / "saga-app-icon-180.png"
-    if icon_file.exists():
-        return FileResponse(icon_file, media_type="image/png", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "icon not found"}, status_code=404)
-
-
-@app.api_route("/saga-brand-final.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_brand_final_svg():
-    public_file = APP_DIR / "frontend" / "public" / "saga-brand-final.svg"
-    if public_file.exists():
-        return FileResponse(public_file, media_type="image/svg+xml", headers={"Cache-Control": "no-cache, max-age=0"})
-    return JSONResponse({"status": "error", "detail": "brand asset not found"}, status_code=404)
-
-
-@app.api_route("/saga-header-mark.svg", methods=["GET", "HEAD"], include_in_schema=False)
-async def saga_header_mark_svg():
-    dist_file = REACT_DIST_DIR / "saga-header-mark.svg"
-    public_file = APP_DIR / "frontend" / "public" / "saga-header-mark.svg"
-
-    if dist_file.exists():
-        return FileResponse(
-            dist_file,
-            media_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    return FileResponse(
-        public_file,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
 
 @app.middleware("http")
 async def saga_no_cache_html(request, call_next):
@@ -1408,251 +1235,43 @@ async def saga_no_cache_html(request, call_next):
 
     return apply_security_headers(response, request)
 
-@app.head("/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/", response_class=HTMLResponse)
-async def react_entry():
-    return react_index_or_missing()
-
-@app.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react", response_class=HTMLResponse)
-async def react_admin_shell():
-    return react_index_or_missing()
-
-@app.head("/admin-react/{path:path}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin-react/{path:path}", response_class=HTMLResponse)
-async def react_admin_shell_path(path: str):
-    return react_index_or_missing()
-
-@app.head("/player", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player", response_class=HTMLResponse)
-@app.head("/player/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/", response_class=HTMLResponse)
-@app.head("/player/{name}", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/player/{name}", response_class=HTMLResponse)
-async def react_player(request: Request, name: str = ""):
-    # Serve the React app directly. The frontend derives the player from /player/{name}.
-    # Avoid RedirectResponse here: user-controlled redirect targets trigger CodeQL open-redirect checks.
-    response = react_index_or_missing()
-    profile = resolve_known_player_profile(name)
-    if profile:
-        set_player_session_cookie(response, request, profile.get("id") or name)
-    else:
-        clear_player_session_cookie(response, request)
-    return response
-
-@app.head("/admin", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/admin")
-async def admin_redirect_to_react():
-    return Response(status_code=307, headers={"Location": "/admin-react"})
+# Las pantallas -/, /player/{name}, /admin-react y /admin- viven ahora en
+# backend/app/routers/shell.py. Con esto main.py se queda sin rutas: solo
+# el ensamblado de la aplicacion y los ayudantes que usan los routers.
 
 
-def get_runtime_version_payload():
-    # Load build env file written by the deploy script (highest priority after env vars).
-    # Format: KEY=value, one per line.
-    _build_env: dict[str, str] = {}
-    try:
-        env_file = APP_DIR / ".saga_build_env"
-        if env_file.exists():
-            for line in env_file.read_text().splitlines():
-                if "=" in line:
-                    k, _, v = line.partition("=")
-                    _build_env[k.strip()] = v.strip()
-    except Exception:
-        pass
-
-    def _get(key: str, fallback: str = "") -> str:
-        # .saga_build_env takes priority — it is written by the deploy script
-        # and reflects the actual deployed version, overriding any stale
-        # env vars that were baked into the container at creation time.
-        return _build_env.get(key, "").strip() or os.getenv(key, "").strip() or fallback
-
-    version = _get("SAGA_VERSION")
-    if not version:
-        try:
-            version = (APP_DIR / "VERSION").read_text().strip()
-        except Exception:
-            version = "dev"
-
-    commit = _get("SAGA_COMMIT", "unknown")
-    if commit == "unknown":
-        try:
-            import subprocess as _sp
-            r = _sp.run(["git", "rev-parse", "HEAD"], cwd=str(APP_DIR),
-                        capture_output=True, text=True, timeout=2)
-            if r.returncode == 0:
-                commit = r.stdout.strip()
-        except Exception:
-            pass
-
-    built_at = _get("SAGA_BUILD_TIME")
-
-    return {
-        "status": "ok",
-        "version": version or "dev",
-        "commit": commit or "unknown",
-        "built_at": built_at,
-    }
+# /api/version, /api/config, /api/player-avatar, las teselas del mapa y el
+# service worker viven ahora en backend/app/routers/public.py.
 
 
-@app.get("/api/version")
-async def get_version():
-    return get_runtime_version_payload()
+# Los nodos de la mision -leerlos, validarlos y prepararlos para el jugador-
+# viven ahora en backend/app/runtime/mision.py. Se reexportan porque los routers
+# todavia los piden por main mientras se rompe el import circular.
+from backend.app.runtime.mision import (  # noqa: E402
+    project_stage_for_player,
+    stage_accepts_code,
+    stage_qr_payloads as _stage_qr_payloads,
+    validate_stages,
+)
+from backend.app.runtime import mision as _mision  # noqa: E402
 
-
-# ---------------------------------------------------------------------------
-# Map Satellite tile proxy – serves tiles from the same HTTP origin
-# ---------------------------------------------------------------------------
-_MAP_TILE_BASE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"
-_TILE_PROXY_HEADERS = {
-    "User-Agent": "SAGA-Engine/2.x tile-proxy",
-}
-
-@app.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
-async def map_tile_proxy(z: int, x: int, y: int):
-    """Proxy Map raster tiles so they are served from the same HTTP origin,
-    avoiding iOS Safari mixed-content (HTTPS tile ← HTTP page) restrictions."""
-    if z < 0 or z > 19:
-        raise HTTPException(status_code=400, detail="Invalid zoom")
-    
-    # ESRI expects /tile/z/y/x (level/row/column)
-    url = f"{_MAP_TILE_BASE}/{z}/{y}/{x}"
-    
-    if _HTTPX_AVAILABLE:
-        try:
-            async with _httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(url, headers=_TILE_PROXY_HEADERS, follow_redirects=True)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
-            
-            content_type = resp.headers.get("Content-Type", "image/jpeg")
-            return Response(
-                content=resp.content,
-                media_type=content_type,
-                headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except _httpx.RequestError as exc:
-            raise HTTPException(status_code=502, detail=f"Tile proxy error: {exc}")
-    else:
-        raise HTTPException(status_code=500, detail="httpx not available for proxying")
-
-
-@app.get("/api/config")
-async def get_config():
-    cfg = load_config()
-    return {
-        "site_name": cfg.get("site_name", "PUT TITLE HERE"),
-        "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
-        "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
-        "ui_lang": normalize_ui_lang(cfg.get("ui_lang", "es")),
-        "player_theme": normalize_player_theme(cfg.get("player_theme", "classic")),
-        "story_title": cfg.get("story_title", ""),
-        "story_text": cfg.get("story_text", ""),
-        "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
-        "prologue_subtitle": cfg.get("prologue_subtitle", ""),
-        "prologue_body": cfg.get("prologue_body", ""),
-        "map_center": cfg.get("map_center", [40.4168, -3.7038]),
-        "map_zoom": cfg.get("map_zoom", 13),
-        "mapbox_style": cfg.get("mapbox_style", ""),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        "player_profiles": get_player_profiles(cfg)
-    }
-
-def validate_stages(raw_stages):
-    if not isinstance(raw_stages, list):
-        return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
-
-    errors = []
-    for idx, stage in enumerate(raw_stages):
-        if not isinstance(stage, dict):
-            errors.append({"index": idx, "field": "node", "detail": "each node must be an object"})
-            continue
-        errors.extend(validate_stage(stage, idx=idx))
-    return errors
 
 def get_runtime_stages():
+    """Los nodos de la mision, normalizados.
+
+    Se queda aqui porque necesita saber DONDE estan guardados, y eso lo decide
+    la configuracion del despliegue.
+    """
     raw_stages = load_stages(STAGES_DB)
     if not isinstance(raw_stages, list):
         return []
     return [normalize_stage(stage) for stage in raw_stages]
 
-def project_stage_for_player(raw_stage, include_runtime=False):
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
 
-    out = {
-        "id": node["id"],
-        "title": node["presentation"]["title"],
-        "lat": node["location"]["lat"],
-        "lon": node["location"]["lon"],
-        "radius": node["location"]["radius_m"],
-    }
-
-    if include_runtime:
-        out.update({
-            "content": node["presentation"]["content"],
-            "type": node["interaction"]["type"],
-            "config": node["interaction"]["config"],
-            "minigame": build_stage_minigame_runtime(node),
-            "entry": node["entry"],
-            "success": node["success"],
-            "requirements": node.get("requirements", {"items": []}),
-            "messages": node["messages"],
-        })
-
-    out = preserve_physical_stage_fields(node, out)
-    return out
-
-def stage_accepts_code(raw_stage, code, manual=False):
-    """¿Este código supera el nodo?
-
-    `manual` marca que viene de una casilla escrita a mano —el código de
-    respaldo—, no de un minijuego ganado. Importa porque el motor añade a todos
-    los nodos una condición interna con la que los minijuegos avisan de que se
-    han superado. Esa palabra la acepta CUALQUIER nodo: escrita en la casilla de
-    respaldo saltaba el que fuera, sin los dos minutos de penalización y sin
-    jugar. Desde una casilla de texto ya no vale.
-    """
-    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
-    submitted = _clean_code(code)
-
-    if not submitted:
-        return False
-
-    for condition in node["success"]["conditions"]:
-        if manual and condition.get("kind") == "minigame_ok":
-            continue
-        expected = _clean_code(condition.get("value"))
-        if expected and submitted == expected:
-            return True
-
-    # El código impreso en la pegatina ES el código del nodo. Sin esto,
-    # escanear el QR correcto guardaba el objeto pero no completaba el nodo, y
-    # teclear "SAGA_01" como respaldo tampoco valía.
-    for expected in _stage_qr_payloads(raw_stage):
-        if expected and submitted == expected:
-            return True
-
-    return False
-
-
-def _stage_qr_payloads(raw_stage):
-    """Códigos impresos en las pegatinas QR de un nodo."""
-    if not isinstance(raw_stage, dict):
-        return []
-
-    values = [raw_stage.get("qr_payload")]
-
-    config = raw_stage.get("config")
-    if isinstance(config, dict):
-        values.append(config.get("qr_payload"))
-
-    physical = raw_stage.get("physical_qr")
-    if isinstance(physical, dict):
-        values.append(physical.get("payload"))
-
-    return [_clean_code(value) for value in values if value]
+def stages_revision(runtime_stages=None):
+    """Huella del contenido de la mision. Ver runtime/mision.py."""
+    stages = runtime_stages if runtime_stages is not None else get_runtime_stages()
+    return _mision.stages_revision(stages)
 
 
 PLAYER_EVENT_TYPES = {
@@ -2041,304 +1660,56 @@ def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=
     }
 
 
-@app.post("/api/admin/react-overview")
-async def admin_react_overview(request: Request):
-    data = await request.json()
+# Las cuatro rutas de administracion que vivian aqui (react-overview,
+# mission-status, stages y save-config) estaban escritas TAMBIEN en
+# backend/app/routers/admin.py, que es el que responde: los routers se
+# incluyen en la primera linea de este fichero, asi que estas copias no se
+# ejecutaban nunca. Editarlas no cambiaba nada. Ver tests/test_rutas_duplicadas.py.
 
-    if not admin_request_authorized(request, data):
-        raise HTTPException(status_code=403, detail="forbidden")
+# La mochila -que objetos lleva un jugador y si le sirven para abrir un nodo-
+# vive ahora en backend/app/runtime/mochila.py. Aqui se quedan las dos funciones
+# que necesitan saber DONDE estan guardados los eventos y el inventario.
+from backend.app.runtime import mochila as _mochila  # noqa: E402
 
-    if admin_password_change_required():
-        return {
-            "status": "password_change_required",
-            "message": "Admin password change required before using the React admin overview.",
-        }
-
-    cfg = load_config()
-    stages = get_runtime_stages()
-    profiles = get_player_profiles(cfg)
-    gamestate = load_player_progress()
-    positions = load_live_positions()
-    inventory_state = load_inventory_state()
-
-    stage_summaries = [
-        _admin_react_stage_summary(stage, idx)
-        for idx, stage in enumerate(stages)
-    ]
-
-    family_counts = {
-        "signal_hunt": 0,
-        "bearing_hunt": 0,
-        "circuit_matrix": 0,
-    }
-    for stage in stage_summaries:
-        stage_type = stage.get("type")
-        if stage_type in family_counts:
-            family_counts[stage_type] += 1
-
-    profile_summaries = [
-        _admin_react_profile_summary(profile, gamestate, positions, inventory_state)
-        for profile in profiles
-    ]
-
-    return {
-        "status": "ok",
-        "config": {
-            "site_name": cfg.get("site_name"),
-            "admin_title": cfg.get("admin_title"),
-            "admin_subtitle": cfg.get("admin_subtitle"),
-            "player_theme": cfg.get("player_theme"),
-            "map_center": cfg.get("map_center"),
-            "map_zoom": cfg.get("map_zoom"),
-        },
-        "counts": {
-            "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
-            "profiles": len(profiles),
-            "stages": len(stage_summaries),
-            "finished_profiles": sum(1 for item in profile_summaries if item.get("finished")),
-            "family_counts": family_counts,
-        },
-        "families": [
-            {"id": "signal_hunt", "label": "Signal Hunt"},
-            {"id": "bearing_hunt", "label": "Bearing Hunt"},
-            {"id": "circuit_matrix", "label": "Circuit Matrix"},
-        ],
-        "stages": stage_summaries,
-        "profiles": profile_summaries,
-    }
-
-
-@app.post("/api/admin/mission-status")
-async def admin_mission_status(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
-
-    cfg = load_config()
-    runtime_stages = get_runtime_stages()
-    state = load_player_progress()
-    positions = load_live_positions()
-    now = int(time.time())
-
-    items = []
-    for profile in get_player_profiles(cfg):
-        profile_id = profile.get("id")
-        lvl = state.get(profile_id, 0)
-        finished = lvl >= len(runtime_stages)
-
-        current_stage = ""
-        if not finished and 0 <= lvl < len(runtime_stages):
-            current_stage = runtime_stages[lvl]["presentation"]["title"]
-
-        items.append({
-            **project_live_profile_status(profile, positions.get(profile_id), now),
-            "level": lvl,
-            "finished": finished,
-            "current_stage": current_stage,
-        })
-
-    return {
-        "status": "ok",
-        "server_ts": now,
-        "profiles": items
-    }
-
-@app.post("/api/admin/stages")
-async def get_stages(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "bad password"}
-        )
-
-    if admin_password_change_required():
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "detail": "password change required"}
-        )
-
-    return load_stages(STAGES_DB)
-
-@app.post("/api/admin/save-config")
-async def save_config_endpoint(request: Request):
-    data = await request.json()
-
-    if not admin_request_authorized(request, data):
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
-
-    if admin_password_change_required():
-        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
-
-    incoming = data.get("config") or {}
-    cfg = load_config()
-
-    if "players" in incoming:
-        players = parse_player_entries(incoming.get("players"))
-    else:
-        players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
-
-    ui_lang = normalize_ui_lang(incoming.get("ui_lang", cfg.get("ui_lang", "es")))
-
-    player_theme = normalize_player_theme(incoming.get("player_theme", cfg.get("player_theme", "classic")))
-
-    cfg["site_name"] = incoming.get("site_name", cfg.get("site_name", "PUT TITLE HERE")).strip() or "PUT TITLE HERE"
-    cfg["admin_title"] = incoming.get("admin_title", cfg.get("admin_title", "PUT ADMIN TITLE HERE")).strip() or "PUT ADMIN TITLE HERE"
-    cfg["admin_subtitle"] = incoming.get("admin_subtitle", cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE")).strip()
-    cfg["ui_lang"] = ui_lang
-    cfg["player_theme"] = player_theme
-    cfg["story_title"] = incoming.get("story_title", cfg.get("story_title", "")).strip()
-    cfg["story_text"] = incoming.get("story_text", cfg.get("story_text", "")).strip()
-    cfg["prologue_title"] = incoming.get("prologue_title", cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE")).strip()
-    cfg["prologue_subtitle"] = incoming.get("prologue_subtitle", cfg.get("prologue_subtitle", "")).strip()
-    cfg["prologue_body"] = incoming.get("prologue_body", cfg.get("prologue_body", "")).strip()
-
-    map_center = incoming.get("map_center", cfg.get("map_center", [40.4168, -3.7038]))
-    if isinstance(map_center, list) and len(map_center) == 2:
-        try:
-            cfg["map_center"] = [float(map_center[0]), float(map_center[1])]
-        except Exception:
-            pass
-
-    try:
-        cfg["map_zoom"] = int(incoming.get("map_zoom", cfg.get("map_zoom", 13)))
-    except Exception:
-        pass
-
-    cfg["mapbox_token"] = incoming.get("mapbox_token", cfg.get("mapbox_token", "")).strip()
-    cfg["mapbox_style"] = incoming.get("mapbox_style", cfg.get("mapbox_style", "")).strip()
-
-    incoming_profiles = incoming.get("player_profiles")
-    if isinstance(incoming_profiles, list) and incoming_profiles:
-        normalized_profiles = [
-            normalize_player_profile(profile, index=i)
-            for i, profile in enumerate(incoming_profiles)
-        ]
-        cfg["player_profiles"] = normalized_profiles
-        cfg["players"] = [
-            profile.get("id") or profile.get("display_name") or f"PLAYER {i + 1}"
-            for i, profile in enumerate(normalized_profiles)
-        ]
-    else:
-        cfg["players"] = players
-        if "player_profiles" in incoming:
-            cfg["player_profiles"] = [
-                normalize_player_profile(player, index=i)
-                for i, player in enumerate(players)
-            ]
-
-    save_config(cfg)
-    return {"status": "ok", "config": cfg}
-
-
-
-def _event_payload(event):
-    payload = event.get("payload") if isinstance(event, dict) else {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _event_inventory_item_id(event):
-    payload = _event_payload(event)
-    return _as_str(
-        payload.get("inventory_item_id")
-        or payload.get("item_id")
-        or payload.get("id")
-    ).strip()
-
-
-def _event_inventory_quantity(event, default=1):
-    payload = _event_payload(event)
-    for key in ("inventory_quantity", "quantity", "delta"):
-        if key in payload:
-            return _positive_int(payload.get(key), default)
-    return default
+_event_payload = _mochila.payload_del_evento
+_event_inventory_item_id = _mochila.item_del_evento
+_event_inventory_quantity = _mochila.cantidad_del_evento
 
 
 def count_player_inventory_item(user, item_id):
+    """Cuantas unidades de un objeto tiene alguien.
+
+    La mochila no se guarda como una lista: se reconstruye sumando los eventos
+    y contrastandolos con la copia que sube el movil. Los eventos cubren lo que
+    se recoge en un nodo; la copia cubre lo que se forja en la mesa de trabajo,
+    que pasa entero en el telefono y no deja evento. Ver runtime/mochila.py.
+    """
     user_key = _as_str(user).strip()
-    item_key = _as_str(item_id).strip()
-    if not user_key or not item_key:
+    if not user_key:
         return 0
 
-    collected = 0
-    used = 0
-    events = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
+    eventos = list_events(EVENT_LOG_DB, user=user_key, limit=10000)
 
-    for event in events:
-        event_type = _as_str(event.get("type")).strip()
-        payload = _event_payload(event)
-        current_item = _event_inventory_item_id(event)
-
-        if current_item != item_key:
-            continue
-
-        action = _as_str(payload.get("inventory_action")).strip().lower()
-
-        if event_type == "inventory_item_used" or action in {"used", "spent", "consumed"}:
-            used += _event_inventory_quantity(event, 1)
-        elif event_type == "inventory_item_collected":
-            collected += _event_inventory_quantity(event, 1)
-        elif action == "collected":
-            # Los escaneos QR/NFC del jugador llegan como qr_scanned/nfc_url_opened
-            # con inventory_action=collected en el payload.
-            collected += _event_inventory_quantity(event, 1)
-
-    # El snapshot de inventario sincronizado por el jugador cubre los objetos
-    # creados en la mesa de trabajo (crafteo local), que no generan eventos.
-    snapshot_quantity = 0
     try:
-        inventory_state = load_inventory_state()
-        snapshot = inventory_state.get(user_key)
-        if not isinstance(snapshot, dict):
-            snapshot = inventory_state.get(_as_str(user))
-        items = snapshot.get("items") if isinstance(snapshot, dict) else None
-        if isinstance(items, list):
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                if _as_str(item.get("item_id")).strip() != item_key:
-                    continue
-                if _as_str(item.get("state")).strip().lower() == "used":
-                    continue
-                snapshot_quantity += _positive_int(item.get("quantity"), 1)
+        inventario = load_inventory_state()
+        copia = inventario.get(user_key)
+        if not isinstance(copia, dict):
+            copia = inventario.get(_as_str(user))
     except Exception:
-        snapshot_quantity = 0
+        copia = {}
 
-    return max(0, max(collected, snapshot_quantity) - used)
+    return _mochila.contar_objeto(eventos, copia, user_key, item_id)
 
 
 def evaluate_stage_item_requirement(raw_stage, user):
-    requirement = read_stage_item_requirement(raw_stage)
-    if not requirement:
-        return {
-            "required": False,
-            "ok": True,
-            "owned": 0,
-            "required_quantity": 0,
-            "item_id": "",
-            "label": "",
-            "consume": False,
-        }
-
-    # Con .get() en lugar de indexar: un requisito al que le falte una clave
-    # debe poder bloquear el nodo, nunca tumbar /api/advance con un 500. Un
-    # error aquí es invisible para el jugador, porque el cliente cae a su copia
-    # local y sigue como si nada mientras el servidor se queda atrás.
-    item_id = str(requirement.get("item_id") or "").strip()
-    owned = count_player_inventory_item(user, item_id)
-    required_quantity = _positive_int(requirement.get("quantity"), 1)
-
-    return {
-        "required": True,
-        "ok": owned >= required_quantity,
-        "owned": owned,
-        "required_quantity": required_quantity,
-        "item_id": item_id,
-        "label": str(requirement.get("label") or item_id),
-        "consume": bool(requirement.get("consume", False)),
-    }
+    """Puede abrirse este nodo con lo que lleva encima."""
+    requisito = read_stage_item_requirement(raw_stage)
+    tiene = (
+        count_player_inventory_item(user, str(requisito.get("item_id") or "").strip())
+        if requisito
+        else 0
+    )
+    return _mochila.evaluar_requisito(raw_stage, tiene)
 
 
 def append_inventory_item_used_event(user, profile_id, current_node, requirement_status):
@@ -2365,80 +1736,3 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
     )
 
 
-@app.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])
-def player_avatar(profile_id: str, request: Request):
-    """Sirve la foto de un jugador como imagen, cacheable.
-
-    Va aparte de la tabla de equipo a propósito: esa se pide cada 5 segundos y
-    llevaba las fotos dentro, repitiéndolas enteras cada vez. Aquí se descargan
-    una vez y el navegador —y el service worker— se las quedan. La URL trae el
-    hash de la imagen, así que cambiar una foto en administración invalida la
-    caché sola.
-    """
-    foto = buscar_avatar_de(profile_id)
-    if not foto:
-        raise HTTPException(status_code=404, detail="sin foto")
-
-    try:
-        cabecera, datos = foto.split(",", 1)
-        tipo = cabecera.split(";")[0].removeprefix("data:") or "image/png"
-        binario = base64.b64decode(datos)
-    except (ValueError, TypeError, base64.binascii.Error):
-        raise HTTPException(status_code=404, detail="foto ilegible")
-
-    etag = f'"{_hash_corto(foto)}"'
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-
-    return Response(
-        content=binario,
-        media_type=tipo,
-        headers={
-            # Inmutable: la URL cambia si cambia la foto, así que el móvil puede
-            # quedarse esta para siempre.
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "ETag": etag,
-        },
-    )
-
-
-@app.api_route("/sw.js", methods=["GET", "HEAD"])
-def player_service_worker():
-    # El nombre de la caché del shell debe cambiar en cada versión desplegada;
-    # si queda fijo, los jugadores siguen recibiendo el shell antiguo cacheado
-    # aunque el admin haya publicado cambios.
-    for sw_file in (REACT_DIST_DIR / "sw.js", Path("frontend/public/sw.js")):
-        if not sw_file.exists():
-            continue
-        try:
-            content = sw_file.read_text(encoding="utf-8")
-            version = get_runtime_version_payload().get("version", "dev")
-            content = re.sub(
-                r"saga-player-shell-v[0-9A-Za-z.\-]+",
-                f"saga-player-shell-v{version}",
-                content,
-            )
-            return Response(
-                content=content,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-        except Exception:
-            return FileResponse(
-                sw_file,
-                media_type="application/javascript",
-                headers={
-                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                    "Service-Worker-Allowed": "/",
-                },
-            )
-
-    return JSONResponse({"status": "missing_service_worker"}, status_code=404)
-
-
-@app.get("/service-worker.js")
-def player_service_worker_alias():
-    return player_service_worker()

@@ -98,10 +98,11 @@ const STYLES = `
   line-height: 1;
   font-weight: 950;
   letter-spacing: -.045em;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 .motion-brief {
-  color: rgba(226,232,240,.72);
+  color: rgba(226,232,240,.8);
   font-size: 12px;
   line-height: 1.32;
 }
@@ -113,10 +114,11 @@ const STYLES = `
   place-items: center;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,.08);
-  background:
-    radial-gradient(circle at 50% 65%, rgba(132,204,22,.16), transparent 42%),
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(17,19,21,0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(132,204,22,0.05);
 }
 
 .motion-radar {
@@ -174,12 +176,13 @@ const STYLES = `
   display: grid;
   place-items: center;
   border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(248,250,252,.10), rgba(248,250,252,.035));
-  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(15,23,42,0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.15);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.10),
-    0 20px 38px rgba(0,0,0,.28);
+    0 20px 38px rgba(0,0,0,.4);
 }
 
 .motion-beacon::before {
@@ -190,7 +193,7 @@ const STYLES = `
   height: 62px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(190,242,100,.18), rgba(190,242,100,.88));
-  box-shadow: 0 0 28px rgba(190,242,100,.36);
+  box-shadow: 0 0 28px rgba(190,242,100,.6);
   opacity: var(--core-opacity);
 }
 
@@ -213,7 +216,7 @@ const STYLES = `
   position: relative;
   z-index: 2;
   font-size: 38px;
-  filter: drop-shadow(0 0 12px rgba(190,242,100,.28));
+  text-shadow: 0 0 15px rgba(190,242,100,.4);
 }
 
 .motion-status {
@@ -226,6 +229,7 @@ const STYLES = `
   font-size: 18px;
   line-height: 1.12;
   letter-spacing: -.02em;
+  text-shadow: 0 0 8px rgba(255,255,255,0.4);
 }
 
 .motion-status span {
@@ -268,11 +272,13 @@ const STYLES = `
   width: var(--fill);
   border-radius: inherit;
   background: linear-gradient(90deg, #f8fafc, #a3e635, #22c55e);
+  box-shadow: 0 0 10px rgba(163,230,53,0.5);
   transition: width 180ms ease;
 }
 
 .motion-fill.heat {
   background: linear-gradient(90deg, #22c55e, #facc15, #fb923c, #ef4444);
+  box-shadow: 0 0 10px rgba(239,68,68,0.5);
 }
 
 .motion-rules {
