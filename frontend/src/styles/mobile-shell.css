@@ -275,7 +275,6 @@ html.saga-route-player .saga-tools-language-row {
   --saga-glass-border: rgba(255, 255, 255, 0.08);
   --saga-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --saga-accent-glow: 0 0 20px rgba(34, 197, 94, 0.4);
-  --saga-transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .saga-glass-panel {
@@ -285,31 +284,6 @@ html.saga-route-player .saga-tools-language-row {
   border: 1px solid var(--saga-glass-border);
   box-shadow: var(--saga-glass-shadow);
   border-radius: 24px;
-}
-
-.saga-premium-button {
-  transition: var(--saga-transition-smooth);
-}
-.saga-premium-button:active {
-  transform: scale(0.96);
-}
-
-.saga-pulse-glow {
-  animation: sagaPulseGlow 2.5s infinite alternate;
-}
-
-@keyframes sagaPulseGlow {
-  0% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
-  100% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.6); }
-}
-
-.saga-slide-up-enter {
-  animation: sagaSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes sagaSlideUp {
-  0% { opacity: 0; transform: translateY(40px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* --- MAP SMOOTHNESS UTILITIES (v2.1.0) ---
