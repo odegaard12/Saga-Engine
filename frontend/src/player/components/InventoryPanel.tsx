@@ -21,16 +21,16 @@ const ICON_MAP: [RegExp, string, string][] = [
   [/cinta|tape|adhesiv/i, '🩹', '#84cc16'],
   [/arma|pistol|rifle/i, '🔫', '#ef4444'],
   [/escudo|shield/i, '🛡️', '#06b6d4'],
-  [/map|mapa/i, '🗺️', '#10b981'],
+  [/map|mapa/i, '🗺️', 'rgb(var(--theme-ok))'],
   [/radio|señal|signal/i, '📡', '#a855f7'],
   [/herramienta|tool|alicate|pinza/i, '🔧', '#f97316'],
   [/linterna|luz|flashlight/i, '🔦', '#fbbf24'],
-  [/comida|agua|food|water/i, '🍶', '#34d399'],
+  [/comida|agua|food|water/i, '🍶', 'rgb(var(--theme-ok-soft))'],
   [/nota|papel|doc|informe/i, '📄', '#e2e8f0'],
   [/medic|pastilla|jeringa/i, '💊', '#fb7185'],
   [/bomb|explosiv/i, '💣', '#ef4444'],
-  [/cerrojo|candado|lock/i, '🔒', '#94a3b8'],
-  [/flecha|arrow/i, '➡️', '#38bdf8'],
+  [/cerrojo|candado|lock/i, '🔒', 'rgb(var(--theme-line))'],
+  [/flecha|arrow/i, '➡️', 'rgb(var(--theme-info))'],
   [/cristal|glass|gema|gem/i, '💎', '#22d3ee'],
   [/moneda|coin|dinero/i, '🪙', '#facc15'],
   [/hueso|bone/i, '🦴', '#e2e8f0'],
@@ -380,8 +380,8 @@ const guideToggleBtn: CSSProperties = {
 }
 
 const guideBox: CSSProperties = {
-  background: 'rgba(14, 165, 233, 0.07)',
-  border: '1px solid rgba(125,211,252,0.18)',
+  background: 'rgba(var(--theme-info-mid), 0.07)',
+  border: '1px solid rgba(var(--theme-info-soft), 0.18)',
   borderRadius: 'var(--theme-radius-card)',
   padding: '12px 14px',
   display: 'flex',
@@ -392,7 +392,7 @@ const guideBox: CSSProperties = {
 const guideTitle: CSSProperties = {
   fontSize: 11,
   fontWeight: 900,
-  color: '#7dd3fc',
+  color: 'rgb(var(--theme-info-soft))',
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
 }
@@ -407,8 +407,8 @@ const guideStep: CSSProperties = {
 }
 
 const guideNum: CSSProperties = {
-  background: 'rgba(125,211,252,0.18)',
-  color: '#7dd3fc',
+  background: 'rgba(var(--theme-info-soft), 0.18)',
+  color: 'rgb(var(--theme-info-soft))',
   borderRadius: 'var(--theme-radius-pill)',
   width: 20,
   height: 20,
@@ -453,8 +453,8 @@ const cellSelected: CSSProperties = {
 }
 
 const cellFeedback: CSSProperties = {
-  background: 'rgba(34,197,94,0.15)',
-  borderColor: 'rgba(34,197,94,0.4)',
+  background: 'rgba(var(--theme-done), 0.15)',
+  borderColor: 'rgba(var(--theme-done), 0.4)',
 }
 
 const cellUsed: CSSProperties = {
@@ -474,7 +474,7 @@ const qrEye: CSSProperties = {
   position: 'absolute',
   width: 9,
   height: 9,
-  border: '2.5px solid #0f172a',
+  border: '2.5px solid rgb(var(--theme-ink))',
   borderRadius: 2,
 }
 
@@ -486,8 +486,8 @@ const qrNoise: CSSProperties = {
   height: 11,
   // Damero de 3x3: sugiere los módulos de datos sin dibujarlos uno a uno.
   backgroundImage:
-    'linear-gradient(90deg, #0f172a 33%, transparent 33% 66%, #0f172a 66%),' +
-    'linear-gradient(0deg, #0f172a 33%, transparent 33% 66%, #0f172a 66%)',
+    'linear-gradient(90deg, rgb(var(--theme-ink)) 33%, transparent 33% 66%, rgb(var(--theme-ink)) 66%),' +
+    'linear-gradient(0deg, rgb(var(--theme-ink)) 33%, transparent 33% 66%, rgb(var(--theme-ink)) 66%)',
   backgroundSize: '100% 100%',
   opacity: 0.85,
 }
@@ -526,7 +526,7 @@ const usedOverlay: CSSProperties = {
   top: 5,
   left: 6,
   fontSize: 9,
-  color: '#4ade80',
+  color: 'rgb(var(--theme-done-soft))',
   fontWeight: 900,
 }
 
@@ -586,8 +586,8 @@ const sourcePill: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.1em',
   color: '#93c5fd',
-  background: 'rgba(59,130,246,0.15)',
-  border: '1px solid rgba(59,130,246,0.25)',
+  background: 'rgba(var(--theme-pin), 0.15)',
+  border: '1px solid rgba(var(--theme-pin), 0.25)',
   borderRadius: 'var(--theme-radius-pill)',
   padding: '2px 7px',
 }
@@ -614,13 +614,13 @@ const useBtn: CSSProperties = {
   padding: '11px 0',
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-done)), rgb(var(--theme-done)))',
   color: '#fff',
   fontWeight: 900,
   fontSize: 13,
   letterSpacing: '0.06em',
   cursor: 'pointer',
-  boxShadow: '0 4px 14px rgba(34,197,94,0.35)',
+  boxShadow: '0 4px 14px rgba(var(--theme-done), 0.35)',
   transition: 'transform 0.15s, box-shadow 0.15s',
 }
 

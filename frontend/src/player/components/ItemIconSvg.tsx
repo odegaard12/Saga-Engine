@@ -65,7 +65,10 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   if (id.includes('cinta') || id.includes('tape') || id.includes('aislante')) {
     return (
       <div className={`saga-svg-icon saga-svg-icon-tape ${className}`} style={style}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#10b981">
+        {/* El color va por `style`, no por el atributo: dentro de un atributo
+            de presentacion de SVG el navegador no sustituye las variables, y
+            el icono saldria negro sin dar ningun aviso. */}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-ok))' }}>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="3" />
           <path d="M12 3v9" />
@@ -163,7 +166,8 @@ export default function ItemIconSvg({ itemId, customIcon, className = '', size =
   // Default Item
   return (
     <div className={`saga-svg-icon saga-svg-icon-default ${className}`} style={style}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} color="#94a3b8">
+      {/* Por `style`, no por el atributo: ahi no se sustituyen las variables. */}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} style={{ color: 'rgb(var(--theme-line))' }}>
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
         <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
         <line x1="12" y1="22.08" x2="12" y2="12" />

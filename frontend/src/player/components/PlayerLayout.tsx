@@ -37,9 +37,9 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     padding: '5px 8px',
     borderRadius: 'var(--theme-radius-panel)',
     // Exactamente el mismo estilo que la barra inferior (Mochila / Herramientas / Nodos)
-    background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
+    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.52 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.42 * var(--theme-solid))))',
     border: '1px solid rgba(255,255,255,.22)',
-    boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+    boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
     pointerEvents: 'auto',
@@ -211,7 +211,7 @@ export function getViewportStyle(mobile: boolean): CSSProperties {
     overflow: 'hidden',
     fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
     color: '#ffffff',
-    background: '#020617',
+    background: 'rgb(var(--theme-ink-deep))',
   }
 }
 
@@ -223,7 +223,7 @@ export function getTopScrimStyle(mobile: boolean): CSSProperties {
     right: 0,
     height: mobile ? 120 : 160,
     background:
-      'linear-gradient(180deg, rgba(2,6,23,.88) 0%, rgba(2,6,23,.4) 50%, transparent 100%)',
+      'linear-gradient(180deg, rgba(var(--theme-ink-deep), .88) 0%, rgba(var(--theme-ink-deep), .4) 50%, transparent 100%)',
     pointerEvents: 'none',
     zIndex: 10,
   }
@@ -273,7 +273,7 @@ export function getOverlayBackdropStyle(mobile: boolean): CSSProperties {
     position: 'absolute',
     inset: 0,
     zIndex: 30,
-    background: 'rgba(2,6,23,.45)',
+    background: 'rgba(var(--theme-ink-deep), .45)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
     display: 'flex',
@@ -294,7 +294,7 @@ const statusCard: CSSProperties = {
   gap: 12,
   padding: '32px 24px',
   borderRadius: 'var(--theme-radius-panel)',
-  background: 'rgba(15,23,42,.6)',
+  background: 'rgba(var(--theme-ink), .6)',
   border: '1px solid rgba(255,255,255,.1)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
@@ -324,7 +324,7 @@ const progressWrapper: CSSProperties = {
 
 const progressBar: CSSProperties = {
   height: '100%',
-  background: 'linear-gradient(90deg, #10b981, #34d399)',
+  background: 'linear-gradient(90deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-soft)))',
   borderRadius: 3,
   transition: 'width 0.2s ease-out',
 }
@@ -348,7 +348,7 @@ const statusLoaderRing: CSSProperties = {
   inset: 0,
   borderRadius: 'var(--theme-radius-pill)',
   border: '3px solid rgba(255,255,255,.1)',
-  borderTopColor: '#34d399',
+  borderTopColor: 'rgb(var(--theme-ok-soft))',
   animation: 'sagaStatusSpin 1s linear infinite',
 }
 
@@ -406,14 +406,14 @@ const overlayPill: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  boxShadow: '0 14px 30px rgba(15,23,42,.12)',
+  boxShadow: '0 14px 30px rgba(var(--theme-ink), .12)',
   willChange: 'transform, opacity',
   animation: 'sagaOverlayPop 520ms cubic-bezier(0.22, 1, 0.36, 1)',
 }
 
 const overlayInfo: CSSProperties = {
   background: 'rgba(239,246,255,.96)',
-  border: '1px solid rgba(59,130,246,.16)',
+  border: '1px solid rgba(var(--theme-pin), .16)',
   color: '#1d4ed8',
 }
 
@@ -461,13 +461,13 @@ export const floatingTrophyButton: CSSProperties = {
   width: 44,
   height: 44,
   borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(16,185,129,.34)',
-  background: 'rgba(16,185,129,.18)',
-  color: '#34d399',
+  border: '1px solid rgba(var(--theme-ok), .34)',
+  background: 'rgba(var(--theme-ok), .18)',
+  color: 'rgb(var(--theme-ok-soft))',
   fontSize: 20,
   display: 'grid',
   placeItems: 'center',
-  boxShadow: '0 14px 34px rgba(16,185,129,.20)',
+  boxShadow: '0 14px 34px rgba(var(--theme-ok), .20)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   cursor: 'pointer',
@@ -487,7 +487,7 @@ export const finishOverlayStyle = `
      trofeo se metía debajo y se cortaba el título. */
   padding: max(16px, calc(env(safe-area-inset-top) + 12px)) 16px
     max(16px, calc(env(safe-area-inset-bottom) + 12px));
-  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.22), #050b1c 88%);
+  background: radial-gradient(circle at center, rgba(var(--theme-ok), 0.22), #050b1c 88%);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   will-change: opacity;
@@ -498,9 +498,9 @@ export const finishOverlayStyle = `
   border-radius: 28px;
   /* Menos negro. Era casi carbón sobre carbón y de día no se distinguía la
      tarjeta del fondo: ahora el azul sube de tono y el borde verde brilla. */
-  border: 1px solid rgba(52, 211, 153, 0.42);
+  border: 1px solid rgba(var(--theme-ok-soft), 0.42);
   background: linear-gradient(180deg, rgba(30, 43, 74, 0.97), rgba(13, 22, 43, 0.99));
-  box-shadow: 0 0 46px rgba(52, 211, 153, 0.24), 0 24px 54px rgba(0, 0, 0, 0.45),
+  box-shadow: 0 0 46px rgba(var(--theme-ok-soft), 0.24), 0 24px 54px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
   padding: 24px;
   text-align: center;
@@ -515,8 +515,8 @@ export const finishOverlayStyle = `
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #047857);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35), inset 0 2px 4px rgba(255,255,255,0.2);
+  background: linear-gradient(135deg, rgb(var(--theme-ok)), #047857);
+  box-shadow: 0 0 20px rgba(var(--theme-ok), 0.35), inset 0 2px 4px rgba(255,255,255,0.2);
   margin: 0 auto;
   display: grid;
   place-items: center;
@@ -531,10 +531,10 @@ export const finishOverlayStyle = `
   color: #ffffff;
   margin: 0;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #34d399, #6ee7b7);
+  background: linear-gradient(90deg, rgb(var(--theme-ok-soft)), #6ee7b7);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 8px rgba(52, 211, 153, 0.15));
+  filter: drop-shadow(0 2px 8px rgba(var(--theme-ok-soft), 0.15));
 }
 .saga-finish-subtitle {
   font-size: 13px;
@@ -559,7 +559,7 @@ export const finishOverlayStyle = `
 .saga-finish-stat-val {
   font-size: 20px;
   font-weight: 900;
-  color: #34d399;
+  color: rgb(var(--theme-ok-soft));
 }
 .saga-finish-stat-lbl {
   font-size: 10px;
@@ -572,18 +572,18 @@ export const finishOverlayStyle = `
   min-height: 46px;
   border-radius: 16px;
   border: none;
-  background: linear-gradient(180deg, #10b981, #059669);
+  background: linear-gradient(180deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
   color: #ffffff;
   font-size: 13px;
   font-weight: 950;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 8px 18px rgba(var(--theme-ok), 0.2);
   transition: all 0.2s ease;
 }
 .saga-finish-btn-primary:hover {
-  background: linear-gradient(180deg, #34d399, #10b981);
+  background: linear-gradient(180deg, rgb(var(--theme-ok-soft)), rgb(var(--theme-ok)));
   transform: translateY(-1px);
 }
 .saga-finish-btn-secondary {

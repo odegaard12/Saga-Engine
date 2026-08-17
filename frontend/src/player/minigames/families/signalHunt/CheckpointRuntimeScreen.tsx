@@ -113,12 +113,12 @@ const STYLES = `
   min-height: 54px;
   border: none;
   border-radius: 18px;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
   color: #022c22;
   font-size: 16px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(16,185,129,.35);
+  box-shadow: 0 10px 28px rgba(var(--theme-ok), .35);
 }
 .cp-btn:disabled {
   background: rgba(255,255,255,.10);

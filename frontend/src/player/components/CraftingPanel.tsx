@@ -270,16 +270,16 @@ const readyBadge: CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  color: '#4ade80',
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
+  color: 'rgb(var(--theme-done-soft))',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
   borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 10px',
 }
 
 const toastBanner: CSSProperties = {
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
   color: '#bbf7d0',
   padding: '9px 14px',
   borderRadius: 'var(--theme-radius-card)',
@@ -360,9 +360,9 @@ const availablePill: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.12em',
-  color: '#4ade80',
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
+  color: 'rgb(var(--theme-done-soft))',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
   borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
@@ -372,9 +372,9 @@ const lockedPill: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.12em',
-  color: '#94a3b8',
-  background: 'rgba(148,163,184,0.1)',
-  border: '1px solid rgba(148,163,184,0.2)',
+  color: 'rgb(var(--theme-line))',
+  background: 'rgba(var(--theme-line), 0.1)',
+  border: '1px solid rgba(var(--theme-line), 0.2)',
   borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
@@ -397,8 +397,8 @@ const inputChip: CSSProperties = {
 }
 
 const inputChipReady: CSSProperties = {
-  borderColor: 'rgba(74,222,128,.45)',
-  background: 'rgba(74,222,128,.12)',
+  borderColor: 'rgba(var(--theme-done-soft), .45)',
+  background: 'rgba(var(--theme-done-soft), .12)',
 }
 
 const inputChipMissing: CSSProperties = {

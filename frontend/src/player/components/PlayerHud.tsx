@@ -311,7 +311,7 @@ export function PlayerHud({
 
         <div style={helper}>{helperCopy}</div>
 
-        <div style={actionRow}>
+        <div className="saga-hud-dock" style={actionRow}>
           <button
             type="button"
             style={detailsOpen ? ghostButtonActive : ghostButton}
@@ -585,7 +585,7 @@ export function PlayerHud({
 
           {/* Selector de Idioma (Español / Galego) */}
           <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgb(var(--theme-line))', marginBottom: 8, letterSpacing: '0.05em' }}>
               🌐 {t('player.tools.language', locale)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -594,9 +594,9 @@ export function PlayerHud({
                 style={{
                   padding: '8px 12px',
                   borderRadius: 'var(--theme-radius-card)',
-                  border: locale === 'es' ? '1px solid rgba(52, 211, 153, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'es' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'es' ? '#34d399' : 'rgba(255, 255, 255, 0.7)',
+                  border: locale === 'es' ? '1px solid rgba(var(--theme-ok-soft), 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: locale === 'es' ? 'rgba(var(--theme-ok), 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: locale === 'es' ? 'rgb(var(--theme-ok-soft))' : 'rgba(255, 255, 255, 0.7)',
                   fontWeight: 800,
                   fontSize: 12,
                   cursor: 'pointer',
@@ -615,9 +615,9 @@ export function PlayerHud({
                 style={{
                   padding: '8px 12px',
                   borderRadius: 'var(--theme-radius-card)',
-                  border: locale === 'gl' ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'gl' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'gl' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
+                  border: locale === 'gl' ? '1px solid rgba(var(--theme-info), 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: locale === 'gl' ? 'rgba(var(--theme-info-mid), 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: locale === 'gl' ? 'rgb(var(--theme-info))' : 'rgba(255, 255, 255, 0.7)',
                   fontWeight: 800,
                   fontSize: 12,
                   cursor: 'pointer',
@@ -646,7 +646,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
   if (disabled || tone === 'locked') {
     return {
       ...primaryBase,
-      background: 'rgba(148,163,184,.22)',
+      background: 'rgba(var(--theme-line), .22)',
       border: '1px solid rgba(255,255,255,.12)',
       color: 'rgba(255,255,255,.72)',
     }
@@ -655,7 +655,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
   if (tone === 'gps') {
     return {
       ...primaryBase,
-      background: 'rgba(59,130,246,.18)',
+      background: 'rgba(var(--theme-pin), .18)',
       border: '1px solid rgba(96,165,250,.26)',
       color: '#dbeafe',
     }
@@ -695,9 +695,9 @@ const card: CSSProperties = {
   display: 'grid',
   gap: 10,
   borderRadius: 'var(--theme-radius-panel)',
-  background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
   border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+  boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
 }
@@ -751,7 +751,7 @@ const ghostButton: CSSProperties = {
   justifyContent: 'center',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.32)',
+  background: 'rgba(var(--theme-ink), .32)',
   color: '#ffffff',
   fontSize: 12,
   fontWeight: 800,
@@ -759,7 +759,7 @@ const ghostButton: CSSProperties = {
 
 const ghostButtonActive: CSSProperties = {
   ...ghostButton,
-  background: 'rgba(59,130,246,.16)',
+  background: 'rgba(var(--theme-pin), .16)',
   border: '1px solid rgba(96,165,250,.18)',
   color: '#dbeafe',
 }
@@ -792,9 +792,9 @@ function getSheetStyle(compact: boolean): CSSProperties {
     borderRadius: compact ? '24px 24px 0 0' : 30,
     border: '1px solid rgba(255,255,255,.22)',
     borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.22)',
-    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
     color: '#f8fafc',
-    boxShadow: '0 -15px 35px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.6)',
+    boxShadow: '0 -15px 35px rgba(var(--theme-info-mid), .08), 0 24px 70px rgba(0,0,0,.6)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
     padding: 14,
@@ -861,8 +861,8 @@ const tabActive: CSSProperties = {
   ...tabButton,
   background: 'linear-gradient(135deg, var(--theme-tint-strong), var(--theme-tint))',
   color: '#a7f3d0',
-  border: '1px solid rgba(52, 211, 153, 0.35)',
-  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+  border: '1px solid rgba(var(--theme-ok-soft), 0.35)',
+  boxShadow: '0 4px 12px rgba(var(--theme-ok), 0.15)',
 }
 
 const statusRow: CSSProperties = {
@@ -892,9 +892,9 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
     width: compact ? '100%' : 'min(100%, 460px)',
     maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
     gap: 14,
-    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
     border: '1px solid rgba(255, 255, 255, 0.22)',
-    boxShadow: '0 -15px 40px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.7)',
+    boxShadow: '0 -15px 40px rgba(var(--theme-info-mid), .08), 0 24px 70px rgba(0,0,0,.7)',
   }
 }
 
@@ -938,7 +938,7 @@ const toolsButton: CSSProperties = {
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(100,116,139,.54), rgba(71,85,105,.54))',
+  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.54 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.54 * var(--theme-solid))))',
   color: '#f8fafc',
   fontSize: 11,
   fontWeight: 900,
@@ -992,12 +992,12 @@ const closeButton: CSSProperties = {
   placeItems: 'center',
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.70)',
+  background: 'rgba(var(--theme-ink), .70)',
   color: '#f8fafc',
   fontSize: 22,
   fontWeight: 950,
   cursor: 'pointer',
-  boxShadow: '0 12px 28px rgba(2,6,23,.24)',
+  boxShadow: '0 12px 28px rgba(var(--theme-ink-deep), .24)',
 }
 
 
@@ -1039,7 +1039,7 @@ const fallbackToolInput: CSSProperties = {
   minHeight: 42,
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.52)',
+  background: 'rgba(var(--theme-ink), .52)',
   color: '#ffffff',
   padding: '0 12px',
   fontSize: 13,
@@ -1075,7 +1075,7 @@ const toolsCardGroup: CSSProperties = {
 }
 
 const toolsCardGroupLabel: CSSProperties = {
-  color: '#34d399',
+  color: 'rgb(var(--theme-ok-soft))',
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.12em',
@@ -1087,19 +1087,19 @@ const toolsGreenButton: CSSProperties = {
   minHeight: 40,
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(52, 211, 153, 0.3)',
-  background: 'rgba(16, 185, 129, 0.12)',
-  color: '#34d399',
+  border: '1px solid rgba(var(--theme-ok-soft), 0.3)',
+  background: 'rgba(var(--theme-ok), 0.12)',
+  color: 'rgb(var(--theme-ok-soft))',
   fontSize: 11,
   fontWeight: 900,
-  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)',
+  boxShadow: '0 4px 12px rgba(var(--theme-ok), 0.08)',
 }
 
 const toolsGreenActiveButton: CSSProperties = {
   ...toolsGreenButton,
-  background: 'rgba(16, 185, 129, 0.22)',
-  border: '1px solid rgba(52, 211, 153, 0.45)',
-  color: '#34d399',
+  background: 'rgba(var(--theme-ok), 0.22)',
+  border: '1px solid rgba(var(--theme-ok-soft), 0.45)',
+  color: 'rgb(var(--theme-ok-soft))',
 }
 
 const toolsGreenDisabledButton: CSSProperties = {

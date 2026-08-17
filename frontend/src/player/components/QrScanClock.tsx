@@ -95,8 +95,8 @@ export function QrScanClock({ ms }: Props) {
         borderBottom: '1px solid rgba(255,255,255,.22)',
         borderTop: 'none',
         background:
-          'linear-gradient(180deg, rgba(110,116,128,.64) 0%, rgba(96,103,115,.58) 100%)',
-        boxShadow: '0 14px 30px rgba(15,23,42,.18)',
+          'linear-gradient(180deg, rgba(var(--theme-shell-b), calc(.64 * var(--theme-solid))) 0%, rgba(96,103,115,.58) 100%)',
+        boxShadow: '0 14px 30px rgba(var(--theme-ink), .18)',
         backdropFilter: 'var(--theme-blur)',
         WebkitBackdropFilter: 'var(--theme-blur)',
         color: '#ffffff',

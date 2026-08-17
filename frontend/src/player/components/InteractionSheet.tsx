@@ -624,7 +624,7 @@ export function InteractionSheet({
                     placeholder="Escribe el código..."
                     disabled={submitting || fallbackSubmitting}
                     style={{
-                      background: 'rgba(15,23,42,0.85)',
+                      background: 'rgba(var(--theme-ink), 0.85)',
                       border: '1px solid rgba(251,191,36,0.4)',
                       color: '#ffffff',
                       borderRadius: 'var(--theme-radius-card)',
@@ -692,7 +692,7 @@ const compactGameOverlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.56)',
+  background: 'rgba(var(--theme-ink-deep), .56)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   animation: 'sagaFadeIn 160ms ease-out',
@@ -708,8 +708,8 @@ const sheet: CSSProperties = {
   overscrollBehavior: 'contain',
   borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'linear-gradient(180deg, rgba(2,6,23,.98), rgba(15,23,42,.94))',
-  boxShadow: '0 18px 40px rgba(2,6,23,.30)',
+  background: 'linear-gradient(180deg, rgba(var(--theme-ink-deep), .98), rgba(var(--theme-ink), .94))',
+  boxShadow: '0 18px 40px rgba(var(--theme-ink-deep), .30)',
   color: '#f8fafc',
   padding: 14,
   paddingTop: 'calc(14px + env(safe-area-inset-top))',
@@ -762,7 +762,7 @@ const compactGameClock: CSSProperties = {
   height: 38,
   padding: '0 14px',
   borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(15,23,42,0.72)',
+  background: 'rgba(var(--theme-ink), 0.72)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   border: '1px solid rgba(255,255,255,0.15)',
@@ -782,10 +782,10 @@ const compactGameBarButton: CSSProperties = {
   padding: 0,
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.22)',
-  background: 'rgba(2,6,23,.86)',
+  background: 'rgba(var(--theme-ink-deep), .86)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  boxShadow: '0 7px 20px rgba(2,6,23,.38)',
+  boxShadow: '0 7px 20px rgba(var(--theme-ink-deep), .38)',
   color: '#fff',
   fontSize: 22,
   fontWeight: 900,
@@ -846,7 +846,7 @@ const miniBadge: CSSProperties = {
   padding: '0 12px',
   borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(22,163,74,.16)',
-  border: '1px solid rgba(34,197,94,.20)',
+  border: '1px solid rgba(var(--theme-done), .20)',
   color: '#dcfce7',
   fontSize: 11,
   fontWeight: 900,
@@ -861,7 +861,7 @@ const userText: CSSProperties = {
 }
 
 const compactLineText: CSSProperties = {
-  color: '#cbd5e1',
+  color: 'rgb(var(--theme-line-soft))',
   fontSize: 14,
   lineHeight: 1.35,
 }
@@ -886,7 +886,7 @@ const bridgeCard: CSSProperties = {
 }
 
 const bridgeText: CSSProperties = {
-  color: '#cbd5e1',
+  color: 'rgb(var(--theme-line-soft))',
   fontSize: 14,
   lineHeight: 1.5,
 }
@@ -929,7 +929,7 @@ const collectibleTitleStyle: CSSProperties = {
 }
 
 const collectibleDescStyle: CSSProperties = {
-  color: '#cbd5e1',
+  color: 'rgb(var(--theme-line-soft))',
   fontSize: 14,
   lineHeight: 1.5,
   margin: '0 0 24px 0',
@@ -946,12 +946,12 @@ const collectibleBtnStyle: CSSProperties = {
   gap: 8,
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'linear-gradient(135deg, #10b981, #059669)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)))',
   color: '#ffffff',
   fontSize: 16,
   fontWeight: 900,
   letterSpacing: '0.05em',
-  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+  boxShadow: '0 8px 20px rgba(var(--theme-ok), 0.3)',
   cursor: 'pointer',
   transition: 'transform 0.15s ease, opacity 0.15s ease',
 }

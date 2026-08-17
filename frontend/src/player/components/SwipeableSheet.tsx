@@ -116,7 +116,7 @@ const overlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.34)',
+  background: 'rgba(var(--theme-ink-deep), .34)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
@@ -128,7 +128,7 @@ const sheet: CSSProperties = {
   zIndex: 2,
   width: 'min(100%, 520px)',
   borderRadius: 'var(--theme-radius-panel)',
-  background: 'rgba(2,6,23,.95)',
+  background: 'rgba(var(--theme-ink-deep), .95)',
   padding: '8px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'flex',
   flexDirection: 'column',

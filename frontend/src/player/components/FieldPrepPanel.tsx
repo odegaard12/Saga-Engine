@@ -201,7 +201,8 @@ const capa: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 16,
-  background: 'radial-gradient(circle at 50% 42%, rgba(2,6,23,.42), rgba(2,6,23,.68))',
+  // Velo neutro: antes era azul marino y teñia la pantalla entera.
+  background: 'radial-gradient(circle at 50% 42%, rgba(0,0,0,.42), rgba(0,0,0,.68))',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
 }
@@ -218,14 +219,14 @@ function tarjeta(mobile: boolean): CSSProperties {
     // backdrop-filter salía en "none" porque la hoja global no llegaba a
     // aplicarse sobre este elemento, y la tarjeta quedaba opaca y plana.
     background:
-      'linear-gradient(180deg, rgba(100,116,139,.34), rgba(30,41,59,.42))',
+      'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.34 * var(--theme-solid))), rgba(var(--theme-ink-soft), .42))',
     border: '1px solid rgba(255,255,255,.24)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
     // Brillo de canto arriba y sombra ancha abajo: es lo que separa una lámina
     // de cristal de un rectángulo translúcido.
     boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,.24), 0 26px 60px rgba(2,6,23,.55)',
+      'inset 0 1px 0 rgba(255,255,255,.24), 0 26px 60px rgba(var(--theme-ink-deep), .55)',
   }
 }
 
@@ -240,7 +241,7 @@ const antetitulo: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '.18em',
-  color: '#7dd3fc',
+  color: 'rgb(var(--theme-info-soft))',
 }
 
 const titulo: CSSProperties = {
@@ -299,7 +300,7 @@ const queEs: CSSProperties = {
 const paraQue: CSSProperties = {
   fontSize: 10.5,
   lineHeight: 1.3,
-  color: 'rgba(203,213,225,.68)',
+  color: 'rgba(var(--theme-line-soft), .68)',
 }
 
 const falloTexto: CSSProperties = {
@@ -311,8 +312,8 @@ const boton: CSSProperties = {
   minHeight: 34,
   padding: '0 13px',
   borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(125,211,252,.55)',
-  background: 'linear-gradient(180deg,rgba(56,189,248,.92),rgba(14,116,190,.92))',
+  border: '1px solid rgba(var(--theme-info-soft), .55)',
+  background: 'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3), 0 6px 16px rgba(2,132,199,.35)',
   color: '#fff',
   fontSize: 12,
@@ -322,5 +323,5 @@ const boton: CSSProperties = {
 
 const hecho: CSSProperties = {
   fontSize: 10.5,
-  color: 'rgba(148,163,184,.75)',
+  color: 'rgba(var(--theme-line), .75)',
 }

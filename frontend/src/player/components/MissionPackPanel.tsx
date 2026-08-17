@@ -249,8 +249,8 @@ const badge: CSSProperties = {
 
 const readyBadge: CSSProperties = {
   ...badge,
-  background: 'rgba(34,197,94,.14)',
-  border: '1px solid rgba(74,222,128,.20)',
+  background: 'rgba(var(--theme-done), .14)',
+  border: '1px solid rgba(var(--theme-done-soft), .20)',
   color: '#dcfce7',
 }
 
@@ -278,7 +278,7 @@ const button: CSSProperties = {
 const primary: CSSProperties = {
   ...button,
   border: '1px solid rgba(187,247,208,.22)',
-  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+  background: 'linear-gradient(180deg, rgb(var(--theme-done)), rgb(var(--theme-done)))',
   color: '#ffffff',
   boxShadow: '0 12px 26px rgba(22,163,74,.18)',
 }
@@ -293,7 +293,7 @@ const secondary: CSSProperties = {
   ...button,
   minHeight: 38,
   border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(100,116,139,.34)',
+  background: 'rgba(var(--theme-sheen-a), calc(.34 * var(--theme-solid)))',
   color: '#f8fafc',
 }
 
@@ -306,7 +306,7 @@ const messageBase: CSSProperties = {
 
 const messageOk: CSSProperties = {
   ...messageBase,
-  background: 'rgba(34,197,94,.11)',
+  background: 'rgba(var(--theme-done), .11)',
   color: '#dcfce7',
 }
 

@@ -40,6 +40,44 @@
   --theme-wash: rgba(34, 197, 94, 0.05);
   --theme-backdrop: blur(16px);
 
+  /* Respaldo: si algo se pinta fuera de un body con tema, sale como siempre. */
+  /* Cuanto tapan las superficies -barras, hojas, paneles-.
+   *
+   * La opacidad de cada una esta escrita en su sitio (.46, .52, .72...), y no
+   * son iguales entre si a proposito. En vez de tocar veinte numeros uno a
+   * uno, cada una se multiplica por esto. En cristal vale 1: sale el mismo
+   * numero exacto de antes, asi que el tema viejo no cambia. En fuego sube y
+   * el navegador recorta en 1 lo que se pase, que es justo lo que se quiere:
+   * esto es una placa y no se ve el mapa a traves.
+   */
+  --theme-solid: 1;
+  --theme-sheen-a: 100, 116, 139;
+  --theme-sheen-b: 71, 85, 105;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 56, 189, 248;
+  --theme-ring-a: 56, 189, 248;
+  --theme-ring-b: 74, 222, 128;
+  --theme-ink: 15, 23, 42;
+  --theme-ink-deep: 2, 6, 23;
+  --theme-ink-soft: 30, 41, 59;
+  --theme-ink-mid: 51, 65, 85;
+  --theme-line: 148, 163, 184;
+  --theme-shell-a: 84, 91, 104;
+  --theme-shell-b: 110, 116, 128;
+  --theme-info-deep: 14, 116, 190;
+  --theme-info-soft: 125, 211, 252;
+  /* El verde de progreso: los puntos y las lineas del recorrido. */
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 203, 213, 225;
+  --theme-info-mid: 14, 165, 233;
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
   /* --- Las FORMAS, que es lo que hace que un tema sea otro diseño --- */
   --theme-radius-panel: 24px;
   --theme-radius-card: 16px;
@@ -57,8 +95,59 @@
  * que compara las dos listas.
  */
 
-/* Cristal: azul de noche. */
+/* Cristal: azul de noche.
+ *
+ * Las variables se declaran para el `html` y para el `body` a la vez: el
+ * servidor pone la clase en los dos, y así el elemento de más afuera —el que
+ * asoma al rebotar el desplazamiento en un móvil— tiene los mismos valores sin
+ * repetir ni un color.
+ *
+ * Los tonos que se repiten por todo el jugador van en crudo (sin la opacidad)
+ * para poder escribir rgba(var(--theme-sheen-a), .46) y conservar cada
+ * transparencia tal cual estaba:
+ *
+ *   sheen-a / sheen-b   el barniz de los paneles. Medido en el banco, es lo
+ *                       que hacía que todo se viese «glass» dijera lo que
+ *                       dijera el tema: cuatro degradados grises del tamaño de
+ *                       la pantalla, uno encima de otro.
+ *   ok / -deep / -soft  el verde de «esto va bien» (COMEZAR A TRAVESÍA, objeto
+ *                       recogido, nodo hecho). Son TRES: colapsarlos en uno
+ *                       aplana los degradados a un color liso.
+ *   info                el azul de los botones de permisos.
+ *
+ * En cristal valen exactamente lo que valían, así que el tema viejo no cambia
+ * ni un píxel. */
+html.theme-glass,
 body.theme-glass {
+  --theme-solid: 1;
+  --theme-sheen-a: 100, 116, 139;
+  --theme-sheen-b: 71, 85, 105;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 56, 189, 248;
+  --theme-ink: 15, 23, 42;
+  --theme-ink-deep: 2, 6, 23;
+  --theme-ink-soft: 30, 41, 59;
+  --theme-ink-mid: 51, 65, 85;
+  --theme-line: 148, 163, 184;
+  --theme-shell-a: 84, 91, 104;
+  --theme-shell-b: 110, 116, 128;
+  --theme-info-deep: 14, 116, 190;
+  --theme-info-soft: 125, 211, 252;
+  /* Los dos aros de la carga: azul cielo y verde, los de siempre. */
+  --theme-ring-a: 56, 189, 248;
+  --theme-ring-b: 74, 222, 128;
+  /* El verde de progreso: los puntos y las lineas del recorrido. */
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 203, 213, 225;
+  --theme-info-mid: 14, 165, 233;
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
   --theme-bg: #0f172a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0284c7;
@@ -83,34 +172,68 @@ body.theme-glass {
 
 /* Fuego: rojo brasa. El fondo es muy oscuro a propósito —el texto va en
  * blanco encima y esto se lee al sol, en el monte, con el brillo a tope—. */
+html.theme-flame-red,
 body.theme-flame-red {
-  --theme-bg: #2f0a0a;
-  --theme-primary: #f87171;
-  --theme-primary-hover: #ef4444;
-  --theme-glass: rgba(60, 12, 12, 0.74);
-  --theme-glass-soft: rgba(94, 22, 22, 0.52);
+  /* El barniz, en ladrillo. El «ok» pasa de esmeralda a brasa naranja: sigue
+     leyéndose como «adelante» pero es de esta misión, no de la otra. */
+  --theme-solid: 2.8;
+  --theme-sheen-a: 128, 62, 48;
+  --theme-sheen-b: 92, 44, 36;
+  --theme-ok: 214, 124, 70;
+  --theme-ok-deep: 176, 88, 48;
+  --theme-ok-soft: 236, 164, 116;
+  --theme-info: 216, 112, 96;
+  --theme-ink: 34, 14, 12;
+  --theme-ink-deep: 22, 9, 8;
+  --theme-ink-soft: 64, 28, 22;
+  --theme-ink-mid: 74, 34, 30;
+  --theme-line: 198, 142, 130;
+  --theme-shell-a: 116, 56, 44;
+  --theme-shell-b: 138, 70, 52;
+  --theme-info-deep: 168, 66, 56;
+  --theme-info-soft: 240, 168, 156;
+  --theme-ring-a: 224, 106, 106;
+  --theme-ring-b: 176, 88, 48;
+  --theme-done: 214, 124, 70;
+  --theme-done-soft: 236, 164, 116;
+  --theme-line-soft: 232, 190, 182;
+  --theme-info-mid: 200, 96, 82;
+  /* Los alfileres NO siguen al tema: ahi el color dice si un nodo esta
+     hecho, si es el que toca o si falta. Es informacion, no decoracion,
+     y cambiarla obliga a reaprender el mapa. Los mismos de cristal. */
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
+  --theme-bg: #331613;
+  --theme-primary: #ef8a5c;
+  --theme-primary-hover: #d4703f;
+  --theme-glass: rgba(58, 27, 22, 0.97);
+  --theme-glass-soft: rgba(76, 35, 27, 0.95);
   --theme-glass-border: rgba(248, 113, 113, 0.22);
-  --theme-surface: #3b1414;
-  --theme-glow: rgba(248, 113, 113, 0.42);
-  --theme-tint: rgba(248, 113, 113, 0.13);
-  --theme-tint-strong: rgba(248, 113, 113, 0.21);
-  --theme-primary-border: rgba(248, 113, 113, 0.28);
-  --theme-wash: rgba(248, 113, 113, 0.07);
+  --theme-surface: #3f1d18;
+  --theme-glow: rgba(239, 138, 92, 0.42);
+  --theme-tint: rgba(239, 138, 92, 0.14);
+  --theme-tint-strong: rgba(239, 138, 92, 0.24);
+  --theme-primary-border: rgba(239, 138, 92, 0.3);
+  --theme-wash: rgba(239, 138, 92, 0.07);
   --theme-backdrop: none;
 
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
      marcado y una esquina cortada. Se distingue de un vistazo desde lejos, que
      es justo lo que un tema tiene que hacer. */
-  --theme-radius-panel: 3px;
-  --theme-radius-card: 2px;
-  --theme-radius-pill: 4px;
+  --theme-radius-panel: 14px;
+  --theme-radius-card: 11px;
+  --theme-radius-pill: 999px;
   --theme-blur: none;
-  --theme-border-w: 2px;
-  --theme-panel-cut: 16px;
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
 }
 
 /* --- Y esto es lo que pinta ---------------------------------------------- */
 
+html[class*='theme-'],
 body[class*='theme-'],
 body[class*='theme-'] #root {
   background-color: var(--theme-bg);
@@ -173,4 +296,43 @@ body.theme-flame-red h3 {
 
 body.theme-flame-red button {
   letter-spacing: 0.08em;
+}
+
+
+/* --- El fuego, sin adorno -------------------------------------------------
+ *
+ * Aqui hubo llamas colgando del filo de las barras y brasas en las esquinas.
+ * Se descartaron al verlas: las barras quedaban raras. Dos intentos de adorno
+ * -placas industriales primero, llamas despues- y los dos fuera.
+ *
+ * Lo que queda es lo que si funciona: el degradado en diagonal por debajo, que
+ * es lo que hace que no se vea un rectangulo pintado, y nada mas.
+ */
+
+body.theme-flame-red {
+  --theme-brasa: linear-gradient(
+    135deg,
+    rgba(var(--theme-sheen-b), calc(0.97 * var(--theme-solid))) 0%,
+    rgba(var(--theme-sheen-a), calc(0.95 * var(--theme-solid))) 52%,
+    rgba(var(--theme-ink-soft), calc(0.97 * var(--theme-solid))) 100%
+  );
+}
+
+body.theme-flame-red [data-saga-player-shell='top'],
+body.theme-flame-red .saga-hud-quick,
+body.theme-flame-red .saga-hud-dock {
+  background: var(--theme-brasa) !important;
+}
+
+/* Los iconos, en blanco.
+ *
+ * Son emoticonos, asi que su color viene de la fuente y no hay forma de
+ * pintarlos desde el CSS. `grayscale` los deja en gris y `brightness` los sube
+ * a blanco: quedan monocromos sobre la barra, sin pelear con el rojo.
+ */
+body.theme-flame-red .saga-hud-quick button span,
+body.theme-flame-red .saga-hud-dock button span {
+  /* `!important` porque el emoticono lleva su propio `filter` en linea -una
+     sombra- y en linea gana. Sin esto la regla no pinta nada. */
+  filter: grayscale(1) brightness(2.4) !important;
 }

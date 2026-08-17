@@ -6,9 +6,9 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
-    radial-gradient(circle at top, rgba(30, 41, 59, 0.08), transparent 42%),
+    radial-gradient(circle at top, rgba(var(--theme-ink-soft), 0.08), transparent 42%),
     linear-gradient(180deg, rgba(223, 232, 221, 1), rgba(220, 231, 218, 1));
-  box-shadow: 0 22px 54px rgba(2, 6, 23, 0.14);
+  box-shadow: 0 22px 54px rgba(var(--theme-ink-deep), 0.14);
 }
 
 .map-surface__canvas {
@@ -65,7 +65,7 @@
   left: 50%;
   width: 140px;
   height: 140px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.2) 30%, transparent 60%);
+  background: radial-gradient(circle, rgba(var(--theme-pin), 0.4) 0%, rgba(var(--theme-pin), 0.2) 30%, transparent 60%);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -80,9 +80,9 @@
   height: 140px;
   background: conic-gradient(
     from 315deg at 50% 50%,
-    rgba(59, 130, 246, 0) 0deg,
-    rgba(59, 130, 246, 0.3) 45deg,
-    rgba(59, 130, 246, 0) 90deg,
+    rgba(var(--theme-pin), 0) 0deg,
+    rgba(var(--theme-pin), 0.3) 45deg,
+    rgba(var(--theme-pin), 0) 90deg,
     transparent 90deg
   );
   border-radius: 50%;
@@ -98,10 +98,25 @@
   left: 50%;
   width: 40px;
   height: 40px;
-  background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="rgba(59, 130, 246, 0.95)" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 16L2 20Z"/></svg>');
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
+  /* La flecha del jugador, la que dice hacia dónde mira.
+   *
+   * El dibujo va por máscara y el color por `background-color`. Dentro de un
+   * `data:` URI el SVG es otro documento: ahí las variables del tema no
+   * existen, así que un atributo `fill` que apunte a una de ellas no vale
+   * nada y la flecha sale negra sin dar ningún aviso. Con máscara el color lo
+   * pone una propiedad normal, que sí lee el tema.
+   *
+   * Las dos formas, con prefijo y sin él: los móviles viejos sólo entienden
+   * `-webkit-mask-*`, y sin eso la flecha desaparece del todo. */
+  background-color: rgba(var(--theme-pin), 0.95);
+  -webkit-mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="black" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 16L2 20Z"/></svg>');
+  mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="black" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 16L2 20Z"/></svg>');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
   transform: translate(-50%, -140%);
   z-index: 3;
   pointer-events: none;
@@ -120,7 +135,7 @@
   color: #f8fafc;
   border: 1px solid rgba(255, 255, 255, .13);
   border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(2, 6, 23, .5);
+  box-shadow: 0 16px 40px rgba(var(--theme-ink-deep), .5);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -137,7 +152,7 @@
 }
 
 .leaflet-container a.leaflet-popup-close-button {
-  color: rgba(148, 163, 184, .8);
+  color: rgba(var(--theme-line), .8);
   padding: 8px 8px 0 0;
   font-size: 18px;
 }

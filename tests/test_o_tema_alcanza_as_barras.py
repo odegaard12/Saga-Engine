@@ -1,0 +1,82 @@
+# -*- coding: utf-8 -*-
+"""Para que el tema pueda rediseñar algo, primero tiene que poder agarrarlo.
+
+Medido en el banco: la barra de arriba, la fila de iconos del mapa y la de
+Mochila/Herramientas no tenían NINGUNA clase. Iban con estilos en línea, así
+que ninguna regla del tema podía alcanzarlas por mucho que se escribiera. Se
+podían cambiar los colores (por variables) pero no las formas.
+
+Y la barra de arriba llevaba además `borderRadius: compact ? 22 : 28` clavado
+en el componente. Un número en línea gana a la regla del tema: seguía redonda
+en un tema de esquinas duras. Es el mismo empate que dejó muerta la regla del
+alfiler del mapa —dos verdades, y la del CSS sin pintar—.
+
+Ahora el radio sale de `--theme-radius-shell` con el 22/28 de respaldo, así que
+cristal se ve igual y fuego manda.
+"""
+import re
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+FRONT = RAIZ / "frontend" / "src"
+CSS = FRONT / "mobile-themes.css"
+
+GANCHOS = {
+    "saga-hud-quick": FRONT / "player" / "PlayerApp.tsx",
+    "saga-hud-dock": FRONT / "player" / "components" / "PlayerHud.tsx",
+}
+
+
+def test_as_barras_teñen_a_que_agarrarse():
+    for clase, fichero in GANCHOS.items():
+        codigo = fichero.read_text(encoding="utf-8")
+        assert 'className="%s"' % clase in codigo, (
+            "%s perdió la clase %s: sin ella el tema no puede tocar esa barra"
+            % (fichero.name, clase)
+        )
+
+
+def test_o_tema_usa_eses_ganchos():
+    css = CSS.read_text(encoding="utf-8")
+
+    for clase in GANCHOS:
+        assert ".%s" % clase in css, (
+            "la clase %s no la usa ningún tema: es un gancho muerto" % clase
+        )
+
+
+def test_a_barra_de_arriba_non_leva_o_radio_cravado():
+    """Un número en línea gana a la regla del tema."""
+    codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
+        encoding="utf-8"
+    )
+    codigo = re.sub(r"/\*.*?\*/", "", codigo, flags=re.DOTALL)
+
+    assert "borderRadius: compact ? 22 : 28" not in codigo, (
+        "vuelve a estar el radio clavado: la barra se queda redonda dijera lo "
+        "que dijera el tema"
+    )
+    assert "--theme-radius-shell" in codigo, (
+        "el radio de la barra tiene que salir del tema, con el de siempre de "
+        "respaldo para que cristal no cambie"
+    )
+
+
+def test_o_respaldo_conserva_o_de_cristal():
+    """Cristal no declara la variable, así que se queda con el respaldo."""
+    codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
+        encoding="utf-8"
+    )
+
+    assert "22 : 28" in codigo, (
+        "el respaldo tiene que seguir siendo el 22/28 exacto de cristal"
+    )
+
+    css = CSS.read_text(encoding="utf-8")
+    inicio = css.index("body.theme-glass {")
+    cuerpo = css[inicio : css.index("}", inicio)]
+
+    assert "--theme-radius-shell" not in cuerpo, (
+        "si cristal declara la variable deja de usar su propio respaldo y "
+        "cambia de forma"
+    )

@@ -254,20 +254,20 @@ const missionCompleteStyle = `
   margin: 0 0 10px;
   padding: 9px 11px;
   border-radius: 11px;
-  background: rgba(56, 189, 248, .14);
-  border: 1px solid rgba(56, 189, 248, .34);
+  background: rgba(var(--theme-info), .14);
+  border: 1px solid rgba(var(--theme-info), .34);
   font-size: 11.5px;
   line-height: 1.5;
   color: #e0f2fe;
   text-align: left;
 }
-.saga-rank-aviso b { color: #7dd3fc; }
+.saga-rank-aviso b { color: rgb(var(--theme-info-soft)); }
 /* A regra do reloxo, en pequeno pero visible. */
 .saga-rank-regra {
   margin: -4px 0 8px;
   font-size: 11.5px;
   line-height: 1.45;
-  color: rgba(203, 213, 225, .78);
+  color: rgba(var(--theme-line-soft), .78);
   text-align: left;
 }
 /* El primero se ve de lejos: es el unico dato que todo el mundo busca. */
@@ -316,8 +316,8 @@ const missionCompleteStyle = `
 }
 .saga-rank-banner--done {
   color: #6ee7b7;
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(var(--theme-ok), 0.1);
+  border-color: rgba(var(--theme-ok), 0.28);
 }
 .saga-rank-banner-icon { font-size: 14px; }
 .saga-rank-spinner {
@@ -361,8 +361,8 @@ const missionCompleteStyle = `
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 .saga-rank-row--self {
-  background: rgba(52, 211, 153, 0.22);
-  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(var(--theme-ok-soft), 0.22);
+  border-color: rgba(var(--theme-ok-soft), 0.55);
 }
 .saga-rank-pos {
   width: 26px;
@@ -414,8 +414,8 @@ const missionCompleteStyle = `
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: rgb(var(--theme-ok-soft));
+  border: 1px solid rgba(var(--theme-ok-soft), 0.4);
   border-radius: 999px;
   padding: 1px 6px;
 }
@@ -427,7 +427,7 @@ const missionCompleteStyle = `
   text-align: right;
 }
 .saga-rank-playing {
-  color: rgba(148, 163, 184, 0.9);
+  color: rgba(var(--theme-line), 0.9);
   font-weight: 700;
 }
 `

@@ -98,7 +98,7 @@ const estilos = `
 .saga-use-overlay{
   position:fixed; inset:0; z-index:7000;
   display:flex; align-items:center; justify-content:center; padding:18px;
-  background:radial-gradient(circle at center, rgba(251,191,36,.14), rgba(2,6,23,.96) 70%);
+  background:radial-gradient(circle at center, rgba(251,191,36,.14), rgba(var(--theme-ink-deep), .96) 70%);
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
   animation:sagaUseFade .28s ease-out both;
 }
@@ -106,7 +106,7 @@ const estilos = `
   position:relative; width:min(100%,360px); padding:26px 22px; text-align:center;
   display:grid; gap:12px; place-items:center;
   border:1px solid rgba(251,191,36,.28); border-radius:26px;
-  background:linear-gradient(180deg, rgba(15,23,42,.97), rgba(2,6,23,.99));
+  background:linear-gradient(180deg, rgba(var(--theme-ink), .97), rgba(var(--theme-ink-deep), .99));
   box-shadow:0 24px 60px rgba(0,0,0,.55);
 }
 /* Resplandor de fondo, para que la tarjeta no sea un rectángulo plano. */
@@ -124,7 +124,7 @@ const estilos = `
 }
 .saga-use-halo--usando{ animation:sagaUsePulse 1.6s ease-out infinite; }
 .saga-use-halo--b.saga-use-halo--usando{ animation-delay:.55s; }
-.saga-use-halo--hecho{ border-color:rgba(52,211,153,.55); opacity:1; }
+.saga-use-halo--hecho{ border-color:rgba(var(--theme-ok-soft), .55); opacity:1; }
 .saga-use-halo--b.saga-use-halo--hecho{ opacity:0; }
 .saga-use-rays{ position:absolute; inset:0; display:grid; place-items:center; opacity:0; }
 .saga-use-rays--usando{ opacity:1; animation:sagaUseSpin 5s linear infinite; }
@@ -142,9 +142,9 @@ const estilos = `
 }
 .saga-use-item--usando{ animation:sagaUseShake .35s ease-in-out infinite; }
 .saga-use-item--hecho{
-  background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.20), rgba(52,211,153,.16) 48%, rgba(6,78,59,.26));
-  border-color:rgba(52,211,153,.55);
-  box-shadow:inset 0 2px 10px rgba(255,255,255,.12), 0 12px 30px rgba(16,185,129,.28);
+  background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.20), rgba(var(--theme-ok-soft), .16) 48%, rgba(6,78,59,.26));
+  border-color:rgba(var(--theme-ok-soft), .55);
+  box-shadow:inset 0 2px 10px rgba(255,255,255,.12), 0 12px 30px rgba(var(--theme-ok), .28);
   animation:sagaUseSnap .5s cubic-bezier(.16,1,.3,1) both;
 }
 .saga-use-title{ margin:0; font-size:20px; font-weight:950; color:#fff; letter-spacing:-.02em; }

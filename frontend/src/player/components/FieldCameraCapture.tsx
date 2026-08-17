@@ -49,7 +49,7 @@ export function FieldCameraCapture({
           position: absolute;
           width: 28px;
           height: 28px;
-          border: 3px solid #38bdf8;
+          border: 3px solid rgb(var(--theme-info));
         }
         .saga-camera-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 20px; }
         .saga-camera-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 20px; }
@@ -85,8 +85,8 @@ export function FieldCameraCapture({
           width: 52px;
           height: 52px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-          box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+          background: linear-gradient(135deg, rgb(var(--theme-info)) 0%, #0284c7 100%);
+          box-shadow: 0 0 12px rgba(var(--theme-info), 0.6);
         }
       `
       document.head.appendChild(style)
@@ -224,7 +224,7 @@ export function FieldCameraCapture({
                   type="button"
                   style={{
                     ...pillControlBtn,
-                    background: torchOn ? '#facc15' : 'rgba(15,23,42,.70)',
+                    background: torchOn ? '#facc15' : 'rgba(var(--theme-ink), .70)',
                     color: torchOn ? '#000' : '#fff',
                     border: torchOn ? '1px solid #facc15' : '1px solid rgba(255,255,255,.25)'
                   }}
@@ -312,7 +312,7 @@ const overlay: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 12,
-  background: 'rgba(2, 6, 23, 0.65)',
+  background: 'rgba(var(--theme-ink-deep), 0.65)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
 }
@@ -324,8 +324,8 @@ const sheet: CSSProperties = {
   padding: 16,
   borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(255, 255, 255, 0.22)',
-  background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
-  boxShadow: '0 25px 60px rgba(15,23,42,.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.52 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.42 * var(--theme-solid))))',
+  boxShadow: '0 25px 60px rgba(var(--theme-ink), .35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   color: '#fff',
@@ -368,7 +368,7 @@ const cameraFrame: CSSProperties = {
   width: '100%',
   minHeight: 280,
   borderRadius: 'var(--theme-radius-panel)',
-  background: 'rgba(15, 23, 42, 0.4)',
+  background: 'rgba(var(--theme-ink), 0.4)',
   border: '1px solid rgba(255, 255, 255, 0.16)',
   overflow: 'hidden',
 }
@@ -390,7 +390,7 @@ const pillControlBtn: CSSProperties = {
   padding: '0 14px',
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.25)',
-  background: 'rgba(15,23,42,.70)',
+  background: 'rgba(var(--theme-ink), .70)',
   color: '#fff',
   fontWeight: 800,
   fontSize: 12,
@@ -436,7 +436,7 @@ const noteInput: CSSProperties = {
   minHeight: 44,
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255, 255, 255, 0.18)',
-  background: 'rgba(15, 23, 42, 0.45)',
+  background: 'rgba(var(--theme-ink), 0.45)',
   color: '#fff',
   padding: '0 14px',
   fontSize: 14,
@@ -462,8 +462,8 @@ const previewActionsGroup: CSSProperties = {
 const primaryBtnStyle: CSSProperties = {
   minHeight: 46,
   borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(125,211,252,.35)',
-  background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+  border: '1px solid rgba(var(--theme-info-soft), .35)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-info)) 0%, #2563eb 100%)',
   color: '#fff',
   fontSize: 14,
   fontWeight: 950,

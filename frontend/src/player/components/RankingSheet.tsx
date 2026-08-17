@@ -16,9 +16,9 @@ interface RankingSheetProps {
 
 function getPresenceConfig(value?: string) {
   const p = String(value || 'offline').toLowerCase()
-  if (p === 'live') return { label: 'EN LÍNEA', color: '#22d3ee', glow: 'rgba(34,211,238,0.35)', dot: '#22c55e' }
+  if (p === 'live') return { label: 'EN LÍNEA', color: '#22d3ee', glow: 'rgba(34,211,238,0.35)', dot: 'rgb(var(--theme-done))' }
   if (p === 'stale') return { label: 'RECIENTE', color: '#fbbf24', glow: 'rgba(251,191,36,0.25)', dot: '#f59e0b' }
-  return { label: 'OFFLINE', color: '#64748b', glow: 'rgba(100,116,139,0.1)', dot: '#475569' }
+  return { label: 'OFFLINE', color: 'rgb(var(--theme-sheen-a))', glow: 'rgba(var(--theme-sheen-a), calc(0.1 * var(--theme-solid)))', dot: 'rgb(var(--theme-sheen-b))' }
 }
 
 function readNumericStat(player: TeamProfileLiveStatus, keys: string[]) {
@@ -81,9 +81,9 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
       open={open}
       onClose={onClose}
       sheetStyle={{
-        background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+        background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
         border: '1px solid rgba(255,255,255,.22)',
-        boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+        boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
         backdropFilter: 'var(--theme-blur)',
         WebkitBackdropFilter: 'var(--theme-blur)',
       }}
@@ -97,8 +97,8 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                 height: 8,
                 borderRadius: '50%',
                 display: 'inline-block',
-                background: liveCount > 0 ? '#22c55e' : '#475569',
-                boxShadow: liveCount > 0 ? '0 0 10px #22c55e' : 'none',
+                background: liveCount > 0 ? 'rgb(var(--theme-done))' : 'rgb(var(--theme-sheen-b))',
+                boxShadow: liveCount > 0 ? '0 0 10px rgb(var(--theme-done))' : 'none',
                 flexShrink: 0,
               }}
             />
@@ -111,8 +111,8 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
             ×
           </button>
           <div style={counterBadge}>
-            <span style={{ color: '#22c55e', fontWeight: 900 }}>{liveCount}</span>
-            <span style={{ color: '#94a3b8' }}> / {sorted.length} jug.</span>
+            <span style={{ color: 'rgb(var(--theme-done))', fontWeight: 900 }}>{liveCount}</span>
+            <span style={{ color: 'rgb(var(--theme-line))' }}> / {sorted.length} jug.</span>
           </div>
         </div>
       </div>
@@ -121,7 +121,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
         <div style={emptyState}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
           <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: 16 }}>Sin jugadores activos</div>
-          <div style={{ color: '#64748b', marginTop: 4, fontSize: 13 }}>No hay datos de clasificación disponibles.</div>
+          <div style={{ color: 'rgb(var(--theme-sheen-a))', marginTop: 4, fontSize: 13 }}>No hay datos de clasificación disponibles.</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
@@ -165,7 +165,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                     ? 'rgba(34,211,238,0.25)'
                     : 'rgba(255,255,255,0.08)',
                   background: isFirst
-                    ? 'linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(15,23,42,0.4) 100%)'
+                    ? 'linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(var(--theme-ink), 0.4) 100%)'
                     : isLive
                     ? 'rgba(34,211,238,0.05)'
                     : 'rgba(255,255,255,0.03)',
@@ -178,7 +178,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                     style={{
                       fontSize: 14,
                       fontWeight: 900,
-                      color: isFirst ? '#fbbf24' : idx === 1 ? '#cbd5e1' : idx === 2 ? '#cd7f32' : '#64748b',
+                      color: isFirst ? '#fbbf24' : idx === 1 ? 'rgb(var(--theme-line-soft))' : idx === 2 ? '#cd7f32' : 'rgb(var(--theme-sheen-a))',
                       width: 24,
                       textAlign: 'center',
                       flexShrink: 0,
@@ -259,11 +259,11 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                         style={{
                           fontSize: 11,
                           fontWeight: 800,
-                          color: finished ? '#10b981' : '#38bdf8',
-                          background: finished ? 'rgba(16,185,129,0.15)' : 'rgba(56,189,248,0.12)',
+                          color: finished ? 'rgb(var(--theme-ok))' : 'rgb(var(--theme-info))',
+                          background: finished ? 'rgba(var(--theme-ok), 0.15)' : 'rgba(var(--theme-info), 0.12)',
                           padding: '2px 8px',
                           borderRadius: 'var(--theme-radius-pill)',
-                          border: `1px solid ${finished ? 'rgba(16,185,129,0.3)' : 'rgba(56,189,248,0.25)'}`,
+                          border: `1px solid ${finished ? 'rgba(var(--theme-ok), 0.3)' : 'rgba(var(--theme-info), 0.25)'}`,
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -300,11 +300,11 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                         width: `${timePercent}%`,
                         borderRadius: 'var(--theme-radius-pill)',
                         background: finished
-                          ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
+                          ? 'linear-gradient(90deg, rgb(var(--theme-ok)) 0%, rgb(var(--theme-ok-soft)) 100%)'
                           : isFirst
                           ? 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)'
-                          : 'linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)',
-                        boxShadow: '0 0 10px rgba(56,189,248,0.4)',
+                          : 'linear-gradient(90deg, #0284c7 0%, rgb(var(--theme-info)) 100%)',
+                        boxShadow: '0 0 10px rgba(var(--theme-info), 0.4)',
                         transition: 'width 0.8s ease-out',
                       }}
                     />
@@ -330,7 +330,7 @@ const eyebrow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-  color: '#94a3b8',
+  color: 'rgb(var(--theme-line))',
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.14em',
@@ -350,7 +350,7 @@ const closeBtn: CSSProperties = {
   borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.15)',
   background: 'rgba(255,255,255,.08)',
-  color: '#cbd5e1',
+  color: 'rgb(var(--theme-line-soft))',
   fontSize: 22,
   fontWeight: 900,
   lineHeight: 1,

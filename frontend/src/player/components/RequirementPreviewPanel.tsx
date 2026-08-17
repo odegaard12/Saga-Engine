@@ -101,8 +101,8 @@ export function RequirementPreviewPanel({ user, stage }: RequirementPreviewPanel
               <div
                 style={{
                   ...requiredItemCard,
-                  borderColor: requirementMet ? 'rgba(74,222,128,.45)' : 'rgba(251,191,36,.45)',
-                  background: requirementMet ? 'rgba(74,222,128,.12)' : 'rgba(251,191,36,.10)',
+                  borderColor: requirementMet ? 'rgba(var(--theme-done-soft), .45)' : 'rgba(251,191,36,.45)',
+                  background: requirementMet ? 'rgba(var(--theme-done-soft), .12)' : 'rgba(251,191,36,.10)',
                 }}
               >
                 <ItemIconSvg itemId={requiredItem} size={20} />
@@ -148,7 +148,7 @@ const panel: CSSProperties = {
   flexDirection: 'column',
   gap: 16,
   padding: '20px',
-  background: 'linear-gradient(to bottom, rgba(15,23,42,0.8), rgba(15,23,42,0.95))',
+  background: 'linear-gradient(to bottom, rgba(var(--theme-ink), 0.8), rgba(var(--theme-ink), 0.95))',
   borderRadius: '16px',
   border: '1px solid rgba(255,255,255,0.05)',
   boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
@@ -161,7 +161,7 @@ const header: CSSProperties = {
 }
 
 const eyebrow: CSSProperties = {
-  color: '#38bdf8',
+  color: 'rgb(var(--theme-info))',
   fontSize: 11,
   fontWeight: 800,
   letterSpacing: '0.15em',
@@ -176,7 +176,7 @@ const title: CSSProperties = {
 }
 
 const copy: CSSProperties = {
-  color: '#94a3b8',
+  color: 'rgb(var(--theme-line))',
   fontSize: 13,
   lineHeight: 1.5,
   margin: 0,
@@ -200,14 +200,14 @@ const stepNumber: CSSProperties = {
   width: 24,
   height: 24,
   borderRadius: '12px',
-  background: 'rgba(56,189,248,0.15)',
-  color: '#38bdf8',
+  background: 'rgba(var(--theme-info), 0.15)',
+  color: 'rgb(var(--theme-info))',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: 13,
   fontWeight: 800,
-  border: '1px solid rgba(56,189,248,0.3)',
+  border: '1px solid rgba(var(--theme-info), 0.3)',
   zIndex: 2,
 }
 
@@ -225,7 +225,7 @@ const stepTitle: CSSProperties = {
 }
 
 const stepDesc: CSSProperties = {
-  color: '#94a3b8',
+  color: 'rgb(var(--theme-line))',
   fontSize: 13,
   lineHeight: 1.4,
 }

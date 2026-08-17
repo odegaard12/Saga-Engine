@@ -71,15 +71,24 @@ def test_o_brillo_do_xogador_segue_o_tema():
     assert not VERDE.search(bloque), "el brillo del marcador sigue verde"
 
 
-def test_os_pins_de_nodo_non_cambian():
-    """Verde = superado, azul = el que toca, rojo = pendiente. Es una escala."""
+def test_a_escala_dos_pins_segue_sendo_tres():
+    """Verde = superado, azul = el que toca, rojo = pendiente. Es una escala.
+
+    Esto antes exigía que los tres colores estuviesen escritos a mano en el
+    `stateColor` del componente. Medido después: ese `stateColor` se escribía
+    como estilo en línea, ganaba a la regla de CSS del mismo alfiler, y las dos
+    ni siquiera decían lo mismo (el pendiente era rojo en línea y gris en el
+    CSS). Ahora el color está sólo en el CSS y sale del tema.
+
+    Lo que importa se mantiene y lo comprueba `test_o_alfiler_do_nodo.py`: tres
+    estados distinguibles, y en cristal los tres colores exactos de siempre.
+    """
     c = codigo()
 
-    inicio = c.index("const stateColor")
-    bloque = c[inicio : inicio + 200]
-
-    assert "#22c55e" in bloque, "el verde de 'superado' se queda: es semántico"
-    assert "#3b82f6" in bloque and "#ef4444" in bloque, "la escala entera se queda"
+    for estado in ("completed", "current", "locked"):
+        assert ".saga-mission-node-pin--%s {" % estado in c, (
+            "falta el estado %s: la escala del mapa deja de decir algo" % estado
+        )
 
 
 def test_o_tema_define_o_lavado_do_mapa():
