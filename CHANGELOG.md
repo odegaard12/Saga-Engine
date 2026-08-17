@@ -6,6 +6,28 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.6
+
+Reiniciar a un jugador ahora le llega al movil.
+
+Medido en el banco con alguien en el nodo 2: el servidor bajaba a 0 y el movil
+seguia marcando 2/10. El organizador reiniciaba a alguien y esa persona seguia
+jugando como si nada.
+
+No era fallo del cliente -manda sobre su propio progreso a proposito, porque en
+el monte avanza sin cobertura-. Habia DOS reinicios en el servidor y no hacian
+lo mismo: el del panel de perfiles sellaba `reset_at`, paraba los relojes,
+vaciaba la mochila y borraba la posicion; `/api/reset` solo bajaba el nivel.
+
+Por ese segundo camino el movil no se enteraba, los cronometros seguian
+corriendo desde la partida anterior y la ultima coordenada seguia en el mapa de
+los demas. Ahora los dos llaman a la misma funcion.
+
+Ademas, docs/plan-de-mejora.md con lo que queda por hacer y lo que hay que
+medir en cada punto.
+
+---
+
 ## 4.9.5
 
 El rojo, de ladrillo apagado a brasa viva. Estaba oscuro y seco: 16 tonos
