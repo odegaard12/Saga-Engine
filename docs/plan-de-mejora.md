@@ -132,6 +132,44 @@ conviene saberlo al leer los tiempos.
 panel «ANTES DE SALIR». En otros nodos sí sale `ACTIVAR GPS`. Dos caminos
 distintos para lo mismo.
 
+### 0.4 Quince jugadores a la vez — **el cuello no es la Pi**
+
+Quince hilos pidiendo `GET /api/game/<user>?offline_pack=true`, que es la
+petición cara. Sólo lecturas: no ensucia el mapa de nadie.
+
+| | 1 jugador | 15 jugadores |
+|---|---|---|
+| Por Cloudflare | p50 458 ms | **p50 4 326 ms** · p95 5 276 · máx 8 727 |
+| Directo a la Pi | p50 554 ms | **p50 5 557 ms** · p95 9 400 · máx 10 455 |
+
+Y durante todo el ensayo, la Pi: **CPU 0,18 %, carga 0,13, 1 160 MB libres**.
+El caudal apenas sube con la concurrencia (2,2 → 2,4 peticiones/s) mientras la
+espera se multiplica por diez. Eso no es un servidor ahogado: es **ancho de
+banda**. Se están mandando **214 KB por jugador**, y quince a la vez son 3,2 MB
+por ronda.
+
+Traducido al aparcamiento: trece personas abriendo la aplicación a la vez
+esperan entre 5 y 10 segundos cada una, con cobertura buena. Con cobertura de
+monte, más.
+
+**Cloudflare no ayuda aquí** — va igual o peor que ir directo, así que el
+paquete no se está cacheando en el borde.
+
+**Lo que esto señala, por orden:**
+
+1. **El paquete de 214 KB es el problema, no la máquina.** Ya existe
+   `stages_rev` (huella del contenido) precisamente para poder pedir lo ligero
+   y reutilizar lo guardado. Habría que medir cuántos de esos 214 KB son
+   contenido que el móvil ya tiene.
+2. **Escalonar la entrada.** Si el arranque de todos coincide, no hay servidor
+   que lo arregle: es el mismo caudal repartido entre más gente.
+3. Subir CPU o RAM de la Pi **no cambiaría nada**. Está parada.
+
+**Lo que NO se probó:** escrituras concurrentes (latidos y avances de quince
+jugadores a la vez). Se dejó fuera a propósito porque planta posiciones falsas
+en el mapa de gente real. Queda pendiente y hay que hacerlo con nombres de
+prueba, no con los de la ruta.
+
 ---
 
 ## 1. Que nadie se quede tirado
