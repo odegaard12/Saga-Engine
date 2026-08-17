@@ -6,7 +6,7 @@ los ciclos de red, sin una sola prueba. Son las que más se equivocan en campo, 
 lo hacen de las dos maneras: si son estrictas, alguien que está encima del nodo
 no puede entrar; si son laxas, se abre desde el coche.
 
-El dato que manda todo esto, medido en Cotorredondo: **bajo arbolado la
+El dato que manda todo esto, medido en el monte: **bajo arbolado la
 precisión anda por los 30-80 metros**. Cualquier regla pensada para una calle de
 ciudad falla ahí.
 

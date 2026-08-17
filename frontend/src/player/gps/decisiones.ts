@@ -11,7 +11,7 @@ import type { PlayerGpsStatus } from '../../types/player'
  * Aquí son funciones puras y con pruebas. Antes no tenían ninguna.
  *
  * El dato que manda todo esto: **bajo arbolado la precisión del GPS anda por
- * los 30-80 metros**, medido en Cotorredondo. Cualquier regla pensada para una
+ * los 30-80 metros**, medido en el monte. Cualquier regla pensada para una
  * calle de ciudad falla ahí.
  */
 
