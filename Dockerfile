@@ -5,6 +5,17 @@ COPY frontend/package*.json ./
 # `ci` y no `install`: instala exactamente lo que dice package-lock.json.
 # Sin fichero de bloqueo, cada construccion traia lo ultimo que hubiera ese dia
 # y dos imagenes de la misma version podian llevar dependencias distintas.
+# El techo de memoria de Node, y no es un capricho.
+#
+# Esta imagen se construye en una Raspberry con 1,8 GB de RAM, y el build
+# la tumbo DOS veces el 17 de agosto: se llevo por delante la web publica
+# las dos. Sin techo, Node crece hasta que el sistema entra en panico.
+#
+# 640 MB deja sitio al resto de la maquina y basta para este proyecto.
+# La solucion buena es compilar fuera de la Pi; esto es el parche que
+# evita tirar produccion mientras tanto.
+ENV NODE_OPTIONS=--max-old-space-size=640
+
 RUN npm ci --no-audit --no-fund
 # VERSION entra en esta etapa porque vite.config.ts la inyecta en el bundle.
 COPY VERSION /app/VERSION
