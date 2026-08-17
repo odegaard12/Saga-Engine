@@ -26,7 +26,8 @@
   --theme-text: #ffffff;
   --theme-primary: #22c55e;
   --theme-primary-hover: #16a34a;
-  --theme-glass: rgba(15, 23, 42, 0.65);
+  --theme-glass: rgba(15, 23, 42, 0.68);
+  --theme-glass-soft: rgba(30, 41, 59, 0.5);
   --theme-glass-border: rgba(255, 255, 255, 0.08);
   --theme-glow: rgba(34, 197, 94, 0.4);
   --theme-backdrop: blur(16px);
@@ -45,7 +46,8 @@ body.theme-glass {
   --theme-bg: #0f172a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0284c7;
-  --theme-glass: rgba(15, 23, 42, 0.68);
+  --theme-glass: rgba(15, 23, 42, 0.72);
+  --theme-glass-soft: rgba(30, 58, 95, 0.52);
   --theme-glass-border: rgba(56, 189, 248, 0.18);
   --theme-glow: rgba(56, 189, 248, 0.4);
   --theme-backdrop: blur(20px);
@@ -57,7 +59,8 @@ body.theme-flame-red {
   --theme-bg: #2f0a0a;
   --theme-primary: #f87171;
   --theme-primary-hover: #ef4444;
-  --theme-glass: rgba(60, 12, 12, 0.72);
+  --theme-glass: rgba(60, 12, 12, 0.74);
+  --theme-glass-soft: rgba(94, 22, 22, 0.52);
   --theme-glass-border: rgba(248, 113, 113, 0.22);
   --theme-glow: rgba(248, 113, 113, 0.42);
   --theme-backdrop: blur(16px);
@@ -70,17 +73,19 @@ body[class*='theme-'] #root {
   background-color: var(--theme-bg);
 }
 
+/*
+ * Un solo bloque: dos reglas con el mismo selector no dan error, gana la
+ * ultima, y eso ya costo caro en la carcasa.
+ *
+ * Las variables --saga-* son el gancho que hace que el tema se note de verdad:
+ * los paneles de cristal del jugador y de los minijuegos leen esas, no las del
+ * tema directamente.
+ */
 body[class*='theme-'] {
   color: var(--theme-text);
   transition: background-color 0.3s ease;
-}
 
-/*
- * El gancho que hace que el tema se note: los paneles de cristal del jugador
- * y de los minijuegos leen estas variables.
- */
-body[class*='theme-'] {
-  --saga-glass-bg: var(--theme-glass);
+  --saga-glass-bg: linear-gradient(180deg, var(--theme-glass), var(--theme-glass-soft));
   --saga-glass-border: var(--theme-glass-border);
   --saga-accent-glow: 0 0 20px var(--theme-glow);
 }

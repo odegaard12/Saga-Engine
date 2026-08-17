@@ -6,6 +6,7 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import { SwipeableSheet } from './SwipeableSheet'
+import { leerMarcaDeTiempo } from '../../shared/fechas'
 
 interface RankingSheetProps {
   open: boolean
@@ -33,11 +34,8 @@ function readTimestamp(player: TeamProfileLiveStatus, keys: string[]) {
   const raw = player as unknown as Record<string, unknown>
   for (const key of keys) {
     const value = raw[key]
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
-    if (typeof value === 'string') {
-      const parsed = Date.parse(value)
-      if (Number.isFinite(parsed)) return parsed
-    }
+    const marca = leerMarcaDeTiempo(value)
+    if (marca !== null) return marca
   }
   return Number.MAX_SAFE_INTEGER
 }
