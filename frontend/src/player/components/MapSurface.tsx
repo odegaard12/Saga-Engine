@@ -1036,13 +1036,13 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-node-radius--current,.saga-node-radius--ready,.saga-node-radius--engaging { animation: none; }
       
       /* Leaflet Control Styling overrides */
-      .leaflet-bar { border: 1px solid rgba(74, 222, 128, 0.25) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; border-radius: 12px !important; overflow: hidden !important; }
-      .leaflet-bar a, .leaflet-bar a:hover { background: rgba(15, 23, 42, 0.88) !important; color: #34d399 !important; border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; font-weight: bold !important; transition: all 0.2s ease !important; }
-      .leaflet-bar a:hover { background: rgba(16, 185, 129, 0.2) !important; color: #10b981 !important; }
-      .leaflet-control { border: 1px solid rgba(74, 222, 128, 0.25) !important; border-radius: 12px !important; background: rgba(15, 23, 42, 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
+      .leaflet-bar { border: 1px solid var(--theme-primary-border) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; border-radius: 12px !important; overflow: hidden !important; }
+      .leaflet-bar a, .leaflet-bar a:hover { background: rgba(15, 23, 42, 0.88) !important; color: var(--theme-primary) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; font-weight: bold !important; transition: all 0.2s ease !important; }
+      .leaflet-bar a:hover { background: var(--theme-tint-strong) !important; color: var(--theme-primary) !important; }
+      .leaflet-control { border: 1px solid var(--theme-primary-border) !important; border-radius: 12px !important; background: rgba(15, 23, 42, 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
 
       @keyframes sagaPlayerAuraBreathe { 0%,100% { opacity:.42; } 50% { opacity:.66; } }
-      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1) translateZ(0); box-shadow:0 12px 28px rgba(16,185,129,.40),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035) translateZ(0); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
+      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1) translateZ(0); box-shadow:0 12px 28px var(--theme-glow),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035) translateZ(0); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
       /* Latido suave y que NUNCA llegue a opacidad 0: el aro es ahora la única
          señal de dónde hay que ir, y desaparecer a ratos lo hacía perderse. */
       @keyframes sagaCurrentNodeHalo { 0%,100% { opacity:1; } 50% { opacity:.45; } }
@@ -2211,11 +2211,26 @@ const mapAnimations = `
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
+/**
+ * La linea de la ruta, del color del tema.
+ *
+ * Leaflet escribe el color como atributo del SVG, y ahi var() no resuelve.
+ * Pero tambien pone la clase, asi que se tiñe desde aqui: el CSS si lo
+ * entiende, y no hay que tocar ni una linea de la logica del mapa.
+ */
+.saga-road-guide {
+  stroke: var(--theme-primary) !important;
+}
+
+.saga-road-guide--casing {
+  stroke: var(--theme-primary-hover) !important;
+}
+
 .saga-offline-grid-tile {
   box-sizing: border-box;
   border: 1px solid rgba(148,163,184,.13);
   background:
-    radial-gradient(circle at 50% 50%, rgba(34,197,94,.05), transparent 34%),
+    radial-gradient(circle at 50% 50%, var(--theme-wash), transparent 34%),
     linear-gradient(135deg, rgba(241,245,249,.92), rgba(226,232,240,.90));
   color: transparent;
 }
@@ -2257,15 +2272,15 @@ const mapAnimations = `
 }
 
 .saga-node-core--locked {
-  filter: drop-shadow(0 0 6px rgba(34,197,94,.18));
+  filter: drop-shadow(0 0 6px var(--theme-tint));
 }
 
 .saga-node-core--ready {
-  filter: drop-shadow(0 0 10px rgba(34,197,94,.28));
+  filter: drop-shadow(0 0 10px var(--theme-tint-strong));
 }
 
 .saga-node-core--engaging {
-  filter: drop-shadow(0 0 14px rgba(34,197,94,.38));
+  filter: drop-shadow(0 0 14px var(--theme-glow));
 }
 
 .saga-avatar-icon-wrap {
