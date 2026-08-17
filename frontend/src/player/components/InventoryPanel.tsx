@@ -282,7 +282,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               ...cellIcon,
               width: 52,
               height: 52,
-              borderRadius: 14,
+              borderRadius: 'var(--theme-radius-card)',
               background: `${getItemIcon(selected).color}22`,
               border: `1px solid ${getItemIcon(selected).color}44`,
               fontSize: 28,
@@ -369,7 +369,7 @@ const grid: CSSProperties = {
 const guideToggleBtn: CSSProperties = {
   background: 'rgba(255,255,255,0.07)',
   border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   color: 'rgba(255,255,255,0.6)',
   fontSize: 11,
   fontWeight: 800,
@@ -382,7 +382,7 @@ const guideToggleBtn: CSSProperties = {
 const guideBox: CSSProperties = {
   background: 'rgba(14, 165, 233, 0.07)',
   border: '1px solid rgba(125,211,252,0.18)',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   padding: '12px 14px',
   display: 'flex',
   flexDirection: 'column',
@@ -409,7 +409,7 @@ const guideStep: CSSProperties = {
 const guideNum: CSSProperties = {
   background: 'rgba(125,211,252,0.18)',
   color: '#7dd3fc',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   width: 20,
   height: 20,
   minWidth: 20,
@@ -434,7 +434,7 @@ const cell: CSSProperties = {
   position: 'relative',
   background: 'rgba(255,255,255,0.04)',
   border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   padding: '10px 4px 8px',
   display: 'flex',
   flexDirection: 'column',
@@ -495,7 +495,7 @@ const qrNoise: CSSProperties = {
 const cellIcon: CSSProperties = {
   width: 40,
   height: 40,
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -511,7 +511,7 @@ const qtyBadge: CSSProperties = {
   color: '#1c1008',
   fontSize: 9,
   fontWeight: 900,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   minWidth: 16,
   height: 16,
   display: 'flex',
@@ -547,14 +547,14 @@ const cellName: CSSProperties = {
 const emptyCell: CSSProperties = {
   background: 'rgba(255,255,255,0.02)',
   border: '1px dashed rgba(255,255,255,0.05)',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   minHeight: 72,
 }
 
 const detailCard: CSSProperties = {
   background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   padding: 14,
   display: 'flex',
   flexDirection: 'column',
@@ -588,7 +588,7 @@ const sourcePill: CSSProperties = {
   color: '#93c5fd',
   background: 'rgba(59,130,246,0.15)',
   border: '1px solid rgba(59,130,246,0.25)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '2px 7px',
 }
 
@@ -599,7 +599,7 @@ const nodePill: CSSProperties = {
   color: '#a5f3fc',
   background: 'rgba(6,182,212,0.12)',
   border: '1px solid rgba(6,182,212,0.2)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '2px 7px',
 }
 
@@ -612,7 +612,7 @@ const qtyText: CSSProperties = {
 const useBtn: CSSProperties = {
   width: '100%',
   padding: '11px 0',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   border: 'none',
   background: 'linear-gradient(135deg, #22c55e, #16a34a)',
   color: '#fff',

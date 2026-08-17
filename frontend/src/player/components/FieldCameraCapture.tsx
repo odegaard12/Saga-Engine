@@ -313,8 +313,8 @@ const overlay: CSSProperties = {
   placeItems: 'center',
   padding: 12,
   background: 'rgba(2, 6, 23, 0.65)',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 const sheet: CSSProperties = {
@@ -322,12 +322,12 @@ const sheet: CSSProperties = {
   height: 'min(94vh, 760px)',
   margin: '0 auto',
   padding: 16,
-  borderRadius: 24,
+  borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(255, 255, 255, 0.22)',
   background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
   boxShadow: '0 25px 60px rgba(15,23,42,.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   color: '#fff',
   display: 'flex',
   flexDirection: 'column',
@@ -351,7 +351,7 @@ const headerTitle: CSSProperties = {
 const closeBtnStyle: CSSProperties = {
   width: 36,
   height: 36,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.20)',
   background: 'rgba(255,255,255,.10)',
   color: '#f8fafc',
@@ -367,7 +367,7 @@ const cameraFrame: CSSProperties = {
   flex: 1,
   width: '100%',
   minHeight: 280,
-  borderRadius: 20,
+  borderRadius: 'var(--theme-radius-panel)',
   background: 'rgba(15, 23, 42, 0.4)',
   border: '1px solid rgba(255, 255, 255, 0.16)',
   overflow: 'hidden',
@@ -388,13 +388,13 @@ const topControlsGroup: CSSProperties = {
 const pillControlBtn: CSSProperties = {
   minHeight: 34,
   padding: '0 14px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.25)',
   background: 'rgba(15,23,42,.70)',
   color: '#fff',
   fontWeight: 800,
   fontSize: 12,
-  backdropFilter: 'blur(10px)',
+  backdropFilter: 'var(--theme-blur)',
   boxShadow: '0 2px 10px rgba(0,0,0,.3)',
 }
 
@@ -415,7 +415,7 @@ const errorBox: CSSProperties = {
   right: 12,
   bottom: 12,
   padding: 12,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'rgba(127,29,29,.90)',
   color: '#fee2e2',
   fontSize: 13,
@@ -434,7 +434,7 @@ const controlsBottomContainer: CSSProperties = {
 const noteInput: CSSProperties = {
   width: '100%',
   minHeight: 44,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255, 255, 255, 0.18)',
   background: 'rgba(15, 23, 42, 0.45)',
   color: '#fff',
@@ -461,7 +461,7 @@ const previewActionsGroup: CSSProperties = {
 
 const primaryBtnStyle: CSSProperties = {
   minHeight: 46,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(125,211,252,.35)',
   background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
   color: '#fff',
@@ -472,7 +472,7 @@ const primaryBtnStyle: CSSProperties = {
 
 const secondaryBtnStyle: CSSProperties = {
   minHeight: 46,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.15)',
   background: 'rgba(255,255,255,.10)',
   color: '#e2e8f0',

@@ -97,8 +97,8 @@ export function QrScanClock({ ms }: Props) {
         background:
           'linear-gradient(180deg, rgba(110,116,128,.64) 0%, rgba(96,103,115,.58) 100%)',
         boxShadow: '0 14px 30px rgba(15,23,42,.18)',
-        backdropFilter: 'blur(20px) saturate(135%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+        backdropFilter: 'var(--theme-blur)',
+        WebkitBackdropFilter: 'var(--theme-blur)',
         color: '#ffffff',
         whiteSpace: 'nowrap',
       }}

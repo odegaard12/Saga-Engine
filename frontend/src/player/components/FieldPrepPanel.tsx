@@ -202,8 +202,8 @@ const capa: CSSProperties = {
   placeItems: 'center',
   padding: 16,
   background: 'radial-gradient(circle at 50% 42%, rgba(2,6,23,.42), rgba(2,6,23,.68))',
-  backdropFilter: 'blur(5px)',
-  WebkitBackdropFilter: 'blur(5px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 function tarjeta(mobile: boolean): CSSProperties {
@@ -213,15 +213,15 @@ function tarjeta(mobile: boolean): CSSProperties {
     gap: 10,
     padding: 16,
     color: '#e2e8f0',
-    borderRadius: 24,
+    borderRadius: 'var(--theme-radius-panel)',
     // El cristal va aquí y no sólo en la clase: comprobado en el navegador,
     // backdrop-filter salía en "none" porque la hoja global no llegaba a
     // aplicarse sobre este elemento, y la tarjeta quedaba opaca y plana.
     background:
       'linear-gradient(180deg, rgba(100,116,139,.34), rgba(30,41,59,.42))',
     border: '1px solid rgba(255,255,255,.24)',
-    backdropFilter: 'blur(22px) saturate(1.25)',
-    WebkitBackdropFilter: 'blur(22px) saturate(1.25)',
+    backdropFilter: 'var(--theme-blur)',
+    WebkitBackdropFilter: 'var(--theme-blur)',
     // Brillo de canto arriba y sombra ancha abajo: es lo que separa una lámina
     // de cristal de un rectángulo translúcido.
     boxShadow:
@@ -258,7 +258,7 @@ const cerrar: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 0,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.2)',
   background: 'rgba(255,255,255,.08)',
   color: '#e2e8f0',
@@ -273,14 +273,14 @@ const fila: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   padding: '10px 11px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.14)',
   // Cristal también dentro: el degradado y el desenfoque hacen que la fila
   // flote sobre la tarjeta en vez de parecer un recuadro plano pegado encima.
   background:
     'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035))',
-  backdropFilter: 'blur(8px) saturate(1.1)',
-  WebkitBackdropFilter: 'blur(8px) saturate(1.1)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14)',
 }
 
@@ -310,7 +310,7 @@ const boton: CSSProperties = {
   flex: '0 0 auto',
   minHeight: 34,
   padding: '0 13px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(125,211,252,.55)',
   background: 'linear-gradient(180deg,rgba(56,189,248,.92),rgba(14,116,190,.92))',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3), 0 6px 16px rgba(2,132,199,.35)',

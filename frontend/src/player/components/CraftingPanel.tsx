@@ -229,7 +229,7 @@ const infoBox: CSSProperties = {
   gap: 8,
   background: 'rgba(167,139,250,0.08)',
   border: '1px solid rgba(167,139,250,0.18)',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   padding: '10px 12px',
 }
 
@@ -273,7 +273,7 @@ const readyBadge: CSSProperties = {
   color: '#4ade80',
   background: 'rgba(34,197,94,0.15)',
   border: '1px solid rgba(34,197,94,0.3)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 10px',
 }
 
@@ -282,7 +282,7 @@ const toastBanner: CSSProperties = {
   border: '1px solid rgba(34,197,94,0.3)',
   color: '#bbf7d0',
   padding: '9px 14px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 13,
   fontWeight: 800,
   textAlign: 'center',
@@ -296,7 +296,7 @@ const recipeList: CSSProperties = {
 }
 
 const recipeCard: CSSProperties = {
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   padding: '14px',
   display: 'flex',
   flexDirection: 'column',
@@ -324,7 +324,7 @@ const recipeOutputRow: CSSProperties = {
 const recipeOutputIcon: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -363,7 +363,7 @@ const availablePill: CSSProperties = {
   color: '#4ade80',
   background: 'rgba(34,197,94,0.15)',
   border: '1px solid rgba(34,197,94,0.3)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
 }
@@ -375,7 +375,7 @@ const lockedPill: CSSProperties = {
   color: '#94a3b8',
   background: 'rgba(148,163,184,0.1)',
   border: '1px solid rgba(148,163,184,0.2)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
 }
@@ -392,7 +392,7 @@ const inputChip: CSSProperties = {
   gap: 5,
   background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 8,
+  borderRadius: 'var(--theme-radius-card)',
   padding: '4px 9px',
 }
 
@@ -414,7 +414,7 @@ const inputChipLabel: CSSProperties = {
 const craftBtn: CSSProperties = {
   width: '100%',
   padding: '11px 0',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   border: 'none',
   background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
   color: '#fff',

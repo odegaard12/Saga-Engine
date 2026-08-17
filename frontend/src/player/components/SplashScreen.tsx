@@ -62,7 +62,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             position: 'relative',
             width: 116,
             height: 116,
-            borderRadius: 28,
+            borderRadius: 'var(--theme-radius-panel)',
             boxShadow: '0 10px 40px rgba(0,0,0,.55)',
             animation: 'sagaSplashPulse 2.4s infinite ease-in-out',
           }}
@@ -74,7 +74,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           width: 'min(88vw, 300px)',
           height: 8,
           background: 'rgba(255,255,255,.09)',
-          borderRadius: 999,
+          borderRadius: 'var(--theme-radius-pill)',
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,.08)',
         }}
@@ -82,7 +82,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         <div
           style={{
             height: '100%',
-            borderRadius: 999,
+            borderRadius: 'var(--theme-radius-pill)',
             background: 'linear-gradient(90deg, #22c55e, #38bdf8)',
             width: known ? `${pct}%` : '38%',
             transition: 'width .35s cubic-bezier(.22,1,.36,1)',
