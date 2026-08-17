@@ -41,7 +41,7 @@ async def get_config():
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),
-        "player_theme": main.normalize_player_theme(cfg.get("player_theme", "classic")),
+        "player_theme": main.normalize_player_theme(cfg.get("player_theme", "glass")),
         "story_title": cfg.get("story_title", ""),
         "story_text": cfg.get("story_text", ""),
         "prologue_title": cfg.get("prologue_title", "PUT PROLOGUE TITLE HERE"),
