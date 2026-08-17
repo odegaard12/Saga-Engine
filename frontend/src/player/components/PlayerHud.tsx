@@ -22,10 +22,8 @@ interface PlayerHudProps {
   distanceMeters: number | null
   inRange: boolean
   debugEnabled: boolean
-  followPlayer: boolean
   toolsOpen: boolean
   playerHref: string
-  loginHref: string
   adminHref: string
   primaryLabel: string
   primaryTone: PrimaryActionTone
@@ -39,12 +37,10 @@ interface PlayerHudProps {
   onOpenTools: () => void
   onCloseTools: () => void
   onToggleDebug: () => void
-  onRequestGps: () => void
   onDownloadFieldProofs?: () => void
   fieldPhotoCount?: number
   submitting?: boolean
   errorMessage?: string | null
-  onShowPrologue?: () => void
   onSubmitCode?: (
     code: string,
     timeSpentMs?: number,
@@ -82,9 +78,7 @@ export function PlayerHud({
   distanceMeters,
   inRange,
   debugEnabled,
-  followPlayer,
   toolsOpen,
-  loginHref,
   primaryLabel,
   primaryTone,
   primaryDisabled,
@@ -96,13 +90,11 @@ export function PlayerHud({
   onOpenTools,
   onCloseTools,
   onToggleDebug,
-  onRequestGps,
   onDownloadFieldProofs,
   fieldPhotoCount = 0,
   submitting = false,
   errorMessage = null,
   onSubmitCode,
-  onShowPrologue,
 }: PlayerHudProps) {
   const [locale, setLocaleState] = useState(getLocale())
   const [backpackTab, setBackpackTab] = useState<BackpackTab>('requirements')
@@ -168,22 +160,50 @@ export function PlayerHud({
       hiddenElements.push(element)
     }
 
+    /**
+     * Compara sin acentos: `Ubicacion`, `ubicacion` y `UBICACION` son lo mismo.
+     *
+     * Aqui habia dos listas, una con tilde y otra sin. La de con tilde estaba
+     * rota —alguna herramienta convirtio lo no-ASCII en interrogantes— y no
+     * casaba con nada, asi que los botones con tilde en la etiqueta no se
+     * escondian y se quedaban encima del panel. Quitando el acento hace falta
+     * una sola lista.
+     */
+    function sinAcentos(valor: string) {
+      return valor
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        // Con escapes a proposito: poner aqui las marcas de acento literales es
+        // volver a meter no-ASCII en el sitio donde ya se rompio una vez.
+        .replace(/[\u0300-\u036f]/g, '')
+    }
+
+    /**
+     * Una etiqueta de un solo caracter que no es letra ni numero.
+     *
+     * Antes esto eran cuatro comparaciones identicas contra un interrogante:
+     * eran cuatro simbolos distintos y la misma herramienta se los comio a los
+     * cuatro. Los originales no estan en ninguna parte de la historia -el dano
+     * viene del commit raiz-, asi que se reconocen por su forma en vez de por
+     * una lista que ya no existe. Y asi vale para cualquier boton de simbolo,
+     * no solo para aquellos cuatro.
+     */
+    function esSimbolo(valor: string) {
+      return valor.length > 0 && valor.length <= 2 && !/[\p{L}\p{N}]/u.test(valor)
+    }
+
     function shouldHideButton(button: HTMLButtonElement) {
-      const text = (button.textContent || '').trim().toLowerCase()
-      const label = (button.getAttribute('aria-label') || '').trim().toLowerCase()
-      const title = (button.getAttribute('title') || '').trim().toLowerCase()
+      const text = sinAcentos(button.textContent || '')
+      const label = sinAcentos(button.getAttribute('aria-label') || '')
+      const title = sinAcentos(button.getAttribute('title') || '')
       const combined = `${text} ${label} ${title}`
 
-      if (text === '?' || text === '?' || text === '?' || text === '?') return true
-      if (combined.includes('ampliar')) return true
-      if (combined.includes('expand')) return true
-      if (combined.includes('centrar')) return true
-      if (combined.includes('ubicacion')) return true
-      if (combined.includes('ubicaci?n')) return true
-      if (combined.includes('mi posicion')) return true
-      if (combined.includes('mi posici?n')) return true
+      if (esSimbolo(text)) return true
 
-      return false
+      return ['ampliar', 'expand', 'centrar', 'ubicacion', 'mi posicion'].some((aguja) =>
+        combined.includes(aguja)
+      )
     }
 
     function hideMapControls() {
@@ -682,26 +702,8 @@ const card: CSSProperties = {
   WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
 }
 
-const eyebrow: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-}
 
-const title: CSSProperties = {
-  color: '#ffffff',
-  fontWeight: 900,
-  lineHeight: 1,
-  letterSpacing: '-0.03em',
-}
 
-const chipRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-}
 
 const chipBase: CSSProperties = {
   minHeight: 28,
@@ -717,31 +719,9 @@ const chipBase: CSSProperties = {
   textTransform: 'uppercase',
 }
 
-const chip: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(34,197,94,.12)',
-  color: '#ecfdf5',
-}
 
-const chipMuted: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(255,255,255,.10)',
-  color: 'rgba(255,255,255,.88)',
-}
 
-const chipDebug: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(127,29,29,.24)',
-  border: '1px solid rgba(248,113,113,.28)',
-  color: '#fecaca',
-}
 
-const chipInfo: CSSProperties = {
-  ...chipBase,
-  background: 'rgba(59,130,246,.18)',
-  border: '1px solid rgba(96,165,250,.24)',
-  color: '#dbeafe',
-}
 
 const primaryBase: CSSProperties = {
   width: '100%',
@@ -797,13 +777,6 @@ function getOverlayStyle(compact: boolean): CSSProperties {
   }
 }
 
-const sheetBackdrop: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background: 'rgba(2,6,23,.22)',
-  backdropFilter: 'blur(4px)',
-  WebkitBackdropFilter: 'blur(4px)',
-}
 
 function getSheetStyle(compact: boolean): CSSProperties {
   return {
@@ -948,22 +921,8 @@ const toolsSubtitle: CSSProperties = {
   lineHeight: 1.35,
 }
 
-const toolsSection: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-}
 
-const toolsSectionHead: CSSProperties = {
-  display: 'grid',
-  gap: 3,
-  padding: '0 2px',
-}
 
-const toolsSectionTitle: CSSProperties = {
-  color: '#f8fafc',
-  fontSize: 12,
-  fontWeight: 950,
-}
 
 const toolsActionGrid: CSSProperties = {
   display: 'grid',
@@ -971,27 +930,8 @@ const toolsActionGrid: CSSProperties = {
   gap: 10,
 }
 
-const toolsSettingsCard: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr',
-  gap: 8,
-  padding: 0,
-  background: 'transparent',
-}
 
-const toolsLanguageBlock: CSSProperties = {
-  display: 'grid',
-  gap: 5,
-  minWidth: 0,
-}
 
-const toolsMiniLabel: CSSProperties = {
-  color: 'rgba(187,247,208,.78)',
-  fontSize: 9,
-  fontWeight: 950,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
 
 const toolsButton: CSSProperties = {
   minHeight: 42,
@@ -1030,16 +970,6 @@ const toolsLoginLink: CSSProperties = {
   textDecoration: 'none',
 }
 
-const toolsLoginLinkMuted: CSSProperties = {
-  ...toolsLoginLink,
-  minHeight: 36,
-  minWidth: 0,
-  padding: '0 10px',
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: 'rgba(226,232,240,.68)',
-  fontSize: 10,
-}
 
 const toolsQuietButton: CSSProperties = {
   ...toolsButton,
@@ -1050,21 +980,7 @@ const toolsQuietButton: CSSProperties = {
   fontSize: 10,
 }
 
-const toolsSecondaryRow: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  paddingTop: 10,
-  borderTop: '1px solid rgba(255,255,255,.08)',
-}
 
-const toolsBuildInfo: CSSProperties = {
-  display: 'grid',
-  justifyItems: 'end',
-  gap: 4,
-}
 
 const closeButton: CSSProperties = {
   position: 'relative',
@@ -1084,14 +1000,6 @@ const closeButton: CSSProperties = {
   boxShadow: '0 12px 28px rgba(2,6,23,.24)',
 }
 
-const fallbackToolPanel: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-  padding: 12,
-  borderRadius: 20,
-  border: '1px solid rgba(251,191,36,.20)',
-  background: 'rgba(251,191,36,.08)',
-}
 
 const fallbackToolHead: CSSProperties = {
   display: 'grid',
@@ -1202,20 +1110,6 @@ const toolsGreenDisabledButton: CSSProperties = {
   cursor: 'not-allowed',
 }
 
-const toolsQuietLink: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 36,
-  padding: '0 12px',
-  borderRadius: 12,
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  background: 'rgba(255, 255, 255, 0.04)',
-  color: 'rgba(226, 232, 240, 0.8)',
-  fontSize: 10,
-  fontWeight: 900,
-  textDecoration: 'none',
-}
 
 const toolsBuildRow: CSSProperties = {
   display: 'flex',
