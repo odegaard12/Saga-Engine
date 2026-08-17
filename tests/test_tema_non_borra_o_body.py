@@ -115,3 +115,48 @@ def test_o_contrato_do_escaner_segue_ahi():
 
     assert "saga-qr-scanner-open" in codigo
     assert "body.saga-qr-scanner-open" in codigo
+
+
+def test_o_tema_sae_da_configuracion_cargada_non_so_da_cache():
+    """La primera visita no tiene nada guardado.
+
+    El efecto que aplica el tema leía `getCachedPublicConfig()`, o sea la copia
+    guardada en el móvil. Un jugador que abre la aplicación por primera vez no
+    tiene esa copia todavía, así que se quedaba con el tema de respaldo aunque
+    la misión dijera otro. Comprobado en el banco de ensayo, en una carga
+    limpia: `body.className` salía `theme-glass` con la misión puesta en
+    `flame-red`.
+
+    La configuración recién traída del servidor está en `state.config`. Esa es
+    la que manda; la copia guardada sólo vale como respaldo.
+    """
+    codigo = sin_comentarios(JUGADOR)
+
+    assert "aplicarTema(state.config?.player_theme" in codigo, (
+        "el tema tiene que salir de la configuración cargada, no sólo de la caché"
+    )
+    assert "getCachedPublicConfig()?.player_theme" in codigo, (
+        "la copia guardada se queda como respaldo, para abrir sin cobertura"
+    )
+
+
+def test_o_tema_ponse_en_canto_chega_a_configuracion():
+    """En la primera apertura, esperar a `ready` son MINUTOS.
+
+    Medido en el banco de ensayo: la pantalla dice "Primera vez: se guarda el
+    mapa. Tarda unos minutos", y durante toda esa descarga el estado no es
+    `ready`. El efecto que pone el tema no corría hasta el final, así que el
+    jugador se pasaba la primera apertura entera con el tema equivocado —a los
+    77 % de las teselas seguía en `theme-glass` con la misión en `flame-red`.
+
+    La configuración llega mucho antes que las teselas. El tema se pone ahí.
+    """
+    codigo = sin_comentarios(JUGADOR)
+
+    inicio = codigo.index("cachePublicConfig(nextConfig)")
+    bloque = codigo[inicio : inicio + 220]
+
+    assert "aplicarTema" in bloque, (
+        "el tema tiene que ponerse en cuanto se conoce la configuración, no al "
+        "terminar de descargar el mapa"
+    )

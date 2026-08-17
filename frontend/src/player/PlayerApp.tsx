@@ -248,9 +248,23 @@ export default function PlayerApp() {
     setShowPrologue(true)
   }, [state])
 
+  /**
+   * El tema, en cuanto la partida está cargada.
+   *
+   * Esto leía `getCachedPublicConfig()`, o sea la copia guardada en el móvil.
+   * Un jugador que abre la aplicación por PRIMERA vez no tiene esa copia
+   * todavía, asi que se quedaba con el tema de respaldo aunque la misión
+   * dijera otro, y sólo se corregía en una carga posterior.
+   *
+   * Comprobado en el banco de ensayo, en una carga limpia: `body.className`
+   * salía `theme-glass` con la misión puesta en `flame-red`.
+   *
+   * `state.config` es lo que acaba de traer el servidor. La copia guardada
+   * sólo vale de respaldo, para cuando se abre sin cobertura.
+   */
   useEffect(() => {
     if (state.status !== 'ready') return
-    aplicarTema(getCachedPublicConfig()?.player_theme)
+    aplicarTema(state.config?.player_theme ?? getCachedPublicConfig()?.player_theme)
   }, [state])
 
   const [activeStageIntro, setActiveStageIntro] = useState(false)
@@ -533,6 +547,17 @@ export default function PlayerApp() {
         const config = await fetchPublicConfig()
           .then((nextConfig) => {
             cachePublicConfig(nextConfig)
+            /**
+             * El tema, AQUI, en cuanto se sabe cual es.
+             *
+             * Lo que viene despues -guardar la mision entera y las teselas del
+             * mapa- tarda minutos la primera vez: la propia pantalla lo avisa.
+             * Hasta ahora el tema no se ponia hasta el final de todo eso, asi
+             * que la primera apertura se pasaba entera con el equivocado.
+             * Medido en el banco de ensayo: al 77% de las teselas el cuerpo
+             * seguia en `theme-glass` con la mision puesta en `flame-red`.
+             */
+            aplicarTema(nextConfig.player_theme)
             return nextConfig
           })
           .catch(() => buildFallbackPublicConfig(user))
