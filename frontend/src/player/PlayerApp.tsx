@@ -2411,7 +2411,7 @@ export default function PlayerApp() {
 
 
       {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
-        <div style={getMapQuickControlsStyle(isPhone)}>
+        <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone)}>
           <QuickProofPanel
             user={user}
             mobile={isPhone}
@@ -2507,9 +2507,9 @@ export default function PlayerApp() {
             type="button"
             style={{
               ...mapRouteToggleInlineButton,
-              background: 'rgba(52, 211, 153, 0.2)',
-              borderColor: 'rgba(52, 211, 153, 0.4)',
-              color: '#34d399',
+              background: 'rgba(var(--theme-ok-soft), 0.2)',
+              borderColor: 'rgba(var(--theme-ok-soft), 0.4)',
+              color: 'rgb(var(--theme-ok-soft))',
               fontWeight: 800,
               fontSize: 13,
               letterSpacing: '0.04em',
@@ -2738,10 +2738,10 @@ const mapPrologueButton: CSSProperties = {
 
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(56, 189, 248, 0.28)',
-  border: '1px solid rgba(56, 189, 248, 0.55)',
+  background: 'rgba(var(--theme-info), 0.28)',
+  border: '1px solid rgba(var(--theme-info), 0.55)',
   color: '#bae6fd',
-  boxShadow: '0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+  boxShadow: '0 0 12px rgba(var(--theme-info), 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
 }
 
 const mapQuickIcon: CSSProperties = {
@@ -2750,7 +2750,7 @@ const mapQuickIcon: CSSProperties = {
   justifyContent: 'center',
   fontSize: 17,
   lineHeight: 1,
-  filter: 'drop-shadow(0 1px 3px rgba(15,23,42,.24))',
+  filter: 'drop-shadow(0 1px 3px rgba(var(--theme-ink), .24))',
   transform: 'translateY(-0.5px)',
 }
 
@@ -2765,7 +2765,7 @@ const mapQuickCountPill: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(15,23,42,.56)',
+  background: 'rgba(var(--theme-ink), .56)',
   border: '1px solid rgba(255,255,255,.16)',
   color: '#ffffff',
   fontSize: 8,

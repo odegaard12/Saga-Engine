@@ -55,14 +55,26 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
           ...card,
           width: compact ? '100%' : 'min(100%, 760px)',
           padding: compact ? 12 : 16,
-          borderRadius: compact ? 22 : 28,
+          /**
+           * El radio, del tema, con el de siempre como respaldo.
+           *
+           * Aqui habia un 22/28 clavado, y un numero en linea gana a la regla
+           * del tema: la barra seguia redonda en un tema de esquinas duras por
+           * mucho que el CSS dijese otra cosa. Es el mismo empate que ya dejo
+           * muerta la regla del alfiler del mapa.
+           *
+           * El respaldo entre parentesis es el valor exacto de antes, asi que
+           * un tema que no declare `--theme-radius-shell` -cristal- se ve
+           * igual que siempre.
+           */
+          borderRadius: `var(--theme-radius-shell, ${compact ? 22 : 28}px)`,
         }}
       >
         <div style={topRow}>
           <div style={eyebrow}>{playerName}</div>
 
           <div style={pillRow}>
-            <div style={{...soloPill, borderColor: 'rgba(56,189,248,0.4)', color: '#e0f2fe', background: 'rgba(14,165,233,0.15)' }}>
+            <div style={{...soloPill, borderColor: 'rgba(var(--theme-info), 0.4)', color: 'rgb(var(--theme-info-soft))', background: 'rgba(var(--theme-info-mid), 0.15)' }}>
               ⏱️ {timeDisplay}
             </div>
             {mode === 'team' ? (
@@ -133,9 +145,9 @@ const wrap: CSSProperties = {
 }
 
 const card: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
+  background: 'linear-gradient(180deg, rgba(var(--theme-shell-a), calc(.72 * var(--theme-solid))) 0%, rgba(var(--theme-shell-b), calc(.64 * var(--theme-solid))) 100%)',
   border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 20px 48px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.12)',
+  boxShadow: '0 20px 48px rgba(var(--theme-ink), .18), inset 0 1px 0 rgba(255,255,255,.12)',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
   color: '#ffffff',
@@ -157,7 +169,7 @@ const pillRow: CSSProperties = {
 }
 
 const eyebrow: CSSProperties = {
-  color: '#c8ffe1',
+  color: 'rgb(var(--theme-ok-soft))',
   fontSize: 11,
   fontWeight: 900,
   letterSpacing: '0.12em',
@@ -231,9 +243,9 @@ const routeNodeIdle: CSSProperties = {
 }
 
 const routeNodeDone: CSSProperties = {
-  background: 'rgba(34,197,94,.88)',
-  border: '1px solid rgba(134,239,172,.55)',
-  boxShadow: '0 0 0 3px rgba(34,197,94,.12)',
+  background: 'rgba(var(--theme-done), .88)',
+  border: '1px solid rgba(var(--theme-done-soft), .55)',
+  boxShadow: '0 0 0 3px rgba(var(--theme-done), .12)',
 }
 
 const routeNodeActive: CSSProperties = {
@@ -253,7 +265,7 @@ const routeConnectorIdle: CSSProperties = {
 }
 
 const routeConnectorDone: CSSProperties = {
-  background: 'linear-gradient(90deg, rgba(34,197,94,.88), rgba(134,239,172,.64))',
+  background: 'linear-gradient(90deg, rgba(var(--theme-done), .88), rgba(var(--theme-done-soft), .64))',
 }
 
 const countPill: CSSProperties = {

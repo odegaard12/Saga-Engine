@@ -33,10 +33,21 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
+        /**
+         * Del tema, no de una paleta propia.
+         *
+         * Esta es la pantalla que un jugador mira mas rato el dia que estrena
+         * la aplicacion, mientras se guarda el mapa. Tenia dos halos azul
+         * cielo y verde sobre un azul marino, dijera lo que dijera el tema:
+         * se entraba a la mision con los colores de otra.
+         *
+         * La pagina ya llega del servidor con la clase del tema puesta, asi
+         * que estas variables valen desde el primer pixel, sin parpadeo.
+         */
         background:
-          'radial-gradient(circle at 50% 22%, rgba(56,189,248,.16), transparent 46%),' +
-          'radial-gradient(circle at 50% 88%, rgba(74,222,128,.12), transparent 44%),' +
-          'linear-gradient(180deg, #030b1a 0%, #020617 100%)',
+          'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
+          'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
+          'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -55,6 +66,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             tarde, en vez de una pantalla aparentemente congelada. */}
         <span className="saga-splash-ring saga-splash-ring--slow" />
         <span className="saga-splash-ring saga-splash-ring--fast" />
+        {/* El marco de fuego: quieto. Ver la nota de abajo. */}
+        <span className="saga-splash-marco" />
         <img
           src="/saga-app-icon-192.png"
           alt="SAGA"
@@ -83,11 +96,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           style={{
             height: '100%',
             borderRadius: 'var(--theme-radius-pill)',
-            background: 'linear-gradient(90deg, #22c55e, #38bdf8)',
+            background:
+              'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
             width: known ? `${pct}%` : '38%',
             transition: 'width .35s cubic-bezier(.22,1,.36,1)',
             animation: known ? 'none' : 'sagaSplashSlide 1.4s infinite ease-in-out',
-            boxShadow: '0 0 14px rgba(56,189,248,.55)',
+            boxShadow: '0 0 14px var(--theme-glow)',
           }}
         />
       </div>
@@ -110,7 +124,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         style={{
           marginTop: known ? 4 : 14,
           fontSize: 13,
-          color: '#94a3b8',
+          color: 'rgb(var(--theme-line))',
           fontWeight: 600,
           textAlign: 'center',
           lineHeight: 1.45,
@@ -124,7 +138,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         style={{
           marginTop: 18,
           fontSize: 11,
-          color: 'rgba(148,163,184,.7)',
+          color: 'rgba(var(--theme-line), .7)',
           fontWeight: 600,
           textAlign: 'center',
           maxWidth: 300,
@@ -148,6 +162,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
           }
+          /* En cristal, los dos aros girando de siempre, con sus dos colores
+             exactos: --theme-ring-a/-b valen ahi lo que valian escritos a
+             mano. */
           .saga-splash-ring {
             position: absolute;
             top: 50%;
@@ -160,8 +177,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             height: 178px;
             margin: -89px 0 0 -89px;
             border: 2px solid transparent;
-            border-top-color: rgba(56,189,248,.55);
-            border-right-color: rgba(56,189,248,.18);
+            border-top-color: rgba(var(--theme-ring-a), .55);
+            border-right-color: rgba(var(--theme-ring-a), .18);
             animation: sagaSplashSpin 3.2s linear infinite;
           }
           .saga-splash-ring--fast {
@@ -169,10 +186,43 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             height: 148px;
             margin: -74px 0 0 -74px;
             border: 2px solid transparent;
-            border-bottom-color: rgba(74,222,128,.6);
-            border-left-color: rgba(74,222,128,.16);
+            border-bottom-color: rgba(var(--theme-ring-b), .6);
+            border-left-color: rgba(var(--theme-ring-b), .16);
             animation: sagaSplashSpin 1.9s linear infinite reverse;
           }
+
+          /* En fuego no gira nada.
+           *
+           * Dos lineas dando vueltas alrededor del logo quedaban feas: en un
+           * tema de esquinas duras, un aro redondo girando es del otro diseno.
+           * Aqui hay un marco quieto, con la misma esquina cortada que los
+           * paneles, que respira en vez de girar. */
+          .saga-splash-marco {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 168px;
+            height: 168px;
+            margin: -84px 0 0 -84px;
+            border: 2px solid rgba(var(--theme-ring-a), .55);
+            clip-path: polygon(
+              var(--theme-panel-cut) 0,
+              100% 0,
+              100% calc(100% - var(--theme-panel-cut)),
+              calc(100% - var(--theme-panel-cut)) 100%,
+              0 100%,
+              0 var(--theme-panel-cut)
+            );
+            animation: sagaSplashBrasa 2.6s ease-in-out infinite;
+            pointer-events: none;
+          }
+          @keyframes sagaSplashBrasa {
+            0%, 100% { opacity: .42; }
+            50% { opacity: .95; }
+          }
+          body.theme-flame-red .saga-splash-ring { display: none; }
+          body.theme-flame-red .saga-splash-marco { display: block; }
         `}
       </style>
     </div>

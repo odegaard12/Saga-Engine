@@ -56,29 +56,59 @@ def test_o_tema_de_cristal_segue_redondeado_e_con_desenfoque():
     assert "blur(" in b, "el cristal lleva desenfoque"
 
 
-def test_o_tema_de_fogo_ten_esquinas_duras_e_sen_desenfoque():
-    """Si no cambia la forma, no es otro tema: es el mismo con otro color."""
-    b = bloque("body.theme-flame-red")
+def test_o_tema_de_fogo_e_mais_pechado_e_opaco():
+    """Menos redondo que cristal, y sin desenfoque: es opaco a propósito.
 
-    radio = re.search(r"--theme-radius-panel:\s*(\d+)px", b)
-    assert radio and int(radio.group(1)) <= 6, (
-        "el tema de fuego tiene que tener esquinas duras"
-    )
-    assert re.search(r"--theme-blur:\s*none", b), "el tema de fuego no lleva desenfoque"
+    Esta prueba exigía antes esquinas DURAS -radio de 6px o menos-. Se escribió
+    cuando el tema de fuego eran placas industriales, y ese diseño se descartó
+    al verlo en pantalla: quedaba bruto y peleaba con los emoticonos. Ahora las
+    formas vuelven a ser redondeadas y lo que da carácter es el adorno.
+
+    Lo que se sigue exigiendo: que sea más cerrado que cristal, y que no lleve
+    desenfoque, porque las barras tienen que tapar el mapa.
+    """
+    f = bloque("body.theme-flame-red")
+    g = bloque("body.theme-glass")
+
+    rf = int(re.search(r"--theme-radius-panel:\s*(\d+)px", f).group(1))
+    rg = int(re.search(r"--theme-radius-panel:\s*(\d+)px", g).group(1))
+
+    assert rf < rg, "fuego tiene que ser menos redondo que cristal (%d vs %d)" % (rf, rg)
+    assert re.search(r"--theme-blur:\s*none", f), "el tema de fuego no lleva desenfoque"
 
 
-def test_os_dous_temas_non_teñen_a_mesma_forma():
-    """La prueba que impide que esto vuelva a ser un cambio de color."""
+def test_os_dous_temas_non_teñen_a_mesma_cara():
+    """La prueba que impide que esto vuelva a ser un cambio de color.
+
+    Antes pedía que TODAS las variables de forma fuesen distintas. Con el
+    diseño nuevo varias coinciden a propósito -el radio de pastilla, el grosor
+    del borde-, porque la diferencia ya no está en la geometría sino en el
+    adorno: las llamas del filo y las brasas de las esquinas.
+
+    Así que se piden las dos cosas: alguna forma distinta, y adorno propio.
+    """
     g = bloque("body.theme-glass")
     f = bloque("body.theme-flame-red")
 
+    distintas = []
     for variable in FORMAS:
         vg = re.search(rf"{re.escape(variable)}:\s*([^;]+);", g)
         vf = re.search(rf"{re.escape(variable)}:\s*([^;]+);", f)
         assert vg and vf, f"falta {variable} en algún tema"
-        assert vg.group(1).strip() != vf.group(1).strip(), (
-            f"{variable} vale lo mismo en los dos: eso no es otro diseño"
-        )
+        if vg.group(1).strip() != vf.group(1).strip():
+            distintas.append(variable)
+
+    assert distintas, "ninguna forma cambia: eso es el mismo diseño con otro color"
+
+    css = TEMAS.read_text(encoding="utf-8")
+
+    # El adorno ha ido cambiando -placas, luego llamas, las dos descartadas al
+    # verlas-. Lo único que se exige es que fuego tenga ALGO propio que cristal
+    # no tenga, no una decoración concreta.
+    assert "--theme-brasa" in css, "fuego se quedó sin nada propio que lo distinga"
+
+    propio = css.split("--theme-brasa")[1][:600]
+    assert "theme-glass" not in propio, "lo propio del fuego no puede alcanzar a cristal"
 
 
 def test_o_panel_de_cristal_le_a_forma_do_tema():

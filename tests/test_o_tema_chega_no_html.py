@@ -47,8 +47,13 @@ def test_a_paxina_xa_non_se_serve_tal_cual():
     """`FileResponse` entrega el fichero sin poder tocarlo."""
     codigo = CONSTRUCCION.read_text(encoding="utf-8")
 
+    # La función entera, hasta la siguiente de primer nivel. Antes esto cortaba
+    # 1400 caracteres a ojo, y bastó añadir un comentario dentro para que la
+    # ventana se quedase corta y la prueba fallase sin que nadie rompiese nada.
     inicio = codigo.index("def react_index_or_missing")
-    cuerpo = codigo[inicio : inicio + 1400]
+    resto = codigo[inicio + 1 :]
+    siguiente = resto.find("\ndef ")
+    cuerpo = resto if siguiente == -1 else resto[:siguiente]
 
     assert "HTMLResponse" in cuerpo, (
         "para poner la clase hay que devolver el html, no el fichero a pelo"

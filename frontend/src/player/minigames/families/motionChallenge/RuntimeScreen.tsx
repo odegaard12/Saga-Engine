@@ -28,7 +28,7 @@ const STYLES = `
     linear-gradient(180deg, rgba(13,18,27,.98), rgba(3,7,18,.99));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.08),
-    0 18px 44px rgba(2,6,23,.24);
+    0 18px 44px rgba(var(--theme-ink-deep), .24);
   color: #f8fafc;
 }
 
@@ -176,7 +176,7 @@ const STYLES = `
   display: grid;
   place-items: center;
   border-radius: 28px;
-  background: rgba(15,23,42,0.4);
+  background: rgba(var(--theme-ink), 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255,255,255,.15);
@@ -271,13 +271,13 @@ const STYLES = `
   height: 100%;
   width: var(--fill);
   border-radius: inherit;
-  background: linear-gradient(90deg, #f8fafc, #a3e635, #22c55e);
+  background: linear-gradient(90deg, #f8fafc, #a3e635, rgb(var(--theme-done)));
   box-shadow: 0 0 10px rgba(163,230,53,0.5);
   transition: width 180ms ease;
 }
 
 .motion-fill.heat {
-  background: linear-gradient(90deg, #22c55e, #facc15, #fb923c, #ef4444);
+  background: linear-gradient(90deg, rgb(var(--theme-done)), #facc15, #fb923c, #ef4444);
   box-shadow: 0 0 10px rgba(239,68,68,0.5);
 }
 
@@ -337,8 +337,8 @@ const STYLES = `
   min-height: 48px;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,.12);
-  background: linear-gradient(180deg, #e5e7eb, #cbd5e1);
-  color: #020617;
+  background: linear-gradient(180deg, #e5e7eb, rgb(var(--theme-line-soft)));
+  color: rgb(var(--theme-ink-deep));
   font-size: 13px;
   font-weight: 950;
   letter-spacing: .06em;
@@ -356,7 +356,7 @@ const STYLES = `
 }
 
 .motion-button.success {
-  background: linear-gradient(180deg, #bef264, #22c55e);
+  background: linear-gradient(180deg, #bef264, rgb(var(--theme-done)));
   color: #052e16;
 }
 

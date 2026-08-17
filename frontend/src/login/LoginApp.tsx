@@ -841,15 +841,33 @@ const insecureLoginBanner: CSSProperties = {
 
 const listBlock: CSSProperties = {
   display: 'grid',
+  /**
+   * Dos por fila. DOS, siempre.
+   *
+   * En vertical, con catorce jugadores, habia que bajar media pantalla para
+   * llegar a los ultimos.
+   *
+   * Aqui habia un `auto-fill` con un minimo de 148px, y eso no es "dos": es
+   * "las que quepan". En un movil estrecho la tarjeta no llega al minimo y
+   * `auto-fill` se queda en UNA columna, que es exactamente la lista vertical
+   * de siempre. Medido en el banco daba dos porque la ventana era mas ancha,
+   * asi que la medida no valia para el caso que importa.
+   *
+   * `minmax(0, 1fr)` -y no `1fr` a secas- para que un nombre largo no ensanche
+   * su columna y descuadre la pareja.
+   */
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
 }
 
 const playerCard: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  gap: 10,
+  // Apilada: en dos columnas no caben el nombre y el boton uno al lado del
+  // otro sin cortar el nombre.
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 8,
   alignItems: 'center',
-  padding: '12px 12px',
+  padding: '10px 10px',
   borderRadius: 'var(--theme-radius-panel)',
   border: 'var(--theme-border-w) solid var(--saga-glass-border)',
   background: 'var(--saga-glass-bg)',
@@ -939,8 +957,10 @@ const playerRight: CSSProperties = {
 }
 
 const enterButton: CSSProperties = {
-  minHeight: 32,
-  minWidth: 88,
+  minHeight: 34,
+  // A lo ancho de la tarjeta: en rejilla de dos, un boton de 88px suelto a la
+  // derecha queda descolgado.
+  width: '100%',
   border: 0,
   borderRadius: 'var(--theme-radius-card)',
   // Del tema: es el boton mas pulsado de esta pantalla y con el tema de fuego

@@ -17,7 +17,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(2, 6, 23, 0.4)',
+        backgroundColor: 'rgba(var(--theme-ink-deep), 0.4)',
         backdropFilter: 'var(--theme-blur)',
         WebkitBackdropFilter: 'var(--theme-blur)',
         zIndex: 9999,
@@ -35,11 +35,11 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           width: '100%',
           maxWidth: '580px',
           maxHeight: '85vh',
-          background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+          background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
           backdropFilter: 'var(--theme-blur)',
           WebkitBackdropFilter: 'var(--theme-blur)',
           borderRadius: '28px',
-          boxShadow: '0 22px 60px rgba(15,23,42,.18)',
+          boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
           display: 'flex',
           flexDirection: 'column',
           border: '1px solid rgba(255, 255, 255, 0.22)',
@@ -60,7 +60,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             {title}
           </h1>
           {subtitle && (
-            <h2 style={{ margin: '8px 0 0 0', fontSize: '1.1rem', fontWeight: 600, color: '#38bdf8' }}>
+            <h2 style={{ margin: '8px 0 0 0', fontSize: '1.1rem', fontWeight: 600, color: 'rgb(var(--theme-info))' }}>
               {subtitle}
             </h2>
           )}
@@ -77,7 +77,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
             style={{
               width: '100%',
               padding: '16px',
-              background: 'linear-gradient(180deg, rgba(16,185,129,0.85) 0%, rgba(5,150,105,0.95) 100%)',
+              background: 'linear-gradient(180deg, rgba(var(--theme-ok), 0.85) 0%, rgba(var(--theme-ok-deep), 0.95) 100%)',
               color: '#fff',
               border: '1px solid rgba(255,255,255,0.25)',
               borderRadius: '16px',
@@ -86,7 +86,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
               cursor: 'pointer',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
+              boxShadow: '0 8px 24px rgba(var(--theme-ok), 0.35)',
               transition: 'transform 0.15s, background 0.15s',
             }}
             onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.01)')}

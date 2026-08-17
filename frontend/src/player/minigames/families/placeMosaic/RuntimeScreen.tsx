@@ -28,7 +28,7 @@ const STYLES = `
   background:
     radial-gradient(
       circle at 50% -15%,
-      rgba(34,197,94,.12),
+      rgba(var(--theme-done), .12),
       transparent 35%
     ),
     #111315;

@@ -25,9 +25,9 @@ const STYLES = `
   border-radius: 24px;
   border: 1px solid rgba(255,255,255,.11);
   background:
-    radial-gradient(circle at 50% -18%, rgba(34,197,94,.10), transparent 34%),
+    radial-gradient(circle at 50% -18%, rgba(var(--theme-done), .10), transparent 34%),
     radial-gradient(circle at 80% 18%, rgba(251,146,60,.06), transparent 32%),
-    linear-gradient(180deg, rgba(10,15,24,.99), rgba(2,6,23,.99));
+    linear-gradient(180deg, rgba(10,15,24,.99), rgba(var(--theme-ink-deep), .99));
   color: #f8fafc;
 }
 
@@ -67,8 +67,8 @@ const STYLES = `
 
 .circuit-chip.ok {
   color: #bbf7d0;
-  border-color: rgba(34,197,94,.22);
-  background: rgba(34,197,94,.10);
+  border-color: rgba(var(--theme-done), .22);
+  background: rgba(var(--theme-done), .10);
 }
 
 .circuit-chip.fail {
@@ -91,7 +91,7 @@ const STYLES = `
 }
 
 .circuit-overline {
-  color: #86efac;
+  color: rgb(var(--theme-done-soft));
   font-size: 10px;
   font-weight: 950;
   letter-spacing: .15em;
@@ -125,7 +125,7 @@ const STYLES = `
 
 .circuit-mini-stat strong {
   display: block;
-  color: #86efac;
+  color: rgb(var(--theme-done-soft));
   font-size: 19px;
   line-height: 1;
 }
@@ -164,7 +164,7 @@ const STYLES = `
   background: rgba(17,19,21,0.4);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(34,197,94,0.05);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(var(--theme-done), 0.05);
   padding: 12px;
 }
 
@@ -179,7 +179,7 @@ const STYLES = `
   min-height: 43px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,.15);
-  background: rgba(15,23,42,.4);
+  background: rgba(var(--theme-ink), .4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: rgba(226,232,240,.9);
@@ -196,9 +196,9 @@ const STYLES = `
 }
 
 .circuit-cell.source {
-  border-color: rgba(34,197,94,.6);
-  box-shadow: 0 0 15px rgba(34,197,94,0.3), inset 0 0 15px rgba(34,197,94,0.3);
-  text-shadow: 0 0 8px rgba(34,197,94,0.8);
+  border-color: rgba(var(--theme-done), .6);
+  box-shadow: 0 0 15px rgba(var(--theme-done), 0.3), inset 0 0 15px rgba(var(--theme-done), 0.3);
+  text-shadow: 0 0 8px rgba(var(--theme-done), 0.8);
 }
 
 .circuit-cell.target {
@@ -208,17 +208,17 @@ const STYLES = `
 }
 
 .circuit-cell.preview {
-  border-color: rgba(134,239,172,.8);
-  background: rgba(34,197,94,.3);
-  box-shadow: 0 0 20px rgba(34,197,94,.4), inset 0 0 20px rgba(34,197,94,.4);
+  border-color: rgba(var(--theme-done-soft), .8);
+  background: rgba(var(--theme-done), .3);
+  box-shadow: 0 0 20px rgba(var(--theme-done), .4), inset 0 0 20px rgba(var(--theme-done), .4);
   animation: circuitPulse 1s infinite alternate;
 }
 
 .circuit-cell.done {
-  border-color: rgba(34,197,94,.6);
-  background: linear-gradient(135deg, rgba(34,197,94,.5), rgba(21,128,61,.4));
+  border-color: rgba(var(--theme-done), .6);
+  background: linear-gradient(135deg, rgba(var(--theme-done), .5), rgba(21,128,61,.4));
   color: #fff;
-  box-shadow: 0 0 20px rgba(34,197,94,.3);
+  box-shadow: 0 0 20px rgba(var(--theme-done), .3);
   text-shadow: 0 0 5px rgba(255,255,255,0.8);
 }
 
@@ -265,12 +265,12 @@ const STYLES = `
   height: 100%;
   width: var(--fill);
   border-radius: inherit;
-  background: linear-gradient(90deg, #f8fafc, #86efac, #22c55e);
+  background: linear-gradient(90deg, #f8fafc, rgb(var(--theme-done-soft)), rgb(var(--theme-done)));
   transition: width 160ms ease;
 }
 
 .circuit-fill.err {
-  background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+  background: linear-gradient(90deg, rgb(var(--theme-done)), #f59e0b, #ef4444);
 }
 
 .circuit-rules {
@@ -309,9 +309,9 @@ const STYLES = `
 }
 
 .circuit-final.success {
-  border-color: rgba(34,197,94,.22);
+  border-color: rgba(var(--theme-done), .22);
   background:
-    radial-gradient(circle at 50% 20%, rgba(34,197,94,.20), transparent 46%),
+    radial-gradient(circle at 50% 20%, rgba(var(--theme-done), .20), transparent 46%),
     rgba(22,163,74,.09);
 }
 
@@ -342,8 +342,8 @@ const STYLES = `
 
 .circuit-final.success .circuit-final-icon {
   color: #bbf7d0;
-  border-color: rgba(134,239,172,.35);
-  background: rgba(34,197,94,.12);
+  border-color: rgba(var(--theme-done-soft), .35);
+  background: rgba(var(--theme-done), .12);
 }
 
 .circuit-final.failed .circuit-final-icon {
@@ -381,8 +381,8 @@ const STYLES = `
   min-height: 48px;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,.12);
-  background: linear-gradient(180deg, #e5e7eb, #cbd5e1);
-  color: #020617;
+  background: linear-gradient(180deg, #e5e7eb, rgb(var(--theme-line-soft)));
+  color: rgb(var(--theme-ink-deep));
   font-size: 13px;
   font-weight: 950;
   letter-spacing: .06em;
@@ -395,7 +395,7 @@ const STYLES = `
 }
 
 .circuit-button.success {
-  background: linear-gradient(180deg, #86efac, #22c55e);
+  background: linear-gradient(180deg, rgb(var(--theme-done-soft)), rgb(var(--theme-done)));
   color: #052e16;
 }
 

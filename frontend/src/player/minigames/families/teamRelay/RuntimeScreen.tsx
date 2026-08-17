@@ -90,7 +90,7 @@ const container: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: 24,
-  background: 'rgba(15, 23, 42, 0.6)',
+  background: 'rgba(var(--theme-ink), 0.6)',
   borderRadius: 16,
   border: '1px solid rgba(255, 255, 255, 0.1)',
 }
@@ -121,12 +121,12 @@ const statusBox: CSSProperties = {
 }
 
 const statusText: CSSProperties = {
-  color: '#cbd5e1',
+  color: 'rgb(var(--theme-line-soft))',
   fontSize: 14,
 }
 
 const statusCount: CSSProperties = {
-  color: '#38bdf8',
+  color: 'rgb(var(--theme-info))',
   fontSize: 18,
   fontWeight: 'bold',
 }
@@ -146,7 +146,7 @@ const holdButtonReady: CSSProperties = {
 
 const holdButtonDisabled: CSSProperties = {
   ...holdButtonReady,
-  background: '#475569',
-  color: '#94a3b8',
+  background: 'rgb(var(--theme-sheen-b))',
+  color: 'rgb(var(--theme-line))',
   cursor: 'not-allowed',
 }

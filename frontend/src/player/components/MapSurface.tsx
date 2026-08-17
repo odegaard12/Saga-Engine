@@ -64,15 +64,20 @@ function getPhysicalNodeTypeEmoji(kind: PhysicalNodeKind): string {
  * buscar en el monte. Lo que el jugador tiene delante es una pegatina con un
  * código, así que se dibuja eso: papel blanco y las tres esquinas del código.
  */
+// Esto NO sigue al tema, a proposito: es el dibujo de una pegatina de papel,
+// negro sobre blanco. Tenido de ladrillo deja de parecer un codigo QR, que es
+// justo lo que el jugador tiene que reconocer de lejos.
+const TINTA_DE_IMPRENTA = '#0f172a' // no-tema: negro de imprenta
+
 const QR_SVG = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
 <rect x="1.5" y="1.5" width="21" height="21" rx="3.5" fill="#f8fafc"/>
-<g fill="#0f172a">
+<g fill="${TINTA_DE_IMPRENTA}">
 <rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/>
 </g>
 <g fill="#f8fafc">
 <rect x="5.5" y="5.5" width="3" height="3"/><rect x="15.5" y="5.5" width="3" height="3"/><rect x="5.5" y="15.5" width="3" height="3"/>
 </g>
-<g fill="#0f172a">
+<g fill="${TINTA_DE_IMPRENTA}">
 <rect x="6.5" y="6.5" width="1" height="1"/><rect x="16.5" y="6.5" width="1" height="1"/><rect x="6.5" y="16.5" width="1" height="1"/>
 <rect x="12" y="12" width="2" height="2"/><rect x="16" y="12" width="2" height="2"/><rect x="18" y="15" width="2" height="2"/>
 <rect x="12" y="16" width="2" height="2"/><rect x="15" y="18" width="2" height="2"/><rect x="19" y="19" width="1.5" height="1.5"/>
@@ -596,7 +601,7 @@ function buildPlayerPopup(
   const dato = (etiqueta: string, valor: string, destacado = false) => `
     <div style="flex:1;min-width:0;">
       <div style="font-size:${destacado ? '17' : '15'}px;font-weight:900;color:#f8fafc;line-height:1;font-variant-numeric:tabular-nums;">${escapeHtml(valor)}</div>
-      <div style="font-size:9px;font-weight:800;letter-spacing:.11em;color:rgba(148,163,184,.85);text-transform:uppercase;margin-top:3px;">${escapeHtml(etiqueta)}</div>
+      <div style="font-size:9px;font-weight:800;letter-spacing:.11em;color:rgba(var(--theme-line), .85);text-transform:uppercase;margin-top:3px;">${escapeHtml(etiqueta)}</div>
     </div>`
 
   return `
@@ -616,7 +621,7 @@ function buildPlayerPopup(
         ${dato('Tempo', tempo, true)}
       </div>
 
-      <div style="margin-top:8px;font-size:10px;color:rgba(148,163,184,.72);">
+      <div style="margin-top:8px;font-size:10px;color:rgba(var(--theme-line), .72);">
         ${kind !== 'self' ? `Visto ${escapeHtml(formatSeenAgo(profile.last_seen))}` : 'A túa posición'}
       </div>
     </div>
@@ -644,12 +649,21 @@ function createMissionNodeIcon(
   // lejos se viese uno y de cerca otro distinto.
   const halo = ''
   const size = state === 'current' ? 56 : 48
-  // Verde = superado, azul = el que toca ahora, rojo = aún por hacer.
-  const stateColor =
-    state === 'completed' ? '#22c55e' : state === 'current' ? '#3b82f6' : '#ef4444'
+  /**
+   * El color del alfiler lo pone el CSS, por la clase `--${state}`.
+   *
+   * Aquí había un `style="background:..."` escrito a mano, y como el estilo en
+   * línea gana, la regla de CSS del mismo alfiler no pintaba nada: dos
+   * verdades sobre el mismo color, y una de ellas muerta sin que se notara.
+   *
+   * No decían lo mismo, además. El nodo aún por hacer salía ROJO por el estilo
+   * en línea, mientras la regla de CSS lo dejaba gris. Lo que se veía en el
+   * monte era el rojo, así que es el que se conserva —ahora en el CSS, con las
+   * variables del tema, y en un solo sitio—.
+   */
   return L.divIcon({
     className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
-    html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}" style="background:${stateColor};border-color:#ffffff;"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div></div>`,
+    html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -1009,11 +1023,19 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-mission-node-marker { position: relative; width: 48px; height: 48px; display: grid; place-items: center; overflow: visible; }
       .saga-mission-node-marker--current { width: 56px; height: 56px; }
       .saga-mission-node-pin { position: relative; z-index: 3; width: 35px; height: 35px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; border: 2px solid rgba(255,255,255,.92); color: #fff; font-family: system-ui,sans-serif; font-weight: 950; line-height: 1; animation: none; }
-      .saga-mission-node-pin--completed { background: linear-gradient(145deg,#10b981,#047857); border-color: rgba(220,252,231,.96); box-shadow: 0 6px 16px rgba(6,78,59,.34); }
-      .saga-mission-node-pin--current { width: 42px; height: 42px; background: linear-gradient(145deg,#3b82f6,#1d4ed8); border-color: rgba(219,234,254,.99); color: #ffffff; box-shadow: 0 8px 20px rgba(29,78,216,.40); }
-      .saga-mission-node-pin--locked { background: linear-gradient(145deg,#374151,#111827); border-color: rgba(255,255,255,.2); color: rgba(255,255,255,0.4); box-shadow: 0 4px 10px rgba(0,0,0,.35); }
+      /* Los tres estados del alfiler, en un solo sitio y planos, que es como
+         se veian de verdad: el estilo en linea que ganaba era plano, y estas
+         reglas tenian degradados que nadie llego a ver nunca. En cristal
+         valen los mismos colores exactos de antes. */
+      .saga-mission-node-pin--completed { background: rgb(var(--theme-pin-done)); border-color: #ffffff; box-shadow: 0 6px 16px rgba(var(--theme-ok-deep), .34); }
+      /* El nodo al que vas. Era azul fijo: en una mision de fuego, el unico
+         punto que el jugador tiene que mirar salia del color de otro tema. */
+      .saga-mission-node-pin--current { width: 42px; height: 42px; background: rgb(var(--theme-pin)); border-color: #ffffff; color: #ffffff; box-shadow: 0 8px 20px rgba(var(--theme-pin-deep), .40); }
+      /* Aun por hacer. En el CSS ponia gris y en la linea rojo; lo que se veia
+         en el monte era el rojo, asi que ese es el que queda. */
+      .saga-mission-node-pin--locked { background: rgb(var(--theme-pin-todo)); border-color: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
       .saga-mission-node-symbol--number { font-size: 16px; font-weight: 950; font-variant-numeric: tabular-nums; }
-      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translate3d(-50%, 0, 0); will-change: transform; border-radius: 50%; background: rgba(15,23,42,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(15,23,42,0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
+      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translate3d(-50%, 0, 0); will-change: transform; border-radius: 50%; background: rgba(var(--theme-ink), 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(var(--theme-ink), 0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
       .saga-mission-node-type-badge::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 5px 5px 0; border-style: solid; border-color: #ffffff transparent transparent transparent; display: block; width: 0; height: 0; }
       .saga-mission-node-type-badge--collectible { border-color: #fbbf24 !important; }
       .saga-mission-node-type-badge--collectible::after { border-top-color: #fbbf24 !important; }
@@ -1023,7 +1045,7 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-mission-node-type-badge--clue::after { border-top-color: #a855f7 !important; }
       .saga-mission-node-type-badge--bonus { border-color: #ec4899 !important; }
       .saga-mission-node-type-badge--bonus::after { border-top-color: #ec4899 !important; }
-      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(59,130,246,.88); box-shadow: 0 0 0 3px rgba(29,78,216,.13),0 0 18px rgba(59,130,246,.28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(var(--theme-pin), .88); box-shadow: 0 0 0 3px rgba(var(--theme-pin-deep), .13),0 0 18px rgba(var(--theme-pin), .28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
       .saga-road-guide--casing { filter: blur(3px); }
       .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; will-change: stroke-dashoffset; transform: translateZ(0); }
 
@@ -1037,12 +1059,12 @@ export const MapSurface = React.memo(function MapSurface({
       
       /* Leaflet Control Styling overrides */
       .leaflet-bar { border: 1px solid var(--theme-primary-border) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; border-radius: 12px !important; overflow: hidden !important; }
-      .leaflet-bar a, .leaflet-bar a:hover { background: rgba(15, 23, 42, 0.88) !important; color: var(--theme-primary) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; font-weight: bold !important; transition: all 0.2s ease !important; }
+      .leaflet-bar a, .leaflet-bar a:hover { background: rgba(var(--theme-ink), 0.88) !important; color: var(--theme-primary) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; font-weight: bold !important; transition: all 0.2s ease !important; }
       .leaflet-bar a:hover { background: var(--theme-tint-strong) !important; color: var(--theme-primary) !important; }
-      .leaflet-control { border: 1px solid var(--theme-primary-border) !important; border-radius: 12px !important; background: rgba(15, 23, 42, 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
+      .leaflet-control { border: 1px solid var(--theme-primary-border) !important; border-radius: 12px !important; background: rgba(var(--theme-ink), 0.88) !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; }
 
       @keyframes sagaPlayerAuraBreathe { 0%,100% { opacity:.42; } 50% { opacity:.66; } }
-      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1) translateZ(0); box-shadow:0 12px 28px var(--theme-glow),0 0 0 4px rgba(52,211,153,.24); } 50% { transform:scale(1.035) translateZ(0); box-shadow:0 14px 34px rgba(16,185,129,.55),0 0 0 10px rgba(52,211,153,.14); } }
+      @keyframes sagaPlayerLocator { 0%,100% { transform:scale(1) translateZ(0); box-shadow:0 12px 28px var(--theme-glow),0 0 0 4px rgba(var(--theme-ok-soft), .24); } 50% { transform:scale(1.035) translateZ(0); box-shadow:0 14px 34px rgba(var(--theme-ok), .55),0 0 0 10px rgba(var(--theme-ok-soft), .14); } }
       /* Latido suave y que NUNCA llegue a opacidad 0: el aro es ahora la única
          señal de dónde hay que ir, y desaparecer a ratos lo hacía perderse. */
       @keyframes sagaCurrentNodeHalo { 0%,100% { opacity:1; } 50% { opacity:.45; } }
@@ -1199,7 +1221,7 @@ export const MapSurface = React.memo(function MapSurface({
       if (latLngs.length < 2) continue
 
       const hecho = L.polyline(latLngs, {
-        color: '#22c55e',
+        color: 'rgb(var(--theme-done))',
         weight: 5,
         opacity: 0.42,
         lineCap: 'round',
@@ -1269,7 +1291,7 @@ export const MapSurface = React.memo(function MapSurface({
         className: 'saga-road-guide saga-road-guide--shadow',
       }).addTo(map)
       const casing = L.polyline(latLngs, {
-        color: '#22c55e',
+        color: 'rgb(var(--theme-done))',
         weight: 8,
         opacity: 0.35,
         lineCap: 'round',
@@ -1278,7 +1300,7 @@ export const MapSurface = React.memo(function MapSurface({
         className: 'saga-road-guide saga-road-guide--casing',
       }).addTo(map)
       const guide = L.polyline(latLngs, {
-        color: '#4ade80',
+        color: 'rgb(var(--theme-done-soft))',
         weight: 5.5,
         opacity: 0.75,
         lineCap: 'round',
@@ -1329,7 +1351,7 @@ export const MapSurface = React.memo(function MapSurface({
           const connector = L.polyline(
             [L.latLng(point.lat, point.lon), L.latLng(snapped.lat, snapped.lon)],
             {
-              color: '#4ade80',
+              color: 'rgb(var(--theme-done-soft))',
               weight: 2,
               opacity: 0.82,
               dashArray: '4 6',
@@ -2148,10 +2170,10 @@ const avisoFueraDeRuta: React.CSSProperties = {
   padding: '11px 17px 11px 14px',
   borderRadius: 'var(--theme-radius-panel)',
   border: '1px solid rgba(253,224,71,.42)',
-  background: 'linear-gradient(180deg, rgba(30,41,59,.90), rgba(15,23,42,.90))',
+  background: 'linear-gradient(180deg, rgba(var(--theme-ink-soft), .90), rgba(var(--theme-ink), .90))',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14), 0 18px 44px rgba(2,6,23,.55)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14), 0 18px 44px rgba(var(--theme-ink-deep), .55)',
   color: '#f8fafc',
   animation: 'sagaAvisoEntra 220ms ease-out',
   pointerEvents: 'none',
@@ -2184,7 +2206,7 @@ const avisoDetalle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
   lineHeight: 1.25,
-  color: 'rgba(203,213,225,.82)',
+  color: 'rgba(var(--theme-line-soft), .82)',
   whiteSpace: 'nowrap',
 }
 
@@ -2193,9 +2215,9 @@ const surface: React.CSSProperties = {
   inset: 0,
   borderRadius: 'var(--theme-radius-panel)',
   overflow: 'hidden',
-  border: '1px solid rgba(15,23,42,.10)',
-  background: '#dfe8dd',
-  boxShadow: '0 18px 40px rgba(15,23,42,.08)',
+  border: '1px solid rgba(var(--theme-ink), .10)',
+  background: 'var(--theme-surface)',
+  boxShadow: '0 18px 40px rgba(var(--theme-ink), .08)',
 }
 
 const canvas: React.CSSProperties = {
@@ -2228,7 +2250,7 @@ const mapAnimations = `
 
 .saga-offline-grid-tile {
   box-sizing: border-box;
-  border: 1px solid rgba(148,163,184,.13);
+  border: 1px solid rgba(var(--theme-line), .13);
   background:
     radial-gradient(circle at 50% 50%, var(--theme-wash), transparent 34%),
     linear-gradient(135deg, rgba(241,245,249,.92), rgba(226,232,240,.90));
@@ -2243,16 +2265,16 @@ const mapAnimations = `
   z-index: 680;
   padding: 7px 10px;
   border-radius: 999px;
-  background: rgba(15,23,42,.72);
+  background: rgba(var(--theme-ink), .72);
   color: rgba(255,255,255,.86);
   font: 800 10px/1 system-ui, sans-serif;
   letter-spacing: .08em;
   pointer-events: none;
 }
 
-.leaflet-container {
-  background: #0f172a !important;
-}
+/* El fondo de Leaflet lo pone PlayerLayout, del tema. Aqui habia una segunda
+   regla con el azul pizarra clavado y tambien con !important: dos reglas
+   iguales empatadas, y decidia el orden de inyeccion. */
 
 .saga-node-radius {
   transform-origin: center;
@@ -2310,9 +2332,9 @@ const mapAnimations = `
   display: grid;
   place-items: center;
   position: relative;
-  background: linear-gradient(135deg, rgba(15,23,42,.88), rgba(51,65,85,.78));
+  background: linear-gradient(135deg, rgba(var(--theme-ink), .88), rgba(var(--theme-ink-mid), .78));
   border: 3px solid rgba(255,255,255,.94);
-  box-shadow: 0 14px 28px rgba(15,23,42,.28), inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow: 0 14px 28px rgba(var(--theme-ink), .28), inset 0 1px 0 rgba(255,255,255,.18);
   color: #fff;
 }
 
@@ -2331,7 +2353,7 @@ const mapAnimations = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14,165,233,.96);
+  background: rgba(var(--theme-info-mid), .96);
   border: 1px solid rgba(255,255,255,.76);
   font-size: 10px;
   font-weight: 950;
@@ -2344,7 +2366,7 @@ const mapAnimations = `
 
 .saga-player-cluster-popup strong {
   display: block;
-  color: #0f172a;
+  color: rgb(var(--theme-ink));
   font-size: 13px;
   margin-bottom: 6px;
 }
@@ -2361,12 +2383,12 @@ const mapAnimations = `
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: #334155;
+  color: rgb(var(--theme-ink-mid));
   font-size: 11px;
 }
 
 .saga-player-cluster-popup li span {
-  color: #64748b;
+  color: rgb(var(--theme-sheen-a));
   font-size: 10px;
   font-weight: 900;
 }
@@ -2377,8 +2399,8 @@ const mapAnimations = `
   border-radius: 16px;
   overflow: hidden;
   border: 2px solid rgba(255,255,255,.96);
-  box-shadow: 0 10px 22px rgba(15,23,42,.24);
-  background: rgba(15,23,42,.18);
+  box-shadow: 0 10px 22px rgba(var(--theme-ink), .24);
+  background: rgba(var(--theme-ink), .18);
   position: relative;
   transform: translateZ(0);
 }
@@ -2395,7 +2417,7 @@ const mapAnimations = `
   content: '';
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 0 1px rgba(15,23,42,.10);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-ink), .10);
   pointer-events: none;
 }
 
@@ -2409,7 +2431,7 @@ const mapAnimations = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15,23,42,.90);
+  background: rgba(var(--theme-ink), .90);
   border: 1px solid rgba(255,255,255,.72);
   color: #fff;
   font-size: 10px;
@@ -2433,7 +2455,7 @@ const mapAnimations = `
     rgba(255,255,255,.94);
   box-shadow:
     0 12px 30px
-      rgba(15,23,42,.34),
+      rgba(var(--theme-ink), .34),
     inset 0 1px 0
       rgba(255,255,255,.35);
   color: #ffffff;
@@ -2441,7 +2463,7 @@ const mapAnimations = `
     linear-gradient(
       135deg,
       var(--saga-player-color,#0891b2),
-      rgba(15,23,42,.72)
+      rgba(var(--theme-ink), .72)
     );
   overflow: hidden;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
@@ -2454,7 +2476,7 @@ const mapAnimations = `
 
 .saga-avatar-active .saga-avatar-pin {
   transform: scale(1.35) translateZ(0) !important;
-  box-shadow: 0 16px 36px rgba(15,23,42,.45), 0 0 0 6px rgba(56,189,248,.30) !important;
+  box-shadow: 0 16px 36px rgba(var(--theme-ink), .45), 0 0 0 6px rgba(var(--theme-info), .30) !important;
 }
 
 .saga-avatar-pin img {
@@ -2495,7 +2517,7 @@ const mapAnimations = `
 .saga-avatar-pin--offline {
           opacity: .62;
           filter: grayscale(.35);
-          border-color: rgba(203,213,225,.82);
+          border-color: rgba(var(--theme-line-soft), .82);
         }
 
 
