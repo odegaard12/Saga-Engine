@@ -1,4 +1,5 @@
 import type { PlayerProfile } from '../types/player'
+import { leerMarcaDeTiempo } from './fechas'
 
 const STORAGE_KEY = 'saga_offline_vault_v1'
 
@@ -95,8 +96,8 @@ export function getOfflineVaultSummary(): OfflineVaultSummary {
 export function formatOfflineVaultAge(summary: OfflineVaultSummary): string {
   if (!summary.prepared_at) return 'Nunca preparado.'
 
-  const ts = Date.parse(summary.prepared_at)
-  if (!Number.isFinite(ts)) return summary.prepared_at
+  const ts = leerMarcaDeTiempo(summary.prepared_at)
+  if (ts === null) return summary.prepared_at
 
   const minutes = Math.max(0, Math.round((Date.now() - ts) / 60000))
 

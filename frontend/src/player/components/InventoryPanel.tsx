@@ -7,6 +7,7 @@ import {
   type InventorySnapshot,
 } from '../offline/inventory'
 import { queuePhysicalEvent } from '../offline/physicalEvents'
+import { leerMarcaDeTiempo } from '../../shared/fechas'
 
 interface InventoryPanelProps {
   user: string
@@ -81,8 +82,8 @@ function getSourceBadge(source?: string): string {
 
 function getUpdatedLabel(value?: string): string {
   if (!value) return ''
-  const ts = Date.parse(value)
-  if (!Number.isFinite(ts)) return ''
+  const ts = leerMarcaDeTiempo(value)
+  if (ts === null) return ''
   const age = Math.max(0, Math.round((Date.now() - ts) / 1000))
   if (age < 10) return 'ahora'
   if (age < 60) return `${age}s`
