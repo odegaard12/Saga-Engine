@@ -1,5 +1,4 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { AdminReactOverviewStage as _AdminReactOverviewStage } from './adminApi'
 import {
   getAdminFamilyIcon,
   getAdminFamilyLabel,

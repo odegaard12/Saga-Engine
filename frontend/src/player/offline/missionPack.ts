@@ -1,6 +1,7 @@
 import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
 import { markInventoryItemUsed } from './inventory'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
+import { configDelNodo } from '../configDelNodo'
 
 const DB_NAME = 'saga-engine-offline-v1'
 const DB_VERSION = 1
@@ -185,21 +186,125 @@ function eventToSyncPayload(event: OfflineEvent) {
 
 export async function getQueuedOfflineEvents(user: string) {
   const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE)
-  return events.filter((event) => event.user === user && event.status !== 'synced')
+
+  // Ordenados por cuándo se crearon, siempre.
+  //
+  // El servidor aplica los avances en el orden en que le llegan, así que el
+  // orden aquí ES el progreso del jugador. IndexedDB devuelve por clave, y la
+  // clave empieza por usuario y TIPO antes que por la fecha: mientras la cola
+  // sólo llevaba nodos completados daba igual, pero al meter en ella también
+  // los escaneos y la mochila, un evento posterior de otro tipo puede colarse
+  // delante. Ordenar por fecha lo deja como pasó de verdad.
+  return events
+    .filter((event) => event.user === user && event.status !== 'synced')
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
 }
 
+/**
+ * Cuántos nodos hay completados en el móvil que el servidor todavía no sabe.
+ *
+ * Es la única razón legítima para que el móvil vaya por delante del servidor.
+ * Mientras haya alguno, una respuesta con un nivel más bajo no significa que el
+ * jugador tenga que repetir nada: significa que falta sincronizar. Cuando la
+ * cola se vacía, el servidor vuelve a ser la única verdad —incluido un reseteo
+ * hecho desde administración, que SÍ tiene que poder devolver al nodo 0—.
+ */
+export async function contarAvancesPendentes(user: string): Promise<number> {
+  const events = await getQueuedOfflineEvents(user).catch(() => [])
+  return events.filter((event) => event.type === 'node_completed').length
+}
+
+/** Todo lo que falta por subir, del tipo que sea. Es lo que se le enseña. */
+export async function contarPendientes(user: string): Promise<number> {
+  const events = await getQueuedOfflineEvents(user).catch(() => [])
+  return events.length
+}
+
+/** Tira la cola entera de este jugador. Se usa al resetearlo desde administración. */
+export async function borrarColaOffline(user: string): Promise<void> {
+  const events = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+  const mios = events.filter((event) => event.user === user)
+  if (!mios.length) return
+
+  const db = await openOfflineDb()
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE_EVENT_QUEUE, 'readwrite')
+    const store = tx.objectStore(STORE_EVENT_QUEUE)
+    mios.forEach((event) => store.delete(event.id))
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      resolve()
+    }
+  })
+}
+
+/**
+ * Motivos por los que el servidor no va a aceptar un evento por mucho que se
+ * insista. Reintentarlos es dejar la cola atascada para siempre y el aviso de
+ * "pendientes" encendido toda la travesía.
+ */
+const RECHAZOS_DEFINITIVOS = [
+  'invalid_completion_code',
+  'missing_required_item',
+  'mission_already_complete',
+  'already_advanced',
+]
+
+function esRechazoDefinitivo(motivo: string | undefined): boolean {
+  const limpio = String(motivo || '')
+    .trim()
+    .toLowerCase()
+  return RECHAZOS_DEFINITIVOS.some((rechazo) => limpio.includes(rechazo))
+}
+
+/**
+ * Una sincronización cada vez, y con espera creciente tras fallar.
+ *
+ * Esto lo llaman el ciclo de refresco, el reintento del avance y la vuelta de
+ * la cobertura, y a veces los tres a la vez. Sin candado se mandaban colas
+ * solapadas al mismo endpoint y el servidor aplicaba los avances en el orden en
+ * que llegaran: el nivel resultante dependía de cuál contestase antes.
+ *
+ * Y con cobertura intermitente —la del monte— reintentar cada ciclo contra una
+ * red que no va es gastar batería y llenar el registro. Tras un fallo se espera,
+ * doblando hasta un minuto.
+ */
+let sincronizando = false
+let esperaTrasFallo = 0
+let siguienteIntento = 0
+
+const ESPERA_MINIMA_MS = 3_000
+const ESPERA_MAXIMA_MS = 60_000
+
 export async function syncPendingOfflineEvents(user: string) {
+  const nada = { status: 'ok' as const, attempted: 0, synced: 0, failed: 0 }
+
+  if (sincronizando) return nada
+  if (Date.now() < siguienteIntento) return nada
+
   const events = await getQueuedOfflineEvents(user)
   const syncable = events.filter((event) => event.status === 'pending' || event.status === 'failed')
 
   if (syncable.length === 0) {
-    return {
-      status: 'ok' as const,
-      attempted: 0,
-      synced: 0,
-      failed: 0,
-    }
+    // Sin nada que mandar no hay por qué seguir castigando la espera.
+    esperaTrasFallo = 0
+    return nada
   }
+
+  sincronizando = true
+
+  try {
+    return await enviarCola(user, syncable)
+  } finally {
+    sincronizando = false
+  }
+}
+
+async function enviarCola(user: string, syncable: OfflineEvent[]) {
 
   const syncing = await Promise.all(
     syncable.map((event) =>
@@ -266,16 +371,28 @@ export async function syncPendingOfflineEvents(user: string) {
         if (isSynced) syncedCount += 1
         else failedCount += 1
 
+        const motivo =
+          backendEvent?.error || backendStatus || 'Backend did not accept this event.'
+
+        /**
+         * Un rechazo definitivo se marca como cerrado, no como fallo.
+         *
+         * Con `failed` volvía a entrar en la siguiente sincronización, y otra
+         * vez, y otra: la cola no bajaba nunca y el aviso de "pendientes" se
+         * quedaba encendido toda la travesía aunque no hubiera nada que hacer.
+         */
         return updateOfflineEvent({
           ...event,
-          status: isSynced ? 'synced' : 'failed',
+          status: isSynced || esRechazoDefinitivo(motivo) ? 'synced' : 'failed',
           backend_event_id: backendEvent?.id,
-          last_error: isSynced
-            ? undefined
-            : backendEvent?.error || backendStatus || 'Backend did not accept this event.',
+          last_error: isSynced ? undefined : motivo,
         })
       })
     )
+
+    // Llegó y contestó: se vuelve a intentar en cuanto haga falta.
+    esperaTrasFallo = 0
+    siguienteIntento = 0
 
     return {
       status: failedCount ? ('error' as const) : ('ok' as const),
@@ -285,6 +402,12 @@ export async function syncPendingOfflineEvents(user: string) {
       message: failedCount ? `${failedCount} offline event(s) need review.` : undefined,
     }
   } catch (error) {
+    // No llegó: se espera antes de volver a intentarlo, doblando hasta un
+    // minuto. Con la cobertura del monte, insistir cada ciclo contra una red
+    // que no va sólo gasta batería.
+    esperaTrasFallo = esperaTrasFallo ? Math.min(esperaTrasFallo * 2, ESPERA_MAXIMA_MS) : ESPERA_MINIMA_MS
+    siguienteIntento = Date.now() + esperaTrasFallo
+
     const message = error instanceof Error ? error.message : 'Unknown sync error'
 
     await Promise.all(
@@ -423,12 +546,9 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
+/** La configuración del nodo. Ver player/configDelNodo.ts para el porqué. */
 function readStageConfig(stage: PlayerStage | null): Record<string, unknown> {
-  const raw = asRecord(stage)
-  return {
-    ...asRecord(raw.config),
-    ...asRecord(asRecord(raw.minigame).config),
-  }
+  return configDelNodo(stage)
 }
 
 /**

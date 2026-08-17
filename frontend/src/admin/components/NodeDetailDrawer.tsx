@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { t as _t } from '../../i18n'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import GameTemplateWizardPanel from './GameTemplateWizardPanel'
 import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import {
   familyCards,

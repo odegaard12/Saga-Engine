@@ -587,9 +587,32 @@ export default function AdminApp() {
       }
 
       setOverview(payload)
+
+      /**
+       * Las fotos de los jugadores llegan por aquí, no por /api/config.
+       *
+       * En /api/config iban incrustadas en base64 y eran 134 KB de los 135 KB
+       * que el jugador se bajaba cada treinta segundos, además de dejar las
+       * caras de los catorce a la vista de cualquiera: ese endpoint es público.
+       * Ahora sale ligero, y los perfiles completos vienen en esta respuesta,
+       * que sí pide contraseña.
+       *
+       * Hay que meterlos en `config` antes de construir nada: todo lo que
+       * edita y guarda jugadores lee de ahí, y con las fotos vacías guardar las
+       * borraría.
+       */
+      const configConFotos = {
+        ...((config || {}) as unknown as Record<string, unknown>),
+        ...(Array.isArray(payload.player_profiles)
+          ? { player_profiles: payload.player_profiles }
+          : {}),
+      } as PublicConfig
+
+      setConfig(configConFotos)
+
       setPlayerDrafts(
         buildPlayerDrafts(payload.profiles || [], {
-          ...((config || {}) as unknown as Record<string, unknown>),
+          ...(configConFotos as unknown as Record<string, unknown>),
           ...((payload.config || {}) as unknown as Record<string, unknown>),
         } as PublicConfig)
       )

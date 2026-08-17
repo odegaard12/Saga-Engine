@@ -72,14 +72,19 @@ const CLAVE_RESET = 'saga:nodo-reset-visto:'
  *
  * Sin esto un jugador reseteado volvía al nodo 1 con el reloj de la partida
  * anterior todavía corriendo, y empezaba con minutos acumulados.
+ *
+ * Devuelve `true` sólo la primera vez que ve cada reset. Quien llama lo
+ * necesita: un reset es la única vez que el servidor puede mandar un nivel MÁS
+ * BAJO y tener razón, así que ese momento hay que distinguirlo de una respuesta
+ * vieja o de un progreso sin sincronizar.
  */
-export function aplicarResetDeRelojes(user: string, resetAt: number) {
-  if (typeof window === 'undefined') return
-  if (!resetAt || !Number.isFinite(resetAt)) return
+export function aplicarResetDeRelojes(user: string, resetAt: number): boolean {
+  if (typeof window === 'undefined') return false
+  if (!resetAt || !Number.isFinite(resetAt)) return false
 
   try {
     const visto = Number(window.localStorage.getItem(CLAVE_RESET + user)) || 0
-    if (resetAt <= visto) return
+    if (resetAt <= visto) return false
 
     limpiarRelojes(user)
     // Los nodos de pegatina llevan su propio reloj, y tambien tiene que irse:
@@ -87,8 +92,10 @@ export function aplicarResetDeRelojes(user: string, resetAt: number) {
     // llevaba buscando una pegatina en la partida anterior.
     limparRelojesQr(user)
     window.localStorage.setItem(CLAVE_RESET + user, String(resetAt))
+    return true
   } catch {
     // Nada que hacer.
+    return false
   }
 }
 

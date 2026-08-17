@@ -160,10 +160,11 @@ const STYLES = `
 
 .circuit-board-wrap {
   border-radius: 22px;
-  border: 1px solid rgba(255,255,255,.08);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(34,197,94,.10), transparent 52%),
-    rgba(255,255,255,.030);
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(17,19,21,0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(34,197,94,0.05);
   padding: 12px;
 }
 
@@ -177,44 +178,59 @@ const STYLES = `
   aspect-ratio: 1;
   min-height: 43px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.095);
-  background: rgba(15,23,42,.86);
-  color: rgba(226,232,240,.76);
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(15,23,42,.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(226,232,240,.9);
   display: grid;
   place-items: center;
   font-weight: 950;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 4px 10px rgba(0,0,0,0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.circuit-cell:active {
+  transform: scale(0.92);
 }
 
 .circuit-cell.source {
-  border-color: rgba(34,197,94,.28);
+  border-color: rgba(34,197,94,.6);
+  box-shadow: 0 0 15px rgba(34,197,94,0.3), inset 0 0 15px rgba(34,197,94,0.3);
+  text-shadow: 0 0 8px rgba(34,197,94,0.8);
 }
 
 .circuit-cell.target {
-  border-color: rgba(251,146,60,.28);
+  border-color: rgba(251,146,60,.6);
+  box-shadow: 0 0 15px rgba(251,146,60,0.3), inset 0 0 15px rgba(251,146,60,0.3);
+  text-shadow: 0 0 8px rgba(251,146,60,0.8);
 }
 
 .circuit-cell.preview {
-  border-color: rgba(134,239,172,.70);
-  background: rgba(34,197,94,.24);
-  box-shadow: 0 0 0 2px rgba(34,197,94,.16), 0 0 26px rgba(34,197,94,.24);
-  animation: circuitPulse 420ms ease-out;
+  border-color: rgba(134,239,172,.8);
+  background: rgba(34,197,94,.3);
+  box-shadow: 0 0 20px rgba(34,197,94,.4), inset 0 0 20px rgba(34,197,94,.4);
+  animation: circuitPulse 1s infinite alternate;
 }
 
 .circuit-cell.done {
-  border-color: rgba(34,197,94,.46);
-  background: linear-gradient(180deg, rgba(34,197,94,.32), rgba(21,128,61,.24));
-  color: #dcfce7;
+  border-color: rgba(34,197,94,.6);
+  background: linear-gradient(135deg, rgba(34,197,94,.5), rgba(21,128,61,.4));
+  color: #fff;
+  box-shadow: 0 0 20px rgba(34,197,94,.3);
+  text-shadow: 0 0 5px rgba(255,255,255,0.8);
 }
 
 .circuit-cell.last {
-  box-shadow: 0 0 0 2px rgba(248,250,252,.12), 0 0 24px rgba(255,255,255,.10);
+  box-shadow: 0 0 0 2px rgba(248,250,252,.3), 0 0 24px rgba(255,255,255,.2);
 }
 
 .circuit-cell.wrong {
-  animation: circuitWrong 260ms ease-out;
-  border-color: rgba(239,68,68,.75);
-  background: rgba(127,29,29,.38);
+  animation: circuitWrong 400ms ease-out;
+  border-color: rgba(239,68,68,.8);
+  background: rgba(239,68,68,.4);
+  box-shadow: 0 0 20px rgba(239,68,68,.5), inset 0 0 20px rgba(239,68,68,.5);
 }
 
 .circuit-cell span {

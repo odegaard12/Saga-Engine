@@ -25,46 +25,43 @@ type Phase = 'ready' | 'playing' | 'success' | 'failed'
 
 const CSS = `
 .tilt-shell,.tilt-shell *{box-sizing:border-box}
-.tilt-shell{width:100%;border:1px solid rgba(255,255,255,.09);border-radius:22px;background:radial-gradient(circle at 50% -12%,rgba(34,197,94,.14),transparent 35%),#111315;color:#f4f4f5}
+.tilt-shell{width:100%;border:1px solid rgba(255,255,255,.15);border-radius:22px;background:rgba(17,19,21,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.3), inset 0 0 20px rgba(34,197,94,0.05);color:#f4f4f5}
 .tilt-body{display:grid;gap:13px;padding:15px}
 .tilt-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.tilt-head h2{margin:0;font-size:clamp(23px,7vw,31px);line-height:1;font-weight:950;letter-spacing:-.045em}
-.tilt-head p{margin:6px 0 0;color:rgba(244,244,245,.62);font-size:12px;line-height:1.4}
+.tilt-head h2{margin:0;font-size:clamp(23px,7vw,31px);line-height:1;font-weight:950;letter-spacing:-.045em;text-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.tilt-head p{margin:6px 0 0;color:rgba(244,244,245,.8);font-size:12px;line-height:1.4}
 .tilt-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.tilt-stat{padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.045);text-align:center}
-.tilt-stat strong{display:block;color:#72df91;font-size:17px}
-.tilt-stat span{display:block;margin-top:3px;color:rgba(244,244,245,.48);font-size:8px;font-weight:900;text-transform:uppercase}
-.tilt-board-wrap{padding:7px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:#090a0b}
-/* El tablero es cuadrado: limitarlo sólo por ancho lo hacía tan alto como ancha
-   la pantalla, y el pad de dirección se iba por debajo del borde inferior.
-   Se limita por ALTURA REAL con dvh —vh en móvil mide la ventana sin contar la
-   barra del navegador, así que se pasaba de largo— dejando sitio para la
-   cabecera, la ayuda, el pad y los botones. El tablero cede tamaño; los
-   controles, nunca. */
-.tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:4px solid #8d99a8;border-radius:14px;background:#17191c;aspect-ratio:1}
-/* Capa de la bola: se coloca sobre el tablero y viaja con transform, así rueda
-   entre casillas en vez de reaparecer en la siguiente. */
-.tilt-ball-layer{position:absolute;top:0;left:0;display:grid;place-items:center;pointer-events:none;z-index:3;transition:transform 130ms cubic-bezier(.33,.9,.4,1);will-change:transform}
+.tilt-stat{padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.05);text-align:center;box-shadow:inset 0 2px 10px rgba(0,0,0,0.2)}
+.tilt-stat strong{display:block;color:#72df91;font-size:17px;text-shadow:0 0 8px rgba(114,223,145,0.4)}
+.tilt-stat span{display:block;margin-top:3px;color:rgba(244,244,245,.6);font-size:8px;font-weight:900;text-transform:uppercase}
+.tilt-board-wrap{padding:7px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:rgba(0,0,0,0.3);box-shadow:inset 0 4px 15px rgba(0,0,0,0.5)}
+.tilt-board{position:relative;display:grid;width:100%;max-width:min(540px,28dvh);margin:auto;overflow:hidden;border:3px solid rgba(34,197,94,0.6);border-radius:14px;background:rgba(10,12,14,0.6);aspect-ratio:1;box-shadow:0 0 15px rgba(34,197,94,0.3), inset 0 0 20px rgba(0,0,0,0.8)}
+.tilt-ball-layer{position:absolute;top:0;left:0;display:grid;place-items:center;pointer-events:none;z-index:3;transition:transform 100ms linear;will-change:transform}
 @media (prefers-reduced-motion: reduce){.tilt-ball-layer{transition:none}}
-.tilt-cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;border-style:solid;border-color:#7d8794;background:#17191c}
-.tilt-cell.goal{background:#1d315c}
-.tilt-cell.hole{background:#35181d}
-.tilt-cell.item{background:#403419}
-.tilt-ball{width:62%;height:62%;border-radius:999px;background:radial-gradient(circle at 35% 30%,#fff 0 8%,#a7f3d0 15%,#22c55e 58%,#166534 100%);box-shadow:0 4px 12px rgba(34,197,94,.52);z-index:3}
-.tilt-mark{font-size:clamp(8px,2.2vw,17px);font-weight:950}
-.tilt-help{min-height:42px;padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:#17191c;color:rgba(244,244,245,.67);font-size:11px;line-height:1.45;text-align:center}
+.tilt-cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;border-style:solid;border-color:rgba(34,197,94,0.2);background:transparent;transition:background 0.3s}
+.tilt-cell.goal{background:rgba(59,130,246,0.3);box-shadow:inset 0 0 12px rgba(59,130,246,0.5)}
+.tilt-cell.hole{background:rgba(239,68,68,0.3);box-shadow:inset 0 0 15px rgba(239,68,68,0.8)}
+.tilt-cell.item{background:rgba(234,179,8,0.25);box-shadow:inset 0 0 10px rgba(234,179,8,0.5)}
+.tilt-ball{width:62%;height:62%;border-radius:999px;background:radial-gradient(circle at 35% 30%,#fff 0%,#a7f3d0 15%,#22c55e 50%,#14532d 100%);box-shadow:0 0 12px rgba(34,197,94,0.9), inset -2px -2px 6px rgba(0,0,0,0.6);z-index:3}
+.tilt-mark{font-size:clamp(10px,2.5vw,18px);font-weight:950;text-shadow:0 0 8px rgba(255,255,255,0.5)}
+.tilt-help{min-height:42px;padding:10px 11px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(0,0,0,0.3);color:rgba(244,244,245,.8);font-size:11px;line-height:1.45;text-align:center;box-shadow:inset 0 2px 10px rgba(0,0,0,0.2)}
 .tilt-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.tilt-actions button,.tilt-primary{min-height:46px;padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:#202327;color:#f4f4f5;font-weight:950;cursor:pointer}
-.tilt-primary{width:100%;border-color:#22c55e;background:#22c55e;color:#102016}
+.tilt-actions button,.tilt-primary{min-height:46px;padding:10px;border:1px solid rgba(255,255,255,.15);border-radius:13px;background:rgba(255,255,255,0.05);color:#f4f4f5;font-weight:950;cursor:pointer;transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);backdrop-filter:blur(4px)}
+.tilt-actions button:active{transform:scale(0.96);background:rgba(255,255,255,0.15)}
+.tilt-primary{width:100%;border-color:#22c55e;background:linear-gradient(135deg,#22c55e,#16a34a);color:#062311;box-shadow:0 4px 15px rgba(34,197,94,0.3)}
+.tilt-primary:active{transform:scale(0.97);filter:brightness(1.1);box-shadow:0 2px 8px rgba(34,197,94,0.4)}
 .tilt-pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,52px);justify-content:center;gap:7px}
-.tilt-pad button{border:1px solid rgba(255,255,255,.1);border-radius:14px;background:#202327;color:#fff;font-size:22px;font-weight:950}
+.tilt-pad button{border:1px solid rgba(255,255,255,.15);border-radius:14px;background:rgba(255,255,255,0.05);color:#fff;font-size:22px;font-weight:950;transition:all 0.15s;backdrop-filter:blur(4px)}
+.tilt-pad button:active{transform:scale(0.9);background:rgba(255,255,255,0.2);box-shadow:0 0 15px rgba(255,255,255,0.2)}
 .tilt-pad .up{grid-column:2}.tilt-pad .left{grid-column:1}.tilt-pad .down{grid-column:2}.tilt-pad .right{grid-column:3}
-.tilt-pad-toggle{width:100%;min-height:44px;padding:10px;border:1px dashed rgba(255,255,255,.18);border-radius:13px;background:transparent;color:rgba(244,244,245,.62);font-size:12px;font-weight:800;cursor:pointer}
+.tilt-pad-toggle{width:100%;min-height:44px;padding:10px;border:1px dashed rgba(255,255,255,.25);border-radius:13px;background:rgba(0,0,0,0.2);color:rgba(244,244,245,.8);font-size:12px;font-weight:800;cursor:pointer;transition:all 0.2s}
+.tilt-pad-toggle:active{transform:scale(0.98);background:rgba(255,255,255,0.05)}
 .tilt-result{display:grid;gap:14px;padding:24px 16px;text-align:center}
-.tilt-result-icon{display:grid;width:70px;height:70px;margin:auto;place-items:center;border-radius:999px;background:#17321f;color:#72df91;font-size:32px}
-.tilt-result.fail .tilt-result-icon{background:#35181d;color:#fda4af}
-.tilt-result h2{margin:0;font-size:27px}.tilt-result p{margin:0;color:rgba(244,244,245,.62);font-size:13px;line-height:1.5}
-.tilt-sensor{color:#72df91;font-size:10px;font-weight:900;text-align:center}
+.tilt-result-icon{display:grid;width:70px;height:70px;margin:auto;place-items:center;border-radius:999px;background:rgba(23,50,31,0.8);border:2px solid #72df91;color:#72df91;font-size:32px;box-shadow:0 0 20px rgba(114,223,145,0.4)}
+.tilt-result.fail .tilt-result-icon{background:rgba(53,24,29,0.8);border-color:#fda4af;color:#fda4af;box-shadow:0 0 20px rgba(253,164,175,0.4)}
+.tilt-result h2{margin:0;font-size:27px;text-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.tilt-result p{margin:0;color:rgba(244,244,245,.8);font-size:13px;line-height:1.5}
+.tilt-sensor{color:#72df91;font-size:10px;font-weight:900;text-align:center;text-shadow:0 0 5px rgba(114,223,145,0.5)}
 @media(max-width:430px){.tilt-body{padding:11px;gap:8px}.tilt-pad{grid-template-columns:repeat(3,54px)}}
 /* Medido en el móvil: cabecera 97 + estadísticas 53 + tablero + ayuda 41 +
    sensor 14 + pad 109 + acciones 45, más el botón de código de respaldo. Con el

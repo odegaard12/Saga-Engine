@@ -35,6 +35,11 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         for i, stage in enumerate(runtime_stages)
     ]
 
+    # Huella del contenido de la misión. El móvil la guarda con su paquete
+    # offline y así sabe si lo que tiene sigue valiendo: mientras no cambie, se
+    # ahorra bajar 200 KB de nodos, fotos incluidas, cada treinta segundos.
+    stages_rev = main.stages_revision(runtime_stages)
+
     inventory_state = main.load_inventory_state()
     inventory_snapshot = inventory_state.get(profile_id, {"items": []})
 
@@ -49,6 +54,8 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         "level": lvl,
         "finished": finished,
         "stages": stages,
+        "stages_rev": stages_rev,
+        "offline_pack": bool(offline_pack),
         "current_stage": current_stage,
         "inventory_snapshot": inventory_snapshot,
     }
@@ -58,9 +65,16 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
     return response
 
 
-@router.get("/api/team/{user}")
-async def get_team_payload(user: str):
+def construir_tabla_de_equipo(user):
+    """La tabla de equipo: dónde va cada jugador y cuánto lleva.
+
+    Vive aparte del endpoint porque el latido la devuelve también. El jugador
+    pedía las dos cosas cada 5 segundos —«aquí estoy yo» y «dónde están los
+    demás»— y son la misma conversación: 1 440 peticiones por hora y por móvil,
+    el 75 % de todo lo que recibía la Raspberry.
+    """
     import main
+
     cfg = main.load_config()
     current_profile = main.get_player_profile(user, cfg)
     current_profile_id = current_profile.get("id") or _as_str(user).strip() or "PLAYER 1"
@@ -91,11 +105,17 @@ async def get_team_payload(user: str):
         "status": "ok",
         "user": current_profile_id,
         "total_nodes": total_nodes,
-        # La pantalla final espera a que acabe el grupo entero, así que
-        # necesita saber cuántos son y cuántos van terminados.
-        "finished_count": sum(1 for item in profiles if item.get("finished")),
+        # Aquí iba `finished_count`. La pantalla final lo cuenta ella misma a
+        # partir de esta misma lista de perfiles, así que era un duplicado que
+        # sólo podía desviarse: dos formas de contar lo mismo acaban dando
+        # números distintos el día que una de las dos cambia.
         "profiles": profiles
     }
+
+
+@router.get("/api/team/{user}")
+async def get_team_payload(user: str):
+    return construir_tabla_de_equipo(user)
 
 
 @router.post("/api/events/sync")
@@ -275,11 +295,26 @@ async def heartbeat(request: Request):
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
 
-    return {
+    respuesta = {
         "status": "ok",
         "user": profile_id,
         "live_status": main.project_live_profile_status(profile, current)
     }
+
+    # La tabla de equipo viaja de vuelta en el mismo latido.
+    #
+    # El jugador mandaba «aquí estoy» y acto seguido preguntaba «¿dónde están
+    # los demás?», los dos cada 5 segundos: 1 440 peticiones por hora y por
+    # móvil, tres cuartas partes de todo lo que le llegaba a la Raspberry, para
+    # una conversación que es una sola. Al devolverla aquí, el móvil deja de
+    # pedirla aparte.
+    #
+    # Se pide con ?equipo=1 para que un cliente viejo -o el panel- siga
+    # recibiendo exactamente lo de antes.
+    if _as_bool(data.get("equipo")) or request.query_params.get("equipo") == "1":
+        respuesta["team"] = construir_tabla_de_equipo(profile_id)
+
+    return respuesta
 
 
 
@@ -318,21 +353,40 @@ async def advance(request: Request):
     # uno entero sin enterarse —medido: mandando dos veces el nodo 1 se acababa
     # en el 3—.
     #
-    # Si el número no cuadra, es un eco de algo ya hecho: se contesta que sí,
-    # con el nivel real, y no se toca nada. Los móviles viejos que no lo manden
-    # siguen funcionando igual que antes.
+    # Los móviles viejos que no manden el número siguen funcionando igual que
+    # antes: sin él no se puede distinguir nada y se procesa la petición.
     try:
         nivel_de_partida = data.get("level_before")
         nivel_de_partida = int(nivel_de_partida) if nivel_de_partida is not None else None
     except (TypeError, ValueError):
         nivel_de_partida = None
 
-    if nivel_de_partida is not None and nivel_de_partida != lvl:
+    # Va por DETRÁS del servidor: es el eco de algo que ya llegó. Se contesta
+    # que sí, con el nivel real, y no se toca nada.
+    if nivel_de_partida is not None and nivel_de_partida < lvl:
         return {
             "status": "ok",
             "user": profile_id,
             "level": lvl,
             "duplicate": True,
+        }
+
+    # Va por DELANTE del servidor, que es un caso muy distinto: el móvil
+    # completó nodos sin cobertura y esos avances siguen en su cola sin
+    # sincronizar. Antes esto contestaba "ok" con el nivel del servidor: el
+    # móvil lo daba por bueno —sólo mira `status`—, el nodo no quedaba anotado
+    # en ninguna parte, y a la siguiente lectura el jugador aparecía varios
+    # nodos atrás. Eso es el "lo completé y me mandó a repetirlo".
+    #
+    # Ahora se dice la verdad: no he avanzado, voy por aquí. El móvil vacía su
+    # cola contra /api/events/sync y lo vuelve a intentar.
+    if nivel_de_partida is not None and nivel_de_partida > lvl:
+        return {
+            "status": "behind",
+            "user": profile_id,
+            "level": lvl,
+            "server_level": lvl,
+            "level_before": nivel_de_partida,
         }
 
     if lvl < len(stages):
@@ -345,6 +399,7 @@ async def advance(request: Request):
                 return {
                     "status": "fail",
                     "user": profile_id,
+                    "level": lvl,
                     "reason": "missing_required_item",
                     "requirement": requirement_status,
                 }
@@ -373,4 +428,6 @@ async def advance(request: Request):
                 "level": lvl + 1,
             }
 
-    return {"status": "fail", "user": profile_id}
+    # El nivel va también en el fallo: el móvil lo necesita para saber si el
+    # rechazo es "ese código no vale" o "estamos en nodos distintos".
+    return {"status": "fail", "user": profile_id, "level": lvl}

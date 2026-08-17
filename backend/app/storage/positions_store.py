@@ -78,6 +78,24 @@ def upsert_live_position(path: str, user: str, position: dict[str, Any]) -> dict
     return upsert_json_live_position(path, user, position)
 
 
+def guardar_posicion_sin_leer_todas(path: str, user: str, position: dict[str, Any]) -> None:
+    """Guarda la posición de un jugador y ya. No devuelve las de los demás.
+
+    `upsert_live_position` termina leyendo la tabla ENTERA para devolverla, y
+    quien la llama desde el latido tira ese resultado. Con trece jugadores
+    latiendo cada cinco segundos eso son 9 360 lecturas completas por hora para
+    nada, sobre una Raspberry que además sirve teselas y fotos.
+
+    Quien necesite la tabla entera que la pida: para eso está
+    `load_live_positions_state`.
+    """
+    if resolve_positions_storage_backend() == "sqlite":
+        upsert_sqlite_position(resolve_positions_db_path(path), user, position)
+        return
+
+    upsert_json_live_position(path, user, position)
+
+
 def remove_live_position(path: str, user: str) -> dict[str, dict[str, Any]]:
     if resolve_positions_storage_backend() == "sqlite":
         return remove_sqlite_position(resolve_positions_db_path(path), user)

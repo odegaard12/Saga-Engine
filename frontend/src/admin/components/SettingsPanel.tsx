@@ -26,9 +26,16 @@ export default function SettingsPanel({
           <p>{t('admin.settingsPanel.subtitle')}</p>
         </div>
 
-        <div className="admin-panel-count">
-          <strong>{missionDraft.player_theme || 'classic'}</strong>
+        <div className="admin-panel-count" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <span>{t('admin.settingsPanel.themeLabel')}</span>
+          <select
+            value={missionDraft.player_theme || 'glass'}
+            onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
+            style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
+          >
+            <option value="glass">Cristal (Glass)</option>
+            <option value="flame-red">Rojo (Fuego)</option>
+          </select>
         </div>
       </div>
 
@@ -47,6 +54,8 @@ export default function SettingsPanel({
               onChange={(event) => onUpdateMissionDraft('site_name', event.target.value)}
             />
           </label>
+
+
 
           <label>
             {t('admin.settingsPanel.adminTitle')}
@@ -108,16 +117,6 @@ export default function SettingsPanel({
             />
           </label>
 
-          <label>
-            {t('admin.settingsPanel.themeLabel')}
-            <select
-              value={missionDraft.player_theme || 'classic'}
-              onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
-            >
-              <option value="classic">classic</option>
-              <option value="glass">glass</option>
-            </select>
-          </label>
         </div>
       </section>
 

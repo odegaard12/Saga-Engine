@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import QrCardStudio, { getQrDesignSignature } from './QrCardStudio'
-import type { QrCardDesign } from './QrCardStudio'
-import {
-  adminGameCatalog as _adminGameCatalog,
-  getAdminGame as _getAdminGame,
-  getDefaultAdminStagePatchForGame,
-  type AdminGameCatalogItem,
-  type AdminGameId as _AdminGameId,
-} from '../lib/gameCatalog'
+import { getDefaultAdminStagePatchForGame, type AdminGameCatalogItem } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
-import type { PhysicalQrKind as _PhysicalQrKind } from './PhysicalQrCardsPanel'
 import CircuitPatternEditor from './circuitPattern/CircuitPatternEditor'
 import SimonSaysEditor from './sequenceCode/SimonSaysEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
@@ -21,19 +13,10 @@ import {
   type StepKey,
   type EditorMode,
   STEPS,
-  READY_STATUSES as _READY_STATUSES,
-  TECHNICAL_CONFIG_KEYS as _TECHNICAL_CONFIG_KEYS,
-  LEGACY_MESSAGE_FALLBACKS as _LEGACY_MESSAGE_FALLBACKS,
-  QR_KIND_BY_GAME_ID as _QR_KIND_BY_GAME_ID,
-  QR_GAME_BY_KIND as _QR_GAME_BY_KIND,
   CONFIG_FIELD_META,
-  CONFIG_ORDER as _CONFIG_ORDER,
   configOf,
-  titleOf as _titleOf,
-  nodeNumber as _nodeNumber,
   displayTitle,
   normalizeQrKind,
-  hasExplicitQrMarker as _hasExplicitQrMarker,
   gameFromStage,
   isCheckpointStage,
   isMapCollectibleStage,
@@ -42,14 +25,12 @@ import {
   qrOptions,
   statusLabel,
   offlineLabel,
-  isPlayableNow as _isPlayableNow,
   usesLocationRadius,
   normalizeDifficultyForEditor,
   isValidFixedCircuitConfig,
   isValidSequenceCodeConfig,
   isValidTiltMazeConfig,
   isValidPlaceMosaicConfig,
-  normalizeCopy as _normalizeCopy,
   shouldReplaceGeneratedGameTitle,
   shouldReplaceSequenceTitle,
   shouldReplacePlaceMosaicTitle,
@@ -57,7 +38,6 @@ import {
   isLegacySequenceHint,
   isExperimentalOrPlanned,
   normalizeMessage,
-  CUSTOM_GAME_EDITOR_IDS as _CUSTOM_GAME_EDITOR_IDS,
   hasCustomGameEditor,
   guidedConfigKeysForGame,
   slugOf,
@@ -70,7 +50,6 @@ import {
   qrDesignFromConfig,
   formatConfigValue,
   parseConfigValue,
-  copyText as _copyText
 } from './guided-editor/guidedEditorUtils'
 
 export interface AdminGameEditorProps {

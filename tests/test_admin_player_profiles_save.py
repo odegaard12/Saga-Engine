@@ -98,9 +98,72 @@ def test_save_config_persists_player_photo(monkeypatch, tmp_path):
     perfil = main.get_player_profiles(main.load_config())[0]
     assert perfil["avatar_url"] == foto
 
-    # Y tiene que salir en el config publico, que es de donde lo lee el login.
+    # El login sigue enseñando la foto, pero ya no viaja incrustada.
+    #
+    # En /api/config las fotos eran 134 KB de los 135 KB que el jugador se
+    # bajaba cada treinta segundos, y ese endpoint es publico: ahi estaban las
+    # caras de los catorce al alcance de cualquiera. Ahora va la URL de
+    # /api/player-avatar, que el navegador y el service worker cachean, y que la
+    # pantalla de login resuelve igual (ver getPlayerAvatarUrl).
     publico = client.get("/api/config").json()
-    assert publico["player_profiles"][0]["avatar_url"] == foto
+    perfil_publico = publico["player_profiles"][0]
+
+    assert perfil_publico["avatar_url"] == "", "la foto no puede ir incrustada aqui"
+    assert perfil_publico["avatar_ref"].startswith("/api/player-avatar/ALFA")
+
+    # Y esa URL tiene que servir la foto de verdad.
+    imagen = client.get(perfil_publico["avatar_ref"])
+    assert imagen.status_code == 200
+    assert imagen.headers["content-type"].startswith("image/")
+
+
+def test_o_config_publico_non_leva_as_fotos(monkeypatch, tmp_path):
+    """El peso de /api/config no puede volver a dispararse con las fotos dentro.
+
+    Medido en la Raspberry con catorce jugadores: 135 KB por peticion, cada
+    treinta segundos y por movil, o sea 16 MB por hora mandando una y otra vez
+    las mismas caras, en el monte y con una barra de cobertura.
+    """
+    configurar(monkeypatch, tmp_path)
+    client = make_client()
+
+    foto = "data:image/jpeg;base64," + ("A" * 8000)
+    client.post(
+        "/api/admin/save-config",
+        json={
+            "config": {
+                "player_profiles": [
+                    {"id": "P%d" % i, "display_name": "P%d" % i, "mode": "solo", "avatar_url": foto}
+                    for i in range(14)
+                ]
+            }
+        },
+    )
+
+    crudo = client.get("/api/config").content
+    assert len(crudo) < 10_000, "el config publico se ha vuelto a llenar de fotos"
+
+
+def test_o_panel_si_recibe_as_fotos_enteiras(monkeypatch, tmp_path):
+    """Si al panel le llegan vacias, guardar borra las fotos de todo el mundo."""
+    configurar(monkeypatch, tmp_path)
+    client = make_client()
+
+    foto = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+    client.post(
+        "/api/admin/save-config",
+        json={
+            "config": {
+                "player_profiles": [
+                    {"id": "ALFA", "display_name": "ALFA", "mode": "solo", "avatar_url": foto}
+                ]
+            }
+        },
+    )
+
+    vista = client.post("/api/admin/react-overview", json={}).json()
+    assert vista["status"] == "ok"
+    assert vista["player_profiles"][0]["avatar_url"] == foto
 
 
 def test_save_config_without_players_keeps_the_saved_ones(monkeypatch, tmp_path):

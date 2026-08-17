@@ -1,4 +1,3 @@
-import React from 'react'
 import { renderMarkdown } from '../utils/formatMarkdown'
 
 interface StoryModalProps {

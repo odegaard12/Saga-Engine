@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import { SagaQrCard } from '../../shared/qrCard'
 
 export type PhysicalQrKind = 'collectible' | 'requirement' | 'clue' | 'bonus' | 'qr'
 
@@ -146,20 +146,11 @@ export default function PhysicalQrCardsPanel({
 
       <div style={layout}>
         <div style={qrCardWrapper}>
+          {/* La tarjeta compartida, la misma que sale por la impresora.
+              Aquí había otra copia: verde sobre blanco, el logo encima del
+              código y la zona de silencio a cero. Ver shared/qrCard.tsx. */}
           <div ref={qrWrapRef} style={qrCardPdfStyle}>
-            <div style={qrCodeBox}>
-              <QRCodeSVG 
-                value={payload} 
-                size={160} 
-                level="H" 
-                fgColor="#007f4f" 
-                includeMargin={false} 
-              />
-              <div style={qrSagaLogo}>SAGA</div>
-            </div>
-            <div style={qrLabelCapsule}>
-              {cleanLabel}
-            </div>
+            <SagaQrCard data={{ payload, label: cleanLabel }} />
           </div>
         </div>
 
@@ -295,44 +286,11 @@ const qrCardPdfStyle: CSSProperties = {
   gap: '16px',
 }
 
-const qrCodeBox: CSSProperties = {
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: '#ffffff',
-  padding: '4px',
-}
-
-const qrSagaLogo: CSSProperties = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  backgroundColor: '#007f4f',
-  color: '#ffffff',
-  fontSize: '12px',
-  fontWeight: 900,
-  letterSpacing: '0.05em',
-  padding: '4px 10px',
-  borderRadius: '12px',
-  border: '3px solid #ffffff',
-  boxShadow: '0 0 0 1px #007f4f',
-}
-
-const qrLabelCapsule: CSSProperties = {
-  color: '#007f4f',
-  fontSize: '14px',
-  fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  border: '2px solid #007f4f',
-  borderRadius: '20px',
-  padding: '4px 24px',
-  background: '#ffffff',
-  minWidth: '140px',
-  textAlign: 'center',
-}
+// Aquí vivía `qrSagaLogo`: un recuadro verde de 12 px con borde blanco, puesto
+// justo en el centro del código. Ese es el que dejó SAGA_01 y SAGA_02
+// ilegibles para cualquier escáner del monte, porque tapaba la información de
+// formato y las pautas de temporización, que no llevan corrección de errores.
+// La marca va ahora en el marco de la tarjeta, fuera del código.
 
 const formGrid: CSSProperties = {
   display: 'flex',
