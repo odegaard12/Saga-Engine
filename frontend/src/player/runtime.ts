@@ -1,5 +1,14 @@
 import type { PlayerGpsStatus, PlayerStage } from '../types/player'
 
+/**
+ * Cuánto se espera a una posición antes de abrir el nodo igual.
+ *
+ * Cuarenta y cinco segundos es de sobra para un arranque en frío del chip GPS
+ * al aire libre. Si a esas alturas no hay posición, o no la va a haber, o va a
+ * tardar tanto que da igual.
+ */
+export const ESPERA_MAXIMA_DE_GPS_MS = 45_000
+
 export type PlayerPanel = 'details' | 'menu' | null
 export type PrimaryActionTone = 'ready' | 'gps' | 'locked' | 'warn' | 'done'
 
@@ -13,6 +22,7 @@ export interface StageRuntimeState {
     | 'out_of_range'
     | 'gps_unavailable'
     | 'distance_unknown'
+    | 'gps_rendido'
     | 'missing_item'
   primaryLabel: string
   primaryTone: PrimaryActionTone
@@ -33,8 +43,26 @@ export function deriveStageRuntime(args: {
   gpsState: PlayerGpsStatus
   debugEnabled: boolean
   itemGate?: StageItemGateInfo | null
+  /**
+   * Milisegundos esperando una posición en este nodo, si es que se espera.
+   *
+   * En el monte la precisión suele ser de 30 a 80 metros y a veces no llega
+   * ninguna posición: bajo cubierta de pinar, en una vaguada, con el móvil
+   * frío. Sin esto el nodo se quedaba en "LOCALIZANDO..." para siempre y no
+   * había forma de entrar. Es un candidato claro a lo de "el botánico no me
+   * dejaba entrar".
+   */
+  esperandoGpsMs?: number | null
 }): StageRuntimeState {
-  const { currentStage, finished, distanceMeters, gpsState, debugEnabled, itemGate } = args
+  const {
+    currentStage,
+    finished,
+    distanceMeters,
+    gpsState,
+    debugEnabled,
+    itemGate,
+    esperandoGpsMs,
+  } = args
 
   if (finished) {
     return {
@@ -111,6 +139,27 @@ export function deriveStageRuntime(args: {
   }
 
   if (distanceMeters === null) {
+    /**
+     * Pasado un tiempo razonable se abre igual.
+     *
+     * El GPS es la puerta del nodo, pero la prueba de verdad es el reto que hay
+     * dentro: la pegatina que hay que encontrar, el laberinto que hay que
+     * resolver. Dejar a alguien plantado delante de "LOCALIZANDO..." sin salida
+     * es peor que dejarle entrar un poco antes de tiempo, porque el reto sigue
+     * ahí y no se puede superar desde el sofá.
+     */
+    if (typeof esperandoGpsMs === 'number' && esperandoGpsMs >= ESPERA_MAXIMA_DE_GPS_MS) {
+      return {
+        canEnter: true,
+        reason: 'gps_rendido',
+        primaryLabel: 'ABRIR NODO',
+        primaryTone: 'warn',
+        helperText:
+          'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: ' +
+          'a proba está dentro.',
+      }
+    }
+
     return {
       canEnter: false,
       reason: 'distance_unknown',

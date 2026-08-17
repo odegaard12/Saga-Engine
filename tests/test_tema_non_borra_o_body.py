@@ -1,0 +1,102 @@
+# -*- coding: utf-8 -*-
+"""Poner el tema no puede borrar las clases que pone el resto de la aplicación.
+
+El tema llegó aplicándose así::
+
+    document.body.className = `theme-${config.player_theme}`
+
+Eso no añade una clase: **sustituye todas las del body**. Y el body no es sólo
+del tema. El escáner de QR pone ``saga-qr-scanner-open``, y de esa clase cuelga
+la regla que esconde la barra de abajo mientras se enfoca la pegatina::
+
+    body.saga-qr-scanner-open [data-saga-player-hud="bottom"] {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+Como la asignación estaba en el cuerpo del componente, corría en CADA render, y
+`PlayerApp` se repinta con cada lectura del GPS —segundos, caminando—. O sea:
+abres el escáner, das dos pasos, y la barra de abajo vuelve a aparecer ENCIMA
+del visor y además se vuelve a tragar los toques.
+
+No es un detalle de estilo: medido contra la misión real, **5 de los 10 nodos
+se completan leyendo un QR**.
+
+Aquí se fija que el tema toca sólo lo suyo.
+"""
+import re
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+FRONT = RAIZ / "frontend" / "src"
+
+TEMA = FRONT / "shared" / "tema.ts"
+JUGADOR = FRONT / "player" / "PlayerApp.tsx"
+ENTRADA = FRONT / "login" / "LoginApp.tsx"
+ESCANER = FRONT / "player" / "components" / "QuickProofPanel.tsx"
+
+
+def sin_comentarios(fichero: Path) -> str:
+    texto = fichero.read_text(encoding="utf-8")
+    texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", "", texto)
+
+
+def test_ninguen_asigna_o_className_do_body_enteiro():
+    """Asignar `className` entero borra lo que hayan puesto los demás."""
+    culpables = []
+
+    for fichero in FRONT.rglob("*"):
+        if fichero.suffix not in (".ts", ".tsx") or not fichero.is_file():
+            continue
+        codigo = sin_comentarios(fichero)
+        if re.search(r"document\.body\.className\s*=", codigo):
+            culpables.append(fichero.relative_to(RAIZ).as_posix())
+
+    assert not culpables, (
+        "estos ficheros sustituyen todas las clases del body en vez de añadir "
+        f"la suya: {culpables}"
+    )
+
+
+def test_o_tema_so_quita_clases_de_tema():
+    codigo = sin_comentarios(TEMA)
+
+    assert re.search(r"PREFIJO\s*=\s*'theme-'", codigo), "el prefijo del tema es 'theme-'"
+    assert "startsWith(PREFIJO)" in codigo, (
+        "sólo se quitan las clases del tema; las demás no son suyas"
+    )
+    assert "classList.add" in codigo
+    assert "classList.remove" in codigo
+
+
+def test_o_tema_ponse_unha_vez_ao_cargar_e_non_en_cada_render():
+    """En el cuerpo del componente corría con cada lectura del GPS."""
+    for fichero in (JUGADOR, ENTRADA):
+        codigo = sin_comentarios(fichero)
+        assert "aplicarTema" in codigo, f"{fichero.name} no usa la función del tema"
+
+        # La llamada de arranque va fuera del componente: una vez, al cargar el
+        # módulo, antes de que React pinte nada. Así no hay parpadeo Y no se
+        # repite en cada render.
+        antes = codigo.index("aplicarTema")
+        assert antes < codigo.index("export default function"), (
+            f"{fichero.name}: el tema de arranque tiene que ponerse al cargar el "
+            "módulo, no dentro del componente"
+        )
+
+
+def test_sen_dato_hai_respaldo():
+    """Un móvil que abre por primera vez no tiene configuración guardada."""
+    codigo = sin_comentarios(TEMA)
+
+    assert "theme-glass" in codigo
+
+
+def test_o_contrato_do_escaner_segue_ahi():
+    """Si esta clase desaparece, la prueba de arriba deja de proteger nada."""
+    codigo = ESCANER.read_text(encoding="utf-8")
+
+    assert "saga-qr-scanner-open" in codigo
+    assert "body.saga-qr-scanner-open" in codigo

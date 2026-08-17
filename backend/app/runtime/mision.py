@@ -1,0 +1,144 @@
+"""Los nodos de la misión: leerlos, validarlos y prepararlos para el jugador.
+
+Cuarta tajada de sacar cosas de `main.py`. Este grupo es el corazón del juego y
+lo usan los routers en seis sitios distintos, así que quitarlo de en medio del
+resto es de lo que más despeja.
+
+Todo lo de aquí es de sólo lectura sobre los nodos: nada toca la partida de un
+jugador. Dónde están guardados lo decide quien llama, pasando la ruta.
+"""
+import hashlib
+import json
+
+from backend.app.runtime.core_engine import (
+    normalize_stage,
+    preserve_physical_stage_fields,
+    validate_stage,
+    _clean_code,
+)
+from backend.app.runtime.minigames import build_stage_minigame_runtime
+
+
+def validate_stages(raw_stages):
+    if not isinstance(raw_stages, list):
+        return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
+
+    errores = []
+    for indice, stage in enumerate(raw_stages):
+        if not isinstance(stage, dict):
+            errores.append({"index": indice, "field": "node", "detail": "each node must be an object"})
+            continue
+        errores.extend(validate_stage(stage, idx=indice))
+
+    return errores
+
+
+def stages_revision(runtime_stages):
+    """Huella del contenido de la misión: cambia sólo si cambian los nodos.
+
+    El móvil necesita los nodos ENTEROS para jugar sin cobertura: el minijuego,
+    su configuración, la foto del mosaico y el código que acepta. Eso son 200 KB,
+    y el jugador pedía la partida cada 30 segundos, al volver a la aplicación y
+    al recuperar la red. En el monte, con una barra de cobertura, eso es la
+    misma foto bajándose una y otra vez durante tres horas.
+
+    Con esta huella el móvil pide lo pesado UNA vez y después sólo pregunta por
+    su estado —nivel, tiempo, mochila—, que son 28 KB.
+    """
+    try:
+        serializado = json.dumps(runtime_stages, sort_keys=True, default=str, ensure_ascii=False)
+    except (TypeError, ValueError):
+        # Antes que dar una huella falsa —que dejaría al jugador con nodos
+        # viejos para siempre—, se declara "no sé": el móvil bajará todo.
+        return ""
+
+    return hashlib.sha1(serializado.encode("utf-8")).hexdigest()[:16]
+
+
+def project_stage_for_player(raw_stage, include_runtime=False):
+    """Un nodo, tal y como lo recibe el móvil.
+
+    ⚠️ `include_runtime` decide si va el contenido jugable —el minijuego, su
+    configuración, el código que acepta— o sólo el título y las coordenadas.
+    Sin él, un nodo no se puede jugar sin cobertura: no tiene ni juego que
+    cargar ni código que aceptar. Cualquier sitio que guarde esto como paquete
+    offline tiene que pedirlo con `include_runtime=True`.
+    """
+    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
+
+    out = {
+        "id": node["id"],
+        "title": node["presentation"]["title"],
+        "lat": node["location"]["lat"],
+        "lon": node["location"]["lon"],
+        "radius": node["location"]["radius_m"],
+    }
+
+    if include_runtime:
+        out.update({
+            "content": node["presentation"]["content"],
+            "type": node["interaction"]["type"],
+            "config": node["interaction"]["config"],
+            "minigame": build_stage_minigame_runtime(node),
+            "entry": node["entry"],
+            "success": node["success"],
+            "requirements": node.get("requirements", {"items": []}),
+            "messages": node["messages"],
+        })
+
+    return preserve_physical_stage_fields(node, out)
+
+
+def stage_accepts_code(raw_stage, code, manual=False):
+    """¿Este código supera el nodo?
+
+    `manual` marca que viene de una casilla escrita a mano —el código de
+    respaldo—, no de un minijuego ganado. Importa porque el motor añade a todos
+    los nodos una condición interna con la que los minijuegos avisan de que se
+    han superado. Esa palabra la acepta CUALQUIER nodo: escrita en la casilla de
+    respaldo saltaba el que fuera, sin los dos minutos de penalización y sin
+    jugar. Desde una casilla de texto ya no vale.
+    """
+    node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
+    enviado = _clean_code(code)
+
+    if not enviado:
+        return False
+
+    for condicion in node["success"]["conditions"]:
+        if manual and condicion.get("kind") == "minigame_ok":
+            continue
+        esperado = _clean_code(condicion.get("value"))
+        if esperado and enviado == esperado:
+            return True
+
+    # El código impreso en la pegatina ES el código del nodo. Sin esto, escanear
+    # el QR correcto guardaba el objeto pero no completaba el nodo, y teclear
+    # "SAGA_01" como respaldo tampoco valía.
+    for esperado in stage_qr_payloads(raw_stage):
+        if esperado and enviado == esperado:
+            return True
+
+    return False
+
+
+def stage_qr_payloads(raw_stage):
+    """Códigos impresos en las pegatinas QR de un nodo.
+
+    Se miran tres sitios porque el editor los ha ido guardando en sitios
+    distintos según la versión, y los nodos viejos siguen ahí.
+    """
+    if not isinstance(raw_stage, dict):
+        return []
+
+    valores = [raw_stage.get("qr_payload")]
+
+    config = raw_stage.get("config")
+    if isinstance(config, dict):
+        valores.append(config.get("qr_payload"))
+
+    fisico = raw_stage.get("physical_qr")
+    if isinstance(fisico, dict):
+        valores.append(fisico.get("payload"))
+
+    return [_clean_code(valor) for valor in valores if valor]

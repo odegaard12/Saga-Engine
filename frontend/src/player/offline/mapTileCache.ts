@@ -225,6 +225,21 @@ function addRouteCorridor(
   }
 }
 
+/**
+ * Lo que ya está guardado, en una sola lectura.
+ *
+ * Preguntar por cada tesela de una en una son mil y pico consultas al almacén
+ * del navegador; pedir la lista entera es una.
+ */
+async function urlsYaGuardadas(cache: Cache): Promise<Set<string>> {
+  try {
+    const claves = await cache.keys()
+    return new Set(claves.map((peticion) => new URL(peticion.url).pathname))
+  } catch {
+    return new Set()
+  }
+}
+
 async function fetchAndCacheUrls(
   urls: string[],
   onProgress?: (progress: OfflineMapTileProgress) => void
@@ -232,6 +247,29 @@ async function fetchAndCacheUrls(
   if (!('caches' in window)) return 0
 
   const cache = await caches.open(TILE_CACHE_NAME)
+
+  /**
+   * Lo que ya está en el móvil no se vuelve a pedir.
+   *
+   * Esta función pedía las mil quinientas teselas en cada arranque. No llegaban
+   * a la red -el service worker las sirve de su caché-, pero el juego no se
+   * abría hasta que terminaban: medido en sagagia.es con todo ya guardado, 22
+   * segundos de pantalla de carga cada vez que se abre la aplicación, con el
+   * cartel de "Primera vez: se guarda el mapa" puesto siempre.
+   */
+  const guardadas = await urlsYaGuardadas(cache)
+  const faltan = urls.filter((url) => !guardadas.has(url))
+
+  if (!faltan.length) {
+    onProgress?.({
+      label: 'Mapa listo',
+      done: urls.length,
+      total: urls.length || 1,
+      detail: 'El mapa ya está guardado en este teléfono',
+    })
+    return 0
+  }
+
   let saved = 0
   let completed = 0
   let index = 0
@@ -240,13 +278,13 @@ async function fetchAndCacheUrls(
   onProgress?.({
     label: 'Mapa offline',
     done: 0,
-    total: urls.length,
-    detail: `Descargando ${urls.length} teselas`,
+    total: faltan.length,
+    detail: `Descargando ${faltan.length} teselas`,
   })
 
   async function worker() {
-    while (index < urls.length) {
-      const url = urls[index]
+    while (index < faltan.length) {
+      const url = faltan[index]
       index += 1
 
       try {
@@ -270,12 +308,12 @@ async function fetchAndCacheUrls(
         // clavada en el mismo número un buen rato y luego pegaba un salto. En
         // la primera descarga —que son más de mil trozos y varios minutos en el
         // móvil— eso es justo lo que hace pensar que se ha colgado.
-        if (completed === urls.length || completed % 5 === 0) {
+        if (completed === faltan.length || completed % 5 === 0) {
           onProgress?.({
             label: 'Mapa offline',
             done: completed,
-            total: urls.length,
-            detail: `${completed} de ${urls.length} trozos · ${saved} guardados`,
+            total: faltan.length,
+            detail: `${completed} de ${faltan.length} trozos · ${saved} guardados`,
           })
           await new Promise(resolve => setTimeout(resolve, 0))
         }
@@ -285,6 +323,19 @@ async function fetchAndCacheUrls(
 
   await Promise.all(Array.from({ length: workers }, () => worker()))
   return saved
+}
+
+/** Cuántas de estas teselas están ya en el móvil. */
+async function contarTeselasGuardadas(urls: string[]): Promise<number> {
+  if (!('caches' in window)) return 0
+
+  try {
+    const cache = await caches.open(TILE_CACHE_NAME)
+    const guardadas = await urlsYaGuardadas(cache)
+    return urls.filter((url) => guardadas.has(url)).length
+  } catch {
+    return 0
+  }
 }
 
 export function getOfflineMapTileSummary(): OfflineMapTileSummary | null {
@@ -362,7 +413,12 @@ export async function prefetchMissionMapTiles(
   }
 
   const orderedUrls = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
-  const saved = await fetchAndCacheUrls(orderedUrls, onProgress)
+  await fetchAndCacheUrls(orderedUrls, onProgress)
+
+  // Lo que hay guardado de esta ruta, no lo que se ha bajado en esta vuelta:
+  // el panel de "antes de salir" tiene que decir si el mapa está o no está, y
+  // saltarse las que ya estaban no puede parecer que se han perdido.
+  const saved = await contarTeselasGuardadas(orderedUrls)
 
   const summary: OfflineMapTileSummary = {
     cached_at: new Date().toISOString(),

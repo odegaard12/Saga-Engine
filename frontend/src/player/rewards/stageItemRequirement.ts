@@ -1,5 +1,6 @@
 import type { PlayerStage } from '../../types/player'
 import { loadInventorySnapshot } from '../offline/inventory'
+import { configDelNodo } from '../configDelNodo'
 
 /**
  * Objeto que un nodo exige llevar encima para poder abrirse.
@@ -20,8 +21,16 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
 
+/**
+ * La configuración del nodo, la de verdad.
+ *
+ * Aquí se leía sólo `config`, y la que manda es `minigame.config`. Un nodo con
+ * el objeto exigido puesto desde el editor podía no exigirlo al validar, o al
+ * revés: el botón de abrir y la comprobación del envío miraban campos
+ * distintos del mismo nodo.
+ */
 function readStageConfig(stage: PlayerStage | null): Record<string, unknown> {
-  return asRecord(asRecord(stage).config)
+  return configDelNodo(stage)
 }
 
 export function readStageItemRequirement(stage: PlayerStage | null): StageItemRequirement | null {

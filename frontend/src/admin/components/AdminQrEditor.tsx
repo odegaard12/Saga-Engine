@@ -1,4 +1,4 @@
-import { QRCodeSVG } from 'qrcode.react'
+import { SagaQrCode } from '../../shared/qrCard'
 import type { StageLike } from './guided-editor/guidedEditorUtils'
 import { configOf, slugOf } from './guided-editor/guidedEditorUtils'
 import { type PhysicalQrKind } from './PhysicalQrCardsPanel'
@@ -153,29 +153,11 @@ export default function AdminQrEditor({
               >
                 {qrPayload ? (
                   <>
-                    <div style={{ position: 'relative', display: 'flex' }}>
-                      <QRCodeSVG value={qrPayload} size={150} level="H" fgColor="#007f4f" />
-                      {/* Logo pequeño: si tapa la fila de formato del QR, el
-                          código deja de ser legible por cualquier escáner. */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          background: '#ffffff',
-                          color: '#007f4f',
-                          fontSize: 8,
-                          fontWeight: 900,
-                          letterSpacing: '0.02em',
-                          padding: '2px 3px',
-                          borderRadius: 3,
-                          lineHeight: 1,
-                        }}
-                      >
-                        SAGA
-                      </div>
-                    </div>
+                    {/* Exactamente el mismo código que se va a imprimir: misma
+                        pieza, mismos ajustes. Aquí había una copia con el logo
+                        centrado encima, que es lo que dejó las pegatinas del
+                        monte ilegibles para cualquier escáner. */}
+                    <SagaQrCode payload={qrPayload} size={150} />
                     <div
                       style={{
                         color: '#007f4f',

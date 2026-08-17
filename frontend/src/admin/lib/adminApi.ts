@@ -126,6 +126,15 @@ export type AdminReactOverviewResponse = {
   families?: Array<{ id: string; label: string }>
   stages?: AdminReactOverviewStage[]
   profiles?: AdminReactOverviewProfile[]
+  /**
+   * Los perfiles completos, con la foto incrustada.
+   *
+   * Vienen por aquí y no por /api/config, que es público: allí eran 134 KB de
+   * los 135 KB que el jugador se bajaba cada treinta segundos, y dejaban las
+   * caras de los catorce al alcance de cualquiera. El panel las necesita
+   * enteras para editarlas.
+   */
+  player_profiles?: Array<Record<string, unknown>>
 }
 
 async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
