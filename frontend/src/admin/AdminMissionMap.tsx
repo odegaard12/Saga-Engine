@@ -1862,84 +1862,12 @@ const mapCanvas: React.CSSProperties = {
   zIndex: 1,
 }
 
-const mapChrome: React.CSSProperties = {
-  position: 'absolute',
-  top: 12,
-  left: 12,
-  zIndex: 10,
-  display: 'flex',
-  alignItems: 'center',
-  padding: '6px 14px',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(2,6,23,0.65)',
-  backdropFilter: 'blur(14px)',
-  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-  pointerEvents: 'none',
-}
 
-const kicker: React.CSSProperties = {
-  color: '#7dd3fc',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
-}
 
-const title: React.CSSProperties = {
-  marginTop: 4,
-  color: '#f8fafc',
-  fontSize: 18,
-  fontWeight: 950,
-  letterSpacing: '-0.04em',
-}
 
-const helper: React.CSSProperties = {
-  marginTop: 5,
-  color: '#cbd5e1',
-  fontSize: 11,
-  fontWeight: 750,
-}
 
-const legend: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  justifyContent: 'flex-end',
-  gap: 8,
-  color: '#cbd5e1',
-  fontSize: 11,
-  fontWeight: 800,
-}
 
-const heatmapBtn: React.CSSProperties = {
-  background: 'rgba(244,63,94,0.15)',
-  border: '1px solid rgba(244,63,94,0.3)',
-  color: '#f43f5e',
-  borderRadius: 999,
-  padding: '2px 10px',
-  fontSize: 10,
-  cursor: 'pointer',
-  marginLeft: 8,
-  pointerEvents: 'auto',
-}
 
-const emptyState: React.CSSProperties = {
-  position: 'absolute',
-  left: '50%',
-  top: '50%',
-  zIndex: 3,
-  transform: 'translate(-50%, -50%)',
-  display: 'grid',
-  gap: 6,
-  width: 'min(320px, calc(100% - 48px))',
-  padding: 18,
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(2,6,23,0.72)',
-  color: '#e5eefc',
-  textAlign: 'center',
-  backdropFilter: 'blur(18px)',
-}
 
 const mapCss = `
 .admin-osm-multiply-layer {

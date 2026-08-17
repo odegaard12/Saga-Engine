@@ -2346,11 +2346,6 @@ export default function PlayerApp() {
         <PlayerShell
           payload={payload}
           currentStage={currentStage}
-          teamOpen={teamOpen}
-          teamCount={teamVisibleCount}
-          teamLiveCount={teamLiveCount}
-          gpsState={gpsState}
-          onOpenTeam={openTeam}
         />
       </div>
 
@@ -2601,10 +2596,8 @@ export default function PlayerApp() {
           distanceMeters={distanceMeters}
           inRange={inRange}
           debugEnabled={effectiveDebugEnabled}
-          followPlayer={followPlayer}
           toolsOpen={toolsOpen}
           playerHref={playerHref}
-          loginHref={shellLoginHref}
           adminHref={adminHref}
           primaryLabel={primaryLabel}
           primaryTone={runtime.primaryTone}
@@ -2617,7 +2610,6 @@ export default function PlayerApp() {
           onOpenTools={openTools}
           onCloseTools={closeTools}
           onToggleDebug={handleToggleDebug}
-          onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
           onDownloadFieldProofs={handleDownloadFieldProofs}
           fieldPhotoCount={todasAsFotos.length}
           submitting={submitting}
