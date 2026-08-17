@@ -1,92 +1,96 @@
-/* mobile-themes.css */
+/**
+ * Los temas del jugador.
+ *
+ * Este fichero existía y NO lo importaba nadie, así que nunca hizo nada: vite
+ * sólo empaqueta el CSS que alguien importa, y el `dist` construido lo
+ * demostraba con cero reglas `theme-*` dentro. El móvil recibía
+ * `class="theme-glass"` y no había ni una regla que casara.
+ *
+ * Además apuntaba a sitios que no existen. Medido: `.player-panel` 0 usos,
+ * `.login-panel` 0, `.saga-mobile-shell` 0, y
+ * `button[type=button][style*=backgroundColor]` no puede casar nunca porque el
+ * DOM serializa el estilo como `background-color`, no como `backgroundColor`.
+ *
+ * Lo que sí existe y lleva la cara del juego es `.saga-glass-panel`: 8
+ * componentes, incluidos los minijuegos. Por ahí es por donde el tema llega de
+ * verdad al jugador.
+ *
+ * Todo lo que pinta va bajo `body[class*="theme-"]`, y esa clase sólo la ponen
+ * la pantalla de entrada y la del jugador. El panel de administración tiene su
+ * propio aspecto y no se toca.
+ */
 
-/* Variables por defecto (classic) */
+/* --- Paleta por defecto: lo que se ve si no hay tema puesto --------------- */
 :root {
-  --theme-bg: #1f302b;
+  --theme-bg: #020617;
   --theme-text: #ffffff;
-  --theme-primary: #10b981;
-  --theme-primary-hover: #059669;
-  --theme-panel-bg: rgba(0, 0, 0, 0.4);
-  --theme-panel-border: rgba(255, 255, 255, 0.1);
-  --theme-backdrop: blur(12px);
+  --theme-primary: #22c55e;
+  --theme-primary-hover: #16a34a;
+  --theme-glass: rgba(15, 23, 42, 0.65);
+  --theme-glass-border: rgba(255, 255, 255, 0.08);
+  --theme-glow: rgba(34, 197, 94, 0.4);
+  --theme-backdrop: blur(16px);
 }
 
-/* Tema: Glass */
+/* --- Los temas ------------------------------------------------------------
+ *
+ * Tienen que ser exactamente los mismos que VALID_PLAYER_THEMES en main.py.
+ * Un tema aquí que el servidor no acepte no se puede elegir; uno que el
+ * servidor acepte y no esté aquí deja al jugador sin colores. Hay una prueba
+ * que compara las dos listas.
+ */
+
+/* Cristal: azul de noche. */
 body.theme-glass {
   --theme-bg: #0f172a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0284c7;
-  --theme-panel-bg: rgba(255, 255, 255, 0.05);
-  --theme-panel-border: rgba(255, 255, 255, 0.15);
+  --theme-glass: rgba(15, 23, 42, 0.68);
+  --theme-glass-border: rgba(56, 189, 248, 0.18);
+  --theme-glow: rgba(56, 189, 248, 0.4);
   --theme-backdrop: blur(20px);
 }
 
-/* Tema: Bosque (glass-green) */
-body.theme-glass-green {
-  --theme-bg: #064e3b;
-  --theme-primary: #34d399;
-  --theme-primary-hover: #10b981;
-  --theme-panel-bg: rgba(255, 255, 255, 0.08);
-  --theme-panel-border: rgba(255, 255, 255, 0.2);
-  --theme-backdrop: blur(16px);
-}
-
-/* Tema: Fuego (flame-red) */
+/* Fuego: rojo brasa. El fondo es muy oscuro a propósito —el texto va en
+ * blanco encima y esto se lee al sol, en el monte, con el brillo a tope—. */
 body.theme-flame-red {
-  --theme-bg: #450a0a;
+  --theme-bg: #2f0a0a;
   --theme-primary: #f87171;
   --theme-primary-hover: #ef4444;
-  --theme-panel-bg: rgba(255, 255, 255, 0.05);
-  --theme-panel-border: rgba(255, 255, 255, 0.15);
-  --theme-backdrop: blur(12px);
-}
-
-/* Tema: Carmesí (crimson) */
-body.theme-crimson {
-  --theme-bg: #881337;
-  --theme-primary: #fb7185;
-  --theme-primary-hover: #f43f5e;
-  --theme-panel-bg: rgba(0, 0, 0, 0.2);
-  --theme-panel-border: rgba(255, 255, 255, 0.1);
-  --theme-backdrop: blur(12px);
-}
-
-/* Tema: Océano (ocean) */
-body.theme-ocean {
-  --theme-bg: #1e3a8a;
-  --theme-primary: #60a5fa;
-  --theme-primary-hover: #3b82f6;
-  --theme-panel-bg: rgba(0, 0, 0, 0.3);
-  --theme-panel-border: rgba(255, 255, 255, 0.1);
+  --theme-glass: rgba(60, 12, 12, 0.72);
+  --theme-glass-border: rgba(248, 113, 113, 0.22);
+  --theme-glow: rgba(248, 113, 113, 0.42);
   --theme-backdrop: blur(16px);
 }
 
-/* Aplicación global al login y player */
-body {
-  background-color: var(--theme-bg) !important;
-  color: var(--theme-text) !important;
+/* --- Y esto es lo que pinta ---------------------------------------------- */
+
+body[class*='theme-'],
+body[class*='theme-'] #root {
+  background-color: var(--theme-bg);
+}
+
+body[class*='theme-'] {
+  color: var(--theme-text);
   transition: background-color 0.3s ease;
 }
 
-.saga-mobile-shell,
-#root {
-  background-color: var(--theme-bg) !important;
+/*
+ * El gancho que hace que el tema se note: los paneles de cristal del jugador
+ * y de los minijuegos leen estas variables.
+ */
+body[class*='theme-'] {
+  --saga-glass-bg: var(--theme-glass);
+  --saga-glass-border: var(--theme-glass-border);
+  --saga-accent-glow: 0 0 20px var(--theme-glow);
 }
 
-button.primary, 
-.admin-cms-side-action--save,
-button[type="button"][style*="backgroundColor"] {
-  background-color: var(--theme-primary) !important;
+body[class*='theme-'] button.primary,
+body[class*='theme-'] .admin-cms-side-action--save {
+  background-color: var(--theme-primary);
 }
 
-button.primary:hover,
-.admin-cms-side-action--save:hover {
-  background-color: var(--theme-primary-hover) !important;
-}
-
-.player-panel, .login-panel {
-  background: var(--theme-panel-bg) !important;
-  border-color: var(--theme-panel-border) !important;
-  backdrop-filter: var(--theme-backdrop) !important;
-  -webkit-backdrop-filter: var(--theme-backdrop) !important;
+body[class*='theme-'] button.primary:hover,
+body[class*='theme-'] .admin-cms-side-action--save:hover {
+  background-color: var(--theme-primary-hover);
 }

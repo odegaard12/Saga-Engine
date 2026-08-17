@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { ErrorBoundary } from './shared/ErrorBoundary'
 import './styles/mobile-shell.css'
+// Después de la carcasa, para que el tema pueda pisarle el fondo y las
+// variables de los paneles. Sin este import vite no lo empaqueta y el tema no
+// existe en el móvil, que es lo que pasaba: el `dist` no tenía ni una regla.
+import './mobile-themes.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'
