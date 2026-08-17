@@ -639,13 +639,33 @@ export function QuickProofPanel({
 
   if (hidden) return null
 
+  /**
+   * La linterna, y qué pasa cuando el móvil dice que sí y luego no puede.
+   *
+   * Esto tenía un `catch {}` vacío: se pedía la linterna, fallaba, y no pasaba
+   * nada. Ni luz, ni mensaje, ni el botón cambiando —`setTorchOn` sólo corre si
+   * la llamada sale bien—. De noche, delante de una pegatina, era darle a un
+   * botón que pone "🔦 OFF" y no hace nada, sin ninguna explicación.
+   *
+   * Cuando falla se hacen dos cosas: se dice, y se retira el botón. El botón
+   * sólo aparece porque el navegador dijo que había linterna; si al usarla
+   * resulta que no, esa promesa era falsa y no se sigue enseñando.
+   */
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0]
     if (!track) return
+
+    const siguiente = !torchOn
+
     try {
-      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] })
-      setTorchOn(!torchOn)
-    } catch {}
+      await track.applyConstraints({ advanced: [{ torch: siguiente } as any] })
+      setTorchOn(siguiente)
+    } catch {
+      setTorchOn(false)
+      setTorchSupported(false)
+      setNoticeTone('info')
+      setNotice('Este móvil no deja encender la linterna desde la aplicación.')
+    }
   }
 
   if (!showLauncher && mode === 'idle' && !notice) return null
@@ -1179,12 +1199,6 @@ const hintText: CSSProperties = {
   textAlign: 'center',
 }
 
-const helpText: CSSProperties = {
-  color: 'rgba(241,245,249,.78)',
-  fontSize: 12,
-  lineHeight: 1.42,
-  fontWeight: 820,
-}
 
 function noticeBox(tone: 'success' | 'info'): CSSProperties {
   const accent = tone === 'success' ? '#4ade80' : '#94a3b8'

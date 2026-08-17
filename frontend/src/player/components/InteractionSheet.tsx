@@ -778,28 +778,6 @@ const compactGameBarButton: CSSProperties = {
   cursor: 'pointer',
 }
 
-const compactGameCloseButton: CSSProperties = {
-  position: 'absolute',
-  top: 7,
-  right: 7,
-  zIndex: 50,
-  width: 38,
-  height: 38,
-  display: 'grid',
-  placeItems: 'center',
-  padding: 0,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.22)',
-  background: 'rgba(2,6,23,.86)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  boxShadow: '0 7px 20px rgba(2,6,23,.38)',
-  color: '#fff',
-  fontSize: 24,
-  fontWeight: 900,
-  lineHeight: 1,
-  cursor: 'pointer',
-}
 
 const dragHandleWrap: CSSProperties = {
   display: 'flex',
@@ -986,51 +964,8 @@ const sheetAnimations = `
 }
 `
 
-const timerOverlay: CSSProperties = {
-  position: 'absolute',
-  top: 16,
-  left: 16,
-  zIndex: 130,
-  padding: '6px 14px',
-  background: 'rgba(255, 255, 255, 0.1)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
-  borderRadius: 12,
-  color: '#fff',
-  fontWeight: 800,
-  fontSize: 14,
-  pointerEvents: 'none',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-}
 
-const completionOverlay: CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 150,
-  background: 'rgba(20, 25, 35, 0.7)',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 22,
-  animation: 'sagaFadeIn 0.3s ease-out',
-}
 
-const completionText: CSSProperties = {
-  color: '#38bdf8',
-  fontSize: 22,
-  fontWeight: 900,
-  textAlign: 'center',
-  textShadow: '0 0 20px rgba(56, 189, 248, 0.6)',
-  lineHeight: 1.5,
-  letterSpacing: '0.05em',
-  animation: 'sagaIconFloat 3s ease-in-out infinite',
-}
 
 const avisoAntiTrampas: CSSProperties = {
   background: 'rgba(216, 122, 42, 0.16)',
