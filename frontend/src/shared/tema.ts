@@ -17,8 +17,31 @@
 
 const PREFIJO = 'theme-'
 
+/**
+ * Los temas que existen. Un solo sitio.
+ *
+ * Había cuatro eligiendo: `VALID_PLAYER_THEMES` en `main.py`, las clases de
+ * `mobile-themes.css`, las `<option>` escritas a mano en el panel, y los
+ * valores por defecto repartidos. Tres de ellos seguían diciendo `classic`, que
+ * dejó de ser un tema válido: una misión sin tema dejaba el selector del panel
+ * EN BLANCO, y al guardar el servidor lo convertía en `glass` sin que nadie lo
+ * hubiese elegido.
+ *
+ * Hay una prueba que compara esta lista con la del servidor y con la del CSS.
+ * Añadir un tema es tocar los tres, y la prueba avisa si te dejas uno.
+ */
+export const TEMAS = [
+  { id: 'glass', etiqueta: 'Cristal (azul de noche)' },
+  { id: 'flame-red', etiqueta: 'Fuego (rojo brasa)' },
+] as const
+
+export type IdDeTema = (typeof TEMAS)[number]['id']
+
+/** El que se aplica si la misión no dice otra cosa. */
+export const TEMA_POR_DEFECTO: IdDeTema = 'glass'
+
 /** Lo que se pone cuando el móvil aún no sabe de qué misión es. */
-const RESPALDO = 'theme-glass'
+const RESPALDO = `${PREFIJO}${TEMA_POR_DEFECTO}`
 
 export function claseDelTema(tema?: string | null): string {
   const limpio = String(tema ?? '')

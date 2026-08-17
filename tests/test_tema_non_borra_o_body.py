@@ -88,10 +88,25 @@ def test_o_tema_ponse_unha_vez_ao_cargar_e_non_en_cada_render():
 
 
 def test_sen_dato_hai_respaldo():
-    """Un móvil que abre por primera vez no tiene configuración guardada."""
+    """Un móvil que abre por primera vez no tiene configuración guardada.
+
+    El respaldo sale del tema por defecto, no de un literal suelto: así no
+    puede quedarse apuntando a un tema que dejó de existir, que es justo lo
+    que pasó con `classic`.
+    """
     codigo = sin_comentarios(TEMA)
 
-    assert "theme-glass" in codigo
+    assert re.search(r"RESPALDO\s*=\s*`\$\{PREFIJO\}\$\{TEMA_POR_DEFECTO\}`", codigo), (
+        "el respaldo tiene que derivar del tema por defecto"
+    )
+
+    defecto = re.search(r"TEMA_POR_DEFECTO:\s*IdDeTema\s*=\s*'([a-z0-9-]+)'", codigo)
+    assert defecto, "no se encontró el tema por defecto"
+
+    validos = set(re.findall(r"id:\s*'([a-z0-9-]+)'", codigo))
+    assert defecto.group(1) in validos, (
+        f"el tema por defecto ({defecto.group(1)}) no está entre los que existen: {sorted(validos)}"
+    )
 
 
 def test_o_contrato_do_escaner_segue_ahi():

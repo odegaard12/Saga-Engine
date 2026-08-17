@@ -35,6 +35,7 @@ import {
   verifyPersistedStages,
 } from './lib/adminStagePersistence'
 import { getStablePlayerColor, getPlayerInitials } from '../shared/playerIdentity'
+import { TEMA_POR_DEFECTO } from '../shared/tema'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
@@ -223,7 +224,7 @@ export default function AdminApp() {
       prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
       prologue_image_url: getConfigTextValue(source, 'prologue_image_url', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
-      player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || 'classic'),
+      player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || TEMA_POR_DEFECTO),
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
       mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
       map_center_lat: String(centerLat ?? 40.4168),
@@ -280,7 +281,7 @@ export default function AdminApp() {
       prologue_subtitle: missionDraft.prologue_subtitle || '',
       prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
-      player_theme: missionDraft.player_theme || 'classic',
+      player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
       map_center: [Number.isFinite(lat) ? lat : 40.4168, Number.isFinite(lon) ? lon : -3.7038],
