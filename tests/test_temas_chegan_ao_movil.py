@@ -28,6 +28,10 @@ FRONT = RAIZ / "frontend" / "src"
 TEMAS = FRONT / "mobile-themes.css"
 ENTRADA = FRONT / "main.tsx"
 SERVIDOR = RAIZ / "main.py"
+LISTA_TS = FRONT / "shared" / "tema.ts"
+PANEL = FRONT / "admin" / "components" / "SettingsPanel.tsx"
+ADMIN = FRONT / "admin" / "AdminApp.tsx"
+PUBLICO = RAIZ / "backend" / "app" / "routers" / "public.py"
 
 
 def sin_comentarios_css(fichero: Path) -> str:
@@ -98,3 +102,55 @@ def test_o_panel_de_administracion_non_se_pinta():
             assert 'body[class*=' in selector, (
                 f"este bloque pinta fuera del tema y alcanzaria al panel: {selector!r}"
             )
+
+
+def _temas_do_servidor() -> set[str]:
+    linea = re.search(
+        r"VALID_PLAYER_THEMES\s*=\s*\{([^}]*)\}", SERVIDOR.read_text(encoding="utf-8")
+    )
+    assert linea, "no se encontró VALID_PLAYER_THEMES"
+    return set(re.findall(r"[\"']([a-z0-9-]+)[\"']", linea.group(1)))
+
+
+def test_a_lista_de_temas_esta_nun_so_sitio():
+    """Había cuatro sitios eligiendo qué temas hay y cuál es el de por defecto."""
+    codigo = LISTA_TS.read_text(encoding="utf-8")
+
+    assert "export const TEMAS" in codigo, "falta la lista canónica de temas"
+    assert "export const TEMA_POR_DEFECTO" in codigo, "falta el tema por defecto"
+
+
+def test_a_lista_de_ts_e_a_do_servidor_coinciden():
+    codigo = LISTA_TS.read_text(encoding="utf-8")
+    en_ts = set(re.findall(r"id:\s*'([a-z0-9-]+)'", codigo))
+
+    assert en_ts == _temas_do_servidor(), (
+        f"solo en TypeScript: {sorted(en_ts - _temas_do_servidor())} · "
+        f"solo en el servidor: {sorted(_temas_do_servidor() - en_ts)}"
+    )
+
+
+def test_ninguen_usa_classic_como_respaldo():
+    """`classic` dejó de ser un tema válido.
+
+    Seguía siendo el valor por defecto en tres sitios. Consecuencia real: una
+    misión sin tema dejaba el selector del panel EN BLANCO, porque `classic` ya
+    no es ninguna de sus opciones, y al guardar el servidor lo convertía en
+    `glass` sin que nadie lo hubiese elegido.
+    """
+    culpables = []
+
+    for fichero in (ADMIN, PUBLICO):
+        for n, linea in enumerate(fichero.read_text(encoding="utf-8").split("\n"), 1):
+            if "player_theme" in linea and "classic" in linea:
+                culpables.append(f"{fichero.name}:{n}")
+
+    assert not culpables, f"usan 'classic', que ya no es un tema: {culpables}"
+
+
+def test_o_panel_ofrece_os_temas_da_lista():
+    """Escritas a mano, las opciones del panel se quedan atrás."""
+    codigo = PANEL.read_text(encoding="utf-8")
+
+    assert "TEMAS" in codigo, "el panel tiene que sacar las opciones de la lista canónica"
+    assert '<option value="glass">' not in codigo, "las opciones ya no se escriben a mano"

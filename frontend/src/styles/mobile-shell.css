@@ -135,9 +135,9 @@ body {
 .saga-tools-language-row button.active {
   /* Del color del tema, no de un verde fijo: con el tema de fuego puesto, un
      verde aqui es lo que se ve mal desde lejos. */
-  background: color-mix(in srgb, var(--theme-primary) 16%, transparent);
+  background: var(--theme-tint-strong);
   color: var(--theme-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-primary) 24%, transparent);
+  box-shadow: inset 0 0 0 1px var(--theme-primary-border);
 }
 
 /* i18n adjustment: player language selector lives inside Tools only */

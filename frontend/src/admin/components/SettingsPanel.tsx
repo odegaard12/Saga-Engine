@@ -7,6 +7,7 @@ type SettingsPanelProps = {
 }
 
 import { useI18n } from '../../i18n/useI18n'
+import { TEMAS, TEMA_POR_DEFECTO } from '../../shared/tema'
 
 export default function SettingsPanel({
   missionDraft,
@@ -29,12 +30,16 @@ export default function SettingsPanel({
         <div className="admin-panel-count" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <span>{t('admin.settingsPanel.themeLabel')}</span>
           <select
-            value={missionDraft.player_theme || 'glass'}
+            value={missionDraft.player_theme || TEMA_POR_DEFECTO}
             onChange={(event) => onUpdateMissionDraft('player_theme', event.target.value)}
             style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
           >
-            <option value="glass">Cristal (Glass)</option>
-            <option value="flame-red">Rojo (Fuego)</option>
+            {/* De la lista canonica: escritas a mano se quedaban atras. */}
+            {TEMAS.map((tema) => (
+              <option key={tema.id} value={tema.id}>
+                {tema.etiqueta}
+              </option>
+            ))}
           </select>
         </div>
       </div>

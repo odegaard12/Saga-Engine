@@ -1960,21 +1960,38 @@ export default function PlayerApp() {
     if (!fieldProofs.length) return
     showNotice('Preparando archivo ZIP...', 'info')
 
+    let fallidas = 0
+
     try {
+      /**
+       * `jszip` se pide aqui, no arriba, asi que sale como un trozo aparte
+       * -96 KB, 28 KB comprimido- que el precache offline NO guarda: ese solo
+       * coge los scripts que ya estan en la pagina. Sin cobertura, esta linea
+       * falla, y esta bien que asi sea -son 28 KB de mas para todos y esto se
+       * hace en casa con wifi, no en el monte-, pero hay que decirlo.
+       */
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
 
       const promises = fieldProofs.map(async (proof, index) => {
         const url = proof.image_url || proof.thumbnail_url
-        if (!url) return
+        if (!url) {
+          fallidas += 1
+          return
+        }
 
         try {
           const response = await fetch(url)
+          if (!response.ok) throw new Error(`http ${response.status}`)
           const blob = await response.blob()
           const filename = `foto_${index + 1}_${proof.id}.jpg`
           zip.file(filename, blob)
         } catch (err) {
-          console.warn('Failed to fetch photo for zip', err)
+          // Antes esto era un console.warn y seguia: el ZIP salia incompleto y
+          // se anunciaba como completado. El jugador borra el movil confiando
+          // en que tiene sus fotos.
+          fallidas += 1
+          console.warn('[SAGA] no se pudo meter una foto en el ZIP', err)
         }
       })
 
@@ -1994,10 +2011,22 @@ export default function PlayerApp() {
 
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000)
 
-      showNotice('Descarga de ZIP completada', 'success')
+      if (fallidas === 0) {
+        showNotice('Descarga de ZIP completada', 'success')
+      } else {
+        showNotice(
+          `ZIP descargado, pero faltan ${fallidas} de ${fieldProofs.length} fotos. Vuelve a intentarlo con mejor cobertura.`,
+          'warn'
+        )
+      }
     } catch (err) {
-      console.error(err)
-      showNotice('Error al crear ZIP', 'warn')
+      console.error('[SAGA] no se pudo armar el ZIP de fotos', err)
+      // Lo mas probable con diferencia es que no haya red: el trozo de jszip
+      // no viene guardado en el movil. Decir solo "error" no ayuda a nadie.
+      showNotice(
+        'No se pudo preparar el ZIP. Hace falta conexión para armarlo.',
+        'warn'
+      )
     }
   }
   function handlePrimaryAction() {

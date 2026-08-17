@@ -682,10 +682,10 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
 
   return {
     ...primaryBase,
-    background: 'linear-gradient(180deg, #22c55e, #16a34a)',
-    border: '1px solid rgba(34,197,94,.22)',
+    background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
+    border: '1px solid var(--theme-primary-border)',
     color: '#ffffff',
-    boxShadow: '0 14px 30px rgba(34,197,94,.24)',
+    boxShadow: 'var(--saga-accent-glow)',
   }
 }
 
@@ -859,7 +859,7 @@ const tabButton: CSSProperties = {
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(16, 185, 129, 0.16))',
+  background: 'linear-gradient(135deg, var(--theme-tint-strong), var(--theme-tint))',
   color: '#a7f3d0',
   border: '1px solid rgba(52, 211, 153, 0.35)',
   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
@@ -963,7 +963,7 @@ const toolsLoginLink: CSSProperties = {
   padding: '0 14px',
   borderRadius: 15,
   border: '1px solid rgba(187,247,208,.18)',
-  background: 'rgba(34,197,94,.12)',
+  background: 'var(--theme-tint)',
   color: '#dcfce7',
   fontSize: 11,
   fontWeight: 900,
@@ -1051,7 +1051,7 @@ const fallbackToolSubmit: CSSProperties = {
   minHeight: 42,
   borderRadius: 14,
   border: '1px solid rgba(187,247,208,.22)',
-  background: 'rgba(34,197,94,.18)',
+  background: 'var(--theme-tint-strong)',
   color: '#dcfce7',
   fontSize: 11,
   fontWeight: 950,
