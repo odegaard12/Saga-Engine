@@ -136,8 +136,8 @@ const card: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
   border: '1px solid rgba(255,255,255,.22)',
   boxShadow: '0 20px 48px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.12)',
-  backdropFilter: 'blur(20px) saturate(135%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   color: '#ffffff',
   display: 'grid',
   gap: 8,
@@ -174,7 +174,7 @@ const soloPill: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 12px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.16)',
   border: '1px solid rgba(255,255,255,.18)',
   color: '#ffffff',
@@ -221,7 +221,7 @@ const routeSegment: CSSProperties = {
 const routeNode: CSSProperties = {
   width: 10,
   height: 10,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.18)',
   flex: '0 0 auto',
 }
@@ -244,7 +244,7 @@ const routeNodeActive: CSSProperties = {
 
 const routeConnector: CSSProperties = {
   height: 3,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   width: '100%',
 }
 
@@ -262,7 +262,7 @@ const countPill: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 12px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   background: 'rgba(255,255,255,.12)',
   border: '1px solid rgba(255,255,255,.16)',
   color: 'rgba(255,255,255,0.9)',

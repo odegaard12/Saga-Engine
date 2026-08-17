@@ -2,7 +2,7 @@
   position: relative;
   min-height: 100%;
   height: 100%;
-  border-radius: 28px;
+  border-radius: var(--theme-radius-panel);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:

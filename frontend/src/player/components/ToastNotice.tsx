@@ -45,8 +45,8 @@ const toastWrap: CSSProperties = {
   fontWeight: 800,
   textAlign: 'center',
   animation: 'sagaToastIn 180ms cubic-bezier(0.22, 1, 0.36, 1)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 const toastInfo: CSSProperties = {

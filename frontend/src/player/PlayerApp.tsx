@@ -27,7 +27,6 @@ import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
-import { TeamSheet } from './components/TeamSheet'
 import { RankingSheet } from './components/RankingSheet'
 import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
@@ -186,16 +185,6 @@ function mantenerNivel(
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
-/**
- * El tema, antes de que React pinte nada.
- *
- * Aqui, al cargar el modulo: una sola vez y sin parpadeo. Estaba dentro del
- * componente, o sea que corria con cada render -y este se repinta con cada
- * lectura del GPS-, y ademas asignaba `className` entero, que borraba las
- * clases del escaner de QR.
- */
-aplicarTema(getCachedPublicConfig()?.player_theme)
-
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
 
@@ -293,8 +282,6 @@ export default function PlayerApp() {
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
   const toolsOpen = usePlayerStore((s) => s.toolsOpen)
   const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
-  const teamOpen = usePlayerStore((s) => s.teamOpen)
-  const setTeamOpen = usePlayerStore((s) => s.setTeamOpen)
   const rankingOpen = usePlayerStore((s) => s.rankingOpen)
   const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
 
@@ -861,7 +848,22 @@ export default function PlayerApp() {
       }
 
       try {
-        const effectivePosition = heartbeatPositionRef.current
+        /**
+         * Con la mision terminada NO se manda donde esta la gente.
+         *
+         * Medido sobre la mision real: de 14 posiciones guardadas, 9 estaban a
+         * mas de 3 km de la ruta -hasta 70 km-, y una de hacia poco mas de un
+         * dia, con la ruta jugada una semana antes. No eran posiciones de
+         * juego: eran casas y trabajos, de gente que abrio la aplicacion para
+         * mirar la clasificacion.
+         *
+         * El latido sigue yendo, porque es lo que trae la tabla del grupo. Lo
+         * que deja de ir son las coordenadas. Contra los datos de personas lo
+         * que protege de verdad no es el permiso firmado, sino no tener lo que
+         * no hace falta.
+         */
+        const misionRematada = Boolean(payloadRef.current?.finished)
+        const effectivePosition = misionRematada ? null : heartbeatPositionRef.current
 
         const respuesta = await sendHeartbeat({
           user,
@@ -1605,13 +1607,11 @@ export default function PlayerApp() {
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
-    setTeamOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
   function openTools() {
     setActivePanel(null)
-    setTeamOpen(false)
     setToolsOpen(!toolsOpen)
   }
 
@@ -1619,21 +1619,9 @@ export default function PlayerApp() {
     setToolsOpen(false)
   }
 
-  function openTeam() {
-    setActivePanel(null)
-    setToolsOpen(false)
-    setRankingOpen(false)
-    setTeamOpen(!teamOpen)
-  }
-
-  function closeTeam() {
-    setTeamOpen(false)
-  }
-
   function openRanking() {
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setRankingOpen(!rankingOpen)
   }
 
@@ -1797,7 +1785,6 @@ export default function PlayerApp() {
     setSubmitError(null)
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setInteractionOpen(true)
   }
 
@@ -2423,7 +2410,7 @@ export default function PlayerApp() {
       />
 
 
-      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !rankingOpen && !overlayState ? (
+      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
         <div style={getMapQuickControlsStyle(isPhone)}>
           <QuickProofPanel
             user={user}
@@ -2494,22 +2481,6 @@ export default function PlayerApp() {
             <span aria-hidden="true" style={mapQuickIcon}>
               🏆
             </span>
-          </button>
-
-          <button
-            type="button"
-            style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              openTeam()
-            }}
-            aria-label="Jugadores"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              👥
-            </span>
-            <span style={mapQuickCountPill}>{teamVisibleCount}</span>
           </button>
 
           <button
@@ -2672,12 +2643,6 @@ export default function PlayerApp() {
         />
       </div>
 
-      <TeamSheet
-        open={teamOpen}
-        players={teamOtherProfiles}
-        currentPosition={playerPosition}
-        onClose={closeTeam}
-      />
       <RankingSheet open={rankingOpen} players={rankingPlayers} onClose={closeRanking} />
 
       <InteractionSheet

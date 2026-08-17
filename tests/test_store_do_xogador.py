@@ -48,7 +48,7 @@ VIVOS = (
     "gpsFresh",
     "gpsCapturedAt",
     "toolsOpen",
-    "teamOpen",
+    # `teamOpen` se fue con la hoja de jugadores: queda la clasificación.
     "rankingOpen",
     "offlinePrepVisible",
 )

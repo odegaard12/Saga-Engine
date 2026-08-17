@@ -241,7 +241,7 @@ const badge: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   padding: '0 8px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   fontSize: 8,
   fontWeight: 950,
   whiteSpace: 'nowrap',
@@ -270,7 +270,7 @@ const offlineBadge: CSSProperties = {
 
 const button: CSSProperties = {
   minHeight: 42,
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 11,
   fontWeight: 950,
 }
@@ -299,7 +299,7 @@ const secondary: CSSProperties = {
 
 const messageBase: CSSProperties = {
   padding: '8px 10px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 10,
   fontWeight: 850,
 }
