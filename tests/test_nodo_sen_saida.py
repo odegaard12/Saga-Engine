@@ -7,7 +7,7 @@ de "la aplicación no va":
 - GPS. En el monte la precisión suele ser de 30 a 80 metros y a veces no llega
   ninguna posición: bajo pinar, en una vaguada, con el móvil frío. El nodo se
   quedaba en "LOCALIZANDO..." para siempre. Es un candidato claro a lo de "el
-  botánico no me dejaba entrar".
+  el monte no me dejaba entrar".
 
 - Configuración. Un nodo trae la configuración en dos sitios, `config` y
   `minigame.config`, y no llevan lo mismo. El botón de abrir miraba una y la

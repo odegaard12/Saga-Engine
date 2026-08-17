@@ -47,7 +47,7 @@ def _una_foto():
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
-                "proof_prueba", "Aroa", "Aroa", "6", "Mámoa do Rei",
+                "proof_prueba", "Bidueira", "Bidueira", "6", "el monte",
                 42.3535, -8.6612, "", "proof_prueba.jpg", "image/jpeg",
                 1770000000, "team", "active",
             ),
@@ -63,7 +63,7 @@ def _una_foto():
 
 def test_sen_confirmacion_so_conta(cliente):
     _una_foto()
-    main.upsert_live_position_for_user("Aroa", {"lat": 42.35, "lon": -8.66, "last_seen": 1})
+    main.upsert_live_position_for_user("Bidueira", {"lat": 42.35, "lon": -8.66, "last_seen": 1})
 
     corpo = cliente.post("/api/admin/datos-personales", json={}).json()
 
@@ -100,7 +100,7 @@ def test_borra_as_fotos_a_fila_e_o_ficheiro(cliente):
 
 
 def test_borra_os_rastros_gps(cliente):
-    main.upsert_live_position_for_user("Aroa", {"lat": 42.35, "lon": -8.66, "last_seen": 1})
+    main.upsert_live_position_for_user("Bidueira", {"lat": 42.35, "lon": -8.66, "last_seen": 1})
     assert main.load_live_positions()
 
     cliente.post("/api/admin/datos-personales", json={"confirmacion": "BORRAR"})

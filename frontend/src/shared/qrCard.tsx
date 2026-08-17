@@ -8,7 +8,7 @@ import { QRCodeSVG } from 'qrcode.react'
  * físicas— cada uno con sus ajustes. Lo que se imprimía y lo que se veía en
  * pantalla podían no ser el mismo código, y de hecho no lo eran.
  *
- * Lo que se aprendió en la ruta de Cotorredondo, y que esta pieza garantiza:
+ * Lo que se aprendió en la ruta de el monte, y que esta pieza garantiza:
  *
  *  1. NADA encima del código. El logo centrado tapaba la información de formato
  *     (fila 8) y las pautas de temporización, que NO tienen corrección de

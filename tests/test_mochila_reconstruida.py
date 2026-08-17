@@ -30,7 +30,7 @@ def evento(tipo, item, cantidad=1, accion=None):
 
 def test_conta_o_que_se_recolle():
     eventos = [evento("inventory_item_collected", "sello", 1)]
-    assert mochila.contar_objeto(eventos, {}, "Odi", "sello") == 1
+    assert mochila.contar_objeto(eventos, {}, "Abeleira", "sello") == 1
 
 
 def test_descontase_o_gastado():
@@ -38,14 +38,14 @@ def test_descontase_o_gastado():
         evento("inventory_item_collected", "sello", 2),
         evento("inventory_item_used", "sello", 1),
     ]
-    assert mochila.contar_objeto(eventos, {}, "Odi", "sello") == 1
+    assert mochila.contar_objeto(eventos, {}, "Abeleira", "sello") == 1
 
 
 def test_o_forxado_no_movil_conta_aunque_non_haxa_evento():
     """Forjar pasa entero en el teléfono: si no se mirase la copia, el nodo
     final rechazaría a quien acaba de fabricar la pieza."""
     copia = {"items": [{"item_id": "sello", "quantity": 1}]}
-    assert mochila.contar_objeto([], copia, "Odi", "sello") == 1
+    assert mochila.contar_objeto([], copia, "Abeleira", "sello") == 1
 
 
 def test_o_mesmo_obxecto_nas_duas_fontes_non_conta_dobre():
@@ -53,30 +53,30 @@ def test_o_mesmo_obxecto_nas_duas_fontes_non_conta_dobre():
     eventos = [evento("inventory_item_collected", "sello", 1)]
     copia = {"items": [{"item_id": "sello", "quantity": 1}]}
 
-    assert mochila.contar_objeto(eventos, copia, "Odi", "sello") == 1
+    assert mochila.contar_objeto(eventos, copia, "Abeleira", "sello") == 1
 
 
 def test_o_gastado_descontase_tamen_do_que_ven_do_movil():
     eventos = [evento("inventory_item_used", "sello", 1)]
     copia = {"items": [{"item_id": "sello", "quantity": 1}]}
 
-    assert mochila.contar_objeto(eventos, copia, "Odi", "sello") == 0
+    assert mochila.contar_objeto(eventos, copia, "Abeleira", "sello") == 0
 
 
 def test_o_marcado_como_usado_no_movil_non_conta():
     copia = {"items": [{"item_id": "sello", "quantity": 1, "state": "used"}]}
-    assert mochila.contar_objeto([], copia, "Odi", "sello") == 0
+    assert mochila.contar_objeto([], copia, "Abeleira", "sello") == 0
 
 
 def test_os_escaneos_contan_como_recollida():
     """Llegan como qr_scanned con inventory_action=collected dentro."""
     eventos = [evento("qr_scanned", "chip_encriptado", 1, accion="collected")]
-    assert mochila.contar_objeto(eventos, {}, "Odi", "chip_encriptado") == 1
+    assert mochila.contar_objeto(eventos, {}, "Abeleira", "chip_encriptado") == 1
 
 
 def test_nunca_devolve_negativo():
     eventos = [evento("inventory_item_used", "sello", 5)]
-    assert mochila.contar_objeto(eventos, {}, "Odi", "sello") == 0
+    assert mochila.contar_objeto(eventos, {}, "Abeleira", "sello") == 0
 
 
 def test_un_nodo_sen_requisito_abrese_sempre():

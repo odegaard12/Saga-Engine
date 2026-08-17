@@ -49,7 +49,7 @@ export function deriveStageRuntime(args: {
    * En el monte la precisión suele ser de 30 a 80 metros y a veces no llega
    * ninguna posición: bajo cubierta de pinar, en una vaguada, con el móvil
    * frío. Sin esto el nodo se quedaba en "LOCALIZANDO..." para siempre y no
-   * había forma de entrar. Es un candidato claro a lo de "el botánico no me
+   * había forma de entrar. Es un candidato claro a lo de "el el monte no me
    * dejaba entrar".
    */
   esperandoGpsMs?: number | null

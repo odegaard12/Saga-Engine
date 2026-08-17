@@ -51,7 +51,7 @@ function loginText(locale: LoginLocale) {
       admin: 'Admin',
       bodyFallback: 'Escolle xogador para continuar.',
       intro:
-        'Dez puntos no monte de Cotorredondo. En cada un agarda unha proba e unha peza da historia. Só fai falta o móbil, camiñar e mirar arredor.',
+        'Unha ruta a pé con probas en cada punto. Só fai falta o móbil, camiñar e mirar arredor.',
       enter: 'Entrar',
       solo: 'SÓ',
       team: 'EQUIPO',
@@ -67,7 +67,7 @@ function loginText(locale: LoginLocale) {
       admin: 'Admin',
       bodyFallback: 'Choose a player to continue.',
       intro:
-        'Ten points across the Cotorredondo hills. Each one holds a challenge and a piece of the story. All you need is your phone, your legs and your eyes.',
+        'A walking route with a challenge at every point. All you need is your phone, your legs and your eyes.',
       enter: 'Enter',
       solo: 'SOLO',
       team: 'TEAM',
@@ -82,7 +82,7 @@ function loginText(locale: LoginLocale) {
     admin: 'Admin',
     bodyFallback: 'Elige jugador para continuar.',
     intro:
-      'Diez puntos en el monte de Cotorredondo. En cada uno espera una prueba y una pieza de la historia. Solo hace falta el móvil, caminar y mirar alrededor.',
+      'Una ruta a pie con pruebas en cada punto. Solo hace falta el móvil, caminar y mirar alrededor.',
     enter: 'Entrar',
     solo: 'SOLO',
     team: 'EQUIPO',

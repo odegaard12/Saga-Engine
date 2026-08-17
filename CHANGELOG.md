@@ -9,7 +9,7 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 ## 4.0.0 — en curso
 
 Reconstrucción posterior a la primera ruta de campo real («O Eco do Vixía»,
-Cotorredondo). El motor aguantó y la gente terminó; lo que no aguantó fue la
+el monte). El motor aguantó y la gente terminó; lo que no aguantó fue la
 cobertura mala del monte. Esta versión ataca eso.
 
 ### Que la mala cobertura no mande a repetir juegos

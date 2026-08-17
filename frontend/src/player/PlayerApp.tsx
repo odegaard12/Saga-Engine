@@ -1378,7 +1378,7 @@ export default function PlayerApp() {
      * título y las coordenadas y nada más. Como esa respuesta se guardaba tal
      * cual como paquete de la misión, completar un nodo con cobertura DEJABA
      * SIN JUEGO a todos los siguientes. Después, sin red, el nodo no tenía ni
-     * configuración del minijuego —la foto del mosaico del botánico vive ahí—
+     * configuración del minijuego —la foto del mosaico del el monte vive ahí—
      * ni código que aceptar: el juego no cargaba y el código de respaldo se
      * rechazaba.
      *
