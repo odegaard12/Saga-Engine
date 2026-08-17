@@ -7,7 +7,7 @@ falta nada más.
 
 ## Contexto en dos párrafos
 
-SAGA es una gymkhana GPS que se jugó de verdad en Cotorredondo (10 nodos,
+SAGA es una gymkhana GPS que se jugó de verdad en el monte (10 nodos,
 8,26 km, +271 m, 13 jugadores, textos en gallego). El motor aguantó y la gente
 terminó, pero falló mucho: nodos que mandaban a repetir, juegos que no cargaban,
 arranques de veinte segundos, pegatinas QR que no leía ningún móvil.

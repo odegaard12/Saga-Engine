@@ -47,6 +47,25 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
 }
 
 
+/**
+ * El CSS global de la pantalla del jugador.
+ *
+ * El fondo venia escrito a mano y con !important, asi que ganaba a cualquier
+ * especificidad: el tema podia tener sus variables perfectas y el fondo seguia
+ * saliendo azul marino. Medido en el navegador sobre produccion:
+ *
+ *     body.className                         = "theme-flame-red"
+ *     --theme-bg                             = "#2f0a0a"
+ *     getComputedStyle(body).backgroundColor = "rgb(2, 6, 23)"
+ *
+ * Y el color se metia reemplazando el texto del azul dentro de este bloque por
+ * una prop, cuyo valor por defecto era ese mismo azul y a la que nadie le
+ * pasaba otra cosa. Un reemplazo de cadenas donde tiene que haber una variable
+ * de CSS.
+ *
+ * Los !important se quedan -estan para ganarle a estilos de Leaflet y del
+ * navegador- pero ahora lo que ponen sale del tema.
+ */
 export const globalPlayerEdgeFix = `
 html,
 body,
@@ -56,7 +75,7 @@ body,
   width: 100%;
   min-width: 100%;
   min-height: 100%;
-  background: #020617 !important;
+  background: var(--theme-bg) !important;
   overflow: hidden;
 }
 
@@ -65,12 +84,12 @@ body {
 }
 
 .leaflet-container {
-  background: #1e293b !important;
+  background: var(--theme-surface) !important;
   outline: none !important;
 }
 
 .saga-player-edge-fix {
-  background: #1e293b !important;
+  background: var(--theme-surface) !important;
 }
 
 .saga-app-fade-in {
@@ -87,17 +106,13 @@ body {
 export function ScreenFrame({
   children,
   mobile,
-  themeColor = '#020617',
 }: {
   children: ReactNode
   mobile: boolean
-  themeColor?: string
 }) {
-  const dynamicFix = globalPlayerEdgeFix.replace(/#020617/g, themeColor)
-
   return (
     <>
-      <style>{dynamicFix}</style>
+      <style>{globalPlayerEdgeFix}</style>
       <div
         className="saga-app-fade-in"
         style={{
@@ -105,7 +120,7 @@ export function ScreenFrame({
           inset: mobile ? 0 : undefined,
           width: '100vw',
           height: '100dvh',
-          background: themeColor,
+          background: 'var(--theme-bg)',
           overflow: 'hidden',
           fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
           color: '#ffffff',

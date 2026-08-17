@@ -12,7 +12,7 @@ De paso se corrige la zona de silencio, que iba a cero cuando la norma pide 4
 módulos. Ojo: esa parte NO está demostrada como causa del fallo de campo —en el
 raster de prueba el código se lee igual sin margen—. Importa cuando la pegatina
 está sobre una piedra o un tronco, porque es lo que permite al decodificador
-delimitar dónde acaba el código; pero no fue lo que rompió las de Cotorredondo.
+delimitar dónde acaba el código; pero no fue lo que rompió las de el monte.
 
 Reconocer aquellas pegatinas costó meter un motor de visión de 11 MB en la
 aplicación. Este test existe para que no vuelva a hacer falta: mira el código
