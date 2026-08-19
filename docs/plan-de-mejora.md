@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 17 de agosto de 2026. Producción: 4.9.6.
+Estado a 17 de agosto de 2026. Producción: **4.9.7**.
 
 ---
 
@@ -99,11 +99,20 @@ pensados justo para tranquilizar sin cobertura:
 - `PlayerApp.tsx:1592` «Sen cobertura: a foto xa se ve, e subirase soa. 📷»
 - `PlayerApp.tsx:1539` «Sen cobertura: a foto borrarase no servidor ao volver a rede.»
 
-**Decisión pendiente (es tuya, no mía):** tragarse los `info` parece a
-propósito, para no llenar la pantalla de avisos. Las salidas razonables son
-subir a `warn` sólo el aviso de avance sin cobertura, o dar a los `info` un
-sitio propio y discreto —una línea en la barra en vez de un cartel—. Cambiar el
-filtro entero haría aparecer de golpe todos los avisos que hoy están mudos.
+**✅ ARREGLADO en 4.9.7 y verificado en producción.** Se eligió darles sitio
+propio: `warn` sigue yendo al cartel de arriba (3 s) y todo lo demás va a una
+línea discreta abajo (`QuietNotice`, 5 s). Nada se descarta ya.
+
+Medido contra producción con el mismo nodo y el mismo botón, después de
+desplegar:
+
+| Momento | Estado |
+|---|---|
+| **48 ms** | **APARECE** «Nodo superado sin conexión» |
+| 5 490 ms | desaparece |
+
+Antes no aparecía nunca. Los 5,5 s confirman que sale por la línea callada y no
+por el cartel viejo, que dura 3 s.
 
 ### 0.3 Caída de servidor y recuperación — **la cadena entera, medida**
 
@@ -269,6 +278,22 @@ queda huérfana y los sube después contra la partida nueva.
 
 **Medir primero:** avanzar tres nodos sin cobertura, reiniciar, devolver la red
 y ver si la cola sube avances de la partida anterior.
+
+🔴 **Visto el 17 de agosto, sin aislar todavía.** Reiniciando al jugador de
+pruebas a 0 con el móvil abierto y con progreso local en el nodo 2:
+
+- El servidor volvió solo a nivel **1**, con `reset_at` recién sellado.
+- El móvil siguió marcando **2/10** incluso después de recargar la página.
+
+O sea que algo del móvil empuja el progreso de vuelta al servidor **después**
+del reinicio, y el `reset_at` no le hace ceder. No está aislado si la culpa es
+de la cola pendiente, del progreso local en IndexedDB o de que el móvil vuelve a
+avanzar solo — hace falta repetirlo mirando la cola antes y después. **Sólo se
+recuperó con la pizarra limpia** (borrar `localStorage` y las tres bases de
+IndexedDB).
+
+Esto es más grave de lo que parecía: en día de ruta significa que reiniciar a
+alguien puede no servir de nada, y 4.9.6 arregló el otro camino, no éste.
 
 ### 1.2 Editor de nodos — **sin auditar**
 Un nodo mal guardado desde el panel se convierte en un jugador delante de una
