@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 17 de agosto de 2026. Producción: 4.9.5.
+Estado a 17 de agosto de 2026. Producción: 4.9.6.
 
 ---
 
@@ -15,9 +15,241 @@ Va primero porque es lo único de esta lista que ya debería estar hecho.
 
 | Cosa | Qué falta | Cómo se comprueba |
 |---|---|---|
-| **GPS** | No está probado que la aplicación reaccione a un cambio de posición | El atajo `?debug=1` coge la posición del **servidor**, no la simulada, así que no sirve. Hay que inyectar posiciones en `watchPosition` **antes** de que arranque la aplicación, o andar con el móvil |
-| **Aviso de avance sin cobertura** | No se sabe si el jugador ve el mensaje «nodo superado sin conexión» | Cortar `/api/advance`, pulsar, y muestrear la pantalla cada 200 ms durante 4 s |
+| ~~**GPS**~~ | **Demostrado el 17 de agosto** (ver 0.1) | — |
+| ~~**Aviso de avance sin cobertura**~~ | **Medido el 17 de agosto: NO lo ve.** Es un fallo, no una duda (ver 0.2) | — |
 | **Panel de permisos** | Se ve «con diseño antiguo» pero mide 0 elementos fuera del tema | Comparar su forma (redondeo, disposición) con el resto, no su color |
+
+### 0.1 El GPS reacciona — medido, no supuesto
+
+Contra producción (4.9.6, sagagia.es), con el jugador de pruebas en el nodo 5
+(`qr_collectible`, radio 50 m). Se eligió ese nodo **porque avanza escaneando un
+QR y no por proximidad**: se puede simular la llegada sin que nadie avance de
+verdad.
+
+El truco que faltaba: el shim de `debugGeolocationShim.ts` pide la posición a
+`/api/game/<user>?fresh=<ts>`, y **la app pide la suya sin ese `fresh=`**. Eso
+permite interceptar `window.fetch` y reescribir sólo la llamada del shim, así
+que el jugador se mueve y el nodo se queda quieto. Moviendo las dos, la
+distancia no cambiaría nunca y la prueba no valdría nada.
+
+Se inyectaron 77 posiciones (una cada 1,2 s) y la pantalla siguió a todas:
+
+| Simulado | En pantalla |
+|---|---|
+| 500 m | `ACHÉGATE MÁIS · 500 M` + aviso «Saíches do camiño» |
+| 400 m | `400 M` |
+| 250 m | `250 M` |
+| 120 m | `120 M` |
+| 60 m | `60 M` — «Acércate para abrir este nodo» |
+| **20 m** | **`ABRIR QR` — «Ya puedes abrir este nodo»** |
+| 300 m / 900 m | `300 M` / `899 M` (también de vuelta) |
+
+Cruzar el radio de 50 m cambia la pantalla solo. El nivel del jugador de pruebas siguió en 5:
+no hubo ni un `/api/advance`.
+
+**Dos cosas que salieron de rebote y no estaban en el plan:**
+
+1. **El GPS no arranca hasta que alguien pulsa.** Al abrir, el panel «ANTES DE
+   SALIR» dice «Faltan 2» y no hay ni una posición: `saga_last_gps_coords`
+   está vacío hasta pulsar `ACTIVAR GPS`. Es defendible, pero significa que
+   quien no pulse sale al monte sin flecha y sin línea al nodo.
+2. **El latido ensucia el mapa y hay que limpiarlo a mano.** La prueba plantó a
+   al jugador de pruebas a 500 m del camino en el mapa de los demás, y ahí se queda. Se limpió
+   con `main.clear_live_position(<jugador de pruebas>)`. Mientras eso siga siendo manual,
+   cualquier prueba deja rastro.
+3. **La línea del radio está en castellano dentro de una pantalla en gallego**:
+   «Radio 50 m. Acércate para abrir este nodo» junto a `ACHÉGATE MÁIS` y
+   `Ferramentas`.
+
+**Lo que esto NO demuestra:** que el chip GPS de un móvil de verdad alimente
+bien esa misma tubería. Prueba las decisiones y el pintado, con posiciones
+perfectas de 3 m de precisión. En el monte la precisión es de 30-80 m.
+
+### 0.2 Quedarse sin cobertura es mudo — **fallo confirmado**
+
+El mensaje «¡Nodo superado sin conexión!» **existe** (`avance/decisiones.ts:205`)
+y **nunca llega a la pantalla**. No es que falte: se calcula, se pasa, y se tira.
+
+`PlayerApp.tsx:993`:
+
+```ts
+function showNotice(message: string, tone: NoticeTone) {
+  const normalizedTone = tone === 'success' ? 'info' : tone
+  if (normalizedTone === 'info') return        // <- aquí muere
+```
+
+Y `avisoDeAvanceSinServidor` devuelve `tono: 'success'` justo en la rama de
+«sin cobertura». La de «servidor caído» devuelve `'warn'`, que sí pasa.
+
+Medido con el mismo nodo, el mismo botón y lo único distinto el tipo de fallo:
+
+| Fallo | Tono | ¿Se ve? |
+|---|---|---|
+| `/api/advance` da 500 | `warn` | **Sí**, a los 101 ms, y dura 3,5 s |
+| Red caída (sin cobertura) | `success` → `info` | **No.** Ni un cambio de pantalla |
+
+O sea: el caso raro avisa y el caso normal del monte no. El jugador avanza, la
+pantalla pasa al nodo siguiente en 60 ms y nada le dice que eso no ha salido
+del móvil.
+
+**Ojo, el mismo filtro se come más cosas.** Todo lo que se manda con tono
+`'info'` o `'success'` es invisible hoy, y ahí hay al menos dos mensajes
+pensados justo para tranquilizar sin cobertura:
+
+- `PlayerApp.tsx:1592` «Sen cobertura: a foto xa se ve, e subirase soa. 📷»
+- `PlayerApp.tsx:1539` «Sen cobertura: a foto borrarase no servidor ao volver a rede.»
+
+**Decisión pendiente (es tuya, no mía):** tragarse los `info` parece a
+propósito, para no llenar la pantalla de avisos. Las salidas razonables son
+subir a `warn` sólo el aviso de avance sin cobertura, o dar a los `info` un
+sitio propio y discreto —una línea en la barra en vez de un cartel—. Cambiar el
+filtro entero haría aparecer de golpe todos los avisos que hoy están mudos.
+
+### 0.3 Caída de servidor y recuperación — **la cadena entera, medida**
+
+Con el nodo 0 (`simple_checkpoint`, avanza por proximidad) y el jugador de pruebas reiniciado a 0:
+
+1. **Servidor caído** → `/api/advance` falla a los 2 ms → el jugador **avanza
+   igual** en local (1/10 → 2/10) y el evento queda en IndexedDB:
+   `event_queue`, un solo registro, `status: pending`, `level_before: 0`,
+   `level_after: 1`. Ni duplicados ni basura.
+2. **Servidor de vuelta, pestaña oculta** → **no sube nada**. Ocho segundos con
+   red perfecta y servidor sano: servidor 0, móvil 1.
+3. **Pestaña visible** → la cola se vacía sola: servidor 0 → 1, registro a
+   `status: synced`.
+
+Los pasos 1 y 3 están bien. **El paso 2 es el punto 2.1 de este plan, y ya no
+es teórico:** con el móvil en el bolsillo la reconciliación no ocurre, por
+mucha cobertura que haya. Sube de prioridad.
+
+**Otro hallazgo:** entrar en el radio **no** avanza solo. Aparece un botón
+`ABRIR NODO`, y tras la historia otro `REXISTRAR O PASO`. Son dos pulsaciones
+conscientes, no una llegada automática — bueno para no avanzar sin querer, pero
+conviene saberlo al leer los tiempos.
+
+**Cómo se activa el GPS, que no es evidente:** en el nodo 0 no hay botón
+`ACTIVAR GPS`; hay que pulsar `COMEZAR A TRAVESÍA` y luego `Permitir` en el
+panel «ANTES DE SALIR». En otros nodos sí sale `ACTIVAR GPS`. Dos caminos
+distintos para lo mismo.
+
+### 0.4 Quince jugadores a la vez — **el cuello no es la Pi**
+
+Quince hilos pidiendo `GET /api/game/<user>?offline_pack=true`, que es la
+petición cara. Sólo lecturas: no ensucia el mapa de nadie.
+
+| | 1 jugador | 15 jugadores |
+|---|---|---|
+| Por Cloudflare | p50 458 ms | **p50 4 326 ms** · p95 5 276 · máx 8 727 |
+| Directo a la Pi | p50 554 ms | **p50 5 557 ms** · p95 9 400 · máx 10 455 |
+
+Y durante todo el ensayo, la Pi: **CPU 0,18 %, carga 0,13, 1 160 MB libres**.
+El caudal apenas sube con la concurrencia (2,2 → 2,4 peticiones/s) mientras la
+espera se multiplica por diez. Eso no es un servidor ahogado: es **ancho de
+banda**. Se están mandando **214 KB por jugador**, y quince a la vez son 3,2 MB
+por ronda.
+
+Traducido al aparcamiento: trece personas abriendo la aplicación a la vez
+esperan entre 5 y 10 segundos cada una, con cobertura buena. Con cobertura de
+monte, más.
+
+**Cloudflare no ayuda aquí** — va igual o peor que ir directo, así que el
+paquete no se está cacheando en el borde.
+
+**Lo que esto señala, por orden:**
+
+1. **El paquete de 214 KB es el problema, no la máquina.** Ya existe
+   `stages_rev` (huella del contenido) precisamente para poder pedir lo ligero
+   y reutilizar lo guardado. Habría que medir cuántos de esos 214 KB son
+   contenido que el móvil ya tiene.
+2. **Escalonar la entrada.** Si el arranque de todos coincide, no hay servidor
+   que lo arregle: es el mismo caudal repartido entre más gente.
+3. Subir CPU o RAM de la Pi **no cambiaría nada**. Está parada.
+
+**Lo que NO se probó:** escrituras concurrentes (latidos y avances de quince
+jugadores a la vez). Se dejó fuera a propósito porque planta posiciones falsas
+en el mapa de gente real. Queda pendiente y hay que hacerlo con nombres de
+prueba, no con los de la ruta.
+
+### 0.5 Escrituras de quince a la vez — **en local, sin tocar producción**
+
+Se montó una instancia local con quince jugadores **inventados**
+(`PROBA01…PROBA15`) y datos de usar y tirar. Nada de esto va contra producción:
+el error de plantar posiciones de gente real en el mapa ya se cometió dos veces.
+
+Primero, un dato que corrige la intuición: **el latido real va cada 30 s**
+(`PlayerApp.tsx`). Quince jugadores son **0,5 peticiones por segundo**. Eso no
+ahoga nada, y cualquier banco que mande más rápido está midiendo un fantasma —
+el primer intento mandaba 74/s y sólo medía el limitador.
+
+Lo que sí puede coincidir de verdad es el volcado de colas: quince móviles
+recuperan cobertura a la vez al salir del monte y sueltan todo de golpe.
+
+| Ráfaga simultánea | Almacén | Resultado |
+|---|---|---|
+| 15 × 6 avances (90) | JSON | 90 OK · p50 **664 ms** · 5,1 s |
+| 15 × 6 avances (90) | **SQLite** | 90 OK · p50 **1 542 ms** · máx 2 857 · 12,9 s |
+| 15 × 20 avances (300) | SQLite | 270 OK + **30 × 429** · 16,5 s |
+
+**Tres cosas que salen de aquí:**
+
+1. **SQLite es 2,4× más lento que JSON** para escrituras concurrentes
+   (p50 1 542 ms contra 664 ms). Y esto es en un portátil: la Pi tiene bastante
+   menos músculo. Un volcado de quince colas a la vez no pierde nada, pero cada
+   avance tarda segundo y medio.
+2. **El limitador funciona exactamente como está escrito.** Los 30 rechazos no
+   son un fallo: el límite es 24 avances por minuto y jugador, la ráfaga
+   anterior ya había gastado 6, y 6 + 20 = 26. Sobran 2 por jugador × 15 = 30.
+   Clavado.
+3. **Las escrituras se serializan**: 300 peticiones en 16,5 s son 18/s, suba lo
+   que suba la concurrencia.
+
+**Lo que NO se probó y sigue pendiente:** velocidad lenta de verdad —retardos de
+3-10 s y pérdidas aleatorias— para ver si la pantalla se cuelga, si se duplican
+avances o si el jugador se queda sin saber qué pasa.
+
+**Aviso para quien repita esto:** `/api/advance` exige pase de jugador, que se
+consigue entrando en `/player/<nombre>`; sin cookie todo son 403 y parece que
+el servidor está roto.
+
+### 0.6 Red lenta — **doce segundos mirando una pantalla quieta**
+
+Retardo de 3-10 s en cada petición y 30 % de pérdidas, contra producción, con el
+nodo 0. Lo peor que sale no es la pérdida de datos: es el silencio.
+
+| Momento | Qué pasa |
+|---|---|
+| 0 ms | El jugador pulsa `REXISTRAR O PASO` |
+| 11 ms | Se cierra la historia y vuelve al mapa |
+| 11 ms → 11 830 ms | **Nada. Ni un cambio en pantalla.** Ni rueda, ni «enviando», ni el botón deshabilitado a la vista |
+| 11 830 ms | Por fin avanza a 2/10 |
+
+Doce segundos es tiempo de sobra para pensar que no ha funcionado y volver a
+pulsar. El indicador de `submitting` existe, pero vive dentro del panel de
+interacción **que ya se ha cerrado**: en el mapa no queda ninguna señal.
+
+**Y ojo al contraste con el modo avión**, que es lo que hace esto raro:
+
+- Sin cobertura (el fallo es inmediato) → avanza en **60 ms**, se siente rápido.
+- Con cobertura mala (la petición está en vuelo) → **espera 12 s**.
+
+O sea que la red a medias se vive peor que no tener red. Es justo el caso del
+monte.
+
+**Lo que sí está bien, y se comprobó:**
+
+- El avance llegó al servidor (nivel 1) **y además** quedó un evento `pending`
+  en la cola del mismo avance `0->1`. Es el escenario clásico de doble conteo.
+- Al volver la red normal, la cola subió y **el servidor se quedó en 1**, no en
+  2. El guardián por `level_before` hace su trabajo. El evento pasó a `synced`.
+
+**Lo que hay que arreglar, y es barato:** una señal en el mapa mientras el
+avance está en vuelo. No hace falta bloquear nada; basta con que la línea
+discreta que ya existe (`QuietNotice`, 4.9.7) diga «rexistrando…» hasta que se
+resuelva.
+
+**Otro dato de paso:** la primera visita se pasa **minutos** guardando el mapa
+(«Primera vez: se guarda el mapa»). Con red de monte eso es mucho peor, y
+conviene que nadie llegue al aparcadoiro sin haberlo hecho en casa.
 
 ---
 
@@ -25,13 +257,18 @@ Va primero porque es lo único de esta lista que ya debería estar hecho.
 
 Lo que puede dejar a una persona parada en el monte sin saber qué hacer.
 
-### 1.1 Reinicio de jugador a mitad de partida — **sin auditar**
-Nadie ha mirado qué pasa si se reinicia a alguien que ya lleva cinco nodos: si
-se le borra el inventario, si la cola de eventos sin subir queda huérfana, si el
-ranking cuenta dos veces. Es el camino más corto a un desastre en día de ruta.
+### 1.1 Reinicio de jugador a mitad de partida — **medio hecho (4.9.6)**
+Había **dos** reinicios en el servidor que no hacían lo mismo: el del panel de
+perfiles sellaba `reset_at`, paraba los relojes, vaciaba la mochila y borraba la
+posición; `/api/reset` sólo bajaba el nivel. Por ese segundo camino el móvil no
+se enteraba. Ahora los dos llaman a la misma función.
 
-**Medir primero:** avanzar tres nodos, reiniciar, y comparar servidor, pantalla
-y cola de IndexedDB antes y después.
+**Lo que sigue sin mirarse:** la cola de eventos sin subir. Si alguien lleva
+avances encolados en IndexedDB y le reinician, nadie ha comprobado si esa cola
+queda huérfana y los sube después contra la partida nueva.
+
+**Medir primero:** avanzar tres nodos sin cobertura, reiniciar, devolver la red
+y ver si la cola sube avances de la partida anterior.
 
 ### 1.2 Editor de nodos — **sin auditar**
 Un nodo mal guardado desde el panel se convierte en un jugador delante de una
@@ -67,8 +304,14 @@ deliberado, pero significa que un móvil en el bolsillo con la pantalla apagada
 no sube nada. Con la aplicación instalada como PWA se podría usar
 **Background Sync** para que suba aunque esté cerrada.
 
+🔴 **Ya no es teórico: medido el 17 de agosto** (ver 0.3). Con la pestaña
+oculta, servidor sano y red perfecta, la cola **no se vacía**; en cuanto pasa a
+visible, sube sola. Servidor 0 / móvil 1 durante todo el rato.
+
 **Medir primero:** cuánto tarda de media un jugador en volver a mirar el móvil
-tras recuperar cobertura. Si son segundos, esto no merece el trabajo.
+tras recuperar cobertura. Si son segundos, esto no merece el trabajo. Pero el
+que acaba la ruta y guarda el móvil puede no mirarlo más en todo el día, y ahí
+el ranking se queda mal para siempre.
 
 ### 2.2 Fotos pendientes
 Ya hay un repaso, pero conviene un contador visible: «3 fotos sin subir». Ahora
@@ -123,7 +366,36 @@ salió de ahí:
 
 ### 4.2 Lo que queda
 - **Los minijuegos siguen con sus propias formas y colores**, al margen del
-  tema. Son diez pantallas y es el trozo grande que falta.
+  tema. **No son diez pantallas: son cinco** (medido el 17 de agosto).
+
+  | Pantalla | Líneas | Colores literales | Formas en línea | Usa el tema |
+  |---|---|---|---|---|
+  | `circuitMatrix` (logic_circuit) | 910 | **127** | 16 | 30 |
+  | `placeMosaic` | 1 236 | 71 | 20 | **1** |
+  | `tiltMaze` | 665 | 69 | 10 | 13 |
+  | `sparkRadar` | 668 | 54 | 8 | 19 |
+  | `signalHunt` (checkpoint) | 271 | 17 | 2 | 3 |
+  | **En la misión** | **3 750** | **338** | **56** | **66** |
+  | El resto (5 familias) | 2 498 | 177 | 42 | 19 |
+
+  Las otras cinco familias —`bearingHunt` (1 051 líneas), `motionChallenge`,
+  `sequenceCode`, `teamRelay`, `audioChallenge`— **no aparecen en «O Eco do
+  Vixía»**. Un tercio del trabajo sería rediseñar pantallas que en esta ruta no
+  ve nadie. Comprobado contra los `game_id` reales de los diez nodos.
+
+  **Por dónde empezar, que es más barato de lo que parece:** de los 338 colores
+  de las pantallas que sí se juegan, **112 son blanco, casi-blanco o negro**
+  —`rgba(255,255,255…)` 68 veces, `rgba(244,244,245)`/`#f4f4f5` 29, `rgba(0,0,0)`
+  15—. Eso es estructura (texto, bordes, sombras), no información: sale a
+  variables sin discutir nada. Lo que hay que mirar con cuidado son los pocos
+  que significan algo: el verde `#72df91` (29 usos), el rojo `rgba(239,68,68)` y
+  el ámbar `#fbbf24`.
+
+  **Y las 56 formas en línea son el bloqueo real**, no los colores. Un
+  `borderRadius` escrito en el componente gana siempre a la regla del tema y la
+  deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` es
+  el peor caso —20 formas en línea y **una sola** referencia al tema en 1 236
+  líneas—.
 - **Un tercer tema** para comprobar que el sistema aguanta: si añadir uno cuesta
   más de tocar dos bloques de variables, es que el sistema no está bien hecho.
 - **Elegir el tema desde el panel** ya funciona, pero no hay forma de ver cómo
@@ -136,11 +408,22 @@ salió de ahí:
 La Raspberry tiene **1,8 GB de RAM**, y un build de Vite dentro de Docker la
 tumbó (17 de agosto). Producción se cayó con ella.
 
+- **Techo de memoria en el build — puesto, sin estrenar.** El Dockerfile ya
+  lleva `NODE_OPTIONS=--max-old-space-size=640` en la etapa de construcción. La
+  imagen 4.9.6 que corre ahora se construyó **antes** de ese commit, así que el
+  techo no se ha probado todavía: el próximo build es el que lo estrena. Ojo al
+  comprobarlo: `docker exec ... printenv NODE_OPTIONS` sale vacío y no significa
+  nada, porque la variable vive en la etapa 1 y no en la de ejecución.
 - **Parar el contenedor de ensayo antes de construir.** Ya se hace, pero a mano.
+  (A 17 de agosto **no hay** contenedor de ensayo levantado: sólo producción.)
 - **Construir fuera de la Pi.** Es lo que de verdad lo arregla: compilar el
-  frontend en otra máquina y mandar sólo el `dist`.
-- **Limpiar imágenes viejas.** Hay 48. Con dejar las tres últimas basta.
-- **Vigilancia:** un aviso si la memoria disponible baja de 200 MB.
+  frontend en otra máquina y mandar sólo el `dist`. Traba conocida: **no hay
+  Node en el Windows local**, así que hace falta decidir dónde se compila
+  (contenedor en el portátil, o el CI de GitHub subiendo el `dist`).
+- **Limpiar imágenes viejas.** Hay **50** (17 de agosto). Con dejar las tres
+  últimas basta.
+- **Vigilancia:** un aviso si la memoria disponible baja de 200 MB. Ahora mismo
+  hay 1 161 MB libres con todo levantado.
 
 ---
 
