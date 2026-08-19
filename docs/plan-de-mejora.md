@@ -170,6 +170,47 @@ jugadores a la vez). Se dejó fuera a propósito porque planta posiciones falsas
 en el mapa de gente real. Queda pendiente y hay que hacerlo con nombres de
 prueba, no con los de la ruta.
 
+### 0.5 Escrituras de quince a la vez — **en local, sin tocar producción**
+
+Se montó una instancia local con quince jugadores **inventados**
+(`PROBA01…PROBA15`) y datos de usar y tirar. Nada de esto va contra producción:
+el error de plantar posiciones de gente real en el mapa ya se cometió dos veces.
+
+Primero, un dato que corrige la intuición: **el latido real va cada 30 s**
+(`PlayerApp.tsx`). Quince jugadores son **0,5 peticiones por segundo**. Eso no
+ahoga nada, y cualquier banco que mande más rápido está midiendo un fantasma —
+el primer intento mandaba 74/s y sólo medía el limitador.
+
+Lo que sí puede coincidir de verdad es el volcado de colas: quince móviles
+recuperan cobertura a la vez al salir del monte y sueltan todo de golpe.
+
+| Ráfaga simultánea | Almacén | Resultado |
+|---|---|---|
+| 15 × 6 avances (90) | JSON | 90 OK · p50 **664 ms** · 5,1 s |
+| 15 × 6 avances (90) | **SQLite** | 90 OK · p50 **1 542 ms** · máx 2 857 · 12,9 s |
+| 15 × 20 avances (300) | SQLite | 270 OK + **30 × 429** · 16,5 s |
+
+**Tres cosas que salen de aquí:**
+
+1. **SQLite es 2,4× más lento que JSON** para escrituras concurrentes
+   (p50 1 542 ms contra 664 ms). Y esto es en un portátil: la Pi tiene bastante
+   menos músculo. Un volcado de quince colas a la vez no pierde nada, pero cada
+   avance tarda segundo y medio.
+2. **El limitador funciona exactamente como está escrito.** Los 30 rechazos no
+   son un fallo: el límite es 24 avances por minuto y jugador, la ráfaga
+   anterior ya había gastado 6, y 6 + 20 = 26. Sobran 2 por jugador × 15 = 30.
+   Clavado.
+3. **Las escrituras se serializan**: 300 peticiones en 16,5 s son 18/s, suba lo
+   que suba la concurrencia.
+
+**Lo que NO se probó y sigue pendiente:** velocidad lenta de verdad —retardos de
+3-10 s y pérdidas aleatorias— para ver si la pantalla se cuelga, si se duplican
+avances o si el jugador se queda sin saber qué pasa.
+
+**Aviso para quien repita esto:** `/api/advance` exige pase de jugador, que se
+consigue entrando en `/player/<nombre>`; sin cookie todo son 403 y parece que
+el servidor está roto.
+
 ---
 
 ## 1. Que nadie se quede tirado
