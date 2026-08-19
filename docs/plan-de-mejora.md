@@ -211,6 +211,46 @@ avances o si el jugador se queda sin saber qué pasa.
 consigue entrando en `/player/<nombre>`; sin cookie todo son 403 y parece que
 el servidor está roto.
 
+### 0.6 Red lenta — **doce segundos mirando una pantalla quieta**
+
+Retardo de 3-10 s en cada petición y 30 % de pérdidas, contra producción, con el
+nodo 0. Lo peor que sale no es la pérdida de datos: es el silencio.
+
+| Momento | Qué pasa |
+|---|---|
+| 0 ms | El jugador pulsa `REXISTRAR O PASO` |
+| 11 ms | Se cierra la historia y vuelve al mapa |
+| 11 ms → 11 830 ms | **Nada. Ni un cambio en pantalla.** Ni rueda, ni «enviando», ni el botón deshabilitado a la vista |
+| 11 830 ms | Por fin avanza a 2/10 |
+
+Doce segundos es tiempo de sobra para pensar que no ha funcionado y volver a
+pulsar. El indicador de `submitting` existe, pero vive dentro del panel de
+interacción **que ya se ha cerrado**: en el mapa no queda ninguna señal.
+
+**Y ojo al contraste con el modo avión**, que es lo que hace esto raro:
+
+- Sin cobertura (el fallo es inmediato) → avanza en **60 ms**, se siente rápido.
+- Con cobertura mala (la petición está en vuelo) → **espera 12 s**.
+
+O sea que la red a medias se vive peor que no tener red. Es justo el caso del
+monte.
+
+**Lo que sí está bien, y se comprobó:**
+
+- El avance llegó al servidor (nivel 1) **y además** quedó un evento `pending`
+  en la cola del mismo avance `0->1`. Es el escenario clásico de doble conteo.
+- Al volver la red normal, la cola subió y **el servidor se quedó en 1**, no en
+  2. El guardián por `level_before` hace su trabajo. El evento pasó a `synced`.
+
+**Lo que hay que arreglar, y es barato:** una señal en el mapa mientras el
+avance está en vuelo. No hace falta bloquear nada; basta con que la línea
+discreta que ya existe (`QuietNotice`, 4.9.7) diga «rexistrando…» hasta que se
+resuelva.
+
+**Otro dato de paso:** la primera visita se pasa **minutos** guardando el mapa
+(«Primera vez: se guarda el mapa»). Con red de monte eso es mucho peor, y
+conviene que nadie llegue al aparcadoiro sin haberlo hecho en casa.
+
 ---
 
 ## 1. Que nadie se quede tirado
