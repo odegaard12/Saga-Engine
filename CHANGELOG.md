@@ -6,6 +6,44 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.7
+
+Quedarse sin cobertura deja de ser mudo.
+
+El mensaje «¡Nodo superado sin conexión!» existía, se calculaba, se pasaba... y
+se tiraba. Había un solo destino para los avisos —el cartel— y como no se quería
+llenar la pantalla de carteles, `showNotice` descartaba en silencio todo lo que
+llegara con tono `info` o `success`:
+
+    const normalizedTone = tone === 'success' ? 'info' : tone
+    if (normalizedTone === 'info') return
+
+Medido contra producción, mismo nodo y mismo botón, cambiando sólo el fallo:
+
+| Fallo | Tono | ¿Se ve? |
+|---|---|---|
+| `/api/advance` da 500 | `warn` | Sí, a los 101 ms, dura 3,5 s |
+| Red caída (sin cobertura) | `success` | **No. Nunca** |
+
+O sea que el caso raro avisaba y el caso normal del monte no. El jugador
+avanzaba, la pantalla pasaba al nodo siguiente en 60 ms y nada le decía que eso
+no había salido del móvil.
+
+La salida no es quitar el filtro y que todo grite igual. Ahora hay dos sitios:
+
+- `warn` va al cartel de arriba, 3 s, como siempre.
+- lo demás va a una línea discreta abajo, 5 s. No interrumpe, así que se le da
+  más margen para que alguien la lea sin mirar aposta.
+
+Con esto vuelven también los dos avisos de fotos sin cobertura, mudos desde el
+mismo sitio: el de la foto que se sube sola y el del borrado aplazado.
+
+`QuietNotice` va sin un color clavado y con el radio saliendo del tema. El
+primer intento se saltó el multiplicador `--theme-solid` y lo cazó una prueba
+que ya existía: en fuego se habría visto el mapa a través de la línea.
+
+---
+
 ## 4.9.6
 
 Reiniciar a un jugador ahora le llega al movil.
