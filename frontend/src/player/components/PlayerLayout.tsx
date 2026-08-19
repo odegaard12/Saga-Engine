@@ -257,6 +257,28 @@ export function getToastOverlayStyle(mobile: boolean): CSSProperties {
   }
 }
 
+/**
+ * El sitio de los avisos callados, aparte del cartel.
+ *
+ * Va ABAJO a proposito. El cartel de `ToastNotice` esta arriba y lo que se
+ * cuenta aqui no compite con el: uno interrumpe, el otro solo informa. Si
+ * compartieran sitio volveriamos a tener un unico destino, que es justo lo que
+ * hizo que los avisos de «sin cobertura» acabaran descartados.
+ */
+export function getQuietOverlayStyle(mobile: boolean): CSSProperties {
+  return {
+    position: 'absolute',
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 148px)' : 132,
+    left: 0,
+    right: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    zIndex: 480,
+    pointerEvents: 'none',
+    padding: '0 16px',
+  }
+}
+
 export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',

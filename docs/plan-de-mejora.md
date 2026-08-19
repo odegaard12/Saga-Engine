@@ -285,7 +285,36 @@ salió de ahí:
 
 ### 4.2 Lo que queda
 - **Los minijuegos siguen con sus propias formas y colores**, al margen del
-  tema. Son diez pantallas y es el trozo grande que falta.
+  tema. **No son diez pantallas: son cinco** (medido el 17 de agosto).
+
+  | Pantalla | Líneas | Colores literales | Formas en línea | Usa el tema |
+  |---|---|---|---|---|
+  | `circuitMatrix` (logic_circuit) | 910 | **127** | 16 | 30 |
+  | `placeMosaic` | 1 236 | 71 | 20 | **1** |
+  | `tiltMaze` | 665 | 69 | 10 | 13 |
+  | `sparkRadar` | 668 | 54 | 8 | 19 |
+  | `signalHunt` (checkpoint) | 271 | 17 | 2 | 3 |
+  | **En la misión** | **3 750** | **338** | **56** | **66** |
+  | El resto (5 familias) | 2 498 | 177 | 42 | 19 |
+
+  Las otras cinco familias —`bearingHunt` (1 051 líneas), `motionChallenge`,
+  `sequenceCode`, `teamRelay`, `audioChallenge`— **no aparecen en «O Eco do
+  Vixía»**. Un tercio del trabajo sería rediseñar pantallas que en esta ruta no
+  ve nadie. Comprobado contra los `game_id` reales de los diez nodos.
+
+  **Por dónde empezar, que es más barato de lo que parece:** de los 338 colores
+  de las pantallas que sí se juegan, **112 son blanco, casi-blanco o negro**
+  —`rgba(255,255,255…)` 68 veces, `rgba(244,244,245)`/`#f4f4f5` 29, `rgba(0,0,0)`
+  15—. Eso es estructura (texto, bordes, sombras), no información: sale a
+  variables sin discutir nada. Lo que hay que mirar con cuidado son los pocos
+  que significan algo: el verde `#72df91` (29 usos), el rojo `rgba(239,68,68)` y
+  el ámbar `#fbbf24`.
+
+  **Y las 56 formas en línea son el bloqueo real**, no los colores. Un
+  `borderRadius` escrito en el componente gana siempre a la regla del tema y la
+  deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` es
+  el peor caso —20 formas en línea y **una sola** referencia al tema en 1 236
+  líneas—.
 - **Un tercer tema** para comprobar que el sistema aguanta: si añadir uno cuesta
   más de tocar dos bloques de variables, es que el sistema no está bien hecho.
 - **Elegir el tema desde el panel** ya funciona, pero no hay forma de ver cómo
