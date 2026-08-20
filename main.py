@@ -189,6 +189,20 @@ def _iso_a_ms(valor):
         return 0
 
 
+def huella_de_imagen(dato_uri) -> str:
+    """Huella corta del contenido de una foto, para meterla en su URL.
+
+    Va en la URL para que la respuesta pueda declararse inmutable y cachearse un
+    anio entero. Si la foto cambia, cambia la URL, y nadie se queda con la
+    vieja. Una direccion fija con contenido cambiante obligaria al navegador a
+    preguntar cada vez, que es justo el viaje que se quiere ahorrar.
+    """
+    texto = _as_str(dato_uri)
+    if not texto:
+        return ""
+    return hashlib.sha1(texto.encode("utf-8")).hexdigest()[:12]
+
+
 def player_reset_at(user) -> int:
     """El milisegundo del último reinicio de este jugador. 0 si nunca lo han reiniciado."""
     record = load_inventory_state().get(user)

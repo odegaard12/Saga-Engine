@@ -149,6 +149,42 @@ def _config_sen_duplicados(node):
     }
 
 
+def _minigame_con_url_de_foto(node):
+    """El minijuego, con la foto tambien anunciada por su propia URL.
+
+    Va JUNTO al `image_data_url`, no en su lugar. Un movil con la aplicacion
+    vieja cacheada seguiria pidiendo la foto de dentro del JSON, y quitarsela
+    de golpe le dejaria el mosaico en blanco sin cobertura, que es el fallo mas
+    caro que ha tenido esto. Primero se anuncia; retirar la copia de dentro es
+    otro paso, y sólo cuando el cliente sepa pedirla por la URL.
+
+    Un campo que el cliente no conoce no le hace nada: lo ignora.
+    """
+    import main
+
+    salida = build_stage_minigame_runtime(node)
+    if not isinstance(salida, dict):
+        return salida
+
+    config = salida.get("config")
+    if not isinstance(config, dict):
+        return salida
+
+    dato = config.get("image_data_url")
+    if not isinstance(dato, str) or not dato.startswith("data:"):
+        return salida
+
+    huella = main.huella_de_imagen(dato)
+    if not huella:
+        return salida
+
+    salida["config"] = {
+        **config,
+        "image_url": f"/api/stage-image/{node['id']}/{huella}",
+    }
+    return salida
+
+
 def project_stage_for_player(raw_stage, include_runtime=False):
     """Un nodo, tal y como lo recibe el móvil.
 
@@ -173,7 +209,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
             "config": _config_sen_duplicados(node),
-            "minigame": build_stage_minigame_runtime(node),
+            "minigame": _minigame_con_url_de_foto(node),
             "entry": node["entry"],
             "success": node["success"],
             "requirements": node.get("requirements", {"items": []}),
