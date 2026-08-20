@@ -6,6 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.10
+
+Un móvil en el bolsillo ya sube lo que lleva pendiente.
+
+Medido con la pestaña oculta, red perfecta y servidor sano: **ocho segundos y el
+servidor seguía en 0 mientras el móvil marcaba 1**. En cuanto la pestaña pasaba
+a visible, la cola subía sola. Quien acaba la ruta y guarda el móvil podía dejar
+su tiempo sin registrar todo el día, con cobertura de sobra.
+
+El ciclo de refresco se cortaba entero si la pantalla no estaba visible, y ahí
+dentro van dos cosas de precio muy distinto:
+
+| | Coste |
+|---|---|
+| `syncPendingOfflineEvents` + `flushOfflineEvents` | un POST diminuto; con la cola vacía, ni eso |
+| `pedirPartida` | **214 KB** |
+
+Saltarse el refresco pesado con la pantalla apagada está bien —no hay nadie
+mirando—. Saltarse el vaciado de la cola no. Ahora lo barato se hace siempre y
+lo caro sigue esperando a que alguien mire.
+
+**Lo que esto NO arregla:** si el navegador *congela* la página —la aplicación
+en segundo plano un rato largo en Android— aquí no corre nada, ni esto ni
+ninguna otra cosa. Para ese caso hace falta Background Sync de verdad, con
+service worker. Esto cubre la pantalla apagada con la página viva, que es el
+caso corriente al guardarse el móvil un momento.
+
+---
+
 ## 4.9.9
 
 Se acabaron los doce segundos de silencio.
