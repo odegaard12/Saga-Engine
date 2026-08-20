@@ -174,10 +174,9 @@ paquete no se está cacheando en el borde.
    que lo arregle: es el mismo caudal repartido entre más gente.
 3. Subir CPU o RAM de la Pi **no cambiaría nada**. Está parada.
 
-**Lo que NO se probó:** escrituras concurrentes (latidos y avances de quince
-jugadores a la vez). Se dejó fuera a propósito porque planta posiciones falsas
-en el mapa de gente real. Queda pendiente y hay que hacerlo con nombres de
-prueba, no con los de la ruta.
+**Las escrituras concurrentes se probaron aparte**, en local y con quince
+jugadores inventados: ver 0.5. Contra producción se dejaron fuera a propósito,
+porque plantan posiciones falsas en el mapa de gente real.
 
 ### 0.5 Escrituras de quince a la vez — **en local, sin tocar producción**
 
@@ -212,9 +211,8 @@ recuperan cobertura a la vez al salir del monte y sueltan todo de golpe.
 3. **Las escrituras se serializan**: 300 peticiones en 16,5 s son 18/s, suba lo
    que suba la concurrencia.
 
-**Lo que NO se probó y sigue pendiente:** velocidad lenta de verdad —retardos de
-3-10 s y pérdidas aleatorias— para ver si la pantalla se cuelga, si se duplican
-avances o si el jugador se queda sin saber qué pasa.
+**La velocidad lenta se probó aparte:** ver 0.6. Salió de ahí el fallo de los
+doce segundos de silencio, arreglado en 4.9.9.
 
 **Aviso para quien repita esto:** `/api/advance` exige pase de jugador, que se
 consigue entrando en `/player/<nombre>`; sin cookie todo son 403 y parece que
@@ -493,12 +491,13 @@ el tema *llega*, no si el diseño *vale*.
 La Raspberry tiene **1,8 GB de RAM**, y un build de Vite dentro de Docker la
 tumbó (17 de agosto). Producción se cayó con ella.
 
-- **Techo de memoria en el build — puesto, sin estrenar.** El Dockerfile ya
-  lleva `NODE_OPTIONS=--max-old-space-size=640` en la etapa de construcción. La
-  imagen 4.9.6 que corre ahora se construyó **antes** de ese commit, así que el
-  techo no se ha probado todavía: el próximo build es el que lo estrena. Ojo al
-  comprobarlo: `docker exec ... printenv NODE_OPTIONS` sale vacío y no significa
-  nada, porque la variable vive en la etapa 1 y no en la de ejecución.
+- ✅ **Techo de memoria en el build — estrenado y aguanta.** El Dockerfile lleva
+  `NODE_OPTIONS=--max-old-space-size=640` en la etapa de construcción. Probado en
+  **cuatro** despliegues seguidos (4.9.7 → 4.9.10) sin acercarse al umbral: la Pi
+  entró con ~1 080 MB libres y salió con entre 1 004 y 1 143, y sagagia.es no se
+  cayó ninguna vez. Ojo al comprobarlo: `docker exec ... printenv NODE_OPTIONS`
+  sale vacío y **no significa nada**, porque la variable vive en la etapa 1 y no
+  en la de ejecución.
 - **Parar el contenedor de ensayo antes de construir.** Ya se hace, pero a mano.
   (A 17 de agosto **no hay** contenedor de ensayo levantado: sólo producción.)
 - **Construir fuera de la Pi.** Es lo que de verdad lo arregla: compilar el
