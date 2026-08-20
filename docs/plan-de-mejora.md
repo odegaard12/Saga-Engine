@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 17 de agosto de 2026. Producción: **4.9.7**.
+Estado a 17 de agosto de 2026. Producción: **4.9.8**.
 
 ---
 
@@ -279,21 +279,42 @@ queda huérfana y los sube después contra la partida nueva.
 **Medir primero:** avanzar tres nodos sin cobertura, reiniciar, devolver la red
 y ver si la cola sube avances de la partida anterior.
 
-🔴 **Visto el 17 de agosto, sin aislar todavía.** Reiniciando al jugador de
-pruebas a 0 con el móvil abierto y con progreso local en el nodo 2:
+✅ **Aislado y arreglado en 4.9.8.** El síntoma: reiniciando al jugador de
+pruebas a 0 con el móvil abierto, el servidor volvía **solo** a nivel 1 y el
+móvil seguía marcando 2/10 incluso tras recargar. Sólo se recuperaba borrando
+`localStorage` y las tres bases de IndexedDB.
 
-- El servidor volvió solo a nivel **1**, con `reset_at` recién sellado.
-- El móvil siguió marcando **2/10** incluso después de recargar la página.
+**La causa no estaba en el cliente.** Los tres sitios que leen `reset_at`
+(`PlayerApp.tsx` líneas ~512, ~696 y ~1488) llaman a `aplicarResetDeRelojes` y
+vacían la cola. El agujero estaba en el servidor, y era de manual:
 
-O sea que algo del móvil empuja el progreso de vuelta al servidor **después**
-del reinicio, y el `reset_at` no le hace ceder. No está aislado si la culpa es
-de la cola pendiente, del progreso local en IndexedDB o de que el móvil vuelve a
-avanzar solo — hace falta repetirlo mirando la cola antes y después. **Sólo se
-recuperó con la pizarra limpia** (borrar `localStorage` y las tres bases de
-IndexedDB).
+```python
+if level_before is not None and level_before < current_level:   # duplicado
+```
 
-Esto es más grave de lo que parecía: en día de ruta significa que reiniciar a
-alguien puede no servir de nada, y 4.9.6 arregló el otro camino, no éste.
+Ese candado protege contra avances **repetidos**, no contra avances **de otra
+partida**. Después de reiniciar a 0, un evento viejo con `level_before: 0`
+encaja perfectamente —el servidor está en 0, el evento dice que venía del 0— y
+vuelve a avanzar al jugador.
+
+El dato que los distingue **ya viajaba y nadie lo miraba**: el móvil manda
+`payload.local_created_at`, y el servidor guarda `reset_at`. Anterior al
+reinicio = partida borrada → `stale_before_reset`.
+
+Tres pruebas: la del fallo, y dos que impiden pasarse de listo —perder un avance
+hecho *después* del reinicio sería peor que el fallo original—.
+
+**Verificado en producción** mandando eventos a mano contra `/api/events/sync`:
+
+| Evento | Respuesta del servidor | Nivel |
+|---|---|---|
+| Creado **antes** del reinicio | `ignored` · `stale_before_reset` | se queda en **0** |
+| Creado **después** del reinicio | `synced` | sube a **1** |
+
+Un detalle al reproducirlo: si el móvil se entera del reinicio **antes** de
+vaciar la cola, la borra él solo y el candado del servidor ni se ejercita. Por
+eso la comprobación buena es mandar el evento a mano; con el navegador se está
+midiendo quién gana la carrera, no si el candado funciona.
 
 ### 1.2 Editor de nodos — **sin auditar**
 Un nodo mal guardado desde el panel se convierte en un jugador delante de una
