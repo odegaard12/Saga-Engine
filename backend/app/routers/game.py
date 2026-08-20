@@ -118,8 +118,8 @@ async def get_team_payload(user: str):
     return construir_tabla_de_equipo(user)
 
 
-@router.get("/api/stage-image/{stage_id}/{huella}")
-async def stage_image(stage_id: str, huella: str):
+@router.get("/media/nodo/{stage_id}/{huella}.{extension}")
+async def stage_image(stage_id: str, huella: str, extension: str):
     """La foto de un nodo, por su propia URL y cacheable para siempre.
 
     Medido el 2026-08-20: el paquete del jugador eran 203 KB y 160 de ellos una
@@ -136,6 +136,15 @@ async def stage_image(stage_id: str, huella: str):
     inmutable y cachearse un anio: si la foto cambia, cambia la URL. Una URL
     fija con la foto cambiante obligaria a revalidar cada vez, que es la mitad
     del viaje que queriamos ahorrar.
+
+    Y va en /media/ con extension, NO en /api/. Medido el 2026-08-20: sirviendola
+    en /api/stage-image/... Cloudflare contestaba CF-Cache-Status: DYNAMIC aunque
+    la respuesta pidiera cache de un anio. Trata /api/ como dinamico por defecto
+    y la cabecera sola no le hace cambiar de idea. Con una ruta que parece lo que
+    es -un fichero de imagen- si entra en su cache, que era todo el objetivo.
+
+    Efecto secundario bueno: el service worker se salta /api/ (`shouldBypass`),
+    asi que desde /media/ SI puede precachearla para jugar sin cobertura.
     """
     import base64
     import main

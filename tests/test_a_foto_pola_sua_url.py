@@ -39,7 +39,7 @@ def _preparar():
 
 def test_a_foto_serve_e_e_a_mesma():
     cliente = _preparar()
-    r = cliente.get(f"/api/stage-image/0/{main.huella_de_imagen(FOTO)}")
+    r = cliente.get(f"/media/nodo/0/{main.huella_de_imagen(FOTO)}.webp")
     assert r.status_code == 200
     assert r.content == CRUDO, "lo servido no es la foto del nodo"
     assert r.headers["content-type"].startswith("image/webp")
@@ -47,7 +47,7 @@ def test_a_foto_serve_e_e_a_mesma():
 
 def test_declarase_inmutable():
     cliente = _preparar()
-    r = cliente.get(f"/api/stage-image/0/{main.huella_de_imagen(FOTO)}")
+    r = cliente.get(f"/media/nodo/0/{main.huella_de_imagen(FOTO)}.webp")
     cache = r.headers.get("cache-control", "")
     assert "immutable" in cache and "max-age=31536000" in cache, (
         "sin caché larga, Cloudflare no la reparte y volvemos a tirar quince "
@@ -57,7 +57,7 @@ def test_declarase_inmutable():
 
 def test_a_huella_vella_non_serve_a_foto_nova():
     cliente = _preparar()
-    r = cliente.get("/api/stage-image/0/huelladelaanterior")
+    r = cliente.get("/media/nodo/0/huelladelaanterior.webp")
     assert r.status_code == 404, (
         "se está sirviendo la foto nueva con la dirección vieja: quien la tenga "
         "cacheada se queda con ella para siempre"
@@ -66,4 +66,23 @@ def test_a_huella_vella_non_serve_a_foto_nova():
 
 def test_un_nodo_que_non_existe_da_404():
     cliente = _preparar()
-    assert cliente.get("/api/stage-image/99/loquesea").status_code == 404
+    assert cliente.get("/media/nodo/99/loquesea.webp").status_code == 404
+
+
+def test_a_ruta_non_vai_baixo_api():
+    """Medido: bajo /api/ Cloudflare contesta DYNAMIC y no la cachea.
+
+    La cabecera de caché sola no le hace cambiar de idea: trata /api/ como
+    dinámico por defecto. Con una ruta que parece un fichero de imagen sí entra
+    en su caché, que era todo el objetivo de sacarla del JSON.
+
+    Y de paso, el service worker se salta /api/ (`shouldBypass`), así que desde
+    /media/ sí puede precacharla para jugar sin cobertura.
+    """
+    import io as _io
+    from pathlib import Path
+
+    juego = Path(__file__).resolve().parent.parent / "backend" / "app" / "routers" / "game.py"
+    codigo = _io.open(juego, encoding="utf-8").read()
+    assert '"/api/stage-image' not in codigo, "la foto vuelve a estar bajo /api/: Cloudflare no la cacheará"
+    assert '"/media/nodo/' in codigo

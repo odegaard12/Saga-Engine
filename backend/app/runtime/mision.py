@@ -149,6 +149,12 @@ def _config_sen_duplicados(node):
     }
 
 
+def _extension_de(dato_uri):
+    """La extension que le toca a una foto, sacada de su tipo."""
+    tipo = dato_uri[5:].split(";")[0].strip().lower()
+    return {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}.get(tipo, "bin")
+
+
 def _minigame_con_url_de_foto(node):
     """El minijuego, con la foto tambien anunciada por su propia URL.
 
@@ -180,7 +186,9 @@ def _minigame_con_url_de_foto(node):
 
     salida["config"] = {
         **config,
-        "image_url": f"/api/stage-image/{node['id']}/{huella}",
+        # /media/ y con extension, no /api/: Cloudflare trata /api/ como
+        # dinamico y no lo cachea aunque se le pida cache de un anio.
+        "image_url": f"/media/nodo/{node['id']}/{huella}.{_extension_de(dato)}",
     }
     return salida
 

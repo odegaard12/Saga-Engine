@@ -6,6 +6,28 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.15
+
+La foto se muda de `/api/` a `/media/`, que es lo que hace que Cloudflare la cachee.
+
+Medido justo después de desplegar 4.9.14: sirviéndola en
+`/api/stage-image/...`, Cloudflare contestaba **`CF-Cache-Status: DYNAMIC`**
+aunque la respuesta pidiera caché de un año. Trata `/api/` como dinámico por
+defecto y la cabecera sola no le hace cambiar de idea.
+
+O sea que 4.9.14 tenía el endpoint bien y **no servía para nada**: la foto
+seguía saliendo de la Raspberry en cada petición. Ahora va en
+`/media/nodo/<nodo>/<huella>.webp`, con una ruta que parece lo que es.
+
+Efecto secundario bueno: el service worker se salta `/api/` (`shouldBypass`),
+así que desde `/media/` **sí** puede precacharla para jugar sin cobertura —que
+es justo lo que hará falta en el paso siguiente, cuando se retire la copia de
+dentro del JSON.
+
+Hay una prueba que impide que vuelva a `/api/`.
+
+---
+
 ## 4.9.14
 
 La foto del mosaico ya tiene su propia URL. Todavía viaja también dentro.
