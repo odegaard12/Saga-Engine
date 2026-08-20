@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.10**.
+Estado a 20 de agosto de 2026. Producción: **4.9.11**.
 
 ---
 
@@ -315,10 +315,91 @@ vaciar la cola, la borra él solo y el candado del servidor ni se ejercita. Por
 eso la comprobación buena es mandar el evento a mano; con el navegador se está
 midiendo quién gana la carrera, no si el candado funciona.
 
-### 1.2 Editor de nodos — **sin auditar**
-Un nodo mal guardado desde el panel se convierte en un jugador delante de una
-pantalla que no avanza. Sobre todo: `route_via`, los ids únicos y qué pasa al
-borrar un nodo intermedio con gente ya pasada por él.
+### 1.1.b Cinco avances encolados a la vez — **bien, y probado**
+
+Todas las pruebas anteriores tenían **un solo** evento en la cola. Simulado el
+20 de agosto con cinco de golpe, como quien hace media ruta en modo avión:
+
+- Los cinco se aplicaron **en orden**, uno por nivel: 0 → 5. Sin saltos ni
+  dobles.
+- El servidor **ignoró el `node_id` que mandaba el cliente** y usó el suyo
+  (devolvió 0, 12, 17, 11, 3 — los ids reales de la misión). Es lo correcto: la
+  progresión la manda el servidor.
+
+Este era el punto que faltaba por comprobar de la cola. Está bien.
+
+### 1.1.c El código interno de «superado» lo acepta cualquier nodo — **decisión pendiente**
+
+Salió de la simulación anterior, y conviene entenderlo antes de opinar.
+
+Cada nodo lleva una condición interna `minigame_ok` con la que los minijuegos
+avisan de que se han ganado, y **esa palabra la acepta cualquier nodo**. Es
+deliberado: sin cobertura el móvil es la autoridad, juega el minijuego y dice
+«superado», y el servidor no tiene forma de volver a comprobarlo.
+
+La bandera `manual` existe para que esa palabra **no** valga escrita en la
+casilla de respaldo (`stage_accepts_code`, `mision.py:92`). Eso protege al
+jugador honesto de saltarse un nodo con la casilla de texto.
+
+**Lo que la simulación enseña:** `manual` la manda el cliente, así que desde una
+consola se omite. Con un pase de jugador —que se consigue entrando en
+`/player/<nombre>`— se puede recorrer la ruta entera mandando `code: 'OK'` a
+`/api/events/sync`. Comprobado: el jugador de pruebas pasó de 0 a 5 sin escanear
+un QR ni jugar nada.
+
+**No lo he tocado, y creo que no hay que tocarlo a la ligera.** Es la otra cara
+de que el juego funcione sin cobertura, que es lo que hemos pasado toda la
+semana protegiendo. Para trece amigos en el monte puede ser perfectamente
+asumible. Las salidas, por orden de coste:
+
+1. **Dejarlo y saberlo.** Es una gymkhana entre conocidos, no un examen.
+2. **Cruzar con la última posición conocida.** El servidor tiene el nodo y el
+   último latido: completar un nodo estando a kilómetros es sospechoso. Tiene
+   que ser flojo, porque sin cobertura no hay latido.
+3. Firmar los avances en el móvil. Mucho trabajo y se rompe fácil.
+
+**Medir primero:** si alguna vez importa, mirar en el registro de eventos cuántos
+avances llegan sin `time_spent_ms` plausible. Hoy nadie lo ha mirado.
+
+### 1.2 Editor de nodos — **auditado el 20 de agosto**
+
+Tres hallazgos, y la raíz de los dos peores es la misma: **el progreso de un
+jugador se guarda como ÍNDICE en la lista de nodos, no como id del nodo.**
+
+**✅ Ids repetidos — arreglado.** El servidor aceptaba guardar dos nodos con el
+mismo id sin decir nada. El editor del panel ya asignaba `max+1` al crear, pero
+no había red por debajo. Importa porque con dos ids iguales se mezclan las
+configuraciones al guardar: un nodo acaba con el minijuego de otro. Ya pasó una
+vez. Ahora `validate_stages` lo rechaza, con prueba.
+
+**🔴 Borrar un nodo anterior hace que el jugador se salte uno — sin arreglar.**
+Medido: jugador en el nodo 5 de 10; el organizador borra el nodo 2; el jugador
+sigue en «nivel 5», pero ahora el nivel 5 apunta al nodo **6**. Se ha saltado un
+nodo entero y nadie se entera. Añadir un nodo antes hace lo simétrico: le obliga
+a repetir uno.
+
+**🔴 Y si va por el último, se le da la misión por terminada.** Medido: jugador
+en el nivel 9 de 10; se borra cualquier nodo anterior; quedan 9 nodos, su nivel
+9 ya no existe, y el servidor lo lee como misión completa. Termina la ruta sin
+jugar el último nodo.
+
+**Lo que costaría arreglarlo de verdad:** guardar el progreso por **id de nodo**
+en vez de por índice. Es una migración de datos y toca el cliente, el servidor y
+la cola offline — no es un parche de una tarde.
+
+**Lo barato mientras tanto**, por orden:
+
+1. **No tocar la ruta con gente jugando.** Es una norma, no código, pero es la
+   que de verdad evita esto.
+2. **Avisar en el panel antes de guardar**: «esto desplaza a N jugadores».
+   El servidor tiene los dos datos —cuántos nodos había y por dónde va cada
+   uno—, así que el aviso se puede calcular sin migrar nada.
+3. Al borrar un nodo, ajustar el nivel de quien estuviera por detrás. Suena
+   bien y es traicionero: hay que hacerlo también en la cola del móvil, que
+   manda sobre su propio progreso.
+
+**Lo que NO se auditó todavía:** `route_via`, el moldeado de los tramos. Queda
+para la siguiente.
 
 ### 1.3 Recorrido completo de una ruta — **parado en el nodo 3 de 10**
 No se puede terminar sin un móvil de verdad: los minijuegos de movimiento
@@ -354,9 +435,22 @@ vaciar la cola, y ahí dentro hay dos cosas de precio muy distinto: el vaciado e
 un POST diminuto y `pedirPartida` son 214 KB. Ahora lo barato se hace siempre y
 lo caro sigue esperando a que alguien mire.
 
-**Sigue pendiente el caso duro:** si el navegador *congela* la página (segundo
-plano largo en Android) no corre nada. Para eso hace falta Background Sync con
-service worker, y eso sí es trabajo de verdad.
+✅ **Y el caso duro, cerrado en 4.9.11.** El service worker escucha ya `sync`:
+el navegador lo despierta cuando vuelve la red aunque la página no esté abierta,
+y vacía la cola desde IndexedDB.
+
+Lo que hizo que esto fuera seguro de construir —y no lo era antes— son los dos
+candados del servidor, porque un vaciado en segundo plano es un **segundo**
+camino hacia `/api/events/sync`:
+
+| Candado | Qué para |
+|---|---|
+| `client_event_id` | duplicados → se contestan como duplicados |
+| `stale_before_reset` | anterior a un reinicio → se ignora (4.9.8) |
+
+**Alcance honesto:** Background Sync es de Chromium (Chrome y Edge en Android);
+en iOS no existe. Por eso el ciclo de 30 s se queda donde está: esto se **suma**,
+no sustituye.
 
 **Verificado en producción con la pantalla oculta:** cola con un evento
 pendiente, servidor en 0, móvil en 1, red devuelta y sin volver a mirar la
@@ -369,6 +463,22 @@ hizo. Lo barato siempre, lo caro cuando hay alguien delante.
 tras recuperar cobertura. Si son segundos, esto no merece el trabajo. Pero el
 que acaba la ruta y guarda el móvil puede no mirarlo más en todo el día, y ahí
 el ranking se queda mal para siempre.
+
+### 2.3 Un minijuego a medias no sobrevive a que maten la pestaña — **sin arreglar**
+
+Del repaso del 20 de agosto: **ninguno de los cinco minijuegos que se juegan
+guarda su estado a medias** (0 usos de `localStorage` / IndexedDB en los cinco).
+
+Un corte de cobertura NO los rompe —van dentro del paquete del jugador y no
+piden nada a la red—, así que esto no es un problema de cobertura. El problema
+es otro: si el navegador mata la pestaña a mitad de un laberinto (Android
+liberando memoria, o un toque en recargar), **el jugador lo repite entero con el
+reloj del nodo corriendo**. No se queda tirado, pero se le penaliza en tiempo
+por algo que no hizo él.
+
+**Medir primero:** cuánto tarda de media alguien en resolver los dos minijuegos
+largos (`placeMosaic` y `circuitMatrix`). Si son dos minutos, esto es una
+molestia; si son ocho, es una injusticia en la clasificación.
 
 ### 2.2 Fotos pendientes
 Ya hay un repaso, pero conviene un contador visible: «3 fotos sin subir». Ahora
@@ -500,10 +610,15 @@ tumbó (17 de agosto). Producción se cayó con ella.
   en la de ejecución.
 - **Parar el contenedor de ensayo antes de construir.** Ya se hace, pero a mano.
   (A 17 de agosto **no hay** contenedor de ensayo levantado: sólo producción.)
-- **Construir fuera de la Pi.** Es lo que de verdad lo arregla: compilar el
-  frontend en otra máquina y mandar sólo el `dist`. Traba conocida: **no hay
-  Node en el Windows local**, así que hace falta decidir dónde se compila
-  (contenedor en el portátil, o el CI de GitHub subiendo el `dist`).
+- 🟢 **Construir fuera de la Pi — ya no hay excusa.** Es lo que de verdad lo
+  arregla: compilar el frontend en otra máquina y mandar sólo el `dist`. La
+  traba que lo bloqueaba era falsa: **sí hay Node en el Windows local (v26.7.0)**,
+  comprobado el 20 de agosto. Con `npm install` en `frontend/`, `npx tsc -b`
+  pasa limpio y `npx vite build` tarda **3 segundos**.
+
+  Dos cosas que esto cambia de golpe: se puede **comprobar el TypeScript antes
+  de desplegar** (hasta ahora se desplegaba a ciegas y se rezaba), y se puede
+  quitar de la Pi la etapa que la tumbó dos veces.
 - **Limpiar imágenes viejas.** Hay **50** (17 de agosto). Con dejar las tres
   últimas basta.
 - **Vigilancia:** un aviso si la memoria disponible baja de 200 MB. Ahora mismo
