@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 17 de agosto de 2026. Producción: **4.9.8**.
+Estado a 20 de agosto de 2026. Producción: **4.9.10**.
 
 ---
 
@@ -350,9 +350,14 @@ deliberado, pero significa que un móvil en el bolsillo con la pantalla apagada
 no sube nada. Con la aplicación instalada como PWA se podría usar
 **Background Sync** para que suba aunque esté cerrada.
 
-🔴 **Ya no es teórico: medido el 17 de agosto** (ver 0.3). Con la pestaña
-oculta, servidor sano y red perfecta, la cola **no se vacía**; en cuanto pasa a
-visible, sube sola. Servidor 0 / móvil 1 durante todo el rato.
+✅ **Arreglado en 4.9.10.** El ciclo cortaba por visibilidad **antes** de
+vaciar la cola, y ahí dentro hay dos cosas de precio muy distinto: el vaciado es
+un POST diminuto y `pedirPartida` son 214 KB. Ahora lo barato se hace siempre y
+lo caro sigue esperando a que alguien mire.
+
+**Sigue pendiente el caso duro:** si el navegador *congela* la página (segundo
+plano largo en Android) no corre nada. Para eso hace falta Background Sync con
+service worker, y eso sí es trabajo de verdad.
 
 **Medir primero:** cuánto tarda de media un jugador en volver a mirar el móvil
 tras recuperar cobertura. Si son segundos, esto no merece el trabajo. Pero el
