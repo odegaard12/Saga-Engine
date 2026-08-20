@@ -70,5 +70,8 @@ def test_o_resto_da_config_segue_igual_nos_dous_sitios():
     salida = project_stage_for_player(nodo(), include_runtime=True)
     arriba = dict(salida.get("config") or {})
     delJuego = dict(((salida.get("minigame") or {}).get("config")) or {})
+    # La foto y su URL sólo viven en la del minijuego: una porque es la que
+    # manda, la otra porque se anuncia ahí para el cliente que sepa usarla.
     delJuego.pop("image_data_url", None)
+    delJuego.pop("image_url", None)
     assert arriba == delJuego, "se ha quitado algo más que la foto duplicada"

@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.14
+
+La foto del mosaico ya tiene su propia URL. Todavía viaja también dentro.
+
+Primer paso del recorte grande, y el que no arriesga nada. Ahora existe
+`GET /api/stage-image/<nodo>/<huella>`, que sirve la foto en binario con
+`Cache-Control: public, max-age=31536000, immutable`.
+
+**Por qué la huella va en la URL:** para poder declarar la respuesta inmutable y
+cachearla un año. Si la foto cambia, cambia la URL. Con una dirección fija y
+contenido cambiante el navegador tendría que preguntar cada vez, que es justo el
+viaje que se quiere ahorrar. Y con la huella vieja se contesta **404** en vez de
+servir la nueva: quien la tuviera cacheada se quedaría con ella para siempre.
+
+**Lo que esto va a arreglar:** dentro del JSON no la puede cachear nadie, porque
+va en una respuesta distinta para cada jugador. Quince móviles abriendo a la vez
+en el aparcadoiro tiran quince veces de la subida de la Raspberry, que es el
+cuello (la Pi está al 0,18 % de CPU). Con una URL compartida, Cloudflare la
+sirve desde su borde y la Pi la manda una vez.
+
+**Lo que NO se ha hecho todavía, a propósito:** quitar la copia de dentro del
+JSON. Un móvil con la aplicación vieja cacheada seguiría pidiendo la foto ahí, y
+quitársela de golpe le dejaría el mosaico en blanco sin cobertura —el fallo más
+caro que ha tenido esto—. Primero se anuncia la URL; retirar la copia es otro
+paso, y sólo cuando el cliente sepa pedirla y guardarla en su paquete offline.
+
+---
+
 ## 4.9.13
 
 La foto del mosaico deja de viajar dos veces.

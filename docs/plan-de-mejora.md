@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.12**.
+Estado a 20 de agosto de 2026. Producción: **4.9.13**.
 
 ---
 
@@ -166,7 +166,31 @@ paquete no se está cacheando en el borde.
 
 **Lo que esto señala, por orden:**
 
-1. **El paquete de 214 KB es el problema, no la máquina.** Ya existe
+✅ **Primer corte hecho en 4.9.13: 200 KB → 120 KB, y la espera de 4,3 s a
+1,6 s.** El paquete estaba dominado por **una foto repetida**: el mosaico del
+nodo final viajaba en `config` y en `minigame.config`, byte a byte la misma,
+79,8 KB cada copia — 160 de los 203 KB totales. Por eso comprimía tan mal (32 %):
+base64 de un WebP ya comprimido no se deja.
+
+Medido con quince jugadores después del cambio:
+
+| | Antes (200 KB) | Ahora (120 KB) |
+|---|---|---|
+| p50 | 4 326 ms | **1 639 ms** |
+| p95 | 5 276 ms | 1 886 ms |
+| caudal | 2,4 pet/s | **9,9 pet/s** |
+
+Mejora más de lo que predice el recorte solo: al pesar menos caben más
+peticiones a la vez por el mismo tubo.
+
+**Lo que queda de aquí, por orden:**
+
+1. **Sacar la foto del JSON** y servirla por su propia URL. Bajaría el paquete a
+   ~40 KB, quitaría el 33 % que añade base64, y la haría cacheable por el
+   navegador **y por Cloudflare** — hoy no se cachea nada porque va dentro de una
+   respuesta por jugador. Ojo: hay que precacharla en el service worker o se
+   rompe el mosaico sin cobertura, que es el fallo más caro que ha tenido esto.
+2. **El paquete de 214 KB es el problema, no la máquina.** Ya existe
    `stages_rev` (huella del contenido) precisamente para poder pedir lo ligero
    y reutilizar lo guardado. Habría que medir cuántos de esos 214 KB son
    contenido que el móvil ya tiene.

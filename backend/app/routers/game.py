@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
@@ -116,6 +116,62 @@ def construir_tabla_de_equipo(user):
 @router.get("/api/team/{user}")
 async def get_team_payload(user: str):
     return construir_tabla_de_equipo(user)
+
+
+@router.get("/api/stage-image/{stage_id}/{huella}")
+async def stage_image(stage_id: str, huella: str):
+    """La foto de un nodo, por su propia URL y cacheable para siempre.
+
+    Medido el 2026-08-20: el paquete del jugador eran 203 KB y 160 de ellos una
+    sola foto -el mosaico del nodo final-, metida como base64 dentro del JSON.
+    Ahi dentro no la puede cachear nadie: ni el navegador ni Cloudflare, porque
+    va en una respuesta distinta para cada jugador.
+
+    Lo que cambia sacarla: quince moviles abriendo a la vez en el aparcadoiro
+    dejan de tirar quince veces de la subida de la Raspberry -que es el cuello,
+    medido: la Pi esta al 0,18 % de CPU- y la piden al borde de Cloudflare, que
+    la sirve una vez y la reparte.
+
+    La huella va EN LA URL a proposito. Asi la respuesta puede declararse
+    inmutable y cachearse un anio: si la foto cambia, cambia la URL. Una URL
+    fija con la foto cambiante obligaria a revalidar cada vez, que es la mitad
+    del viaje que queriamos ahorrar.
+    """
+    import base64
+    import main
+
+    for stage in main.get_runtime_stages():
+        if _as_str(stage.get("id")) != _as_str(stage_id):
+            continue
+
+        # `get_runtime_stages` da el nodo NORMALIZADO, no la proyeccion que
+        # recibe el jugador: aqui la configuracion vive en `interaction`.
+        interaccion = stage.get("interaction") if isinstance(stage.get("interaction"), dict) else {}
+        config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
+        dato = _as_str(config.get("image_data_url"))
+        if not dato.startswith("data:"):
+            break
+
+        try:
+            cabecera, cuerpo = dato.split(",", 1)
+            tipo = cabecera[5:].split(";")[0] or "application/octet-stream"
+            crudo = base64.b64decode(cuerpo)
+        except (ValueError, TypeError):
+            break
+
+        if huella != main.huella_de_imagen(dato):
+            # La foto cambio y esta URL es de la anterior. No se sirve la nueva
+            # con la direccion vieja: el que la tenga cacheada se quedaria con
+            # ella para siempre.
+            return JSONResponse(status_code=404, content={"status": "error", "detail": "stale image"})
+
+        return Response(
+            content=crudo,
+            media_type=tipo,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+
+    return JSONResponse(status_code=404, content={"status": "error", "detail": "not found"})
 
 
 @router.post("/api/events/sync")
