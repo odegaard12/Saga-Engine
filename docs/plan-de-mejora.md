@@ -251,10 +251,11 @@ monte.
 - Al volver la red normal, la cola subió y **el servidor se quedó en 1**, no en
   2. El guardián por `level_before` hace su trabajo. El evento pasó a `synced`.
 
-**Lo que hay que arreglar, y es barato:** una señal en el mapa mientras el
-avance está en vuelo. No hace falta bloquear nada; basta con que la línea
-discreta que ya existe (`QuietNotice`, 4.9.7) diga «rexistrando…» hasta que se
-resuelva.
+✅ **Arreglado en 4.9.9 y verificado en producción.** La línea callada dice
+«Rexistrando…» mientras el envío está en vuelo. Con 6 s de retardo inyectado:
+aparece a los **5 ms** y desaparece a los **6 345 ms**, justo al resolverse, y
+deja paso a «¡Nodo superado! ⚡». Los segundos de pantalla muerta son ahora
+segundos de pantalla que habla.
 
 **Otro dato de paso:** la primera visita se pasa **minutos** guardando el mapa
 («Primera vez: se guarda el mapa»). Con red de monte eso es mucho peor, y
@@ -358,6 +359,13 @@ lo caro sigue esperando a que alguien mire.
 **Sigue pendiente el caso duro:** si el navegador *congela* la página (segundo
 plano largo en Android) no corre nada. Para eso hace falta Background Sync con
 service worker, y eso sí es trabajo de verdad.
+
+**Verificado en producción con la pantalla oculta:** cola con un evento
+pendiente, servidor en 0, móvil en 1, red devuelta y sin volver a mirar la
+pantalla → **el servidor pasó a 1** y el evento a `synced`. Y la otra mitad
+también: en toda la ventana observada, cada llamada a `/api/game/` llevaba
+`fresh=` —o sea, el simulador de GPS—, así que el refresco de 214 KB **no** se
+hizo. Lo barato siempre, lo caro cuando hay alguien delante.
 
 **Medir primero:** cuánto tarda de media un jugador en volver a mirar el móvil
 tras recuperar cobertura. Si son segundos, esto no merece el trabajo. Pero el
