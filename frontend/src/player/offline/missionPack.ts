@@ -509,7 +509,36 @@ export function queueOfflineEvent(args: {
     node_id: args.node_id,
   }
 
+  // Pedirle al navegador que lo suba aunque la aplicación se cierre.
+  //
+  // El ciclo de 30 s sólo corre con la página viva. Si Android la congela —la
+  // aplicación en segundo plano un rato largo— no corre nada, y el jugador que
+  // acaba la ruta y guarda el móvil puede dejar su último nodo sin subir.
+  // Background Sync despierta al service worker cuando vuelve la red.
+  //
+  // Va después de escribir, no antes: si el registro falla, el evento ya está
+  // guardado y lo recogerá el ciclo normal. Esto se SUMA, no sustituye.
+  void rexistrarSyncDeFondo()
+
   return writeRecord(STORE_EVENT_QUEUE, event)
+}
+
+/**
+ * Background Sync es de Chromium (Chrome y Edge en Android); en iOS no existe.
+ * Por eso todo va detrás de comprobaciones y nada de esto puede tirar nada: si
+ * no está disponible, sencillamente no se registra y queda el ciclo de siempre.
+ */
+async function rexistrarSyncDeFondo() {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+    const registro = await navigator.serviceWorker.ready
+    const sync = (registro as ServiceWorkerRegistration & { sync?: { register(t: string): Promise<void> } }).sync
+    if (!sync) return
+    await sync.register('saga-cola-offline')
+  } catch {
+    // Sin permiso, sin soporte o sin service worker: no pasa nada, el ciclo de
+    // 30 s sigue estando.
+  }
 }
 
 export async function getOfflineMissionSummary(user: string): Promise<OfflineMissionSummary> {
