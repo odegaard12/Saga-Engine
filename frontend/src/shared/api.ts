@@ -106,10 +106,15 @@ export async function fetchBuildInfo(): Promise<BuildInfoPayload> {
 
 export async function fetchPlayerGame(
   user: string,
-  options: { offlinePack?: boolean } = {}
+  options: { offlinePack?: boolean; fotosPorUrl?: boolean } = {}
 ): Promise<PlayerGamePayload> {
   const params = new URLSearchParams()
   if (options.offlinePack) params.set('offline_pack', 'true')
+  // Le dice al servidor que este cliente sabe pedir las fotos por su URL, así
+  // que no hace falta que se las meta dentro del JSON. Mientras no se pida,
+  // el servidor las manda dentro como siempre: un móvil con la aplicación
+  // vieja cacheada no puede quedarse sin ellas.
+  if (options.fotosPorUrl) params.set('fotos_por_url', 'true')
   params.set('_', String(Date.now()))
   const suffix = `?${params.toString()}`
   const timeout = withTimeoutSignal(5000)
