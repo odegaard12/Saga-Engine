@@ -2433,8 +2433,22 @@ export default function PlayerApp() {
         <ToastNotice notice={uiNotice} />
       </div>
 
+      {/*
+        Mientras el avance esta EN VUELO, la linea callada lo dice.
+
+        Medido con red lenta: el jugador pulsaba, se cerraba la historia y la
+        pantalla no cambiaba en 11,8 segundos. El indicador de `submitting`
+        existia, pero vive dentro del panel de interaccion, que para entonces ya
+        se ha cerrado: en el mapa no quedaba ninguna senal, y doce segundos son
+        de sobra para pensar que no ha funcionado y volver a pulsar.
+
+        Va como expresion de render y NO como hook nuevo: `submitting` ya
+        existe, y un hook detras de un `return` temprano tira esta pantalla
+        entera con el error 310. Al resolverse el envio vuelve `uiQuiet`, que
+        para entonces ya lleva el aviso de «superado sin conexion» si lo hubo.
+      */}
       <div style={getQuietOverlayStyle(isPhone)}>
-        <QuietNotice notice={uiQuiet} />
+        <QuietNotice notice={submitting ? { message: 'Rexistrando…' } : uiQuiet} />
       </div>
 
       <FieldPhotoViewer

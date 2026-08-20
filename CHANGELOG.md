@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.9
+
+Se acabaron los doce segundos de silencio.
+
+Medido con red lenta (retardo de 3-10 s):
+
+       0 ms  el jugador pulsa REXISTRAR O PASO
+      11 ms  se cierra la historia y vuelve al mapa
+      11 ms → 11 830 ms   **nada, ni un cambio en pantalla**
+   11 830 ms  por fin avanza
+
+Doce segundos mirando una pantalla quieta es tiempo de sobra para pensar que no
+ha funcionado y volver a pulsar. El indicador de `submitting` existía, pero vive
+dentro del panel de interacción, que para entonces ya se ha cerrado: en el mapa
+no quedaba ninguna señal.
+
+Lo raro era el contraste: **sin cobertura el fallo es inmediato y el jugador
+avanza en 60 ms; con cobertura mala espera doce segundos**. La red a medias se
+vivía peor que no tener red, que es justo el caso del monte.
+
+Ahora la línea callada de abajo —la que se estrenó en 4.9.7— dice
+«Rexistrando…» mientras el envío está en vuelo, y al resolverse deja paso al
+aviso que toque. Va como expresión de render y no como hook nuevo: `submitting`
+ya existía, y un hook detrás de un `return` temprano tira esta pantalla entera
+con el error 310.
+
+---
+
 ## 4.9.8
 
 Un reinicio que aguanta a la cola vieja del móvil, y los iconos recuperan su

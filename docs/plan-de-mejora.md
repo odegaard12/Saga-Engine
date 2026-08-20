@@ -410,6 +410,32 @@ salió de ahí:
 - **El adorno no ha funcionado ninguna de las dos veces** (placas industriales,
   llamas en el filo). Lo que sí funciona: el degradado en diagonal y los tonos.
 
+### 4.1.b Lo que dijo Óscar el 20 de agosto, con el rojo ya en producción
+
+Palabras suyas: **«el rojo no me convence… no veo cambio de diseño»**, y lo que
+pide es *«dejar menús y como la base de Mochila / Herramientas y tal, pero no me
+veo un cambio que aparezca bien, otro diseño nuevo entero»*.
+
+Eso es una crítica precisa, no un «no me gusta»: el tema de fuego **se lee como
+un repintado**, no como otro diseño. Y marca el límite, que es lo útil:
+
+- **La estructura se queda.** Menús, la base de Mochila / Herramientas, la
+  disposición. No se toca.
+- **Lo que tiene que cambiar es la piel**: formas, densidad, jerarquía, bordes,
+  espaciado. Que al abrirlo se note que es otro diseño, no la misma pantalla
+  pintada de rojo.
+
+Pantallas señaladas como feas o sin pulir, por sus palabras: **«antes de salir»
+(el panel de permisos), el HUD y las barras, y los minijuegos.** Son justo las
+tres que ya estaban en esta lista, así que el orden no cambia — lo que cambia es
+que el objetivo no es «que el tema alcance el color», que ya está, sino que la
+forma cuente otra cosa.
+
+⚠️ **Y aquí no se puede trabajar a ciegas.** Van tres rondas de diseño
+descartadas al verlas. Cualquier intento nuevo tiene que mirarse en pantalla
+antes de darlo por bueno: medir cuántos elementos quedan fuera del tema dice si
+el tema *llega*, no si el diseño *vale*.
+
 ### 4.2 Lo que queda
 - **Los minijuegos siguen con sus propias formas y colores**, al margen del
   tema. **No son diez pantallas: son cinco** (medido el 17 de agosto).
