@@ -155,7 +155,7 @@ def _extension_de(dato_uri):
     return {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}.get(tipo, "bin")
 
 
-def _minigame_con_url_de_foto(node):
+def _minigame_con_url_de_foto(node, fotos_por_url=False):
     """El minijuego, con la foto tambien anunciada por su propia URL.
 
     Va JUNTO al `image_data_url`, no en su lugar. Un movil con la aplicacion
@@ -184,16 +184,26 @@ def _minigame_con_url_de_foto(node):
     if not huella:
         return salida
 
-    salida["config"] = {
+    nueva = {
         **config,
         # /media/ y con extension, no /api/: Cloudflare trata /api/ como
         # dinamico y no lo cachea aunque se le pida cache de un anio.
         "image_url": f"/media/nodo/{node['id']}/{huella}.{_extension_de(dato)}",
     }
+
+    # La copia de dentro SOLO se quita si el cliente ha dicho que sabe pedirla
+    # por la URL. Un movil con la aplicacion vieja cacheada sigue esperandola
+    # aqui, y quitarsela de golpe le dejaria el mosaico en blanco sin cobertura:
+    # el fallo mas caro que ha tenido esto. Que lo pida el cliente y no lo
+    # decida el servidor es lo que hace este cambio seguro de desplegar.
+    if fotos_por_url:
+        nueva.pop("image_data_url", None)
+
+    salida["config"] = nueva
     return salida
 
 
-def project_stage_for_player(raw_stage, include_runtime=False):
+def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False):
     """Un nodo, tal y como lo recibe el móvil.
 
     ⚠️ `include_runtime` decide si va el contenido jugable —el minijuego, su
@@ -217,7 +227,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
             "config": _config_sen_duplicados(node),
-            "minigame": _minigame_con_url_de_foto(node),
+            "minigame": _minigame_con_url_de_foto(node, fotos_por_url),
             "entry": node["entry"],
             "success": node["success"],
             "requirements": node.get("requirements", {"items": []}),

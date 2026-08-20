@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.16
+
+La foto sale del JSON. El paquete queda en unos 40 KB.
+
+Último paso del recorte, y el que tenía el riesgo. Ahora el cliente pide
+`?fotos_por_url=true`, el servidor manda sólo la URL, y **el móvil se baja la
+foto aparte y la vuelve a meter en su paquete antes de guardarlo**.
+
+Por qué así, y no simplemente dejando la URL en el paquete guardado: lo que se
+guarda en IndexedDB es lo que hace que el mosaico se pueda jugar en modo avión.
+Quedarse sin la foto ahí es el fallo más caro que ha tenido esto. Por el cable
+viaja una vez y cacheada; en IndexedDB queda igual que siempre.
+
+**Tres redes de seguridad**, porque este cambio se despliega con gente que
+puede tener la aplicación vieja cacheada:
+
+1. **Lo pide el cliente, no lo decide el servidor.** Mientras no se pida, la
+   foto viaja dentro como siempre. Un móvil viejo no se entera de nada.
+2. **Si una sola foto no se puede bajar, se tira el atajo** y se vuelve a pedir
+   el paquete entero con las fotos dentro. Antes un arranque más lento que un
+   paquete a medias: lo primero se nota en el aparcadoiro, lo segundo en el
+   monte.
+3. **El service worker la precachea** (`/media/nodo/…`), con el mismo trato que
+   los avatares: la URL trae la huella, así que no caduca nunca y si la foto
+   cambia se baja sola.
+
+---
+
 ## 4.9.15
 
 La foto se muda de `/api/` a `/media/`, que es lo que hace que Cloudflare la cachee.

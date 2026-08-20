@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.13**.
+Estado a 20 de agosto de 2026. Producción: **4.9.15**.
 
 ---
 
@@ -185,11 +185,28 @@ peticiones a la vez por el mismo tubo.
 
 **Lo que queda de aquí, por orden:**
 
-1. **Sacar la foto del JSON** y servirla por su propia URL. Bajaría el paquete a
-   ~40 KB, quitaría el 33 % que añade base64, y la haría cacheable por el
-   navegador **y por Cloudflare** — hoy no se cachea nada porque va dentro de una
-   respuesta por jugador. Ojo: hay que precacharla en el service worker o se
-   rompe el mosaico sin cobertura, que es el fallo más caro que ha tenido esto.
+1. **Sacar la foto del JSON — a medias (4.9.14 y 4.9.15).**
+
+   ✅ Ya existe `GET /media/nodo/<nodo>/<huella>.webp`: sirve la foto en binario
+   (**60 KB**, frente a 80 en base64) con caché de un año, y **Cloudflare la
+   cachea de verdad** — comprobado: `MISS`, luego `HIT`, luego `HIT`. Con quince
+   personas en el aparcadoiro la Pi la manda una vez y el borde reparte las
+   otras catorce.
+
+   ⚠️ **Y una lección de método:** 4.9.14 sirvió la foto desde
+   `/api/stage-image/...` con la cabecera correcta, y Cloudflare contestaba
+   `CF-Cache-Status: DYNAMIC`. Trata `/api/` como dinámico por defecto y la
+   cabecera sola no le hace cambiar de idea. **Parecía hecho y no servía para
+   nada.** Sólo se vio al medirlo. Hay una prueba que impide que la ruta vuelva
+   a `/api/`.
+
+   ❌ **Falta el paso que da el ahorro grande:** retirar la copia de dentro del
+   JSON, que dejaría el paquete en ~40 KB. No se ha hecho a propósito: un móvil
+   con la aplicación vieja cacheada seguiría pidiéndola ahí, y quitársela de
+   golpe le dejaría el mosaico en blanco sin cobertura. Antes hace falta que el
+   cliente sepa pedirla por la URL **y guardarla en su paquete offline**, y que
+   el service worker la precache. Ahora se puede: desde `/media/` el service
+   worker ya la ve, porque se salta `/api/`.
 2. **El paquete de 214 KB es el problema, no la máquina.** Ya existe
    `stages_rev` (huella del contenido) precisamente para poder pedir lo ligero
    y reutilizar lo guardado. Habría que medir cuántos de esos 214 KB son
