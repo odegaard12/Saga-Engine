@@ -30,6 +30,38 @@ def validate_stages(raw_stages):
             continue
         errores.extend(validate_stage(stage, idx=indice))
 
+    # El moldeado del tramo tiene que caer dentro del planeta.
+    #
+    # `route_via` son los puntos con los que se dobla el tramo hacia este nodo.
+    # El cliente ya descarta lo que no sea un par de numeros finitos, asi que la
+    # basura evidente no rompe nada: el moldeado simplemente no se aplica, en
+    # silencio. Pero una coordenada FUERA DE RANGO si pasa ese filtro -999 es un
+    # numero finito- y se dibuja: la linea verde que el jugador tiene que seguir
+    # sale disparada fuera del mapa.
+    #
+    # No se comprueba que esten cerca de la ruta a proposito: mover un tramo
+    # lejos puede ser legitimo mientras se disenia una mision nueva.
+    for indice, stage in enumerate(raw_stages):
+        if not isinstance(stage, dict):
+            continue
+        via = stage.get("route_via")
+        if via is None:
+            continue
+        if not isinstance(via, list):
+            errores.append({"index": indice, "field": "route_via", "detail": "route_via tiene que ser una lista de pares [lat, lon]"})
+            continue
+        for n_punto, punto in enumerate(via):
+            if not isinstance(punto, (list, tuple)) or len(punto) < 2:
+                errores.append({"index": indice, "field": "route_via", "detail": f"el punto {n_punto} no es un par [lat, lon]"})
+                continue
+            try:
+                lat, lon = float(punto[0]), float(punto[1])
+            except (TypeError, ValueError):
+                errores.append({"index": indice, "field": "route_via", "detail": f"el punto {n_punto} no son numeros"})
+                continue
+            if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+                errores.append({"index": indice, "field": "route_via", "detail": f"el punto {n_punto} cae fuera del planeta: {lat}, {lon}"})
+
     # Dos nodos con el mismo id mezclan sus configuraciones al guardar: uno
     # acaba con el minijuego del otro. El editor del panel ya asigna max+1 al
     # crear, pero esto es la red por debajo, para que no dependa de que el
