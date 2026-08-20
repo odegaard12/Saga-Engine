@@ -6,6 +6,41 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.11
+
+El último eslabón: la cola sube aunque la aplicación esté cerrada.
+
+Con la pantalla apagada y la página viva la cola ya subía (4.9.10). Pero si
+Android **congela** la pestaña —la aplicación en segundo plano un rato largo—
+ahí no corre nada: ni el ciclo de 30 s ni ningún temporizador. El jugador acaba
+la ruta, guarda el móvil, y su último nodo podía no llegar nunca.
+
+Ahora el service worker escucha `sync`: el navegador lo despierta cuando vuelve
+la red, aunque la página no esté abierta, y vacía la cola desde IndexedDB.
+
+**Por qué se puede hacer ahora y no antes.** Un vaciado en segundo plano es un
+segundo camino hacia `/api/events/sync`, y eso sólo es seguro si el servidor
+aguanta que le llegue lo mismo dos veces o lo de una partida ya borrada. Las dos
+cosas están puestas y verificadas contra producción:
+
+| Candado | Qué para |
+|---|---|
+| `client_event_id` | duplicados → se contestan como duplicados |
+| `stale_before_reset` | anterior a un reinicio → se ignora (4.9.8) |
+
+Sin esos dos, esto habría sido una forma nueva de contar dos veces.
+
+Detalles que importan: no se marca nada como subido si el servidor no lo acepta
+—marcarlo antes de tiempo perdería el avance para siempre—, y al fallar se lanza
+para que el navegador reintente el sync solo. Los eventos van ordenados por
+fecha, porque ese orden **es** el progreso del jugador.
+
+**Alcance honesto:** Background Sync es de Chromium (Chrome y Edge en Android).
+En iOS no existe. Cubre a la mayoría, no a todos, y por eso el ciclo de 30 s de
+la aplicación se queda donde está: esto se **suma**, no sustituye.
+
+---
+
 ## 4.9.10
 
 Un móvil en el bolsillo ya sube lo que lleva pendiente.

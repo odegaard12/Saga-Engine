@@ -274,6 +274,150 @@ self.addEventListener('message', (event) => {
   event.waitUntil(cacheUrls(urls))
 })
 
+/* ------------------------------------------------------------------ *
+ * El ultimo eslabon: vaciar la cola con la aplicacion CERRADA.
+ *
+ * Con la pantalla apagada y la pagina viva la cola ya sube sola (4.9.10).
+ * Pero si Android CONGELA la pestania -la aplicacion en segundo plano un rato
+ * largo- ahi no corre nada: ni el ciclo de 30 s ni ningun temporizador. El
+ * jugador acaba la ruta, guarda el movil, y su ultimo nodo puede no llegar
+ * nunca. Background Sync es lo unico que despierta al service worker cuando
+ * vuelve la red aunque la pagina no este abierta.
+ *
+ * POR QUE ES SEGURO TENER DOS CAMINOS HACIA /api/events/sync: porque el
+ * servidor aguanta que le llegue lo mismo dos veces o lo de una partida ya
+ * borrada, y las dos cosas estan verificadas contra produccion:
+ *
+ *     client_event_id      duplicados -> se contestan como duplicados
+ *     stale_before_reset   anterior a un reinicio -> se ignora
+ *
+ * Sin esos dos candados esto seria una forma nueva de contar dos veces.
+ *
+ * ALCANCE: Background Sync es de Chromium (Chrome y Edge en Android). En iOS no
+ * existe. Cubre a la mayoria, no a todos, y por eso el ciclo de 30 s de la
+ * aplicacion se queda donde esta: esto se SUMA, no sustituye.
+ * ------------------------------------------------------------------ */
+
+const ETIQUETA_COLA = 'saga-cola-offline'
+const BASE_OFFLINE = 'saga-engine-offline-v1'
+const ALMACEN_COLA = 'event_queue'
+
+function abrirBaseOffline() {
+  return new Promise((resolve, reject) => {
+    // Sin numero de version a proposito: si se abre con uno mas alto se
+    // dispararia una migracion desde aqui, y quien crea el esquema es la
+    // aplicacion, no el service worker.
+    const peticion = indexedDB.open(BASE_OFFLINE)
+    peticion.onsuccess = () => resolve(peticion.result)
+    peticion.onerror = () => reject(peticion.error)
+  })
+}
+
+function leerPendientes(db) {
+  return new Promise((resolve) => {
+    if (!db.objectStoreNames.contains(ALMACEN_COLA)) {
+      resolve([])
+      return
+    }
+    const peticion = db.transaction(ALMACEN_COLA).objectStore(ALMACEN_COLA).getAll()
+    peticion.onsuccess = () => {
+      const filas = peticion.result || []
+      resolve(
+        filas
+          .filter((fila) => fila && fila.status !== 'synced')
+          // El orden ES el progreso del jugador: el servidor aplica los avances
+          // segun le llegan.
+          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+      )
+    }
+    peticion.onerror = () => resolve([])
+  })
+}
+
+function marcarSubidos(db, ids) {
+  return new Promise((resolve) => {
+    if (!ids.length || !db.objectStoreNames.contains(ALMACEN_COLA)) {
+      resolve()
+      return
+    }
+    const tx = db.transaction(ALMACEN_COLA, 'readwrite')
+    const almacen = tx.objectStore(ALMACEN_COLA)
+    ids.forEach((id) => {
+      const lectura = almacen.get(id)
+      lectura.onsuccess = () => {
+        const fila = lectura.result
+        if (fila) almacen.put({ ...fila, status: 'synced' })
+      }
+    })
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+}
+
+function aFormatoDeEnvio(evento) {
+  return {
+    client_event_id: evento.id,
+    type: evento.type,
+    source: evento.source || 'offline_queue',
+    team_id: evento.team_id,
+    node_id: evento.node_id,
+    payload: {
+      ...(evento.payload || {}),
+      local_event_id: evento.id,
+      // Esta fecha es la que deja al servidor distinguir un avance de la
+      // partida de ahora de uno de una partida ya reiniciada. Sin ella, el
+      // candado del reinicio no puede hacer su trabajo.
+      local_created_at: evento.created_at,
+      retry_count: evento.retry_count,
+      // Para poder ver en el registro del servidor que vino por aqui.
+      via: 'background_sync',
+    },
+  }
+}
+
+async function vaciarColaEnSegundoPlano() {
+  const db = await abrirBaseOffline()
+  try {
+    const pendientes = await leerPendientes(db)
+    if (!pendientes.length) return
+
+    // Cada jugador, su peticion: el endpoint recibe un `user` y este movil
+    // podria tener cola de mas de uno si se cambio de jugador.
+    const porJugador = new Map()
+    pendientes.forEach((evento) => {
+      const quen = evento.user
+      if (!quen) return
+      if (!porJugador.has(quen)) porJugador.set(quen, [])
+      porJugador.get(quen).push(evento)
+    })
+
+    for (const [quen, eventos] of porJugador) {
+      const response = await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // El endpoint exige pase de jugador; sin cookie son 403.
+        credentials: 'include',
+        body: JSON.stringify({ user: quen, events: eventos.map(aFormatoDeEnvio) }),
+      })
+
+      // Si no lo acepta NO se marca nada: marcarlo antes de tiempo perderia el
+      // avance para siempre. Al lanzar, el navegador reintenta el sync solo.
+      if (!response.ok) {
+        throw new Error('el servidor no acepto la cola: ' + response.status)
+      }
+
+      await marcarSubidos(db, eventos.map((evento) => evento.id))
+    }
+  } finally {
+    db.close()
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag !== ETIQUETA_COLA) return
+  event.waitUntil(vaciarColaEnSegundoPlano())
+})
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
