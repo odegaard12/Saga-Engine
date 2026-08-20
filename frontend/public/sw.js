@@ -451,6 +451,19 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  /**
+   * La foto de un nodo.
+   *
+   * Mismo trato que los avatares: la URL trae la huella del contenido, asi que
+   * se puede guardar y no caduca nunca; si la foto cambia, cambia la URL y se
+   * baja sola. Esto es lo que permite que el mosaico del nodo final se juegue
+   * sin cobertura ahora que la foto no viaja dentro del JSON de la partida.
+   */
+  if (url.pathname.startsWith('/media/nodo/')) {
+    event.respondWith(customCacheFirst(FIELD_PROOF_ASSET_CACHE, request))
+    return
+  }
+
   if (shouldBypass(url)) return
 
   if (request.mode === 'navigate') {

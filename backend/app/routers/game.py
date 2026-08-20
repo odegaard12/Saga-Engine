@@ -16,7 +16,7 @@ async def get_state(user: str):
 
 
 @router.get("/api/game/{user}")
-async def get_game_payload(user: str, request: Request, offline_pack: bool = False):
+async def get_game_payload(user: str, request: Request, offline_pack: bool = False, fotos_por_url: bool = False):
     import main
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
@@ -28,10 +28,10 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
 
     current_stage = None
     if not finished and 0 <= lvl < len(runtime_stages):
-        current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True)
+        current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True, fotos_por_url=fotos_por_url)
 
     stages = [
-        main.project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)))
+        main.project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)), fotos_por_url=fotos_por_url)
         for i, stage in enumerate(runtime_stages)
     ]
 
