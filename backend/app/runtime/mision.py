@@ -107,6 +107,48 @@ def stages_revision(runtime_stages):
     return hashlib.sha1(serializado.encode("utf-8")).hexdigest()[:16]
 
 
+# Lo bastante gordo para que viajar dos veces se note. Por debajo de esto no
+# compensa la complicacion de mirarlo.
+_DUPLICADO_GORDO = 2048
+
+
+def _config_sen_duplicados(node):
+    """La config del editor, sin lo gordo que ya viaja en la del minijuego.
+
+    Medido contra produccion el 2026-08-20: el paquete del jugador son 203 KB, y
+    160 de esos KB son UNA foto repetida —el mosaico del nodo final, en
+    `config` y en `minigame.config`, byte a byte la misma—. Por eso el paquete
+    comprime tan mal, un 32 %: dentro va base64 de un WebP, que ya esta
+    comprimido y no se deja.
+
+    Quitarla de aqui no cambia nada para el jugador: `configDelNodo.ts` mezcla
+    las dos y la del minijuego PISA a la del editor, asi que la foto le llega
+    igual. Su propio comentario dice que quitar uno de los dos "es trabajo del
+    servidor"; esto es esa parte, hecha en pequenio.
+
+    Se quita SOLO lo gordo y SOLO cuando es identico. `game_id` y todo lo que
+    decide la identidad del nodo se lee de aqui en varios sitios y no se toca.
+    """
+    config = node["interaction"]["config"]
+    if not isinstance(config, dict):
+        return config
+
+    delJuego = build_stage_minigame_runtime(node) or {}
+    delJuego = delJuego.get("config") if isinstance(delJuego, dict) else None
+    if not isinstance(delJuego, dict):
+        return config
+
+    return {
+        clave: valor
+        for clave, valor in config.items()
+        if not (
+            isinstance(valor, str)
+            and len(valor) > _DUPLICADO_GORDO
+            and delJuego.get(clave) == valor
+        )
+    }
+
+
 def project_stage_for_player(raw_stage, include_runtime=False):
     """Un nodo, tal y como lo recibe el móvil.
 
@@ -130,7 +172,7 @@ def project_stage_for_player(raw_stage, include_runtime=False):
         out.update({
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
-            "config": node["interaction"]["config"],
+            "config": _config_sen_duplicados(node),
             "minigame": build_stage_minigame_runtime(node),
             "entry": node["entry"],
             "success": node["success"],
