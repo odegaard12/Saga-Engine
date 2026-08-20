@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.13
+
+La foto del mosaico deja de viajar dos veces.
+
+Medido contra producción: el paquete del jugador son **203 KB**, y **160 de esos
+KB son UNA foto repetida** —el mosaico del nodo final, en `config` y en
+`minigame.config`, byte a byte la misma—.
+
+| Ruta | Tamaño |
+|---|---|
+| `stages[9].minigame.config.image_data_url` | 79,8 KB |
+| `stages[9].config.image_data_url` | 79,8 KB (la misma) |
+
+Por eso el paquete comprimía tan mal —200 KB a 136 KB, un 32 %, cuando un JSON
+con esa duplicación debería bajar mucho más—: dentro va base64 de un WebP, que
+ya está comprimido y no se deja.
+
+Quitarla del `config` de arriba no cambia nada para el jugador: `configDelNodo`
+mezcla las dos y **la del minijuego pisa a la del editor**, así que la foto le
+llega igual. Se quita **sólo lo gordo** (más de 2 KB) y **sólo cuando es
+idéntico**; `game_id` y todo lo que decide la identidad del nodo se lee de ahí
+en varios sitios y no se toca.
+
+Esto es el primer corte, el seguro. El bueno viene después: sacar la foto del
+JSON y servirla por su propia URL, que además la haría cacheable por el
+navegador y por Cloudflare. Eso toca el guardado sin cobertura, así que va
+aparte.
+
+---
+
 ## 4.9.12
 
 Dos guardias en el editor de nodos, para que un guardado malo no llegue al monte.
