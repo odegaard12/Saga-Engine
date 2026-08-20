@@ -189,6 +189,17 @@ def _iso_a_ms(valor):
         return 0
 
 
+def player_reset_at(user) -> int:
+    """El milisegundo del último reinicio de este jugador. 0 si nunca lo han reiniciado."""
+    record = load_inventory_state().get(user)
+    if not isinstance(record, dict):
+        return 0
+    try:
+        return int(record.get("reset_at") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def save_player_inventory(user: str, inventory_snapshot: dict):
     """Guarda la mochila que sube el jugador, respetando el último reset.
 
@@ -1434,6 +1445,34 @@ def apply_synced_player_event(normalized_event, user, profile):
             **raw_payload,
             "server_level": current_level,
             "duplicate_of_level": level_before,
+        }
+        return append_event(EVENT_LOG_DB, event)
+
+    # Un reinicio tiene que aguantar a la cola vieja del móvil.
+    #
+    # El candado de arriba es por NIVEL y protege contra avances repetidos: si el
+    # servidor ya va por delante, el evento es un eco. Pero después de reiniciar a
+    # alguien a 0, un evento de la partida ANTERIOR con `level_before: 0` encaja
+    # perfectamente —el servidor está en 0, el evento dice que venía del 0— y le
+    # vuelve a avanzar.
+    #
+    # Visto en producción el 2026-08-17: se reinicia a un jugador con el móvil
+    # abierto y al rato el servidor está otra vez en 1 él solo. El móvil seguía
+    # marcando 2/10 hasta borrarle localStorage y las tres bases de IndexedDB. En
+    # día de ruta eso deja al organizador sin forma de arreglar nada.
+    #
+    # Lo que distingue una cosa de la otra ya viajaba y nadie lo miraba: el móvil
+    # manda `payload.local_created_at` con la fecha en que encoló el avance, y
+    # aquí está `reset_at`. Anterior al reinicio = partida borrada.
+    reset_at = player_reset_at(profile_id) or player_reset_at(user)
+    creado_ms = _iso_a_ms(raw_payload.get("local_created_at"))
+    if reset_at and creado_ms and creado_ms < reset_at:
+        event["status"] = "ignored"
+        event["error"] = "stale_before_reset"
+        event["payload"] = {
+            **raw_payload,
+            "reset_at": reset_at,
+            "event_created_ms": creado_ms,
         }
         return append_event(EVENT_LOG_DB, event)
 

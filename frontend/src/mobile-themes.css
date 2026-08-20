@@ -324,15 +324,24 @@ body.theme-flame-red .saga-hud-dock {
   background: var(--theme-brasa) !important;
 }
 
-/* Los iconos, en blanco.
+/* Los iconos, con su color y separados del fondo.
  *
- * Son emoticonos, asi que su color viene de la fuente y no hay forma de
- * pintarlos desde el CSS. `grayscale` los deja en gris y `brightness` los sube
- * a blanco: quedan monocromos sobre la barra, sin pelear con el rojo.
+ * Antes iban con `grayscale(1) brightness(2.4)`, y eso no los «pone en blanco»:
+ * les BORRA el dibujo. Una camara 📷 se queda en una mancha blanca sin detalle,
+ * y sobre la brasa hay que adivinar cual es cual. Quedaba feo y ademas costaba
+ * usarlo.
+ *
+ * Un emoticono ya viene disenado para leerse sobre cualquier fondo. Lo que
+ * necesita sobre el rojo no es perder el color, sino despegarse: una sombra
+ * oscura corta y basta.
+ *
+ * Va por variable para que se pueda cambiar de tema en tema sin tocar esto. Si
+ * algun dia se quiere volver a los monocromos, se declara `--theme-icon-filter`
+ * en el bloque del tema y ya esta; aqui solo esta el respaldo.
  */
 body.theme-flame-red .saga-hud-quick button span,
 body.theme-flame-red .saga-hud-dock button span {
-  /* `!important` porque el emoticono lleva su propio `filter` en linea -una
-     sombra- y en linea gana. Sin esto la regla no pinta nada. */
-  filter: grayscale(1) brightness(2.4) !important;
+  /* `!important` porque el emoticono puede llevar su propio `filter` en linea y
+     en linea gana. Sin esto la regla no pinta nada. */
+  filter: var(--theme-icon-filter, drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))) !important;
 }

@@ -6,6 +6,51 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.8
+
+Un reinicio que aguanta a la cola vieja del móvil, y los iconos recuperan su
+dibujo.
+
+### Reiniciar a alguien ya no se deshace solo
+
+Visto en producción: se reinicia a un jugador a 0 con el móvil abierto y al rato
+el servidor está otra vez en 1 él solo. El móvil seguía marcando 2/10 incluso
+después de recargar, y sólo se recuperó borrando `localStorage` y las tres bases
+de IndexedDB. En día de ruta eso deja al organizador sin forma de arreglar nada.
+
+La causa no estaba en el cliente: los tres sitios que leen `reset_at` llaman a
+`aplicarResetDeRelojes` y vacían la cola. El agujero estaba en el servidor.
+
+El único candado que había era por nivel:
+
+    if level_before is not None and level_before < current_level:  # duplicado
+
+Protege contra avances repetidos, no contra avances **de otra partida**. Después
+de reiniciar a 0, un evento viejo con `level_before: 0` encaja perfectamente —el
+servidor está en 0, el evento dice que venía del 0— y vuelve a avanzarle.
+
+El dato que los distingue ya viajaba y nadie lo miraba: el móvil manda
+`payload.local_created_at` con la fecha en que encoló el avance, y el servidor
+guarda `reset_at`. Si el evento es anterior al reinicio, es de la partida que se
+acaba de borrar y se ignora (`stale_before_reset`).
+
+Tres pruebas: la del fallo, y dos que impiden pasarse de listo —un avance hecho
+DESPUÉS del reinicio sigue contando, y a quien nunca han reiniciado no le cambia
+nada—.
+
+### Los iconos recuperan su dibujo
+
+Iban con `grayscale(1) brightness(2.4)`, y eso no los «pone en blanco»: les
+borra el dibujo. Una cámara 📷 se quedaba en una mancha blanca sin detalle y
+sobre la brasa había que adivinar cuál era cuál: feo y además incómodo de usar.
+
+Un emoticono ya viene diseñado para leerse sobre cualquier fondo. Lo que
+necesita sobre el rojo no es perder el color, sino despegarse del fondo, así que
+ahora llevan una sombra corta y nada más. Va por `--theme-icon-filter`, con la
+sombra como respaldo, para poder cambiarlo por tema sin tocar la regla.
+
+---
+
 ## 4.9.7
 
 Quedarse sin cobertura deja de ser mudo.
