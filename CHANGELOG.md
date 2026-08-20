@@ -6,6 +6,32 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.12
+
+Dos guardias en el editor de nodos, para que un guardado malo no llegue al monte.
+
+**Ids repetidos.** El servidor aceptaba guardar dos nodos con el mismo id sin
+decir nada. El editor del panel ya asignaba `max+1` al crear, pero no había red
+por debajo. Con dos ids iguales se mezclan las configuraciones al guardar y un
+nodo acaba con el minijuego de otro: ya pasó una vez.
+
+**Moldeado de tramo fuera del planeta.** `route_via` pasaba tal cual al jugador
+sin mirarlo. El cliente descarta lo que no sea un par de números finitos, así
+que la basura evidente no rompe nada —el moldeado simplemente no se aplica, en
+silencio—. Pero una coordenada fuera de rango sí pasa ese filtro (999 es un
+número finito) y se dibuja: la línea verde que el jugador tiene que seguir sale
+disparada fuera del mapa.
+
+Las dos con pruebas de que **no se pasan de listas**: una misión buena se sigue
+guardando, y un nodo sin moldeado también. Comprobado además contra la misión
+real antes de desplegar: los 10 nodos llevan `route_via` vacío —el trazado viene
+de `route_track`, el GPX de campo—, así que no se rechaza nada de lo que hay.
+
+Sin arreglar, y escrito en el plan: borrar un nodo desplaza a los jugadores que
+van por detrás, porque el progreso se guarda como índice y no como id de nodo.
+
+---
+
 ## 4.9.11
 
 El último eslabón: la cola sube aunque la aplicación esté cerrada.
