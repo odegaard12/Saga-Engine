@@ -653,9 +653,28 @@ export default function PlayerApp() {
       if (!initialLoadDoneRef.current) return
       if (interactionOpen || submitting) return
 
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
+      /**
+       * Con la pantalla apagada la cola SI sube; lo que no se hace es el
+       * refresco pesado.
+       *
+       * Antes este `return` cortaba las dos cosas a la vez, y medido el
+       * 2026-08-17 eso significaba que un movil en el bolsillo no subia nada:
+       * ocho segundos con red perfecta y servidor sano, el servidor en 0 y el
+       * movil en 1. Solo se reconciliaba al volver a mirar la pantalla. Quien
+       * acaba la ruta y guarda el movil podia dejar su tiempo sin registrar
+       * todo el dia.
+       *
+       * Pero no son dos cosas del mismo precio: vaciar la cola es un POST
+       * diminuto -y con la cola vacia, ni eso-, mientras que `pedirPartida` son
+       * 214 KB. Lo caro se salta; lo barato, no.
+       *
+       * OJO CON LO QUE ESTO NO ARREGLA: si el navegador CONGELA la pagina -app
+       * en segundo plano un rato largo en Android- aqui no corre nada, ni esto
+       * ni ninguna otra cosa. Para ese caso hace falta Background Sync de
+       * verdad, con service worker. Esto cubre la pantalla apagada con la
+       * pagina viva, que es el caso corriente al guardarse el movil un momento.
+       */
+      const oculto = typeof document !== 'undefined' && document.visibilityState !== 'visible'
 
       running = true
 
@@ -673,6 +692,10 @@ export default function PlayerApp() {
           await syncPendingOfflineEvents(user).catch(() => undefined)
           await flushOfflineEvents(user).catch(() => undefined)
         }
+
+        // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
+        // para cuando hay alguien mirando.
+        if (oculto) return
 
         /**
          * Repasar tambien las fotos que estaban esperando.
