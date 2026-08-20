@@ -315,6 +315,52 @@ vaciar la cola, la borra él solo y el candado del servidor ni se ejercita. Por
 eso la comprobación buena es mandar el evento a mano; con el navegador se está
 midiendo quién gana la carrera, no si el candado funciona.
 
+### 1.1.b Cinco avances encolados a la vez — **bien, y probado**
+
+Todas las pruebas anteriores tenían **un solo** evento en la cola. Simulado el
+20 de agosto con cinco de golpe, como quien hace media ruta en modo avión:
+
+- Los cinco se aplicaron **en orden**, uno por nivel: 0 → 5. Sin saltos ni
+  dobles.
+- El servidor **ignoró el `node_id` que mandaba el cliente** y usó el suyo
+  (devolvió 0, 12, 17, 11, 3 — los ids reales de la misión). Es lo correcto: la
+  progresión la manda el servidor.
+
+Este era el punto que faltaba por comprobar de la cola. Está bien.
+
+### 1.1.c El código interno de «superado» lo acepta cualquier nodo — **decisión pendiente**
+
+Salió de la simulación anterior, y conviene entenderlo antes de opinar.
+
+Cada nodo lleva una condición interna `minigame_ok` con la que los minijuegos
+avisan de que se han ganado, y **esa palabra la acepta cualquier nodo**. Es
+deliberado: sin cobertura el móvil es la autoridad, juega el minijuego y dice
+«superado», y el servidor no tiene forma de volver a comprobarlo.
+
+La bandera `manual` existe para que esa palabra **no** valga escrita en la
+casilla de respaldo (`stage_accepts_code`, `mision.py:92`). Eso protege al
+jugador honesto de saltarse un nodo con la casilla de texto.
+
+**Lo que la simulación enseña:** `manual` la manda el cliente, así que desde una
+consola se omite. Con un pase de jugador —que se consigue entrando en
+`/player/<nombre>`— se puede recorrer la ruta entera mandando `code: 'OK'` a
+`/api/events/sync`. Comprobado: el jugador de pruebas pasó de 0 a 5 sin escanear
+un QR ni jugar nada.
+
+**No lo he tocado, y creo que no hay que tocarlo a la ligera.** Es la otra cara
+de que el juego funcione sin cobertura, que es lo que hemos pasado toda la
+semana protegiendo. Para trece amigos en el monte puede ser perfectamente
+asumible. Las salidas, por orden de coste:
+
+1. **Dejarlo y saberlo.** Es una gymkhana entre conocidos, no un examen.
+2. **Cruzar con la última posición conocida.** El servidor tiene el nodo y el
+   último latido: completar un nodo estando a kilómetros es sospechoso. Tiene
+   que ser flojo, porque sin cobertura no hay latido.
+3. Firmar los avances en el móvil. Mucho trabajo y se rompe fácil.
+
+**Medir primero:** si alguna vez importa, mirar en el registro de eventos cuántos
+avances llegan sin `time_spent_ms` plausible. Hoy nadie lo ha mirado.
+
 ### 1.2 Editor de nodos — **sin auditar**
 Un nodo mal guardado desde el panel se convierte en un jugador delante de una
 pantalla que no avanza. Sobre todo: `route_via`, los ids únicos y qué pasa al
