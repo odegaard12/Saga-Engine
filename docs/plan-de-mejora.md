@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.11**.
+Estado a 20 de agosto de 2026. Producción: **4.9.12**.
 
 ---
 
@@ -398,8 +398,26 @@ la cola offline — no es un parche de una tarde.
    bien y es traicionero: hay que hacerlo también en la cola del móvil, que
    manda sobre su propio progreso.
 
-**Lo que NO se auditó todavía:** `route_via`, el moldeado de los tramos. Queda
-para la siguiente.
+**✅ `route_via` — auditado y con guardia (4.9.12).** El servidor lo pasaba al
+jugador sin mirarlo: aceptaba textos, pares incompletos, nulos y coordenadas
+imposibles.
+
+El cliente resultó ser defensivo —descarta lo que no sea un par de números
+finitos (`MapSurface.tsx`)—, así que la basura evidente no rompe nada. El fallo
+silencioso era otro: el moldeado sencillamente no se aplicaba y nadie se
+enteraba.
+
+Pero un caso **sí** pasaba ese filtro: una coordenada fuera de rango. `999` es
+un número finito, así que se dibujaba, y la línea verde que el jugador tiene que
+seguir salía disparada fuera del mapa. Ahora se rechaza.
+
+No se comprueba que los puntos estén **cerca** de la ruta, a propósito: mover un
+tramo lejos puede ser legítimo mientras se diseña una misión nueva.
+
+Comprobado contra la misión real antes de desplegar, que era el riesgo: los 10
+nodos llevan `route_via` **vacío** —el trazado de verdad viene de `route_track`,
+el GPX de campo—, así que la guardia no rechaza nada de lo que ya existe. Y
+verificado dentro del contenedor después de desplegar.
 
 ### 1.3 Recorrido completo de una ruta — **parado en el nodo 3 de 10**
 No se puede terminar sin un móvil de verdad: los minijuegos de movimiento
