@@ -30,6 +30,26 @@ def validate_stages(raw_stages):
             continue
         errores.extend(validate_stage(stage, idx=indice))
 
+    # Dos nodos con el mismo id mezclan sus configuraciones al guardar: uno
+    # acaba con el minijuego del otro. El editor del panel ya asigna max+1 al
+    # crear, pero esto es la red por debajo, para que no dependa de que el
+    # cliente siga portandose bien.
+    vistos = {}
+    for indice, stage in enumerate(raw_stages):
+        if not isinstance(stage, dict):
+            continue
+        id_ = stage.get("id")
+        if id_ is None:
+            continue
+        if id_ in vistos:
+            errores.append({
+                "index": indice,
+                "field": "id",
+                "detail": f"id repetido: el nodo {indice} usa el mismo id ({id_}) que el {vistos[id_]}",
+            })
+        else:
+            vistos[id_] = indice
+
     return errores
 
 

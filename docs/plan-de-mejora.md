@@ -361,10 +361,45 @@ asumible. Las salidas, por orden de coste:
 **Medir primero:** si alguna vez importa, mirar en el registro de eventos cuántos
 avances llegan sin `time_spent_ms` plausible. Hoy nadie lo ha mirado.
 
-### 1.2 Editor de nodos — **sin auditar**
-Un nodo mal guardado desde el panel se convierte en un jugador delante de una
-pantalla que no avanza. Sobre todo: `route_via`, los ids únicos y qué pasa al
-borrar un nodo intermedio con gente ya pasada por él.
+### 1.2 Editor de nodos — **auditado el 20 de agosto**
+
+Tres hallazgos, y la raíz de los dos peores es la misma: **el progreso de un
+jugador se guarda como ÍNDICE en la lista de nodos, no como id del nodo.**
+
+**✅ Ids repetidos — arreglado.** El servidor aceptaba guardar dos nodos con el
+mismo id sin decir nada. El editor del panel ya asignaba `max+1` al crear, pero
+no había red por debajo. Importa porque con dos ids iguales se mezclan las
+configuraciones al guardar: un nodo acaba con el minijuego de otro. Ya pasó una
+vez. Ahora `validate_stages` lo rechaza, con prueba.
+
+**🔴 Borrar un nodo anterior hace que el jugador se salte uno — sin arreglar.**
+Medido: jugador en el nodo 5 de 10; el organizador borra el nodo 2; el jugador
+sigue en «nivel 5», pero ahora el nivel 5 apunta al nodo **6**. Se ha saltado un
+nodo entero y nadie se entera. Añadir un nodo antes hace lo simétrico: le obliga
+a repetir uno.
+
+**🔴 Y si va por el último, se le da la misión por terminada.** Medido: jugador
+en el nivel 9 de 10; se borra cualquier nodo anterior; quedan 9 nodos, su nivel
+9 ya no existe, y el servidor lo lee como misión completa. Termina la ruta sin
+jugar el último nodo.
+
+**Lo que costaría arreglarlo de verdad:** guardar el progreso por **id de nodo**
+en vez de por índice. Es una migración de datos y toca el cliente, el servidor y
+la cola offline — no es un parche de una tarde.
+
+**Lo barato mientras tanto**, por orden:
+
+1. **No tocar la ruta con gente jugando.** Es una norma, no código, pero es la
+   que de verdad evita esto.
+2. **Avisar en el panel antes de guardar**: «esto desplaza a N jugadores».
+   El servidor tiene los dos datos —cuántos nodos había y por dónde va cada
+   uno—, así que el aviso se puede calcular sin migrar nada.
+3. Al borrar un nodo, ajustar el nivel de quien estuviera por detrás. Suena
+   bien y es traicionero: hay que hacerlo también en la cola del móvil, que
+   manda sobre su propio progreso.
+
+**Lo que NO se auditó todavía:** `route_via`, el moldeado de los tramos. Queda
+para la siguiente.
 
 ### 1.3 Recorrido completo de una ruta — **parado en el nodo 3 de 10**
 No se puede terminar sin un móvil de verdad: los minijuegos de movimiento
