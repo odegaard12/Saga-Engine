@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.10**.
+Estado a 20 de agosto de 2026. Producción: **4.9.11**.
 
 ---
 
@@ -354,9 +354,22 @@ vaciar la cola, y ahí dentro hay dos cosas de precio muy distinto: el vaciado e
 un POST diminuto y `pedirPartida` son 214 KB. Ahora lo barato se hace siempre y
 lo caro sigue esperando a que alguien mire.
 
-**Sigue pendiente el caso duro:** si el navegador *congela* la página (segundo
-plano largo en Android) no corre nada. Para eso hace falta Background Sync con
-service worker, y eso sí es trabajo de verdad.
+✅ **Y el caso duro, cerrado en 4.9.11.** El service worker escucha ya `sync`:
+el navegador lo despierta cuando vuelve la red aunque la página no esté abierta,
+y vacía la cola desde IndexedDB.
+
+Lo que hizo que esto fuera seguro de construir —y no lo era antes— son los dos
+candados del servidor, porque un vaciado en segundo plano es un **segundo**
+camino hacia `/api/events/sync`:
+
+| Candado | Qué para |
+|---|---|
+| `client_event_id` | duplicados → se contestan como duplicados |
+| `stale_before_reset` | anterior a un reinicio → se ignora (4.9.8) |
+
+**Alcance honesto:** Background Sync es de Chromium (Chrome y Edge en Android);
+en iOS no existe. Por eso el ciclo de 30 s se queda donde está: esto se **suma**,
+no sustituye.
 
 **Verificado en producción con la pantalla oculta:** cola con un evento
 pendiente, servidor en 0, móvil en 1, red devuelta y sin volver a mirar la
@@ -369,6 +382,22 @@ hizo. Lo barato siempre, lo caro cuando hay alguien delante.
 tras recuperar cobertura. Si son segundos, esto no merece el trabajo. Pero el
 que acaba la ruta y guarda el móvil puede no mirarlo más en todo el día, y ahí
 el ranking se queda mal para siempre.
+
+### 2.3 Un minijuego a medias no sobrevive a que maten la pestaña — **sin arreglar**
+
+Del repaso del 20 de agosto: **ninguno de los cinco minijuegos que se juegan
+guarda su estado a medias** (0 usos de `localStorage` / IndexedDB en los cinco).
+
+Un corte de cobertura NO los rompe —van dentro del paquete del jugador y no
+piden nada a la red—, así que esto no es un problema de cobertura. El problema
+es otro: si el navegador mata la pestaña a mitad de un laberinto (Android
+liberando memoria, o un toque en recargar), **el jugador lo repite entero con el
+reloj del nodo corriendo**. No se queda tirado, pero se le penaliza en tiempo
+por algo que no hizo él.
+
+**Medir primero:** cuánto tarda de media alguien en resolver los dos minijuegos
+largos (`placeMosaic` y `circuitMatrix`). Si son dos minutos, esto es una
+molestia; si son ocho, es una injusticia en la clasificación.
 
 ### 2.2 Fotos pendientes
 Ya hay un repaso, pero conviene un contador visible: «3 fotos sin subir». Ahora
@@ -500,10 +529,15 @@ tumbó (17 de agosto). Producción se cayó con ella.
   en la de ejecución.
 - **Parar el contenedor de ensayo antes de construir.** Ya se hace, pero a mano.
   (A 17 de agosto **no hay** contenedor de ensayo levantado: sólo producción.)
-- **Construir fuera de la Pi.** Es lo que de verdad lo arregla: compilar el
-  frontend en otra máquina y mandar sólo el `dist`. Traba conocida: **no hay
-  Node en el Windows local**, así que hace falta decidir dónde se compila
-  (contenedor en el portátil, o el CI de GitHub subiendo el `dist`).
+- 🟢 **Construir fuera de la Pi — ya no hay excusa.** Es lo que de verdad lo
+  arregla: compilar el frontend en otra máquina y mandar sólo el `dist`. La
+  traba que lo bloqueaba era falsa: **sí hay Node en el Windows local (v26.7.0)**,
+  comprobado el 20 de agosto. Con `npm install` en `frontend/`, `npx tsc -b`
+  pasa limpio y `npx vite build` tarda **3 segundos**.
+
+  Dos cosas que esto cambia de golpe: se puede **comprobar el TypeScript antes
+  de desplegar** (hasta ahora se desplegaba a ciegas y se rezaba), y se puede
+  quitar de la Pi la etapa que la tumbó dos veces.
 - **Limpiar imágenes viejas.** Hay **50** (17 de agosto). Con dejar las tres
   últimas basta.
 - **Vigilancia:** un aviso si la memoria disponible baja de 200 MB. Ahora mismo
