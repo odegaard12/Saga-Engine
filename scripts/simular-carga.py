@@ -143,6 +143,7 @@ def modo_lectura(args, jugadores: list[str], medidas: Medidas) -> None:
             url = (
                 f"{args.base}/api/game/{urllib.parse.quote(nombre)}"
                 f"?offline_pack=true&t={time.time()}"
+                + ("&fotos_por_url=true" if args.fotos_por_url else "")
             )
             t0 = time.perf_counter()
             try:
@@ -261,6 +262,12 @@ def main() -> int:
         "va cada 30 s; sin esto se martillea y sólo se mide el limitador.",
     )
     p.add_argument("--nombres", default="", help="lista separada por comas")
+    p.add_argument(
+        "--fotos-por-url",
+        action="store_true",
+        help="pide el paquete como lo pide un cliente actual: sin las fotos "
+        "dentro, que se bajan aparte y las cachea Cloudflare",
+    )
     p.add_argument(
         "--si-se-lo-que-hago",
         action="store_true",

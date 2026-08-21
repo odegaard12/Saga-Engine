@@ -228,7 +228,18 @@ body.theme-flame-red {
   --theme-radius-pill: 999px;
   --theme-blur: none;
   --theme-border-w: 1px;
-  --theme-panel-cut: 0px;
+  /* La esquina cortada, encendida.
+   *
+   * Estaba a 0, y con 0 la clip-path de mas abajo es un rectangulo exacto: el
+   * corte no aparecia nunca y el CSS no daba ningun error. El disenio de 4.9.4
+   * dice que la esquina cortada es una de sus TRES ideas -con la brasa en
+   * diagonal y el filo encendido-; las otras dos estaban puestas y esta llevaba
+   * apagada desde entonces. Por eso el tema se leia como el mismo disenio con
+   * otro color.
+   *
+   * 12 px con un radio de panel de 14: se nota sin comerse la esquina. Cristal
+   * se queda en 0 a proposito, que es el tema redondo. */
+  --theme-panel-cut: 12px;
 }
 
 /* --- Y esto es lo que pinta ---------------------------------------------- */

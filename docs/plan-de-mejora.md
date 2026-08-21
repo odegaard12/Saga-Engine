@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.15**.
+Estado a 20 de agosto de 2026. Producción: **4.9.16**.
 
 ---
 
@@ -200,7 +200,29 @@ peticiones a la vez por el mismo tubo.
    nada.** Sólo se vio al medirlo. Hay una prueba que impide que la ruta vuelva
    a `/api/`.
 
-   ❌ **Falta el paso que da el ahorro grande:** retirar la copia de dentro del
+   ✅ **Y el paso grande, hecho en 4.9.16.** El cliente pide
+   `?fotos_por_url=true`, el servidor manda sólo la URL, y el móvil **se baja la
+   foto aparte y la vuelve a meter en su paquete antes de guardarlo**: por el
+   cable viaja una vez y cacheada, y en IndexedDB queda igual que siempre.
+
+   Medido con quince jugadores, el recorrido entero:
+
+   | | Original | Sin duplicado | Foto fuera |
+   |---|---|---|---|
+   | Paquete | 200 KB | 120 KB | **38 KB** |
+   | p50 | 4 326 ms | 1 639 ms | **1 170 ms** |
+   | Caudal | 2,4/s | 9,9/s | **12,4/s** |
+
+   Verificado en el móvil, que era lo que daba miedo: el paquete guardado lleva
+   los 10 nodos y **la foto dentro (80 KB)**, y además el service worker la tiene
+   en su caché. Doble garantía de modo avión.
+
+   Las tres redes que lo hacen seguro de desplegar: lo pide el cliente y no lo
+   decide el servidor (un móvil viejo sigue recibiendo 120 KB con la foto
+   dentro, comprobado); si una sola foto no se baja se pide el paquete entero; y
+   el service worker la precachea.
+
+   ~~**Falta el paso que da el ahorro grande:**~~ retirar la copia de dentro del
    JSON, que dejaría el paquete en ~40 KB. No se ha hecho a propósito: un móvil
    con la aplicación vieja cacheada seguiría pidiéndola ahí, y quitársela de
    golpe le dejaría el mosaico en blanco sin cobertura. Antes hace falta que el
