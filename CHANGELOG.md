@@ -6,6 +6,40 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.18
+
+Ahora sí cambia de forma **lo que se ve**.
+
+4.9.17 encendió el corte, y aun así el tema seguía leyéndose igual. Medido en el
+navegador, en la pantalla principal:
+
+| Elemento | Área | Forma |
+|---|---|---|
+| **Barra de arriba** | **97 767 px²** | píldora de 28 px, sin corte |
+| Mochila / Herramientas | 28 691 px² | sin corte |
+| Fila de iconos | 10 811 px² | sin corte |
+
+El corte va en una regla de `.saga-glass-panel`, y en el mapa eso es **un solo
+elemento**. Alcanzaba los minijuegos y el panel de preparación, no lo que se
+mira el 90 % del tiempo.
+
+**Y el segundo cero.** `PlayerShell.tsx` lee el radio con
+`var(--theme-radius-shell, 28px)`… y **ningún tema declaraba esa variable**. El
+arreglo de 4.9.4 enganchó la barra a una variable y nunca le dio valor, así que
+siempre ganaba el respaldo — en fuego igual que en cristal. Mecanismo puesto,
+valor nunca. Por segunda vez en dos días.
+
+Ahora fuego declara `--theme-radius-shell: 4px` y el corte llega a las tres
+superficies grandes (137 000 px² entre ellas). Cristal declara sus 28 px: **no
+cambia ni un píxel**, pero deja de heredar en silencio un valor que nadie
+eligió para él.
+
+De paso se resolvió un choque entre dos pruebas del propio proyecto —una exige
+que los dos temas declaren el mismo juego de variables, otra pedía que cristal
+NO declarase ésta—. No podían cumplirse a la vez en cuanto fuego la declaró.
+
+---
+
 ## 4.9.17
 
 La esquina cortada del tema de fuego, encendida. Llevaba apagada por un cero.
