@@ -168,6 +168,18 @@ body.theme-glass {
   --theme-blur: blur(22px) saturate(1.12);
   --theme-border-w: 1px;
   --theme-panel-cut: 0px;
+
+  /* El radio de la barra de arriba, DECLARADO y no heredado del respaldo.
+   *
+   * 28 px es exactamente lo que ya se veia: `PlayerShell.tsx` la lee con
+   * `var(--theme-radius-shell, 28px)` y nadie la declaraba, asi que cristal no
+   * cambia ni un pixel. Lo que cambia es que ahora esta escrito.
+   *
+   * Se declara porque hay una prueba que exige que los dos temas declaren el
+   * mismo juego de variables, y tiene razon: una variable en un tema y no en el
+   * otro es justo el fallo que se estaba arreglando -el que hereda se lleva un
+   * valor que nadie eligio para el-. */
+  --theme-radius-shell: 28px;
 }
 
 /* Fuego: rojo brasa. El fondo es muy oscuro a propósito —el texto va en
@@ -240,6 +252,19 @@ body.theme-flame-red {
    * 12 px con un radio de panel de 14: se nota sin comerse la esquina. Cristal
    * se queda en 0 a proposito, que es el tema redondo. */
   --theme-panel-cut: 12px;
+
+  /* El radio de la barra de arriba, que NADIE declaraba.
+   *
+   * `PlayerShell.tsx` la lee con `var(--theme-radius-shell, 28px)`, y ningun
+   * tema declaraba esa variable: siempre ganaba el respaldo de 28 y la barra
+   * seguia siendo una pildora en los dos temas. El arreglo de 4.9.4 la engancho
+   * a la variable y nunca le dio valor.
+   *
+   * Es el elemento mas grande de la pantalla -medido: 97 767 px2, tres veces la
+   * barra de abajo-, asi que mientras siguiera redonda el tema se leia igual.
+   *
+   * Cristal NO la declara a proposito: su respaldo es su disenio. */
+  --theme-radius-shell: 4px;
 }
 
 /* --- Y esto es lo que pinta ---------------------------------------------- */
@@ -333,6 +358,22 @@ body.theme-flame-red [data-saga-player-shell='top'],
 body.theme-flame-red .saga-hud-quick,
 body.theme-flame-red .saga-hud-dock {
   background: var(--theme-brasa) !important;
+  /* El mismo corte que los paneles, en las TRES superficies grandes de la
+   * pantalla principal. Encender la variable no bastaba: el corte va en una
+   * regla de `.saga-glass-panel`, y en el mapa eso es UN solo elemento. Estas
+   * tres suman 137 000 px2 y son las que hacen que el tema se lea distinto.
+   *
+   * Va aqui dentro, limitado a fuego, y no en el componente: en cristal la
+   * variable vale 0 y un poligono rectangular le borraria las esquinas
+   * redondas. */
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
 }
 
 /* Los iconos, con su color y separados del fondo.

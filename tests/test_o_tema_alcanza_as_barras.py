@@ -63,7 +63,22 @@ def test_a_barra_de_arriba_non_leva_o_radio_cravado():
 
 
 def test_o_respaldo_conserva_o_de_cristal():
-    """Cristal no declara la variable, así que se queda con el respaldo."""
+    """Cristal sigue con SUS 28 px, los declare o los herede.
+
+    Esta prueba pedía antes que cristal NO declarase `--theme-radius-shell`,
+    para que se quedara con el respaldo del componente. Chocaba de frente con
+    `test_variables_sen_repetir`, que exige que los dos temas declaren el mismo
+    juego: en cuanto fuego declaró la suya (2026-08-21), las dos no podían
+    cumplirse a la vez.
+
+    Se resolvió por el lado que protege lo mismo con menos trampa: cristal la
+    declara con los 28 px que ya usaba. No cambia ni un píxel —es el mismo
+    número que el respaldo— y deja de heredar en silencio un valor que nadie
+    eligió para él, que es justo el fallo que se estaba arreglando.
+
+    Lo que esta prueba protege sigue siendo lo de siempre: que cristal no
+    cambie de forma.
+    """
     codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
         encoding="utf-8"
     )
@@ -76,7 +91,8 @@ def test_o_respaldo_conserva_o_de_cristal():
     inicio = css.index("body.theme-glass {")
     cuerpo = css[inicio : css.index("}", inicio)]
 
-    assert "--theme-radius-shell" not in cuerpo, (
-        "si cristal declara la variable deja de usar su propio respaldo y "
-        "cambia de forma"
+    hallado = re.search(r"--theme-radius-shell:\s*([^;]+);", cuerpo)
+    assert hallado, "cristal hereda un valor que nadie eligió para él"
+    assert "28" in hallado.group(1), (
+        "cristal ha cambiado de forma: tiene que seguir en sus 28 px"
     )
