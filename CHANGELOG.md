@@ -6,6 +6,43 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.19
+
+Los alfileres, los puntos y la mesa. Lo que faltaba de verdad.
+
+4.9.18 cambió la forma de las tres superficies grandes, y aun así seguía sin
+verse el diseño nuevo: **los alfileres del mapa, los puntos de la barra y la
+mesa de trabajo son elementos aparte, con su forma escrita a mano.**
+
+**Los alfileres seguían siendo pelotas.** 4.9.4 decía que «dejan de ser pelotas
+y pasan a ser chapas» y no era verdad en el código servido:
+
+| | Antes |
+|---|---|
+| `.saga-mission-node-pin` | `border-radius: 999px` clavado |
+| `.saga-mission-node-type-badge` | `border-radius: 50%` clavado |
+| Puntos de la barra | `--theme-radius-pill`, que vale **999px en los dos temas** |
+
+Tres formas redondas que ningún tema podía cambiar. Ahora salen de
+`--theme-radius-dot`: 999px en cristal —exactamente lo que ya se veía— y 3px en
+fuego. Va en variable propia y no reutilizando `--theme-radius-pill`, porque esa
+la usan cosas que **sí** son píldoras (la de SOLO, la de la cuenta) y ahí el 999
+es correcto.
+
+**La posición del jugador se queda redonda a propósito:** un marcador de
+posición redondo es lo convencional, y su aura es un degradado radial que
+cuadrado se vería mal.
+
+**Y la mesa de trabajo**, que era la pantalla que quedaba fuera de todo: no
+lleva `.saga-glass-panel` ni las clases del HUD, así que ni el corte ni la brasa
+le llegaban. Por dentro tenía **morado** (`rgba(167,139,250)`, `rgba(124,58,237)`)
+y gris pizarra clavados, de otro tema. Ahora los colores salen del tema y las
+fichas llevan clase propia con el corte, en una regla limitada a fuego —en
+cristal la variable vale 0 y un polígono rectangular les borraría las esquinas
+redondas—.
+
+---
+
 ## 4.9.18
 
 Ahora sí cambia de forma **lo que se ve**.
