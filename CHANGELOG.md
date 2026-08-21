@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.23
+
+El vigilante de versión estaba escrito y **no lo llamaba nadie**.
+
+Buscando por qué un despliegue no se veía, apareció esto: `versionGuard.ts`
+compara la versión del bundle con la de `/api/version` y, si no coinciden, borra
+la caché del armazón y recarga una vez. Está bien escrito —candado de una
+recarga por versión, no toca el mapa ni las misiones guardadas—, tiene su
+cabecera explicando para qué existe:
+
+> «Ha pasado: se desplegaban arreglos, el servidor los servía, y en el móvil no.»
+
+**Cero importaciones en todo el proyecto.** El mecanismo escrito para arreglar
+ese problema exacto llevaba sin enchufar desde que se escribió, así que el
+problema seguía pasando.
+
+Es la **séptima** vez en dos días con el mismo patrón —mecanismo montado, pieza
+sin enganchar, ningún error— y la más cara de todas: un móvil que abrió la
+aplicación por la mañana se queda con ese código todo el día, y un arreglo
+desplegado a media mañana no le llega nunca.
+
+Ahora se llama al arrancar, que es el único momento en que una recarga no le
+interrumpe un minijuego a nadie, y con `void`: sin cobertura `/api/version` no
+contesta, y arrancar es justo lo que tiene que seguir funcionando en el monte.
+
+Con tres pruebas: que alguien lo llame, que sea al arrancar, y que no bloquee el
+arranque.
+
+---
+
 ## 4.9.22
 
 La hoja de Mochila y Herramientas, que era lo que dominaba la pantalla.
