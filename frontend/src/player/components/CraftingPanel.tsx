@@ -28,6 +28,7 @@ function RecipeCard({
 
   return (
     <div
+      className={CLASE_FICHA_MESA}
       style={{
         ...recipeCard,
         ...(canCraft ? recipeCardReady : recipeCardLocked),
@@ -227,15 +228,15 @@ const infoBox: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 8,
-  background: 'rgba(167,139,250,0.08)',
-  border: '1px solid rgba(167,139,250,0.18)',
+  background: 'rgba(var(--theme-info), 0.08)',
+  border: '1px solid rgba(var(--theme-info), 0.18)',
   borderRadius: 'var(--theme-radius-card)',
   padding: '10px 12px',
 }
 
 const infoText: CSSProperties = {
   fontSize: 12,
-  color: 'rgba(226,232,240,0.75)',
+  color: 'rgba(var(--theme-line-soft), 0.75)',
   lineHeight: 1.5,
 }
 
@@ -295,6 +296,12 @@ const recipeList: CSSProperties = {
   gap: 10,
 }
 
+// La clase es lo que permite al tema darle FORMA. Sin ella no hay manera: el
+// corte de fuego tiene que ir en una regla limitada a ese tema, porque en
+// cristal la variable vale 0 y un poligono rectangular le borraria las esquinas
+// redondas.
+export const CLASE_FICHA_MESA = 'saga-mesa-ficha'
+
 const recipeCard: CSSProperties = {
   borderRadius: 'var(--theme-radius-card)',
   padding: '14px',
@@ -350,7 +357,7 @@ const recipeOutputMeta: CSSProperties = {
   marginTop: 2,
   fontSize: 11,
   fontWeight: 700,
-  color: 'rgba(226,232,240,0.55)',
+  color: 'rgba(var(--theme-line-soft), 0.55)',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
@@ -408,7 +415,7 @@ const inputChipMissing: CSSProperties = {
 const inputChipLabel: CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
-  color: 'rgba(226,232,240,0.7)',
+  color: 'rgba(var(--theme-line-soft), 0.7)',
 }
 
 const craftBtn: CSSProperties = {
@@ -426,7 +433,7 @@ const craftBtn: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: 8,
-  boxShadow: '0 4px 18px rgba(124,58,237,0.4)',
+  boxShadow: '0 4px 18px rgba(var(--theme-info-deep), 0.4)',
   transition: 'transform 0.15s, box-shadow 0.15s',
 }
 

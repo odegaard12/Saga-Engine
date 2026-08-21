@@ -165,6 +165,10 @@ body.theme-glass {
   --theme-radius-panel: 24px;
   --theme-radius-card: 16px;
   --theme-radius-pill: 999px;
+
+  /* La forma de los alfileres y de los puntos de la barra. Redondos: es el
+     disenio de cristal, y este 999px es exactamente lo que ya se veia. */
+  --theme-radius-dot: 999px;
   --theme-blur: blur(22px) saturate(1.12);
   --theme-border-w: 1px;
   --theme-panel-cut: 0px;
@@ -238,6 +242,19 @@ body.theme-flame-red {
   --theme-radius-panel: 14px;
   --theme-radius-card: 11px;
   --theme-radius-pill: 999px;
+
+  /* Chapas, no pelotas.
+   *
+   * 4.9.4 dijo que los alfileres del mapa "dejan de ser pelotas y pasan a ser
+   * chapas" y no era verdad en el codigo: el alfiler llevaba border-radius 999px
+   * clavado, la insignia un 50% clavado, y los puntos de la barra usaban
+   * --theme-radius-pill, que vale 999px en LOS DOS temas. Tres formas redondas
+   * que ningun tema podia cambiar.
+   *
+   * Va en variable propia y no reutilizando --theme-radius-pill porque esa la
+   * usan cosas que SI son pildoras -la de SOLO, la de la cuenta- y ahi el 999
+   * es correcto. */
+  --theme-radius-dot: 3px;
   --theme-blur: none;
   --theme-border-w: 1px;
   /* La esquina cortada, encendida.
@@ -352,6 +369,27 @@ body.theme-flame-red {
     rgba(var(--theme-sheen-a), calc(0.95 * var(--theme-solid))) 52%,
     rgba(var(--theme-ink-soft), calc(0.97 * var(--theme-solid))) 100%
   );
+}
+
+/* La mesa de trabajo.
+ *
+ * Es la pantalla que quedaba fuera: no lleva `.saga-glass-panel` ni las clases
+ * del HUD, asi que ni el corte ni la brasa le llegaban. Y por dentro tenia
+ * morado -rgba(167,139,250)- y gris pizarra clavados, de otro tema.
+ *
+ * La regla va aqui, limitada a fuego, y no en el componente: en cristal
+ * --theme-panel-cut vale 0 y un poligono rectangular le borraria las esquinas
+ * redondas a las fichas. */
+body.theme-flame-red .saga-mesa-ficha {
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+  border-left: 2px solid var(--theme-primary);
 }
 
 body.theme-flame-red [data-saga-player-shell='top'],
