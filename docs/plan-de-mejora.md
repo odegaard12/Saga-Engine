@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 21 de agosto de 2026. Producción: **4.9.17**.
+Estado a 21 de agosto de 2026. Producción: **4.9.18**.
 
 ---
 
@@ -666,6 +666,33 @@ navegador: `polygon(12px 0px, 100% 0px, 100% calc(100% - 12px), …)`.
 los minijuegos —`circuitMatrix`, `placeMosaic`, `motionChallenge`,
 `bearingHunt`, `audioChallenge`—, el panel de preparación y la de carga. Justo
 las que estaban señaladas como sin pulir.
+
+**Y encender la variable NO bastó (4.9.18).** Medido en el navegador después de
+desplegar 4.9.17, en la pantalla principal:
+
+| Elemento | Área | Forma |
+|---|---|---|
+| **Barra de arriba** | **97 767 px²** | píldora de 28 px, sin corte |
+| Mochila / Herramientas | 28 691 px² | sin corte |
+| Fila de iconos | 10 811 px² | sin corte |
+
+El corte vive en una regla de `.saga-glass-panel`, y en el mapa eso es **un solo
+elemento**. Alcanzaba los minijuegos, no lo que se mira el 90 % del tiempo.
+
+🔴 **Y apareció el segundo cero, el mismo fallo por segunda vez en dos días.**
+`PlayerShell.tsx` lee el radio con `var(--theme-radius-shell, 28px)` y **ningún
+tema declaraba esa variable**. El arreglo de 4.9.4 enganchó la barra a una
+variable y nunca le dio valor, así que siempre ganaba el respaldo, en fuego
+igual que en cristal. Mecanismo puesto, valor nunca.
+
+Arreglado: fuego declara `--theme-radius-shell: 4px` y el corte llega a las tres
+superficies grandes. Verificado en producción: barra a 4 px **con** corte, y las
+otras dos con corte.
+
+**Lección para la lista de 4.1:** no basta con vigilar que la forma no se
+escriba en línea. Hay que comprobar que **la variable del tema tenga valor** —
+dos veces ya se enganchó el mecanismo y se dejó el número sin poner, y el CSS no
+da ningún error en ninguno de los dos casos.
 
 **Dónde NO llega, y hay que decirlo:** la mesa de trabajo no lleva esa clase, así
 que se queda igual. Y ojo con la tentación de aplicar la `clip-path` sin
