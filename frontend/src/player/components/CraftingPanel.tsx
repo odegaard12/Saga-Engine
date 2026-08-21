@@ -66,6 +66,7 @@ function RecipeCard({
           return (
             <div
               key={inp.item_id}
+              className={CLASE_PIEZA_MESA}
               style={{ ...inputChip, ...(enough ? inputChipReady : inputChipMissing) }}
             >
               <ItemIconSvg itemId={inp.item_id} size={16} />
@@ -301,6 +302,7 @@ const recipeList: CSSProperties = {
 // cristal la variable vale 0 y un poligono rectangular le borraria las esquinas
 // redondas.
 export const CLASE_FICHA_MESA = 'saga-mesa-ficha'
+export const CLASE_PIEZA_MESA = 'saga-mesa-pieza'
 
 const recipeCard: CSSProperties = {
   borderRadius: 'var(--theme-radius-card)',
@@ -405,6 +407,7 @@ const inputChip: CSSProperties = {
 
 const inputChipReady: CSSProperties = {
   borderColor: 'rgba(var(--theme-done-soft), .45)',
+  borderLeft: '2px solid rgb(var(--theme-done))',
   background: 'rgba(var(--theme-done-soft), .12)',
 }
 
