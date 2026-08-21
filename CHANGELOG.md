@@ -6,6 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.21
+
+La ayuda de la mesa, en voz baja.
+
+Al mirar por fin el DOM de la mesa —que es lo que tenía que haber hecho tres
+versiones antes— apareció la diferencia real entre lo que se ve y la maqueta, y
+**no era la piel: era la densidad**.
+
+La mesa lleva arriba una caja explicativa («⚒️ Combina objetos de tu mochila
+para fabricar piezas más potentes…») con fondo, borde y esquinas. En una
+pantalla de 375 px eso se come el sitio de lo único que importa ahí: la receta.
+La maqueta no la tenía, y por eso la comparación salía «sigue igual» aunque el
+corte, la brasa y el filo estuvieran aplicados.
+
+Se queda el texto —hace falta la primera vez— pero sin caja: una línea callada,
+para que mande la ficha.
+
+---
+
 ## 4.9.20
 
 Más hondo: la brasa sale de las barras y llega a los paneles.
