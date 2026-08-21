@@ -6,6 +6,40 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.17
+
+La esquina cortada del tema de fuego, encendida. Llevaba apagada por un cero.
+
+«El rojo no me convence, no veo cambio de diseño» — y no era gusto. El tema
+define esta regla:
+
+```css
+body.theme-flame-red .saga-glass-panel {
+  clip-path: polygon(var(--theme-panel-cut) 0, ...);
+}
+body.theme-flame-red { --theme-panel-cut: 0px; }
+```
+
+Con **0**, ese polígono es un rectángulo exacto: el corte no aparece nunca y el
+CSS no da ningún error. El diseño de 4.9.4 dice que la esquina cortada es una de
+sus **tres** ideas —con la brasa en diagonal y el filo encendido—; las otras dos
+estaban puestas y ésta llevaba apagada desde entonces. Por eso el tema se leía
+como el mismo diseño con otro color.
+
+Es el fallo de siempre de este proyecto, pero **al revés**: aquí la regla del
+tema está viva y es el *valor* el que la deja muerta.
+
+Ahora vale 12 px, con un radio de panel de 14: se nota sin comerse la esquina.
+Y alcanza más de lo que parece, porque `.saga-glass-panel` la llevan las
+pantallas de los minijuegos —`circuitMatrix`, `placeMosaic`, `motionChallenge`,
+`bearingHunt`, `audioChallenge`—, el panel de preparación y la de carga.
+
+Cristal se queda en 0 a propósito: es el tema redondo. Hay una prueba para cada
+cosa, incluida una que impide que alguien clave el número en la regla y deje la
+variable muerta otra vez.
+
+---
+
 ## 4.9.16
 
 La foto sale del JSON. El paquete queda en unos 40 KB.
