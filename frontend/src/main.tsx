@@ -11,12 +11,31 @@ import './mobile-themes.css'
 import './player/components/map-surface.css'
 import { setupLegacySpanishBridge } from './i18n/legacySpanishBridge'
 import { installDebugGeolocationShim } from './player/utils/debugGeolocationShim'
+import { vixiarVersion } from './shared/versionGuard'
 
 setupLegacySpanishBridge()
 
 // El shim de GPS de depuración existía pero NADIE lo llamaba: el modo debug de
 // ubicación era código muerto y no había forma de probar la ruta sin caminarla.
 installDebugGeolocationShim()
+
+/**
+ * Y el vigilante de versión, por lo mismo: estaba escrito y no lo llamaba nadie.
+ *
+ * Compara la versión del bundle con la que dice `/api/version` y, si no
+ * coinciden, borra la caché del armazón y recarga UNA vez. Su propia cabecera
+ * explica para qué se escribió: «se desplegaban arreglos, el servidor los
+ * servía, y en el móvil no». Exactamente eso seguía pasando, porque el
+ * mecanismo estaba sin enchufar.
+ *
+ * Va con `void` a propósito: sin cobertura `/api/version` no contesta, y
+ * arrancar es justo lo que tiene que seguir funcionando en el monte. La
+ * pantalla no espera a esto.
+ *
+ * Al ARRANCAR y no en un ciclo: es el único momento en que una recarga no le
+ * interrumpe un minijuego a nadie.
+ */
+void vixiarVersion()
 
 const queryClient = new QueryClient({
   defaultOptions: {
