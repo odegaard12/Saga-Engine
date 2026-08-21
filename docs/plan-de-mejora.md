@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 21 de agosto de 2026. Producción: **4.9.18**.
+Estado a 21 de agosto de 2026. Producción: **4.9.22**.
 
 ---
 
@@ -600,6 +600,30 @@ de ruta. Si no cabe en un QR, hay que partirlo en varios y eso cambia el diseño
 ### 4.1 Lo aprendido, para no repetirlo
 Van cuatro rondas de diseño y tres han acabado descartadas al verlas. Lo que
 salió de ahí:
+
+- 🔴 **La otra mitad de la trampa, encontrada seis veces en dos días: el
+  mecanismo montado y la pieza sin enganchar.** No es la forma escrita en línea
+  ganándole al tema — es el tema **sin nada que decir**, y no da ningún error:
+
+  | Dónde | Qué faltaba |
+  |---|---|
+  | El corte de los paneles | `--theme-panel-cut` valía **0**, igual que cristal |
+  | La barra de arriba | `--theme-radius-shell` **no la declaraba nadie** |
+  | Los alfileres y los puntos | `border-radius` **clavado** en el componente |
+  | La brasa en diagonal | el degradado, en **un solo sitio** de todo el CSS |
+  | La mesa de trabajo | **sin clase** de tema |
+  | La hoja de Mochila | **sin clase** de tema |
+
+  Hay ya una guardia para las tres primeras
+  (`test_o_lume_non_e_cristal_repintado.py`): **una variable que vale lo mismo en
+  los dos temas es sospechosa**, con una lista corta de excepciones justificadas
+  —los colores de los alfileres, que significan algo, y las píldoras de verdad—.
+  Comprobado que caza el fallo original.
+
+  Y la lección de método, que costó cuatro versiones: **pedir una captura**.
+  Medir clases decía «alcanza los minijuegos y el panel de preparación» y era
+  cierto; lo que domina la vista era otra cosa. Con la imagen delante se vio en
+  treinta segundos.
 
 - **El color se puede cambiar por variables; la forma no**, si el componente la
   lleva escrita en línea. Un `borderRadius` en línea gana siempre a la regla del
