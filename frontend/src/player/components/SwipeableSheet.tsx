@@ -73,6 +73,10 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
 
       <aside
         ref={sheetRef}
+        // La clase es lo que permite al tema darle forma y fondo. Sin ella esta
+        // hoja -la de Mochila y Herramientas, el panel mas grande que se abre-
+        // se queda redondeada y plana pase lo que pase en el tema.
+        className="saga-hoja"
         style={dynamicSheetStyle}
         aria-modal="true"
         role="dialog"

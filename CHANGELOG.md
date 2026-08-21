@@ -6,6 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.22
+
+La hoja de Mochila y Herramientas, que era lo que dominaba la pantalla.
+
+Con una captura delante por fin se vio: el panel grande que se abre —el de
+Mochila y Herramientas, `SwipeableSheet`— **no llevaba ninguna clase**. Ni el
+corte ni la brasa podían alcanzarlo, así que seguía redondeado y plano dijera lo
+que dijera el tema.
+
+Y es el elemento que **domina la vista** cuando está abierto. Mientras siguiera
+así, cualquier cambio de dentro —la mesa, las fichas, las piezas— se leía como
+«sigue el diseño antiguo», porque lo que se mira es el marco.
+
+Van ya **seis** sitios con el mismo patrón esta semana: el mecanismo del tema
+puesto y la pieza sin enganchar —variable a cero, variable sin declarar, número
+clavado, degradado en un solo sitio, componente sin clase—. Ninguno da error.
+
+---
+
 ## 4.9.21
 
 La ayuda de la mesa, en voz baja.
