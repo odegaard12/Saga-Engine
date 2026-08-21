@@ -96,3 +96,23 @@ def test_o_respaldo_conserva_o_de_cristal():
     assert "28" in hallado.group(1), (
         "cristal ha cambiado de forma: tiene que seguir en sus 28 px"
     )
+
+
+def test_a_brasa_chega_aos_paneis_e_non_so_as_barras():
+    """El degradado en diagonal es una de las tres ideas del diseño.
+
+    Estaba en DOS sitios de todo el CSS: su declaración y la regla de las tres
+    barras. Los paneles de dentro —la mesa, los minijuegos, la guía— eran
+    planos, así que la idea sólo la veía el 20 % de la pantalla y el tema se
+    leía como un color de fondo en vez de como un diseño.
+    """
+    css = CSS.read_text(encoding="utf-8")
+    usos = css.count("var(--theme-brasa)")
+    assert usos >= 2, (
+        "la brasa vuelve a estar sólo en las barras: los paneles se quedan "
+        "planos y el tema se lee como un repintado"
+    )
+
+    inicio = css.index("body.theme-flame-red .saga-glass-panel")
+    bloque = css[inicio : css.index("}", inicio)]
+    assert "var(--theme-brasa)" in bloque, "los paneles siguen sin la diagonal"
