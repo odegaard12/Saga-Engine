@@ -6,6 +6,32 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.20
+
+Más hondo: la brasa sale de las barras y llega a los paneles.
+
+«Es ligera, no un cambio tan profundo» — y tenía razón. Lo aplicado en 4.9.17-19
+estaba bien pero se quedaba corto, y al mirar por qué apareció el dato:
+
+**El degradado de brasa en diagonal estaba en DOS sitios de todo el CSS**: su
+declaración y la regla de las tres barras. Los paneles de dentro —la mesa, los
+minijuegos, la guía, la preparación— eran **planos**. Una de las tres ideas que
+definen el diseño de 4.9.4 sólo la veía una parte de la pantalla, y por eso el
+tema se seguía leyendo como un color de fondo en vez de como otro diseño.
+
+Tres cambios, todos sobre mecanismos que ya existían:
+
+- **La brasa a los paneles** (`.saga-glass-panel`) y a las fichas de la mesa.
+- **El corte, de 12 a 18 px.** En superficies anchas 12 no se lee.
+- **Cada pieza de la mesa** con su corte pequeño y un filo encendido a la
+  izquierda: el estado se cuenta con luz en el borde, no con un borde punteado
+  igual para todo.
+
+De paso se limpiaron dos reglas que se habían quedado con el selector partido en
+dos declaraciones, que una prueba del proyecto prohíbe con razón.
+
+---
+
 ## 4.9.19
 
 Los alfileres, los puntos y la mesa. Lo que faltaba de verdad.

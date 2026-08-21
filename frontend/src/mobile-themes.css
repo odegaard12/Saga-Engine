@@ -268,7 +268,7 @@ body.theme-flame-red {
    *
    * 12 px con un radio de panel de 14: se nota sin comerse la esquina. Cristal
    * se queda en 0 a proposito, que es el tema redondo. */
-  --theme-panel-cut: 12px;
+  --theme-panel-cut: 18px;
 
   /* El radio de la barra de arriba, que NADIE declaraba.
    *
@@ -328,7 +328,26 @@ body[class*='theme-'] .admin-cms-side-action--save:hover {
  * Todo bajo `body.theme-flame-red`, asi que `cristal` no se entera.
  */
 
+body.theme-flame-red .saga-mesa-pieza {
+  /* Cada pieza, con el corte pequenio y el filo encendido a la izquierda: el
+     estado se cuenta con luz en el borde, no con un borde punteado. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 7px),
+    calc(100% - 7px) 100%,
+    0 100%
+  );
+}
+
 body.theme-flame-red .saga-glass-panel {
+  /* La brasa en diagonal, tambien en los paneles.
+   *
+   * Estaba en DOS sitios de todo el CSS: su declaracion y la regla de las tres
+   * barras. Los paneles de dentro -los minijuegos, la guia, la preparacion- eran
+   * planos, asi que una de las tres ideas del disenio de 4.9.4 solo la veia una
+   * parte de la pantalla, y el tema se leia como un color de fondo. */
+  background: var(--theme-brasa) !important;
   clip-path: polygon(
     var(--theme-panel-cut) 0,
     100% 0,
@@ -381,6 +400,7 @@ body.theme-flame-red {
  * --theme-panel-cut vale 0 y un poligono rectangular le borraria las esquinas
  * redondas a las fichas. */
 body.theme-flame-red .saga-mesa-ficha {
+  background: var(--theme-brasa) !important;
   clip-path: polygon(
     var(--theme-panel-cut) 0,
     100% 0,
