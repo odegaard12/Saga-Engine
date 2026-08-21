@@ -233,7 +233,10 @@ const routeSegment: CSSProperties = {
 const routeNode: CSSProperties = {
   width: 10,
   height: 10,
-  borderRadius: 'var(--theme-radius-pill)',
+  // Del tema, no de la pildora: --theme-radius-pill vale 999px en los dos temas
+  // y la usan cosas que SI son pildoras. Estos puntos son alfileres pequenios y
+  // tienen que seguir la forma de los del mapa.
+  borderRadius: 'var(--theme-radius-dot, var(--theme-radius-pill))',
   border: '1px solid rgba(255,255,255,.18)',
   flex: '0 0 auto',
 }

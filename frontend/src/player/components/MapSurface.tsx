@@ -1022,7 +1022,7 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-mission-node-icon-wrap { background: transparent !important; border: 0 !important; }
       .saga-mission-node-marker { position: relative; width: 48px; height: 48px; display: grid; place-items: center; overflow: visible; }
       .saga-mission-node-marker--current { width: 56px; height: 56px; }
-      .saga-mission-node-pin { position: relative; z-index: 3; width: 35px; height: 35px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; border: 2px solid rgba(255,255,255,.92); color: #fff; font-family: system-ui,sans-serif; font-weight: 950; line-height: 1; animation: none; }
+      .saga-mission-node-pin { position: relative; z-index: 3; width: 35px; height: 35px; box-sizing: border-box; display: grid; place-items: center; border-radius: var(--theme-radius-dot, 999px); border: 2px solid rgba(255,255,255,.92); color: #fff; font-family: system-ui,sans-serif; font-weight: 950; line-height: 1; animation: none; }
       /* Los tres estados del alfiler, en un solo sitio y planos, que es como
          se veian de verdad: el estilo en linea que ganaba era plano, y estas
          reglas tenian degradados que nadie llego a ver nunca. En cristal
@@ -1035,7 +1035,7 @@ export const MapSurface = React.memo(function MapSurface({
          en el monte era el rojo, asi que ese es el que queda. */
       .saga-mission-node-pin--locked { background: rgb(var(--theme-pin-todo)); border-color: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
       .saga-mission-node-symbol--number { font-size: 16px; font-weight: 950; font-variant-numeric: tabular-nums; }
-      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translate3d(-50%, 0, 0); will-change: transform; border-radius: 50%; background: rgba(var(--theme-ink), 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(var(--theme-ink), 0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
+      .saga-mission-node-type-badge { position: absolute; top: -34px; left: 50%; z-index: 10; width: 32px; height: 32px; display: grid; place-items: center; transform: translate3d(-50%, 0, 0); will-change: transform; border-radius: var(--theme-radius-dot, 50%); background: rgba(var(--theme-ink), 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(var(--theme-ink), 0.45); animation: sagaTypeBadgeFloat 3s ease-in-out infinite; font-size: 16px; line-height: 1; }
       .saga-mission-node-type-badge::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 5px 5px 0; border-style: solid; border-color: #ffffff transparent transparent transparent; display: block; width: 0; height: 0; }
       .saga-mission-node-type-badge--collectible { border-color: #fbbf24 !important; }
       .saga-mission-node-type-badge--collectible::after { border-top-color: #fbbf24 !important; }
@@ -1045,7 +1045,7 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-mission-node-type-badge--clue::after { border-top-color: #a855f7 !important; }
       .saga-mission-node-type-badge--bonus { border-color: #ec4899 !important; }
       .saga-mission-node-type-badge--bonus::after { border-top-color: #ec4899 !important; }
-      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: 999px; border: 3px solid rgba(var(--theme-pin), .88); box-shadow: 0 0 0 3px rgba(var(--theme-pin-deep), .13),0 0 18px rgba(var(--theme-pin), .28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
+      .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: var(--theme-radius-dot, 999px); border: 3px solid rgba(var(--theme-pin), .88); box-shadow: 0 0 0 3px rgba(var(--theme-pin-deep), .13),0 0 18px rgba(var(--theme-pin), .28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
       .saga-road-guide--casing { filter: blur(3px); }
       .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; will-change: stroke-dashoffset; transform: translateZ(0); }
 
