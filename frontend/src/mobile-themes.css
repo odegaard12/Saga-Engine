@@ -239,9 +239,23 @@ body.theme-flame-red {
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
      marcado y una esquina cortada. Se distingue de un vistazo desde lejos, que
      es justo lo que un tema tiene que hacer. */
-  --theme-radius-panel: 14px;
-  --theme-radius-card: 11px;
-  --theme-radius-pill: 999px;
+  /* Cuadrado de verdad.
+   *
+   * Estaba en 14 y 11 -cristal tiene 24 y 16-, y once pixeles SIGUEN SIENDO
+   * redondos. Se estuvieron aniadiendo cortes con clip-path ENCIMA de esquinas
+   * redondeadas: se cortaban dos y las otras dos seguian curvas, asi que la
+   * pantalla se leia igual por mucho corte que se pusiera.
+   *
+   * El corte y el redondeo son la misma decision y tienen que ir juntos: si el
+   * tema corta esquinas, no puede redondear las demas. */
+  --theme-radius-panel: 2px;
+  --theme-radius-card: 2px;
+  /* Ni las pildoras son pildoras aqui.
+   *
+   * Era 999px, igual que cristal, y la llevan el reloj, la de SOLO, la cuenta
+   * 6/10 y el FALTAN de la mesa. En un tema que corta esquinas, una gragea
+   * perfecta canta: era lo ultimo que quedaba redondo en la pantalla. */
+  --theme-radius-pill: 3px;
 
   /* Chapas, no pelotas.
    *

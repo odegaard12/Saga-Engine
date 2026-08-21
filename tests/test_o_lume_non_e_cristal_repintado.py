@@ -29,8 +29,9 @@ COMPARTIDAS = {
     "--theme-pin-deep": "íd.",
     "--theme-pin-done": "íd.",
     "--theme-pin-todo": "íd.",
-    "--theme-radius-pill": "las píldoras de verdad (SOLO, la cuenta) son píldoras en los dos",
     "--theme-border-w": "el grosor del borde no distingue un tema de otro",
+    # --theme-radius-pill salió de esta lista el 21/8: en un tema que corta
+    # esquinas, una gragea perfecta canta. Fuego la tiene en 3px.
 }
 
 
