@@ -340,6 +340,26 @@ body.theme-flame-red .saga-mesa-pieza {
   );
 }
 
+body.theme-flame-red .saga-hoja {
+  /* La hoja de Mochila y Herramientas.
+   *
+   * Es el panel MAS GRANDE que se abre en la pantalla, y no llevaba ninguna
+   * clase: ni el corte ni la brasa podian alcanzarla, asi que se quedaba
+   * redondeada y plana dijera lo que dijera el tema. Mientras siguiera asi,
+   * cualquier cambio de dentro se leia como "sigue el disenio antiguo",
+   * porque lo que domina la vista es ella. */
+  background: var(--theme-brasa) !important;
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+  border-top: var(--theme-border-w) solid var(--theme-primary);
+}
+
 body.theme-flame-red .saga-glass-panel {
   /* La brasa en diagonal, tambien en los paneles.
    *
