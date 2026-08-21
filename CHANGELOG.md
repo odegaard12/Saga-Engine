@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.24
+
+Cuadrado de verdad. Llevaba siete versiones cortando esquinas **encima** de
+esquinas redondeadas.
+
+Con la captura de la mesa delante se vio el error de bulto: el tema de fuego
+tenía los radios en **14 y 11 px** (cristal tiene 24 y 16), y once píxeles
+**siguen siendo redondos**. Yo iba añadiendo `clip-path` que corta dos esquinas
+y las otras dos seguían curvas — así que la pantalla se leía igual por mucho
+corte que pusiera.
+
+| | Antes | Ahora |
+|---|---|---|
+| `--theme-radius-panel` | 14 px | **2 px** |
+| `--theme-radius-card` | 11 px | **2 px** |
+| `--theme-radius-pill` | 999 px | **3 px** |
+
+**El corte y el redondeo son la misma decisión y tienen que ir juntos:** si el
+tema corta esquinas, no puede redondear las demás.
+
+La píldora sale además de la lista de «variables que pueden valer lo mismo en
+los dos temas». La llevan el reloj, la de SOLO, la cuenta 6/10 y el FALTAN de la
+mesa: era lo último que quedaba redondo en la pantalla, y en un tema de esquinas
+duras una gragea perfecta canta.
+
+Las pestañas de la mochila (GUÍA / OBXECTOS / MESA) se cuadran solas: ya salían
+de `--theme-radius-card`.
+
+---
+
 ## 4.9.23
 
 El vigilante de versión estaba escrito y **no lo llamaba nadie**.
