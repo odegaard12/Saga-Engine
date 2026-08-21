@@ -225,14 +225,16 @@ const panel: CSSProperties = {
   overflowY: 'auto',
 }
 
+// La ayuda, en voz baja.
+//
+// Era una caja con fondo y borde, y en una pantalla de 375 px de ancho se comia
+// el sitio de lo unico que importa aqui: la receta. Se queda el texto -hace
+// falta la primera vez- pero sin caja, para que mande la ficha.
 const infoBox: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: 8,
-  background: 'rgba(var(--theme-info), 0.08)',
-  border: '1px solid rgba(var(--theme-info), 0.18)',
-  borderRadius: 'var(--theme-radius-card)',
-  padding: '10px 12px',
+  gap: 6,
+  padding: '0 2px',
 }
 
 const infoText: CSSProperties = {
