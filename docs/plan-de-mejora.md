@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 20 de agosto de 2026. Producción: **4.9.16**.
+Estado a 21 de agosto de 2026. Producción: **4.9.17**.
 
 ---
 
@@ -637,6 +637,41 @@ forma cuente otra cosa.
 descartadas al verlas. Cualquier intento nuevo tiene que mirarse en pantalla
 antes de darlo por bueno: medir cuántos elementos quedan fuera del tema dice si
 el tema *llega*, no si el diseño *vale*.
+
+### 4.1.c Por qué el rojo se leía como un repintado — **encontrado y arreglado (4.9.17)**
+
+No era gusto. El tema de fuego define esta regla:
+
+```css
+body.theme-flame-red .saga-glass-panel {
+  clip-path: polygon(var(--theme-panel-cut) 0, ...);
+}
+body.theme-flame-red { --theme-panel-cut: 0px; }
+```
+
+Con **0**, ese polígono es un rectángulo exacto: el corte no aparece nunca, y el
+CSS no da ningún error. El diseño de 4.9.4 dice que la esquina cortada es una de
+sus **tres** ideas —con la brasa en diagonal y el filo encendido—. Las otras dos
+estaban puestas; ésta llevaba apagada desde entonces.
+
+**Es el fallo de siempre del proyecto, pero al revés:** aquí la regla del tema
+está viva y es el *valor* el que la deja muerta. Añádelo a la lista de 4.1: no
+sólo hay que vigilar que la forma no se escriba en línea, también que la
+variable del tema no valga cero.
+
+Ahora vale 12 px con un radio de panel de 14. Verificado en producción, en el
+navegador: `polygon(12px 0px, 100% 0px, 100% calc(100% - 12px), …)`.
+
+**Alcanza más de lo que parecía:** `.saga-glass-panel` la llevan las pantallas de
+los minijuegos —`circuitMatrix`, `placeMosaic`, `motionChallenge`,
+`bearingHunt`, `audioChallenge`—, el panel de preparación y la de carga. Justo
+las que estaban señaladas como sin pulir.
+
+**Dónde NO llega, y hay que decirlo:** la mesa de trabajo no lleva esa clase, así
+que se queda igual. Y ojo con la tentación de aplicar la `clip-path` sin
+limitarla al tema de fuego: en cristal la variable vale 0, y un polígono
+rectangular **borraría las esquinas redondas** de cristal. Por eso la regla está
+dentro de `body.theme-flame-red`.
 
 ### 4.2 Lo que queda
 - **Los minijuegos siguen con sus propias formas y colores**, al margen del
