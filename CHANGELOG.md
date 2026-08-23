@@ -6,6 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.27
+
+Las fotos se apartan del nodo, no sólo se meten debajo.
+
+En 4.9.26 les bajé la capa y no bastaba: seguían viéndose a medias detrás del
+alfiler. Había ya un desplazamiento para no taparle la flecha al jugador —a
+35&nbsp;m—, pero **ninguno para los nodos**, y las fotos se hacen justo junto a
+un nodo, así que acaban clavadas encima.
+
+Ahora una foto a menos de 40&nbsp;m de un nodo se aparta 34&nbsp;m **en
+dirección contraria al nodo**, para no cruzarse ni con el camino ni con el
+alfiler siguiente. Si está exactamente encima no hay dirección que calcular y se
+manda al este.
+
+Y una dependencia que faltaba en el efecto: sin `missionStages`, el
+desplazamiento no se recalculaba al cambiar los nodos.
+
+---
+
 ## 4.9.26
 
 Tres correcciones sobre 4.9.25, todas de mirar capturas.

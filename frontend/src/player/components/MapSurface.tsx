@@ -1922,9 +1922,36 @@ export const MapSurface = React.memo(function MapSurface({
     groups.forEach((group, groupIndex) => {
       const baseCenter = { lat: group.lat, lon: group.lon }
       const nearPlayer = playerPosition && getDistanceMeters(baseCenter, playerPosition) <= 35
-      const visualCenter = nearPlayer
-        ? offsetLatLon(baseCenter, 28 + groupIndex * 10, 135 + groupIndex * 45)
-        : baseCenter
+
+      /**
+       * Y apartarse tambien de los NODOS, no solo del jugador.
+       *
+       * Ya habia un desplazamiento para no taparle la flecha al jugador, pero
+       * no para los alfileres, y las fotos se hacen JUNTO a un nodo: acaban
+       * clavadas encima. Bajarles la capa no basta -se ven a medias detras-;
+       * hay que moverlas a un lado.
+       *
+       * Se aparta en direccion CONTRARIA al nodo, para que no se cruce con el
+       * camino ni con el alfiler siguiente. Si la foto esta exactamente encima,
+       * no hay direccion que calcular y se manda al este.
+       */
+      const nodoPegado = (missionStages || [])
+        .map((n) => ({ lat: Number(n?.lat), lon: Number(n?.lon) }))
+        .filter((n) => Number.isFinite(n.lat) && Number.isFinite(n.lon))
+        .find((n) => getDistanceMeters(baseCenter, n) <= 40)
+
+      let visualCenter = baseCenter
+      if (nearPlayer) {
+        visualCenter = offsetLatLon(baseCenter, 28 + groupIndex * 10, 135 + groupIndex * 45)
+      } else if (nodoPegado) {
+        const dx = baseCenter.lon - nodoPegado.lon
+        const dy = baseCenter.lat - nodoPegado.lat
+        const rumbo =
+          Math.abs(dx) < 1e-7 && Math.abs(dy) < 1e-7
+            ? 0
+            : (Math.atan2(dy, dx) * 180) / Math.PI
+        visualCenter = offsetLatLon(baseCenter, 34 + groupIndex * 8, rumbo)
+      }
 
       const marker = L.marker([visualCenter.lat, visualCenter.lon], {
         icon: createFieldProofIcon(group.proofs),
@@ -1949,7 +1976,7 @@ export const MapSurface = React.memo(function MapSurface({
 
       fieldProofLayersRef.current.push(marker)
     })
-  }, [fieldProofs, mapReadyToken, mapZoom, onOpenFieldProofs, playerPosition?.lat, playerPosition?.lon])
+  }, [fieldProofs, mapReadyToken, mapZoom, missionStages, onOpenFieldProofs, playerPosition?.lat, playerPosition?.lon])
 
   useEffect(() => {
     const map = mapRef.current
