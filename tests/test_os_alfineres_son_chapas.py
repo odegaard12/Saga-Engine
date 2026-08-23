@@ -66,11 +66,23 @@ def test_o_alfinete_do_mapa_sae_do_tema():
     )
 
 
-def test_o_punto_da_barra_sae_do_tema():
+def test_a_tira_de_puntos_xa_non_esta_na_barra():
+    """La tira se fue de la barra con el rediseño (Barra C).
+
+    Esta prueba exigía antes que los puntos de la barra sacaran su forma del
+    tema. Ya no hay puntos: el mapa cuenta qué nodo está hecho con el color de
+    cada alfiler, así que la tira repetía esa información ocupando el tercio
+    inferior de la barra. Queda la cuenta 6/10, que es el resumen que sí hacía
+    falta.
+
+    Lo que la variable gobierna ahora son los alfileres del mapa, y de eso se
+    encarga la prueba de arriba.
+    """
     shell = SHELL.read_text(encoding="utf-8")
-    nodo = re.search(r"const routeNode: CSSProperties = \{[^}]*\}", shell)
-    assert nodo, "no encuentro el punto de la barra"
-    assert VARIABLE in nodo.group(0), "el punto de la barra no sigue al tema"
+    assert "const routeNode" not in shell, (
+        "ha vuelto la tira de puntos a la barra: si es a propósito, esta prueba "
+        "tiene que volver a exigir que su forma salga del tema"
+    )
 
 
 def test_a_posicion_do_xogador_segue_redonda():
