@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react'
-import type { PlayerGamePayload } from '../../types/player'
+import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
+  currentStage: PlayerStage | null
 }
 
 function getProgress(payload: PlayerGamePayload) {
@@ -27,11 +28,13 @@ function getProgress(payload: PlayerGamePayload) {
   }
 }
 
-export function PlayerShell({ payload }: PlayerShellProps) {
+export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
+  const stageName =
+    currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
 
   const totalMs = payload.live_status?.total_time_ms || 0
@@ -49,7 +52,9 @@ export function PlayerShell({ payload }: PlayerShellProps) {
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 12 : 16,
+          // Fina a proposito: con una sola fila, el relleno de 12/16 dejaba
+          // una caja grande y medio vacia, que se veia peor que la de antes.
+          padding: compact ? '8px 12px' : '9px 14px',
           /**
            * El radio, del tema, con el de siempre como respaldo.
            *
@@ -67,6 +72,11 @@ export function PlayerShell({ payload }: PlayerShellProps) {
       >
         <div style={topRow}>
           <div style={eyebrow}>{playerName}</div>
+          {/* El nodo, en la MISMA linea. Estuvo un rato colgando de su alfiler
+              en el mapa y no funciono: choca con las fotos de los nodos y tapa
+              el camino, que es lo que hay que ver. Aqui cabe, porque la barra
+              ya no lleva ni titulo aparte ni tira de puntos. */}
+          <div style={nodoEnLinea} title={stageName}>{stageName}</div>
 
           <div style={pillRow}>
             <div style={{...soloPill, borderColor: 'rgba(var(--theme-info), 0.4)', color: 'rgb(var(--theme-info-soft))', background: 'rgba(var(--theme-info-mid), 0.15)' }}>
@@ -118,8 +128,20 @@ const card: CSSProperties = {
 const topRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
+  gap: 10,
+}
+
+// El nombre del nodo se come el sitio que sobre, y se corta con puntos suspensivos
+// antes que empujar al reloj fuera de la pantalla.
+const nodoEnLinea: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 14,
+  fontWeight: 800,
+  color: '#ffffff',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 }
 
 const pillRow: CSSProperties = {
