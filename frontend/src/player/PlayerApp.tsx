@@ -2446,8 +2446,7 @@ export default function PlayerApp() {
       <div style={getTopScrimStyle(isPhone)} />
 
       <div style={getTopOverlayStyle(isPhone)}>
-        {/* Ya no necesita el nodo: su nombre cuelga del alfiler en el mapa. */}
-        <PlayerShell payload={payload} />
+        <PlayerShell payload={payload} currentStage={currentStage} />
       </div>
 
       <div style={getToastOverlayStyle(isPhone)}>
