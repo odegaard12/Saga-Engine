@@ -780,7 +780,9 @@ function getSheetStyle(compact: boolean): CSSProperties {
     position: 'relative',
     zIndex: 1,
     display: 'grid',
-    gap: 10,
+    // Sin hueco: los dos hijos son el tirador y el contenido, y el tirador ya
+    // se pone su propio aire. El hueco solo lo duplicaba.
+    gap: 0,
     width: compact ? '100%' : 'min(100%, 480px)',
     maxHeight: compact ? '84dvh' : 'min(66vh, 590px)',
     overflowY: 'auto',
@@ -794,7 +796,7 @@ function getSheetStyle(compact: boolean): CSSProperties {
     boxShadow: '0 -15px 35px rgba(var(--theme-info-mid), .08), 0 24px 70px rgba(0,0,0,.6)',
     backdropFilter: 'var(--theme-blur)',
     WebkitBackdropFilter: 'var(--theme-blur)',
-    padding: 14,
+    padding: '0 14px',
     paddingBottom: compact
       ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
       : 'calc(14px + env(safe-area-inset-bottom, 0px))',

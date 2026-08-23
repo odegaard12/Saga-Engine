@@ -6,6 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.30
+
+El hueco de la cabecera de la Mochila era el tirador, no las pestañas.
+
+Medido: por encima de la palabra «Guía» había **54&nbsp;px**, y 35 eran aire
+muerto alrededor de un tirador de 5&nbsp;px de alto — 14 de relleno superior de
+la hoja, 16 de relleno del tirador y 10 de hueco de rejilla, sumados uno detrás
+de otro porque cada capa ponía el suyo sin mirar la de al lado.
+
+Ahora **el relleno del tirador es el único aire de arriba**: la hoja no pone
+ninguno y el hueco de rejilla se va. Quedan 36&nbsp;px, y el tirador sigue
+teniendo 27&nbsp;px de zona de arrastre.
+
 ## 4.9.29
 
 Los avisos ya no se esconden detrás de la barra, y las pestañas llenan su fila.
