@@ -661,9 +661,24 @@ function createMissionNodeIcon(
    * monte era el rojo, así que es el que se conserva —ahora en el CSS, con las
    * variables del tema, y en un solo sitio—.
    */
+  /**
+   * El nombre del nodo, pegado a SU alfiler.
+   *
+   * Antes vivia arriba, en la barra, a media pantalla de distancia del punto al
+   * que se refiere: habia que saltar la vista de un sitio a otro para saber a
+   * donde vas. Aqui va donde esta la cosa que nombra.
+   *
+   * Solo en el nodo actual: ponerselo a los diez llenaria el mapa de texto y
+   * taparia justo lo que hay que ver, que es el camino.
+   */
+  const etiqueta =
+    state === 'current'
+      ? `<div class="saga-mission-node-etiqueta">${escapeHtml(title)}</div>`
+      : ''
+
   return L.divIcon({
     className: `saga-mission-node-icon-wrap saga-mission-node-icon-wrap--${state}${physicalVisual ? ' saga-mission-node-icon-wrap--physical' : ''}`,
-    html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div></div>`,
+    html: `<div class="saga-mission-node-marker saga-mission-node-marker--${state}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${halo}${typeBadge}<div class="saga-mission-node-pin saga-mission-node-pin--${state}"><span class="saga-mission-node-symbol saga-mission-node-symbol--number">${number}</span></div>${etiqueta}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -1045,6 +1060,7 @@ export const MapSurface = React.memo(function MapSurface({
       .saga-mission-node-type-badge--clue::after { border-top-color: #a855f7 !important; }
       .saga-mission-node-type-badge--bonus { border-color: #ec4899 !important; }
       .saga-mission-node-type-badge--bonus::after { border-top-color: #ec4899 !important; }
+      .saga-mission-node-etiqueta { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); z-index: 12; white-space: nowrap; padding: 6px 11px; background: var(--theme-brasa); color: rgb(var(--theme-line-soft)); border-top: 2px solid var(--theme-primary); font-family: system-ui,sans-serif; font-weight: 800; font-size: 13px; line-height: 1; letter-spacing: .01em; box-shadow: 0 6px 18px rgba(var(--theme-ink-deep), .5); pointer-events: none; clip-path: polygon(var(--theme-panel-cut) 0, 100% 0, 100% calc(100% - var(--theme-panel-cut)), calc(100% - var(--theme-panel-cut)) 100%, 0 100%, 0 var(--theme-panel-cut)); }
       .saga-mission-node-halo { position: absolute; z-index: 1; width: 48px; height: 48px; border-radius: var(--theme-radius-dot, 999px); border: 3px solid rgba(var(--theme-pin), .88); box-shadow: 0 0 0 3px rgba(var(--theme-pin-deep), .13),0 0 18px rgba(var(--theme-pin), .28); pointer-events: none; transform-origin: center; will-change: transform, opacity; transform: translateZ(0); animation: sagaCurrentNodeHalo 2.7s cubic-bezier(.22,.61,.36,1) infinite; }
       .saga-road-guide--casing { filter: blur(3px); }
       .saga-road-guide--route { stroke-dasharray: 14 18; animation: sagaRoadFlow 1.2s linear infinite; will-change: stroke-dashoffset; transform: translateZ(0); }
