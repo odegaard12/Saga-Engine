@@ -271,12 +271,19 @@ export function getToastOverlayStyle(mobile: boolean): CSSProperties {
 export function getQuietOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 148px)' : 132,
+    // POR ENCIMA de la barra de iconos, no debajo.
+    //
+    // Estaba a 148 px y la barra de iconos esta a 138 con zIndex 1600: los
+    // avisos salian detras y no se leia ninguno. Se veian a medias -"Solicitando
+    // ..." asomando por los lados- y parecian un fallo de pintado.
+    //
+    // 138 de la barra + sus 58 de alto + 12 de aire = 208.
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 208px)' : 214,
     left: 0,
     right: 0,
     display: 'flex',
     justifyContent: 'center',
-    zIndex: 480,
+    zIndex: 1650,
     pointerEvents: 'none',
     padding: '0 16px',
   }
