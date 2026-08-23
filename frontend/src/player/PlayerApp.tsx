@@ -2779,15 +2779,25 @@ export default function PlayerApp() {
   )
 }
 
+// SIN CAPSULA.
+//
+// Cada icono llevaba su propio marco -borde, fondo y un radio de 18 clavado-
+// DENTRO de otro marco: tres bordes por boton en una barra de cinco. Ahora el
+// icono va suelto y lo que separa es una linea fina, que es lo que hace una
+// barra de herramientas de verdad.
+//
+// El area de toque se queda en 44x40: es lo minimo para el dedo y no depende
+// de que se vea un recuadro.
 const mapRouteToggleInlineButton: CSSProperties = {
   width: 44,
   height: 40,
   minWidth: 44,
   minHeight: 40,
   padding: 0,
-  borderRadius: 18,
-  border: '1px solid rgba(255, 255, 255, 0.18)',
-  background: 'rgba(255, 255, 255, 0.10)',
+  borderRadius: 0,
+  border: 'none',
+  borderLeft: '1px solid rgba(var(--theme-line), .22)',
+  background: 'transparent',
   color: '#f1f5f9',
   display: 'inline-flex',
   alignItems: 'center',
@@ -2799,7 +2809,6 @@ const mapRouteToggleInlineButton: CSSProperties = {
   textAlign: 'center',
   whiteSpace: 'nowrap',
   textShadow: '0 1px 4px rgba(0,0,0,.5)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)',
   position: 'relative',
   overflow: 'hidden',
   pointerEvents: 'auto',
@@ -2813,12 +2822,14 @@ const mapPrologueButton: CSSProperties = {
   ...mapRouteToggleInlineButton,
 }
 
+// Activo: se marca con un filo encendido abajo, no devolviendole el recuadro.
+// Y del tema, que este llevaba un azul cielo clavado (#bae6fd) heredado de
+// cristal.
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(var(--theme-info), 0.28)',
-  border: '1px solid rgba(var(--theme-info), 0.55)',
-  color: '#bae6fd',
-  boxShadow: '0 0 12px rgba(var(--theme-info), 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+  background: 'var(--theme-tint)',
+  borderBottom: '2px solid var(--theme-primary)',
+  color: 'var(--theme-primary)',
 }
 
 const mapQuickIcon: CSSProperties = {

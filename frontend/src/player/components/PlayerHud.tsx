@@ -335,22 +335,10 @@ export function PlayerHud({
         onClose={onToggleDetails}
         sheetStyle={getSheetStyle(compact)}
       >
-        <div style={sheetHeader}>
-          <div>
-            <div style={sheetEyebrow}>MOCHILA</div>
-            <div style={sheetTitle}>Guia, objetos y respaldo</div>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Cerrar mochila"
-            style={closeButton}
-            onClick={onToggleDetails}
-          >
-            ×
-          </button>
-        </div>
-
+        {/* La cabecera «MOCHILA / Guia, objetos y respaldo» se fue.
+            Ocupaba dos lineas para decir lo que las pestanias ya dicen, y en
+            una hoja de movil eso es sitio que le quitas al contenido. El boton
+            de cerrar se queda, en la misma linea que las pestanias. */}
         <div style={tabs}>
           <button
             type="button"
@@ -372,6 +360,16 @@ export function PlayerHud({
             onClick={() => setBackpackTab('crafting')}
           >
             Mesa
+          </button>
+
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            aria-label="Cerrar mochila"
+            style={closeButton}
+            onClick={onToggleDetails}
+          >
+            ×
           </button>
         </div>
 
@@ -818,13 +816,6 @@ const sheetHeader: CSSProperties = {
   borderBottom: '1px solid rgba(255,255,255,.10)',
 }
 
-const sheetEyebrow: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-}
 
 const sheetTitle: CSSProperties = {
   marginTop: 4,
@@ -835,35 +826,36 @@ const sheetTitle: CSSProperties = {
   letterSpacing: '-0.03em',
 }
 
+// Cintas, no cajas.
+//
+// Eran tres cajas dentro de otra caja con su propio fondo y borde: cuatro
+// marcos para elegir entre tres cosas. Ahora son texto, y la activa se marca
+// con un subrayado encendido. Se lee igual de rapido y no gasta altura.
 const tabs: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 6,
-  padding: 4,
-  borderRadius: 'var(--theme-radius-card)',
-  background: 'rgba(0,0,0,.2)',
-  border: '1px solid rgba(255,255,255,.05)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 22,
 }
 
 const tabButton: CSSProperties = {
-  minHeight: 40,
   border: 'none',
-  borderRadius: 'var(--theme-radius-card)',
   background: 'transparent',
-  color: 'rgba(226,232,240,.70)',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
+  padding: '4px 0',
+  color: 'rgba(var(--theme-line-soft), .55)',
+  fontSize: 14,
+  fontWeight: 800,
+  letterSpacing: '.01em',
+  cursor: 'pointer',
+  borderBottom: '2px solid transparent',
 }
+
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'linear-gradient(135deg, var(--theme-tint-strong), var(--theme-tint))',
-  color: '#a7f3d0',
-  border: '1px solid rgba(var(--theme-ok-soft), 0.35)',
-  boxShadow: '0 4px 12px rgba(var(--theme-ok), 0.15)',
+  color: '#ffffff',
+  borderBottom: '2px solid var(--theme-primary)',
 }
+
 
 const statusRow: CSSProperties = {
   display: 'flex',
