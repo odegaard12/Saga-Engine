@@ -362,7 +362,6 @@ export function PlayerHud({
             Mesa
           </button>
 
-          <div style={{ flex: 1 }} />
           <button
             type="button"
             aria-label="Cerrar mochila"
@@ -833,20 +832,29 @@ const sheetTitle: CSSProperties = {
 // con un subrayado encendido. Se lee igual de rapido y no gasta altura.
 const tabs: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  gap: 22,
+  alignItems: 'stretch',
+  gap: 0,
+  borderBottom: '1px solid rgba(var(--theme-line), .18)',
 }
 
+// Cada pestania se lleva su tercio del ancho.
+//
+// Alineadas a la izquierda dejaban medio ancho muerto: tres palabras cortas y
+// un vacio hasta el boton de cerrar. Repartidas, el subrayado ocupa su tramo y
+// se leen como pestanias, no como tres enlaces sueltos.
 const tabButton: CSSProperties = {
+  flex: 1,
   border: 'none',
   background: 'transparent',
-  padding: '4px 0',
+  padding: '9px 0 7px',
   color: 'rgba(var(--theme-line-soft), .55)',
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 800,
-  letterSpacing: '.01em',
+  letterSpacing: '.02em',
+  textTransform: 'uppercase',
   cursor: 'pointer',
   borderBottom: '2px solid transparent',
+  marginBottom: -1,
 }
 
 
@@ -862,11 +870,12 @@ const statusRow: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 8,
-  borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(255,255,255,.10)',
-  color: 'rgba(248,250,252,.82)',
-  padding: '8px 12px',
-  fontSize: 11,
+  // Sin pastilla: era un bloque blanco del ancho entero para dos datos de
+  // servicio, justo debajo de las pestanias. Ahora es una linea y ya.
+  background: 'transparent',
+  color: 'rgba(var(--theme-line-soft), .6)',
+  padding: '7px 2px 2px',
+  fontSize: 10,
   fontWeight: 950,
   letterSpacing: '0.02em',
   textTransform: 'uppercase',

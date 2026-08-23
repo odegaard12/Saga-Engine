@@ -6,6 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.29
+
+Los avisos ya no se esconden detrás de la barra, y las pestañas llenan su fila.
+
+**Los avisos estaban tapados.** La línea callada se pintaba a 148&nbsp;px del
+borde y la barra de iconos está a 138 con `zIndex: 1600`: cualquier aviso salía
+**detrás**. Se veían a medias —«Solicitando…» asomando por los lados— y parecían
+un fallo de pintado. Ahora va a 208 (138 de la barra + sus 58 de alto + 12 de
+aire) y con capa por delante.
+
+Es un fallo que me llevé puesto desde 4.9.7, cuando le di sitio propio a los
+avisos: elegí una altura sin comprobar qué había ya ahí.
+
+**Las pestañas dejaban medio ancho muerto.** Tres palabras cortas alineadas a la
+izquierda y un vacío hasta el botón de cerrar. Ahora **cada una se lleva su
+tercio**, el subrayado ocupa su tramo y se leen como pestañas y no como tres
+enlaces sueltos.
+
+**Y la línea de distancia deja de ser un pastillón blanco** del ancho entero
+para dos datos de servicio. Ahora es una línea y ya.
+
+---
+
 ## 4.9.28
 
 Los tres rediseños de la propuesta, montados.
