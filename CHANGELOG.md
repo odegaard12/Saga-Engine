@@ -6,6 +6,30 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.26
+
+Tres correcciones sobre 4.9.25, todas de mirar capturas.
+
+**La barra era una caja grande y vacía.** Le quité el título y la tira de puntos
+pero le dejé el relleno de 16&nbsp;px y una sola fila dentro: quedó peor que
+antes. Ahora es una línea fina de verdad —relleno de 8/9&nbsp;px— con todo en
+la misma fila: nombre, nodo, reloj y cuenta. El nombre del nodo se queda con el
+sitio que sobre y se corta con puntos suspensivos antes que empujar al reloj
+fuera de la pantalla.
+
+**La etiqueta colgada del alfiler, retirada.** La idea era buena sobre el papel
+y no sobrevivió al mapa de verdad, por dos motivos: se solapaba con las fotos de
+campo y con los alfileres vecinos —que en esta ruta van a menos de 100&nbsp;m
+unos de otros—, y el texto que tenía a mano no era el nombre del nodo sino su
+etiqueta de accesibilidad («Coleccionable · Nodo 6 · siguiente nodo»). El nombre
+vuelve a la barra, que ahora tiene sitio.
+
+**Las fotos tapaban los alfileres.** Iban a `zIndexOffset: 600` y los nodos a
+540/560, así que un nodo con una foto cerca desaparecía debajo. Invertido: las
+fotos a 510. Los nodos son a dónde hay que ir; las fotos son recuerdos.
+
+---
+
 ## 4.9.25
 
 Barra C y Mesa C. El rediseño de verdad, no la piel.
