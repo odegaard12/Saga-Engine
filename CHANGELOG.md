@@ -6,6 +6,46 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.25
+
+Barra C y Mesa C. El rediseño de verdad, no la piel.
+
+Ocho versiones cambiando colores, radios y cortes sin que se notara, porque
+**eso era la piel**. Esto cambia qué se ve, cuánto ocupa y en qué orden se lee.
+
+### La barra: dos piezas
+
+Arriba queda **sólo una línea de estado** —nombre, reloj, 6/10—. Se van dos
+cosas:
+
+- **El nombre del nodo**, que vivía a media pantalla del punto al que se
+  refiere. Ahora **cuelga de su propio alfiler en el mapa**, y sólo el del nodo
+  actual: ponérselo a los diez llenaría el mapa de texto y taparía el camino.
+- **La tira de puntos.** El mapa ya cuenta qué nodo está hecho con el color de
+  cada alfiler; la tira repetía esa información ocupando el tercio inferior de
+  la barra. Queda la cuenta 6/10, que es el resumen que sí hacía falta.
+
+De paso se fueron **doce estilos y tres variables** que quedaron sin uso, y una
+prop que el componente ya no necesita.
+
+### La mesa: sin ficha
+
+Era una tarjeta dentro de una hoja dentro de un panel — tres marcos para un
+contenido, en 375 px de ancho. Ahora:
+
+- La receta es una **sección plana**.
+- Cada pieza es una **fila a todo el ancho** con su filo de estado a la
+  izquierda: se leen en vertical de un vistazo y se distinguen con guantes. En
+  horizontal se envolvían y quedaban a medias.
+- **ENSAMBLAR está siempre**, apagado mientras faltan piezas. Antes sólo
+  aparecía al completar la receta, así que mientras juntabas no había nada que
+  te dijera hacia dónde ibas.
+
+Y otro color de otro tema que quedaba: el botón era **morado**
+(`#a78bfa → #7c3aed`) en un tema rojo.
+
+---
+
 ## 4.9.24
 
 Cuadrado de verdad. Llevaba siete versiones cortando esquinas **encima** de

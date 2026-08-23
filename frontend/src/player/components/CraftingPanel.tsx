@@ -79,11 +79,15 @@ function RecipeCard({
         })}
       </div>
 
-      {/* Craft button */}
-      {canCraft && (
-        <button
+      {/* El boton, SIEMPRE.
+          Antes solo aparecia cuando ya podias fabricar, asi que mientras
+          juntabas piezas no habia nada que te dijera hacia donde ibas: la
+          seccion terminaba en la ultima pieza y ya. Ahora esta desde el
+          principio, apagado, y se enciende al completar la receta. */}
+      <button
           type="button"
-          style={craftBtn}
+          disabled={!canCraft}
+          style={canCraft ? craftBtn : { ...craftBtn, ...craftBtnApagado }}
           onPointerDown={() => setPressed(true)}
           onPointerUp={() => setPressed(false)}
           onPointerLeave={() => setPressed(false)}
@@ -97,7 +101,6 @@ function RecipeCard({
         >
           <span>⚒</span> Ensamblar
         </button>
-      )}
     </div>
   )
 }
@@ -306,12 +309,15 @@ const recipeList: CSSProperties = {
 export const CLASE_FICHA_MESA = 'saga-mesa-ficha'
 export const CLASE_PIEZA_MESA = 'saga-mesa-pieza'
 
+// SIN FICHA.
+//
+// Era una tarjeta dentro de la hoja dentro del panel: tres marcos para un
+// contenido, en una pantalla de 375 px. Ahora la receta es una seccion plana y
+// el sitio se lo quedan las piezas, que es lo que se mira.
 const recipeCard: CSSProperties = {
-  borderRadius: 'var(--theme-radius-card)',
-  padding: '14px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 12,
+  gap: 10,
   transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
 }
 
@@ -391,26 +397,29 @@ const lockedPill: CSSProperties = {
   flexShrink: 0,
 }
 
+// Una pieza por fila y a todo el ancho: se leen en vertical de un vistazo, y
+// con guantes se distinguen. En horizontal se envolvian y quedaban a medias.
 const inputsRow: CSSProperties = {
   display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
+  flexDirection: 'column',
+  gap: 4,
 }
 
 const inputChip: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 5,
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  gap: 8,
+  width: '100%',
+  background: 'rgba(var(--theme-sheen-b), calc(.5 * var(--theme-solid)))',
+  // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
+  borderLeft: '3px solid rgba(var(--theme-line), .35)',
   borderRadius: 'var(--theme-radius-card)',
-  padding: '4px 9px',
+  padding: '10px 12px',
 }
 
 const inputChipReady: CSSProperties = {
-  borderColor: 'rgba(var(--theme-done-soft), .45)',
-  borderLeft: '2px solid rgb(var(--theme-done))',
-  background: 'rgba(var(--theme-done-soft), .12)',
+  borderLeft: '3px solid rgb(var(--theme-done))',
+  background: 'rgba(var(--theme-done-soft), .14)',
 }
 
 const inputChipMissing: CSSProperties = {
@@ -418,18 +427,28 @@ const inputChipMissing: CSSProperties = {
 }
 
 const inputChipLabel: CSSProperties = {
-  fontSize: 11,
+  flex: 1,
+  fontSize: 13,
   fontWeight: 700,
-  color: 'rgba(var(--theme-line-soft), 0.7)',
+  color: 'rgba(var(--theme-line-soft), 0.9)',
+}
+
+// Apagado mientras faltan piezas: se ve a donde vas, pero no invita a pulsarlo.
+const craftBtnApagado: CSSProperties = {
+  background: 'rgba(var(--theme-line), .14)',
+  color: 'rgba(var(--theme-line-soft), .45)',
+  boxShadow: 'none',
+  cursor: 'default',
 }
 
 const craftBtn: CSSProperties = {
   width: '100%',
-  padding: '11px 0',
+  padding: '14px 0',
   borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
-  color: '#fff',
+  // Era morado -#a78bfa a #7c3aed- en un tema rojo. Del tema, ahora.
+  background: 'var(--theme-primary)',
+  color: 'rgb(var(--theme-ink-deep))',
   fontWeight: 900,
   fontSize: 14,
   letterSpacing: '0.05em',
@@ -438,7 +457,7 @@ const craftBtn: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: 8,
-  boxShadow: '0 4px 18px rgba(var(--theme-info-deep), 0.4)',
+  boxShadow: '0 4px 18px rgba(var(--theme-ink-deep), 0.45)',
   transition: 'transform 0.15s, box-shadow 0.15s',
 }
 

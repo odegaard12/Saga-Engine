@@ -1,9 +1,8 @@
 import type { CSSProperties } from 'react'
-import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import type { PlayerGamePayload } from '../../types/player'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
-  currentStage: PlayerStage | null
 }
 
 function getProgress(payload: PlayerGamePayload) {
@@ -28,21 +27,17 @@ function getProgress(payload: PlayerGamePayload) {
   }
 }
 
-export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
+export function PlayerShell({ payload }: PlayerShellProps) {
   const compact = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
   const mode = payload.session_mode || payload.mode || payload.profile?.mode || 'solo'
   const playerName = payload.display_name || payload.profile?.display_name || payload.user
-  const stageName =
-    currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
 
   const totalMs = payload.live_status?.total_time_ms || 0
   const minutes = Math.floor(totalMs / 60000)
   const seconds = Math.floor((totalMs % 60000) / 1000)
   const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-
-  const nodes = Array.from({ length: progress.total })
 
   return (
     <div style={wrap}>
@@ -80,58 +75,23 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
             {mode === 'team' ? (
               <div style={soloPill}>EQUIPO</div>
             ) : null}
+            <div style={countPill}>
+              {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
+            </div>
           </div>
         </div>
 
-        <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{stageName}</div>
+        {/* El nombre del nodo YA NO va aqui.
+            Vivia a media pantalla del punto al que se refiere, y habia que
+            saltar la vista de la barra al mapa para saber a donde vas. Ahora
+            cuelga de su propio alfiler (`saga-mission-node-etiqueta`). */}
 
-        <div style={progressRow}>
-          <div style={routeWrap}>
-            {nodes.length > 0 ? (
-              nodes.map((_, index) => {
-                const nodeDone = payload.finished || index < progress.current - 1
-                const nodeActive = index === progress.activeIndex && !payload.finished
-                const connectorDone = payload.finished || index < progress.current - 1
+        {/* La tira de nodos YA NO va aqui.
+            El mapa ya cuenta que nodo esta hecho con el color de cada alfiler
+            -hecho / el que toca / pendiente-, asi que la tira repetia esa misma
+            informacion ocupando el tercio inferior de la barra. La cuenta 6/10
+            sube a la linea de estado, que es el resumen que si hacia falta. */}
 
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      ...routeSegment,
-                      flex: index === nodes.length - 1 ? '0 0 auto' : 1,
-                    }}
-                  >
-                    <span
-                      style={{
-                        ...routeNode,
-                        ...(nodeActive
-                          ? routeNodeActive
-                          : nodeDone
-                            ? routeNodeDone
-                            : routeNodeIdle),
-                      }}
-                    />
-
-                    {index < nodes.length - 1 ? (
-                      <span
-                        style={{
-                          ...routeConnector,
-                          ...(connectorDone ? routeConnectorDone : routeConnectorIdle),
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                )
-              })
-            ) : (
-              <span style={progressEmpty}>Sin ruta</span>
-            )}
-          </div>
-
-          <div style={countPill}>
-            {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
-          </div>
-        </div>
       </section>
     </div>
   )
@@ -196,80 +156,16 @@ const soloPill: CSSProperties = {
 }
 
 
-const playerTitle: CSSProperties = {
-  fontWeight: 900,
-  lineHeight: 1.05,
-  letterSpacing: '-0.03em',
-  color: '#ffffff',
-  maxWidth: '100%',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
 
-const progressRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginTop: 4,
-}
 
-const routeWrap: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  flex: 1,
-  minWidth: 0,
-}
 
-const routeSegment: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '10px minmax(10px, 1fr)',
-  alignItems: 'center',
-  gap: 6,
-  minWidth: 10,
-}
 
-const routeNode: CSSProperties = {
-  width: 10,
-  height: 10,
-  // Del tema, no de la pildora: --theme-radius-pill vale 999px en los dos temas
-  // y la usan cosas que SI son pildoras. Estos puntos son alfileres pequenios y
-  // tienen que seguir la forma de los del mapa.
-  borderRadius: 'var(--theme-radius-dot, var(--theme-radius-pill))',
-  border: '1px solid rgba(255,255,255,.18)',
-  flex: '0 0 auto',
-}
 
-const routeNodeIdle: CSSProperties = {
-  background: 'rgba(255,255,255,.18)',
-}
 
-const routeNodeDone: CSSProperties = {
-  background: 'rgba(var(--theme-done), .88)',
-  border: '1px solid rgba(var(--theme-done-soft), .55)',
-  boxShadow: '0 0 0 3px rgba(var(--theme-done), .12)',
-}
 
-const routeNodeActive: CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid rgba(255,255,255,.92)',
-  boxShadow: '0 0 0 4px rgba(255,255,255,.12)',
-}
 
-const routeConnector: CSSProperties = {
-  height: 3,
-  borderRadius: 'var(--theme-radius-pill)',
-  width: '100%',
-}
 
-const routeConnectorIdle: CSSProperties = {
-  background: 'rgba(255,255,255,.16)',
-}
 
-const routeConnectorDone: CSSProperties = {
-  background: 'linear-gradient(90deg, rgba(var(--theme-done), .88), rgba(var(--theme-done-soft), .64))',
-}
 
 const countPill: CSSProperties = {
   minHeight: 28,
@@ -286,8 +182,3 @@ const countPill: CSSProperties = {
   letterSpacing: '0.05em',
 }
 
-const progressEmpty: CSSProperties = {
-  color: 'rgba(255,255,255,.72)',
-  fontSize: 11,
-  fontWeight: 800,
-}
