@@ -33,8 +33,11 @@ export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    gap: 4,
-    padding: '5px 8px',
+    // Sin hueco entre iconos: lo que los separa ahora es la linea fina que
+    // lleva cada uno a su izquierda, no el aire.
+    gap: 0,
+    padding: 0,
+    overflow: 'hidden',
     borderRadius: 'var(--theme-radius-panel)',
     // Exactamente el mismo estilo que la barra inferior (Mochila / Herramientas / Nodos)
     background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.52 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.42 * var(--theme-solid))))',
