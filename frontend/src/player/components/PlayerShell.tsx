@@ -91,6 +91,27 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
           </div>
         </div>
 
+        {/* El progreso ES el filo de la barra.
+            El 6/10 dice en que nodo vas, pero no se VE cuanto llevas. La tira
+            de puntos si lo enseniaba y se comia el tercio inferior de la barra.
+            Esto lo cuenta en 3 px: una regla partida en tantos tramos como
+            nodos, encendida hasta donde estas. A sangre, pegada al borde de
+            abajo, porque un filo no es una fila: no ocupa alto propio. */}
+        <div style={{ ...rielProgreso, margin: compact ? '6px -12px -8px' : '7px -14px -9px' }}>
+          {Array.from({ length: Math.max(progress.total, 1) }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                ...rielTramo,
+                background:
+                  i < progress.current
+                    ? 'var(--theme-primary)'
+                    : 'rgba(var(--theme-line), .22)',
+              }}
+            />
+          ))}
+        </div>
+
         {/* El nombre del nodo YA NO va aqui.
             Vivia a media pantalla del punto al que se refiere, y habia que
             saltar la vista de la barra al mapa para saber a donde vas. Ahora
@@ -122,7 +143,19 @@ const card: CSSProperties = {
   WebkitBackdropFilter: 'var(--theme-blur)',
   color: '#ffffff',
   display: 'grid',
-  gap: 8,
+  gap: 0,
+}
+
+// El filo de progreso: a sangre y de 3 px, para que cuente sin ocupar una fila.
+const rielProgreso: CSSProperties = {
+  display: 'flex',
+  gap: 2,
+  height: 3,
+}
+
+const rielTramo: CSSProperties = {
+  flex: 1,
+  height: '100%',
 }
 
 const topRow: CSSProperties = {

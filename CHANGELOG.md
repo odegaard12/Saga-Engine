@@ -6,6 +6,46 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 4.9.28
+
+Los tres rediseños de la propuesta, montados.
+
+### El progreso ES el filo de la barra
+
+El `6/10` dice en qué nodo vas; no enseña **cuánto llevas**. La tira de puntos sí
+lo hacía y se comía el tercio inferior de la barra. Ahora lo cuenta una regla de
+**3 px pegada al borde de abajo**, partida en tantos tramos como nodos y
+encendida hasta donde estás. A sangre, con márgenes negativos: **un filo no es
+una fila** y no ocupa alto propio.
+
+### La barra de abajo pierde las cápsulas
+
+Cada icono llevaba borde, fondo y un radio de 18 clavado **dentro** de otro
+marco con los suyos: tres bordes por botón en una barra de cinco. Ahora el icono
+va suelto y lo que separa es una línea fina. El área de toque se queda en
+44×40&nbsp;px — es lo mínimo para el dedo y no depende de que se vea un
+recuadro.
+
+El botón activo se marca con un **filo encendido abajo**, no devolviéndole el
+recuadro. Y de paso sale un azul cielo (`#bae6fd`) que quedaba de cristal.
+
+### La hoja: fuera la cabecera, las pestañas son cintas
+
+- **La cabecera se va.** «MOCHILA / Guía, objetos y respaldo» ocupaba dos líneas
+  para decir lo que las pestañas ya dicen. El botón de cerrar se queda, en la
+  misma fila que ellas.
+- **Las pestañas dejan de ser cajas.** Eran tres cajas dentro de otra caja con
+  su fondo y su borde: cuatro marcos para elegir entre tres cosas. Ahora son
+  texto con un subrayado encendido en la activa.
+
+Entre las dos, la hoja gana unos 90&nbsp;px de altura para lo que se usa.
+
+**Lo que NO se movió:** la línea de distancia y radio se queda como fila propia.
+En la maqueta iba junto a las pestañas, pero lleva el indicador de cobertura
+—una barra de señal dibujada— y meterlo ahí era más riesgo que ganancia.
+
+---
+
 ## 4.9.27
 
 Las fotos se apartan del nodo, no sólo se meten debajo.
