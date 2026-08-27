@@ -1,4 +1,4 @@
-import type { AdminRawStage, AdminReactOverviewStage } from './adminApi'
+import type { AdminRawStage, AdminReactOverviewProfile, AdminReactOverviewStage } from './adminApi'
 import { withPhysicalStageFields } from './physicalStageFields'
 import {
   buildAdminMinigameBlock,
@@ -263,6 +263,54 @@ function stablePersistenceValue(value: unknown): unknown {
 
 function persistenceJson(value: unknown) {
   return JSON.stringify(stablePersistenceValue(value))
+}
+
+export type JugadorDesplazado = {
+  id: string
+  display_name: string
+  level: number
+}
+
+/**
+ * A quién le cambia el nodo con este guardado, sin migrar nada.
+ *
+ * El progreso de un jugador se guarda como ÍNDICE en la lista de nodos, no
+ * como id del nodo (ver docs/plan-de-mejora.md, 1.2). Borrar un nodo antes de
+ * donde va alguien no le baja el nivel: su nivel 5 sigue siendo 5, pero ese
+ * puesto en la lista ahora lo ocupa el nodo que antes era el 6. Se salta uno
+ * entero y nadie se entera. Y si el nodo que desaparece es justo el último
+ * antes del suyo, su nivel deja de existir en la lista nueva y el servidor lo
+ * lee como misión terminada.
+ *
+ * Por eso la comparación es por ÍNDICE, no por id: lo que importa es si el
+ * nodo que hay en el puesto `level` sigue siendo el mismo antes y después de
+ * guardar, esté donde esté ese nodo en el nuevo orden.
+ */
+export function jugadoresDesprazadosPolGardado(
+  stagesAntes: AdminRawStage[],
+  stagesDespois: AdminRawStage[],
+  profiles: AdminReactOverviewProfile[]
+): JugadorDesplazado[] {
+  const desplazados: JugadorDesplazado[] = []
+
+  for (const profile of profiles) {
+    if (profile.finished) continue
+    const level = typeof profile.level === 'number' ? profile.level : null
+    if (level === null || level < 0) continue
+
+    const antes = stagesAntes[level]
+    if (!antes) continue // ya iba fuera de rango antes de tocar nada; no es este guardado
+
+    const idAntes = rawStageIdentity(antes, level)
+    const despois = stagesDespois[level]
+    const idDespois = despois ? rawStageIdentity(despois, level) : null
+
+    if (idDespois !== idAntes) {
+      desplazados.push({ id: profile.id, display_name: profile.display_name, level })
+    }
+  }
+
+  return desplazados
 }
 
 export function verifyPersistedStages(
