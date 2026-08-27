@@ -780,14 +780,26 @@ dentro de `body.theme-flame-red`.
   objeto que se mueve), no decoración, igual que los alfileres del mapa-,
   documentado en el propio CSS y con test que lo exige así.
 
-  **✅ `circuitMatrix` — 4.9.33.** Mismo tratamiento, con una complicación de
-  más: cuatro selectores (`.circuit-shell`, `.circuit-board-wrap`,
-  `.circuit-cell`, `.circuit-button`) estaban declarados dos veces en el mismo
-  bloque -una simplificación añadida al final sin limpiar la versión
-  original-, con la segunda ganando siempre por cascada. Las dos declaraciones
-  de cada uno pasan a la variable, porque tocar sólo la que "se ve" no habría
-  cambiado nada. Verificado con `getComputedStyle` en un arnés real. Queda
-  anotada aparte la limpieza de la duplicación (no cambia nada visible hoy).
+  **✅ `circuitMatrix` — 4.9.33, limpiado del todo después.** Mismo
+  tratamiento, con una complicación de más: cuatro selectores
+  (`.circuit-shell`, `.circuit-board-wrap`, `.circuit-cell`,
+  `.circuit-button`) estaban declarados dos veces en el mismo bloque -una
+  simplificación añadida al final sin limpiar la versión original-, con la
+  segunda ganando siempre por cascada. Las dos declaraciones de cada uno
+  pasaron a la variable en 4.9.33, porque tocar sólo la que "se ve" no habría
+  cambiado nada.
+
+  Auditado después el JSX entero: la mitad "completa" del diseño -topbar,
+  chip, título, mini-estadística, medidor, reglas- no la renderiza **nada**,
+  0 apariciones en el componente real. No era sólo esos 4 selectores
+  duplicados: era media hoja de estilos muerta detrás de un
+  `display:none!important` que ocultaba clases que ni existían ya en el
+  árbol. Se borraron ~10 reglas inalcanzables y se fusionaron los ~13
+  selectores vivos que seguían duplicados (`.circuit-status`,
+  `.circuit-body`, `.circuit-bottombar`, `.circuit-final` y las variantes de
+  `.circuit-cell`/`.circuit-button`) en una sola declaración cada uno.
+  Verificado con `getComputedStyle` antes y después: ningún valor cambia,
+  sólo desaparece el texto muerto (el bundle final baja ~5 KB).
 
   **✅ `placeMosaic` — 4.9.32.** Las 15 formas que cuentan (contenedor,
   tarjetas, tablero, botones, píldoras e insignias) pasan a
