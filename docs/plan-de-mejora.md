@@ -454,12 +454,16 @@ la cola offline — no es un parche de una tarde.
 
 1. **No tocar la ruta con gente jugando.** Es una norma, no código, pero es la
    que de verdad evita esto.
-2. **Avisar en el panel antes de guardar**: «esto desplaza a N jugadores».
-   El servidor tiene los dos datos —cuántos nodos había y por dónde va cada
-   uno—, así que el aviso se puede calcular sin migrar nada.
+2. **✅ Avisar en el panel antes de guardar — hecho en 4.9.31.** «Esto
+   desplaza a N jugadores», con nombre y nivel de cada uno, calculado en el
+   cliente comparando por índice el nodo de antes y el de después
+   (`jugadoresDesprazadosPolGardado` en `adminStagePersistence.ts`). Cancelar
+   el aviso corta el guardado. No migra nada: el índice sigue siendo el
+   índice, esto sólo avisa antes de pisarlo.
 3. Al borrar un nodo, ajustar el nivel de quien estuviera por detrás. Suena
    bien y es traicionero: hay que hacerlo también en la cola del móvil, que
-   manda sobre su propio progreso.
+   manda sobre su propio progreso. **Sigue sin hacerse** — el aviso del punto
+   2 es la barrera, no el arreglo de fondo.
 
 **✅ `route_via` — auditado y con guardia (4.9.12).** El servidor lo pasaba al
 jugador sin mirarlo: aceptaba textos, pares incompletos, nulos y coordenadas
@@ -561,9 +565,11 @@ por algo que no hizo él.
 largos (`placeMosaic` y `circuitMatrix`). Si son dos minutos, esto es una
 molestia; si son ocho, es una injusticia en la clasificación.
 
-### 2.2 Fotos pendientes
-Ya hay un repaso, pero conviene un contador visible: «3 fotos sin subir». Ahora
-mismo el jugador no tiene forma de saber que lleva cosas pendientes.
+### 2.2 Fotos pendientes — ✅ hecho en 4.9.31
+`fotos.pendientes` ya existía en `useFotosDeCampo` y `PlayerApp.tsx` incluso lo
+nombraba (`fotosPendentes`), pero el número se calculaba y se tiraba. Ahora
+sale un aviso junto al botón de descargar fotos, sólo cuando hay al menos una
+pendiente (`PlayerHud.tsx`).
 
 ---
 
