@@ -470,7 +470,7 @@ const hudBlock: CSSProperties = {
   display: 'grid',
   gap: 2,
   padding: '8px 10px',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card, 14px)',
   background: 'rgba(var(--theme-ink), .72)',
   border: '1px solid rgba(var(--theme-line), .2)',
   textAlign: 'center',
@@ -498,7 +498,7 @@ const hudTotal: CSSProperties = {
 
 const progressTrack: CSSProperties = {
   height: 6,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill, 999px)',
   background: 'rgba(var(--theme-line), .18)',
   overflow: 'hidden',
 }
@@ -509,6 +509,12 @@ const progressFill: CSSProperties = {
   transition: 'width .18s ease-out',
 }
 
+/**
+ * El radar, sus anillos y el barrido NO siguen al tema, a propósito: son un
+ * radar, tienen que leerse como un radar en cualquier tema. Es información
+ * (la forma del propio juego), no decoración, igual que la bola de tiltMaze
+ * o los alfileres del mapa en mobile-themes.css.
+ */
 const radar: CSSProperties = {
   position: 'relative',
   width: '100%',
@@ -567,6 +573,8 @@ const sweep: CSSProperties = {
   pointerEvents: 'none',
 }
 
+// El blip que se toca tampoco sigue al tema: es un punto en el radar, redondo
+// en cualquier tema por la misma razón que el radar de arriba.
 const sparkButton: CSSProperties = {
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
@@ -624,7 +632,7 @@ const resumo: CSSProperties = {
   gap: 6,
   margin: '4px 0 12px',
   padding: '10px 12px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card, 16px)',
   border: '1px solid rgba(255,255,255,.14)',
   background: 'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04))',
 }
@@ -649,7 +657,7 @@ const primaryButton: CSSProperties = {
   marginTop: 6,
   minHeight: 48,
   padding: '0 26px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card, 16px)',
   border: 'none',
   background: 'linear-gradient(135deg,rgb(var(--theme-ok-soft)),rgb(var(--theme-ok-deep)))',
   color: '#022c22',

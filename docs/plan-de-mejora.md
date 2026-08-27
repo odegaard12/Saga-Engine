@@ -738,8 +738,8 @@ dentro de `body.theme-flame-red`.
   |---|---|---|---|---|
   | `circuitMatrix` (logic_circuit) | 910 | **127** | ~~16~~ 0 | **✅ 15 en 4.9.33** |
   | `placeMosaic` | 1 236 | 71 | ~~20~~ 1 sin tocar (a propósito) | **✅ 16 en 4.9.32** |
-  | `tiltMaze` | 665 | 69 | 10 | 13 |
-  | `sparkRadar` | 668 | 54 | 8 | 19 |
+  | `tiltMaze` | 665 | 69 | ~~10~~ 1 (la bola, a propósito) | **✅ 9 en 4.9.34** |
+  | `sparkRadar` | 668 | 54 | ~~8~~ 4 (el radar, a propósito) | **✅ 4 en 4.9.35** |
   | `signalHunt` (checkpoint) | 271 | 17 | 2 | 3 |
   | **En la misión** | **3 750** | **338** | **56** | **66** |
   | El resto (5 familias) | 2 498 | 177 | 42 | 19 |
@@ -762,6 +762,23 @@ dentro de `body.theme-flame-red`.
   deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` era
   el peor caso —20 formas en línea y **una sola** referencia al tema en 1 236
   líneas—.
+
+  **✅ `sparkRadar` — 4.9.35, último de los cinco.** Aquí las formas viven en
+  objetos `CSSProperties` de React, no en una plantilla CSS -mismo bloqueo,
+  otra sintaxis-. Lo decorativo (tarjetas del HUD, barra de progreso, resumen,
+  botón) pasa al tema. El radar, sus anillos, el barrido y el blip se dejan
+  en `'50%'` a propósito: son un radar, tienen que leerse como un radar en
+  cualquier tema.
+
+  **Con esto, los cinco minijuegos que se juegan de verdad en la ruta ya
+  responden al tema.** Quedan las cinco familias que no aparecen en «O Eco do
+  Vixía» (`bearingHunt`, `motionChallenge`, `sequenceCode`, `teamRelay`,
+  `audioChallenge`), y son las que menos urgen: nadie las ve en esta misión.
+
+  **✅ `tiltMaze` — 4.9.34.** Igual, con una excepción a propósito: la bola
+  (`.tilt-ball`) se deja en 999px fijo en cualquier tema -es información (el
+  objeto que se mueve), no decoración, igual que los alfileres del mapa-,
+  documentado en el propio CSS y con test que lo exige así.
 
   **✅ `circuitMatrix` — 4.9.33.** Mismo tratamiento, con una complicación de
   más: cuatro selectores (`.circuit-shell`, `.circuit-board-wrap`,
