@@ -736,7 +736,7 @@ dentro de `body.theme-flame-red`.
 
   | Pantalla | Líneas | Colores literales | Formas en línea | Usa el tema |
   |---|---|---|---|---|
-  | `circuitMatrix` (logic_circuit) | 910 | **127** | 16 | 30 |
+  | `circuitMatrix` (logic_circuit) | 910 | **127** | ~~16~~ 0 | **✅ 15 en 4.9.33** |
   | `placeMosaic` | 1 236 | 71 | ~~20~~ 1 sin tocar (a propósito) | **✅ 16 en 4.9.32** |
   | `tiltMaze` | 665 | 69 | 10 | 13 |
   | `sparkRadar` | 668 | 54 | 8 | 19 |
@@ -762,6 +762,15 @@ dentro de `body.theme-flame-red`.
   deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` era
   el peor caso —20 formas en línea y **una sola** referencia al tema en 1 236
   líneas—.
+
+  **✅ `circuitMatrix` — 4.9.33.** Mismo tratamiento, con una complicación de
+  más: cuatro selectores (`.circuit-shell`, `.circuit-board-wrap`,
+  `.circuit-cell`, `.circuit-button`) estaban declarados dos veces en el mismo
+  bloque -una simplificación añadida al final sin limpiar la versión
+  original-, con la segunda ganando siempre por cascada. Las dos declaraciones
+  de cada uno pasan a la variable, porque tocar sólo la que "se ve" no habría
+  cambiado nada. Verificado con `getComputedStyle` en un arnés real. Queda
+  anotada aparte la limpieza de la duplicación (no cambia nada visible hoy).
 
   **✅ `placeMosaic` — 4.9.32.** Las 15 formas que cuentan (contenedor,
   tarjetas, tablero, botones, píldoras e insignias) pasan a
