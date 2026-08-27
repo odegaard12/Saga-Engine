@@ -30,6 +30,7 @@ import {
 } from './lib/playerDrafts'
 import {
   buildRawStagesFromOverview,
+  jugadoresDesprazadosPolGardado,
   mergeOverviewIntoRawStages,
   stageSaveIdentity,
   verifyPersistedStages,
@@ -645,6 +646,28 @@ export default function AdminApp() {
 
       if (raw.status === 'ok') {
         persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
+
+        const desplazados = jugadoresDesprazadosPolGardado(
+          raw.stages || [],
+          persistedStages,
+          overview.profiles || []
+        )
+
+        if (desplazados.length > 0) {
+          const detalle = desplazados
+            .map((j) => `${j.display_name || j.id} (nivel ${j.level})`)
+            .join('\n')
+          const continuar = window.confirm(
+            `Este guardado desplaza a ${desplazados.length} jugador(es):\n\n${detalle}\n\n` +
+              'Verán un nodo distinto del que esperaban, o la misión dada por ' +
+              'terminada sin jugar el último. ¿Guardar de todos modos?'
+          )
+          if (!continuar) {
+            setSaveState('idle')
+            setLocalNotice('Guardado cancelado: desplazaba a jugadores en curso.')
+            return
+          }
+        }
       } else {
         usedFallback = true
         persistedStages = buildRawStagesFromOverview(overview.stages || [])
