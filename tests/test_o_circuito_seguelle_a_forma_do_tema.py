@@ -3,14 +3,21 @@
 líneas, 16 formas en línea y sólo 30 usos del tema (casi todos de color, no de
 forma). Cambiar de tema no le movía ni un píxel a nada.
 
-El fichero tiene una complicación de más: varios selectores
-(`.circuit-shell`, `.circuit-board-wrap`, `.circuit-cell`, `.circuit-button`)
-están declarados DOS veces en el mismo bloque de estilos -una simplificación
-de diseño añadida al final sin limpiar la versión original-, y la segunda
-declaración siempre gana. Verificado con `getComputedStyle` en un arnés real
-antes de dar esto por bueno: hoy se pintan los valores de la SEGUNDA
-declaración. Por eso esta prueba exige la variable del tema en las DOS, no
-sólo en la que "se ve": tocar sólo una habría sido un cambio sin efecto.
+**4.9.33** puso las formas a seguir al tema, pero el fichero tenía una
+complicación de más: varios selectores (`.circuit-shell`, `.circuit-cell`,
+`.circuit-button`, `.circuit-board-wrap`, y de hecho casi todo el bloque de
+estilos) estaban declarados DOS veces -una simplificación de diseño añadida
+al final del fichero sin limpiar la versión original-, con la segunda
+ganando siempre por cascada. Auditado el JSX entero: la primera mitad del
+fichero (topbar, chip, título, mini-estadística, medidor, reglas) no la
+renderiza NADA -0 apariciones en el componente-, así que no era sólo una
+declaración muerta por selector: era media hoja de estilos entera, muerta.
+
+**Aquí, en la limpieza:** las ~10 reglas nunca alcanzables se borran, y los
+~13 selectores que sí se usan y estaban duplicados se fusionan en una sola
+declaración cada uno -quedándose con lo que ya se pintaba-. Verificado con
+`getComputedStyle` en un arnés real antes y después: los valores no cambian,
+sólo desaparece el texto muerto.
 """
 import re
 from pathlib import Path
@@ -21,76 +28,97 @@ RUNTIME = (
 )
 
 SELECTORES_CARD_O_PANEL = (
-    ".circuit-mini-stat {",
+    ".circuit-shell {",
     ".circuit-status {",
-    ".circuit-rule {",
+    ".circuit-board-wrap {",
+    ".circuit-cell {",
+    ".circuit-button {",
+    ".circuit-final {",
 )
 
-SELECTORES_PILDORA = (
-    ".circuit-chip {",
-    ".circuit-bar {",
-    ".circuit-final-icon {",
-)
+SELECTORES_PILDORA = (".circuit-final-icon {",)
 
-# Declarados dos veces en el mismo fichero; las dos tienen que llevar la
-# variable, porque la segunda es la que gana en cascada.
-SELECTORES_DUPLICADOS_PANEL = (".circuit-shell {", ".circuit-board-wrap {")
-SELECTORES_DUPLICADOS_CARD = (".circuit-cell {", ".circuit-button {")
+# Clases que el JSX del componente no aplica a ningún elemento -auditado con
+# grep sobre las líneas de `className` del propio fichero-. Si alguna de
+# estas vuelve a aparecer en STYLES sin que el JSX la use, es la misma trampa
+# de antes: media hoja de estilos que nadie ve.
+CLASES_MUERTAS = (
+    "circuit-topbar",
+    "circuit-chip",
+    "circuit-title-row",
+    "circuit-overline",
+    "circuit-title",
+    "circuit-brief",
+    "circuit-mini-stat",
+    "circuit-meter",
+    "circuit-bar",
+    "circuit-fill",
+    "circuit-rules",
+    "circuit-rule",
+)
 
 
 def styles() -> str:
     return RUNTIME.read_text(encoding="utf-8")
 
 
-def bloques(selector: str) -> list[str]:
-    """Los bloques de un selector EXACTO, no de uno que lo lleve como sufijo.
+def jsx() -> str:
+    texto = styles()
+    inicio = texto.index("export function CircuitMatrixRuntimeScreen")
+    return texto[inicio:]
 
-    `.circuit-final-icon {` no puede devolver también
-    `.circuit-final.success .circuit-final-icon {`: son reglas distintas.
-    """
+
+def bloque(selector: str) -> str:
+    """El bloque de un selector EXACTO (al principio de línea), no de uno que
+    lo lleve como sufijo -`.circuit-final.success .circuit-final-icon {` no
+    puede colar como si fuera `.circuit-final-icon {`-."""
     texto = styles()
     patron = re.compile(r"(?:^|\n)" + re.escape(selector))
-    resultado = []
-    for m in patron.finditer(texto):
-        inicio = m.start() + (1 if texto[m.start()] == "\n" else 0)
-        resultado.append(texto[inicio : texto.index("}", inicio)])
-    return resultado
+    coincidencias = list(patron.finditer(texto))
+
+    if len(coincidencias) > 1:
+        raise AssertionError(f"{selector} sigue apareciendo más de una vez: la fusión no se completó")
+    if not coincidencias:
+        raise AssertionError(f"no se encontró {selector}")
+
+    m = coincidencias[0]
+    inicio = m.start() + (1 if texto[m.start()] == "\n" else 0)
+    return texto[inicio : texto.index("}", inicio)]
 
 
-def test_as_formas_de_tarxeta_seguen_a_variable_do_tema():
+def test_as_formas_de_tarxeta_ou_panel_seguen_a_variable_do_tema():
     for selector in SELECTORES_CARD_O_PANEL:
-        bs = bloques(selector)
-        assert bs, f"no se encontró {selector}"
-        assert any(re.search(r"border-radius:\s*var\(--theme-radius-(panel|card)", b) for b in bs), (
+        b = bloque(selector)
+        assert re.search(r"border-radius:\s*var\(--theme-radius-(panel|card)", b), (
             f"{selector} sigue con una forma clavada en píxeles"
         )
 
 
 def test_as_pildoras_seguen_a_variable_do_tema():
     for selector in SELECTORES_PILDORA:
-        bs = bloques(selector)
-        assert bs, f"no se encontró {selector}"
-        assert any(re.search(r"border-radius:\s*var\(--theme-radius-pill", b) for b in bs), (
+        b = bloque(selector)
+        assert re.search(r"border-radius:\s*var\(--theme-radius-pill", b), (
             f"{selector} dejó de usar --theme-radius-pill"
         )
 
 
-def test_os_selectores_duplicados_levan_a_variable_nas_dous_sitios():
-    """Tocar sólo la primera declaración no cambiaría nada: la segunda gana."""
-    for selector in SELECTORES_DUPLICADOS_PANEL:
-        for b in bloques(selector):
-            assert re.search(r"border-radius:\s*var\(--theme-radius-panel", b), (
-                f"una de las dos declaraciones de {selector} sigue en píxeles fijos"
-            )
-        assert len(bloques(selector)) == 2, (
-            f"{selector} ya no está duplicado; revisa si esta prueba sigue haciendo falta"
+def test_non_queda_ningunha_clase_morta_no_bloque_de_estilos():
+    """El fallo de origen: media hoja de estilos que ningún elemento usaba."""
+    codigo = jsx()
+    hoja = styles()
+
+    for clase in CLASES_MUERTAS:
+        assert f'"{clase}' not in codigo and f"'{clase}" not in codigo, (
+            f"{clase} aparece en el JSX; si ya se usa, sácala de CLASES_MUERTAS "
+            "y devuélvele su regla en STYLES"
+        )
+        assert f".{clase} {{" not in hoja and f".{clase}." not in hoja, (
+            f".{clase} sigue en STYLES sin que ningún elemento la use"
         )
 
-    for selector in SELECTORES_DUPLICADOS_CARD:
-        for b in bloques(selector):
-            assert re.search(r"border-radius:\s*var\(--theme-radius-card", b), (
-                f"una de las dos declaraciones de {selector} sigue en píxeles fijos"
-            )
-        assert len(bloques(selector)) == 2, (
-            f"{selector} ya no está duplicado; revisa si esta prueba sigue haciendo falta"
-        )
+
+def test_o_bloque_de_display_none_desaparece_con_as_clases_que_ocultaba():
+    assert "display: none !important" not in styles(), (
+        "ese display:none ocultaba clases que ya no existen; si vuelve, "
+        "revisa que no esté ocultando algo que sí se usa"
+    )
