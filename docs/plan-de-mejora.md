@@ -737,7 +737,7 @@ dentro de `body.theme-flame-red`.
   | Pantalla | Líneas | Colores literales | Formas en línea | Usa el tema |
   |---|---|---|---|---|
   | `circuitMatrix` (logic_circuit) | 910 | **127** | 16 | 30 |
-  | `placeMosaic` | 1 236 | 71 | 20 | **1** |
+  | `placeMosaic` | 1 236 | 71 | ~~20~~ 1 sin tocar (a propósito) | **✅ 16 en 4.9.32** |
   | `tiltMaze` | 665 | 69 | 10 | 13 |
   | `sparkRadar` | 668 | 54 | 8 | 19 |
   | `signalHunt` (checkpoint) | 271 | 17 | 2 | 3 |
@@ -759,9 +759,20 @@ dentro de `body.theme-flame-red`.
 
   **Y las 56 formas en línea son el bloqueo real**, no los colores. Un
   `borderRadius` escrito en el componente gana siempre a la regla del tema y la
-  deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` es
+  deja muerta sin dar ningún error: ya ha pasado cuatro veces. `placeMosaic` era
   el peor caso —20 formas en línea y **una sola** referencia al tema en 1 236
   líneas—.
+
+  **✅ `placeMosaic` — 4.9.32.** Las 15 formas que cuentan (contenedor,
+  tarjetas, tablero, botones, píldoras e insignias) pasan a
+  `var(--theme-radius-panel|card|pill, Npx)`, reutilizando las variables que ya
+  existían en vez de inventar unas nuevas siempre-iguales. Verificado con
+  `getComputedStyle` en un arnés con el CSS real de las dos pieles antes de
+  darlo por bueno: contenedor 24px/2px, tarjetas 16px/2px, píldoras 999px/3px
+  (cristal/fuego). Quedó fuera a propósito el radio de la ficha individual
+  (5px) —y de paso salió un bug de especificidad ajeno a esto: esa regla nunca
+  gana, la pisa siempre `.mosaic-shell button`—. Quedan las otras cuatro
+  pantallas de la lista.
 - **Un tercer tema** para comprobar que el sistema aguanta: si añadir uno cuesta
   más de tocar dos bloques de variables, es que el sistema no está bien hecho.
 - **Elegir el tema desde el panel** ya funciona, pero no hay forma de ver cómo
