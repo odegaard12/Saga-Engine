@@ -39,6 +39,7 @@ interface PlayerHudProps {
   onToggleDebug: () => void
   onDownloadFieldProofs?: () => void
   fieldPhotoCount?: number
+  pendingFieldPhotoCount?: number
   submitting?: boolean
   errorMessage?: string | null
   onSubmitCode?: (
@@ -92,6 +93,7 @@ export function PlayerHud({
   onToggleDebug,
   onDownloadFieldProofs,
   fieldPhotoCount = 0,
+  pendingFieldPhotoCount = 0,
   submitting = false,
   errorMessage = null,
   onSubmitCode,
@@ -457,6 +459,11 @@ export function PlayerHud({
                   ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
                   : `📥 ${t('player.tools.noPhotos', locale)}`}
               </button>
+            ) : null}
+            {pendingFieldPhotoCount > 0 ? (
+              <div style={pendingPhotosBadge}>
+                ⏳ {pendingFieldPhotoCount} {t('player.tools.photosPending', locale)}
+              </div>
             ) : null}
           </div>
 
@@ -1111,6 +1118,20 @@ const toolsGreenDisabledButton: CSSProperties = {
   border: '1px solid rgba(255, 255, 255, 0.05)',
   color: 'rgba(255, 255, 255, 0.3)',
   cursor: 'not-allowed',
+}
+
+
+const pendingPhotosBadge: CSSProperties = {
+  gridColumn: '1 / -1',
+  marginTop: 2,
+  padding: '0.35rem 0.6rem',
+  borderRadius: 'var(--theme-radius-card)',
+  border: '1px solid rgba(251, 191, 36, 0.35)',
+  background: 'rgba(251, 191, 36, 0.1)',
+  color: '#fbbf24',
+  fontSize: '0.72rem',
+  fontWeight: 700,
+  textAlign: 'center',
 }
 
 

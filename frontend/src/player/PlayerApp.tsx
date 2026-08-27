@@ -2714,6 +2714,7 @@ export default function PlayerApp() {
           onToggleDebug={handleToggleDebug}
           onDownloadFieldProofs={handleDownloadFieldProofs}
           fieldPhotoCount={todasAsFotos.length}
+          pendingFieldPhotoCount={fotosPendentes.length}
           submitting={submitting}
           errorMessage={submitError}
           onSubmitCode={handleSubmitCode}
