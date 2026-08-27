@@ -24,7 +24,7 @@ const STYLES = `
   width: 100%;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.09);
-  border-radius: 22px;
+  border-radius: var(--theme-radius-panel, 22px);
   background:
     radial-gradient(
       circle at 50% -15%,
@@ -70,7 +70,7 @@ const STYLES = `
   min-width: 72px;
   padding: 8px 9px;
   border: 1px solid rgba(255,255,255,.08);
-  border-radius: 15px;
+  border-radius: var(--theme-radius-card, 15px);
   background: rgba(255,255,255,.045);
   text-align: right;
 }
@@ -96,7 +96,7 @@ const STYLES = `
   gap: 10px;
   padding: 11px;
   border: 1px solid rgba(255,255,255,.07);
-  border-radius: 18px;
+  border-radius: var(--theme-radius-card, 18px);
   background: #17191c;
 }
 
@@ -115,7 +115,7 @@ const STYLES = `
   max-width: min(100%, calc(100dvh - 300px));
   margin: 0 auto;
   padding: 3px;
-  border-radius: 17px;
+  border-radius: var(--theme-radius-card, 17px);
   background: #0b0c0d;
   aspect-ratio: 1;
 }
@@ -183,7 +183,7 @@ const STYLES = `
 .mosaic-progress-track {
   height: 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(255,255,255,.08);
 }
 
@@ -211,7 +211,7 @@ const STYLES = `
   min-height: 45px;
   padding: 10px 12px;
   border: 1px solid rgba(255,255,255,.11);
-  border-radius: 13px;
+  border-radius: var(--theme-radius-card, 13px);
   background: #202327;
   color: #f4f4f5;
   font: inherit;
@@ -234,7 +234,7 @@ const STYLES = `
 .mosaic-preview {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--theme-radius-card, 18px);
   background: #0b0c0d;
   aspect-ratio: 1;
 }
@@ -253,7 +253,7 @@ const STYLES = `
   gap: 7px;
   padding: 10px 12px;
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 12px;
+  border-radius: var(--theme-radius-card, 12px);
   background: rgba(8,9,10,.82);
   backdrop-filter: blur(9px);
   color: #f4f4f5;
@@ -281,7 +281,7 @@ const STYLES = `
   height: 28px;
   place-items: center;
   border: 1px solid rgba(114,223,145,.34);
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(114,223,145,.11);
   color: #bbf7d0;
   font-size: 12px;
@@ -291,7 +291,7 @@ const STYLES = `
 .mosaic-preview-progress {
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(255,255,255,.12);
 }
 
@@ -312,7 +312,7 @@ const STYLES = `
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(114,223,145,.26);
-  border-radius: 18px;
+  border-radius: var(--theme-radius-card, 18px);
   background: #0b0c0d;
   aspect-ratio: 1;
   box-shadow:
@@ -334,7 +334,7 @@ const STYLES = `
   gap: 9px;
   padding: 9px 12px;
   border: 1px solid rgba(114,223,145,.35);
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(11,28,17,.92);
   color: #bbf7d0;
   font-size: 11px;
@@ -349,7 +349,7 @@ const STYLES = `
   width: 24px;
   height: 24px;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: #72df91;
   color: #102016;
   font-style: normal;
@@ -361,7 +361,7 @@ const STYLES = `
   gap: 5px;
   padding: 12px;
   border: 1px solid rgba(255,255,255,.07);
-  border-radius: 14px;
+  border-radius: var(--theme-radius-card, 14px);
   background: #17191c;
 }
 
@@ -381,7 +381,7 @@ const STYLES = `
   gap: 12px;
   padding: 14px;
   border: 1px solid rgba(255,255,255,.08);
-  border-radius: 18px;
+  border-radius: var(--theme-radius-card, 18px);
   background: #17191c;
 }
 
@@ -418,7 +418,7 @@ const STYLES = `
   width: 27px;
   height: 27px;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(255,255,255,.07);
   color: rgba(244,244,245,.68);
   font-size: 10px;
@@ -463,7 +463,7 @@ const STYLES = `
   height: 66px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   background: rgba(114,223,145,.15);
   color: #72df91;
   font-size: 31px;
