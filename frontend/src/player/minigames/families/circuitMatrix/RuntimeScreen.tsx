@@ -22,7 +22,7 @@ const PATRON_ENTEIRO_MS = 1600
 const STYLES = `
 .circuit-shell {
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: var(--theme-radius-panel, 24px);
   border: 1px solid rgba(255,255,255,.11);
   background:
     radial-gradient(circle at 50% -18%, rgba(var(--theme-done), .10), transparent 34%),
@@ -53,7 +53,7 @@ const STYLES = `
 .circuit-chip {
   min-height: 25px;
   padding: 0 9px;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   display: inline-flex;
   align-items: center;
   background: rgba(255,255,255,.065);
@@ -116,7 +116,7 @@ const STYLES = `
 .circuit-mini-stat {
   flex: 0 0 auto;
   min-width: 72px;
-  border-radius: 16px;
+  border-radius: var(--theme-radius-card, 16px);
   border: 1px solid rgba(255,255,255,.08);
   background: rgba(255,255,255,.045);
   padding: 8px 9px;
@@ -140,7 +140,7 @@ const STYLES = `
 }
 
 .circuit-status {
-  border-radius: 17px;
+  border-radius: var(--theme-radius-card, 17px);
   border: 1px solid rgba(255,255,255,.075);
   background: rgba(255,255,255,.045);
   padding: 10px 11px;
@@ -159,7 +159,7 @@ const STYLES = `
 }
 
 .circuit-board-wrap {
-  border-radius: 22px;
+  border-radius: var(--theme-radius-panel, 22px);
   border: 1px solid rgba(255,255,255,.15);
   background: rgba(17,19,21,0.4);
   backdrop-filter: blur(12px);
@@ -177,7 +177,7 @@ const STYLES = `
   position: relative;
   aspect-ratio: 1;
   min-height: 43px;
-  border-radius: 14px;
+  border-radius: var(--theme-radius-card, 14px);
   border: 1px solid rgba(255,255,255,.15);
   background: rgba(var(--theme-ink), .4);
   backdrop-filter: blur(8px);
@@ -255,7 +255,7 @@ const STYLES = `
 
 .circuit-bar {
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   overflow: hidden;
   background: rgba(255,255,255,.075);
   border: 1px solid rgba(255,255,255,.075);
@@ -280,7 +280,7 @@ const STYLES = `
 }
 
 .circuit-rule {
-  border-radius: 15px;
+  border-radius: var(--theme-radius-card, 15px);
   border: 1px solid rgba(255,255,255,.075);
   background: rgba(255,255,255,.04);
   padding: 8px;
@@ -300,7 +300,7 @@ const STYLES = `
 
 .circuit-final {
   min-height: 260px;
-  border-radius: 22px;
+  border-radius: var(--theme-radius-panel, 22px);
   border: 1px solid rgba(255,255,255,.09);
   padding: 18px;
   display: grid;
@@ -331,7 +331,7 @@ const STYLES = `
   width: 76px;
   height: 76px;
   margin: 0 auto;
-  border-radius: 999px;
+  border-radius: var(--theme-radius-pill, 999px);
   display: grid;
   place-items: center;
   border: 1px solid rgba(255,255,255,.18);
@@ -379,7 +379,7 @@ const STYLES = `
 
 .circuit-button {
   min-height: 48px;
-  border-radius: 16px;
+  border-radius: var(--theme-radius-card, 16px);
   border: 1px solid rgba(255,255,255,.12);
   background: linear-gradient(180deg, #e5e7eb, rgb(var(--theme-line-soft)));
   color: rgb(var(--theme-ink-deep));
@@ -417,7 +417,7 @@ const STYLES = `
 }
 
 .circuit-shell {
-  border-radius: 22px;
+  border-radius: var(--theme-radius-panel, 22px);
   border: 1px solid rgba(255,255,255,.09);
   background: #111315;
   color: #f4f4f5;
@@ -447,7 +447,7 @@ const STYLES = `
 
 .circuit-board-wrap {
   padding: 9px;
-  border-radius: 19px;
+  border-radius: var(--theme-radius-panel, 19px);
   border: 1px solid rgba(255,255,255,.07);
   background: #17191c;
 }
@@ -463,7 +463,7 @@ const STYLES = `
 
 .circuit-cell {
   min-height: 40px;
-  border-radius: 12px;
+  border-radius: var(--theme-radius-card, 12px);
   border-color: rgba(255,255,255,.07);
   background: #24272b;
   color: #f4f4f5;
@@ -495,7 +495,7 @@ const STYLES = `
 .circuit-button {
   min-height: 52px;
   border: 0;
-  border-radius: 15px;
+  border-radius: var(--theme-radius-card, 15px);
   background: #f4f4f5;
   color: #151719;
   text-transform: none;
