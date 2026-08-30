@@ -2027,6 +2027,25 @@ export const MapSurface = React.memo(function MapSurface({
     if (!map || !focusRequest) return
     if (lastFocusTokenRef.current === focusRequest.token) return
 
+    /**
+     * En iOS Safari el contenedor puede seguir a 0×0 cuando esto se dispara
+     * -es el mismo fallo que ya arregla el `invalidateSize` de 100/400 ms al
+     * montar el mapa, pero aquí puede pillarlo ANTES de que llegue-. Con
+     * tamaño cero, `map.getCenter()` no tiene centro real y el siguiente
+     * `flyTo`/`flyToBounds` calcula posiciones intermedias con `unproject`
+     * sobre ese centro: `Invalid LatLng object: (NaN, NaN)`, capturado por
+     * el ErrorBoundary y la aplicación entera caía.
+     *
+     * Pasó con GPS listo desde el primer render -el shim de depuración, pero
+     * también un fix rápido de verdad-: `focusRequest` llega antes de que el
+     * temporizador de 100 ms invalide el tamaño. Forzarlo aquí, sin animar,
+     * dejar el mapa con un tamaño real antes de que unproject lo necesite.
+     */
+    const tamano = map.getSize()
+    if (!tamano.x || !tamano.y) {
+      map.invalidateSize({ animate: false })
+    }
+
     let consumed = false
 
     if (focusRequest.target === 'player') {
