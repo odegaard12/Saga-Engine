@@ -53,6 +53,7 @@ from backend.app.runtime.minigames import (
     _clean_code,
     build_stage_minigame_runtime
 )
+from backend.app.runtime import player_timers as _player_timers
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -919,210 +920,57 @@ def clear_live_position(user):
 
 
 def load_player_progress():
-    return load_game_state(GAME_DB)
+    return _player_timers.load_player_progress(GAME_DB)
 
 
 def load_player_timers():
-    return load_json(TIMERS_DB, {})
+    return _player_timers.load_player_timers(TIMERS_DB)
 
 def save_player_timers(timers):
-    save_json(TIMERS_DB, timers)
+    _player_timers.save_player_timers(TIMERS_DB, timers)
 
 def record_player_stage_time(user, level, time_ms):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-    if user_key not in timers:
-        timers[user_key] = {"stage_times_ms": {}}
-    
-    stage_times = timers[user_key].setdefault("stage_times_ms", {})
-    lvl_str = str(level)
-    
-    # SET the time for this level - do not accumulate across retries.
-    # The client sends the correct elapsed time; penalties are added explicitly.
-    # Using the max of existing vs new prevents regression when called multiple times.
-    existing = stage_times.get(lvl_str, 0)
-    stage_times[lvl_str] = max(existing, int(time_ms or 0))
-    save_player_timers(timers)
+    _player_timers.record_player_stage_time(TIMERS_DB, user, level, time_ms)
 
 
 def _now_ms():
-    return int(time.time() * 1000)
+    return _player_timers._now_ms()
 
 
 def mark_player_started(user):
-    """Guarda cuándo empezó a jugar, la primera vez que completa algo.
-
-    El tiempo total era la suma de lo que se pasaba DENTRO de cada pantalla, así
-    que caminar siete kilómetros entre nodos contaba cero: una ruta entera daba
-    veinticinco segundos y la clasificación no medía nada. Lo que cuenta es el
-    reloj: desde que arrancas hasta que acabas.
-    """
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-
-    entrada = timers.setdefault(user_key, {"stage_times_ms": {}})
-    if not entrada.get("started_at"):
-        entrada["started_at"] = _now_ms()
-        save_player_timers(timers)
+    _player_timers.mark_player_started(TIMERS_DB, user)
 
 
 def mark_player_finished(user):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return
-
-    timers[user_key]["finished_at"] = _now_ms()
-    save_player_timers(timers)
+    _player_timers.mark_player_finished(TIMERS_DB, user)
 
 
 def add_player_penalty(user, penalty_ms):
-    """Suma una penalización al tiempo total (código de respaldo, fallos...)."""
-    penalty = int(penalty_ms or 0)
-    if penalty <= 0:
-        return
-
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-
-    entrada = timers.setdefault(user_key, {"stage_times_ms": {}})
-    entrada["penalties_ms"] = int(entrada.get("penalties_ms") or 0) + penalty
-    save_player_timers(timers)
+    _player_timers.add_player_penalty(TIMERS_DB, user, penalty_ms)
 
 
 def clear_all_player_timers(user):
-    """Completely wipe all stage timer data for a player. Called on full profile reset."""
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-    if user_key in timers:
-        timers[user_key]["stage_times_ms"] = {}
-        # Las penalizaciones y las marcas de inicio y fin también: si no, un
-        # jugador reiniciado arrancaba la partida nueva con los minutos que le
-        # habían caído en la anterior.
-        timers[user_key].pop("penalties_ms", None)
-        timers[user_key].pop("started_at", None)
-        timers[user_key].pop("finished_at", None)
-        timers[user_key].pop("current_stage_started_at", None)
-        save_player_timers(timers)
+    _player_timers.clear_all_player_timers(TIMERS_DB, user)
 
 def clear_player_stage_time(user, level):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return
-    stage_times = timers[user_key].setdefault("stage_times_ms", {})
-    lvl_str = str(level)
-    if lvl_str in stage_times:
-        stage_times[lvl_str] = 0
-    save_player_timers(timers)
+    _player_timers.clear_player_stage_time(TIMERS_DB, user, level)
 
 def get_player_progress_level(user, default=0):
-    return get_player_level(GAME_DB, user, default=default)
+    return _player_timers.get_player_progress_level(GAME_DB, user, default=default)
 
 def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False):
-    if penalty_ms > 0:
-        record_player_stage_time(user, level, penalty_ms)
-
-    objetivo = int(level or 0)
-
-    # Volver al nodo 1 es empezar de cero, tambien en el reloj.
-    #
-    # Al resetear se borraban los tiempos de los nodos pero NO las
-    # penalizaciones, asi que un jugador reseteado arrancaba la partida nueva
-    # arrastrando los minutos que le habian caido en la anterior.
-    if objetivo <= 0:
-        clear_all_player_timers(user)
-        return set_player_level(GAME_DB, user, 0)
-
-    # HACIA ATRAS NO SE VA.
-    #
-    # Este es el fallo que se persiguio todo el dia: un nodo ya superado que de
-    # pronto volvia a estar por hacer, la pantalla en la salida con el tiempo a
-    # cero, y al rato todo de vuelta en su sitio. Pasaba jugando en casa y con
-    # wifi, asi que no era cobertura.
-    #
-    # Da igual de donde venga el numero mas bajo -una respuesta que llega tarde,
-    # una peticion repetida, un movil que guardo datos de antes-: lo hecho,
-    # hecho esta. Para deshacerlo esta el reset, que entra por el camino de
-    # arriba con un cero explicito.
-    #
-    # Menos cuando lo pide el organizador desde el panel: ahi el numero mas bajo
-    # no es un rebote, es una correccion a mano y tiene que entrar.
-    actual = int(get_player_progress_level(user, 0) or 0)
-    if objetivo < actual and not desde_admin:
-        return load_game_state(GAME_DB)
-
-    # Retroceder desde el panel borra el reloj de lo que se va a repetir.
-    #
-    # Se devolvia al jugador a un nodo anterior y los tiempos de los nodos que
-    # tenia que rehacer seguian guardados: el marcador arrancaba la repeticion
-    # con segundos de una partida que ya no cuenta -un 00:04 de la nada- y al
-    # superar el nodo otra vez se quedaba el mayor de los dos, no el nuevo.
-    # Si se vuelve atras es para rehacerlo, y rehacerlo empieza en cero.
-    if objetivo < actual and desde_admin:
-        for nivel in range(objetivo, actual + 1):
-            clear_player_stage_time(user, nivel)
-
-    # Volver al nodo 1 es empezar de cero, tambien en el reloj.
-    #
-    # Al resetear se borraban los tiempos de los nodos pero NO las
-    # penalizaciones, asi que un jugador reseteado arrancaba la partida nueva
-    # arrastrando los minutos que le habian caido en la anterior: dos minutos de
-    # un codigo de respaldo, por ejemplo, sin que nada lo dijera en pantalla.
-    if int(level or 0) <= 0:
-        clear_all_player_timers(user)
-        return set_player_level(GAME_DB, user, level)
-
-    # If the level is explicitly set (e.g. by an admin), we should clear any future stage times
-    # to avoid the timer holding onto times from nodes they are replaying.
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if user_key and user_key in timers:
-        stage_times = timers[user_key].get("stage_times_ms", {})
-        keys_to_remove = [k for k in list(stage_times.keys()) if k.isdigit() and int(k) >= level]
-        for k in keys_to_remove:
-            del stage_times[k]
-        save_player_timers(timers)
-
-    return set_player_level(GAME_DB, user, level)
+    return _player_timers.set_player_progress_level(
+        TIMERS_DB, GAME_DB, user, level, penalty_ms=penalty_ms, desde_admin=desde_admin
+    )
 
 def get_player_total_time_ms(user):
-    """Tiempo dentro de las pruebas más las penalizaciones.
-
-    NO es reloj de pared. Todos los equipos hacen la ruta juntos y a la vez, así
-    que el tiempo de caminar es el mismo para todos y no distingue a nadie: lo
-    que decide la clasificación es lo que cuesta cada reto. Cuenta desde que se
-    abre el nodo hasta que se supera —incluido el rato mirando el patrón del
-    laberinto o la foto del mosaico, y cada vez que se vuelve a mirar— más lo
-    que sumen los fallos y los códigos de respaldo.
-    """
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return 0
-
-    entrada = timers[user_key]
-    penalizaciones = int(entrada.get("penalties_ms") or 0)
-    return sum(entrada.get("stage_times_ms", {}).values()) + penalizaciones
+    return _player_timers.get_player_total_time_ms(TIMERS_DB, user)
 
 def get_player_is_playing(user):
-    # Sin timers en backend, podemos devolver False. El cliente gestiona su propio estado interactivo.
-    return False
+    return _player_timers.get_player_is_playing(user)
 
 def get_player_stage_time_ms(user, level):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return 0
-    return timers[user_key].get("stage_times_ms", {}).get(str(level), 0)
+    return _player_timers.get_player_stage_time_ms(TIMERS_DB, user, level)
 
 
 def project_live_profile_status(
