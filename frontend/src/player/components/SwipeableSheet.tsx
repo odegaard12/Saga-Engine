@@ -87,9 +87,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-        >
-          <div style={dragHandle} />
-        </div>
+        />
         <div
           style={{
             flex: 1,
@@ -143,21 +141,13 @@ const sheet: CSSProperties = {
   pointerEvents: 'auto',
 }
 
-// El tirador mide 5 px y arrastraba 16 px de aire debajo, mas el hueco de
-// rejilla de la hoja y su relleno superior: 35 px muertos por encima de la
-// primera pestania. Ahora el relleno de este envoltorio ES el aire de arriba
-// -la hoja ya no pone ninguno- y de paso sigue siendo una zona de arrastre
-// decente: 27 px de alto para un tirador de 5.
+// Zona de arrastre para cerrar deslizando. Llevaba un tirador visual -una
+// pildora blanca fija que no seguia al tema y se veia mal sobre la brasa de
+// fuego-; se quito el dibujo y se dejo la zona de arrastre, que sigue
+// funcionando igual.
 const dragHandleWrapper: CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   padding: '10px 0 12px',
   cursor: 'grab',
-}
-
-const dragHandle: CSSProperties = {
-  width: 40,
-  height: 5,
-  borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(255,255,255,.25)',
 }
