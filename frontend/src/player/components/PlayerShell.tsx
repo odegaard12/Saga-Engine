@@ -85,7 +85,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
             {mode === 'team' ? (
               <div style={soloPill}>EQUIPO</div>
             ) : null}
-            <div style={countPill}>
+            <div className="saga-shell-count-pill" style={countPill}>
               {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
             </div>
           </div>
