@@ -5,9 +5,31 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 21 de agosto de 2026. Producción: **4.9.22**.
+Estado a 21 de agosto de 2026 (actualizado el 30 con 0.0). Producción: **4.9.37**.
 
 ---
+
+## 0.0 El mapa podía reventar la aplicación entera — ✅ arreglado en 4.9.37
+
+Reproducido el 27-30 de agosto con `scripts/banco-de-simulacion.js` +
+`?debug=1`: un jugador con el GPS listo desde el primer render -el shim de
+depuración, pero un móvil real con el permiso ya concedido haría lo mismo-
+deja que el mapa intente centrarse (`flyTo`/`flyToBounds`) antes de que el
+temporizador de 100 ms que ya arregla el contenedor a 0×0 en iOS Safari
+llegue a correr. Con el mapa a 0×0, `map.getCenter()` no tiene centro real y
+el cálculo revienta: `Invalid LatLng object: (NaN, NaN)`, capturado por el
+ErrorBoundary y **la aplicación entera cae**, pantalla de «SAGA ENGINE NO
+PUDO CARGARSE CORRECTAMENTE».
+
+Se descartó primero una hipótesis más estrecha (nodo sin `route_track`): se
+reproducía igual con `simple_checkpoint`, y una reproducción a mano con el
+clic real de «Modo Prueba GPS» no lo disparaba -son dos caminos de código
+distintos-. El de verdad sólo salía con el flujo de `?debug=1`, que es
+exactamente el que usa un móvil con el permiso ya dado.
+
+**Arreglo:** el efecto que centra el mapa ahora invalida el tamaño sin
+animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
+3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
 ## 0. Lo que está sin demostrar ahora mismo
 
