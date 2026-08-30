@@ -495,6 +495,25 @@ body.theme-flame-red .saga-story-panel {
   );
 }
 
+/* La píldora del contador (1/2, 2/2) en la barra de arriba.
+ *
+ * Llevaba un blanco al 12% pensado para asentar sobre el azul noche de
+ * cristal. Sobre la brasa de fuego -un degradado que ya es cálido- ese mismo
+ * blanco casi no cambia el matiz: medido, el fondo de la píldora
+ * (rgba(255,255,255,.12) sobre rgb(92,44,36)) cae dentro del mismo rango de
+ * la barra (64-128, 28-62, 22-48). No es que se lea mal: no se lee como
+ * píldora, se lee como el número flotando sobre la barra sin más.
+ *
+ * El reloj de al lado no tiene este problema porque usa un color con tinte
+ * propio (--theme-info-mid), no un blanco translúcido. Aquí el arreglo es el
+ * mismo principio: oscurecer en vez de aclarar, que sí separa en cualquier
+ * matiz de fondo, y un borde con el color de acento del tema. */
+body.theme-flame-red .saga-shell-count-pill {
+  background: rgba(0, 0, 0, 0.32) !important;
+  border-color: rgba(var(--theme-ok), 0.5) !important;
+  color: #fff !important;
+}
+
 /* Los iconos, con su color y separados del fondo.
  *
  * Antes iban con `grayscale(1) brightness(2.4)`, y eso no los «pone en blanco»:
