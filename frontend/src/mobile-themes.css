@@ -468,6 +468,33 @@ body.theme-flame-red .saga-hud-dock {
   );
 }
 
+/* El prólogo y los textos de historia (StoryModal.tsx).
+ *
+ * Llevaba su forma entera en línea -color, radio, borde, sombra-, escrita a
+ * mano con las variables de brasa de cristal (--theme-sheen-*) en vez de
+ * apoyarse en .saga-glass-panel. En cristal daba la casualidad de que
+ * coincidía en píxeles, así que nunca se notó; en fuego se quedaba
+ * completamente plano, sin el corte ni la brasa: ni un solo elemento fuera
+ * del tema, medido, y aun así se leía como el diseño de otro sitio.
+ *
+ * El arreglo va aquí y no en el componente, a propósito: lo en línea sigue
+ * ganando en cristal (nada cambia), y estas reglas -con !important, que es
+ * lo único que le gana a lo en línea- sólo entran en fuego. */
+body.theme-flame-red .saga-story-panel {
+  background: var(--theme-brasa) !important;
+  border: none !important;
+  border-top: var(--theme-border-w) solid var(--theme-primary) !important;
+  border-radius: var(--theme-radius-panel) !important;
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+}
+
 /* Los iconos, con su color y separados del fondo.
  *
  * Antes iban con `grayscale(1) brightness(2.4)`, y eso no los «pone en blanco»:

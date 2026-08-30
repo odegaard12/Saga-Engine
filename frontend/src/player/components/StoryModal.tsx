@@ -31,6 +31,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
       }}
     >
       <div
+        className="saga-story-panel"
         style={{
           width: '100%',
           maxWidth: '580px',
