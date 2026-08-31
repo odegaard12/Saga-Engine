@@ -52,6 +52,7 @@ from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import player_events as _player_events
 from backend.app.runtime import admin_overview as _admin_overview
+from backend.app.runtime import mission_schedule as _mission_schedule
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -927,6 +928,12 @@ from backend.app.runtime.mision import (  # noqa: E402
 from backend.app.runtime import mision as _mision  # noqa: E402
 
 
+def mission_is_locked(cfg=None):
+    """¿Toca esperar todavía para completar nodos? Ver runtime/mission_schedule.py."""
+    cfg = cfg or load_config()
+    return _mission_schedule.mission_is_locked(cfg.get("mission_launch_at"))
+
+
 def get_runtime_stages():
     """Los nodos de la mision, normalizados.
 
@@ -1010,6 +1017,28 @@ def apply_synced_player_event(normalized_event, user, profile):
 
     if current_level < 0:
         current_level = 0
+
+    # La misión puede tener fecha de inicio (ver runtime/mission_schedule.py):
+    # se puede descargar y prepararse con días de antelación, pero no
+    # completar nodos hasta esa hora.
+    #
+    # A PROPOSITO no se guarda con append_event: si quedara escrito con este
+    # client_event_id, el PRÓXIMO intento lo encontraría por
+    # find_existing_player_client_event y lo cerraría como "duplicate" antes
+    # de volver a pasar por aquí -el mismo camino que ya usa
+    # already_advanced-, y el nodo no se completaría NUNCA aunque llegase la
+    # hora. Sin guardar nada, cada reintento de la cola vuelve a mirar el
+    # reloj desde cero.
+    #
+    # "failed", no "ignored": según syncPendingOfflineEvents en
+    # missionPack.ts, "ignored" cierra el hueco local como si ya estuviera
+    # resuelto y deja de reintentarse. "failed" con un motivo que no está en
+    # RECHAZOS_DEFINITIVOS es justo lo que hace que el móvil lo vuelva a
+    # mandar en el siguiente ciclo, solo.
+    if mission_is_locked():
+        event["status"] = "failed"
+        event["error"] = "mission_not_started_yet"
+        return event
 
     # Idempotencia: el jugador encola node_completed cuando /api/advance falla
     # (timeout con mala cobertura). Si la petición sí llegó al servidor, al

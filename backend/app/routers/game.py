@@ -410,6 +410,13 @@ async def advance(request: Request):
     stages = main.get_runtime_stages()
     lvl = main.get_player_progress_level(profile_id, main.get_player_progress_level(user, 0))
 
+    # La misión puede tener fecha de inicio (ver runtime/mission_schedule.py):
+    # se puede descargar y prepararse con días de antelación, pero no
+    # completar nodos hasta esa hora. El código ni se comprueba -si vale o no
+    # es indiferente antes de tiempo-, y el nivel no se toca.
+    if main.mission_is_locked():
+        return {"status": "fail", "user": profile_id, "level": lvl, "reason": "mission_not_started_yet"}
+
     # ¿Desde qué nodo cree el jugador que está avanzando?
     #
     # Con cobertura mala una petición puede tardar más que el corte del móvil:
