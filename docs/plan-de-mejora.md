@@ -890,11 +890,16 @@ Sólo si sobra tiempo. Nada de esto deja a nadie tirado:
   el cronómetro y el progreso (`player_timers.py`, 4.9.41), los perfiles de
   jugador (`player_profiles.py`, 4.9.42), el latido y la posición en vivo
   (`live_positions.py`, 4.9.44), la parte pura de los eventos -sanear texto y
-  payload, normalizar el evento- (`player_events.py`, 4.9.45). Lo que SÍ muta
+  payload, normalizar el evento- (`player_events.py`, 4.9.45), y el resumen
+  de nodo/jugador para el panel (`admin_overview.py`, 4.9.46). Lo que SÍ muta
   el progreso de verdad (`apply_synced_player_event`,
   `find_existing_player_client_event`) se queda en main.py a propósito: es la
-  parte más sensible de la sincronización offline. `main.py` bajó de 1791 a
-  1368 líneas.
+  parte más sensible de la sincronización offline. De paso, 4.9.46 quitó dos
+  funciones muertas de main.py (`_now_ts`, `_safe_runtime_json_file`, sin
+  ninguna llamada en todo el repositorio) y una de
+  `backend/app/runtime/minigames.py` (`_normalize_sequence_tokens`,
+  huérfana desde que `sequence_code` se validaba por otro camino). `main.py`
+  bajó de 1791 a 1196 líneas.
 - El paquete del jugador pesa 0,9 MB en un solo trozo. Se puede partir, **pero
   no los minijuegos** (ver 2).
 - El panel de administración tiene su propia paleta, al margen de los temas. Es

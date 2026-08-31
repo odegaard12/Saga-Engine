@@ -230,33 +230,6 @@ def _normalize_circuit_path_cells(value, rows, cols):
 
 
 
-def _normalize_sequence_tokens(value):
-    if not isinstance(value, list):
-        return []
-
-    if len(value) < 3 or len(value) > 10:
-        return []
-
-    tokens = []
-    seen = set()
-
-    for raw_item in value:
-        token = _as_str(raw_item).strip()
-
-        if not token or len(token) > 32:
-            return []
-
-        identity = token.casefold()
-
-        if identity in seen:
-            return []
-
-        tokens.append(token)
-        seen.add(identity)
-
-    return tokens
-
-
 def _normalize_mosaic_choices(value):
     if not isinstance(value, list):
         return [
