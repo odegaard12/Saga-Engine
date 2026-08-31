@@ -613,7 +613,14 @@ async def save_stages_endpoint(request: Request):
             content={"status": "error", "detail": "invalid stages", "errors": errors}
         )
 
+    # El nivel guardado de cada jugador es un índice en esta lista, no un id
+    # de nodo: hay que leer la lista VIEJA antes de pisarla, para poder decir
+    # a qué nodo apuntaba cada jugador antes del cambio. Ver
+    # backend/app/runtime/mision_reindex.py.
+    old_stages = main.load_stages(main.STAGES_DB)
+
     main.save_stages(main.STAGES_DB, stages)
+    main.reindex_player_levels_on_save(old_stages, stages)
     return {"status": "ok"}
 
 
