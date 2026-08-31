@@ -15,7 +15,6 @@ import secrets
 import sqlite3
 import time
 import ipaddress
-import urllib.parse
 from datetime import datetime
 from pathlib import Path
 try:
@@ -32,13 +31,6 @@ from backend.app.storage.game_state_store import (
     reset_player_level,
     save_game_state,
     set_player_level,
-)
-from backend.app.storage.positions_store import (
-    get_live_position as get_live_position_state,
-    load_live_positions_state,
-    save_live_positions_state,
-    upsert_live_position as upsert_live_position_state,
-    guardar_posicion_sin_leer_todas,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
@@ -57,6 +49,7 @@ from backend.app.runtime.minigames import (
 from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
+from backend.app.runtime import live_positions as _live_positions
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -656,153 +649,61 @@ def profile_matches_user(profile, user_text):
 def get_player_profile(user, cfg=None):
     return _player_profiles.get_player_profile(cfg or load_config(), user)
 
-HEARTBEAT_STALE_SECONDS = 180
-HEARTBEAT_MIN_INTERVAL_SECONDS = 2
-HEARTBEAT_RATE_WINDOW_SECONDS = 3600
-HEARTBEAT_LAST_SEEN_BY_KEY = {}
+HEARTBEAT_STALE_SECONDS = _live_positions.HEARTBEAT_STALE_SECONDS
+HEARTBEAT_MIN_INTERVAL_SECONDS = _live_positions.HEARTBEAT_MIN_INTERVAL_SECONDS
+HEARTBEAT_RATE_WINDOW_SECONDS = _live_positions.HEARTBEAT_RATE_WINDOW_SECONDS
+# MISMO diccionario que el del módulo, no una copia: game.py lo muta
+# directamente (main.HEARTBEAT_LAST_SEEN_BY_KEY[clave] = ahora).
+HEARTBEAT_LAST_SEEN_BY_KEY = _live_positions.HEARTBEAT_LAST_SEEN_BY_KEY
 
-VALID_HEARTBEAT_GPS_STATUS = {
-    "ok",
-    "unknown",
-    "unavailable",
-    "stale",
-    "searching",
-    "error",
-    "denied",
-}
-
-VALID_HEARTBEAT_SOURCES = {
-    "player",
-    "device",
-    "react",
-    "pwa",
-    "browser_gps",
-}
+VALID_HEARTBEAT_GPS_STATUS = _live_positions.VALID_HEARTBEAT_GPS_STATUS
+VALID_HEARTBEAT_SOURCES = _live_positions.VALID_HEARTBEAT_SOURCES
 
 def get_heartbeat_client_ip(request: Request):
     return get_client_ip(request)
 
 
 def prune_heartbeat_rate_state(now=None):
-    now = now or time.time()
-    stale_keys = [
-        key for key, ts in HEARTBEAT_LAST_SEEN_BY_KEY.items()
-        if now - float(ts or 0) > HEARTBEAT_RATE_WINDOW_SECONDS
-    ]
-    for key in stale_keys:
-        HEARTBEAT_LAST_SEEN_BY_KEY.pop(key, None)
+    _live_positions.prune_heartbeat_rate_state(now or time.time())
 
 def normalize_heartbeat_gps_status(value):
-    status = _as_str(value or "unknown").strip().lower() or "unknown"
-    return status if status in VALID_HEARTBEAT_GPS_STATUS else "unknown"
+    return _live_positions.normalize_heartbeat_gps_status(value)
 
 def normalize_heartbeat_source(value):
-    source = _as_str(value or "player").strip().lower() or "player"
-    return source if source in VALID_HEARTBEAT_SOURCES else "player"
+    return _live_positions.normalize_heartbeat_source(value)
 
 def resolve_known_player_profile(user, cfg=None):
-    cfg = cfg or load_config()
-    user_text = _as_str(user).strip()
-    if not user_text:
-        return None
-
-    for profile in get_player_profiles(cfg):
-        if profile_matches_user(profile, user_text):
-            return profile
-
-    return None
+    return _live_positions.resolve_known_player_profile(cfg or load_config(), user)
 
 def load_live_positions():
-    return load_live_positions_state(POSITIONS_DB)
+    return _live_positions.load_live_positions(POSITIONS_DB)
 
 def save_live_positions(data):
-    save_live_positions_state(POSITIONS_DB, data)
+    _live_positions.save_live_positions(POSITIONS_DB, data)
 
 
 def get_live_position(user):
-    return get_live_position_state(POSITIONS_DB, user)
+    return _live_positions.get_live_position(POSITIONS_DB, user)
 
 
 def upsert_live_position_for_user(user, position):
-    """Guarda dónde está un jugador.
-
-    No devuelve nada: quien llama a esto —el latido, trece móviles cada cinco
-    segundos— no usaba el resultado, y calcularlo obligaba a leer la tabla
-    entera de posiciones cada vez. Para la tabla del grupo está
-    `load_live_positions`.
-    """
-    return guardar_posicion_sin_leer_todas(POSITIONS_DB, user, position)
+    return _live_positions.upsert_live_position_for_user(POSITIONS_DB, user, position)
 
 
 def _hash_corto(texto: str) -> str:
-    return hashlib.sha256(texto.encode("utf-8", errors="replace")).hexdigest()[:10]
+    return _live_positions._hash_corto(texto)
 
 
 def aligerar_avatar(perfil: dict) -> dict:
-    """Cambia la foto incrustada por una referencia a /api/player-avatar.
-
-    Las fotos se guardan como data URI en base64 dentro del perfil. La tabla de
-    equipo se pide cada 5 segundos, y con las fotos dentro esa respuesta era el
-    87 % foto: 43 KB con dos jugadores retratados, y proyectando las catorce,
-    271 KB por petición. Trece móviles a ese ritmo son 700 KB/s saliendo de la
-    Raspberry por el túnel, cada segundo de la travesía, para mandar una y otra
-    vez las mismas caras.
-
-    Ahora va la URL de un endpoint aparte que el navegador y el service worker
-    cachean: se descarga una vez por jugador y se olvida. El `v=` es el hash de
-    la imagen, así que si se cambia una foto en administración la URL cambia y se
-    vuelve a bajar sola.
-    """
-    if not isinstance(perfil, dict):
-        return perfil
-
-    foto = _as_str(perfil.get("avatar_url") or "")
-    if not foto.startswith("data:"):
-        # URL externa o sin foto: no hay nada que aligerar.
-        return perfil
-
-    pid = _as_str(perfil.get("id") or perfil.get("user") or "").strip()
-    if not pid:
-        return perfil
-
-    ligero = dict(perfil)
-    ligero["avatar_url"] = ""
-    ligero["avatar_ref"] = (
-        f"/api/player-avatar/{urllib.parse.quote(pid, safe='')}?v={_hash_corto(foto)}"
-    )
-    return ligero
+    return _live_positions.aligerar_avatar(perfil)
 
 
 def buscar_avatar_de(profile_id: str):
-    """Data URI de la foto de un jugador, o None."""
-    objetivo = _as_str(profile_id).strip()
-    if not objetivo:
-        return None
-
-    for perfil in get_player_profiles(load_config()):
-        if _as_str(perfil.get("id")).strip() == objetivo:
-            foto = _as_str(perfil.get("avatar_url") or "")
-            return foto if foto.startswith("data:") else None
-    return None
+    return _live_positions.buscar_avatar_de(load_config(), profile_id)
 
 
 def clear_live_position(user):
-    """Borra la última posición conocida de un jugador.
-
-    Se usa al resetear: un jugador a cero no ha estado en ninguna parte todavía,
-    y dejarle la posición de la partida anterior lo pintaba en el mapa —a veces
-    en mitad de la ruta— como si ya estuviese andando.
-    """
-    user_key = _as_str(user).strip()
-    if not user_key:
-        return
-
-    estado = load_live_positions()
-    if not isinstance(estado, dict) or user_key not in estado:
-        return
-
-    estado.pop(user_key, None)
-    save_live_positions(estado)
+    _live_positions.clear_live_position(POSITIONS_DB, user)
 
 
 def load_player_progress():
