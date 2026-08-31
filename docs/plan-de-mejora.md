@@ -457,35 +457,45 @@ no había red por debajo. Importa porque con dos ids iguales se mezclan las
 configuraciones al guardar: un nodo acaba con el minijuego de otro. Ya pasó una
 vez. Ahora `validate_stages` lo rechaza, con prueba.
 
-**🔴 Borrar un nodo anterior hace que el jugador se salte uno — sin arreglar.**
-Medido: jugador en el nodo 5 de 10; el organizador borra el nodo 2; el jugador
-sigue en «nivel 5», pero ahora el nivel 5 apunta al nodo **6**. Se ha saltado un
-nodo entero y nadie se entera. Añadir un nodo antes hace lo simétrico: le obliga
-a repetir uno.
+**✅ Borrar un nodo anterior hace que el jugador se salte uno — arreglado en
+4.9.43.** Medido: jugador en el nodo 5 de 10; el organizador borra el nodo 2; el
+jugador seguía en «nivel 5», pero el nivel 5 pasaba a apuntar al nodo **6**. Se
+saltaba un nodo entero y nadie se enteraba. Añadir un nodo antes hacía lo
+simétrico: le obligaba a repetir uno.
 
-**🔴 Y si va por el último, se le da la misión por terminada.** Medido: jugador
-en el nivel 9 de 10; se borra cualquier nodo anterior; quedan 9 nodos, su nivel
-9 ya no existe, y el servidor lo lee como misión completa. Termina la ruta sin
-jugar el último nodo.
+**✅ Y si iba por el último, se le daba la misión por terminada — mismo
+arreglo.** Medido: jugador en el nivel 9 de 10; se borraba cualquier nodo
+anterior; quedaban 9 nodos, su nivel 9 ya no existía, y el servidor lo leía
+como misión completa. Terminaba la ruta sin jugar el último nodo.
 
-**Lo que costaría arreglarlo de verdad:** guardar el progreso por **id de nodo**
-en vez de por índice. Es una migración de datos y toca el cliente, el servidor y
-la cola offline — no es un parche de una tarde.
+**El arreglo de fondo, no el parche.** Se descartó migrar el progreso a **id de
+nodo** en todas partes -cliente, servidor, eventos, clasificación, cola
+offline y ~30 pruebas ya asumen un índice numérico; es una migración de datos
+completa, no una tarde-. En su lugar, `POST /api/admin/save` reindexa el nivel
+de cada jugador EN EL SERVIDOR, en el mismo momento en que se guarda la
+misión nueva (`backend/app/runtime/mision_reindex.py`,
+`reindex_player_levels_on_save` en `main.py`): para cada jugador busca, yendo
+hacia atrás desde su último nodo superado, el primero que siga existiendo en
+la lista nueva, y recoloca su nivel justo después de ése. Si ninguno de sus
+nodos superados sobrevive, vuelve al nodo 1 -nunca a «terminado» sin haber
+jugado-. Quien ya había terminado la misión entera sigue terminado.
 
-**Lo barato mientras tanto**, por orden:
+Es seguro sin tocar el cliente ni la cola offline: `apply_synced_player_event`
+sólo rechaza un evento como duplicado cuando llega con un nivel MENOR que el
+que el servidor ya tiene guardado; si no, siempre avanza desde el nivel que
+el servidor considera actual. Cambiar ese nivel aquí, en el servidor, es
+exactamente el caso que ese guardia ya sabía manejar -no hace falta que el
+móvil se entere de nada-.
 
-1. **No tocar la ruta con gente jugando.** Es una norma, no código, pero es la
-   que de verdad evita esto.
+1. **No tocar la ruta con gente jugando** sigue siendo la norma de fondo: el
+   reindexado corrige el número guardado, pero un jugador a mitad de camino
+   entre dos GPS puede notar el hueco igualmente si el nodo que tenía delante
+   desaparece.
 2. **✅ Avisar en el panel antes de guardar — hecho en 4.9.31.** «Esto
-   desplaza a N jugadores», con nombre y nivel de cada uno, calculado en el
-   cliente comparando por índice el nodo de antes y el de después
-   (`jugadoresDesprazadosPolGardado` en `adminStagePersistence.ts`). Cancelar
-   el aviso corta el guardado. No migra nada: el índice sigue siendo el
-   índice, esto sólo avisa antes de pisarlo.
-3. Al borrar un nodo, ajustar el nivel de quien estuviera por detrás. Suena
-   bien y es traicionero: hay que hacerlo también en la cola del móvil, que
-   manda sobre su propio progreso. **Sigue sin hacerse** — el aviso del punto
-   2 es la barrera, no el arreglo de fondo.
+   desplaza a N jugadores», con nombre y nivel de cada uno
+   (`jugadoresDesprazadosPolGardado` en `adminStagePersistence.ts`). Sigue
+   ahí: el aviso decide si se guarda, el reindexado decide qué pasa después de
+   guardar.
 
 **✅ `route_via` — auditado y con guardia (4.9.12).** El servidor lo pasaba al
 jugador sin mirarlo: aceptaba textos, pares incompletos, nulos y coordenadas

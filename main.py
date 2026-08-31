@@ -30,6 +30,7 @@ from backend.app.storage.game_state_store import (
     get_player_level,
     load_game_state,
     reset_player_level,
+    save_game_state,
     set_player_level,
 )
 from backend.app.storage.positions_store import (
@@ -55,6 +56,7 @@ from backend.app.runtime.minigames import (
 )
 from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import player_profiles as _player_profiles
+from backend.app.runtime import mision_reindex as _mision_reindex
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -846,6 +848,19 @@ def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False):
     return _player_timers.set_player_progress_level(
         TIMERS_DB, GAME_DB, user, level, penalty_ms=penalty_ms, desde_admin=desde_admin
     )
+
+def reindex_player_levels_on_save(old_stages, new_stages):
+    """Recoloca el nivel guardado de cada jugador cuando se edita la misión.
+
+    Se llama desde `save_stages_endpoint` justo después de guardar los nodos
+    nuevos, con la lista de ANTES y la de DESPUÉS. Ver
+    backend/app/runtime/mision_reindex.py para el porqué y el cómo.
+    """
+    niveles = load_game_state(GAME_DB)
+    reindexados = _mision_reindex.reindex_player_levels(old_stages, new_stages, niveles)
+    if reindexados != niveles:
+        save_game_state(GAME_DB, reindexados)
+
 
 def get_player_total_time_ms(user):
     return _player_timers.get_player_total_time_ms(TIMERS_DB, user)
