@@ -33,11 +33,17 @@ async def get_config():
     alcance de cualquiera. Ahora va la URL de /api/player-avatar, que se cachea.
     """
     import main
+    import time
 
     cfg = main.load_config()
 
     return {
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
+        # La hora del SERVIDOR, no la del móvil: para la cuenta atrás de
+        # mission_launch_at hace falta un reloj que no se cambie en dos
+        # toques de ajustes. Ver runtime/mission_schedule.py.
+        "server_time_ms": int(time.time() * 1000),
+        "mission_launch_at": cfg.get("mission_launch_at", ""),
         "admin_title": cfg.get("admin_title", "PUT ADMIN TITLE HERE"),
         "admin_subtitle": cfg.get("admin_subtitle", "PUT ADMIN SUBTITLE HERE"),
         "ui_lang": main.normalize_ui_lang(cfg.get("ui_lang", "es")),

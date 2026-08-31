@@ -33,6 +33,7 @@ import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { MissionLockScreen } from './components/MissionLockScreen'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
@@ -216,6 +217,10 @@ export default function PlayerApp() {
    */
   const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
   const [showPrologue, setShowPrologue] = useState(false)
+  // Empieza en false: si hay mission_launch_at, la cortina se ve desde el
+  // primer render y MissionLockScreen decide en su propio efecto si ya tocaba
+  // o no -sin eso habría un parpadeo con el mapa de fondo antes de taparlo.
+  const [missionUnlocked, setMissionUnlocked] = useState(false)
 
   /**
    * El prólogo se enseña SIEMPRE que se entra estando en el primer nodo.
@@ -2757,6 +2762,24 @@ export default function PlayerApp() {
           body={state.config.prologue_body || ''}
           buttonText="Comezar a travesía"
           onClose={() => setShowPrologue(false)}
+        />
+      )}
+
+      {/* La misión puede tener fecha de inicio (mission_launch_at, panel de
+          admin). El bloqueo de VERDAD es del servidor -/api/advance y
+          node_completed lo rechazan igual-; esto es la cortina que lo avisa
+          y deja preparar todo mientras tanto. */}
+      {!missionUnlocked && state.status === 'ready' && state.config?.mission_launch_at && (
+        <MissionLockScreen
+          launchAtRaw={state.config.mission_launch_at}
+          serverTimeMs={state.config.server_time_ms}
+          mobile={isPhone}
+          displayName={payload.display_name || payload.user}
+          onUnlocked={() => setMissionUnlocked(true)}
+          onOpenDownload={() => {
+            setPrepCerrada(false)
+            setOfflinePrepVisible(true)
+          }}
         />
       )}
 

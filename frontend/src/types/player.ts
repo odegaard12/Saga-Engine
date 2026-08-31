@@ -138,6 +138,10 @@ export interface PublicConfig {
   mapbox_style?: string
   players?: string[]
   player_profiles?: PlayerProfile[]
+  /** Fecha (ISO) desde la que se puede completar un nodo. Vacío = sin bloqueo. */
+  mission_launch_at?: string
+  /** Reloj del SERVIDOR, en ms — para la cuenta atrás no vale fiarse del móvil. */
+  server_time_ms?: number
 }
 
 export interface FieldProof {
