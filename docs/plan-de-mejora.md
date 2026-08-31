@@ -889,7 +889,12 @@ Sólo si sobra tiempo. Nada de esto deja a nadie tirado:
   módulo en `backend/app/runtime/` y su prueba de que main.py sólo delega:
   el cronómetro y el progreso (`player_timers.py`, 4.9.41), los perfiles de
   jugador (`player_profiles.py`, 4.9.42), el latido y la posición en vivo
-  (`live_positions.py`, 4.9.44). `main.py` bajó de 1791 a 1439 líneas.
+  (`live_positions.py`, 4.9.44), la parte pura de los eventos -sanear texto y
+  payload, normalizar el evento- (`player_events.py`, 4.9.45). Lo que SÍ muta
+  el progreso de verdad (`apply_synced_player_event`,
+  `find_existing_player_client_event`) se queda en main.py a propósito: es la
+  parte más sensible de la sincronización offline. `main.py` bajó de 1791 a
+  1368 líneas.
 - El paquete del jugador pesa 0,9 MB en un solo trozo. Se puede partir, **pero
   no los minijuegos** (ver 2).
 - El panel de administración tiene su propia paleta, al margen de los temas. Es

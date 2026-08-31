@@ -50,6 +50,7 @@ from backend.app.runtime import player_timers as _player_timers
 from backend.app.runtime import player_profiles as _player_profiles
 from backend.app.runtime import mision_reindex as _mision_reindex
 from backend.app.runtime import live_positions as _live_positions
+from backend.app.runtime import player_events as _player_events
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -947,94 +948,22 @@ def stages_revision(runtime_stages=None):
     return _mision.stages_revision(stages)
 
 
-PLAYER_EVENT_TYPES = {
-    "node_opened",
-    "node_completed",
-    "qr_scanned",
-    "nfc_url_opened",
-    "team_ready",
-    "team_proof_created",
-    "team_proof_accepted",
-    "inventory_item_collected",
-    "inventory_item_used",
-    "offline_sync_received",
-}
-
-EVENT_PAYLOAD_MAX_KEYS = 32
-EVENT_PAYLOAD_MAX_TEXT_LENGTH = 500
+PLAYER_EVENT_TYPES = _player_events.PLAYER_EVENT_TYPES
+EVENT_PAYLOAD_MAX_KEYS = _player_events.EVENT_PAYLOAD_MAX_KEYS
+EVENT_PAYLOAD_MAX_TEXT_LENGTH = _player_events.EVENT_PAYLOAD_MAX_TEXT_LENGTH
 
 def sanitize_event_text(value, max_length=EVENT_PAYLOAD_MAX_TEXT_LENGTH):
-    text = _as_str(value).strip()
-    if len(text) > max_length:
-        return text[:max_length]
-    return text
+    return _player_events.sanitize_event_text(value, max_length)
 
 def sanitize_event_payload(value):
-    if not isinstance(value, dict):
-        return {}
-
-    clean = {}
-    for index, (key, raw_value) in enumerate(value.items()):
-        if index >= EVENT_PAYLOAD_MAX_KEYS:
-            break
-
-        clean_key = sanitize_event_text(key, 80)
-        if not clean_key:
-            continue
-
-        if isinstance(raw_value, bool) or raw_value is None:
-            clean[clean_key] = raw_value
-        elif isinstance(raw_value, (int, float)):
-            clean[clean_key] = raw_value
-        elif isinstance(raw_value, list):
-            clean[clean_key] = [
-                sanitize_event_text(item)
-                for item in raw_value[:20]
-            ]
-        elif isinstance(raw_value, dict):
-            nested = {}
-            for nested_index, (nested_key, nested_value) in enumerate(raw_value.items()):
-                if nested_index >= 20:
-                    break
-                nested_clean_key = sanitize_event_text(nested_key, 80)
-                if nested_clean_key:
-                    nested[nested_clean_key] = sanitize_event_text(nested_value)
-            clean[clean_key] = nested
-        else:
-            clean[clean_key] = sanitize_event_text(raw_value)
-
-    return clean
+    return _player_events.sanitize_event_payload(value)
 
 def normalize_player_event(raw_event, user, profile):
-    raw_event = raw_event if isinstance(raw_event, dict) else {}
-    event_type = sanitize_event_text(raw_event.get("type"), 80)
-
-    if event_type not in PLAYER_EVENT_TYPES:
-        raise HTTPException(status_code=400, detail=f"unsupported event type: {event_type or 'missing'}")
-
-    node_id = sanitize_event_text(raw_event.get("node_id"), 120)
-    team_id = sanitize_event_text(raw_event.get("team_id") or profile.get("id"), 120)
-    client_event_id = sanitize_event_text(raw_event.get("client_event_id"), 160)
-
-    return {
-        "type": event_type,
-        "status": "pending",
-        "source": sanitize_event_text(raw_event.get("source") or "offline_queue", 80),
-        "user": user,
-        "team_id": team_id,
-        "node_id": node_id,
-        "client_event_id": client_event_id,
-        "payload": sanitize_event_payload(raw_event.get("payload")),
-    }
+    return _player_events.normalize_player_event(raw_event, user, profile)
 
 
 def _event_payload_code(payload):
-    payload = payload if isinstance(payload, dict) else {}
-    for key in ("code", "manual_code", "answer", "raw_value"):
-        value = _as_str(payload.get(key)).strip()
-        if value:
-            return value
-    return ""
+    return _player_events.event_payload_code(payload)
 
 def find_existing_player_client_event(user, client_event_id):
     client_event_id = sanitize_event_text(client_event_id, 160)
