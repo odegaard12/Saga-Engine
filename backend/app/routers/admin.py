@@ -352,6 +352,9 @@ async def save_config_endpoint(request: Request):
         "prologue_image_url": _as_str(incoming.get("prologue_image_url") if "prologue_image_url" in incoming else cfg.get("prologue_image_url", "")).strip(),
         "mapbox_token": _as_str(incoming.get("mapbox_token") if "mapbox_token" in incoming else cfg.get("mapbox_token", "")).strip(),
         "mapbox_style": _as_str(incoming.get("mapbox_style") if "mapbox_style" in incoming else cfg.get("mapbox_style", "")).strip(),
+        # Fecha desde la que se puede completar un nodo (ver
+        # runtime/mission_schedule.py). Vacío = sin bloqueo.
+        "mission_launch_at": _as_str(incoming.get("mission_launch_at") if "mission_launch_at" in incoming else cfg.get("mission_launch_at", "")).strip(),
     }
 
     raw_center = incoming.get("map_center")

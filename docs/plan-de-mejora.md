@@ -31,6 +31,46 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.1 Fecha y hora de inicio — ✅ en 4.9.47
+
+Pedido explícito: dejar que la gente descargue la misión y conceda permisos
+con días de antelación, pero que nadie pueda completar un nodo hasta la
+fecha y hora que ponga el organizador.
+
+**Config nueva:** `mission_launch_at` (panel → Ajustes → 🕒 Fecha y Hora de
+Inicio). Vacío = sin bloqueo, se juega igual que siempre.
+
+**El bloqueo de verdad es del SERVIDOR**, en los dos caminos por los que se
+puede completar un nodo:
+- `/api/advance` (con cobertura): rechaza con `{"status":"fail","reason":
+  "mission_not_started_yet"}` sin ni mirar el código.
+- `node_completed` en `/api/events/sync` (la cola offline): se rechaza con
+  `status: "failed"`, pero **a propósito no se guarda** con ese
+  `client_event_id` -si quedara escrito, el próximo reintento lo
+  encontraría por `find_existing_player_client_event` y lo cerraría como
+  duplicado sin volver a intentarlo NUNCA, ni siquiera después de que
+  llegara la hora-. Sin guardar nada, cada ciclo de la cola vuelve a mirar
+  el reloj desde cero. Ver `backend/app/runtime/mission_schedule.py`.
+
+Se compara contra la hora del SERVIDOR (`server_time_ms`, nuevo en
+`/api/config`), no la del móvil: cambiar el reloj del teléfono no adelanta
+nada.
+
+**La cortina del jugador** (`MissionLockScreen.tsx`) es sólo la parte
+visual: se ve entre el login y el mapa, dice cuándo empieza con cuenta
+atrás en vivo, y dentro tiene el mismo botón de "antes de salir" -descargar
+la misión offline y pedir permisos-, que sigue funcionando esté bloqueada o
+no. Al llegar la hora desaparece sola, sin recargar la página.
+
+Encontrado de paso: `/api/admin/save-config` arma la respuesta campo a
+campo -el mismo fallo que ya pasó una vez con `player_profiles`- y
+`mission_launch_at` no estaba en la lista. Sin el arreglo, el panel guardaba
+la fecha, el servidor contestaba "ok" y la descartaba en silencio.
+
+11 pruebas nuevas, incluida la que demuestra el punto que más importa: un
+intento rechazado antes de hora se reintenta solo y SÍ se aplica en cuanto
+se desbloquea, con el mismo `client_event_id`.
+
 ## 0. Lo que está sin demostrar ahora mismo
 
 Va primero porque es lo único de esta lista que ya debería estar hecho.
