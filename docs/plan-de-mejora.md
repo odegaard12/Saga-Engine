@@ -885,7 +885,11 @@ tumbó (17 de agosto). Producción se cayó con ella.
 Sólo si sobra tiempo. Nada de esto deja a nadie tirado:
 
 - `main.py` expone 77 símbolos a los routers. Se estaba bajando de uno en uno
-  para romper el import circular.
+  para romper el import circular. Movidos hasta ahora, cada uno con su
+  módulo en `backend/app/runtime/` y su prueba de que main.py sólo delega:
+  el cronómetro y el progreso (`player_timers.py`, 4.9.41), los perfiles de
+  jugador (`player_profiles.py`, 4.9.42), el latido y la posición en vivo
+  (`live_positions.py`, 4.9.44). `main.py` bajó de 1791 a 1439 líneas.
 - El paquete del jugador pesa 0,9 MB en un solo trozo. Se puede partir, **pero
   no los minijuegos** (ver 2).
 - El panel de administración tiene su propia paleta, al margen de los temas. Es
