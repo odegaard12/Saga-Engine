@@ -31,6 +31,39 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.2 Un minijuego con premio se volvía ilegible al reabrirlo — ✅ en 4.9.49
+
+Auditando el editor guiado de nodos (`AdminGameEditor.tsx` /
+`guidedEditorUtils.ts`), no un bug reportado.
+
+`isMapCollectibleStage(stage)` -la función que `GuidedNodeEditorFlow.tsx`
+usa para decidir qué editor montar: `AdminCollectibleEditor`, `AdminQrEditor`
+o `AdminGameEditor`- tenía como último recurso `return
+Boolean(config.reward_item_id)`. Pero `reward_item_id` NO es exclusivo de
+los coleccionables de mapa: es el mismo campo que pone el desplegable
+"¿Entrega algún objeto de regalo al superar el juego?" en CUALQUIER
+minijuego normal (circuit_matrix, tilt_maze, sequence_code...).
+
+Efecto: un organizador monta un circuito, le pone de premio la Llave
+Maestra, guarda. Al reabrir ese nodo para retocar el patrón,
+`GuidedNodeEditorFlow` lo clasifica como coleccionable de mapa y monta
+`AdminCollectibleEditor` -una pantalla de "recoger objeto por GPS" sin
+ningún rastro del minijuego-. El circuito seguía guardado y jugable, pero
+parecía haber desaparecido del panel; no había forma de volver a verlo ni
+editarlo desde ahí.
+
+**Arreglo:** `reward_item_id` sólo cuenta como coleccionable cuando NO hay
+ya un `game_id` de un minijuego real detrás (`gameId && gameId !==
+'qr_collectible'` corta antes). El fallback legado -nodos viejos con premio
+y sin `game_id`- se mantiene igual que antes.
+
+Comprobado contra los 10 nodos de producción: **ninguno estaba afectado
+todavía** (0 con `reward_item_id` + `game_id` a la vez), así que es un
+arreglo preventivo, no una incidencia activa. Verificado con 4 casos de
+comportamiento (minijuego con premio, coleccionable real, fallback legado,
+checkpoint con premio) ejecutados en Node contra la función extraída, y
+`tsc -b` + `vite build` limpios.
+
 ## 0.1 Fecha y hora de inicio — ✅ en 4.9.47
 
 Pedido explícito: dejar que la gente descargue la misión y conceda permisos
