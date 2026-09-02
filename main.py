@@ -1223,3 +1223,82 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
     )
 
 
+# El banco de pruebas del panel: jugadores simulados recorriendo la misión
+# real. Ver backend/app/runtime/simulation_bench.py.
+from backend.app.runtime import simulation_bench as _simulation_bench  # noqa: E402
+
+
+async def run_simulation_bench(jugadores, dispositivo, red):
+    """Registra los SIM_XX como perfiles conocidos MIENTRAS dura la
+    simulación, y devuelve la configuración exactamente a como estaba pase lo
+    que pase.
+
+    Hace falta porque `/api/events/sync` -el camino sin cobertura- exige un
+    perfil CONOCIDO (`resolve_known_player_profile`); `/api/advance` no,
+    porque `get_player_profile` cae a un perfil sintético para cualquier
+    nombre. Son dos guardias distintas para el mismo caso, y el banco tiene
+    que pasar las dos para probar los dos caminos de verdad.
+
+    Efecto colateral bienvenido: mientras corre, un admin con el panel
+    abierto en otra pestaña ve aparecer y moverse a los SIM_XX -es la
+    confirmación visual de que el banco está haciendo algo de verdad, no un
+    número en una consola-.
+    """
+    cfg_original = load_config()
+
+    jugadores_n = max(1, min(int(jugadores or 3), _simulation_bench.MAX_JUGADORES))
+    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
+
+    perfiles_base = cfg_original.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg_original))
+    perfiles_temporales = list(perfiles_base) + [
+        {"id": nombre, "display_name": nombre, "mode": "solo"} for nombre in nombres_sim
+    ]
+
+    save_config({
+        **cfg_original,
+        "player_profiles": perfiles_temporales,
+        "players": [p["id"] for p in perfiles_temporales],
+    })
+
+    try:
+        return await _simulation_bench.ejecutar_simulacion(
+            app=app,
+            stages=get_runtime_stages(),
+            jugadores=jugadores_n,
+            dispositivo=dispositivo,
+            red=red,
+            cookie_name=PLAYER_SESSION_COOKIE,
+            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
+            session_secret=get_session_signing_secret(),
+            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
+        )
+    finally:
+        # SIEMPRE, pase lo que pase durante la simulación -incluida una
+        # excepción a mitad-: si un SIM_XX se quedara registrado de verdad,
+        # aparecería en la lista de jugadores del panel como si lo fuera.
+        save_config(cfg_original)
+
+
+def simulation_bench_jugadores_reales_en_marcha():
+    cfg = load_config()
+    perfiles = get_player_profiles(cfg)
+    niveles = load_game_state(GAME_DB)
+    return _simulation_bench.hay_progreso_real_en_marcha(perfiles, niveles)
+
+
+def limpiar_rastro_de_simulacion():
+    niveles = load_game_state(GAME_DB)
+    timers = load_player_timers()
+    posiciones = load_live_positions()
+    borrados = _simulation_bench.borrar_rastro_de_simulacion(
+        niveles=niveles, timers=timers, posiciones=posiciones
+    )
+    if borrados:
+        save_game_state(GAME_DB, niveles)
+        save_player_timers(timers)
+        save_live_positions(posiciones)
+    return borrados
+
+
