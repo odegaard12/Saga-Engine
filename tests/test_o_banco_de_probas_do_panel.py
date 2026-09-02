@@ -1,0 +1,224 @@
+# -*- coding: utf-8 -*-
+"""El banco de pruebas, enganchado al panel de administración. Jugadores
+simulados (`SIM_XX`) recorriendo la misión REAL por los mismos caminos que
+un móvil de verdad -sesión, heartbeat, /api/advance, la cola offline-, con
+perfil de dispositivo y de red. Ver backend/app/runtime/simulation_bench.py
+y POST /api/admin/simulation/run · /cleanup en admin.py.
+"""
+import os
+import tempfile
+
+os.environ.setdefault("ADMIN_PASS", "pytest_admin_password")
+os.environ.setdefault("SAGA_DATA_DIR", tempfile.mkdtemp(prefix="saga-test-banco-"))
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+import main  # noqa: E402
+from backend.app.runtime import simulation_bench  # noqa: E402
+from backend.app.runtime.simulation_bench import (  # noqa: E402
+    borrar_rastro_de_simulacion,
+    hay_progreso_real_en_marcha,
+    nombre_simulado,
+)
+
+
+def make_client():
+    return TestClient(main.app)
+
+
+@pytest.fixture(autouse=True)
+def estado_limpo():
+    """Los tests comparten SAGA_DATA_DIR -y por tanto game_state.json- dentro
+    de este fichero: sin esto, SIM_01 arrancaba en el nivel que le dejara el
+    test anterior."""
+    main.save_game_state(main.GAME_DB, {})
+    yield
+
+
+def configurar(monkeypatch):
+    monkeypatch.setattr(main, "admin_request_authorized", lambda request, data: True)
+    monkeypatch.setattr(main, "admin_password_change_required", lambda: False)
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+
+    main.save_stages(
+        main.STAGES_DB,
+        [
+            {
+                "id": "n1",
+                "title": "Nodo 1",
+                "type": "checkpoint",
+                "lat": 42.10,
+                "lon": -8.80,
+                "radius": 9999,
+                "entry": {"mode": "gps", "require_proximity": True},
+                "success": {"conditions": [{"kind": "answer", "value": "OK"}]},
+            },
+            {
+                "id": "n2",
+                "title": "Nodo 2",
+                "type": "checkpoint",
+                "lat": 42.11,
+                "lon": -8.81,
+                "radius": 9999,
+                "entry": {"mode": "gps", "require_proximity": True},
+                "success": {"conditions": [{"kind": "answer", "value": "OK"}]},
+            },
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Funciones puras
+# ---------------------------------------------------------------------------
+
+def test_nombre_simulado():
+    assert nombre_simulado(0) == "SIM_01"
+    assert nombre_simulado(9) == "SIM_10"
+
+
+def test_hai_progreso_real_ignora_os_sim():
+    perfiles = [{"id": "ALFA"}, {"id": "SIM_01"}]
+    niveles = {"ALFA": 2, "SIM_01": 5}
+    assert hay_progreso_real_en_marcha(perfiles, niveles) == ["ALFA"]
+
+
+def test_hai_progreso_real_baleiro_se_ninguen_empezou():
+    perfiles = [{"id": "ALFA"}]
+    niveles = {"ALFA": 0}
+    assert hay_progreso_real_en_marcha(perfiles, niveles) == []
+
+
+def test_borrar_rastro_so_toca_o_sim():
+    niveles = {"ALFA": 3, "SIM_01": 2, "SIM_02": 1}
+    timers = {"ALFA": {"a": 1}, "SIM_01": {"b": 2}}
+    posiciones = {"ALFA": {"lat": 1}, "SIM_02": {"lat": 2}}
+
+    borrados = borrar_rastro_de_simulacion(niveles=niveles, timers=timers, posiciones=posiciones)
+
+    assert borrados == ["SIM_01", "SIM_02"]
+    assert niveles == {"ALFA": 3}
+    assert timers == {"ALFA": {"a": 1}}
+    assert posiciones == {"ALFA": {"lat": 1}}
+
+
+# ---------------------------------------------------------------------------
+# De verdad, contra POST /api/admin/simulation/run
+# ---------------------------------------------------------------------------
+
+def test_o_banco_recorre_a_ruta_de_verdade(monkeypatch):
+    configurar(monkeypatch)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 2, "device": "mixed", "network": "buena"},
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["status"] == "ok"
+    informe = datos["report"]
+    assert informe["player_count"] == 2
+    assert informe["stage_count"] == 2
+    for jugador in informe["players"]:
+        assert jugador["errores"] == []
+        assert jugador["nivel_final"] == 2
+
+    assert main.get_player_progress_level("SIM_01", 0) == 2
+    assert main.get_player_progress_level("SIM_02", 0) == 2
+
+
+def test_o_banco_require_sesion_de_administrador(monkeypatch):
+    main.save_stages(main.STAGES_DB, [])
+    client = make_client()
+
+    respuesta = client.post("/api/admin/simulation/run", json={"player_count": 1})
+    assert respuesta.status_code == 403
+
+
+def test_o_banco_sen_cobertura_manda_a_cola_de_golpe(monkeypatch):
+    configurar(monkeypatch)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "device": "iphone", "network": "sin_cobertura"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    assert jugador["errores"] == []
+    assert jugador["nivel_final"] == 2
+    # Toda la ruta se manda en UNA petición, como el móvil que sale del monte
+    # con la cola llena -no una petición por nodo-.
+    assert len(jugador["peticiones"]) == 1
+    assert jugador["peticiones"][0]["tipo"] == "events_sync_lote"
+
+
+def test_o_banco_non_toca_a_ruta_con_xente_de_verdade_xogando(monkeypatch):
+    configurar(monkeypatch)
+    monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
+    main.set_player_progress_level("ALFA", 1, desde_admin=True)
+
+    client = make_client()
+    respuesta = client.post("/api/admin/simulation/run", json={"player_count": 1, "network": "buena"})
+
+    assert respuesta.status_code == 409
+    assert "ALFA" in respuesta.json()["players_in_progress"]
+    # Y no se lanzó nada de verdad.
+    assert main.get_player_progress_level("SIM_01", 0) == 0
+
+
+def test_o_banco_deixase_forzar_aínda_con_xente_xogando(monkeypatch):
+    configurar(monkeypatch)
+    monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
+    main.set_player_progress_level("ALFA", 1, desde_admin=True)
+
+    client = make_client()
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "network": "buena", "force": True},
+    )
+
+    assert respuesta.status_code == 200
+
+
+def test_o_banco_reconoce_o_eco_como_duplicado(monkeypatch):
+    """O perfil "mala" reenvía a veces a mesma petición -un móvil que cre que
+    a primeira se perdeu-. O servidor ten que collela como duplicado."""
+    configurar(monkeypatch)
+    monkeypatch.setitem(
+        simulation_bench.PERFILES_RED,
+        "mala",
+        {"retraso_ms": (0, 5), "duplicado_prob": 1.0, "sin_cobertura": False},
+    )
+
+    client = make_client()
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "network": "mala"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    assert jugador["errores"] == []
+    ecos = [p for p in jugador["peticiones"] if p["tipo"] == "advance_eco"]
+    assert len(ecos) == 2, "un eco por cada uno de los dos nodos"
+    assert jugador["nivel_final"] == 2, "el eco no puede avanzar de más"
+
+
+def test_o_borrado_limpa_o_rastro_pero_non_a_xente_de_verdade(monkeypatch):
+    configurar(monkeypatch)
+    client = make_client()
+
+    client.post("/api/admin/simulation/run", json={"player_count": 1, "network": "buena"})
+    main.set_player_progress_level("ALFA_DE_VERDADE", 1, desde_admin=True)
+    assert main.get_player_progress_level("SIM_01", 0) == 2
+
+    respuesta = client.post("/api/admin/simulation/cleanup", json={})
+    assert respuesta.status_code == 200
+    assert "SIM_01" in respuesta.json()["cleaned"]
+
+    assert main.get_player_progress_level("SIM_01", 0) == 0
+    assert main.get_player_progress_level("ALFA_DE_VERDADE", 0) == 1

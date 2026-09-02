@@ -957,3 +957,63 @@ async def admin_datos_personales(request: Request):
         },
         "queda": _contar_datos_personales(),
     }
+
+
+@router.post("/api/admin/simulation/run")
+async def run_simulation_endpoint(request: Request):
+    """El banco de pruebas del panel: N jugadores simulados recorriendo la
+    misión real -no una de mentira-. Ver backend/app/runtime/simulation_bench.py
+    para el cómo y el porqué."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    stages = main.get_runtime_stages()
+    if not stages:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "no hay nodos guardados: no hay ruta que simular"},
+        )
+
+    forzar = _as_bool(data.get("force"))
+    if not forzar:
+        en_marcha = main.simulation_bench_jugadores_reales_en_marcha()
+        if en_marcha:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "error",
+                    "detail": "hay jugadores de verdad con la ruta empezada",
+                    "players_in_progress": en_marcha,
+                },
+            )
+
+    jugadores = data.get("player_count", 3)
+    dispositivo = _as_str(data.get("device") or "mixed").strip().lower()
+    red = _as_str(data.get("network") or "mala").strip().lower()
+
+    try:
+        jugadores = int(jugadores)
+    except (TypeError, ValueError):
+        jugadores = 3
+
+    informe = await main.run_simulation_bench(jugadores, dispositivo, red)
+    return {"status": "ok", "report": informe}
+
+
+@router.post("/api/admin/simulation/cleanup")
+async def cleanup_simulation_endpoint(request: Request):
+    """Borra el rastro (SIM_*) que deja el banco de pruebas: nivel, cronómetros
+    y posición en vivo. Nunca toca jugadores de verdad -sólo mira el prefijo-."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+
+    borrados = main.limpiar_rastro_de_simulacion()
+    return {"status": "ok", "cleaned": borrados}
