@@ -1,11 +1,48 @@
 # Banco de simulación
 
 Jugar la ruta sin caminarla, y romper la red a propósito para ver qué hace la
-aplicación. Son dos herramientas: una en el navegador y otra contra el servidor.
+aplicación. Son TRES herramientas: una en el navegador, otra contra el
+servidor desde fuera, y una tercera **dentro del panel de administración**.
 
 Existe porque todo esto se venía escribiendo a mano en cada sesión de pruebas, y
 cada vez salía un poco distinto. **Cuando la herramienta cambia entre medición y
 medición, los números dejan de poder compararse.**
+
+---
+
+## Desde el panel — pestaña «Banco de pruebas 🧪»
+
+La más rápida de usar: sin consola, sin terminal. Un botón lanza de 1 a 8
+jugadores simulados (`SIM_XX`) por la misión REAL -no una de mentira-, cada
+uno con su perfil de móvil y de cobertura, y enseña un informe al momento.
+
+- **Dispositivo**: iPhone, Android, o mezclado (la mitad de cada).
+- **Cobertura**: buena · mala (lenta, algún eco) · inestable (lenta y con
+  más ecos) · sin cobertura (la ruta entera se completa en local y se manda
+  de una vez al final, como un móvil que sale del monte con la cola llena).
+- **El eco**: con "mala" o "inestable", a veces el jugador simulado reenvía
+  la MISMA petición de avance -un móvil que cree que la primera se perdió-.
+  El informe dice si el servidor la reconoció como duplicado o si avanzó de
+  más por error.
+- **Se niega a correr con gente de verdad jugando** -mismo espíritu que
+  `--sí-sé-lo-que-hago` en `simular-carga.py`-, salvo que se marque
+  "Lanzar de todos modos".
+- **"Limpiar rastro"** borra el nivel, los cronómetros y la posición en
+  vivo de cualquier `SIM_XX` que quede.
+
+Cómo funciona por dentro, para quien lo toque:
+`backend/app/runtime/simulation_bench.py` usa `httpx.AsyncClient` con
+`ASGITransport` -peticiones DE VERDAD contra `/api/heartbeat`,
+`/api/advance` y `/api/events/sync`, con el enrutado, los límites de
+peticiones y la sesión de jugador de siempre, pero sin abrir ningún puerto-.
+La sesión de cada `SIM_XX` se firma directamente
+(`player_session_security.create_player_session_token`); como
+`/api/events/sync` sí exige un perfil CONOCIDO (a diferencia de
+`/api/advance`), `main.run_simulation_bench` los registra en
+`player_profiles` SÓLO mientras dura la simulación y devuelve la
+configuración a como estaba pase lo que pase -por eso, si tienes el panel
+abierto en otra pestaña mientras corre, puede que veas aparecer y moverse a
+los `SIM_XX` un instante-.
 
 ---
 

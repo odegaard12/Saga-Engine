@@ -512,3 +512,43 @@ export function runAdminProfileAction(profileId: string, action: AdminProfileAct
     action,
   })
 }
+
+/**
+ * A diferencia de adminPostJson, esta NO lanza en un HTTP que no sea 2xx: el
+ * endpoint del banco de pruebas contesta 409 con un cuerpo útil
+ * (`players_in_progress`) cuando hay gente de verdad jugando, y hace falta
+ * leerlo, no perderlo en una excepción genérica.
+ */
+async function adminPostJsonConEstado(url: string, body: unknown): Promise<{ httpStatus: number; data: any }> {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  let data: any = null
+  try {
+    data = await res.json()
+  } catch {
+    data = null
+  }
+
+  return { httpStatus: res.status, data }
+}
+
+export function runSimulationBench(params: {
+  player_count: number
+  device: string
+  network: string
+  force?: boolean
+}) {
+  return adminPostJsonConEstado('/api/admin/simulation/run', params)
+}
+
+export function cleanupSimulationBench() {
+  return adminPostJsonConEstado('/api/admin/simulation/cleanup', {})
+}
