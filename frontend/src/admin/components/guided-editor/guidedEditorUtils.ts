@@ -305,6 +305,19 @@ export function isMapCollectibleStage(stage: StageLike): boolean {
     return true
   }
 
+  // reward_item_id NO basta por sí solo: cualquier minijuego normal
+  // (circuit_matrix, tilt_maze...) también lo lleva en cuanto se le pone un
+  // premio desde "¿Entrega algún objeto de regalo al superar el juego?"
+  // (ver AdminGameEditor). Antes esto lo enviaba aquí igual que a un
+  // coleccionable de mapa de verdad: el admin daba un premio a un
+  // minijuego, guardaba, y al reabrir el nodo GuidedNodeEditorFlow montaba
+  // AdminCollectibleEditor en vez de AdminGameEditor -el minijuego
+  // "desaparecía" detrás de la pantalla de recogida GPS, sin forma de
+  // volver a ver su configuración-. Sólo cuenta como señal de coleccionable
+  // cuando NO hay ya un game_id de un minijuego real detrás.
+  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  if (gameId && gameId !== 'qr_collectible') return false
+
   return Boolean(config.reward_item_id)
 }
 
