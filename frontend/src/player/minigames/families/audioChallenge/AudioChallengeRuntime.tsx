@@ -12,9 +12,24 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const progressRef = useRef(0)
+  /**
+   * El bucle que mira el micrófono necesita saber "estoy activo" AHORA, no
+   * en el render en que se definió.
+   *
+   * checkVolume() se llama sola, justo después de setActive(true) -sin
+   * esperar al siguiente render-. React no actualiza `active` hasta
+   * entonces, así que esa primera llamada seguía viendo `active=false` -el
+   * closure del render de antes del clic- y se paraba en la primera línea:
+   * el bucle de requestAnimationFrame nunca llegaba a arrancar. La barra se
+   * quedaba en 0% para siempre, con el micrófono realmente escuchando y sin
+   * que nada leyera lo que oía. No hacía falta tocar el micrófono ni el
+   * hilo de audio: solo esta comprobación necesita el valor de verdad.
+   */
+  const activeRef = useRef(false)
 
   useEffect(() => {
     return () => {
+      activeRef.current = false
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
@@ -40,6 +55,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
       source.connect(analyser)
       analyserRef.current = analyser
 
+      activeRef.current = true
       setActive(true)
       progressRef.current = 0
 
@@ -50,7 +66,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
   }
 
   function checkVolume() {
-    if (!analyserRef.current || !active) return
+    if (!analyserRef.current || !activeRef.current) return
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
     analyserRef.current.getByteFrequencyData(dataArray)
@@ -71,6 +87,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
     setLevel(progressRef.current)
 
     if (progressRef.current >= 100) {
+      activeRef.current = false
       setActive(false)
       onWin()
     } else {
