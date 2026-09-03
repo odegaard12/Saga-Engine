@@ -68,6 +68,31 @@ def configurar(monkeypatch):
     )
 
 
+def configurar_ruta_larga(monkeypatch, n):
+    """Como `configurar`, pero con N nodos -para el perfil "corte", que
+    necesita ruta suficiente para que caiga algo dentro de la franja 35-65%."""
+    monkeypatch.setattr(main, "admin_request_authorized", lambda request, data: True)
+    monkeypatch.setattr(main, "admin_password_change_required", lambda: False)
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+
+    main.save_stages(
+        main.STAGES_DB,
+        [
+            {
+                "id": f"n{i + 1}",
+                "title": f"Nodo {i + 1}",
+                "type": "checkpoint",
+                "lat": 42.10 + i * 0.01,
+                "lon": -8.80 - i * 0.01,
+                "radius": 9999,
+                "entry": {"mode": "gps", "require_proximity": True},
+                "success": {"conditions": [{"kind": "answer", "value": "OK"}]},
+            }
+            for i in range(n)
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Funciones puras
 # ---------------------------------------------------------------------------
@@ -154,6 +179,33 @@ def test_o_banco_sen_cobertura_manda_a_cola_de_golpe(monkeypatch):
     # con la cola llena -no una petición por nodo-.
     assert len(jugador["peticiones"]) == 1
     assert jugador["peticiones"][0]["tipo"] == "events_sync_lote"
+
+
+def test_o_banco_simula_un_corte_a_mitade_de_ruta(monkeypatch):
+    """El caso que máis importaba probar: non "todo ou nada", un tramo morto
+    no medio -unha vagoada- e que ao saír del se manda todo o pendente de
+    golpe, en orde, sen perder nin duplicar nada."""
+    configurar_ruta_larga(monkeypatch, 8)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "device": "android", "network": "corte"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    assert jugador["errores"] == []
+    assert jugador["nivel_final"] == 8
+
+    # Con 8 nodos y la franja 35-65 %, algo tiene que haber caído en corte.
+    assert len(jugador["nodos_en_corte"]) > 0
+
+    # Y ese tramo se manda en un ÚNICO lote, no nodo a nodo.
+    lotes = [p for p in jugador["peticiones"] if p["tipo"] == "events_sync_lote"]
+    assert len(lotes) == 1
+
+    assert main.get_player_progress_level("SIM_01", 0) == 8
 
 
 def test_o_banco_non_toca_a_ruta_con_xente_de_verdade_xogando(monkeypatch):
