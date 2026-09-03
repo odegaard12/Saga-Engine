@@ -59,6 +59,13 @@ PERFILES_DISPOSITIVO = {
 # mentira-, si a veces reenvía la misma petición -el eco-, y si hay algún
 # tramo de la ruta SIN cobertura (`zona_muerta`).
 #
+# "mala" e "inestable" no son números inventados: "mala" calca el "Slow 3G"
+# de Chrome DevTools/Lighthouse (~150 ms de latencia base, ~2000 ms por
+# petición bajo carga -es el preset estándar de la industria para "cobertura
+# mala pero hay cobertura", no un número al azar). "inestable" va más allá
+# de cualquier preset con nombre a propósito -el tramo con vaguada y roca por
+# medio, donde ni Slow 3G llega-.
+#
 # `zona_muerta` es (inicio, fin) como fracción de la ruta -0.0 a 1.0-, o
 # `None` si nunca se pierde la señal. Dentro de esa franja los nodos se
 # completan en LOCAL -como jugaría alguien de verdad, sin enterarse de que
@@ -66,7 +73,7 @@ PERFILES_DISPOSITIVO = {
 # la franja: el móvil que recupera la señal a la vuelta de una vaguada.
 PERFILES_RED = {
     "buena": {"retraso_ms": (0, 80), "duplicado_prob": 0.0, "zona_muerta": None},
-    "mala": {"retraso_ms": (400, 1800), "duplicado_prob": 0.12, "zona_muerta": None},
+    "mala": {"retraso_ms": (400, 2000), "duplicado_prob": 0.12, "zona_muerta": None},
     "inestable": {"retraso_ms": (150, 2600), "duplicado_prob": 0.25, "zona_muerta": None},
     # Sin cobertura del todo: la ruta entera se completa en local y se manda
     # de una vez al final, como un móvil que sale del monte y recupera la
@@ -89,6 +96,18 @@ PERFILES_RED = {
         "duplicado_prob": 0.10,
         "zona_muerta": None,
         "patron_saltos": (3, 1),
+    },
+    # Móvil viejo: alguien que no ha vuelto a abrir la app desde hace meses,
+    # con el service worker de una versión anterior. No manda 'level_before'
+    # -el campo se añadió para el eco/adelanto, ver el comentario de
+    # game.py::advance-. El propio código del servidor dice que un cliente
+    # sin él "sigue funcionando igual que antes": este perfil comprueba esa
+    # frase, no se la cree porque lo diga un comentario.
+    "cliente_antiguo": {
+        "retraso_ms": (200, 900),
+        "duplicado_prob": 0.0,
+        "zona_muerta": None,
+        "omitir_level_before": True,
     },
 }
 
@@ -204,7 +223,19 @@ async def _jugador_simulado(
 
     zona_muerta = perfil_red.get("zona_muerta")
     patron_saltos = perfil_red.get("patron_saltos")
+    omitir_level_before = bool(perfil_red.get("omitir_level_before"))
     total = len(stages)
+
+    def cuerpo_advance(indice: int) -> dict:
+        """El cuerpo de /api/advance. Un móvil viejo (perfil
+        'cliente_antiguo') no manda 'level_before' -el campo no existía en
+        su versión-: el propio código de game.py::advance dice que sin él
+        "se procesa la petición" igual, así que esto es lo que comprueba esa
+        promesa de verdad."""
+        cuerpo = {"user": nombre, "code": "OK", "time_spent_ms": 1500}
+        if not omitir_level_before:
+            cuerpo["level_before"] = indice
+        return cuerpo
 
     def sin_cobertura_en(indice: int) -> bool:
         if zona_muerta:
@@ -307,7 +338,7 @@ async def _jugador_simulado(
                     client,
                     "POST",
                     "/api/advance",
-                    json_body={"user": nombre, "code": "OK", "time_spent_ms": 1500, "level_before": indice},
+                    json_body=cuerpo_advance(indice),
                     retraso_rango=perfil_red["retraso_ms"],
                     resultados=resultados,
                     etiqueta="advance",
@@ -330,7 +361,7 @@ async def _jugador_simulado(
                         client,
                         "POST",
                         "/api/advance",
-                        json_body={"user": nombre, "code": "OK", "time_spent_ms": 1500, "level_before": indice},
+                        json_body=cuerpo_advance(indice),
                         retraso_rango=(50, 300),
                         resultados=resultados,
                         etiqueta="advance_eco",

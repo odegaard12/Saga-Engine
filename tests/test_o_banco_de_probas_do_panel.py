@@ -264,6 +264,32 @@ def test_o_banco_a_saltos_cruza_e_volve_varias_veces(monkeypatch):
     assert main.get_player_progress_level("SIM_01", 0) == 9
 
 
+def test_o_banco_cliente_antigo_avanza_sen_level_before(monkeypatch):
+    """El comentario de game.py::advance promete que un movil sin
+    level_before "sigue funcionando igual que antes". Esto lo comprueba de
+    verdad -no se fia del comentario-."""
+    configurar_ruta_larga(monkeypatch, 5)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "device": "android", "network": "cliente_antiguo"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    assert jugador["errores"] == []
+    assert jugador["nivel_final"] == 5
+
+    # Ninguna peticion de este perfil llevaba level_before: si el servidor
+    # de verdad lo necesitara, se habria parado en el primer nodo.
+    avances = [p for p in jugador["peticiones"] if p["tipo"] == "advance"]
+    assert len(avances) == 5
+    assert all(p["estado"] == 200 for p in avances)
+
+    assert main.get_player_progress_level("SIM_01", 0) == 5
+
+
 def test_o_banco_non_toca_a_ruta_con_xente_de_verdade_xogando(monkeypatch):
     configurar(monkeypatch)
     monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])

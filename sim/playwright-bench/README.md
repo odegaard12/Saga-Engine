@@ -95,6 +95,20 @@ iPhone (`devices['iPhone 14']` de Playwright) es el compromiso correcto.
 Un modo "fidelidad de Safari" con WebKit, sin throttling, queda anotado como
 mejora futura para bugs específicos de motor.
 
+## Pendiente (investigado, no construido)
+
+- **GPS interpolado, no teletransportado.** Ahora mismo `context.setGeolocation()`
+  salta de nodo en nodo. Las herramientas de la industria (p. ej.
+  [geolocation-simulator](https://github.com/russellsamora/geolocation-simulator))
+  interpolan el camino a velocidad de paseo entre puntos -hace falta para
+  probar de verdad lo que reacciona a la posición EN VIVO, no solo al
+  llegar: bearing_hunt, el latido de team_relay-.
+- **Offline-descargado-antes.** Jugar la ruta entera ya predescargada,
+  desde el nodo 1, sin cobertura desde el principio. Necesita el mapa ya
+  cacheado -ver la limitación de precarga más arriba, ya resuelta en el
+  sentido de que el porcentaje ya no miente, pero la descarga sigue
+  tardando minutos de verdad-.
+
 ## Sobre la Raspberry Pi
 
 Nada aquí se despliega en la Pi -es una herramienta de desarrollo, no un

@@ -31,6 +31,45 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.4 Banco de pruebas: cliente antiguo, y perfiles calibrados de verdad — ✅ en 4.9.61
+
+Pedido explícito: buscar en foros/apps/repos ideas para mejorar el banco
+antes de seguir a ciegas. Tres cosas concretas de esa búsqueda:
+
+**Los perfiles de red ya no son números inventados.** "mala" ahora calca
+"Slow 3G" de Chrome DevTools/Lighthouse -~150 ms de latencia base, ~2000 ms
+por petición bajo carga: es el preset estándar de la industria, no un
+número al azar-. "inestable" se queda deliberadamente peor que cualquier
+preset con nombre -el tramo con vaguada y roca de por medio-.
+
+**Cliente antiguo, el perfil de versión de app vieja que quedaba
+pendiente.** El propio código de `game.py::advance` dice, en un
+comentario: "los móviles viejos que no manden `level_before` siguen
+funcionando igual que antes". Nuevo perfil `cliente_antiguo`: manda
+`/api/advance` sin ese campo, exactamente como lo haría un móvil con el
+service worker de hace meses. No se dio por buena la promesa del
+comentario -se comprobó-: ruta de 5 nodos, 5 avances sin `level_before`,
+los 5 con HTTP 200, nivel final correcto. La promesa era cierta.
+
+**Investigado, no construido esta vez** -para no meter más en un solo
+commit-: la simulación GPS actual (`sim/playwright-bench`) teletransporta
+la posición de nodo a nodo. Las herramientas de la industria
+(`geolocation-simulator`, simuladores de ruta GPX) interpolan el camino a
+velocidad de paseo -~5 km/h- entre puntos, que es lo que haría falta para
+probar de verdad cosas que reaccionan a la posición EN VIVO -bearing_hunt,
+el latido de team_relay- en vez de solo al llegar. Y offline-descargado-
+antes -jugar toda la ruta ya predescargada, desde el nodo 1- sigue sin
+tener escenario propio en `sim/playwright-bench`: es la otra pieza
+pendiente identificada, ninguna construida todavía.
+
+Fuentes consultadas:
+[Lighthouse throttling docs](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md),
+[Playwright mobile/PWA testing](https://webscraping.ai/faq/playwright/can-i-use-playwright-to-test-progressive-web-apps-pwas),
+[simulación de rutas GPS](https://github.com/russellsamora/geolocation-simulator).
+
+Verificado: suite completa 539/539 (1 test nuevo), `tsc -b`/`vite build`
+limpios.
+
 ## 1.3 Auditoría de las 7 familias que faltaban — ✅ en 4.9.60
 
 "Sigue con todo, corrigiendo todos los errores en bancos, juegos, offline,
