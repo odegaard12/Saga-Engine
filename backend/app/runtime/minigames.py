@@ -269,6 +269,15 @@ def normalize_minigame_config(minigame_type, raw_cfg):
                 out[field] = _as_bool(raw[field])
             else:
                 out[field] = _as_str(raw[field]).strip()
+    # required_members: solo lo usa team_relay (un game_id de signal_hunt,
+    # no un campo real de esa familia -ver frontend/.../family-types.ts-),
+    # así que va aquí, junto a game_id, y no en el whitelist de campos de
+    # signal_hunt de _normalize_minigame_config_raw. Sin esto, admin.py
+    # guardaba el número pero normalize_stage lo tiraba al leer: el jugador
+    # nunca veía el umbral que puso el organizador, siempre el 2 de
+    # siempre. Encontrado con sim/playwright-bench, no a ojo.
+    if "required_members" in raw:
+        out["required_members"] = _clamp_int(raw.get("required_members"), 2, 1, 20)
     return out
 
 

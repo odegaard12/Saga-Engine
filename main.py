@@ -1252,9 +1252,7 @@ async def run_simulation_bench(jugadores, dispositivo, red):
     perfiles_base = cfg_original.get("player_profiles")
     if not isinstance(perfiles_base, list):
         perfiles_base = list(get_player_profiles(cfg_original))
-    perfiles_temporales = list(perfiles_base) + [
-        {"id": nombre, "display_name": nombre, "mode": "solo"} for nombre in nombres_sim
-    ]
+    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
 
     save_config({
         **cfg_original,
@@ -1279,6 +1277,56 @@ async def run_simulation_bench(jugadores, dispositivo, red):
         # excepción a mitad-: si un SIM_XX se quedara registrado de verdad,
         # aparecería en la lista de jugadores del panel como si lo fuera.
         save_config(cfg_original)
+
+
+def registrar_jugadores_de_simulacion(n):
+    """Para una sesión de navegador DE VERDAD (Playwright u otra herramienta
+    externa, no la simulación httpx-en-proceso): registra N SIM_XX como
+    perfiles conocidos y los DEJA registrados -a diferencia de
+    `run_simulation_bench`, que corre entero dentro de una petición y los
+    quita al momento con un `finally`-. Aquí quien pregunta va a controlar
+    un navegador real durante minutos, así que el alta y la baja son dos
+    pasos sueltos: hay que llamar a `quitar_jugadores_de_simulacion()` al
+    terminar, o el panel se queda viendo SIM_XX como si fueran de verdad.
+    Devuelve los nombres registrados, en orden.
+    """
+    cfg = load_config()
+    jugadores_n = max(1, min(int(n or 1), _simulation_bench.MAX_JUGADORES))
+    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
+
+    perfiles_base = cfg.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg))
+    perfiles_base = _simulation_bench.quitar_perfiles_sim(perfiles_base)
+    perfiles = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
+
+    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
+    return nombres_sim
+
+
+def quitar_jugadores_de_simulacion():
+    """Deshace `registrar_jugadores_de_simulacion`: quita cualquier SIM_*
+    de la lista de perfiles conocidos. No toca progreso ni posición -para
+    eso ya está `limpiar_rastro_de_simulacion`-."""
+    cfg = load_config()
+    perfiles_base = cfg.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        return
+    perfiles = _simulation_bench.quitar_perfiles_sim(perfiles_base)
+    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
+
+
+def mint_simulation_player_tokens(nombres):
+    """Un token de sesión de jugador ya firmado por nombre -mismo mecanismo
+    que usa el banco httpx, pero para entregárselo a un navegador de
+    verdad en vez de meterlo en una cookie de `httpx.AsyncClient`-."""
+    secret = get_session_signing_secret()
+    return {
+        nombre: player_session_security.create_player_session_token(
+            nombre, ttl_seconds=PLAYER_SESSION_TTL_SECONDS, secret=secret
+        )
+        for nombre in nombres
+    }
 
 
 def simulation_bench_jugadores_reales_en_marcha():

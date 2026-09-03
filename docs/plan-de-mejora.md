@@ -31,6 +31,51 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.7 Segundo banco de pruebas: navegadores de verdad (Playwright) — ✅ en 4.9.54
+
+Pedido explícito: "¿puede incorporarse tecnologías punteras de simulaciones
+que hagan que podamos simular varios teléfonos... android iphone cobertura
+cortes juegos de varios a la vez?". El banco de pruebas del panel
+(`simulation_bench.py`) es `httpx` puro: peticiones HTTP directas, sin
+navegador, sin React, sin Service Worker. No podía responder a la pregunta
+sobre `team_relay` -qué ve CADA jugador en SU pantalla, no lo que sabe el
+servidor-.
+
+Nuevo, en `sim/playwright-bench/` (herramienta de desarrollo, no se
+despliega): N navegadores Chromium de verdad, cada uno con perfil de
+dispositivo (iPhone/Android, vía los "devices" de Playwright) y su propia
+condición de red por CDP -incluido un corte real, offline de verdad, no solo
+lento-, autenticados como jugador de verdad (cookie `saga_player_session`
+con un token firmado igual que el banco httpx) contra la misión real.
+
+Dos endpoints nuevos para esto, mismo patrón de guardas que
+`/api/admin/simulation/run`:
+- `POST /api/admin/simulation/browser-session/start` — registra N SIM_XX
+  como perfiles conocidos y devuelve un token de sesión por jugador, listo
+  para meter como cookie en un navegador de verdad. No ejecuta nada -solo
+  entrega las llaves-.
+- `POST /api/admin/simulation/browser-session/stop` — deshace el registro.
+
+**Ya encontró un bug de verdad la primera vez que se usó** (no a ojo): el
+`required_members` de 4.9.53 se guardaba desde el editor, pero
+`normalize_minigame_config` lo tiraba al leerlo de vuelta -no estaba en el
+whitelist de campos de `signal_hunt`-, así que el jugador siempre veía 2,
+nunca el número configurado. Arreglado en `backend/app/runtime/minigames.py`
+junto con este mismo trabajo.
+
+Verificado en vivo: login de admin real, token real, navegador real
+cargando la pantalla de precarga de mapa CON EL TEMA REAL (capturas
+guardadas, no simuladas) — la primera vez, en meses, que se ve una captura
+de verdad de la app en esta sesión de trabajo, no una reconstrucción. El
+escenario `team-relay-cobertura` quedó bloqueado en la pantalla de precarga
+de teselas de un servidor de pruebas recién sembrado sin mapa cacheado -no
+es un bug de esto, es la app protegiendo el juego offline de verdad-; ver
+`sim/playwright-bench/README.md` para el detalle y el siguiente paso
+(perfil persistente de Playwright, o correr contra un servidor con teselas).
+
+Verificado: suite completa 533/533 (5 tests nuevos de los endpoints,
+3 de `required_members`).
+
 ## 0.6 Relevo de equipo tenía el umbral de compañeros fijo en 2 — ✅ en 4.9.53
 
 Pregunta directa tras 4.9.51: "¿por qué dos jugadores y ni más?". Aclaración

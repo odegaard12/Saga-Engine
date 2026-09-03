@@ -90,6 +90,25 @@ def nombre_simulado(indice: int) -> str:
     return f"SIM_{indice + 1:02d}"
 
 
+def perfiles_temporales_con_sim(perfiles_base: list[dict], nombres_sim: list[str]) -> list[dict]:
+    """Los perfiles de siempre + uno solo/temporal por cada SIM_XX.
+
+    Compartido por `main.run_simulation_bench` (los quita al momento, todo
+    pasa dentro de una sola petición) y por una sesión de navegador de
+    verdad -Playwright u otra herramienta externa- que puede durar minutos:
+    ahí hace falta dejarlos registrados mientras dura, ver
+    `main.registrar_jugadores_de_simulacion`.
+    """
+    return list(perfiles_base) + [
+        {"id": nombre, "display_name": nombre, "mode": "solo"} for nombre in nombres_sim
+    ]
+
+
+def quitar_perfiles_sim(perfiles: list[dict]) -> list[dict]:
+    """Los mismos perfiles, sin ningún SIM_*."""
+    return [p for p in perfiles if not str(p.get("id", "")).startswith("SIM_")]
+
+
 def _elegir_dispositivo(perfil: str, indice: int) -> str:
     if perfil == "mixed":
         perfil = "iphone" if indice % 2 == 0 else "android"

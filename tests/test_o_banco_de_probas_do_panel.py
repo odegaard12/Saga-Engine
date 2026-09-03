@@ -20,6 +20,8 @@ from backend.app.runtime.simulation_bench import (  # noqa: E402
     borrar_rastro_de_simulacion,
     hay_progreso_real_en_marcha,
     nombre_simulado,
+    perfiles_temporales_con_sim,
+    quitar_perfiles_sim,
 )
 
 
@@ -112,6 +114,18 @@ def test_hai_progreso_real_baleiro_se_ninguen_empezou():
     perfiles = [{"id": "ALFA"}]
     niveles = {"ALFA": 0}
     assert hay_progreso_real_en_marcha(perfiles, niveles) == []
+
+
+def test_perfiles_temporales_con_sim_engade_ao_final():
+    base = [{"id": "ALFA"}]
+    perfiles = perfiles_temporales_con_sim(base, ["SIM_01", "SIM_02"])
+    assert [p["id"] for p in perfiles] == ["ALFA", "SIM_01", "SIM_02"]
+    assert base == [{"id": "ALFA"}], "non muta a lista orixinal"
+
+
+def test_quitar_perfiles_sim_so_quita_o_prefixo():
+    perfiles = [{"id": "ALFA"}, {"id": "SIM_01"}, {"id": "BETA"}, {"id": "SIM_02"}]
+    assert [p["id"] for p in quitar_perfiles_sim(perfiles)] == ["ALFA", "BETA"]
 
 
 def test_borrar_rastro_so_toca_o_sim():
@@ -274,3 +288,62 @@ def test_o_borrado_limpa_o_rastro_pero_non_a_xente_de_verdade(monkeypatch):
 
     assert main.get_player_progress_level("SIM_01", 0) == 0
     assert main.get_player_progress_level("ALFA_DE_VERDADE", 0) == 1
+
+
+# ---------------------------------------------------------------------------
+# Sesión de navegador de verdad (Playwright): .../browser-session/start · /stop
+#
+# A diferencia de /run, aquí no se ejecuta nada -solo se abre la puerta para
+# que un navegador de verdad entre como SIM_XX-. Ver sim/playwright-bench/.
+# ---------------------------------------------------------------------------
+
+def test_o_browser_session_start_rexistra_perfis_e_devolve_tokens(monkeypatch):
+    configurar(monkeypatch)
+    monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/browser-session/start", json={"player_count": 2}
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["status"] == "ok"
+    assert datos["cookie_name"] == main.PLAYER_SESSION_COOKIE
+    nombres = [p["name"] for p in datos["players"]]
+    assert nombres == ["SIM_01", "SIM_02"]
+
+    cfg = main.load_config()
+    ids = [p["id"] for p in cfg["player_profiles"]]
+    assert ids == ["ALFA", "SIM_01", "SIM_02"], "ALFA sigue, y los SIM_XX quedan registrados"
+
+    for jugador in datos["players"]:
+        datos_token = main.player_session_security.read_player_session_token(
+            jugador["token"], secret=main.get_session_signing_secret()
+        )
+        assert datos_token["user"] == jugador["name"]
+
+
+def test_o_browser_session_stop_quita_os_perfis_pero_non_a_xente_de_verdade(monkeypatch):
+    configurar(monkeypatch)
+    monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
+    client = make_client()
+
+    client.post("/api/admin/simulation/browser-session/start", json={"player_count": 1})
+    assert "SIM_01" in [p["id"] for p in main.load_config()["player_profiles"]]
+
+    respuesta = client.post("/api/admin/simulation/browser-session/stop", json={})
+    assert respuesta.status_code == 200
+
+    ids = [p["id"] for p in main.load_config()["player_profiles"]]
+    assert ids == ["ALFA"]
+
+
+def test_o_browser_session_require_sesion_de_administrador(monkeypatch):
+    client = make_client()
+
+    inicio = client.post("/api/admin/simulation/browser-session/start", json={"player_count": 1})
+    assert inicio.status_code == 403
+
+    fin = client.post("/api/admin/simulation/browser-session/stop", json={})
+    assert fin.status_code == 403
