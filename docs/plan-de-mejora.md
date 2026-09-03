@@ -31,6 +31,35 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.9 El icono no era "maskable" de verdad — ✅ en 4.9.56
+
+Feedback sobre la 4.9.55: "el icono cuadrado sobre ese círculo redondo... o
+mejor rediseñar ese icono". No era solo gusto: el `manifest.webmanifest`
+marca el icono como `"purpose": "any maskable"` -Android (y quien lo pida)
+le aplica SU PROPIA máscara encima, del launcher que sea, sea circular o lo
+que sea-. Pero el icono tenía su propia esquina redondeada ya cocinada
+(`rx="228"` en `saga-app-icon.svg`), y parte del dibujo -la punta de la
+bandera del arrow, el pin de abajo- llegaba casi al borde. Cuando el sistema
+le encima OTRA máscara, ahí nace de verdad el "cuadrado sobre círculo": no
+era la pantalla de carga, era el propio icono el que no seguía la
+especificación de iconos maskable (fondo a sangre completa, contenido
+importante dentro del círculo de seguridad central).
+
+**Arreglo, en el SVG fuente** (`frontend/public/saga-app-icon.svg`, el resto
+son PNGs derivados): fondo sin `rx` -a los cuatro bordes-, todo el dibujo
+(la S, la brújula, el pin, los anillos decorativos) reescalado al 78% y
+recentrado para caber dentro del círculo de seguridad de 410 px que pide
+`icon.spec.whatwg.org`. Regenerados `saga-app-icon-180/192/512.png` desde
+ese SVG con Playwright (`sim/playwright-bench`, el mismo arnés del punto
+0.7, ahora también sirve para renderizar assets), y en la pantalla de
+carga, el `<img>` pasa a `border-radius: 50%` -ya no hay nada que recorte
+mal, porque el dibujo ya vive a salvo del borde-. Versión de caché
+(`?v=...`) subida en `index.html` y en el propio manifest, para que ni
+Cloudflare ni el navegador sigan sirviendo el icono viejo.
+
+Verificado con captura real antes/después. Suite completa 533/533 (cambio
+solo de assets + frontend).
+
 ## 0.8 La pantalla de carga en fuego: tres geometrías compitiendo — ✅ en 4.9.55
 
 Feedback directo con la primera captura real de esta sesión: "pantalla de
