@@ -66,8 +66,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             tarde, en vez de una pantalla aparentemente congelada. */}
         <span className="saga-splash-ring saga-splash-ring--slow" />
         <span className="saga-splash-ring saga-splash-ring--fast" />
-        {/* El marco de fuego: quieto. Ver la nota de abajo. */}
-        <span className="saga-splash-marco" />
+        {/* El resplandor de fuego: quieto. Ver la nota de abajo. */}
+        <span className="saga-splash-halo" />
         <img
           src="/saga-app-icon-192.png"
           alt="SAGA"
@@ -191,38 +191,41 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             animation: sagaSplashSpin 1.9s linear infinite reverse;
           }
 
-          /* En fuego no gira nada.
+          /* En fuego no gira nada, y ya no hay un marco compitiendo con el
+           * icono.
            *
            * Dos lineas dando vueltas alrededor del logo quedaban feas: en un
-           * tema de esquinas duras, un aro redondo girando es del otro diseno.
-           * Aqui hay un marco quieto, con la misma esquina cortada que los
-           * paneles, que respira en vez de girar. */
-          .saga-splash-marco {
+           * tema de esquinas duras, un aro redondo girando es del otro
+           * diseno -eso seguia siendo verdad-. Pero el arreglo anterior (un
+           * marco de esquina cortada, ademas del icono) metia una TERCERA
+           * geometria sobre una imagen que ya trae su propio anillo redondo
+           * dibujado dentro: bastidor anguloso + panel cuadrado con esquinas
+           * redondeadas + circulo del icono, las tres a la vez. Es lo que se
+           * veia mal.
+           *
+           * Ahora solo hay dos: el icono, tal cual es, y un resplandor
+           * (nada de bordes ni esquinas, un brillo de ascua difuminado
+           * detras) que respira en vez de girar o competir en forma. */
+          .saga-splash-halo {
             display: none;
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 168px;
-            height: 168px;
-            margin: -84px 0 0 -84px;
-            border: 2px solid rgba(var(--theme-ring-a), .55);
-            clip-path: polygon(
-              var(--theme-panel-cut) 0,
-              100% 0,
-              100% calc(100% - var(--theme-panel-cut)),
-              calc(100% - var(--theme-panel-cut)) 100%,
-              0 100%,
-              0 var(--theme-panel-cut)
-            );
+            width: 210px;
+            height: 210px;
+            margin: -105px 0 0 -105px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--theme-glow) 0%, transparent 68%);
+            filter: blur(1px);
             animation: sagaSplashBrasa 2.6s ease-in-out infinite;
             pointer-events: none;
           }
           @keyframes sagaSplashBrasa {
-            0%, 100% { opacity: .42; }
-            50% { opacity: .95; }
+            0%, 100% { opacity: .35; transform: scale(0.96); }
+            50% { opacity: .8; transform: scale(1.04); }
           }
           body.theme-flame-red .saga-splash-ring { display: none; }
-          body.theme-flame-red .saga-splash-marco { display: block; }
+          body.theme-flame-red .saga-splash-halo { display: block; }
         `}
       </style>
     </div>
