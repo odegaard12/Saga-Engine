@@ -22,6 +22,7 @@ from backend.app.runtime.simulation_bench import (  # noqa: E402
     nombre_simulado,
     perfiles_temporales_con_sim,
     quitar_perfiles_sim,
+    zonas_muertas_aleatorias,
 )
 
 
@@ -141,6 +142,22 @@ def test_quitar_perfiles_sim_so_quita_o_prefixo():
     assert [p["id"] for p in quitar_perfiles_sim(perfiles)] == ["ALFA", "BETA"]
 
 
+def test_zonas_mortas_aleatorias_non_se_pisan_e_repiten_coa_mesma_semente():
+    tramos = zonas_muertas_aleatorias(6, duracion_min=0.05, duracion_max=0.14, semilla=42)
+    assert len(tramos) == 6
+
+    for ini, fin in tramos:
+        assert 0.0 <= ini < fin <= 1.0
+
+    ordenados = sorted(tramos)
+    for (ini_a, fin_a), (ini_b, fin_b) in zip(ordenados, ordenados[1:]):
+        assert fin_a <= ini_b, "dous tramos non poden pisarse"
+
+    # Mesma semente, mesmo resultado -para poder repetir unha proba "longa"
+    # exactamente igual-.
+    assert zonas_muertas_aleatorias(6, semilla=42) == zonas_muertas_aleatorias(6, semilla=42)
+
+
 def test_borrar_rastro_so_toca_o_sim():
     niveles = {"ALFA": 3, "SIM_01": 2, "SIM_02": 1}
     timers = {"ALFA": {"a": 1}, "SIM_01": {"b": 2}}
@@ -157,6 +174,37 @@ def test_borrar_rastro_so_toca_o_sim():
 # ---------------------------------------------------------------------------
 # De verdad, contra POST /api/admin/simulation/run
 # ---------------------------------------------------------------------------
+
+def test_o_banco_manda_heartbeat_de_verdade(monkeypatch):
+    """get_runtime_stages() -lo que usa esta simulación siempre- normaliza
+    las coordenadas a stage["location"]["lat"/"lon"], no a stage["lat"]
+    a secas. Con el nombre plano, /api/heartbeat nunca se mandaba -en
+    NINGUNA prueba, ni siquiera con cobertura buena-, pese a que el
+    docstring del módulo lo prometía. Esto comprueba que de verdad se
+    manda, no que el código "no dé error".
+
+    No se exige que TODOS respondan 200: con cobertura "buena" (0-80 ms de
+    retraso) el jugador simulado se mueve más rápido que el límite real de
+    /api/heartbeat -2 s entre latidos del mismo jugador, ver
+    HEARTBEAT_MIN_INTERVAL_SECONDS-, así que un 429 aquí es esperable y no
+    rompe nada -el `except` de _peticion solo atrapa fallos de red, no
+    códigos de estado-. Es una diferencia real entre el banco (sin tiempo
+    de caminar entre nodos) y un jugador de verdad, anotada, no un bug."""
+    configurar(monkeypatch)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "device": "android", "network": "buena"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    latidos = [p for p in jugador["peticiones"] if p["tipo"] == "heartbeat"]
+    assert len(latidos) == 2, "un heartbeat por cada uno de los dos nodos de la ruta"
+    assert all(p["estado"] in (200, 429) for p in latidos)
+    assert jugador["errores"] == [], "un 429 de heartbeat no debe contar como error del jugador"
+
 
 def test_o_banco_recorre_a_ruta_de_verdade(monkeypatch):
     configurar(monkeypatch)
@@ -262,6 +310,35 @@ def test_o_banco_a_saltos_cruza_e_volve_varias_veces(monkeypatch):
     assert len(lotes) == 3
 
     assert main.get_player_progress_level("SIM_01", 0) == 9
+
+
+def test_o_banco_ruta_larga_caotica_non_perde_nin_duplica_nada(monkeypatch):
+    """"Todas las casuísticas a la vez": empieza sin cobertura, seis cortes
+    sueltos más repartidos sin patrón, GPS degradado todo el rato. Una ruta
+    de 30 nodos -no las 8-10 de las pruebas de siempre- para que de verdad
+    se note si algo se pierde por el camino."""
+    configurar_ruta_larga(monkeypatch, 30)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 3, "device": "mixed", "network": "ruta_larga_caotica"},
+    )
+
+    assert respuesta.status_code == 200
+    informe = respuesta.json()["report"]
+    assert informe["players_with_errors"] == 0
+
+    for jugador in informe["players"]:
+        assert jugador["errores"] == []
+        assert jugador["nivel_final"] == 30
+        # zona_muerta (0.0-0.08) + zonas_muertas (6 tramos sueltos): más de
+        # un grupo de nodos en corte, no un tramo único.
+        assert len(jugador["nodos_en_corte"]) > 5
+        lotes = [p for p in jugador["peticiones"] if p["tipo"] == "events_sync_lote"]
+        assert len(lotes) >= 5, "cada cruce de vuelta a cobertura manda su propio lote"
+
+        assert main.get_player_progress_level(jugador["nombre"], 0) == 30
 
 
 def test_o_banco_cliente_antigo_avanza_sen_level_before(monkeypatch):

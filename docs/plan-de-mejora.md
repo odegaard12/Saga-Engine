@@ -31,6 +31,57 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.6 Ruta larga y caótica — y el banco nunca había mandado un heartbeat — ✅ en 4.9.63
+
+"¿Por qué tan poca duración? Quiero un test más largo, todas las
+casuísticas: cortes intermedios, empezar sin cobertura, GPS malo." Nuevo
+perfil `ruta_larga_caotica`, todo a la vez -no una variable movida-:
+
+- Empieza SIN cobertura desde el nodo 1 (antes solo existía "sin cobertura
+  del todo" o "a mitad de ruta").
+- Seis cortes más, sueltos, de duración distinta, repartidos SIN patrón por
+  el resto de la ruta -`zonas_muertas_aleatorias()`, con semilla fija para
+  poder repetir la misma prueba exacta-.
+- GPS degradado todo el rato: a veces sin fix (`gps_status: unavailable`,
+  el móvil manda el latido igual, sin coordenadas), a veces con 30-90 m de
+  desviación real, no el punto exacto del nodo.
+- `MAX_NODOS`: 15 → 40, para que quepa una ruta larga de verdad.
+
+**Al montarla salió un bug real que llevaba escondido desde que se escribió
+el banco:** `/api/heartbeat` nunca se había mandado, en NINGUNA prueba,
+tampoco con cobertura buena -pese a que el docstring del módulo lo
+prometía-. `get_runtime_stages()` -lo que usa esta simulación siempre-
+devuelve las coordenadas anidadas en `stage["location"]["lat"/"lon"]`, no
+en `stage["lat"]` a secas; el banco miraba el nombre plano, así que
+`lat`/`lon` eran `None` siempre y el heartbeat se saltaba en silencio.
+Arreglado leyendo `location` primero. Verificado con una prueba directa
+contra `_jugador_simulado()`: antes, `{'advance'}`; después,
+`{'advance', 'heartbeat'}`.
+
+Con el heartbeat mandándose de verdad salió, de propina, algo que NO es un
+bug: con cobertura "buena" (0-80 ms) un jugador simulado se mueve más
+rápido que el límite real de `/api/heartbeat` -2 s entre latidos del mismo
+jugador-, así que algunos vuelven 429. No rompe nada -el jugador no
+camina de verdad entre nodos en el banco, así que esto es una diferencia
+real de ritmo entre el banco y un jugador de carne y hueso, no del código-,
+queda anotado como el siguiente hueco a cerrar: simular tiempo de camino
+entre nodos, no solo el corte de cobertura.
+
+**Prueba de verdad, 30 nodos, 15 jugadores, con el heartbeat ya
+arreglado:**
+
+- Duración: 30.5 s (antes 12-15 s en las pruebas cortas -esto sí lleva
+  tiempo analizar-).
+- 381 peticiones: 135 heartbeat (121 con 200, 14 con 429 -el límite de
+  ritmo de arriba, esperado-), 135 advance, 90 lotes de sincronización, 21
+  ecos.
+- Latencia p50 236 ms, p95 981 ms.
+- **Los 15 llegaron a nivel 30/30. Cero errores.**
+
+Verificado: suite completa 542/542 (2 tests nuevos: la función de zonas
+aleatorias, y la ruta larga caótica de 30 nodos), más el hallazgo del
+heartbeat con su propia prueba dedicada. `tsc -b`/`vite build` limpios.
+
 ## 1.5 Orden del catálogo, tope de 20 jugadores, y prueba de carga real — ✅ en 4.9.62
 
 Tres preguntas en una: "¿los 10 juegos están bien ordenados por grupo?",

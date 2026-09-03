@@ -35,6 +35,7 @@ y posición en vivo -eso sí es cosa de este módulo, no de la config-.
 from __future__ import annotations
 
 import asyncio
+import math
 import random
 import time
 import uuid
@@ -53,6 +54,39 @@ PERFILES_DISPOSITIVO = {
         "(KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
     ),
 }
+
+
+def zonas_muertas_aleatorias(
+    n_cortes: int,
+    duracion_min: float = 0.04,
+    duracion_max: float = 0.12,
+    semilla: int | None = None,
+) -> list[tuple[float, float]]:
+    """`n_cortes` tramos sin cobertura, repartidos SIN pisarse por toda la
+    ruta -no un solo tramo fijo como "corte", ni un patrón regular como
+    "a_saltos": vaguadas de verdad no vienen a intervalos iguales-.
+
+    Cada tramo dura entre `duracion_min` y `duracion_max` de la ruta.
+    `semilla` fija el resultado -para que una prueba "larga" se pueda
+    repetir exactamente igual, cortes en los mismos sitios, si hace falta
+    comparar dos pasadas-.
+    """
+    generador = random.Random(semilla)
+    tramos: list[tuple[float, float]] = []
+    intentos = 0
+
+    while len(tramos) < n_cortes and intentos < n_cortes * 40:
+        intentos += 1
+        duracion = generador.uniform(duracion_min, duracion_max)
+        ini = generador.uniform(0.0, max(0.0, 1.0 - duracion))
+        fin = min(1.0, ini + duracion)
+
+        if any(ini < existente_fin and fin > existente_ini for existente_ini, existente_fin in tramos):
+            continue
+
+        tramos.append((ini, fin))
+
+    return sorted(tramos)
 
 # Cada perfil de red decide TRES cosas: cuánto tarda cada petición -para
 # medir cómo se comporta la interfaz con respuestas lentas de verdad, no de
@@ -109,6 +143,23 @@ PERFILES_RED = {
         "zona_muerta": None,
         "omitir_level_before": True,
     },
+    # Ruta larga y caótica: "todas las casuísticas a la vez", no una sola
+    # variable movida. Empieza YA sin cobertura -llega al punto de salida
+    # sin señal, como quien sale de casa sin datos y la coge en el monte-,
+    # luego SEIS tramos sueltos más, repartidos sin patrón y de duración
+    # distinta -no un intervalo regular como "a_saltos"-, y GPS degradado
+    # todo el rato -a veces sin fix, a veces con 30-90 m de desviación
+    # real, no el punto exacto del nodo-. Semilla fija: la misma prueba,
+    # exactamente en los mismos sitios, para poder comparar dos pasadas.
+    "ruta_larga_caotica": {
+        "retraso_ms": (300, 1600),
+        "duplicado_prob": 0.15,
+        "zona_muerta": (0.0, 0.08),
+        "zonas_muertas": zonas_muertas_aleatorias(
+            6, duracion_min=0.05, duracion_max=0.14, semilla=20260903
+        ),
+        "gps_calidad": "degradado",
+    },
 }
 
 # 20, no 8: "con 15 jugadores ahoga el ancho de banda, no la Pi" es un
@@ -116,7 +167,11 @@ PERFILES_RED = {
 # anterior ni dejaba LLEGAR a probar ese escenario -se quedaba corto por
 # debajo del número que de verdad importa comprobar-.
 MAX_JUGADORES = 20
-MAX_NODOS = 15
+# 40, no 15: "quiero rutas largas" -una misión real de este proyecto ronda
+# la decena de nodos, pero una prueba que solo llegue hasta ahí no deja
+# ver qué pasa con MÁS cortes repartidos en MÁS tramo. 40 es margen de
+# sobra sin ser una ruta absurda.
+MAX_NODOS = 40
 DEFAULT_TIMEOUT_S = 20.0
 
 
@@ -227,6 +282,8 @@ async def _jugador_simulado(
 
     zona_muerta = perfil_red.get("zona_muerta")
     patron_saltos = perfil_red.get("patron_saltos")
+    zonas_muertas = perfil_red.get("zonas_muertas")
+    gps_calidad = perfil_red.get("gps_calidad")
     omitir_level_before = bool(perfil_red.get("omitir_level_before"))
     total = len(stages)
 
@@ -259,7 +316,48 @@ async def _jugador_simulado(
             if cada > 0 and (indice % cada) < seguidos:
                 return True
 
+        if zonas_muertas:
+            # Varios tramos SUELTOS, de duración y sitio distintos -no un
+            # patrón regular-. Es lo que genera zonas_muertas_aleatorias():
+            # una ruta larga de verdad no pierde cobertura a intervalos
+            # iguales, pierde donde hay una vaguada, y cada vaguada dura lo
+            # suyo.
+            fraccion = indice / total if total else 0.0
+            for ini, fin in zonas_muertas:
+                if ini <= fraccion < fin:
+                    return True
+
         return False
+
+    def cuerpo_heartbeat(lat, lon) -> dict | None:
+        """Con gps_calidad='degradado': a veces GPS bueno, a veces sin fix
+        -el móvil manda el latido igual, sin coordenadas, como hace uno de
+        verdad cuando el GPS no engancha bajo árboles o entre edificios- y a
+        veces con una desviación real de metros, no el punto exacto del
+        nodo. Devuelve None cuando este latido en concreto no lleva
+        coordenadas -pero SÍ se manda, es lo que probaría "sin GPS" de un
+        corte total-.
+        """
+        if gps_calidad != "degradado":
+            return {"user": nombre, "lat": lat, "lon": lon, "accuracy": 12, "gps_status": "ok"}
+
+        tirada = random.random()
+        if tirada < 0.15:
+            return {"user": nombre, "gps_status": "unavailable"}
+        if tirada < 0.35:
+            # Deriva real: 30-90 m de error, como un GPS de móvil bajo mala
+            # cobertura celeste, no el punto exacto.
+            deriva_m = random.uniform(30, 90)
+            deriva_grados = deriva_m / 111_000  # ~111 km por grado de latitud
+            angulo = random.uniform(0, 2 * math.pi)
+            return {
+                "user": nombre,
+                "lat": lat + deriva_grados * math.cos(angulo),
+                "lon": lon + deriva_grados * math.sin(angulo),
+                "accuracy": round(deriva_m),
+                "gps_status": "ok",
+            }
+        return {"user": nombre, "lat": lat, "lon": lon, "accuracy": 12, "gps_status": "ok"}
 
     async def vaciar_cola(client: httpx.AsyncClient, cola: list[dict]) -> None:
         """El móvil que recupera la señal: manda de golpe, en orden, todo lo
@@ -321,15 +419,25 @@ async def _jugador_simulado(
                 await vaciar_cola(client, cola_offline)
                 cola_offline = []
 
-            lat = stage.get("lat")
-            lon = stage.get("lon")
+            # get_runtime_stages() -lo que usa esta simulación siempre, ver
+            # ejecutar_simulacion()- ya viene normalizado a "version 2":
+            # las coordenadas viven en stage["location"]["lat"/"lon"], NO en
+            # stage["lat"]/["lon"] a secas. Con el nombre plano, esto
+            # devolvía None SIEMPRE -no solo en el tramo sin cobertura-, así
+            # que /api/heartbeat nunca se llegó a mandar en ninguna prueba,
+            # pese a que el docstring del módulo lo prometía. Encontrado
+            # añadiendo la degradación de GPS: los heartbeats no aparecían
+            # en el informe de ningún jugador, ni con cobertura buena.
+            location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
+            lat = location.get("lat", stage.get("lat"))
+            lon = location.get("lon", stage.get("lon"))
             if lat is not None and lon is not None:
                 try:
                     await _peticion(
                         client,
                         "POST",
                         "/api/heartbeat",
-                        json_body={"user": nombre, "lat": lat, "lon": lon, "accuracy": 12, "gps_status": "ok"},
+                        json_body=cuerpo_heartbeat(lat, lon),
                         retraso_rango=perfil_red["retraso_ms"],
                         resultados=resultados,
                         etiqueta="heartbeat",

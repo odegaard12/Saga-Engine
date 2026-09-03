@@ -184,6 +184,7 @@ export default function SimulationBenchPanel() {
               <option value="a_saltos">A saltos (entra y sale de cobertura toda la ruta)</option>
               <option value="sin_cobertura">Sin cobertura (todo por la cola offline)</option>
               <option value="cliente_antiguo">Móvil viejo (no manda level_before)</option>
+              <option value="ruta_larga_caotica">Ruta larga y caótica (empieza sin señal, 6 cortes sueltos, GPS degradado)</option>
             </select>
           </label>
         </div>
