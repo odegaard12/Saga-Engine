@@ -33,8 +33,21 @@ def make_client():
 def estado_limpo():
     """Los tests comparten SAGA_DATA_DIR -y por tanto game_state.json- dentro
     de este fichero: sin esto, SIM_01 arrancaba en el nivel que le dejara el
-    test anterior."""
+    test anterior.
+
+    El limitador de peticiones (PLAYER_RATE_LIMITS) también es compartido
+    -vive en memoria del proceso, no en SAGA_DATA_DIR- y tampoco lo resetea
+    nada: con SIM_01 repitiéndose en cada test de este fichero, ~15 tests
+    después bastaba para superar ADVANCE_RATE_LIMIT_MAX y que /api/advance
+    devolviera 429 (sin 'status' en el cuerpo) en un test que en nada tenía
+    que ver con límites de peticiones. Encontrado con las pruebas de partida
+    larga -las últimas del fichero, y las que más llamadas hacen por test-,
+    fallando con un nodo distinto cada vez según qué otros tests hubieran
+    corrido antes: la pista de que era un limitador acumulado, no un fallo
+    de lógica de verdad.
+    """
     main.save_game_state(main.GAME_DB, {})
+    main.clear_player_rate_limits()
     yield
 
 
@@ -222,6 +235,35 @@ def test_o_banco_simula_un_corte_a_mitade_de_ruta(monkeypatch):
     assert main.get_player_progress_level("SIM_01", 0) == 8
 
 
+def test_o_banco_a_saltos_cruza_e_volve_varias_veces(monkeypatch):
+    """El caso que "corte" no prueba: no UN tramo muerto, sino entrar y
+    salir de cobertura VARIAS veces en la misma ruta -cada cruce tiene que
+    vaciar su propia cola, sin perder ni duplicar nada-."""
+    configurar_ruta_larga(monkeypatch, 9)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/run",
+        json={"player_count": 1, "device": "android", "network": "a_saltos"},
+    )
+
+    assert respuesta.status_code == 200
+    jugador = respuesta.json()["report"]["players"][0]
+    assert jugador["errores"] == []
+    assert jugador["nivel_final"] == 9
+
+    # patron_saltos=(3, 1): nodos 0, 3, 6 sin cobertura -tres grupos
+    # separados, no uno solo-.
+    assert jugador["nodos_en_corte"] == [0, 3, 6]
+
+    # Y cada uno de los tres cruces manda su propio lote: no uno solo al
+    # final (eso sería "sin_cobertura" mal implementado), tres.
+    lotes = [p for p in jugador["peticiones"] if p["tipo"] == "events_sync_lote"]
+    assert len(lotes) == 3
+
+    assert main.get_player_progress_level("SIM_01", 0) == 9
+
+
 def test_o_banco_non_toca_a_ruta_con_xente_de_verdade_xogando(monkeypatch):
     configurar(monkeypatch)
     monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
@@ -288,6 +330,68 @@ def test_o_borrado_limpa_o_rastro_pero_non_a_xente_de_verdade(monkeypatch):
 
     assert main.get_player_progress_level("SIM_01", 0) == 0
     assert main.get_player_progress_level("ALFA_DE_VERDADE", 0) == 1
+
+
+# ---------------------------------------------------------------------------
+# Partida larga con pausa: POST /api/admin/simulation/long-session
+# ---------------------------------------------------------------------------
+
+def test_a_partida_longa_garda_o_nivel_na_pausa_e_o_final(monkeypatch):
+    configurar_ruta_larga(monkeypatch, 8)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/long-session",
+        json={"device": "android", "pause_at": 0.5},
+    )
+
+    assert respuesta.status_code == 200
+    informe = respuesta.json()["report"]
+    assert informe["errores"] == []
+    assert informe["stage_count"] == 8
+    assert informe["punto_de_pausa"] == 4
+    assert informe["nivel_tras_pausa"] == 4, "a segunda sesion arrincou dun nivel que xa non era 0"
+    assert informe["nivel_final"] == 8
+
+    assert main.get_player_progress_level("SIM_01", 0) == 8
+
+
+def test_a_partida_longa_non_repite_nin_perde_nada_na_costura(monkeypatch):
+    """A comprobación que de verdade importa: os dous lotes de peticións
+    -antes e despois da pausa- non se pisan os niveis un ao outro."""
+    configurar_ruta_larga(monkeypatch, 6)
+    client = make_client()
+
+    respuesta = client.post(
+        "/api/admin/simulation/long-session",
+        json={"device": "iphone", "pause_at": 0.33},
+    )
+
+    assert respuesta.status_code == 200
+    informe = respuesta.json()["report"]
+    assert informe["punto_de_pausa"] == 2
+    assert informe["nivel_tras_pausa"] == 2
+    assert informe["nivel_final"] == 6
+    assert len(informe["peticiones_primera_sesion"]) > 0
+    assert len(informe["peticiones_segunda_sesion"]) > 0
+
+
+def test_a_partida_longa_require_sesion_de_administrador():
+    client = make_client()
+    respuesta = client.post("/api/admin/simulation/long-session", json={})
+    assert respuesta.status_code == 403
+
+
+def test_a_partida_longa_non_toca_a_ruta_con_xente_de_verdade_xogando(monkeypatch):
+    configurar_ruta_larga(monkeypatch, 6)
+    monkeypatch.setattr(main, "get_player_profiles", lambda cfg=None: [{"id": "ALFA"}])
+    main.set_player_progress_level("ALFA", 1, desde_admin=True)
+
+    client = make_client()
+    respuesta = client.post("/api/admin/simulation/long-session", json={})
+
+    assert respuesta.status_code == 409
+    assert main.get_player_progress_level("SIM_01", 0) == 0
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,93 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.2 Banco de pruebas: cobertura a saltos y "¿se guarda bien todo?" — ✅ en 4.9.58
+
+Pedido explícito, dos de los cuatro perfiles nuevos que se pidieron para el
+banco (versión de app vieja y offline-descargado-antes quedan para la
+próxima, ver abajo):
+
+**Cobertura "a saltos"**: no un tramo muerto -eso ya lo hacía "corte"-,
+sino entrar y salir de cobertura VARIAS veces en la misma ruta -el camino
+con árboles a un lado, sombra de antena a ratos-. Nuevo perfil
+`patron_saltos: (3, 1)` -de cada 3 nodos, 1 sin cobertura-: resultó que la
+lógica de vaciar la cola ya estaba escrita de forma genérica (se vacía
+cada vez que se vuelve a cobertura, no solo la primera), así que solo hizo
+falta enseñarle a `sin_cobertura_en` a mirar un patrón además de un tramo
+único. Verificado con una ruta de 9 nodos: tres grupos separados
+(`nodos_en_corte == [0, 3, 6]`), tres lotes de `events_sync` distintos, no
+uno.
+
+**"¿Se guarda bien todo?"**: la pregunta literal. Nueva función
+`simular_partida_larga_con_pausa` -y botón "⏸️ Probar pausa y retomar" en
+el panel-: un jugador de mentira juega hasta la mitad de la ruta, CIERRA
+esa sesión -token tirado, como quien se queda sin batería y vuelve horas
+después, no un reintento-, y retoma con una sesión nueva desde donde dice
+el SERVIDOR que se quedó. Comprueba DOS niveles, no solo el final: el
+intermedio (justo tras la pausa) y el final -si solo se mirara el final,
+un fallo que se autocorrige en la segunda sesión podría dar el mismo
+número sin que hubiera pasado nada bueno por en medio-.
+
+**Encontró un bug real de infraestructura de pruebas al primer intento,
+no del juego**: los tests de este fichero fallaban de forma intermitente y
+con un nodo distinto cada vez, según qué otros tests hubieran corrido
+antes. La pista: `PLAYER_RATE_LIMITS` -el limitador de `/api/advance`-
+vive en memoria del proceso, no en `SAGA_DATA_DIR`, y ningún test lo
+reseteaba. Con SIM_01 repitiéndose en cada test del fichero, los tests de
+partida larga -los que más llamadas hacen, y los últimos del fichero-
+acababan superando el límite y recibiendo un 429 que no tiene campo
+`status` en el cuerpo. Arreglado en la fixture `estado_limpo`
+(`main.clear_player_rate_limits()`), no en la lógica de la partida -que
+nunca estuvo rota-.
+
+Verificado: suite completa 538/538 (5 tests nuevos), y en vivo contra un
+servidor real por `curl` (nivel tras la pausa y nivel final correctos,
+limpieza de rastro después).
+
+**Pendiente para la próxima** -no llegó esta vez-: perfiles de versión de
+app vieja (simular un cliente con la forma de petición de una versión
+anterior, para probar compatibilidad hacia atrás del servidor) y
+offline-descargado-antes (jugar entero desde el nodo 1 con la misión
+predescargada, que solo se puede probar de verdad con
+`sim/playwright-bench` -navegador real, IndexedDB real-, no con el banco
+httpx).
+
+## 1.1 🔴 La precarga del mapa SÍ descarga teselas reales — el "0%" es el bug
+
+Corrige lo dicho en 0.7 y en el cierre de 1.0: ahí se concluyó "el servidor
+de pruebas no tiene teselas reales que servir" tras esperar 60 s sin ver
+avanzar el número. Era una conclusión a ojo, sin medir lo suficiente -y
+estaba mal-. Pedido directo: "debes crear sistema para que tengas teselas
+reales... o hacer algo". Se construyó el "algo": un escenario de diagnóstico
+(`sim/playwright-bench`, `diagnose-tiles.mjs`) que lee las peticiones de red
+reales y el texto del DOM cada 15 s, en vez de adivinar desde una captura.
+
+**Lo que mide de verdad:** `/map-tiles/{z}/{x}/{y}.png` es un proxy en vivo a
+ArcGIS World Imagery (`backend/app/routers/public.py`), no una caché local -
+y funciona perfectamente: 0 fallos en más de 300 peticiones seguidas,
+~0.3-0.5 s cada una, tanto en directo (`curl` a ArcGIS) como a través del
+proxy del propio servidor. El mapa SÍ se está descargando de verdad, tesela
+a tesela, a buen ritmo.
+
+**El bug real:** el porcentaje que ve el jugador no refleja ese progreso.
+Medido con el mismo escenario: a los 15 s marcaba "3.9%" -un número real-,
+a los 30 s había vuelto a "0%", y se quedó en "0%" el resto de la prueba
+mientras las peticiones de red seguían subiendo sin parar (111 teselas
+servidas a los 45 s). El indicador no solo se congela: puede **retroceder**.
+Todo apunta a `PlayerApp.tsx` llamando a `guardarMapa()`/
+`prefetchMissionMapTiles()` más de una vez para la misma carga -un remount
+o una repetición del efecto reinicia `{done: 0, total: ...}` mientras la
+descarga anterior sigue viva de fondo, sin cancelarse de verdad-, pero la
+causa exacta del remount no está confirmada todavía: hace falta seguir
+mirando `PlayerApp.tsx` alrededor del efecto con dependencia `[user]`
+(líneas ~493-630) antes de tocar nada.
+
+**No arreglado esta vez** -es un hallazgo nuevo, no estaba en el plan de
+hoy, y merece su propia sesión con cuidado en vez de un parche a última
+hora-. Impacto real: es la pantalla que ve TODO jugador nuevo la primera
+vez, y le dice "esto no avanza" cuando sí está avanzando. Prioridad alta
+para la próxima.
+
 ## 1.0 bearing_hunt y motion_challenge: auditados y dados de alta — ✅ en 4.9.57
 
 Pedido explícito: auditar estas dos familias antes de diseñar minijuegos

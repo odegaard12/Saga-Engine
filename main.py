@@ -1279,6 +1279,41 @@ async def run_simulation_bench(jugadores, dispositivo, red):
         save_config(cfg_original)
 
 
+async def run_long_session_pause_bench(dispositivo, punto_de_pausa=0.5):
+    """"¿Se guarda bien todo?" -partida larga con una pausa real en medio,
+    sesión nueva para retomar-. Mismo patrón de alta/baja de perfil que
+    `run_simulation_bench`, ver ahí el porqué. Solo un jugador -SIM_01-,
+    porque esto prueba la costura entre dos sesiones de UN jugador, no
+    concurrencia."""
+    cfg_original = load_config()
+
+    nombres_sim = [_simulation_bench.nombre_simulado(0)]
+    perfiles_base = cfg_original.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg_original))
+    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
+
+    save_config({
+        **cfg_original,
+        "player_profiles": perfiles_temporales,
+        "players": [p["id"] for p in perfiles_temporales],
+    })
+
+    try:
+        return await _simulation_bench.simular_partida_larga_con_pausa(
+            app=app,
+            stages=get_runtime_stages(),
+            dispositivo=dispositivo,
+            cookie_name=PLAYER_SESSION_COOKIE,
+            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
+            session_secret=get_session_signing_secret(),
+            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
+            punto_de_pausa=punto_de_pausa,
+        )
+    finally:
+        save_config(cfg_original)
+
+
 def registrar_jugadores_de_simulacion(n):
     """Para una sesión de navegador DE VERDAD (Playwright u otra herramienta
     externa, no la simulación httpx-en-proceso): registra N SIM_XX como
