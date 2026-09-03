@@ -31,6 +31,48 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.3 Auditoría de las 7 familias que faltaban — ✅ en 4.9.60
+
+"Sigue con todo, corrigiendo todos los errores en bancos, juegos, offline,
+funcionamiento". Con las tres ya auditadas (team_relay, bearing_hunt,
+motion_challenge), quedaban 7: circuit_matrix y sus cuatro variantes
+(logic_circuit, sequence_code, place_mosaic, tilt_maze, spark_radar),
+audio_challenge y checkpoint/signal_hunt. Mismo método que las anteriores:
+leer cada campo de configuración que el editor deja tocar y comprobar que
+el runtime lo lee con el mismo nombre exacto.
+
+**Seis limpias.** logic_circuit, sequence_code (Simón), place_mosaic,
+spark_radar y checkpoint: todos los campos del catálogo llegan al runtime
+con el nombre correcto, sin sorpresas. tilt_maze igual, con una excepción
+menor: `difficulty` aparece en su config y el editor lo deja tocar -entra
+por la regla genérica de la categoría "motion"- pero el runtime nunca lo
+lee (el laberinto ya tiene grid/agujeros/vidas/tiempo como mandos reales,
+así que el impacto es bajo). Anotado, no arreglado esta vez.
+
+**audio_challenge: un bug real, y de los serios -el juego no respondía
+nunca al micrófono-.** `checkVolume()` es la función que se llama sola en
+bucle (`requestAnimationFrame`) para leer el volumen. Se dispara la
+PRIMERA vez justo después de `setActive(true)`, sin esperar al siguiente
+render -React no aplica ese cambio hasta entonces-, así que esa primera
+llamada seguía viendo `active=false` -el valor de antes del clic, atrapado
+en el cierre de esa función- y se paraba en la primera línea. El bucle de
+`requestAnimationFrame` nunca llegaba a arrancar: el micrófono SÍ estaba
+escuchando de verdad, pero nada leía lo que oía. La barra se quedaba en 0%
+para siempre, indistinguible a ojo de "no sopla lo bastante fuerte".
+
+**Arreglo:** un `activeRef` que se pone a `true` en el mismo instante que
+`setActive(true)`, sin esperar al render -exactamente el patrón que ya
+usan motion_challenge (`completedRef`) y bearing_hunt (`completeSentRef`)
+para lo mismo-. `checkVolume()` mira el ref, no el estado. Verificado con
+`tsc -b` y `vite build` limpios; no se pudo montar una prueba en vivo con
+micrófono falso esta vez (queda pendiente para `sim/playwright-bench`),
+pero la causa -un cierre de JavaScript leyendo un valor de antes del
+cambio- es inequívoca leyendo el código, sin margen de duda razonable.
+
+Con esto, las 10 familias de minijuegos están auditadas. Antes de diseñar
+los 10 juegos nuevos que se pidieron, el catálogo real -qué hay, qué
+funciona, qué le falta- está claro por primera vez.
+
 ## 1.1b El "0%" de la precarga: encontrado y arreglado — ✅ en 4.9.59
 
 Cierra 1.1. "Sigue con todo, corrigiendo todos los errores" -y este era el
