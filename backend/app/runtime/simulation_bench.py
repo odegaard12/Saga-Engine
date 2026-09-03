@@ -2,9 +2,10 @@
 
 Simula N jugadores recorriendo la misión REAL -no una de mentira-, cada uno
 con su perfil de dispositivo (User-Agent) y su perfil de red (buena, mala,
-inestable, o sin cobertura del todo), pasando por los MISMOS caminos que un
-móvil de verdad: sesión de jugador, `/api/heartbeat`, `/api/advance` con
-cobertura, y `node_completed` en `/api/events/sync` sin ella.
+inestable, un corte de cobertura a mitad de ruta, o sin cobertura del
+todo), pasando por los MISMOS caminos que un móvil de verdad: sesión de
+jugador, `/api/heartbeat`, `/api/advance` con cobertura, y `node_completed`
+en `/api/events/sync` sin ella.
 
 Usa `httpx.AsyncClient` con `ASGITransport`: peticiones de VERDAD contra la
 aplicación entera -enrutado, límites de peticiones, sesión de jugador,
@@ -53,17 +54,31 @@ PERFILES_DISPOSITIVO = {
     ),
 }
 
-# Cada perfil de red decide DOS cosas: cuánto tarda cada petición -para medir
-# cómo se comporta la interfaz con respuestas lentas de verdad, no de mentira-
-# y si el nodo se completa por el camino directo o por la cola offline.
+# Cada perfil de red decide TRES cosas: cuánto tarda cada petición -para
+# medir cómo se comporta la interfaz con respuestas lentas de verdad, no de
+# mentira-, si a veces reenvía la misma petición -el eco-, y si hay algún
+# tramo de la ruta SIN cobertura (`zona_muerta`).
+#
+# `zona_muerta` es (inicio, fin) como fracción de la ruta -0.0 a 1.0-, o
+# `None` si nunca se pierde la señal. Dentro de esa franja los nodos se
+# completan en LOCAL -como jugaría alguien de verdad, sin enterarse de que
+# no hay cobertura- y se mandan de golpe al primer nodo que ya esté fuera de
+# la franja: el móvil que recupera la señal a la vuelta de una vaguada.
 PERFILES_RED = {
-    "buena": {"retraso_ms": (0, 80), "duplicado_prob": 0.0, "sin_cobertura": False},
-    "mala": {"retraso_ms": (400, 1800), "duplicado_prob": 0.12, "sin_cobertura": False},
-    "inestable": {"retraso_ms": (150, 2600), "duplicado_prob": 0.25, "sin_cobertura": False},
+    "buena": {"retraso_ms": (0, 80), "duplicado_prob": 0.0, "zona_muerta": None},
+    "mala": {"retraso_ms": (400, 1800), "duplicado_prob": 0.12, "zona_muerta": None},
+    "inestable": {"retraso_ms": (150, 2600), "duplicado_prob": 0.25, "zona_muerta": None},
     # Sin cobertura del todo: la ruta entera se completa en local y se manda
     # de una vez al final, como un móvil que sale del monte y recupera la
     # red -el caso que de verdad importa probar-.
-    "sin_cobertura": {"retraso_ms": (0, 0), "duplicado_prob": 0.0, "sin_cobertura": True},
+    "sin_cobertura": {"retraso_ms": (0, 0), "duplicado_prob": 0.0, "zona_muerta": (0.0, 1.0)},
+    # Corte de cobertura A MITAD de ruta -no todo o nada-: el tramo central
+    # (del 35 % al 65 % de los nodos) se completa en local; antes y después
+    # va con la misma cobertura mala de siempre. Es el caso real de una
+    # vaguada, un bosque cerrado o una zona de sombra de la antena, y es
+    # justo el que "todo o nada" no prueba: ¿el móvil recupera BIEN al
+    # volver la señal, sin perder nodos y sin duplicar los ya hechos?
+    "corte": {"retraso_ms": (400, 1800), "duplicado_prob": 0.12, "zona_muerta": (0.35, 0.65)},
 }
 
 MAX_JUGADORES = 8
@@ -148,7 +163,40 @@ async def _jugador_simulado(
 
     resultados: list[dict] = []
     errores: list[str] = []
+    nodos_en_corte: list[int] = []
     inicio = time.perf_counter()
+
+    zona_muerta = perfil_red.get("zona_muerta")
+    total = len(stages)
+
+    def sin_cobertura_en(indice: int) -> bool:
+        if not zona_muerta:
+            return False
+        ini, fin = zona_muerta
+        fraccion = indice / total if total else 0.0
+        return ini <= fraccion < fin
+
+    async def vaciar_cola(client: httpx.AsyncClient, cola: list[dict]) -> None:
+        """El móvil que recupera la señal: manda de golpe, en orden, todo lo
+        que se completó mientras no había cobertura."""
+        if not cola:
+            return
+        try:
+            respuesta = await _peticion(
+                client,
+                "POST",
+                "/api/events/sync",
+                json_body={"user": nombre, "events": cola},
+                retraso_rango=(0, 0),
+                resultados=resultados,
+                etiqueta="events_sync_lote",
+            )
+            cuerpo = respuesta.json()
+            for evento in cuerpo.get("events", []):
+                if evento.get("status") not in ("synced", "ignored"):
+                    errores.append(f"{evento.get('type')}: {evento.get('error') or evento.get('status')}")
+        except httpx.HTTPError as exc:
+            errores.append(f"events_sync (corte de cobertura): {exc}")
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
@@ -158,93 +206,91 @@ async def _jugador_simulado(
         # tarro de galletas entre SIM_01 y SIM_02 corriendo a la vez.
         client.cookies.set(cookie_name, token)
 
-        if perfil_red["sin_cobertura"]:
-            # Toda la ruta se "completa" en local -sin mandar nada- y se
-            # sincroniza de una vez al final, en orden: el móvil que sale del
-            # monte con la cola llena.
-            eventos = [
-                {
-                    "client_event_id": f"{nombre}-{indice}-{uuid.uuid4().hex[:8]}",
-                    "type": "node_completed",
-                    "node_id": str(stage.get("id")),
-                    "payload": {"code": "OK", "level_before": indice},
-                }
-                for indice, stage in enumerate(stages)
-            ]
+        cola_offline: list[dict] = []
+
+        for indice, stage in enumerate(stages):
+            if sin_cobertura_en(indice):
+                # Se juega el nodo -el minijuego no sabe ni le importa si hay
+                # cobertura-, pero no se manda nada todavía: se completa en
+                # local, como una cola real de IndexedDB.
+                nodos_en_corte.append(indice)
+                cola_offline.append(
+                    {
+                        "client_event_id": f"{nombre}-{indice}-{uuid.uuid4().hex[:8]}",
+                        "type": "node_completed",
+                        "node_id": str(stage.get("id")),
+                        "payload": {"code": "OK", "level_before": indice},
+                    }
+                )
+                continue
+
+            # Se acaba de recuperar la señal: lo primero, vaciar lo que
+            # quedó pendiente del corte, ANTES de seguir avanzando en vivo.
+            if cola_offline:
+                await vaciar_cola(client, cola_offline)
+                cola_offline = []
+
+            lat = stage.get("lat")
+            lon = stage.get("lon")
+            if lat is not None and lon is not None:
+                try:
+                    await _peticion(
+                        client,
+                        "POST",
+                        "/api/heartbeat",
+                        json_body={"user": nombre, "lat": lat, "lon": lon, "accuracy": 12, "gps_status": "ok"},
+                        retraso_rango=perfil_red["retraso_ms"],
+                        resultados=resultados,
+                        etiqueta="heartbeat",
+                    )
+                except httpx.HTTPError:
+                    pass  # el latido nunca bloquea el avance; es sólo el punto en el mapa
+
             try:
                 respuesta = await _peticion(
                     client,
                     "POST",
-                    "/api/events/sync",
-                    json_body={"user": nombre, "events": eventos},
-                    retraso_rango=(0, 0),
+                    "/api/advance",
+                    json_body={"user": nombre, "code": "OK", "time_spent_ms": 1500, "level_before": indice},
+                    retraso_rango=perfil_red["retraso_ms"],
                     resultados=resultados,
-                    etiqueta="events_sync_lote",
+                    etiqueta="advance",
                 )
-                cuerpo = respuesta.json()
-                for evento in cuerpo.get("events", []):
-                    if evento.get("status") not in ("synced", "ignored"):
-                        errores.append(f"{evento.get('type')}: {evento.get('error') or evento.get('status')}")
             except httpx.HTTPError as exc:
-                errores.append(f"events_sync: {exc}")
-        else:
-            for indice, stage in enumerate(stages):
-                lat = stage.get("lat")
-                lon = stage.get("lon")
-                if lat is not None and lon is not None:
-                    try:
-                        await _peticion(
-                            client,
-                            "POST",
-                            "/api/heartbeat",
-                            json_body={"user": nombre, "lat": lat, "lon": lon, "accuracy": 12, "gps_status": "ok"},
-                            retraso_rango=perfil_red["retraso_ms"],
-                            resultados=resultados,
-                            etiqueta="heartbeat",
-                        )
-                    except httpx.HTTPError:
-                        pass  # el latido nunca bloquea el avance; es sólo el punto en el mapa
+                errores.append(f"advance nodo {indice}: {exc}")
+                break
 
+            cuerpo = respuesta.json()
+            if cuerpo.get("status") != "ok":
+                errores.append(f"advance nodo {indice}: {cuerpo.get('status')} ({cuerpo.get('reason', '')})")
+                break
+
+            # El eco: un móvil con mala cobertura reenvía la misma
+            # petición porque cree que la primera se perdió. El servidor
+            # tiene que reconocerla como duplicado, NO avanzar dos veces.
+            if random.random() < perfil_red["duplicado_prob"]:
                 try:
-                    respuesta = await _peticion(
+                    eco = await _peticion(
                         client,
                         "POST",
                         "/api/advance",
                         json_body={"user": nombre, "code": "OK", "time_spent_ms": 1500, "level_before": indice},
-                        retraso_rango=perfil_red["retraso_ms"],
+                        retraso_rango=(50, 300),
                         resultados=resultados,
-                        etiqueta="advance",
+                        etiqueta="advance_eco",
                     )
-                except httpx.HTTPError as exc:
-                    errores.append(f"advance nodo {indice}: {exc}")
-                    break
-
-                cuerpo = respuesta.json()
-                if cuerpo.get("status") != "ok":
-                    errores.append(f"advance nodo {indice}: {cuerpo.get('status')} ({cuerpo.get('reason', '')})")
-                    break
-
-                # El eco: un móvil con mala cobertura reenvía la misma
-                # petición porque cree que la primera se perdió. El servidor
-                # tiene que reconocerla como duplicado, NO avanzar dos veces.
-                if random.random() < perfil_red["duplicado_prob"]:
-                    try:
-                        eco = await _peticion(
-                            client,
-                            "POST",
-                            "/api/advance",
-                            json_body={"user": nombre, "code": "OK", "time_spent_ms": 1500, "level_before": indice},
-                            retraso_rango=(50, 300),
-                            resultados=resultados,
-                            etiqueta="advance_eco",
+                    cuerpo_eco = eco.json()
+                    if not cuerpo_eco.get("duplicate"):
+                        errores.append(
+                            f"eco nodo {indice}: no se reconoció como duplicado (nivel {cuerpo_eco.get('level')})"
                         )
-                        cuerpo_eco = eco.json()
-                        if not cuerpo_eco.get("duplicate"):
-                            errores.append(
-                                f"eco nodo {indice}: no se reconoció como duplicado (nivel {cuerpo_eco.get('level')})"
-                            )
-                    except httpx.HTTPError as exc:
-                        errores.append(f"eco nodo {indice}: {exc}")
+                except httpx.HTTPError as exc:
+                    errores.append(f"eco nodo {indice}: {exc}")
+
+        # Si la ruta se acaba DENTRO del corte -zona_muerta llega hasta el
+        # final, como en "sin_cobertura"-, queda por vaciar la cola.
+        if cola_offline:
+            await vaciar_cola(client, cola_offline)
 
     duracion_ms = round((time.perf_counter() - inicio) * 1000, 1)
 
@@ -254,6 +300,7 @@ async def _jugador_simulado(
         "duracion_ms": duracion_ms,
         "peticiones": resultados,
         "errores": errores,
+        "nodos_en_corte": nodos_en_corte,
     }
 
 

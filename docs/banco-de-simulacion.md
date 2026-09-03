@@ -18,12 +18,19 @@ uno con su perfil de móvil y de cobertura, y enseña un informe al momento.
 
 - **Dispositivo**: iPhone, Android, o mezclado (la mitad de cada).
 - **Cobertura**: buena · mala (lenta, algún eco) · inestable (lenta y con
-  más ecos) · sin cobertura (la ruta entera se completa en local y se manda
-  de una vez al final, como un móvil que sale del monte con la cola llena).
+  más ecos) · **corte a mitad de ruta** (nueva, 2/09: el tramo central -35 %
+  a 65 % de los nodos- se juega en local, sin mandar nada, y se sube de
+  golpe en cuanto el siguiente nodo ya está fuera de la franja: la vaguada
+  o el bosque cerrado, no "todo o nada") · sin cobertura (la ruta entera se
+  completa en local y se manda de una vez al final, como un móvil que sale
+  del monte con la cola llena).
 - **El eco**: con "mala" o "inestable", a veces el jugador simulado reenvía
   la MISMA petición de avance -un móvil que cree que la primera se perdió-.
   El informe dice si el servidor la reconoció como duplicado o si avanzó de
   más por error.
+- El informe de cada jugador lleva `nodos_en_corte`: qué nodos concretos
+  cayeron dentro de la franja sin cobertura, para poder comprobar a ojo que
+  el lote que sale al recuperar la señal es justo ése y no otro.
 - **Se niega a correr con gente de verdad jugando** -mismo espíritu que
   `--sí-sé-lo-que-hago` en `simular-carga.py`-, salvo que se marque
   "Lanzar de todos modos".
