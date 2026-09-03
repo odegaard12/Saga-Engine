@@ -1,10 +1,6 @@
 import type { SignalHuntConfig } from '../../core/family-types'
 import type { SignalHuntDefinition } from '../../core/registry-types'
-import type {
-  MinigameController,
-  MinigamePreflightResult,
-  MinigameRuntimeBindings,
-} from '../../core/types'
+import type { MinigamePreflightResult, MinigameRuntimeBindings } from '../../core/types'
 
 export const signalHuntDefinition: SignalHuntDefinition = {
   family: 'signal_hunt',
@@ -134,9 +130,4 @@ async function runSignalHuntPreflight(
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Signal hunt ready.'],
   }
-}
-
-export const signalHuntController: MinigameController<SignalHuntConfig> = {
-  validateConfig: validateSignalHuntConfig,
-  runPreflight: runSignalHuntPreflight,
 }
