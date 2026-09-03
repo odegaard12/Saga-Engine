@@ -91,15 +91,20 @@ export default function SimulationBenchPanel() {
     setEstadoLarga('done')
   }
 
-  async function ejecutar(forzar: boolean) {
+  // playerCount/network/forzar como parámetros, no solo leídos del estado:
+  // el botón de "Prueba grande" pone los dos con setState y lanza en el
+  // mismo gesto -si ejecutar() leyera el estado directamente, vería los
+  // valores de ANTES del clic, el mismo fallo de cierre obsoleto que ya
+  // costó el audio_challenge que no oía el micrófono (ver 4.9.60).
+  async function ejecutar(forzar: boolean, jugadoresOverride?: number, coberturaOverride?: string) {
     setEstado('running')
     setAviso('')
     setLimpiado(null)
 
     const { httpStatus, data } = await runSimulationBench({
-      player_count: playerCount,
+      player_count: jugadoresOverride ?? playerCount,
       device,
-      network,
+      network: coberturaOverride ?? network,
       force: forzar,
     })
 
@@ -150,13 +155,13 @@ export default function SimulationBenchPanel() {
 
         <div className="admin-settings-grid-modern">
           <label>
-            Jugadores (1-8)
+            Jugadores (1-20)
             <input
               type="number"
               min={1}
-              max={8}
+              max={20}
               value={playerCount}
-              onChange={(event) => setPlayerCount(Math.max(1, Math.min(8, Number(event.target.value) || 1)))}
+              onChange={(event) => setPlayerCount(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
             />
           </label>
 
@@ -186,6 +191,19 @@ export default function SimulationBenchPanel() {
         <div style={filaBotones}>
           <button type="button" style={botonPrimario} disabled={estado === 'running'} onClick={() => ejecutar(false)}>
             {estado === 'running' ? 'Corriendo…' : '▶️ Ejecutar'}
+          </button>
+          <button
+            type="button"
+            style={botonSecundario}
+            disabled={estado === 'running'}
+            title="15 jugadores, cobertura a saltos: el escenario más parecido a un día de verdad con todo el grupo en el monte."
+            onClick={() => {
+              setPlayerCount(15)
+              setNetwork('a_saltos')
+              void ejecutar(false, 15, 'a_saltos')
+            }}
+          >
+            📈 Prueba grande (15 · a saltos)
           </button>
           <button type="button" style={botonSecundario} disabled={limpiando} onClick={limpiar}>
             {limpiando ? 'Limpiando…' : '🧹 Limpiar rastro (SIM_*)'}

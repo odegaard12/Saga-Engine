@@ -804,6 +804,29 @@ export const missionTemplates: MissionTemplate[] = [
   },
 ]
 
+// Orden con sentido para quien navega la lista -no el orden en que se fue
+// añadiendo al catálogo, que es el que usan las funciones de abajo para su
+// fallback por familia (getAdminGameForStage) y no debe tocarse: cambiar el
+// ORDEN DEL ARRAY podría cambiar A QUÉ JUEGO cae una misión vieja sin
+// game_id. Este es solo para mostrar, nunca para resolver identidad.
+const ORDEN_DE_CATEGORIA: Record<AdminGameCatalogItem['category'], number> = {
+  gps: 0,
+  compass: 1,
+  logic: 2,
+  motion: 3,
+  photo: 4,
+  physical: 5,
+  team: 6,
+}
+
+export function sortedByCategoryForDisplay(
+  games: AdminGameCatalogItem[]
+): AdminGameCatalogItem[] {
+  return games
+    .slice()
+    .sort((a, b) => ORDEN_DE_CATEGORIA[a.category] - ORDEN_DE_CATEGORIA[b.category])
+}
+
 export function getAdminGame(gameId?: string | null): AdminGameCatalogItem {
   return adminGameCatalog.find((game) => game.id === gameId) || adminGameCatalog[0]
 }

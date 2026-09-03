@@ -111,7 +111,11 @@ PERFILES_RED = {
     },
 }
 
-MAX_JUGADORES = 8
+# 20, no 8: "con 15 jugadores ahoga el ancho de banda, no la Pi" es un
+# hallazgo real de esta misión (ver memoria del proyecto), y el tope
+# anterior ni dejaba LLEGAR a probar ese escenario -se quedaba corto por
+# debajo del número que de verdad importa comprobar-.
+MAX_JUGADORES = 20
 MAX_NODOS = 15
 DEFAULT_TIMEOUT_S = 20.0
 
