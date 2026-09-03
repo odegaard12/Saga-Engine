@@ -127,6 +127,11 @@ export const CONFIG_FIELD_META: Record<
     help: 'Valor de señal o precisión necesario para dar el nodo por válido.',
     type: 'number',
   },
+  required_members: {
+    label: 'Compañeros necesarios',
+    help: 'Cuántos jugadores del equipo (aparte de quien juega) deben estar en el punto a la vez para desbloquearlo. Solo se usa en Relevo de equipo.',
+    type: 'number',
+  },
   hold_ms: {
     label: 'Tiempo de espera',
     help: 'Milisegundos que debe mantenerse la condición antes de completar.',
@@ -190,6 +195,7 @@ export const CONFIG_ORDER = [
   'source_radius_m',
   'lock_threshold',
   'hold_ms',
+  'required_members',
   'target_bearing_deg',
   'tolerance_deg',
   'grid_cols',
@@ -630,7 +636,7 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     game.completionMethod === 'hold' ||
     game.completionMethod === 'team'
   ) {
-    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms']) {
+    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms', 'required_members']) {
       if (key in config) keys.add(key)
     }
   }
