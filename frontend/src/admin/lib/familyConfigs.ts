@@ -119,7 +119,7 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
   if (type === 'motion_challenge') {
     return {
       objective: 'shake_charge',
-      game_id: 'shake_antenna_charge',
+      game_id: 'shake_charge',
       difficulty: 'normal',
       duration_mode: 'normal',
       penalty_mode: 'normal',
@@ -209,7 +209,7 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
   if (type === 'motion_challenge') {
     return {
       objective: String(raw.objective || 'shake_charge'),
-      game_id: String(raw.game_id || 'shake_antenna_charge'),
+      game_id: String(raw.game_id || 'shake_charge'),
       difficulty: String(raw.difficulty || 'normal'),
       duration_mode: String(raw.duration_mode || 'normal'),
       penalty_mode: String(raw.penalty_mode || 'normal'),

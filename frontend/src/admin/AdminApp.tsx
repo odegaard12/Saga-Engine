@@ -969,7 +969,7 @@ export default function AdminApp() {
     const nextIndex = stages.length
     const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
     const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -1003,7 +1003,7 @@ export default function AdminApp() {
   }
 
   function insertLocalNodeAt(lat: number, lon: number, index: number) {
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -1073,7 +1073,7 @@ export default function AdminApp() {
           ]
         : mapCenter
 
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     itemsToCreate.forEach((item, idx) => {
       const offset = (idx - (itemsToCreate.length - 1) / 2) * 0.00035
