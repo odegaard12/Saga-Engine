@@ -58,12 +58,14 @@ ignoradas por git — son evidencia de una corrida, no algo que versionar).
 - **`solo-screenshot`**: un jugador, una captura. No comprueba nada, es para
   verificar algo puntual (colores, un icono, un layout) sin montar un
   escenario completo. Variables: `NOMBRE_SALIDA`, `ESPERA_MS`.
-- **`diagnose-tiles`**: lee, cada 15 s, el texto real del DOM Y las
-  peticiones de red reales -no una captura- mientras carga un jugador. Se
-  construyó para comprobar la pantalla de precarga del mapa (ver más abajo)
-  en vez de adivinar desde una imagen.
+- **`diagnose-tiles`**: lee, cada `INTERVALO_MS` (3 s por defecto), el texto
+  real del DOM Y las peticiones de red reales -no una captura- mientras
+  carga un jugador. Se construyó para comprobar la pantalla de precarga del
+  mapa (ver más abajo) en vez de adivinar desde una imagen, y encontró el
+  bug real de raíz -se queda en el arnés para cualquier sospecha parecida
+  en el futuro-.
 
-## La pantalla de precarga del mapa (corregido 03-set-2026)
+## La pantalla de precarga del mapa (03-set-2026, arreglado en 4.9.59)
 
 Una nota anterior aquí decía que un servidor recién sembrado se quedaba
 parado porque no tenía teselas reales que servir. **Era falso** -medido a
@@ -72,10 +74,15 @@ ojo, esperando solo 60 s-. Con `diagnose-tiles.mjs` se comprobó de verdad:
 (`backend/app/routers/public.py`), funciona perfectamente (0 fallos en 300+
 peticiones seguidas), y las teselas se descargan de verdad a buen ritmo.
 
-El bug real es otro: el porcentaje que ve el jugador no refleja ese
-progreso -llegó a marcar "3.9%" y luego volvió a "0%" mientras las
-peticiones seguían subiendo sin parar-. Ver `docs/plan-de-mejora.md` §1.1
-para el detalle; no arreglado todavía.
+El bug real era otro: el porcentaje que veía el jugador no reflejaba ese
+progreso -se congelaba tras la primera actualización, mientras React
+seguía calculando el número correcto por dentro sin que llegara al DOM-.
+Arreglado con `key={pctFino}` en `SplashScreen.tsx` -fuerza a React a
+recrear ese nodo de texto en vez de intentar parchearlo, que es donde se
+atascaba-. Ver `docs/plan-de-mejora.md` §1.1b para el detalle completo,
+incluido lo que no se llegó a explicar del todo (el arreglo está
+verificado en la práctica, la causa última de por qué se atascaba
+justo ese nodo no).
 
 ## Por qué Chromium para los dos perfiles, incluido "iPhone"
 

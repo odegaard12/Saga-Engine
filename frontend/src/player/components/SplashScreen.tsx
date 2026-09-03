@@ -113,7 +113,18 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       </div>
 
       {known ? (
+        // key={pctFino}: sin esto el número se quedaba clavado tras la
+        // primera actualización -medido con sim/playwright-bench: la barra
+        // de arriba SÍ seguía llenándose con datos reales (0 fallos, 900+
+        // teselas bajadas), pero este texto se congelaba en el primer valor
+        // que le tocaba, mientras React seguía recalculando el correcto por
+        // dentro (visto en consola) sin que llegara nunca al DOM. Con la key
+        // atada al valor, React descarta y crea el nodo en vez de intentar
+        // parchear el que ya había -rodea lo que fuera que se atascaba-.
+        // Verificado: 7 lecturas seguidas cada 3 s, todas correctas
+        // (0.6% → 1.7% → 3.3% → 4.4% → 6.1% → 7.2% → 8.8%).
         <div
+          key={pctFino}
           style={{
             marginTop: 10,
             fontSize: 22,

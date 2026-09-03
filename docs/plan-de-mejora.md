@@ -31,6 +31,40 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.1b El "0%" de la precarga: encontrado y arreglado — ✅ en 4.9.59
+
+Cierra 1.1. "Sigue con todo, corrigiendo todos los errores" -y este era el
+más visible de los pendientes: lo primero que ve cualquier jugador nuevo-.
+
+Diagnóstico en tres pasos, cada uno más fino que el anterior, todos con
+`sim/playwright-bench` (no a ojo):
+1. Se instrumentó `prefetchMissionMapTiles`'s `onProgress` con un log
+   crudo: los números YA llegaban bien -`done` subía de 5 en 5, monótono,
+   sin saltos atrás, `total` fijo en 908-.
+2. Se instrumentó el punto de `PlayerApp.tsx` justo antes de pasarle
+   `progress` a `<SplashScreen>`: el `ratio` calculado ahí también era
+   correcto -3.85%, 4.4%, 4.95%... subiendo limpio-.
+3. Se instrumentó `SplashScreen.tsx` por dentro: `pctFino` se calculaba
+   bien EN CADA RENDER (visto en consola). Pero el `<div>{pctFino}%</div>`
+   del DOM se quedaba clavado en el primer valor que le tocó -mientras la
+   barra de progreso, la de al lado, SÍ seguía llenándose con los mismos
+   datos-. React recalculaba el número correcto por dentro y no lo dejaba
+   llegar a ese nodo del DOM.
+
+**Arreglo:** `key={pctFino}` en ese `<div>`. En vez de pedirle a React que
+parchee el texto de un nodo que ya existe -que es donde se atascaba, sea
+cual sea la razón exacta-, la key fuerza a que trate cada valor nuevo como
+un nodo distinto: lo tira y crea uno nuevo. Verificado con 7+ lecturas
+reales seguidas cada 3 s, todas correctas y subiendo: 0.6% → 1.7% → 3.3% →
+4.4% → 6.1% → 7.2% → 8.8%.
+
+No se llegó a la causa última -por qué React se atascaba parcheando ESE
+nodo en concreto y no la barra de al lado, que usa el mismo tipo de
+actualización-, y queda dicho con esas palabras: el arreglo está verificado
+en la práctica, no explicado del todo en la teoría. `diagnose-tiles.mjs`
+se queda en el arnés -sondeando cada 3 s- para cualquier sospecha parecida
+en el futuro.
+
 ## 1.2 Banco de pruebas: cobertura a saltos y "¿se guarda bien todo?" — ✅ en 4.9.58
 
 Pedido explícito, dos de los cuatro perfiles nuevos que se pidieron para el
