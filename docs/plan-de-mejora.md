@@ -31,6 +31,23 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.6 Relevo de equipo tenía el umbral de compañeros fijo en 2 — ✅ en 4.9.53
+
+Pregunta directa tras 4.9.51: "¿por qué dos jugadores y ni más?". Aclaración
++ arreglo: NO había un tope de dos -`cercanos` en `TeamRelayRuntimeScreen`
+ya recoge a TODOS los compañeros con latido `live` dentro del radio, sean 2,
+5 u 8-. Lo que sí estaba fijo era el **mínimo** para desbloquear
+(`requiredMembers = 2`, un número en el código, no en la configuración del
+nodo), lo que no tiene sentido para un grupo grande donde el organizador
+quiera exigir que se junten 3 o 4 de verdad.
+
+**Arreglo:** nuevo campo `required_members` en la config de team_relay
+(`SignalHuntConfig.required_members` en `family-types.ts`), editable por
+nodo desde el editor guiado del admin ("Compañeros necesarios"), con 2 como
+valor por defecto para no romper misiones ya guardadas sin el campo.
+
+Verificado: `tsc -b` y `vite build` limpios, suite 525/525.
+
 ## 0.5 Limpieza: un sistema entero de "controllers" muerto, y familias fantasma en el catálogo — ✅ en 4.9.52
 
 Pedido explícito: "borra familias antiguas, mal orden en juegos, organiza que no

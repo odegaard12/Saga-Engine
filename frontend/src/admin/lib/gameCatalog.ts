@@ -434,12 +434,14 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       'Necesita cobertura de AMBOS jugadores a la vez: cada uno ve al resto por el latido del servidor (cada pocos segundos), no hay nada que funcione sin señal. Si uno de los dos está sin cobertura en el punto de encuentro, el otro no lo detecta como "aquí" aunque esté al lado.',
     summary: 'Prueba pensada para varios jugadores o roles.',
     playerGoal: 'Coordinarse para llegar, registrar prueba o compartir pista.',
-    editorHint: 'Úsalo si quieres que varios jugadores participen.',
+    editorHint:
+      'Úsalo si quieres que varios jugadores participen. Sube "Compañeros necesarios" si es un grupo grande y quieres que se junten de verdad, no solo dos sueltos.',
     config: {
       objective: 'team_relay',
       source_radius_m: 80,
       lock_threshold: 60,
       hold_ms: 1500,
+      required_members: 2,
       game_id: 'team_relay',
     },
     content: 'El equipo debe coordinarse para completar esta parada.',
