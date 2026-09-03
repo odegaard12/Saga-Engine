@@ -10,6 +10,7 @@ const nombre = process.argv[2] || 'team-relay-cobertura'
 const escenarios = {
   'team-relay-cobertura': () => import('./scenarios/team-relay-cobertura.mjs'),
   'solo-screenshot': () => import('./scenarios/solo-screenshot.mjs'),
+  'diagnose-tiles': () => import('./scenarios/diagnose-tiles.mjs'),
 }
 
 const cargar = escenarios[nombre]

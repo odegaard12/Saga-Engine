@@ -1005,6 +1005,51 @@ async def run_simulation_endpoint(request: Request):
     return {"status": "ok", "report": informe}
 
 
+@router.post("/api/admin/simulation/long-session")
+async def run_long_session_pause_endpoint(request: Request):
+    """"¿Se guarda bien todo?": un jugador de mentira juega hasta la mitad
+    de la ruta, cierra esa sesión, y retoma con un token nuevo desde donde
+    dice el SERVIDOR que se quedó. Ver
+    backend/app/runtime/simulation_bench.py::simular_partida_larga_con_pausa."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    stages = main.get_runtime_stages()
+    if not stages:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "no hay nodos guardados: no hay ruta que simular"},
+        )
+
+    forzar = _as_bool(data.get("force"))
+    if not forzar:
+        en_marcha = main.simulation_bench_jugadores_reales_en_marcha()
+        if en_marcha:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "error",
+                    "detail": "hay jugadores de verdad con la ruta empezada",
+                    "players_in_progress": en_marcha,
+                },
+            )
+
+    dispositivo = _as_str(data.get("device") or "mixed").strip().lower()
+    punto_de_pausa = data.get("pause_at", 0.5)
+    try:
+        punto_de_pausa = max(0.1, min(0.9, float(punto_de_pausa)))
+    except (TypeError, ValueError):
+        punto_de_pausa = 0.5
+
+    informe = await main.run_long_session_pause_bench(dispositivo, punto_de_pausa)
+    return {"status": "ok", "report": informe}
+
+
 @router.post("/api/admin/simulation/cleanup")
 async def cleanup_simulation_endpoint(request: Request):
     """Borra el rastro (SIM_*) que deja el banco de pruebas: nivel, cronómetros
