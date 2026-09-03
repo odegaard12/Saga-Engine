@@ -14,6 +14,7 @@ import {
   adminGameCatalog,
   getAdminGameForStage,
   getDefaultAdminStagePatchForGame,
+  sortedByCategoryForDisplay,
   type AdminGameId,
 } from '../lib/gameCatalog'
 
@@ -33,11 +34,20 @@ function normalizeLegacyNodeCopy(value?: unknown) {
 type DrawerTab = 'basics' | 'game' | 'requirement' | 'messages'
 
 function isPlayableAdminGame(game: { runtimeStatus: string; offlineStatus: string }) {
-  return game.runtimeStatus === 'runtime_ready' && game.offlineStatus === 'offline_ready'
+  // offline_partial cuenta como jugable -significa "con un matiz real, ya
+  // escrito en offlineNote", no "no funciona"-. Solo offline_planned (el
+  // juego aún no está listo) lo saca del selector. Antes exigía
+  // offline_ready a secas: cuando team_relay pasó a offline_partial (4.9.51,
+  // necesita cobertura de los dos jugadores a la vez, cierto pero no motivo
+  // para esconderlo) desapareció sin querer del selector de "añadir juego" -
+  // solo seguía viéndose al editar un nodo YA creado con ese tipo-.
+  return game.runtimeStatus === 'runtime_ready' && game.offlineStatus !== 'offline_planned'
 }
 
 function getVisibleAdminGames(selectedGameId: string) {
-  return adminGameCatalog.filter((game) => isPlayableAdminGame(game) || game.id === selectedGameId)
+  return sortedByCategoryForDisplay(
+    adminGameCatalog.filter((game) => isPlayableAdminGame(game) || game.id === selectedGameId)
+  )
 }
 
 function buildFallbackCodeForStage(stage: AdminReactOverviewStage) {

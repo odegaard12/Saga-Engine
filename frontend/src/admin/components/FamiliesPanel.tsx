@@ -1,5 +1,7 @@
 import { familyCards } from '../lib/familyConfigs'
-import { adminGameCatalog } from '../lib/gameCatalog'
+import { adminGameCatalog, sortedByCategoryForDisplay } from '../lib/gameCatalog'
+
+const juegosOrdenados = sortedByCategoryForDisplay(adminGameCatalog)
 
 export default function FamiliesPanel() {
   return (
@@ -11,7 +13,7 @@ export default function FamiliesPanel() {
       </span>
 
       <div className="admin-local-list">
-        {adminGameCatalog.map((game) => (
+        {juegosOrdenados.map((game) => (
           <div key={game.id} className="admin-local-row static admin-game-list-row">
             <span>
               {game.icon} {game.title}
