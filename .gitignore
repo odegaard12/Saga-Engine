@@ -115,3 +115,10 @@ frontend/dist/
 # Y ninguna distribucion de Node dentro del repositorio: son 85 MB que paga
 # cada clon para siempre. Si hace falta Node en Windows, se instala en Windows.
 node-v*/
+
+# sim/playwright-bench: arnes de pruebas con navegadores de verdad. node_modules
+# se instala local (playwright descarga ademas ~300 MB de navegadores, ver su
+# README), y las capturas de cada corrida son evidencia de UNA prueba, no algo
+# que versionar.
+sim/playwright-bench/node_modules/
+sim/playwright-bench/out/*.png
