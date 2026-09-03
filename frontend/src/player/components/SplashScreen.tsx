@@ -69,13 +69,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         {/* El resplandor de fuego: quieto. Ver la nota de abajo. */}
         <span className="saga-splash-halo" />
         <img
-          src="/saga-app-icon-192.png"
+          src="/saga-app-icon-192.png?v=redondo"
           alt="SAGA"
           style={{
             position: 'relative',
             width: 116,
             height: 116,
-            borderRadius: 'var(--theme-radius-panel)',
+            // Redondo de verdad, no la esquina cortada del tema. El icono
+            // en sí ya venía a sangre completa hasta el borde -lo pedía la
+            // especificación de iconos "maskable" del manifest, ver
+            // saga-app-icon.svg-, así que recortarlo en redondo aquí no
+            // corta nada importante: el dibujo ya vive dentro de la zona
+            // segura central.
+            borderRadius: '50%',
             boxShadow: '0 10px 40px rgba(0,0,0,.55)',
             animation: 'sagaSplashPulse 2.4s infinite ease-in-out',
           }}
