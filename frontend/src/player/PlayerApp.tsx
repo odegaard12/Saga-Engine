@@ -294,7 +294,12 @@ export default function PlayerApp() {
   const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
 
   const addTrackerPoint = useGpsTracker((s) => s.addPoint)
-  const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
+  // En el store compartido, no en un useState suelto: los minijuegos de
+  // equipo -Relevo de Equipo- necesitan saber dónde va el resto del grupo,
+  // y antes no había forma de que llegaran hasta ahí. Ver la nota en
+  // usePlayerStore.ts.
+  const teamProfiles = usePlayerStore((s) => s.teamProfiles)
+  const setTeamProfiles = usePlayerStore((s) => s.setTeamProfiles)
 
   // La mochila vive en localStorage y cambia sin que React se entere (al forjar
   // en la mesa de trabajo o al recoger un objeto). Sin este latido, el botón del
