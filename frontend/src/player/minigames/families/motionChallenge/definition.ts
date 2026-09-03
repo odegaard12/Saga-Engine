@@ -1,10 +1,6 @@
 import type { MotionChallengeConfig } from '../../core/family-types'
 import type { MotionChallengeDefinition } from '../../core/registry-types'
-import type {
-  MinigameController,
-  MinigamePreflightResult,
-  MinigameRuntimeBindings,
-} from '../../core/types'
+import type { MinigamePreflightResult, MinigameRuntimeBindings } from '../../core/types'
 
 export const motionChallengeDefinition: MotionChallengeDefinition = {
   family: 'motion_challenge',
@@ -142,9 +138,4 @@ async function runMotionChallengePreflight(
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Reto de movimiento listo.'],
   }
-}
-
-export const motionChallengeController: MinigameController<MotionChallengeConfig> = {
-  validateConfig: validateMotionChallengeConfig,
-  runPreflight: runMotionChallengePreflight,
 }

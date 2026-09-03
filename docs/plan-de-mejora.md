@@ -31,6 +31,52 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.5 Limpieza: un sistema entero de "controllers" muerto, y familias fantasma en el catálogo — ✅ en 4.9.52
+
+Pedido explícito: "borra familias antiguas, mal orden en juegos, organiza que no
+haya duplicados o cosas raras". Auditoría de `frontend/src/player/minigames/core/`
+y `frontend/src/admin/lib/gameCatalog.ts`, verificando cada hallazgo por nombre
+de export (no solo por ruta de fichero, que puede esconder un re-export via
+barrel) antes de tocar nada.
+
+**Muerto de verdad, borrado:** `core/registry.ts` (el `MINIGAME_REGISTRY` y
+`getRegisteredMinigame` no los importaba nadie, ni siquiera vía el barrel
+`core/index.ts`) y el tipo `RegisteredMinigame` en `registry-types.ts`. Cada
+`definition.ts` de familia (circuitMatrix, bearingHunt, signalHunt,
+motionChallenge) tenía un `xxxController` construido solo para ese registro
+muerto — se borra el wrapper, pero se dejan las funciones
+`validateXConfig`/`runXPreflight` que hay debajo: son comprobaciones de
+permisos/sensores reales, nunca conectadas al runtime, candidatas a usar
+cuando se audite bearing_hunt/motion_challenge en profundidad. También caen
+`MinigameController`, `MinigameCompletionPayload` y `MinigameRuntimeState` de
+`core/types.ts`, sin ningún consumidor en todo el árbol.
+
+**Catálogo del admin, dos hallazgos reales:**
+
+1. `AdminGameId` tenía 4 ids -`gps_signal_lock`, `hot_cold_search`,
+   `bearing_compass`, `three_bearing_triangle`- que no aparecían en
+   `adminGameCatalog` ni en ningún otro sitio del repo: puro ruido de tipos.
+   Borrados.
+2. `shake_antenna_charge` sí es real -es el `game_id` por defecto de la
+   familia `motion_challenge`, usado en tres sitios de `AdminApp.tsx`-, pero
+   **no tiene entrada en `adminGameCatalog`**, así que `getAdminGame()` cae
+   siempre al primer juego de la lista. Y en el jugador,
+   `runtime-bridge.ts` redirige cualquier config con ese `game_id` a
+   `circuit_matrix`/`logic_circuit` ANTES de mirar la familia real, mientras
+   que `InteractionSheet.tsx` lo trata como confirmación de que SÍ es
+   `motion_challenge`. Contradicción entre dos ficheros del mismo runtime:
+   documentado con un comentario en el tipo, no arreglado todavía -toca
+   decidir diseño de juego, no es limpieza mecánica-. Queda como el primer
+   punto de la auditoría de `bearing_hunt`/`motion_challenge`.
+
+`team_relay`: el `offlineNote` y `offlineStatus` del catálogo describían el
+mecanismo Yjs que se borró en 4.9.51. Corregidos para decir lo que pasa de
+verdad: necesita cobertura de los dos jugadores a la vez, no es
+`offline_ready`, es `offline_partial`.
+
+Verificado: `tsc -b` y `vite build` limpios (211 módulos, uno menos),
+525/525 en la suite.
+
 ## 0.4 Relevo de Equipo (multijugador) nunca podía completarse — ✅ en 4.9.51
 
 Auditando el catálogo de minijuegos tras pedir "unos 10 juegos nuevos, si
