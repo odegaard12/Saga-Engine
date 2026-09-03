@@ -31,6 +31,63 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.0 bearing_hunt y motion_challenge: auditados y dados de alta — ✅ en 4.9.57
+
+Pedido explícito: auditar estas dos familias antes de diseñar minijuegos
+nuevos. Las dos tenían motor, pantalla (bien construida en los dos casos:
+permisos de sensor en iOS, reserva táctil/manual cuando el sensor no
+responde) y hasta el editor sabía construir su config -pero **ninguna tenía
+entrada en `adminGameCatalog`**, así que ningún organizador podía crear un
+nodo de ese tipo desde el panel-. La auditoría encontró dos bugs reales,
+además del hueco de catálogo:
+
+**1. `shake_antenna_charge` (arrastraba desde 4.9.52, ver 0.5): confirmado y
+arreglado.** Era el `game_id` por defecto de `motion_challenge`, pero esa
+misma cadena la usa `runtime-bridge.ts` (jugador) para redirigir misiones
+VIEJAS de `signal_hunt` a `circuit_matrix`/`logic_circuit` -una migración
+real, de antes de que existiera esta familia-. Cualquier nodo
+`motion_challenge` con el valor de siempre acababa mostrando un puzle de
+circuitos en vez del reto de movimiento. Verificado que ningún dato real en
+producción usaba esa cadena (`grep` sobre `saga.sqlite3`, 0 resultados)
+antes de renombrar: `shake_charge`, sin colisión, en los 8 sitios que lo
+usaban (frontend y backend). Los dos sitios que SÍ necesitaban seguir
+diciendo `shake_antenna_charge` -el redirect legacy y su equivalente en el
+admin- se quedan como estaban, documentados con comentarios para que no se
+vuelvan a confundir.
+
+**2. `bearing_hunt` nunca leía su propia configuración.** `RuntimeScreen.tsx`
+busca el rumbo objetivo y la tolerancia con una lista de nombres de campo
+alternativos (`targetBearing`, `target_bearing`, `tolerance`,
+`toleranceDeg`...) que **no incluía los nombres reales**
+(`target_bearing_deg`, `tolerance_deg`, ver `family-types.ts` y
+`getDefaultAdminConfigForFamily`). Daba igual lo que configurara un
+organizador: el juego siempre pedía apuntar a 90° con ±18°. Arreglado
+añadiendo los nombres reales a la lista de búsqueda.
+
+**3. `motion_challenge` ignoraba `difficulty`.** El editor ya dejaba
+tocarlo -aparece en la lista de campos de cualquier juego de categoría
+"motion"-, pero `RuntimeScreen.tsx` usaba constantes fijas
+(pulsos objetivo, sensibilidad) sin mirar la config. Arreglado: fácil/normal/
+difícil ahora escalan pulsos objetivo y sensibilidad de verdad. El resto de
+números del formulario (energía objetivo, calor, ritmo de carga...) siguen
+sin conectar -se ha quitado del catálogo lo que no hace nada, para no
+prometer un control que no hay, y queda anotado en el `editorHint` de la
+entrada-.
+
+Dadas de alta en `adminGameCatalog`: `shake_charge` ("Cargar antena") y
+`bearing_hunt` ("Caza de rumbo"), con su config real y honesta sobre qué
+está conectado.
+
+**Verificación parcial, dicho con todas las letras:** `tsc -b`, `vite
+build` y la suite completa (533/533) pasan limpios, y el código se leyó con
+cuidado -no a ojo, comparando nombre de campo contra nombre de campo-. Lo
+que NO se pudo verificar en vivo esta vez: cómo se ve/juega cada nodo de
+verdad en el navegador. El servidor de pruebas suelto tarda varios minutos
+en la pantalla de precarga del mapa (0.7/0.9) porque no tiene teselas reales
+que servir, y no llegó a completarse ni esperando 60 s. Pendiente para la
+próxima sesión con `sim/playwright-bench`: un servidor con mapa ya
+cacheado, o un perfil persistente de Playwright.
+
 ## 0.9 El icono no era "maskable" de verdad — ✅ en 4.9.56
 
 Feedback sobre la 4.9.55: "el icono cuadrado sobre ese círculo redondo... o

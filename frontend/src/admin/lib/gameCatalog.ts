@@ -8,15 +8,17 @@ import {
 
 export type AdminGameId =
   | 'simple_checkpoint'
-  // 'shake_antenna_charge' es el game_id real de motion_challenge (ver
-  // motionChallenge/definition.ts), pero NO tiene entrada en
-  // adminGameCatalog: getAdminGame('shake_antenna_charge') siempre cae al
-  // primer juego del catálogo. Además, en el player, runtime-bridge.ts
-  // redirige cualquier config con este game_id a circuit_matrix/logic_circuit
-  // ANTES de mirar la familia real -así que ni admin puede crear el nodo bien
-  // ni el jugador lo vería como Motion Challenge si existiera. No lo borro
-  // del tipo (main.py todavía puede tener misiones viejas con este id) pero
-  // no lo trato como "listo": falta el catálogo Y arreglar ese choque.
+  // El game_id real de motion_challenge. Antes era 'shake_antenna_charge' -
+  // colisionaba con la migración legacy de abajo, así que un nodo
+  // motion_challenge acababa mostrando un puzle de circuitos-. Renombrado,
+  // ver motionChallenge/definition.ts.
+  | 'shake_charge'
+  | 'bearing_hunt'
+  // Marca legacy: misiones de antes de que existiera circuit_matrix. NO es
+  // el game_id de ningún juego actual -runtime-bridge.ts (jugador) y
+  // getAdminGameForStage (aquí abajo) la redirigen las dos a logic_circuit-.
+  // Se mantiene el tipo por si alguna misión vieja de verdad la sigue
+  // usando; no tiene entrada propia en adminGameCatalog a propósito.
   | 'shake_antenna_charge'
   | 'logic_circuit'
   | 'sequence_code'
@@ -534,6 +536,87 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       locked: 'Carga la barra completamente para continuar.',
     },
   },
+  {
+    // Familia motion_challenge: existía el motor, la pantalla y hasta el
+    // editor sabía construir su config -pero sin entrada en este catálogo
+    // nadie podía crear el nodo desde el admin-. Añadido tras auditar
+    // shake_antenna_charge (ver el comentario de AdminGameId más arriba).
+    id: 'shake_charge',
+    title: 'Cargar antena',
+    icon: '📳',
+    family: 'motion_challenge',
+    category: 'motion',
+    difficulty: 'Media',
+    duration: '1-2 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'motion',
+    offlineNote:
+      'El acelerómetro y la validación funcionan offline en local, con reserva táctil si el sensor falla o no existe.',
+    summary: 'Sacudir el móvil en pulsos cortos y separados para cargar una antena, sin sobrecalentarla.',
+    playerGoal: 'Cargar la antena con pulsos de movimiento cortos, sin pasarse de fuerte.',
+    editorHint:
+      'Dificultad y tiempo límite se aplican de verdad. El resto de números (energía objetivo, calor, ritmo de carga...) todavía los decide el propio motor del juego, no el editor -pendiente de conectar, no se muestran para no prometer un control que no hay-.',
+    config: {
+      objective: 'shake_charge',
+      game_id: 'shake_charge',
+      difficulty: 'normal',
+      duration_mode: 'normal',
+      penalty_mode: 'normal',
+      allow_touch_fallback: true,
+      energy_target: 100,
+      time_limit_ms: 35000,
+      calibration_ms: 1000,
+      good_min: 1.2,
+      good_max: 3.8,
+      overcharge_threshold: 5.4,
+      idle_decay: 0.15,
+      charge_rate: 2.4,
+      stability_min: 35,
+      use_vibration: true,
+    },
+    content: 'Sacude el móvil para cargar la antena. Pulsos cortos, no aporrees.',
+    messages: {
+      hint: 'Golpes breves y separados. Quieto no carga, muy fuerte sobrecalienta.',
+      gps_unavailable: 'Este reto puede jugarse sin GPS si el nodo ya está abierto.',
+      locked: 'Carga la antena para continuar.',
+    },
+  },
+  {
+    // Familia bearing_hunt: mismo caso que motion_challenge, sin entrada en
+    // el catálogo. Auditado antes de añadirla: target_bearing_deg y
+    // tolerance_deg NUNCA llegaban al runtime -RuntimeScreen.tsx buscaba
+    // 'target_bearing'/'tolerance', no los nombres reales del campo-,
+    // arreglado en el mismo commit que esta entrada.
+    id: 'bearing_hunt',
+    title: 'Caza de rumbo',
+    icon: '🧭',
+    family: 'bearing_hunt',
+    category: 'compass',
+    difficulty: 'Media',
+    duration: '1-3 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'bearing',
+    offlineNote: 'La brújula del móvil funciona sin conexión; solo hace falta el sensor de orientación.',
+    summary: 'Girar el móvil hasta apuntar al rumbo objetivo y mantenerlo unos segundos.',
+    playerGoal: 'Girar hasta que la aguja entre en la ventana del rumbo objetivo y aguantar quieto.',
+    editorHint:
+      'Ajusta el rumbo objetivo (0-359°) y el margen de tolerancia. En iPhone pide permiso de orientación con un toque; si el sensor no responde, hay una prueba manual con deslizador.',
+    config: {
+      objective: 'single_lock',
+      game_id: 'bearing_hunt',
+      target_bearing_deg: 270,
+      tolerance_deg: 12,
+      hold_ms: 1200,
+    },
+    content: 'Gira el móvil hasta apuntar en la dirección correcta y mantente quieto unos segundos.',
+    messages: {
+      hint: 'Observa los grados que se muestran: gira hacia el lado que indique.',
+      gps_unavailable: 'Este reto no necesita GPS, solo la brújula del móvil.',
+      locked: 'Bloquea el rumbo para continuar.',
+    },
+  },
 ]
 
 export const missionTemplates: MissionTemplate[] = [
@@ -736,11 +819,12 @@ export function getAdminGameForStage(
   explicit = adminGameCatalog.find((game) => game.id === type)
   if (explicit) return explicit
 
-  // Legacy: signal_hunt sin game_id ya no debe caer en QR físico.
+  // Legacy: signal_hunt sin game_id ya no debe caer en QR físico. La misma
+  // migración que runtime-bridge.ts hace en el jugador: al puzle de
+  // circuitos, no a un catálogo con la etiqueta 'shake_antenna_charge' que
+  // nunca existió como preset propio.
   if (type === 'signal_hunt') {
-    return (
-      adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
-    )
+    return adminGameCatalog.find((game) => game.id === 'logic_circuit') || adminGameCatalog[0]
   }
 
   return (
