@@ -31,6 +31,29 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.3 El banco de pruebas ya simula un corte de cobertura a mitad de ruta — ✅ en 4.9.50
+
+Pedido explícito: "¿se puede simular cortes de cobertura, y qué pasaría al
+completar juegos en una zona sin cobertura y al volver a tenerla?". Hasta
+4.9.49 el banco sólo tenía perfiles de "todo o nada" -toda la ruta online o
+toda offline-, que no prueba el caso real de una vaguada o un bosque
+cerrado: un tramo muerto en medio de una ruta que por lo demás tiene
+cobertura.
+
+Perfil nuevo `corte`: los nodos del 35 % al 65 % de la ruta se juegan y se
+completan en LOCAL -sin mandar nada-, y se suben de golpe, en un único lote
+a `/api/events/sync`, en cuanto el siguiente nodo ya está fuera de la
+franja. Antes y después del corte va con cobertura mala normal. El informe
+de cada jugador dice exactamente qué nodos cayeron en la franja
+(`nodos_en_corte`), para poder comprobar que el lote que sube es ése y no
+otro.
+
+Verificado en vivo contra una misión de 10 nodos: 4 avances directos, un
+único lote con los nodos 5-6-7, y 3 avances directos más -nivel final 10/10,
+cero errores-. El caso `sin_cobertura` de siempre no cambia de
+comportamiento: es el mismo mecanismo con la franja puesta a toda la ruta
+(0.0-1.0).
+
 ## 0.2 Un minijuego con premio se volvía ilegible al reabrirlo — ✅ en 4.9.49
 
 Auditando el editor guiado de nodos (`AdminGameEditor.tsx` /

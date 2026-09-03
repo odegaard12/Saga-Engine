@@ -9,6 +9,7 @@ interface InformeJugador {
   nodos_esperados: number
   errores: string[]
   peticiones: Array<{ tipo: string; estado: number | string; ms: number }>
+  nodos_en_corte: number[]
 }
 
 interface Informe {
@@ -133,6 +134,7 @@ export default function SimulationBenchPanel() {
               <option value="buena">Buena</option>
               <option value="mala">Mala (lenta, algún eco)</option>
               <option value="inestable">Inestable (lenta y con ecos)</option>
+              <option value="corte">Corte a mitad de ruta (vaguada, tramo sin señal)</option>
               <option value="sin_cobertura">Sin cobertura (todo por la cola offline)</option>
             </select>
           </label>
@@ -206,6 +208,7 @@ export default function SimulationBenchPanel() {
                 <tr>
                   <th style={th}>Jugador</th>
                   <th style={th}>Nivel final</th>
+                  <th style={th}>Corte</th>
                   <th style={th}>Duración</th>
                   <th style={th}>Peticiones</th>
                   <th style={th}>Errores</th>
@@ -217,6 +220,11 @@ export default function SimulationBenchPanel() {
                     <td style={td}>{jugador.nombre}</td>
                     <td style={td}>
                       {jugador.nivel_final} / {jugador.nodos_esperados}
+                    </td>
+                    <td style={td}>
+                      {jugador.nodos_en_corte && jugador.nodos_en_corte.length > 0
+                        ? `nodos ${jugador.nodos_en_corte.map((n) => n + 1).join(', ')}`
+                        : '—'}
                     </td>
                     <td style={td}>{(jugador.duracion_ms / 1000).toFixed(1)} s</td>
                     <td style={td}>{jugador.peticiones.length}</td>
