@@ -55,23 +55,27 @@ ignoradas por git — son evidencia de una corrida, no algo que versionar).
   jugador, no lo que sabe el servidor- en tres momentos: al llegar, durante
   el corte, y tras recuperar cobertura. Si no hay ningún nodo `team_relay`
   en la misión activa, falla con un mensaje claro en vez de simular nada.
+- **`solo-screenshot`**: un jugador, una captura. No comprueba nada, es para
+  verificar algo puntual (colores, un icono, un layout) sin montar un
+  escenario completo. Variables: `NOMBRE_SALIDA`, `ESPERA_MS`.
+- **`diagnose-tiles`**: lee, cada 15 s, el texto real del DOM Y las
+  peticiones de red reales -no una captura- mientras carga un jugador. Se
+  construyó para comprobar la pantalla de precarga del mapa (ver más abajo)
+  en vez de adivinar desde una imagen.
 
-## Limitación encontrada (03-set-2026): la pantalla de precarga del mapa
+## La pantalla de precarga del mapa (corregido 03-set-2026)
 
-Un servidor recién sembrado, sin teselas de mapa cacheadas en disco,
-se queda parado en la pantalla "Primera vez: se guarda el mapa" al 0% —
-`frontend/src/player/offline/mapTileCache.ts` pide un radio de 30 km a varios
-zooms antes de dejar jugar, y si `/map-tiles/{z}/{x}/{y}.png` no tiene nada
-que servir, se queda reintentando sin avisar de que algo va mal. No es un bug
-de este arnés: es el comportamiento real de la app protegiendo el juego
-offline, y aquí se ve exactamente igual que lo vería un móvil de verdad -que
-es el punto-.
+Una nota anterior aquí decía que un servidor recién sembrado se quedaba
+parado porque no tenía teselas reales que servir. **Era falso** -medido a
+ojo, esperando solo 60 s-. Con `diagnose-tiles.mjs` se comprobó de verdad:
+`/map-tiles/{z}/{x}/{y}.png` es un proxy en vivo a ArcGIS World Imagery
+(`backend/app/routers/public.py`), funciona perfectamente (0 fallos en 300+
+peticiones seguidas), y las teselas se descargan de verdad a buen ritmo.
 
-Para escenarios que necesiten llegar más allá de la pantalla de carga:
-correr esto contra un servidor con teselas ya cacheadas (no uno recién
-sembrado desde cero), o -pendiente- añadir un `storageState`/perfil
-persistente de Playwright para que la caché de teselas sobreviva entre
-corridas y solo se pague una vez.
+El bug real es otro: el porcentaje que ve el jugador no refleja ese
+progreso -llegó a marcar "3.9%" y luego volvió a "0%" mientras las
+peticiones seguían subiendo sin parar-. Ver `docs/plan-de-mejora.md` §1.1
+para el detalle; no arreglado todavía.
 
 ## Por qué Chromium para los dos perfiles, incluido "iPhone"
 

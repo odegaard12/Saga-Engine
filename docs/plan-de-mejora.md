@@ -31,6 +31,42 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.1 🔴 La precarga del mapa SÍ descarga teselas reales — el "0%" es el bug
+
+Corrige lo dicho en 0.7 y en el cierre de 1.0: ahí se concluyó "el servidor
+de pruebas no tiene teselas reales que servir" tras esperar 60 s sin ver
+avanzar el número. Era una conclusión a ojo, sin medir lo suficiente -y
+estaba mal-. Pedido directo: "debes crear sistema para que tengas teselas
+reales... o hacer algo". Se construyó el "algo": un escenario de diagnóstico
+(`sim/playwright-bench`, `diagnose-tiles.mjs`) que lee las peticiones de red
+reales y el texto del DOM cada 15 s, en vez de adivinar desde una captura.
+
+**Lo que mide de verdad:** `/map-tiles/{z}/{x}/{y}.png` es un proxy en vivo a
+ArcGIS World Imagery (`backend/app/routers/public.py`), no una caché local -
+y funciona perfectamente: 0 fallos en más de 300 peticiones seguidas,
+~0.3-0.5 s cada una, tanto en directo (`curl` a ArcGIS) como a través del
+proxy del propio servidor. El mapa SÍ se está descargando de verdad, tesela
+a tesela, a buen ritmo.
+
+**El bug real:** el porcentaje que ve el jugador no refleja ese progreso.
+Medido con el mismo escenario: a los 15 s marcaba "3.9%" -un número real-,
+a los 30 s había vuelto a "0%", y se quedó en "0%" el resto de la prueba
+mientras las peticiones de red seguían subiendo sin parar (111 teselas
+servidas a los 45 s). El indicador no solo se congela: puede **retroceder**.
+Todo apunta a `PlayerApp.tsx` llamando a `guardarMapa()`/
+`prefetchMissionMapTiles()` más de una vez para la misma carga -un remount
+o una repetición del efecto reinicia `{done: 0, total: ...}` mientras la
+descarga anterior sigue viva de fondo, sin cancelarse de verdad-, pero la
+causa exacta del remount no está confirmada todavía: hace falta seguir
+mirando `PlayerApp.tsx` alrededor del efecto con dependencia `[user]`
+(líneas ~493-630) antes de tocar nada.
+
+**No arreglado esta vez** -es un hallazgo nuevo, no estaba en el plan de
+hoy, y merece su propia sesión con cuidado en vez de un parche a última
+hora-. Impacto real: es la pantalla que ve TODO jugador nuevo la primera
+vez, y le dice "esto no avanza" cuando sí está avanzando. Prioridad alta
+para la próxima.
+
 ## 1.0 bearing_hunt y motion_challenge: auditados y dados de alta — ✅ en 4.9.57
 
 Pedido explícito: auditar estas dos familias antes de diseñar minijuegos
