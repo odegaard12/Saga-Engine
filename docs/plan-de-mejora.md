@@ -31,6 +31,31 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.8 La pantalla de carga en fuego: tres geometrías compitiendo — ✅ en 4.9.55
+
+Feedback directo con la primera captura real de esta sesión: "pantalla de
+carga fea, sobre todo el icono cuadrado sobre ese círculo redondo". La
+captura que se mandó resultó ser del tema por defecto (glass/classic) del
+servidor de pruebas suelto, no de fuego -producción tiene `player_theme:
+"flame-red"`, verificado contra la Pi antes de tocar nada, para no acabar
+editando el tema que no se toca-. Con eso corregido, se repitió la captura
+en fuego de verdad (`sim/playwright-bench`, escenario `solo-screenshot`
+nuevo) y el problema seguía ahí, más claro incluso: el icono (que ya trae su
+propio anillo redondo dibujado dentro) llevaba ADEMÁS un marco de esquina
+cortada alrededor -pensado para reemplazar los aros girando de glass sin
+meter otro círculo-, y las dos geometrías competían. Tres formas a la vez:
+bastidor anguloso, panel cuadrado de esquinas redondeadas, círculo del
+icono.
+
+**Arreglo:** se quita el marco. En su lugar, un resplandor -sin bordes, sin
+esquinas, un brillo de ascua difuminado detrás del icono que respira en vez
+de girar o competir en forma-. El icono en sí no se toca -es el icono real
+de la PWA, cambiarlo es una tarea de diseño de marca aparte, no una
+corrección de CSS-.
+
+Verificado con captura real antes/después contra el tema de producción, no
+a ojo. Suite completa 533/533 (cambio solo de frontend).
+
 ## 0.7 Segundo banco de pruebas: navegadores de verdad (Playwright) — ✅ en 4.9.54
 
 Pedido explícito: "¿puede incorporarse tecnologías punteras de simulaciones
