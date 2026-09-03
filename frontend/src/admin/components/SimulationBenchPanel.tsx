@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { cleanupSimulationBench, runSimulationBench } from '../lib/adminApi'
+import { cleanupSimulationBench, runLongSessionPauseBench, runSimulationBench } from '../lib/adminApi'
 
 interface InformeJugador {
   nombre: string
@@ -27,6 +27,16 @@ interface Informe {
 
 type Estado = 'idle' | 'running' | 'done' | 'blocked' | 'error'
 
+interface InformePartidaLarga {
+  nombre: string
+  device: string
+  stage_count: number
+  punto_de_pausa: number
+  nivel_tras_pausa: number
+  nivel_final: number
+  errores: string[]
+}
+
 /**
  * El banco de pruebas, enganchado al panel.
  *
@@ -49,6 +59,37 @@ export default function SimulationBenchPanel() {
   const [jugadoresEnMarcha, setJugadoresEnMarcha] = useState<string[]>([])
   const [limpiando, setLimpiando] = useState(false)
   const [limpiado, setLimpiado] = useState<string[] | null>(null)
+
+  const [estadoLarga, setEstadoLarga] = useState<Estado>('idle')
+  const [informeLarga, setInformeLarga] = useState<InformePartidaLarga | null>(null)
+  const [avisoLarga, setAvisoLarga] = useState<string>('')
+  const [jugadoresEnMarchaLarga, setJugadoresEnMarchaLarga] = useState<string[]>([])
+
+  async function ejecutarPartidaLarga(forzar: boolean) {
+    setEstadoLarga('running')
+    setAvisoLarga('')
+
+    const { httpStatus, data } = await runLongSessionPauseBench({
+      device,
+      pause_at: 0.5,
+      force: forzar,
+    })
+
+    if (httpStatus === 409) {
+      setEstadoLarga('blocked')
+      setJugadoresEnMarchaLarga(data?.players_in_progress || [])
+      return
+    }
+
+    if (httpStatus !== 200 || data?.status !== 'ok') {
+      setEstadoLarga('error')
+      setAvisoLarga(data?.detail || `HTTP ${httpStatus}`)
+      return
+    }
+
+    setInformeLarga(data.report)
+    setEstadoLarga('done')
+  }
 
   async function ejecutar(forzar: boolean) {
     setEstado('running')
@@ -135,6 +176,7 @@ export default function SimulationBenchPanel() {
               <option value="mala">Mala (lenta, algún eco)</option>
               <option value="inestable">Inestable (lenta y con ecos)</option>
               <option value="corte">Corte a mitad de ruta (vaguada, tramo sin señal)</option>
+              <option value="a_saltos">A saltos (entra y sale de cobertura toda la ruta)</option>
               <option value="sin_cobertura">Sin cobertura (todo por la cola offline)</option>
             </select>
           </label>
@@ -238,6 +280,74 @@ export default function SimulationBenchPanel() {
           </div>
         </section>
       )}
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong>¿Se guarda bien todo?</strong>
+          <span>
+            Partida larga con una pausa real en medio: un jugador llega hasta la mitad de la
+            ruta, cierra esa sesión -como quien se queda sin batería-, y retoma con una sesión
+            nueva desde donde dice el servidor que se quedó. Usa el dispositivo elegido arriba.
+          </span>
+        </div>
+
+        <div style={filaBotones}>
+          <button
+            type="button"
+            style={botonSecundario}
+            disabled={estadoLarga === 'running'}
+            onClick={() => ejecutarPartidaLarga(false)}
+          >
+            {estadoLarga === 'running' ? 'Corriendo…' : '⏸️ Probar pausa y retomar'}
+          </button>
+        </div>
+
+        {estadoLarga === 'blocked' && (
+          <div style={avisoBloqueo}>
+            <strong>⚠️ Hay jugadores de verdad con la ruta empezada:</strong>{' '}
+            {jugadoresEnMarchaLarga.join(', ')}.
+            <div style={{ marginTop: 8 }}>
+              <button type="button" style={botonSecundario} onClick={() => ejecutarPartidaLarga(true)}>
+                Lanzar de todos modos
+              </button>
+            </div>
+          </div>
+        )}
+
+        {estadoLarga === 'error' && <p style={notaError}>{avisoLarga}</p>}
+
+        {informeLarga && (
+          <div style={resumenGrid}>
+            <div style={tarjetaResumen}>
+              <div style={tarjetaLabel}>Pausa en el nodo</div>
+              <div style={tarjetaValor}>{informeLarga.punto_de_pausa}</div>
+            </div>
+            <div style={tarjetaResumen}>
+              <div style={tarjetaLabel}>Nivel tras la pausa</div>
+              <div style={tarjetaValor}>
+                {informeLarga.nivel_tras_pausa} / {informeLarga.punto_de_pausa}
+              </div>
+            </div>
+            <div style={tarjetaResumen}>
+              <div style={tarjetaLabel}>Nivel final</div>
+              <div style={tarjetaValor}>
+                {informeLarga.nivel_final} / {informeLarga.stage_count}
+              </div>
+            </div>
+            <div
+              style={{
+                ...tarjetaResumen,
+                ...(informeLarga.errores.length ? tarjetaResumenMal : tarjetaResumenBien),
+              }}
+            >
+              <div style={tarjetaLabel}>Resultado</div>
+              <div style={{ ...tarjetaValor, fontSize: 14 }}>
+                {informeLarga.errores.length ? informeLarga.errores.join(' · ') : '✓ se guardó bien'}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

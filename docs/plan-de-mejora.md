@@ -31,6 +31,57 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.2 Banco de pruebas: cobertura a saltos y "¿se guarda bien todo?" — ✅ en 4.9.58
+
+Pedido explícito, dos de los cuatro perfiles nuevos que se pidieron para el
+banco (versión de app vieja y offline-descargado-antes quedan para la
+próxima, ver abajo):
+
+**Cobertura "a saltos"**: no un tramo muerto -eso ya lo hacía "corte"-,
+sino entrar y salir de cobertura VARIAS veces en la misma ruta -el camino
+con árboles a un lado, sombra de antena a ratos-. Nuevo perfil
+`patron_saltos: (3, 1)` -de cada 3 nodos, 1 sin cobertura-: resultó que la
+lógica de vaciar la cola ya estaba escrita de forma genérica (se vacía
+cada vez que se vuelve a cobertura, no solo la primera), así que solo hizo
+falta enseñarle a `sin_cobertura_en` a mirar un patrón además de un tramo
+único. Verificado con una ruta de 9 nodos: tres grupos separados
+(`nodos_en_corte == [0, 3, 6]`), tres lotes de `events_sync` distintos, no
+uno.
+
+**"¿Se guarda bien todo?"**: la pregunta literal. Nueva función
+`simular_partida_larga_con_pausa` -y botón "⏸️ Probar pausa y retomar" en
+el panel-: un jugador de mentira juega hasta la mitad de la ruta, CIERRA
+esa sesión -token tirado, como quien se queda sin batería y vuelve horas
+después, no un reintento-, y retoma con una sesión nueva desde donde dice
+el SERVIDOR que se quedó. Comprueba DOS niveles, no solo el final: el
+intermedio (justo tras la pausa) y el final -si solo se mirara el final,
+un fallo que se autocorrige en la segunda sesión podría dar el mismo
+número sin que hubiera pasado nada bueno por en medio-.
+
+**Encontró un bug real de infraestructura de pruebas al primer intento,
+no del juego**: los tests de este fichero fallaban de forma intermitente y
+con un nodo distinto cada vez, según qué otros tests hubieran corrido
+antes. La pista: `PLAYER_RATE_LIMITS` -el limitador de `/api/advance`-
+vive en memoria del proceso, no en `SAGA_DATA_DIR`, y ningún test lo
+reseteaba. Con SIM_01 repitiéndose en cada test del fichero, los tests de
+partida larga -los que más llamadas hacen, y los últimos del fichero-
+acababan superando el límite y recibiendo un 429 que no tiene campo
+`status` en el cuerpo. Arreglado en la fixture `estado_limpo`
+(`main.clear_player_rate_limits()`), no en la lógica de la partida -que
+nunca estuvo rota-.
+
+Verificado: suite completa 538/538 (5 tests nuevos), y en vivo contra un
+servidor real por `curl` (nivel tras la pausa y nivel final correctos,
+limpieza de rastro después).
+
+**Pendiente para la próxima** -no llegó esta vez-: perfiles de versión de
+app vieja (simular un cliente con la forma de petición de una versión
+anterior, para probar compatibilidad hacia atrás del servidor) y
+offline-descargado-antes (jugar entero desde el nodo 1 con la misión
+predescargada, que solo se puede probar de verdad con
+`sim/playwright-bench` -navegador real, IndexedDB real-, no con el banco
+httpx).
+
 ## 1.1 🔴 La precarga del mapa SÍ descarga teselas reales — el "0%" es el bug
 
 Corrige lo dicho en 0.7 y en el cierre de 1.0: ahí se concluyó "el servidor

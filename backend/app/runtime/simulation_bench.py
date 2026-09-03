@@ -79,6 +79,17 @@ PERFILES_RED = {
     # justo el que "todo o nada" no prueba: ¿el móvil recupera BIEN al
     # volver la señal, sin perder nodos y sin duplicar los ya hechos?
     "corte": {"retraso_ms": (400, 1800), "duplicado_prob": 0.12, "zona_muerta": (0.35, 0.65)},
+    # Cobertura a saltos: no un tramo muerto, sino repicar dentro y fuera de
+    # cobertura TODA la ruta -el móvil que va por un camino con árboles a un
+    # lado, sombra de antena, entra y sale-. patron_saltos=(3, 1): de cada 3
+    # nodos, 1 sin cobertura. Cada cruce vacía su propia cola; si alguno se
+    # pierde o se duplica, ahí se vería.
+    "a_saltos": {
+        "retraso_ms": (300, 1400),
+        "duplicado_prob": 0.10,
+        "zona_muerta": None,
+        "patron_saltos": (3, 1),
+    },
 }
 
 MAX_JUGADORES = 8
@@ -177,7 +188,13 @@ async def _jugador_simulado(
     cookie_name: str,
     session_ttl_s: int,
     session_secret: str,
+    offset: int = 0,
 ) -> dict:
+    """`offset` es para retomar una partida ya empezada -una sesión nueva,
+    token nuevo, pero el mismo jugador y el nivel que YA tenía guardado en
+    el servidor-. `stages` es solo el tramo pendiente; `offset` es cuánto
+    llevaba antes, para que `level_before` hable en los mismos números que
+    ya conoce el servidor. Ver `simular_partida_larga_con_pausa`."""
     token = create_player_session_token(nombre, ttl_seconds=session_ttl_s, secret=session_secret)
 
     resultados: list[dict] = []
@@ -186,14 +203,28 @@ async def _jugador_simulado(
     inicio = time.perf_counter()
 
     zona_muerta = perfil_red.get("zona_muerta")
+    patron_saltos = perfil_red.get("patron_saltos")
     total = len(stages)
 
     def sin_cobertura_en(indice: int) -> bool:
-        if not zona_muerta:
-            return False
-        ini, fin = zona_muerta
-        fraccion = indice / total if total else 0.0
-        return ini <= fraccion < fin
+        if zona_muerta:
+            ini, fin = zona_muerta
+            fraccion = indice / total if total else 0.0
+            if ini <= fraccion < fin:
+                return True
+
+        if patron_saltos:
+            # (cada_cuantos, cuantos_seguidos): de cada grupo de
+            # "cada_cuantos" nodos, los primeros "cuantos_seguidos" van sin
+            # cobertura. A diferencia de zona_muerta -un solo tramo-, esto
+            # cruza la franja muerta y vuelve a cobertura VARIAS veces en la
+            # misma ruta: cada cruce tiene que vaciar su propia cola sin
+            # perder ni duplicar nada, no solo el primero.
+            cada, seguidos = patron_saltos
+            if cada > 0 and (indice % cada) < seguidos:
+                return True
+
+        return False
 
     async def vaciar_cola(client: httpx.AsyncClient, cola: list[dict]) -> None:
         """El móvil que recupera la señal: manda de golpe, en orden, todo lo
@@ -227,8 +258,14 @@ async def _jugador_simulado(
 
         cola_offline: list[dict] = []
 
-        for indice, stage in enumerate(stages):
-            if sin_cobertura_en(indice):
+        for indice_local, stage in enumerate(stages):
+            # indice_local: posición dentro de ESTE tramo -es lo que mira
+            # sin_cobertura_en, junto con `total` (también de este tramo)-.
+            # indice: el nivel real, el que ya conoce el servidor. Iguales
+            # salvo que offset > 0 -una sesión que retoma-.
+            indice = indice_local + offset
+
+            if sin_cobertura_en(indice_local):
                 # Se juega el nodo -el minijuego no sabe ni le importa si hay
                 # cobertura-, pero no se manda nada todavía: se completa en
                 # local, como una cola real de IndexedDB.
@@ -391,6 +428,88 @@ async def ejecutar_simulacion(
         "latency_p95_ms": round(percentil(0.95), 1),
         "players": resultados_jugadores,
         "players_with_errors": sum(1 for j in resultados_jugadores if j["errores"]),
+    }
+
+
+async def simular_partida_larga_con_pausa(
+    *,
+    app,
+    stages: list[dict],
+    dispositivo: str,
+    cookie_name: str,
+    session_ttl_s: int,
+    session_secret: str,
+    obtener_nivel,
+    punto_de_pausa: float = 0.5,
+) -> dict:
+    """"¿Se guarda bien todo?" en una frase: un jugador de mentira llega
+    hasta la mitad de la ruta -o hasta `punto_de_pausa`, como fracción-,
+    CIERRA esa sesión -token tirado, como quien deja el móvil sin batería y
+    vuelve horas después, o simplemente cierra la pestaña-, y retoma con un
+    token NUEVO y una sesión NUEVA desde donde dice el SERVIDOR que se
+    quedó -no desde donde el cliente cree, que es justo la diferencia con
+    un simple reintento-. Perfil de red "buena" a propósito: aquí lo que se
+    prueba es la costura entre dos sesiones, no la cobertura.
+
+    Dos comprobaciones, no una: el nivel INTERMEDIO (justo tras la pausa,
+    antes de que la segunda sesión toque nada) y el nivel FINAL. Si solo se
+    mirara el final, un fallo que se autocorrige en la segunda sesión -por
+    ejemplo, que la pausa no guardara nada y la segunda sesión repitiera
+    toda la ruta desde 0- podría acabar dando el mismo número final sin que
+    hubiera pasado nada bueno por en medio.
+    """
+    stages = stages[: max(1, min(len(stages), MAX_NODOS))]
+    total = len(stages)
+    corte = max(1, min(total - 1, round(total * punto_de_pausa))) if total > 1 else total
+    nombre = nombre_simulado(0)
+    perfil = PERFILES_RED["buena"]
+    dispositivo_ua = _elegir_dispositivo(dispositivo, 0)
+
+    primera_sesion = await _jugador_simulado(
+        app=app,
+        nombre=nombre,
+        dispositivo_ua=dispositivo_ua,
+        perfil_red=perfil,
+        stages=stages[:corte],
+        cookie_name=cookie_name,
+        session_ttl_s=session_ttl_s,
+        session_secret=session_secret,
+    )
+
+    nivel_tras_pausa = obtener_nivel(nombre)
+
+    segunda_sesion = await _jugador_simulado(
+        app=app,
+        nombre=nombre,
+        dispositivo_ua=dispositivo_ua,
+        perfil_red=perfil,
+        stages=stages[corte:],
+        cookie_name=cookie_name,
+        session_ttl_s=session_ttl_s,
+        session_secret=session_secret,
+        offset=corte,
+    )
+
+    nivel_final = obtener_nivel(nombre)
+
+    errores = list(primera_sesion["errores"]) + list(segunda_sesion["errores"])
+    if nivel_tras_pausa != corte:
+        errores.append(
+            f"tras la pausa el servidor tenía nivel {nivel_tras_pausa}, se esperaba {corte}"
+        )
+    if nivel_final != total:
+        errores.append(f"nivel final {nivel_final}, se esperaban {total} nodos")
+
+    return {
+        "nombre": nombre,
+        "device": dispositivo,
+        "stage_count": total,
+        "punto_de_pausa": corte,
+        "nivel_tras_pausa": nivel_tras_pausa,
+        "nivel_final": nivel_final,
+        "errores": errores,
+        "peticiones_primera_sesion": primera_sesion["peticiones"],
+        "peticiones_segunda_sesion": segunda_sesion["peticiones"],
     }
 
 

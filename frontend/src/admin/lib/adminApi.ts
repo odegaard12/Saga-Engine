@@ -552,3 +552,7 @@ export function runSimulationBench(params: {
 export function cleanupSimulationBench() {
   return adminPostJsonConEstado('/api/admin/simulation/cleanup', {})
 }
+
+export function runLongSessionPauseBench(params: { device: string; pause_at?: number; force?: boolean }) {
+  return adminPostJsonConEstado('/api/admin/simulation/long-session', params)
+}
