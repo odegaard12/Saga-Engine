@@ -459,10 +459,15 @@ export function MotionChallengeRuntimeScreen({
   const debug = hasDebugMotion()
   const allowFallback = cfg.allow_touch_fallback !== false
 
-  const targetPulses = 16
+  // El editor ya dejaba tocar 'difficulty' -aparece en la lista de campos
+  // de cualquier juego de categoría "motion"-, pero aquí no se leía nunca:
+  // daba igual lo que pusiera el organizador, siempre la misma sensibilidad.
+  // Encontrado auditando antes de dar de alta esta familia en el catálogo.
+  const difficulty = cfg.difficulty === 'easy' || cfg.difficulty === 'hard' ? cfg.difficulty : 'normal'
+  const targetPulses = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 22 : 16
   const timeLimitMs = Number(cfg.time_limit_ms || 45000)
-  const pulseThreshold = 2.75
-  const strongThreshold = 8.3
+  const pulseThreshold = difficulty === 'easy' ? 2.2 : difficulty === 'hard' ? 3.3 : 2.75
+  const strongThreshold = difficulty === 'easy' ? 9.5 : difficulty === 'hard' ? 7.2 : 8.3
   const minPulseGapMs = 520
 
   const [phase, setPhase] = useState<RuntimePhase>('ready')

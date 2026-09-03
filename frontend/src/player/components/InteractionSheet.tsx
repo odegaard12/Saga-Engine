@@ -45,7 +45,7 @@ function isMotionStage(stage: PlayerStage | null) {
   return (
     stage.minigame?.type === 'motion_challenge' ||
     stage.type === 'motion_challenge' ||
-    gameId === 'shake_antenna_charge'
+    gameId === 'shake_charge'
   )
 }
 

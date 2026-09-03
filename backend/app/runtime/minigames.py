@@ -792,7 +792,17 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
         out = {
             "objective": _as_str(raw.get("objective") or "shake_charge").strip().lower() or "shake_charge",
-            "game_id": _as_str(raw.get("game_id") or "shake_antenna_charge").strip() or "shake_antenna_charge",
+            # No "shake_antenna_charge": esa cadena la usa runtime-bridge.ts
+            # (React, jugador) para redirigir misiones VIEJAS de signal_hunt
+            # a circuit_matrix/logic_circuit -una migracion real, de antes de
+            # que existiera este objetivo-. motion_challenge la reutilizaba
+            # por accidente como su propio game_id por defecto: cualquier
+            # nodo motion_challenge con el valor de siempre acababa
+            # mostrando un puzle de circuitos en vez del reto de movimiento.
+            # Verificado que ningun dato real en produccion usa
+            # "shake_antenna_charge" (grep sobre saga.sqlite3, 0 resultados)
+            # antes de renombrar: no hace falta migrar nada.
+            "game_id": _as_str(raw.get("game_id") or "shake_charge").strip() or "shake_charge",
             "difficulty": difficulty,
             "duration_mode": duration_mode,
             "penalty_mode": penalty_mode,

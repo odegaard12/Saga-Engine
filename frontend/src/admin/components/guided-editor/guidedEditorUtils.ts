@@ -279,11 +279,11 @@ export function gameFromStage(stage: StageLike): AdminGameCatalogItem {
   if (byGameType) return byGameType
 
   // Legacy: los nodos antiguos signal_hunt sin game_id eran GPS/señal.
-  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer signal_hunt físico/QR.
+  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer
+  // signal_hunt físico/QR. Misma migración que runtime-bridge.ts en el
+  // jugador: al puzle de circuitos.
   if (stage.type === 'signal_hunt' && !hasExplicitQrMarker(stage)) {
-    return (
-      adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
-    )
+    return adminGameCatalog.find((game) => game.id === 'logic_circuit') || adminGameCatalog[0]
   }
 
   return (
