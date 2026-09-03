@@ -1017,3 +1017,51 @@ async def cleanup_simulation_endpoint(request: Request):
 
     borrados = main.limpiar_rastro_de_simulacion()
     return {"status": "ok", "cleaned": borrados}
+
+
+@router.post("/api/admin/simulation/browser-session/start")
+async def start_browser_simulation_session_endpoint(request: Request):
+    """Abre la puerta para un navegador DE VERDAD -Playwright u otra
+    herramienta externa, no el banco httpx-en-proceso-: registra N SIM_XX
+    como perfiles conocidos y devuelve un token de sesión de jugador ya
+    firmado para cada uno, listo para meter como cookie `saga_player_session`
+    en un contexto de navegador real. A diferencia de .../run, aquí no se
+    ejecuta ni se mueve nada -solo se entregan las llaves-. Ver
+    `main.registrar_jugadores_de_simulacion`. Hay que llamar a .../stop al
+    terminar, o los SIM_XX se quedan como perfiles conocidos."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    jugadores = data.get("player_count", 1)
+    try:
+        jugadores = int(jugadores)
+    except (TypeError, ValueError):
+        jugadores = 1
+
+    nombres = main.registrar_jugadores_de_simulacion(jugadores)
+    tokens = main.mint_simulation_player_tokens(nombres)
+    return {
+        "status": "ok",
+        "cookie_name": main.PLAYER_SESSION_COOKIE,
+        "players": [{"name": nombre, "token": tokens[nombre]} for nombre in nombres],
+    }
+
+
+@router.post("/api/admin/simulation/browser-session/stop")
+async def stop_browser_simulation_session_endpoint(request: Request):
+    """Cierra lo que abrió .../start: quita los SIM_XX de la lista de
+    perfiles conocidos. No borra progreso ni posición -para eso sigue
+    haciendo falta /api/admin/simulation/cleanup-."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+
+    main.quitar_jugadores_de_simulacion()
+    return {"status": "ok"}
