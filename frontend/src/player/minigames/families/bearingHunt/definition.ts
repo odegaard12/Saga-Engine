@@ -1,10 +1,6 @@
 import type { BearingHuntConfig } from '../../core/family-types'
 import type { BearingHuntDefinition } from '../../core/registry-types'
-import type {
-  MinigameController,
-  MinigamePreflightResult,
-  MinigameRuntimeBindings,
-} from '../../core/types'
+import type { MinigamePreflightResult, MinigameRuntimeBindings } from '../../core/types'
 
 export const bearingHuntDefinition: BearingHuntDefinition = {
   family: 'bearing_hunt',
@@ -127,9 +123,4 @@ async function runBearingHuntPreflight(
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Bearing hunt ready.'],
   }
-}
-
-export const bearingHuntController: MinigameController<BearingHuntConfig> = {
-  validateConfig: validateBearingHuntConfig,
-  runPreflight: runBearingHuntPreflight,
 }

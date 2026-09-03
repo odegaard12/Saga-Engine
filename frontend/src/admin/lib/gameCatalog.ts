@@ -8,11 +8,16 @@ import {
 
 export type AdminGameId =
   | 'simple_checkpoint'
+  // 'shake_antenna_charge' es el game_id real de motion_challenge (ver
+  // motionChallenge/definition.ts), pero NO tiene entrada en
+  // adminGameCatalog: getAdminGame('shake_antenna_charge') siempre cae al
+  // primer juego del catálogo. Además, en el player, runtime-bridge.ts
+  // redirige cualquier config con este game_id a circuit_matrix/logic_circuit
+  // ANTES de mirar la familia real -así que ni admin puede crear el nodo bien
+  // ni el jugador lo vería como Motion Challenge si existiera. No lo borro
+  // del tipo (main.py todavía puede tener misiones viejas con este id) pero
+  // no lo trato como "listo": falta el catálogo Y arreglar ese choque.
   | 'shake_antenna_charge'
-  | 'gps_signal_lock'
-  | 'hot_cold_search'
-  | 'bearing_compass'
-  | 'three_bearing_triangle'
   | 'logic_circuit'
   | 'sequence_code'
   | 'place_mosaic'
@@ -420,10 +425,13 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     difficulty: 'Media',
     duration: '5-8 min',
     runtimeStatus: 'runtime_ready',
-    offlineStatus: 'offline_ready',
+    // No 'offline_ready': el mecanismo de proximidad depende del latido del
+    // servidor (ver 4.9.51 en plan-de-mejora.md), así que necesita cobertura
+    // de los dos jugadores a la vez, no solo de uno.
+    offlineStatus: 'offline_partial',
     completionMethod: 'team',
     offlineNote:
-      'Funciona offline. Si hay conexión usa Yjs para ver a los compañeros, si no, se cierra cuando todos registran el nodo.',
+      'Necesita cobertura de AMBOS jugadores a la vez: cada uno ve al resto por el latido del servidor (cada pocos segundos), no hay nada que funcione sin señal. Si uno de los dos está sin cobertura en el punto de encuentro, el otro no lo detecta como "aquí" aunque esté al lado.',
     summary: 'Prueba pensada para varios jugadores o roles.',
     playerGoal: 'Coordinarse para llegar, registrar prueba o compartir pista.',
     editorHint: 'Úsalo si quieres que varios jugadores participen.',
