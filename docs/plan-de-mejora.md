@@ -31,6 +31,55 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.5 Orden del catálogo, tope de 20 jugadores, y prueba de carga real — ✅ en 4.9.62
+
+Tres preguntas en una: "¿los 10 juegos están bien ordenados por grupo?",
+"mejorar diseño del banco, más funciones, más optimización" y "lanza una
+prueba de 15 jugadores en 10 nodos".
+
+**El orden, arreglado sin tocar lo peligroso.** El catálogo real (el orden
+del array en `gameCatalog.ts`) no se toca: ese orden es el que usa
+`getAdminGameForStage()` para decidir a qué juego cae una misión vieja sin
+`game_id` -tocarlo podía cambiar la identidad de nodos reales, ya se dejó
+anotado como riesgo hace tiempo-. En su lugar, un `sortedByCategoryForDisplay()`
+nuevo que ordena SOLO para mostrar (gps → compass → logic → motion → photo
+→ physical → team), aplicado donde el orden se ve de verdad: el selector de
+"añadir/cambiar juego" y el panel de familias. Cero riesgo para la
+resolución de identidad, orden con sentido para quien mira la lista.
+
+**De paso, un efecto secundario real de 4.9.51: `team_relay` había
+desaparecido del selector de crear nodos.** El filtro exigía
+`offlineStatus === 'offline_ready'` a secas; team_relay pasó a
+`offline_partial` en 4.9.51 (cierto -necesita cobertura de los dos
+jugadores-, pero no motivo para esconderlo). Seguía editable en nodos ya
+creados, invisible para crear uno nuevo. Arreglado: el filtro ahora solo
+excluye `offline_planned` (lo que de verdad no está listo).
+
+**Tope de jugadores: 8 → 20.** "Con 15 jugadores ahoga el ancho de banda,
+no la Pi" es un hallazgo real de este proyecto (memoria del 30 de agosto) -
+el tope anterior ni dejaba LLEGAR a probar ese número-. Nuevo botón en el
+panel, "📈 Prueba grande (15 · a saltos)", para lanzar ese escenario
+concreto sin teclear nada -con cuidado de no repetir el mismo fallo de
+cierre obsoleto que ya costó el audio_challenge en 4.9.60: `ejecutar()` ahora
+acepta los valores como parámetros, no solo leídos del estado que el propio
+clic acaba de cambiar-.
+
+**La prueba de carga, hecha y con los cuatro números.** Misión de 10 nodos
+variados (checkpoint, circuitos, rumbo, Simón, movimiento, equipo, mosaico,
+laberinto, caza-señales, final), 15 jugadores, cuatro pasadas:
+
+| Cobertura | Duración | Peticiones | p50 | p95 | Errores |
+|---|---|---|---|---|---|
+| corte (vaguada nodos 4-6) | 12.1 s | 128 | 89.6 ms | 749.6 ms | 0 |
+| a_saltos (4 cortes por jugador) | 15.1 s | 167 | 581.4 ms | 1437.0 ms | 0 |
+| sin_cobertura (todo en un lote) | 11.3 s | 15 | — | — | 0 |
+| cliente_antiguo (sin level_before) | 13.0 s | — | — | — | 0 |
+
+Los 15 jugadores llegaron a 10/10 en las cuatro pasadas, sin excepción.
+Rastro limpiado y verificado después de cada una.
+
+Verificado: suite completa 539/539, `tsc -b`/`vite build` limpios.
+
 ## 1.4 Banco de pruebas: cliente antiguo, y perfiles calibrados de verdad — ✅ en 4.9.61
 
 Pedido explícito: buscar en foros/apps/repos ideas para mejorar el banco
