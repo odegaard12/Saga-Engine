@@ -1,7 +1,8 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMinigame } from '../../core/resolver'
-import { useTeamStore } from '../../../store/useTeamStore'
+import { usePlayerStore } from '../../../store/usePlayerStore'
+import { getDistanceMeters } from '../../../utils/geo'
 
 export interface TeamRelayRuntimeScreenProps {
   resolved: ResolvedMinigame
@@ -11,25 +12,58 @@ export interface TeamRelayRuntimeScreenProps {
   onWin: () => Promise<void>
 }
 
+/**
+ * Relevo de Equipo: hacen falta dos o más juntos en el mismo punto.
+ *
+ * Antes leía `useTeamStore.ts` -un intento con Yjs que sólo persistía en el
+ * propio móvil (`IndexeddbPersistence`), sin ningún transporte entre
+ * dispositivos-: cada jugador sólo veía sus propios cambios, así que
+ * `activeMembersCount` nunca pasaba de cero por vías legítimas. El catálogo
+ * lo daba por "listo" y no lo estaba.
+ *
+ * Ahora lee del store compartido -`teamProfiles`, lo que ya trae el latido
+ * cada pocos segundos con la posición de todo el grupo- y calcula la
+ * distancia real al nodo con la misma fórmula que usa el mapa. Nada nuevo
+ * que pedir: mismo camino, misma tolerancia a cobertura mala, que ya está
+ * hecho y probado.
+ */
 export function TeamRelayRuntimeScreen({
-  resolved,
+  resolved: _resolved,
   stage,
   helperText,
   submitting,
   onWin,
 }: TeamRelayRuntimeScreenProps) {
   const [holding, setHolding] = useState(false)
-  const { memberPositions } = useTeamStore()
+  const teamProfiles = usePlayerStore((s) => s.teamProfiles)
 
-  // Calcula cuántos miembros hay cerca del nodo.
-  // En un caso real calcularíamos la distancia GPS, por ahora asumiremos
-  // que los miembros que han actualizado posición en los últimos 5 mins están activos.
-  const activeMembersCount = Object.values(memberPositions).filter(
-    (pos) => Date.now() - pos.timestamp < 5 * 60 * 1000
-  ).length
+  const cercanos = useMemo(() => {
+    if (stage.lat == null || stage.lon == null) return []
 
-  // Umbral configurable
+    const radio = Number(stage.radius) > 0 ? Number(stage.radius) : 50
+
+    return teamProfiles
+      .filter((p) => !p.is_self)
+      // "live" es un latido de menos de 3 minutos (HEARTBEAT_STALE_SECONDS
+      // en el servidor): más viejo que eso no dice dónde está AHORA.
+      .filter((p) => p.presence === 'live')
+      .filter((p) => typeof p.lat === 'number' && typeof p.lon === 'number')
+      .map((p) => ({
+        ...p,
+        distancia: getDistanceMeters(
+          { lat: stage.lat, lon: stage.lon },
+          { lat: p.lat as number, lon: p.lon as number }
+        ),
+      }))
+      .filter((p) => p.distancia <= radio)
+      .sort((a, b) => a.distancia - b.distancia)
+  }, [teamProfiles, stage.lat, stage.lon, stage.radius])
+
+  // El umbral original (2 compañeros más, aparte de quien juega). No lo
+  // cambio: lo que estaba roto era de dónde salían los datos, no cuántos
+  // hacen falta.
   const requiredMembers = 2
+  const activeMembersCount = cercanos.length
   const isReady = activeMembersCount >= requiredMembers
 
   const handleHoldStart = () => {
@@ -42,12 +76,14 @@ export function TeamRelayRuntimeScreen({
     setHolding(false)
   }
 
+  // Mantener pulsado 1,5 s confirma que es a propósito, no un toque al pasar
+  // el móvil a un compañero.
   useEffect(() => {
     let timeout: number
     if (holding) {
       timeout = window.setTimeout(() => {
-        onWin()
-      }, 1500) // 1.5s manteniéndolo presionado
+        void onWin()
+      }, 1500)
     }
     return () => window.clearTimeout(timeout)
   }, [holding, onWin])
@@ -56,11 +92,14 @@ export function TeamRelayRuntimeScreen({
     <section className="saga-glass-panel" style={container}>
       <div style={title}>Relevo de Equipo</div>
       <p style={description}>
-        {helperText || 'Esperando a que todos los miembros del equipo lleguen al punto...'}
+        {helperText ||
+          (isReady
+            ? `${cercanos.map((p) => p.display_name || p.user).join(', ')} está${cercanos.length === 1 ? '' : 'n'} aquí contigo.`
+            : 'Esperando a que llegue alguien más del equipo a este punto...')}
       </p>
 
       <div style={statusBox}>
-        <div style={statusText}>Miembros cercanos:</div>
+        <div style={statusText}>Compañeros aquí:</div>
         <div style={statusCount}>
           {activeMembersCount} / {requiredMembers}
         </div>
@@ -91,7 +130,7 @@ const container: CSSProperties = {
   alignItems: 'center',
   padding: 24,
   background: 'rgba(var(--theme-ink), 0.6)',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-panel, 16px)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
 }
 
@@ -115,7 +154,7 @@ const statusBox: CSSProperties = {
   justifyContent: 'space-between',
   background: 'rgba(255, 255, 255, 0.05)',
   padding: '12px 24px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card, 12px)',
   width: '100%',
   marginBottom: 24,
 }
@@ -134,8 +173,8 @@ const statusCount: CSSProperties = {
 const holdButtonReady: CSSProperties = {
   width: '100%',
   padding: 16,
-  borderRadius: 12,
-  background: '#3b82f6',
+  borderRadius: 'var(--theme-radius-pill, 12px)',
+  background: 'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
   color: '#fff',
   fontWeight: 'bold',
   fontSize: 16,

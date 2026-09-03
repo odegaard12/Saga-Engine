@@ -31,6 +31,45 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 0.4 Relevo de Equipo (multijugador) nunca podía completarse — ✅ en 4.9.51
+
+Auditando el catálogo de minijuegos tras pedir "unos 10 juegos nuevos, si
+puede ser jugar entre varios" — antes de diseñar nada nuevo, comprobar si lo
+ya construido funcionaba de verdad. `gameCatalog.ts` marcaba `team_relay`
+como `runtime_ready`. No lo estaba.
+
+`TeamRelayRuntimeScreen.tsx` exige `activeMembersCount >= 2` compañeros en el
+mismo punto para desbloquear el botón. Sacaba esa cuenta de
+`useTeamStore.ts`, un store aparte hecho con Yjs
+(`new Y.Doc()` + `IndexeddbPersistence('saga-team-sync', ydoc)`) que sólo
+persiste en el propio móvil — el comentario del propio archivo admitía que
+faltaba "WebRTC o WS en el futuro" para sincronizar entre dispositivos. Cada
+jugador veía sus propios cambios y nunca los de nadie más: el contador no
+podía pasar de cero por vías legítimas, así que el juego nunca era
+completable en el monte con gente de verdad, sólo en pruebas de un solo
+móvil.
+
+No hacía falta construir nada nuevo: `/api/heartbeat?equipo=1` ya manda,
+cada pocos segundos, la posición de todo el equipo
+(`construir_tabla_de_equipo()` en `game.py` — `lat`, `lon`, `presence`,
+`gps_status`, `last_seen` de cada compañero), y esa respuesta ya llegaba a
+`PlayerApp.tsx` (`aplicarEquipo()`) pero se quedaba en un `useState` local,
+invisible para los minijuegos anidados.
+
+**Arreglo:** ese estado pasa a `usePlayerStore` (compartido, no persistido
+entre arranques — son datos de "ahora mismo"), y `TeamRelayRuntimeScreen`
+calcula la proximidad real con la misma fórmula de distancia que usa el mapa
+(`getDistanceMeters`), filtrando a compañeros con latido `live` (menos de 3
+min) dentro del radio del nodo. Se borra `useTeamStore.ts` y las
+dependencias `yjs`/`y-indexeddb` (sin más usos en el repo). Umbral de 2
+compañeros sin tocar — lo roto era de dónde salían los datos, no las reglas
+del juego.
+
+Verificado: `tsc -b` y `vite build` limpios, suite completa 525/525. Falta
+verificación en vivo con dos móviles reales caminando juntos — el banco de
+simulación es sólo backend y no renderiza la pantalla de React, así que esa
+prueba queda pendiente para la próxima salida de campo.
+
 ## 0.3 El banco de pruebas ya simula un corte de cobertura a mitad de ruta — ✅ en 4.9.50
 
 Pedido explícito: "¿se puede simular cortes de cobertura, y qué pasaría al

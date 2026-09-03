@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { PlayerGpsStatus } from '../../types/player'
+import type { PlayerGpsStatus, TeamProfileLiveStatus } from '../../types/player'
 
 /**
  * Lo que comparten las pantallas del jugador: dónde está y qué tiene abierto.
@@ -29,6 +29,19 @@ interface PlayerState {
   rankingOpen: boolean
   offlinePrepVisible: boolean
 
+  /**
+   * Dónde va el resto del equipo, tal y como lo trae el último latido.
+   *
+   * Vivía como `useState` suelto dentro de `PlayerApp`, así que ningún
+   * minijuego podía leerlo -"Relevo de Equipo" tiraba en su lugar de
+   * `useTeamStore.ts`, un intento con Yjs que sólo persistía en el propio
+   * móvil (`IndexeddbPersistence`, sin ningún transporte entre
+   * dispositivos) y por eso nunca veía a nadie más-. Aquí sí llega a todos
+   * los componentes, y sin pedir nada aparte: son los mismos datos que ya
+   * trae el latido cada pocos segundos.
+   */
+  teamProfiles: TeamProfileLiveStatus[]
+
   setGpsStatus: (status: PlayerGpsStatus) => void
   setGpsPosition: (pos: { lat: number; lon: number } | null) => void
   setGpsAccuracy: (acc: number | null) => void
@@ -37,6 +50,7 @@ interface PlayerState {
   setToolsOpen: (open: boolean) => void
   setRankingOpen: (open: boolean) => void
   setOfflinePrepVisible: (visible: boolean) => void
+  setTeamProfiles: (profiles: TeamProfileLiveStatus[]) => void
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -51,6 +65,7 @@ export const usePlayerStore = create<PlayerState>()(
       toolsOpen: false,
       rankingOpen: false,
       offlinePrepVisible: true,
+      teamProfiles: [],
 
       setGpsStatus: (gpsStatus) => set({ gpsStatus }),
       setGpsPosition: (gpsPosition) => set({ gpsPosition }),
@@ -61,6 +76,7 @@ export const usePlayerStore = create<PlayerState>()(
       setToolsOpen: (toolsOpen) => set({ toolsOpen }),
       setRankingOpen: (rankingOpen) => set({ rankingOpen }),
       setOfflinePrepVisible: (offlinePrepVisible) => set({ offlinePrepVisible }),
+      setTeamProfiles: (teamProfiles) => set({ teamProfiles }),
     }),
     {
       name: 'saga-player-store',
