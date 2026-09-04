@@ -226,8 +226,8 @@ Verificado: suite completa, `tsc -b`/`vite build` limpios.
 
 ## 1.8 La barra de iconos tapaba la tarjeta inferior con textos de ayuda largos — ✅ en 4.9.65
 
-Encontrado midiendo de verdad, no a ojo: entrando como `Odi` (jugador real,
-misión terminada 10/10) en producción, la barra de iconos rápidos
+Encontrado midiendo de verdad, no a ojo: entrando con el perfil de un
+jugador real ya terminado (10/10) en producción, la barra de iconos rápidos
 (📷 foto / 📖 historia / 🏆 clasificación) tenía su borde inferior a
 `650.1px` del top del viewport, y la tarjeta inferior (Mochila/Herramientas
 + el texto de ayuda del botón principal) empezaba en `637.8px` -**12px de
