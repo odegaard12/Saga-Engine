@@ -31,6 +31,36 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.12 1.11 TAMBIÉN se equivocó: no era el minificador — ✅ de verdad en 4.9.70
+
+1.11 daba el cambio a terser por bueno con UNA prueba. Al repetir con más
+fuerza (15 actualizaciones seguidas, dos veces), **el mismo error volvió a
+saltar con terser también**, en la misma línea exacta
+(`hasOfflineMissionRef.current && setOfflinePrepVisible(false)`, dentro de
+`onSuccess`). Ni el nombre de la variable (1.10), ni la forma de
+declararla -`function` en vez de `const` flecha, por si era el cruce con
+`cambiarAModoPorRed`/`onError`, tampoco- ni el minificador (1.11) eran la
+causa real: el patrón que fallaba, siempre, era leer CUALQUIER cosa de
+fuera de `handleRequestLiveGps` dentro del callback nativo de
+`watchPosition`/`getCurrentPosition`.
+
+**Arreglo de verdad**: sacar esa lectura del callback nativo del todo. El
+cierre del panel "misión offline lista" ahora es un `useEffect` normal de
+React que reacciona a `browserGpsFresh` -el mismo estado que el propio
+callback ya pone a `true`-, no una lectura a mano dentro de la API del
+navegador. Verificado con la prueba fuerte (15 actualizaciones seguidas)
+**dos veces, en corridas independientes**: cero errores las dos.
+
+**La causa última de por qué ese patrón en concreto rompía tres veces
+distintas de tres formas distintas -nombre, tipo de declaración,
+minificador- sigue sin explicarse del todo.** Lo que sí queda establecido,
+comprobado tres veces con evidencia real: NO era ninguna de esas tres
+cosas, y sacar la lectura del callback nativo lo arregla. Documentado el
+proceso completo -incluidos los dos intentos fallidos- porque la lección
+importa más que el resultado: **una prueba corta no basta para dar un
+fallo intermitente por resuelto; hay que forzar el camino que lo dispara
+varias veces, en corridas independientes, antes de fiarse.**
+
 ## 1.11 1.10 se equivocó: no era esa variable, era el minificador — ✅ en 4.9.68
 
 1.10 decía "confirmado que no reaparece después" del arreglo del `ln`.
