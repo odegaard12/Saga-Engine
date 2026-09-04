@@ -31,6 +31,35 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.17 Login rediseñado: "Brasa" — 4.9.75
+
+"El login es feísimo." Se le pasaron a Óscar tres direcciones dibujadas
+(editorial / brasa / expediente) antes de tocar nada, en vez de adivinar.
+Eligió **Brasa**. Lo que cambia:
+
+- **La foto de portada se ve de verdad.** El velo era parejo (0.62 arriba,
+  0.44 al 30 %): oscurecía la foto entera lo justo para que no se apreciara
+  y aun así dejaba trozos de cielo claro bajo el texto de abajo. Ahora la
+  franja de arriba va casi limpia (0.20) y cierra a 0.86 en el 34 %: la foto
+  es una cabecera real, y la lista tiene fondo estable.
+- **El rótulo deja de ser una tarjeta de cristal.** `heroCard` era un panel
+  translúcido con borde y desenfoque flotando sobre la foto. Ahora el título
+  se apoya directamente en la franja, alineado a la izquierda como un
+  titular.
+- **La tarjeta de jugador ES el botón.** Fuera el "ENTRAR" repetido catorce
+  veces: se pulsa la foto, el nombre o cualquier hueco de la tarjeta. Área
+  de toque mucho mayor y la mitad del ruido de la pantalla, menos.
+- **Las fotos mandan.** Avatar de 40 px a la izquierda → 54 px centrado
+  arriba, nombre debajo. Es lo que cada uno busca al entrar.
+- **Menos coste de pintado**: fuera el `backdrop-filter` de las catorce
+  tarjetas (el elemento más caro de la pantalla) sobre un fondo que ya es
+  casi opaco.
+- El subtítulo bajo "SAGA" pasa a `var(--theme-primary)`: era verde menta
+  fijo y con el tema de fuego cantaba.
+
+⏳ Pendiente en la misma línea, ya dibujado y aprobado: barra superior con
+progreso, dock de iconos unido, pestañas en mochila y podio en clasificación.
+
 ## 1.16 Hueco entre la barra de título y la isla del iPhone — 4.9.74
 
 "La barra que pone SAGA o O ECO hay que subirla más arriba, hay hueco

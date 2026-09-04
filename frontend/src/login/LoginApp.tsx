@@ -516,86 +516,80 @@ export default function LoginApp() {
             const avatarInitials = getPlayerAvatarInitials(profile)
 
             return (
-              <article
+              /**
+               * La tarjeta ENTERA es el botón, no un botón "ENTRAR" dentro de
+               * ella. Catorce botones repetidos con la misma palabra era la
+               * mitad del ruido de esta pantalla, y encima dejaba el área de
+               * toque pequeña: ahora se pulsa la foto, el nombre o cualquier
+               * hueco de la tarjeta.
+               */
+              <button
+                type="button"
                 key={profile.id}
+                disabled={loggingInId !== null}
                 style={{
                   ...playerCard,
                   animationDelay: `${index * 35}ms`,
+                  opacity: loggingInId === profile.id ? 0.65 : 1,
+                }}
+                onClick={() => {
+                  setLoggingInId(profile.id)
+                  const loginId = Date.now()
+                  const href = `/player/${encodeURIComponent(profile.id)}?login=${loginId}`
+
+                  const proceed = () => {
+                    window.history.pushState(null, '', href)
+                    window.dispatchEvent(new CustomEvent('saga:navigate'))
+                  }
+
+                  window.navigator.geolocation.getCurrentPosition(
+                    () => proceed(),
+                    (err) => {
+                      console.warn('GPS request at login failed or denied, proceeding anyway.', err)
+                      proceed()
+                    },
+                    { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
+                  )
                 }}
               >
-                <div style={playerLeft}>
-                  <div
-                    style={{
-                      ...avatar,
-                      background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.20))`,
-                      borderColor: `${profileColor}66`,
-                      color: '#ffffff',
-                    }}
-                  >
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          borderRadius: 'var(--theme-radius-pill)',
-                          display: 'block',
-                        }}
-                      />
-                    ) : (
-                      avatarInitials
-                    )}
-                  </div>
-
-                  <div style={identity}>
-                    <div style={playerName}>{profile.display_name}</div>
-                    <div style={identityBottom}>
-                      <span style={modePill}>{isTeam ? copy.team : copy.solo}</span>
-                      {meta ? <span style={playerMetaInline}>{meta}</span> : null}
-                    </div>
-                  </div>
+                <div
+                  style={{
+                    ...avatar,
+                    background: `linear-gradient(135deg, ${profileColor}, rgba(255,255,255,.20))`,
+                    borderColor: `${profileColor}66`,
+                    color: '#ffffff',
+                  }}
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: 'var(--theme-radius-pill)',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    avatarInitials
+                  )}
                 </div>
 
-                <div style={playerRight}>
-                  <button
-                    type="button"
-                    style={{ ...enterButton, opacity: loggingInId === profile.id ? 0.7 : 1 }}
-                    disabled={loggingInId !== null}
-                    onClick={() => {
-                      setLoggingInId(profile.id)
-                      const label = profile.display_name || profile.id
-                      const loginId = Date.now()
-                      const href = `/player/${encodeURIComponent(profile.id)}?login=${loginId}`
-
-                      const proceed = () => {
-                        window.history.pushState(null, '', href)
-                        window.dispatchEvent(new CustomEvent('saga:navigate'))
-                      }
-
-                      window.navigator.geolocation.getCurrentPosition(
-                        () => proceed(),
-                        (err) => {
-                          console.warn(
-                            'GPS request at login failed or denied, proceeding anyway.',
-                            err
-                          )
-                          proceed()
-                        },
-                        { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
-                      )
-                    }}
-                  >
-                    {loggingInId === profile.id ? '⏳' : copy.enter}
-                  </button>
+                <div style={identity}>
+                  <div style={playerName}>
+                    {loggingInId === profile.id ? '⏳' : profile.display_name}
+                  </div>
+                  <div style={identityBottom}>
+                    <span style={modePill}>{isTeam ? copy.team : copy.solo}</span>
+                  </div>
+                  {meta ? <div style={playerMetaInline}>{meta}</div> : null}
                 </div>
-              </article>
+              </button>
             )
           })}
         </section>
-
-        {/* Mapbox Warning Removed */}
       </div>
     </main>
   )
@@ -662,14 +656,19 @@ const backVignette: CSSProperties = {
   pointerEvents: 'none',
 }
 
+/**
+ * "Brasa": la portada NO es una tarjeta de cristal flotando sobre la foto.
+ *
+ * Antes el rótulo vivía dentro de un panel translúcido con borde, encima de
+ * un velo que oscurecía la foto entera por igual: la foto no se veía y el
+ * panel parecía un cuadro pegado. Ahora el título se apoya directamente
+ * sobre la franja de foto de arriba -sin caja, sin borde, sin desenfoque- y
+ * el velo (ver `fondoVelo`) deja esa franja clara y oscurece de la mitad
+ * para abajo, que es donde va la lista y donde el texto tiene que leerse.
+ */
 const heroCard: CSSProperties = {
-  padding: '22px 18px 24px',
-  borderRadius: 'var(--theme-radius-panel)',
-  border: 'var(--theme-border-w) solid var(--saga-glass-border)',
-  background: 'var(--saga-glass-bg)',
-  boxShadow: '0 22px 52px rgba(5,14,12,.28), inset 0 1px 0 rgba(255,255,255,.10)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  padding: '2px 4px 18px',
+  background: 'transparent',
   animation: 'sagaFadeIn 260ms ease-out',
 }
 
@@ -700,12 +699,15 @@ const adminButton: CSSProperties = {
   textDecoration: 'none',
 }
 
+// Alineado a la izquierda, no centrado: el rótulo se apoya sobre la franja
+// de foto como un titular, no como un cartel. Centrado, con la foto detrás,
+// quedaba flotando en medio de la nada.
 const heroCenter: CSSProperties = {
-  marginTop: 8,
+  marginTop: 96,
   display: 'grid',
-  justifyItems: 'center',
-  textAlign: 'center',
-  gap: 8,
+  justifyItems: 'start',
+  textAlign: 'left',
+  gap: 6,
 }
 
 // Tamaños contenidos: el rótulo ocupaba media pantalla en el móvil y empujaba
@@ -719,15 +721,17 @@ const sagaWordmark: CSSProperties = {
   textShadow: '0 16px 34px rgba(2,6,23,.34)',
 }
 
+// Del tema, no verde fijo: con el tema de fuego este subtítulo salía verde
+// menta bajo un rótulo blanco sobre foto cálida, y cantaba.
 const sagaWordmarkSub: CSSProperties = {
-  color: '#dcffe9',
+  color: 'var(--theme-primary)',
   fontSize: 10,
   lineHeight: 1,
   fontWeight: 1000,
-  letterSpacing: '0.36em',
+  letterSpacing: '0.3em',
   textTransform: 'uppercase',
-  marginTop: 3,
-  marginBottom: 8,
+  marginTop: 5,
+  marginBottom: 4,
 }
 
 const heroTitle: CSSProperties = {
@@ -749,17 +753,18 @@ const heroSubtitle: CSSProperties = {
   fontWeight: 900,
 }
 
+// Filete del color del tema a la izquierda, sin caja: la caja completa
+// competía con las tarjetas de jugador de abajo -dos recuadros seguidos-.
+// Una línea basta para decir "esto es aparte del título".
 const heroExplainerBox: CSSProperties = {
-  marginTop: 6,
+  marginTop: 10,
   width: '100%',
   maxWidth: 420,
   display: 'grid',
-  gap: 8,
-  padding: '14px 16px',
-  borderRadius: 'var(--theme-radius-card)',
-  background: 'rgba(10,14,22,.42)',
-  border: '1px solid rgba(255,255,255,.12)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)',
+  gap: 7,
+  paddingLeft: 11,
+  borderLeft: '2px solid var(--theme-primary)',
+  textAlign: 'left',
 }
 
 const heroBody: CSSProperties = {
@@ -792,16 +797,21 @@ const fondoFoto: CSSProperties = {
 }
 
 /**
- * Velo sobre la foto.
+ * Velo sobre la foto: franja de arriba clara, resto casi opaco.
  *
- * Sin esto el texto blanco cae sobre el cielo claro del amanecer y no se lee.
- * Va más oscuro abajo, que es donde está la lista de jugadores.
+ * Antes el velo era parejo -0.62 arriba, 0.44 al 30 %-: oscurecía la foto
+ * entera lo justo para que no se viese bien, y aun así el texto de abajo
+ * caía sobre trozos de cielo claro. Ahora la foto SE VE de verdad en la
+ * franja de arriba, que es donde va el rótulo (texto blanco grande, se lee
+ * igual), y de ahí para abajo cierra a casi negro para que la lista de
+ * jugadores tenga fondo estable. Es lo que hace que la portada parezca una
+ * cabecera con foto y no un cristal empañado.
  */
 const fondoVelo: CSSProperties = {
   position: 'fixed',
   inset: 0,
   background:
-    'linear-gradient(180deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.44) 30%, rgba(0,0,0,.70) 62%, rgba(0,0,0,.90) 100%)',
+    'linear-gradient(180deg, rgba(0,0,0,.20) 0%, rgba(0,0,0,.30) 16%, rgba(0,0,0,.86) 34%, rgba(0,0,0,.95) 55%, rgba(0,0,0,.97) 100%)',
   pointerEvents: 'none',
 }
 
@@ -879,63 +889,66 @@ const listBlock: CSSProperties = {
   gap: 8,
 }
 
+/**
+ * La tarjeta es el botón, y la foto manda.
+ *
+ * Antes: foto pequeña a la izquierda, nombre al lado, y debajo un botón
+ * "ENTRAR" repetido catorce veces. Ahora: foto grande y centrada arriba,
+ * nombre debajo, y toda la tarjeta se pulsa. Menos ruido, área de toque
+ * mucho mayor, y las caras -que es lo que cada uno busca aquí- ganan sitio.
+ * Sin `backdrop-filter`: con catorce tarjetas era el elemento más caro de
+ * pintar de toda la pantalla, y sobre un fondo ya casi opaco no aporta nada.
+ */
 const playerCard: CSSProperties = {
   display: 'grid',
-  // Apilada: en dos columnas no caben el nombre y el boton uno al lado del
-  // otro sin cortar el nombre.
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  gap: 8,
-  alignItems: 'center',
-  padding: '10px 10px',
+  justifyItems: 'center',
+  gap: 7,
+  padding: '12px 8px 11px',
   borderRadius: 'var(--theme-radius-panel)',
   border: 'var(--theme-border-w) solid var(--saga-glass-border)',
-  background: 'var(--saga-glass-bg)',
-  boxShadow: '0 16px 34px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.08)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  background: 'rgba(255,255,255,.05)',
+  color: 'inherit',
+  font: 'inherit',
+  textAlign: 'center',
+  cursor: 'pointer',
   animation: 'sagaFadeIn 260ms ease-out',
   animationFillMode: 'both',
 }
 
-const playerLeft: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '40px minmax(0, 1fr)',
-  gap: 10,
-  alignItems: 'center',
-  minWidth: 0,
-}
-
 const avatar: CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 54,
+  height: 54,
   borderRadius: 'var(--theme-radius-pill)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   background: 'rgba(219,234,254,.92)',
-  border: '1px solid rgba(96,165,250,.28)',
+  border: '1px solid rgba(255,255,255,.18)',
   color: '#ffffff',
-  fontSize: 13,
+  fontSize: 17,
   fontWeight: 900,
   overflow: 'hidden',
+  flex: '0 0 auto',
 }
 
 const identity: CSSProperties = {
   display: 'grid',
+  justifyItems: 'center',
   gap: 5,
   minWidth: 0,
+  width: '100%',
 }
 
 const playerName: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+  maxWidth: '100%',
   color: '#ffffff',
-  fontSize: 18,
-  lineHeight: 1,
+  fontSize: 15,
+  lineHeight: 1.1,
   fontWeight: 1000,
-  letterSpacing: '-0.04em',
-  textShadow: '0 8px 18px rgba(2,6,23,.24)',
+  letterSpacing: '-0.02em',
 }
 
 const identityBottom: CSSProperties = {
@@ -969,16 +982,10 @@ const playerMetaInline: CSSProperties = {
   fontWeight: 700,
 }
 
-const playerRight: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-}
-
+// Ya no lo usa la lista -la tarjeta entera es el botón-, pero se queda: es
+// el estilo del botón de la pantalla de clave de misión.
 const enterButton: CSSProperties = {
   minHeight: 34,
-  // A lo ancho de la tarjeta: en rejilla de dos, un boton de 88px suelto a la
-  // derecha queda descolgado.
   width: '100%',
   border: 0,
   borderRadius: 'var(--theme-radius-card)',
