@@ -1,11 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
-import {
-  fetchFieldProofs,
-  fetchPlayerGame,
-  fetchPublicConfig,
-  fetchTeamStatus,
-  unlockMission,
-} from '../shared/api'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
@@ -65,13 +59,6 @@ function loginText(locale: LoginLocale) {
       configError: 'Erro de configuración',
       mapboxLimitTitle: '⚠️ Límite de Mapbox',
       mapboxLimitText: 'Mapa premium activo. Límite: 200.000 cargas/mes.',
-      missionTitle: 'Misión pechada',
-      missionBody: 'Escribe a clave do grupo para entrar.',
-      missionPlaceholder: 'Clave da misión',
-      missionButton: 'Abrir',
-      missionWrong: 'Clave incorrecta.',
-      missionTooMany: 'Demasiados intentos. Agarda uns minutos.',
-      missionFail: 'Non se puido comprobar a clave.',
     }
   }
 
@@ -88,13 +75,6 @@ function loginText(locale: LoginLocale) {
       configError: 'Configuration error',
       mapboxLimitTitle: '⚠️ Mapbox Quota Warning',
       mapboxLimitText: 'Premium map active. Limit: 200k loads/month.',
-      missionTitle: 'Mission locked',
-      missionBody: 'Enter the group key to continue.',
-      missionPlaceholder: 'Mission key',
-      missionButton: 'Unlock',
-      missionWrong: 'Wrong key.',
-      missionTooMany: 'Too many attempts. Wait a few minutes.',
-      missionFail: 'Could not verify the key.',
     }
   }
 
@@ -110,13 +90,6 @@ function loginText(locale: LoginLocale) {
     configError: 'Error de configuración',
     mapboxLimitTitle: '⚠️ Límite de Mapbox',
     mapboxLimitText: 'Configurado mapa premium. Límite: 200.000 cargas/mes.',
-    missionTitle: 'Misión cerrada',
-    missionBody: 'Escribe la clave del grupo para entrar.',
-    missionPlaceholder: 'Clave de la misión',
-    missionButton: 'Abrir',
-    missionWrong: 'Clave incorrecta.',
-    missionTooMany: 'Demasiados intentos. Espera unos minutos.',
-    missionFail: 'No se pudo comprobar la clave.',
   }
 }
 
@@ -298,9 +271,6 @@ export default function LoginApp() {
   const [playerInput, setPlayerInput] = useState('')
   const [loggingInId, setLoggingInId] = useState<string | null>(null)
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
-  const [missionPass, setMissionPass] = useState('')
-  const [missionUnlocking, setMissionUnlocking] = useState(false)
-  const [missionError, setMissionError] = useState('')
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
 
   useEffect(() => {
@@ -365,34 +335,6 @@ export default function LoginApp() {
   useEffect(() => {
     aplicarTema(state.status === 'ready' ? state.config.player_theme : null)
   }, [state])
-
-  async function handleMissionUnlock(event: FormEvent) {
-    event.preventDefault()
-    if (missionUnlocking) return
-    const value = missionPass.trim()
-    if (!value) return
-
-    setMissionUnlocking(true)
-    setMissionError('')
-    try {
-      await unlockMission(value)
-      const config = await fetchPublicConfig()
-      cachePublicConfig(config)
-      setState({ status: 'ready', config })
-      setMissionPass('')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : ''
-      setMissionError(
-        message === 'wrong-mission-password'
-          ? 'wrong'
-          : message === 'too-many-attempts'
-            ? 'many'
-            : 'fail',
-      )
-    } finally {
-      setMissionUnlocking(false)
-    }
-  }
 
   async function handlePrepareOffline() {
     if (state.status !== 'ready') return
@@ -494,85 +436,6 @@ export default function LoginApp() {
   const locale = getLoginLocale(state.config)
   const copy = loginText(locale)
   const { title, subtitle, body, intro } = resolveLoginCopy(state.config, locale)
-
-  // La misión pide clave de grupo y todavía no hay lista: el servidor no la
-  // manda hasta desbloquear. Pantalla de clave antes de la de jugadores.
-  if (state.config.mission_pass_required === true && profiles.length === 0) {
-    const missionErrorText =
-      missionError === 'wrong'
-        ? copy.missionWrong
-        : missionError === 'many'
-          ? copy.missionTooMany
-          : missionError === 'fail'
-            ? copy.missionFail
-            : ''
-
-    const brandIsGeneric = !title || title.toUpperCase() === 'SAGA'
-
-    return (
-      <main style={pageWrap}>
-        <style>{loginAnimations}</style>
-        <div style={fondoFoto} />
-        <div style={fondoVelo} />
-        <div style={backGlowTop} />
-        <div style={backGlowBottom} />
-        <div style={backVignette} />
-
-        <div
-          style={{
-            ...shellWrap,
-            padding: mobile
-              ? 'calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px)'
-              : '32px 20px 40px',
-          }}
-        >
-          <section style={heroCard}>
-            <div style={heroTopSpacer} />
-            <div style={heroCenter}>
-              {brandIsGeneric ? (
-                <>
-                  <div style={sagaWordmark}>SAGA</div>
-                  <div style={sagaWordmarkSub}>{copy.brandKicker}</div>
-                </>
-              ) : (
-                <h1 style={heroTitle}>{title}</h1>
-              )}
-
-              <div style={missionLockCard}>
-                <div style={missionLockIcon} aria-hidden="true">
-                  🔒
-                </div>
-                <h2 style={missionLockTitle}>{copy.missionTitle}</h2>
-                <p style={missionLockBody}>{copy.missionBody}</p>
-
-                <form onSubmit={handleMissionUnlock} style={missionForm}>
-                  <input
-                    type="password"
-                    value={missionPass}
-                    onChange={(event) => setMissionPass(event.target.value)}
-                    placeholder={copy.missionPlaceholder}
-                    autoComplete="off"
-                    autoFocus
-                    style={missionInput}
-                    aria-label={copy.missionPlaceholder}
-                  />
-                  <button type="submit" disabled={missionUnlocking} style={enterButton}>
-                    {missionUnlocking ? '⏳' : copy.missionButton}
-                  </button>
-                </form>
-
-                {missionErrorText ? (
-                  <p style={missionErrorStyle} role="alert">
-                    {missionErrorText}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    )
-  }
 
   return (
     <main style={pageWrap}>
@@ -1130,81 +993,6 @@ const enterButton: CSSProperties = {
   textTransform: 'uppercase',
   boxShadow: '0 12px 24px rgba(22,163,74,.22), inset 0 1px 0 rgba(255,255,255,.20)',
   cursor: 'pointer',
-}
-
-const missionLockCard: CSSProperties = {
-  width: '100%',
-  maxWidth: 360,
-  margin: '22px auto 0',
-  padding: '24px 22px 26px',
-  borderRadius: 'var(--theme-radius-card)',
-  background: 'rgba(10,14,22,.55)',
-  border: '1px solid rgba(255,255,255,.10)',
-  boxShadow: '0 24px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)',
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
-  animation: 'sagaFadeIn .4s ease both',
-}
-
-const missionLockIcon: CSSProperties = {
-  width: 52,
-  height: 52,
-  margin: '0 auto 12px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 24,
-  borderRadius: '50%',
-  background: 'rgba(255,255,255,.08)',
-  border: '1px solid rgba(255,255,255,.12)',
-}
-
-const missionLockTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 17,
-  fontWeight: 900,
-  letterSpacing: '0.02em',
-  color: '#ffffff',
-  textAlign: 'center',
-}
-
-const missionLockBody: CSSProperties = {
-  margin: '6px 0 0',
-  fontSize: 13,
-  lineHeight: 1.45,
-  color: 'rgba(255,255,255,.68)',
-  textAlign: 'center',
-}
-
-const missionForm: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  width: '100%',
-  margin: '18px auto 0',
-}
-
-const missionInput: CSSProperties = {
-  minHeight: 44,
-  width: '100%',
-  padding: '0 14px',
-  border: '1px solid rgba(255,255,255,.18)',
-  borderRadius: 'var(--theme-radius-card)',
-  background: 'rgba(8,12,20,.6)',
-  color: '#ffffff',
-  fontSize: 16,
-  letterSpacing: '0.12em',
-  textAlign: 'center',
-  outline: 'none',
-}
-
-const missionErrorStyle: CSSProperties = {
-  margin: '12px 0 0',
-  color: '#fca5a5',
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: '0.03em',
-  textAlign: 'center',
 }
 
 const loginAnimations = `
