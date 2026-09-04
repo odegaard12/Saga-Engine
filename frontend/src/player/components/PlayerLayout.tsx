@@ -19,13 +19,25 @@ export function getMobileBrowserChromeLift(mobile: boolean): number {
   return standalone ? 0 : 22
 }
 
-export function getMapQuickControlsStyle(mobile: boolean): CSSProperties {
+// Alto de la tarjeta inferior (Mochila/Herramientas, con su texto de ayuda
+// debajo del botón principal) cuando aún no se ha medido de verdad -antes
+// del primer render del observador, o si measure falla por lo que sea-.
+// Calibrado a ojo hace tiempo; el texto de ayuda ("indicaciones") creció
+// desde entonces y ya no basta: con un mensaje largo la tarjeta sube más de
+// 138px y toca la barra de iconos (foto/historia/clasificación) que está
+// posicionada aparte, con este número fijo, sin saber nada de la tarjeta.
+const ALTO_TARJETA_POR_DEFECTO = 138
+const HUECO_SOBRE_TARJETA = 14
+
+export function getMapQuickControlsStyle(mobile: boolean, altoTarjetaInferior?: number | null): CSSProperties {
   const browserChromeLift = getMobileBrowserChromeLift(mobile)
+  const alto = altoTarjetaInferior && altoTarjetaInferior > 0 ? altoTarjetaInferior : ALTO_TARJETA_POR_DEFECTO
+  const desplazamiento = altoTarjetaInferior ? alto + HUECO_SOBRE_TARJETA : alto
 
   return {
     position: 'fixed',
     left: '50%',
-    bottom: mobile ? `calc(env(safe-area-inset-bottom, 0px) + ${138 + browserChromeLift}px)` : 148,
+    bottom: mobile ? `calc(env(safe-area-inset-bottom, 0px) + ${desplazamiento + browserChromeLift}px)` : 148,
     transform: 'translateX(-50%)',
     zIndex: 1600,
     display: 'inline-flex',

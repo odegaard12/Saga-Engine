@@ -411,6 +411,50 @@ export default function PlayerApp() {
 
   const isPhone = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 
+  /**
+   * Alto REAL de la tarjeta inferior (Mochila/Herramientas + el texto de
+   * ayuda debajo del botón principal), para que la barra de iconos de
+   * arriba (foto/historia/clasificación) se coloque justo encima -nunca
+   * pisándola-, sea cual sea el largo del mensaje de ayuda de este nodo.
+   *
+   * Antes ese hueco era un número fijo (138px), calibrado para un mensaje
+   * corto: con una indicación larga la tarjeta crece más de esos 138px y
+   * su borde de arriba tocaba -o tapaba- los iconos, que ni se enteran de
+   * cuánto mide la tarjeta porque están posicionados aparte.
+   */
+  const [hudBottomHeight, setHudBottomHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined
+
+    let frame = 0
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      // rAF: ResizeObserver puede disparar varias veces por el mismo cambio
+      // de layout; con setState directo ahí dentro, React avisaba de
+      // actualizaciones en cascada dentro del propio observador.
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        setHudBottomHeight(Math.round(entry.contentRect.height))
+      })
+    })
+
+    const elemento = document.querySelector('[data-saga-player-hud="bottom"]')
+    if (elemento) observer.observe(elemento)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+    // state.status, no [] a secas: en el primer montaje real la app está en
+    // 'loading' -pantalla de carga del mapa, sin PlayerHud todavía en el
+    // DOM- y el querySelector no encuentra nada. Sin este disparador, el
+    // observador se quedaba enganchado a nada para siempre y la altura no
+    // se medía jamás. Una vez engachado a 'ready' no hace falta reenganchar
+    // por cambiar de nodo: el propio observador sigue avisando solo.
+  }, [state.status])
+
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
     void registerPlayerServiceWorker()
@@ -2498,7 +2542,7 @@ export default function PlayerApp() {
 
 
       {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
-        <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone)}>
+        <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}>
           <QuickProofPanel
             user={user}
             mobile={isPhone}
