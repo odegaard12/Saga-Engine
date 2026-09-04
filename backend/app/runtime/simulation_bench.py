@@ -159,6 +159,11 @@ PERFILES_RED = {
             6, duracion_min=0.05, duracion_max=0.14, semilla=20260903
         ),
         "gps_calidad": "degradado",
+        # Este perfil es EL que se pidió "que lleve tiempo analizar" (ver
+        # docs/plan-de-mejora.md): un paseo comprimido 6x, no 25x, para que la
+        # prueba larga dure de verdad minutos, no segundos, y el ritmo entre
+        # nodos se parezca al de un jugador andando, no al de una API en bucle.
+        "factor_velocidad": 6.0,
     },
 }
 
@@ -173,6 +178,44 @@ MAX_JUGADORES = 20
 # sobra sin ser una ruta absurda.
 MAX_NODOS = 40
 DEFAULT_TIMEOUT_S = 20.0
+
+# Ritmo de paseo humano: 1.3 m/s (~4.7 km/h) es el valor medio citado en
+# literatura de movilidad peatonal para adultos en terreno llano -ni carrera
+# ni paseo dominguero-. Sin esto, el banco mandaba heartbeat+advance de un
+# nodo al siguiente en milisegundos, muy por debajo de
+# HEARTBEAT_MIN_INTERVAL_SECONDS (2s): disparaba 429 que no significaban
+# nada, un móvil de verdad jamás pega dos heartbeats así de pegados porque
+# tarda MINUTOS en andar de un nodo al siguiente.
+PASO_HUMANO_MPS = 1.3
+
+# El paseo real se comprime para que una ruta de varios km no tarde minutos
+# u horas en simularse. A 25x, un tramo de 100 m (unos 77 s andando) se
+# queda en ~3 s de banco -por encima del suelo de 2 s del heartbeat en la
+# inmensa mayoría de tramos reales, sin que la prueba se eternice-.
+FACTOR_VELOCIDAD_DEFECTO = 25.0
+
+
+def distancia_metros(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine: distancia en línea recta entre dos puntos GPS, en metros.
+
+    No es la distancia real andada -un camino serpentea, esto no-, pero es
+    la misma aproximación que ya usa el resto del proyecto para "cuánto
+    falta" y es más que suficiente para dosificar el ritmo del banco."""
+    radio_tierra_m = 6_371_000.0
+    fi1, fi2 = math.radians(lat1), math.radians(lat2)
+    dfi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dfi / 2) ** 2 + math.cos(fi1) * math.cos(fi2) * math.sin(dlambda / 2) ** 2
+    return radio_tierra_m * 2 * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _coords_stage(stage: dict) -> tuple[float, float] | None:
+    location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
+    lat = location.get("lat", stage.get("lat"))
+    lon = location.get("lon", stage.get("lon"))
+    if lat is None or lon is None:
+        return None
+    return float(lat), float(lon)
 
 
 def nombre_simulado(indice: int) -> str:
@@ -267,6 +310,7 @@ async def _jugador_simulado(
     session_ttl_s: int,
     session_secret: str,
     offset: int = 0,
+    factor_velocidad: float = FACTOR_VELOCIDAD_DEFECTO,
 ) -> dict:
     """`offset` es para retomar una partida ya empezada -una sesión nueva,
     token nuevo, pero el mismo jugador y el nivel que YA tenía guardado en
@@ -390,6 +434,12 @@ async def _jugador_simulado(
         client.cookies.set(cookie_name, token)
 
         cola_offline: list[dict] = []
+        # Coordenada del último nodo EN VIVO -no de cada nodo, aunque haya
+        # pasado por un corte de por medio-: durante un corte no se manda
+        # nada al servidor, así que el heartbeat/advance de después del corte
+        # no necesita esperar el paseo por el tramo sin cobertura, solo el
+        # tramo desde el último punto que sí habló con el servidor.
+        ultima_coord_viva: tuple[float, float] | None = None
 
         for indice_local, stage in enumerate(stages):
             # indice_local: posición dentro de ESTE tramo -es lo que mira
@@ -428,9 +478,26 @@ async def _jugador_simulado(
             # pese a que el docstring del módulo lo prometía. Encontrado
             # añadiendo la degradación de GPS: los heartbeats no aparecían
             # en el informe de ningún jugador, ni con cobertura buena.
-            location = stage.get("location") if isinstance(stage.get("location"), dict) else {}
-            lat = location.get("lat", stage.get("lat"))
-            lon = location.get("lon", stage.get("lon"))
+            coords = _coords_stage(stage)
+
+            # El paseo real: nada de disparar heartbeat+advance del nodo
+            # siguiente en milisegundos. Si hay coordenadas de este nodo y
+            # del último nodo en vivo, la distancia entre los dos manda
+            # cuánto se tarda -a paso humano, comprimido por
+            # factor_velocidad-. Sin coordenadas en alguno de los dos -pasa
+            # con nodos mal cargados- no hay de dónde sacar la distancia, así
+            # que no se espera nada: mejor un tramo sin pausa que inventarse
+            # una.
+            if coords and ultima_coord_viva:
+                distancia_m = distancia_metros(*ultima_coord_viva, *coords)
+                factor = factor_velocidad if factor_velocidad > 0 else FACTOR_VELOCIDAD_DEFECTO
+                espera_s = distancia_m / PASO_HUMANO_MPS / factor
+                if espera_s > 0:
+                    await asyncio.sleep(espera_s)
+            if coords:
+                ultima_coord_viva = coords
+
+            lat, lon = coords if coords else (None, None)
             if lat is not None and lon is not None:
                 try:
                     await _peticion(
@@ -524,6 +591,7 @@ async def ejecutar_simulacion(
     jugadores = max(1, min(int(jugadores), MAX_JUGADORES))
     stages = stages[: max(1, min(len(stages), MAX_NODOS))]
     perfil_red = PERFILES_RED.get(red, PERFILES_RED["mala"])
+    factor_velocidad = perfil_red.get("factor_velocidad", FACTOR_VELOCIDAD_DEFECTO)
 
     tareas = [
         _jugador_simulado(
@@ -535,6 +603,7 @@ async def ejecutar_simulacion(
             cookie_name=cookie_name,
             session_ttl_s=session_ttl_s,
             session_secret=session_secret,
+            factor_velocidad=factor_velocidad,
         )
         for i in range(jugadores)
     ]
