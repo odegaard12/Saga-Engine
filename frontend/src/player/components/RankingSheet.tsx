@@ -14,9 +14,18 @@ interface RankingSheetProps {
   onClose: () => void
 }
 
+// "EN LÍNEA" en verde fijo, no en --theme-done: ese token es la piel de
+// marca de cada tema, y en fuego --theme-done es naranja-terracota, no
+// verde. "Este jugador está conectado AHORA MISMO" es una señal semántica
+// -verde universal de "activo/bien"-, no una decoración de marca; ponerla
+// en el color de marca del tema hacía que "conectado" se leyera como aviso,
+// no como buena señal. RECIENTE/OFFLINE sí pueden variar con el tema, son
+// estados neutros, no una señal de "todo va bien".
+const VERDE_EN_LINEA = '#22c55e'
+
 function getPresenceConfig(value?: string) {
   const p = String(value || 'offline').toLowerCase()
-  if (p === 'live') return { label: 'EN LÍNEA', color: '#22d3ee', glow: 'rgba(34,211,238,0.35)', dot: 'rgb(var(--theme-done))' }
+  if (p === 'live') return { label: 'EN LÍNEA', color: '#22d3ee', glow: 'rgba(34,211,238,0.35)', dot: VERDE_EN_LINEA }
   if (p === 'stale') return { label: 'RECIENTE', color: '#fbbf24', glow: 'rgba(251,191,36,0.25)', dot: '#f59e0b' }
   return { label: 'OFFLINE', color: 'rgb(var(--theme-sheen-a))', glow: 'rgba(var(--theme-sheen-a), calc(0.1 * var(--theme-solid)))', dot: 'rgb(var(--theme-sheen-b))' }
 }
@@ -97,8 +106,8 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                 height: 8,
                 borderRadius: '50%',
                 display: 'inline-block',
-                background: liveCount > 0 ? 'rgb(var(--theme-done))' : 'rgb(var(--theme-sheen-b))',
-                boxShadow: liveCount > 0 ? '0 0 10px rgb(var(--theme-done))' : 'none',
+                background: liveCount > 0 ? VERDE_EN_LINEA : 'rgb(var(--theme-sheen-b))',
+                boxShadow: liveCount > 0 ? `0 0 10px ${VERDE_EN_LINEA}` : 'none',
                 flexShrink: 0,
               }}
             />
@@ -111,7 +120,7 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
             ×
           </button>
           <div style={counterBadge}>
-            <span style={{ color: 'rgb(var(--theme-done))', fontWeight: 900 }}>{liveCount}</span>
+            <span style={{ color: VERDE_EN_LINEA, fontWeight: 900 }}>{liveCount}</span>
             <span style={{ color: 'rgb(var(--theme-line))' }}> / {sorted.length} jug.</span>
           </div>
         </div>
