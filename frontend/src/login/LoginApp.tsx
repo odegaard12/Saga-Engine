@@ -455,34 +455,32 @@ export default function LoginApp() {
         }}
       >
         <section style={heroCard}>
+          {/* El título va EN LA MISMA FILA que "Admin", no debajo.
+              Antes el botón ocupaba una fila entera para él solo y el rótulo
+              empezaba por debajo: eso, más el margen que reservaba una foto
+              de portada inexistente, era el hueco muerto de la parte de
+              arriba. Ahora la pantalla empieza donde tiene que empezar. */}
           <div style={heroTop}>
-            <div />
+            <div style={heroTopTitle}>
+              {title && title.toUpperCase() !== 'SAGA' ? (
+                <h1 style={heroTitle}>{title}</h1>
+              ) : (
+                <div style={sagaWordmark}>SAGA</div>
+              )}
+              {subtitle ? (
+                <p style={heroSubtitle}>{subtitle}</p>
+              ) : (
+                <div style={sagaWordmarkSub}>{copy.brandKicker}</div>
+              )}
+            </div>
             <a href="/admin" style={adminButton}>
               {copy.admin}
             </a>
           </div>
 
-          <div style={heroCenter}>
-            {title && title.toUpperCase() !== 'SAGA' ? (
-              <h1 style={heroTitle}>{title}</h1>
-            ) : (
-              <>
-                <div style={sagaWordmark}>SAGA</div>
-                <div style={sagaWordmarkSub}>{copy.brandKicker}</div>
-              </>
-            )}
-
-            {subtitle ? <p style={heroSubtitle}>{subtitle}</p> : null}
-
-            {/* Antes el texto flotaba suelto bajo el rótulo, sin nada que lo
-                separase visualmente de "SAGA" -mismo fondo, mismo bloque-.
-                Un recuadro propio dice "esto es la explicación", no "esto es
-                el título" -misma idea que missionLockCard más abajo, para
-                que las dos pantallas de login se lean con el mismo idioma. */}
-            <div style={heroExplainerBox}>
-              <p style={heroBody}>{body}</p>
-              {intro ? <p style={heroIntro}>{intro}</p> : null}
-            </div>
+          <div style={heroExplainerBox}>
+            <p style={heroBody}>{body}</p>
+            {intro ? <p style={heroIntro}>{intro}</p> : null}
           </div>
         </section>
 
@@ -582,15 +580,19 @@ export default function LoginApp() {
                     {loggingInId === profile.id ? '⏳' : profile.display_name}
                   </div>
                   {/* La etiqueta sólo cuando dice algo: con catorce jugadores
-                      en solo, catorce "SÓ" idénticos son ruido puro y encima
-                      añaden una línea a cada tarjeta. En equipo sí importa. */}
+                      en solo, catorce "SÓ" idénticos son ruido puro. En
+                      equipo sí importa, porque cambia cómo se juega. */}
                   {isTeam ? (
                     <div style={identityBottom}>
                       <span style={modePill}>{copy.team}</span>
+                      {meta ? <span style={playerMetaInline}>{meta}</span> : null}
                     </div>
                   ) : null}
-                  {meta ? <div style={playerMetaInline}>{meta}</div> : null}
                 </div>
+
+                <span style={chevron} aria-hidden="true">
+                  ›
+                </span>
               </button>
             )
           })}
@@ -683,10 +685,17 @@ const heroTopSpacer: CSSProperties = {
 
 const heroTop: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
+  // 'start', no 'center': el título tiene dos líneas y el botón una. Centrado,
+  // "Admin" quedaba a media altura del rótulo en vez de arriba con él.
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 10,
-  minHeight: 30,
+  gap: 12,
+}
+
+const heroTopTitle: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  minWidth: 0,
 }
 
 const adminButton: CSSProperties = {
@@ -725,47 +734,44 @@ const heroCenter: CSSProperties = {
   gap: 6,
 }
 
-// Tamaños contenidos: el rótulo ocupaba media pantalla en el móvil y empujaba
-// hacia abajo la lista de jugadores, que es a lo que se entra aquí.
+// 27px, no 34-50: comparte fila con el botón "Admin". Un rótulo de 50px al
+// lado de un botón de 28px de alto no es una fila, es un rótulo con algo
+// pegado. A este tamaño los dos se leen como una cabecera.
 const sagaWordmark: CSSProperties = {
   color: '#ffffff',
-  fontSize: 'clamp(34px, 8vw, 50px)',
-  lineHeight: 0.82,
+  fontSize: 'clamp(24px, 6.4vw, 30px)',
+  lineHeight: 1,
   fontWeight: 1000,
-  letterSpacing: '-0.08em',
-  textShadow: '0 16px 34px rgba(2,6,23,.34)',
+  letterSpacing: '-0.045em',
 }
 
 // Del tema, no verde fijo: con el tema de fuego este subtítulo salía verde
 // menta bajo un rótulo blanco sobre foto cálida, y cantaba.
 const sagaWordmarkSub: CSSProperties = {
   color: 'var(--theme-primary)',
-  fontSize: 10,
+  fontSize: 9.5,
   lineHeight: 1,
   fontWeight: 1000,
-  letterSpacing: '0.3em',
+  letterSpacing: '0.26em',
   textTransform: 'uppercase',
-  marginTop: 5,
-  marginBottom: 4,
 }
 
 const heroTitle: CSSProperties = {
   margin: 0,
-  fontSize: 'clamp(26px, 6vw, 40px)',
+  fontSize: 'clamp(24px, 6.4vw, 30px)',
   lineHeight: 1,
-  fontWeight: 900,
-  letterSpacing: '-0.06em',
+  fontWeight: 1000,
+  letterSpacing: '-0.045em',
   color: '#ffffff',
-  textShadow: '0 10px 26px rgba(15,23,42,.20)',
 }
 
 const heroSubtitle: CSSProperties = {
   margin: 0,
-  color: '#dcffe9',
-  fontSize: 12,
-  letterSpacing: '0.18em',
+  color: 'var(--theme-primary)',
+  fontSize: 9.5,
+  letterSpacing: '0.26em',
   textTransform: 'uppercase',
-  fontWeight: 900,
+  fontWeight: 1000,
 }
 
 // Filete del color del tema a la izquierda, sin caja: la caja completa
@@ -886,64 +892,56 @@ const insecureLoginBanner: CSSProperties = {
   marginBottom: 16,
 }
 
+// Una columna. La rejilla de dos venía de cuando cada jugador era una
+// tarjeta con caja: catorce cajas en vertical eran demasiado scroll. Sin
+// cajas, una fila ocupa 58px y catorce caben en pantalla y media, leyéndose
+// mucho mejor -y con la foto al tamaño en que se distingue una cara-.
 const listBlock: CSSProperties = {
   display: 'grid',
-  /**
-   * Dos por fila. DOS, siempre.
-   *
-   * En vertical, con catorce jugadores, habia que bajar media pantalla para
-   * llegar a los ultimos.
-   *
-   * Aqui habia un `auto-fill` con un minimo de 148px, y eso no es "dos": es
-   * "las que quepan". En un movil estrecho la tarjeta no llega al minimo y
-   * `auto-fill` se queda en UNA columna, que es exactamente la lista vertical
-   * de siempre. Medido en el banco daba dos porque la ventana era mas ancha,
-   * asi que la medida no valia para el caso que importa.
-   *
-   * `minmax(0, 1fr)` -y no `1fr` a secas- para que un nombre largo no ensanche
-   * su columna y descuadre la pareja.
-   */
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 0,
+  marginTop: 4,
 }
 
 /**
- * La tarjeta es el botón, y la foto manda.
+ * Fila, no tarjeta: se acabó el recuadro dentro del recuadro.
  *
- * Antes: foto pequeña a la izquierda, nombre al lado, y debajo un botón
- * "ENTRAR" repetido catorce veces. Ahora: foto grande y centrada arriba,
- * nombre debajo, y toda la tarjeta se pulsa. Menos ruido, área de toque
- * mucho mayor, y las caras -que es lo que cada uno busca aquí- ganan sitio.
- * Sin `backdrop-filter`: con catorce tarjetas era el elemento más caro de
- * pintar de toda la pantalla, y sobre un fondo ya casi opaco no aporta nada.
+ * Una foto ya es un rectángulo con su forma; meterla en una tarjeta con
+ * borde y fondo propio la encierra en un segundo marco y ensucia toda la
+ * pantalla -catorce veces-. Aquí no hay caja ninguna: foto, nombre, y una
+ * línea finísima de separación. La fila entera sigue siendo el botón.
  */
 const playerCard: CSSProperties = {
-  display: 'grid',
-  justifyItems: 'center',
-  gap: 7,
-  padding: '12px 8px 11px',
-  borderRadius: 'var(--theme-radius-panel)',
-  border: 'var(--theme-border-w) solid var(--saga-glass-border)',
-  background: 'rgba(255,255,255,.05)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  width: '100%',
+  padding: '9px 2px',
+  border: 0,
+  borderBottom: '0.5px solid rgba(255,255,255,.10)',
+  borderRadius: 0,
+  background: 'transparent',
   color: 'inherit',
   font: 'inherit',
-  textAlign: 'center',
+  textAlign: 'left',
   cursor: 'pointer',
   animation: 'sagaFadeIn 260ms ease-out',
   animationFillMode: 'both',
 }
 
+// Sin borde: el aro alrededor de la foto era otro marco más. La foto se
+// sostiene sola.
 const avatar: CSSProperties = {
-  width: 50,
-  height: 50,
+  width: 44,
+  height: 44,
   borderRadius: 'var(--theme-radius-avatar)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   background: 'rgba(219,234,254,.92)',
-  border: '1px solid rgba(255,255,255,.18)',
+  border: 0,
   color: '#ffffff',
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 900,
   overflow: 'hidden',
   flex: '0 0 auto',
@@ -951,10 +949,18 @@ const avatar: CSSProperties = {
 
 const identity: CSSProperties = {
   display: 'grid',
-  justifyItems: 'center',
-  gap: 5,
+  gap: 4,
   minWidth: 0,
-  width: '100%',
+  flex: 1,
+}
+
+// La flecha dice "esto se pulsa" sin gastar una palabra ni una caja.
+const chevron: CSSProperties = {
+  color: 'rgba(255,255,255,.34)',
+  fontSize: 22,
+  lineHeight: 1,
+  flex: '0 0 auto',
+  paddingRight: 2,
 }
 
 const playerName: CSSProperties = {
@@ -963,10 +969,10 @@ const playerName: CSSProperties = {
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   color: '#ffffff',
-  fontSize: 15,
-  lineHeight: 1.1,
-  fontWeight: 1000,
-  letterSpacing: '-0.02em',
+  fontSize: 16,
+  lineHeight: 1.15,
+  fontWeight: 900,
+  letterSpacing: '-0.015em',
 }
 
 const identityBottom: CSSProperties = {
