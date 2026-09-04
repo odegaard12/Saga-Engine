@@ -1363,6 +1363,30 @@ export default function PlayerApp() {
     return () => window.clearInterval(id)
   }, [qrPayloadActual, user])
 
+  // El velo que disuelve la carga en el juego. ANTES del return de arriba a
+  // proposito -misma regla que ya costo el error #310 una vez: ningun hook
+  // despues de un return condicional-.
+  //
+  // "Queda feo el salto, es muy brusco": cuando el mapa YA estaba guardado,
+  // `state.status` pasaba de 'loading' a 'ready' en el mismo tick y la
+  // pantalla de carga desaparecia de golpe, sustituida sin transicion por
+  // el mapa. Esto no evita la carga -sigue durando lo que tenga que durar-,
+  // solo disuelve el cambio de una pantalla a la otra en vez de cortarlo.
+  const fueListoRef = useRef(false)
+  const [velo, setVelo] = useState(false)
+  useEffect(() => {
+    if (state.status === 'ready' && !fueListoRef.current) {
+      fueListoRef.current = true
+      setVelo(true)
+      const id = window.setTimeout(() => setVelo(false), 480)
+      return () => window.clearTimeout(id)
+    }
+    if (state.status !== 'ready') {
+      fueListoRef.current = false
+    }
+    return undefined
+  }, [state.status])
+
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
     // total 0 quiere decir "trabajando, pero aun no se cuanto queda": ahi no
@@ -2646,6 +2670,22 @@ export default function PlayerApp() {
 
   return (
     <ScreenFrame mobile={isPhone}>
+      {velo ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            pointerEvents: 'none',
+            background:
+              'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
+              'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
+              'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
+            animation: 'sagaVeloDisolver 480ms ease-out forwards',
+          }}
+        />
+      ) : null}
       <MapSurface
         currentStage={currentStage}
         missionStages={payload.stages || []}
@@ -2907,7 +2947,19 @@ export default function PlayerApp() {
          * ahí mientras faltase un permiso, la X no hacía nada y no se podía
          * quitar de en medio: si el permiso de cámara fallaba, quedaba fija.
          */
+        /**
+         * `!showPrologue`: BUG REAL, visto en captura.
+         *
+         * El prólogo (StoryModal) se abre solo al entrar, y este panel podía
+         * abrirse en el mismo instante -falta la cámara, por ejemplo-. Los
+         * dos son overlays de pantalla completa centrados; el velo del
+         * prólogo es semitransparente (rgba .4), así que no tapaba al otro:
+         * se veían LOS DOS A LA VEZ, uno asomando a través del otro, con la
+         * tarjeta "ANTES DE SALIR" incrustada a media historia del prólogo.
+         * Ahora el panel espera a que se cierre el prólogo primero.
+         */
         visible={
+          !showPrologue &&
           !prepCerrada &&
           (offlinePrepVisible ||
             permisoMovimiento !== 'ok' ||
