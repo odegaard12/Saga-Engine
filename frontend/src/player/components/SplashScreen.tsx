@@ -61,7 +61,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div style={{ position: 'relative', marginBottom: 34 }}>
+      <div style={{ position: 'relative', marginBottom: 26 }}>
         {/* Halos girando: dan sensación de actividad aunque la descarga
             tarde, en vez de una pantalla aparentemente congelada. */}
         <span className="saga-splash-ring saga-splash-ring--slow" />
@@ -88,73 +88,119 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         />
       </div>
 
-      <div
-        style={{
-          width: 'min(88vw, 300px)',
-          height: 8,
-          background: 'rgba(255,255,255,.09)',
-          borderRadius: 'var(--theme-radius-pill)',
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,.08)',
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            borderRadius: 'var(--theme-radius-pill)',
-            background:
-              'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
-            width: known ? `${pct}%` : '38%',
-            transition: 'width .35s cubic-bezier(.22,1,.36,1)',
-            animation: known ? 'none' : 'sagaSplashSlide 1.4s infinite ease-in-out',
-            boxShadow: '0 0 14px var(--theme-glow)',
-          }}
-        />
-      </div>
-
-      {known ? (
-        // key={pctFino}: sin esto el número se quedaba clavado tras la
-        // primera actualización -medido con sim/playwright-bench: la barra
-        // de arriba SÍ seguía llenándose con datos reales (0 fallos, 900+
-        // teselas bajadas), pero este texto se congelaba en el primer valor
-        // que le tocaba, mientras React seguía recalculando el correcto por
-        // dentro (visto en consola) sin que llegara nunca al DOM. Con la key
-        // atada al valor, React descarta y crea el nodo en vez de intentar
-        // parchear el que ya había -rodea lo que fuera que se atascaba-.
-        // Verificado: 7 lecturas seguidas cada 3 s, todas correctas
-        // (0.6% → 1.7% → 3.3% → 4.4% → 6.1% → 7.2% → 8.8%).
-        <div
-          key={pctFino}
-          style={{
-            marginTop: 10,
-            fontSize: 22,
-            fontWeight: 900,
-            letterSpacing: '-.02em',
-            color: '#e2e8f0',
-          }}
-        >
-          {pctFino}%
+      {/**
+       * Por pasos, no un porcentaje suelto.
+       *
+       * Antes esto era una barra y un número grande: decía CUÁNTO falta pero
+       * no QUÉ está pasando, y con el mapa tardando minutos parecía colgado.
+       * Ahora se ve la lista de lo que hace, con lo ya hecho en verde y lo
+       * que va por dentro con su barra.
+       *
+       * Los pasos son REALES, no decorativos: si hay progreso de mapa es que
+       * la misión ya se cargó -es lo que dispara esta pantalla en
+       * PlayerApp-, así que ese paso se marca hecho de verdad, no "porque
+       * queda bonito". No se inventan pasos de los que no haya dato.
+       */}
+      <div style={{ width: 'min(86vw, 290px)', display: 'grid', gap: 13 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              width: 18,
+              textAlign: 'center',
+              fontSize: 14,
+              color: known ? 'rgb(var(--theme-done))' : 'var(--theme-primary)',
+            }}
+          >
+            {known ? '✓' : '•'}
+          </span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: known ? 'rgb(var(--theme-line))' : '#f8fafc',
+            }}
+          >
+            Misión
+          </span>
         </div>
-      ) : null}
 
-      <div
-        style={{
-          marginTop: known ? 4 : 14,
-          fontSize: 13,
-          color: 'rgb(var(--theme-line))',
-          fontWeight: 600,
-          textAlign: 'center',
-          lineHeight: 1.45,
-          maxWidth: 320,
-        }}
-      >
-        {known ? '' : detail || 'Preparando la misión…'}
+        <div style={{ display: 'grid', gap: 7 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                width: 18,
+                textAlign: 'center',
+                fontSize: 14,
+                color: 'var(--theme-primary)',
+              }}
+            >
+              •
+            </span>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>Mapa</span>
+            {known ? (
+              // key={pctFino}: sin esto el número se quedaba clavado tras la
+              // primera actualización -medido con sim/playwright-bench: la
+              // barra SÍ seguía llenándose con datos reales (0 fallos, 900+
+              // teselas bajadas), pero este texto se congelaba en el primer
+              // valor, mientras React seguía recalculando el correcto por
+              // dentro (visto en consola) sin que llegara al DOM. Con la key
+              // atada al valor, React recrea el nodo en vez de parchearlo.
+              <span
+                key={pctFino}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 900,
+                  color: 'rgb(var(--theme-line))',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {pctFino}%
+              </span>
+            ) : null}
+          </div>
+
+          <div
+            style={{
+              marginLeft: 28,
+              height: 4,
+              background: 'rgba(255,255,255,.09)',
+              borderRadius: 'var(--theme-radius-pill)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                borderRadius: 'var(--theme-radius-pill)',
+                background:
+                  'linear-gradient(90deg, var(--theme-primary-hover), var(--theme-primary))',
+                width: known ? `${pct}%` : '38%',
+                transition: 'width .35s cubic-bezier(.22,1,.36,1)',
+                animation: known ? 'none' : 'sagaSplashSlide 1.4s infinite ease-in-out',
+                boxShadow: '0 0 14px var(--theme-glow)',
+              }}
+            />
+          </div>
+
+          {haiContas ? (
+            <div
+              style={{
+                marginLeft: 28,
+                fontSize: 10.5,
+                color: 'rgba(var(--theme-line), .7)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {done} / {total} trozos
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div
         style={{
-          marginTop: 18,
-          fontSize: 11,
+          marginTop: 20,
+          fontSize: 11.5,
           color: 'rgba(var(--theme-line), .7)',
           fontWeight: 600,
           textAlign: 'center',
@@ -162,7 +208,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           lineHeight: 1.5,
         }}
       >
-        {primeiraVez ? 'Primera vez: se guarda el mapa. Tarda unos minutos.' : ''}
+        {primeiraVez
+          ? 'Se guarda para poder jugar sin cobertura. La primera vez tarda unos minutos.'
+          : known
+            ? ''
+            : detail || 'Preparando la misión…'}
       </div>
 
       <style>
