@@ -932,8 +932,8 @@ const playerCard: CSSProperties = {
 // Sin borde: el aro alrededor de la foto era otro marco más. La foto se
 // sostiene sola.
 const avatar: CSSProperties = {
-  width: 44,
-  height: 44,
+  width: 60,
+  height: 60,
   borderRadius: 'var(--theme-radius-avatar)',
   display: 'inline-flex',
   alignItems: 'center',
@@ -947,20 +947,22 @@ const avatar: CSSProperties = {
   flex: '0 0 auto',
 }
 
+// Sin `flex: 1`: eso estiraba el bloque del nombre hasta el borde y empujaba
+// la flecha al extremo, dejando un vacío enorme entre las dos cosas. Ahora el
+// nombre ocupa lo que mide y la flecha va justo detrás; el hueco sobrante
+// queda a la derecha de la fila, donde no molesta.
 const identity: CSSProperties = {
   display: 'grid',
   gap: 4,
   minWidth: 0,
-  flex: 1,
 }
 
 // La flecha dice "esto se pulsa" sin gastar una palabra ni una caja.
 const chevron: CSSProperties = {
-  color: 'rgba(255,255,255,.34)',
+  color: 'rgba(255,255,255,.30)',
   fontSize: 22,
   lineHeight: 1,
   flex: '0 0 auto',
-  paddingRight: 2,
 }
 
 const playerName: CSSProperties = {
@@ -969,10 +971,10 @@ const playerName: CSSProperties = {
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   color: '#ffffff',
-  fontSize: 16,
+  fontSize: 20,
   lineHeight: 1.15,
   fontWeight: 900,
-  letterSpacing: '-0.015em',
+  letterSpacing: '-0.02em',
 }
 
 const identityBottom: CSSProperties = {

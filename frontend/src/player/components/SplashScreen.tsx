@@ -61,20 +61,23 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div style={{ position: 'relative', marginBottom: 26 }}>
-        {/* Halos girando: dan sensación de actividad aunque la descarga
-            tarde, en vez de una pantalla aparentemente congelada. */}
-        <span className="saga-splash-ring saga-splash-ring--slow" />
-        <span className="saga-splash-ring saga-splash-ring--fast" />
-        {/* El resplandor de fuego: quieto. Ver la nota de abajo. */}
-        <span className="saga-splash-halo" />
+      {/**
+       * El icono, más pequeño y sin halos girando.
+       *
+       * Con 116px + dos anillos en movimiento + halo era lo que más pesaba de
+       * la pantalla, y en una carga que dura dos segundos aparece y desaparece
+       * a destiempo: "queda feo entre medias". A 72px y quieto acompaña a los
+       * pasos en vez de competir con ellos, que son lo que de verdad hay que
+       * mirar aquí.
+       */}
+      <div style={{ position: 'relative', marginBottom: 22 }}>
         <img
           src="/saga-app-icon-192.png?v=redondo"
           alt="SAGA"
           style={{
             position: 'relative',
-            width: 116,
-            height: 116,
+            width: 72,
+            height: 72,
             // Redondo de verdad, no la esquina cortada del tema. El icono
             // en sí ya venía a sangre completa hasta el borde -lo pedía la
             // especificación de iconos "maskable" del manifest, ver
@@ -82,8 +85,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             // corta nada importante: el dibujo ya vive dentro de la zona
             // segura central.
             borderRadius: '50%',
-            boxShadow: '0 10px 40px rgba(0,0,0,.55)',
-            animation: 'sagaSplashPulse 2.4s infinite ease-in-out',
+            boxShadow: '0 8px 28px rgba(0,0,0,.5)',
           }}
         />
       </div>

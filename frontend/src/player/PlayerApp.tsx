@@ -708,7 +708,28 @@ export default function PlayerApp() {
          * sí se espera: entrar al monte sin mapa es peor que esperar un rato,
          * y para eso está la pantalla.
          */
-        const hayMapa = Boolean(getOfflineMapTileSummary()?.saved)
+        /**
+         * "Hay mapa" = está ENTERO, no "hay alguna tesela".
+         *
+         * Esto era `Boolean(resumen?.saved)`, y `saved` es un NÚMERO -cuántas
+         * teselas hay guardadas-, no un sí/no. Con una sola tesela bajada, el
+         * `Boolean` daba `true` y la app se saltaba la espera entera: quien
+         * hubiera cerrado la app al 3 % la siguiente vez entraba directo, con
+         * el mapa casi vacío, y la pantalla de carga pasaba en un suspiro.
+         * Justo lo que el comentario de arriba dice que hay que evitar -entrar
+         * al monte sin mapa-, y justo lo que Óscar veía: "pasa muy rápido".
+         *
+         * Se pide el 98 %, no el 100 %: alguna tesela suelta puede fallar por
+         * la red y no merece repetir la espera entera por eso. `recortado`
+         * -el plan no cabía en el tope y se cortó a propósito- ya está guardado
+         * como completo: lo que hay es todo lo que va a haber.
+         */
+        const resumenMapa = getOfflineMapTileSummary()
+        const hayMapa = Boolean(
+          resumenMapa &&
+            resumenMapa.requested > 0 &&
+            resumenMapa.saved >= resumenMapa.requested * 0.98
+        )
 
         const guardarMapa = async () => {
           try {
