@@ -387,6 +387,21 @@ export default function PlayerApp() {
   const gpsModoRef = useRef<'preciso' | 'por_red'>('preciso')
   const gpsAvisoModoRef = useRef(false)
   const gpsReintentoPrecisoTimerRef = useRef<number | null>(null)
+
+  /**
+   * Batería: el chip GPS de precisión (`enableHighAccuracy: true`) en
+   * `watchPosition` continuo es lo que más consume, con diferencia, de
+   * toda la app. La mayor parte de una ruta se anda LEJOS de cualquier
+   * nodo -no hace falta precisión de satélite para saber que quedan 800m,
+   * solo hace falta saberlo, no acertar el metro-. Solo al acercarse de
+   * verdad (radio de nodo típico: 50m, aquí 250m de margen) hace falta la
+   * precisión que sí gasta batería. `null` -sin nodo o sin fix todavía- se
+   * trata como "lejos": mejor arrancar en modo barato y subir a preciso en
+   * cuanto haya un primer punto de referencia, que arrancar gastando de más
+   * sin necesidad.
+   */
+  const DISTANCIA_MODO_PRECISO_M = 250
+  const distanciaAlNodoRef = useRef<number | null>(null)
   const handleRequestLiveGpsRef = useRef<
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
   >(null)
@@ -1391,6 +1406,29 @@ export default function PlayerApp() {
       ? Math.round(getDistanceMeters(displayPosition, stagePosition))
       : null
 
+  useEffect(() => {
+    distanciaAlNodoRef.current = distanceMeters
+  }, [distanceMeters])
+
+  /**
+   * Bajar a modo barato al alejarse -ahorra batería de forma activa, no
+   * solo como reacción a un fallo-. Solo el sentido "lejos", a propósito:
+   * el sentido contrario -subir a preciso al acercarse- ya lo cubre el
+   * reintento periódico de más arriba (cada 90s). Forzarlo aquí también,
+   * al vuelo con cada lectura de posición, podía entrar en bucle: cerca de
+   * un nodo con cobertura mala, un fallback a por_red por fallo real haría
+   * que este efecto quisiera subir a preciso otra vez de inmediato, fallara
+   * otra vez, bajara otra vez... 400m de margen sobre los 250 de subida
+   * evita además que el ruido normal del GPS haga oscilar el modo cerca
+   * del borde.
+   */
+  useEffect(() => {
+    if (distanceMeters === null || gpsWatchRef.current === null) return
+    if (gpsModoRef.current === 'preciso' && distanceMeters > 400) {
+      void handleRequestLiveGpsRef.current?.({ silent: true })
+    }
+  }, [distanceMeters])
+
   const unlockDistanceMeters =
     stagePosition && unlockPosition
       ? Math.round(getDistanceMeters(unlockPosition, stagePosition))
@@ -2148,13 +2186,19 @@ export default function PlayerApp() {
     })
 
     if (gpsWatchRef.current === null) {
+      // Lejos del nodo (o todavía sin ningún punto de referencia): arrancar
+      // ya en modo barato ahorra batería desde el primer segundo, no solo
+      // tras fallar en preciso. Cerca, al revés: preciso desde ya, porque
+      // ahí sí hace falta acertar el radio del nodo.
+      const lejos =
+        distanciaAlNodoRef.current === null || distanciaAlNodoRef.current > DISTANCIA_MODO_PRECISO_M
+      gpsModoRef.current = lejos ? 'por_red' : 'preciso'
+      gpsTimeoutsSeguidosRef.current = 0
       // watchPosition: long timeout so the GPS chip can finish a cold fix
       // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
-      gpsModoRef.current = 'preciso'
-      gpsTimeoutsSeguidosRef.current = 0
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
+        enableHighAccuracy: !lejos,
+        maximumAge: lejos ? 15000 : 5000,
         timeout: 20000,
       })
     }

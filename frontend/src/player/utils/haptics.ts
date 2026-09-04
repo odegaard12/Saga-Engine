@@ -80,6 +80,22 @@ if (typeof document !== 'undefined') {
     }
   }
   unlockEvents.forEach(e => document.addEventListener(e, unlockHandler, { once: true, passive: true }))
+
+  // iOS suspende el AudioContext otra vez -no solo la primera vez- al
+  // volver de un cambio de app: pedir permiso de cámara o GPS, o
+  // simplemente minimizar Safari un momento, ya basta. audioUnlocked se
+  // quedaba en `true` para siempre tras el primer desbloqueo, así que
+  // playTone() lo daba por bueno y se callaba en silencio -sin error, sin
+  // aviso- el resto de la sesión. "Superaste el nodo" sin sonido era esto:
+  // el contexto llevaba suspendido desde que el jugador dio el permiso de
+  // cámara al principio de la ruta.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return
+    const ctx = getAudioCtx()
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => { /* se reintentará en el siguiente sonido */ })
+    }
+  })
 }
 
 function playTone(
@@ -90,7 +106,16 @@ function playTone(
   fadeOut = true
 ) {
   const ctx = getAudioCtx()
-  if (!ctx || ctx.state === 'suspended') return
+  if (!ctx) return
+
+  // Igual que en visibilitychange: un contexto suspendido no es un
+  // contexto muerto. Reintentar resume() aquí -no solo confiar en el
+  // desbloqueo inicial- es lo que lo hace sonar de verdad la segunda vez
+  // que hiciera falta, no solo la primera.
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(() => playTone(frequency, duration, type, gainValue, fadeOut)).catch(() => undefined)
+    return
+  }
 
   try {
     const oscillator = ctx.createOscillator()
