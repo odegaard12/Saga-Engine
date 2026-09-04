@@ -176,23 +176,44 @@ export default function SimulationBenchPanel() {
 
           <label>
             Cobertura
+            {/* Agrupado por qué variable se está probando, no por orden de
+                creación -antes eran 8 opciones seguidas sin ningún criterio
+                visual, y encontrar "el perfil GPS" entre "cliente viejo" y
+                "corte a mitad de ruta" costaba más de lo que debería-. */}
             <select value={network} onChange={(event) => setNetwork(event.target.value)}>
-              <option value="buena">Buena</option>
-              <option value="mala">Mala (lenta, algún eco)</option>
-              <option value="inestable">Inestable (lenta y con ecos)</option>
-              <option value="corte">Corte a mitad de ruta (vaguada, tramo sin señal)</option>
-              <option value="a_saltos">A saltos (entra y sale de cobertura toda la ruta)</option>
-              <option value="sin_cobertura">Sin cobertura (todo por la cola offline)</option>
-              <option value="cliente_antiguo">Móvil viejo (no manda level_before)</option>
-              <option value="ruta_larga_caotica">Ruta larga y caótica (empieza sin señal, 6 cortes sueltos, GPS degradado)</option>
+              <optgroup label="Con cobertura de sobra">
+                <option value="buena">Buena</option>
+                <option value="mala">Mala (lenta, algún eco)</option>
+                <option value="inestable">Inestable (lenta y con ecos)</option>
+              </optgroup>
+              <optgroup label="Cortes de cobertura">
+                <option value="corte">Corte a mitad de ruta (vaguada, tramo sin señal)</option>
+                <option value="a_saltos">A saltos (entra y sale de cobertura toda la ruta)</option>
+                <option value="sin_cobertura">Sin cobertura (todo por la cola offline)</option>
+              </optgroup>
+              <optgroup label="GPS, no la red">
+                <option value="gps_degradado">GPS malo, cobertura buena (sin fix / desviado, aislado)</option>
+              </optgroup>
+              <optgroup label="Casos especiales">
+                <option value="cliente_antiguo">Móvil viejo (no manda level_before)</option>
+                <option value="ruta_larga_caotica">Ruta larga y caótica (todas las variables a la vez)</option>
+              </optgroup>
             </select>
           </label>
         </div>
 
         <div style={filaBotones}>
           <button type="button" style={botonPrimario} disabled={estado === 'running'} onClick={() => ejecutar(false)}>
-            {estado === 'running' ? 'Corriendo…' : '▶️ Ejecutar'}
+            {estado === 'running' ? 'Corriendo…' : `▶️ Ejecutar con estos parámetros (${playerCount} · ${network})`}
           </button>
+        </div>
+
+        {/* Separado de "Ejecutar": estos ya traen sus propios parámetros
+            fijos -pulsar aquí cambia lo elegido arriba, no lo respeta-, así
+            que iban confusos en la misma fila que un botón que sí lee el
+            formulario. */}
+        <div style={filaAccesosRapidos}>
+          <span style={etiquetaAccesosRapidos}>Accesos rápidos:</span>
           <button
             type="button"
             style={botonSecundario}
@@ -204,7 +225,20 @@ export default function SimulationBenchPanel() {
               void ejecutar(false, 15, 'a_saltos')
             }}
           >
-            📈 Prueba grande (15 · a saltos)
+            📈 Grande (15 · a saltos)
+          </button>
+          <button
+            type="button"
+            style={botonSecundario}
+            disabled={estado === 'running'}
+            title="5 jugadores, GPS malo con cobertura buena: aísla si un fallo es del GPS o de la red."
+            onClick={() => {
+              setPlayerCount(5)
+              setNetwork('gps_degradado')
+              void ejecutar(false, 5, 'gps_degradado')
+            }}
+          >
+            📍 GPS malo (5)
           </button>
           <button type="button" style={botonSecundario} disabled={limpiando} onClick={limpiar}>
             {limpiando ? 'Limpiando…' : '🧹 Limpiar rastro (SIM_*)'}
@@ -377,6 +411,24 @@ const filaBotones: CSSProperties = {
   gap: 10,
   marginTop: 14,
   flexWrap: 'wrap',
+}
+
+const filaAccesosRapidos: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  marginTop: 10,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  paddingTop: 10,
+  borderTop: '1px dashed rgba(255,255,255,.12)',
+}
+
+const etiquetaAccesosRapidos: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '.04em',
+  textTransform: 'uppercase',
+  color: '#94a3b8',
 }
 
 const botonPrimario: CSSProperties = {

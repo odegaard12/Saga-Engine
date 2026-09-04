@@ -31,6 +31,27 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.9 Perfil de GPS aislado, y el desplegable de cobertura por fin agrupado — ✅ en 4.9.66
+
+"Mejorar simulaciones, orden, análisis más potente" -concretado en dos
+cosas: más perfiles de prueba, y mejor organización del panel.
+
+**Perfil nuevo `gps_degradado`**: GPS malo -15% sin fix, 20% con 30-90 m de
+desviación real- con cobertura de red BUENA. Antes esa degradación de GPS
+solo existía mezclada dentro de `ruta_larga_caotica`, junto con 6 cortes de
+cobertura sueltos: un fallo ahí no decía si la culpa era del GPS o de la
+red. Ahora se puede aislar la variable.
+
+**El desplegable de cobertura, agrupado por qué se está probando**: 8
+opciones seguidas sin ningún criterio visual pasaron a 4 grupos ("Con
+cobertura de sobra", "Cortes de cobertura", "GPS, no la red", "Casos
+especiales"). En el panel, además, "Ejecutar" (lee los parámetros de
+arriba) se separó de los accesos rápidos (parámetros fijos propios,
+confusos en la misma fila que un botón que sí respeta el formulario) —
+`📈 Grande (15 · a saltos)` y el nuevo `📍 GPS malo (5)`.
+
+Verificado: suite completa, `tsc -b`/`vite build` limpios.
+
 ## 1.8 La barra de iconos tapaba la tarjeta inferior con textos de ayuda largos — ✅ en 4.9.65
 
 Encontrado midiendo de verdad, no a ojo: entrando como `Odi` (jugador real,
