@@ -1992,7 +1992,16 @@ export default function PlayerApp() {
     if (!options.silent)
       showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
-    const onSuccess = (position: GeolocationPosition) => {
+    // function, no const con flecha: onSuccess, cambiarAModoPorRed y onError
+    // se referencian entre sí -cambiarAModoPorRed llama a onError dentro de
+    // watchPosition, onError llama a cambiarAModoPorRed-. Con `const` eso
+    // seguía dando en producción "Cannot access 'X' before initialization"
+    // en CADA actualización de posición -reproducido y comprobado que
+    // persistía tanto con esbuild como con terser, dos minificadores
+    // distintos: no era cosa de uno en concreto, era este cruce en sí-. Una
+    // `function` está izada entera (nombre Y cuerpo) en todo el ámbito, así
+    // que el orden en que se escriban ya no puede importarle a nada.
+    function onSuccess(position: GeolocationPosition) {
       if (localDebugEnabled) {
         return
       }
@@ -2053,7 +2062,7 @@ export default function PlayerApp() {
     // -puede que no baste para entrar en un radio de 50m-, pero suele
     // responder donde el chip no lo hace, y es mejor tener un punto
     // aproximado que ninguno.
-    const cambiarAModoPorRed = () => {
+    function cambiarAModoPorRed() {
       if (gpsModoRef.current === 'por_red') return
       gpsModoRef.current = 'por_red'
 
@@ -2075,7 +2084,7 @@ export default function PlayerApp() {
       }
     }
 
-    const onError = (error: GeolocationPositionError) => {
+    function onError(error: GeolocationPositionError) {
       // TIMEOUT (code 3) while watching means the hardware GPS is still acquiring signal
       // (e.g. airplane mode with GPS chip active, or first cold fix outdoors).
       // Keep 'searching' so the UI shows "Buscando señal…" instead of a hard error.
