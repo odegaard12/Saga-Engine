@@ -52,6 +52,23 @@ def estado_limpo():
     yield
 
 
+@pytest.fixture(autouse=True)
+def paso_instantaneo(monkeypatch):
+    """El banco espera ahora un paseo real entre nodos con cobertura (ver
+    simulation_bench.PASO_HUMANO_MPS): sin esto, los nodos de prueba de más
+    arriba -0.01° de separación, más de 1 km- hacían que este fichero
+    tardara MINUTOS en correr, con cada test durmiendo de verdad decenas de
+    segundos por una distancia que aquí no representa nada real, solo dos
+    coordenadas distintas para probar lógica.
+
+    A velocidad casi infinita el paseo se queda en fracciones de milisegundo
+    -el código que calcula la distancia y duerme se sigue ejecutando y
+    probando igual-, sin importar qué factor_velocidad traiga cada perfil
+    (ruta_larga_caotica trae el suyo propio, distinto del por defecto)."""
+    monkeypatch.setattr(simulation_bench, "PASO_HUMANO_MPS", 1_000_000_000.0)
+    yield
+
+
 def configurar(monkeypatch):
     monkeypatch.setattr(main, "admin_request_authorized", lambda request, data: True)
     monkeypatch.setattr(main, "admin_password_change_required", lambda: False)

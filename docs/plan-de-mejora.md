@@ -31,6 +31,61 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.7 El banco ya anda entre nodos — cierra el hueco que dejó anotado 1.6 — ✅ en 4.9.64
+
+1.6 dejó anotado el hueco: "simular tiempo de camino entre nodos, no solo el
+corte de cobertura". Sin eso, un jugador simulado con cobertura buena
+mandaba heartbeat+advance de un nodo al siguiente en milisegundos -muy por
+debajo de los 2 s mínimos entre latidos del mismo jugador-, así que salían
+429 que no significaban nada: ningún jugador de carne y hueso tarda menos
+de 2 s en andar de un nodo al siguiente.
+
+**`backend/app/runtime/simulation_bench.py`:** `PASO_HUMANO_MPS = 1.3`
+(~4.7 km/h, la media citada en literatura de movilidad peatonal para
+adultos en llano) + `distancia_metros()` (haversine, misma fórmula que ya
+usa el resto del proyecto). Antes de cada nodo con cobertura, el jugador
+simulado espera la distancia real -coordenadas de verdad de la misión,
+no inventadas- entre el último nodo en vivo y este, dividida por el paso
+humano y comprimida por `factor_velocidad` (25x por defecto: un paseo real
+de minutos se queda en segundos de banco). Los nodos EN CORTE no esperan
+nada -ahí no se manda nada al servidor, así que no hay heartbeat que
+proteger-, y `ruta_larga_caotica` -el perfil que pidió expresamente "que
+lleve tiempo analizar"- trae su propio `factor_velocidad: 6.0`, mucho más
+cercano al paseo real, para que la prueba larga dure de verdad minutos.
+
+**Trampa encontrada al mismo tiempo:** los nodos de prueba de
+`tests/test_o_banco_de_probas_do_panel.py` están a 0.01° de separación -más
+de 1 km-, pensados solo para dar coordenadas distintas, no para representar
+distancias reales. Con el paseo real activado, ese fichero solo (26 tests)
+pasó a tardar minutos de verdad en vez de segundos. Arreglado con una
+fixture `autouse` que sube `PASO_HUMANO_MPS` a un valor absurdo solo durante
+los tests -el código que calcula la distancia y espera se sigue ejecutando
+y probando igual, la espera en sí se queda en fracciones de milisegundo-.
+Verificado: 26/26 en 59.58 s.
+
+**`sim/playwright-bench/lib/devices.mjs`:** mismo ritmo (`PASO_HUMANO_MPS`,
+misma haversine), llevado al navegador de verdad. `andarHasta(context,
+desde, hasta, {factorVelocidad, pasosPorSegundo})` mueve la geolocalización
+del contexto en varios pasos intermedios vía `setGeolocation()`, no de un
+salto -lo que dejaba pendiente 0.7/1.2 desde que se montó el arnés de
+Playwright-. Usado por el escenario nuevo (abajo); `team-relay-cobertura`
+todavía teletransporta, sin retocar.
+
+**Escenario nuevo, `offline-descargado-antes.mjs`:** la forma realista de
+jugar sin cobertura -misión descargada CON wifi, como en casa antes de
+salir, y LUEGO cero cobertura, sin fecha de vuelta-, algo que nunca se
+había probado con un navegador de verdad. Comprueba: que la app recarga
+desde caché ya sin cobertura (no una pantalla en blanco), que se completa
+un nodo -código de respaldo, no el minijuego en sí, eso es otro proyecto-
+con cero peticiones de red mientras dura el corte, y que al recuperar la
+señal sincroniza sola. Construido leyendo el código fuente real de cada
+botón y selector (`PlayerApp.tsx`, `InteractionSheet.tsx`, `PlayerHud.tsx`),
+no adivinado. **Sin verificar en una corrida real** -no había a mano la
+contraseña de admin vigente al escribirlo (`saga-admin-y-pruebas.md` ya
+dejó anotado que caducaba)-: sintaxis comprobada (`node --check`), lógica
+razonada contra el código fuente, pero pendiente de una corrida real antes
+de fiarse del todo.
+
 ## 1.6 Ruta larga y caótica — y el banco nunca había mandado un heartbeat — ✅ en 4.9.63
 
 "¿Por qué tan poca duración? Quiero un test más largo, todas las
