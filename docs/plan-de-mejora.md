@@ -31,6 +31,37 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.14 El verde de "en línea" salía naranja en fuego, y una caja para el texto del login — 4.9.72
+
+**"No me convence el rojo de clasificación."** Encontrado con la causa
+exacta, no a ojo: el punto y el número de "EN LÍNEA" en la pantalla de
+clasificación usaban `--theme-done` -el token de marca de cada tema-, y en
+`flame-red` ese token vale `rgb(214, 124, 70)`, naranja-terracota, no
+verde. "Este jugador está conectado ahora mismo" es una señal semántica
+-verde universal de "activo/bien", el mismo lenguaje en cualquier app-, no
+una decoración de marca: ponerla en el color de fuego hacía que
+"conectado" se leyera como aviso, no como buena señal. Fijado a un verde
+propio (`#22c55e`), independiente del tema. RECIENTE/OFFLINE sí siguen
+variando con el tema -esos son estados neutros, no una señal de "todo va
+bien"-.
+
+**El login, un recuadro para el texto que explica de qué va la misión.**
+El párrafo bajo "SAGA" flotaba suelto, sin nada que lo separase
+visualmente del rótulo -mismo fondo, mismo bloque, ninguna frontera entre
+"esto es el título" y "esto es la explicación"-. Ahora tiene su propio
+panel, mismo lenguaje visual que la tarjeta de clave de misión (más abajo
+en la misma pantalla), para que las dos pantallas del login se lean con el
+mismo criterio.
+
+⏳ **Cámara: revisada, sin cambio -de momento.** El componente
+(`FieldCameraCapture.tsx`) usa colores neutros (blanco/negro, guía en azul
+de `--theme-info`), no encontré ahí un problema de rojo de marca como en
+clasificación. Pendiente de que Óscar concrete qué específicamente no le
+convence antes de tocar nada a ciegas.
+
+Verificado: `tsc -b` limpio (incluido el trabajo en curso de otra sesión
+en el mismo árbol, sin tocarlo).
+
 ## 1.13 GPS por distancia (batería), y el sonido de iPhone que se callaba solo — 4.9.71
 
 **Batería: modo barato por defecto, preciso solo cerca del nodo.** Antes
