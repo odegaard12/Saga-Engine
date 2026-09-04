@@ -287,7 +287,7 @@ async def download_field_proofs(request: Request, user: str = ""):
             created_at = int(row["created_at"] or 0)
             target = (base_dir / filename).resolve()
 
-            if not str(target).startswith(str(base_dir)):
+            if not target.is_relative_to(base_dir):
                 continue
             if not target.exists() or not target.is_file():
                 continue
@@ -375,7 +375,7 @@ async def get_field_proof_image(request: Request, proof_id: str):
     base_dir = resolve_field_proofs_dir().resolve()
     target = (base_dir / filename).resolve()
 
-    if not str(target).startswith(str(base_dir)):
+    if not target.is_relative_to(base_dir):
         raise HTTPException(status_code=400, detail="invalid proof path")
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="proof image not found")
@@ -392,8 +392,8 @@ async def get_field_proof_image(request: Request, proof_id: str):
 
 
 @router.delete("/api/field-proofs/{proof_id}")
-async def delete_field_proof(proof_id: str, user: str = ""):
-    from main import resolve_known_player_profile
+async def delete_field_proof(proof_id: str, request: Request, user: str = ""):
+    from main import resolve_known_player_profile, require_player_session
     safe_id = _as_str(proof_id).strip()
     user_text = _as_str(user).strip()
 
@@ -401,6 +401,11 @@ async def delete_field_proof(proof_id: str, user: str = ""):
         raise HTTPException(status_code=404, detail="proof not found")
     if not user_text:
         raise HTTPException(status_code=400, detail="user required")
+
+    # El `user` del body ya no basta: la sesión firmada tiene que ser la de ese
+    # mismo jugador, si no cualquiera con un nombre y un proof_id borra fotos
+    # ajenas.
+    require_player_session(request, user_text)
 
     profile = resolve_known_player_profile(user_text)
     if not profile:
@@ -444,7 +449,7 @@ async def delete_field_proof(proof_id: str, user: str = ""):
         base_dir = resolve_field_proofs_dir().resolve()
         target = (base_dir / filename).resolve()
 
-        if str(target).startswith(str(base_dir)) and target.exists() and target.is_file():
+        if target.is_relative_to(base_dir) and target.exists() and target.is_file():
             try:
                 target.unlink()
             except OSError:
@@ -458,12 +463,23 @@ async def delete_field_proof(proof_id: str, user: str = ""):
 
 @router.post("/api/field-proofs")
 async def create_field_proof(request: Request):
-    from main import resolve_known_player_profile, get_live_position, sanitize_event_text, EVENT_LOG_DB
+    from main import (
+        resolve_known_player_profile,
+        get_live_position,
+        sanitize_event_text,
+        require_player_session,
+        EVENT_LOG_DB,
+    )
     data = await request.json()
 
     user = _as_str(data.get("user")).strip()
     if not user:
         raise HTTPException(status_code=400, detail="user required")
+
+    # Subir una foto exige la sesión firmada de ese jugador, no sólo saber su
+    # nombre: si no, un extraño planta fotos a nombre de un menor y, omitiendo
+    # lat/lon, sobre su posición GPS real.
+    require_player_session(request, user)
 
     profile = resolve_known_player_profile(user)
     if not profile:
