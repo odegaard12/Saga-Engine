@@ -81,7 +81,10 @@ export async function run() {
   try {
     const context = await browser.newContext({
       ...PERFILES_DISPOSITIVO.iphone,
-      geolocation: coordsA,
+      // Playwright quiere {latitude, longitude}, no {lat, lon} -el resto del
+      // proyecto usa lat/lon (mismo nombre que la API de Saga), así que esto
+      // se traduce aquí, en el único sitio donde hace falta.
+      geolocation: { latitude: coordsA.lat, longitude: coordsA.lon },
       permissions: ['geolocation'],
     })
     await context.addCookies([{ name: sesion.cookie_name, value: jugador.token, url: BASE_URL }])
