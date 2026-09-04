@@ -31,6 +31,49 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.18 Login "E", carga por pasos, y el bug de las caras cuadradas — 4.9.76 a 4.9.78
+
+**Brasa (1.17) salió mal, y por un motivo que debí comprobar antes.** El
+diseño se apoyaba en una franja de foto de portada… y `/login-fondo.jpg`
+devuelve **404** en producción (comprobado con `curl`, después de que Óscar
+dijera "queda fatal"). Reservar 74-96px para una imagen que no existe = un
+agujero muerto enorme sobre el título. **Lección: no diseñar sobre un
+recurso sin comprobar antes que está.**
+
+**Las caras salían cuadradas.** El avatar usaba `--theme-radius-pill`, que
+en `flame-red` vale **3px a propósito** (ese tema corta esquinas, es su
+idioma). Nueva variable `--theme-radius-avatar: 999px` en los dos temas:
+una cara recortada en cuadrado parece foto de carnet mal hecha, y es el
+único sitio donde la esquina cortada del tema estorba en vez de aportar. El
+mismo fallo estaba en la clasificación (avatar de 42px) — arreglado también.
+
+**Login rehecho como "E", elegido por Óscar de entre maquetas dibujadas:**
+- Título **en la misma fila que "Admin"**. El botón ocupaba una fila entera
+  para él solo y el rótulo empezaba debajo: eso era el hueco de arriba.
+  Medido tras el cambio: los dos a `top: 18px` exactos.
+- **Se acabó el recuadro dentro del recuadro.** Fuera la tarjeta con borde y
+  fondo: fila limpia con foto redonda, nombre, flecha y una línea finísima.
+  Una foto ya es un rectángulo con su forma; encerrarla en una caja la mete
+  en un segundo marco, catorce veces seguidas.
+- Una columna en vez de dos, rótulo de 50px a 27px. Scroll total de 1276px
+  a 1096px, con la foto más grande y legible que antes.
+
+**Pantalla de carga, por pasos.** Era una barra y un número: decía cuánto
+falta pero no QUÉ pasa, y con el mapa tardando minutos parecía colgada.
+Ahora lista de pasos con lo hecho en verde y lo que corre con su barra. Los
+pasos son **reales**: si hay progreso de mapa, la misión ya se cargó -es lo
+que dispara esta pantalla-. No se inventan pasos sin dato detrás.
+
+⚠️ **Lo que NO era un cambio, aunque yo dibujé maquetas de ello.** Al ir a
+implementar el "modo jugador" resultó que ya estaba hecho: la barra de
+progreso por segmentos en la barra superior (`rielProgreso` en
+`PlayerShell.tsx`), el dock de iconos unido en un bloque
+(`getMapQuickControlsStyle`, `gap: 0` + `overflow: hidden`), y las pestañas
+de la mochila (objetos / mesa / requisitos). Mis maquetas dibujaban en
+buena parte lo que la app ya hacía. Queda dicho para no volver a
+"proponer" lo que ya existe: **mirar el código antes de dibujar la
+propuesta, no después.**
+
 ## 1.17 Login rediseñado: "Brasa" — 4.9.75
 
 "El login es feísimo." Se le pasaron a Óscar tres direcciones dibujadas
