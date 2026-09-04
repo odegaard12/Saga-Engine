@@ -31,6 +31,30 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.11 1.10 se equivocó: no era esa variable, era el minificador — ✅ en 4.9.68
+
+1.10 decía "confirmado que no reaparece después" del arreglo del `ln`.
+**Era falso** -medido mal, dando por bueno un solo cambio sin volver a
+provocar el fallo con más fuerza-. Al repetir la prueba con más
+actualizaciones de posición seguidas, el mismo error volvió a saltar en
+la MISMA posición del código minificado, esta vez con otra variable
+(`pn`, esta vez el propio ref `hasOfflineMissionRef` que se acababa de
+añadir para arreglarlo). Cambiar el nombre no arreglaba nada: solo movía
+el problema a lo siguiente que cayera en esa posición.
+
+Eso apunta a un fallo del propio minificador (esbuild, el que usa Vite
+por defecto), no del código fuente -el orden en el código siempre fue
+correcto-: en un componente tan grande como `PlayerApp.tsx` (miles de
+bindings locales), su renombrado a 1-2 caracteres colisiona dos variables
+de ámbitos que sí se solapan. `vite.config.ts`: `build.minify: 'terser'`
+-más lento (4.9s en vez de 0.5s), pero mucho más conservador con el
+ámbito-. Verificado esta vez de verdad: la misma prueba que antes hacía
+saltar el error 11 veces seguidas, cero veces con terser.
+
+Lección para no repetir: un solo cambio + una sola prueba corta no basta
+para dar un fallo de minificación por resuelto. Hay que forzar el camino
+que lo dispara varias veces seguidas, no una.
+
 ## 1.10 El GPS que fallaba en el monte pese al permiso — dos bugs reales, no uno — ✅ en 4.9.67
 
 Reportado en persona: en la ruta, a bastante gente le falló el GPS o nunca
