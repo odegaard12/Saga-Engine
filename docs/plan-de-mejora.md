@@ -31,6 +31,32 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.8 La barra de iconos tapaba la tarjeta inferior con textos de ayuda largos — ✅ en 4.9.65
+
+Encontrado midiendo de verdad, no a ojo: entrando como `Odi` (jugador real,
+misión terminada 10/10) en producción, la barra de iconos rápidos
+(📷 foto / 📖 historia / 🏆 clasificación) tenía su borde inferior a
+`650.1px` del top del viewport, y la tarjeta inferior (Mochila/Herramientas
++ el texto de ayuda del botón principal) empezaba en `637.8px` -**12px de
+solape real**, no hipotético, en un estado normal (avisando de activar el
+GPS), no un caso límite-.
+
+Causa: `getMapQuickControlsStyle()` posicionaba la barra de iconos a una
+distancia FIJA del fondo del viewport (`138px`), calibrada hace tiempo para
+un texto de ayuda corto. La tarjeta de abajo, en cambio, crece con su
+contenido -el texto de ayuda "indicaciones" puede ser largo-, así que su
+borde de arriba sube sin que la barra de iconos, que no sabe nada de ella,
+se entere ni se aparte.
+
+**Arreglo:** `PlayerApp.tsx` mide el alto real de la tarjeta con
+`ResizeObserver` sobre `[data-saga-player-hud="bottom"]` -enganchado cuando
+`state.status` pasa a `'ready'`, porque en el primer montaje real la tarjeta
+todavía no existe, está la pantalla de carga del mapa- y coloca la barra de
+iconos justo encima, con un hueco fijo de 14px, en vez de una distancia
+inventada. Con `ResizeObserver` no hace falta reenganchar nada cuando cambia
+el nodo o el texto de ayuda: sigue avisando solo de cada cambio de alto.
+Verificado: `tsc -b` y `vite build` limpios.
+
 ## 1.7 El banco ya anda entre nodos — cierra el hueco que dejó anotado 1.6 — ✅ en 4.9.64
 
 1.6 dejó anotado el hueco: "simular tiempo de camino entre nodos, no solo el
