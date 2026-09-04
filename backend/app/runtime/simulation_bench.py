@@ -143,6 +143,18 @@ PERFILES_RED = {
         "zona_muerta": None,
         "omitir_level_before": True,
     },
+    # GPS malo, cobertura buena: la variable GPS AISLADA. Antes solo se podía
+    # probar mezclada dentro de ruta_larga_caotica -junto con 6 cortes de
+    # cobertura sueltos-, así que un fallo ahí no decía si la culpa era del
+    # GPS o de la cobertura. Aquí la red no falla nunca; solo el GPS: 15% de
+    # los latidos sin fix (bajo árboles, entre edificios), 20% con 30-90 m
+    # de desviación real, el resto normal.
+    "gps_degradado": {
+        "retraso_ms": (0, 80),
+        "duplicado_prob": 0.0,
+        "zona_muerta": None,
+        "gps_calidad": "degradado",
+    },
     # Ruta larga y caótica: "todas las casuísticas a la vez", no una sola
     # variable movida. Empieza YA sin cobertura -llega al punto de salida
     # sin señal, como quien sale de casa sin datos y la coge en el monte-,
