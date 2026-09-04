@@ -64,6 +64,21 @@ ignoradas por git — son evidencia de una corrida, no algo que versionar).
   mapa (ver más abajo) en vez de adivinar desde una imagen, y encontró el
   bug real de raíz -se queda en el arnés para cualquier sospecha parecida
   en el futuro-.
+- **`offline-descargado-antes`**: la forma realista de jugar sin cobertura —
+  se descarga la misión CON wifi, como en casa antes de salir, y luego se
+  corta la red del todo, sin fecha de vuelta. Comprueba, con un navegador de
+  verdad: que la app vuelve a arrancar desde caché al recargarla ya sin
+  cobertura (no una pantalla en blanco), que se puede completar un nodo
+  -código de respaldo, no el minijuego en sí: automatizar los 10 minijuegos
+  por UI es otro proyecto aparte- con CERO peticiones de red mientras dura el
+  corte, y que al recuperar la señal sincroniza solo, sin que nadie recargue
+  nada a mano. Usa `andarHasta()` (ver abajo) para moverse de un nodo a otro
+  de verdad, no de un salto. **Construido leyendo el código fuente real de
+  cada botón/selector (PlayerApp.tsx, InteractionSheet.tsx, PlayerHud.tsx),
+  no adivinado — pero todavía sin una corrida en vivo verificada, por no
+  tener a mano la contraseña de admin vigente en el momento de escribirlo
+  (ver `saga-admin-y-pruebas.md`: quedó anotado que caducaba). Antes de
+  fiarse del todo, correrlo una vez contra un servidor de prueba.**
 
 ## La pantalla de precarga del mapa (03-set-2026, arreglado en 4.9.59)
 
@@ -95,19 +110,19 @@ iPhone (`devices['iPhone 14']` de Playwright) es el compromiso correcto.
 Un modo "fidelidad de Safari" con WebKit, sin throttling, queda anotado como
 mejora futura para bugs específicos de motor.
 
-## Pendiente (investigado, no construido)
+## `andarHasta()` — GPS interpolado, no teletransportado
 
-- **GPS interpolado, no teletransportado.** Ahora mismo `context.setGeolocation()`
-  salta de nodo en nodo. Las herramientas de la industria (p. ej.
-  [geolocation-simulator](https://github.com/russellsamora/geolocation-simulator))
-  interpolan el camino a velocidad de paseo entre puntos -hace falta para
-  probar de verdad lo que reacciona a la posición EN VIVO, no solo al
-  llegar: bearing_hunt, el latido de team_relay-.
-- **Offline-descargado-antes.** Jugar la ruta entera ya predescargada,
-  desde el nodo 1, sin cobertura desde el principio. Necesita el mapa ya
-  cacheado -ver la limitación de precarga más arriba, ya resuelta en el
-  sentido de que el porcentaje ya no miente, pero la descarga sigue
-  tardando minutos de verdad-.
+`lib/devices.mjs` exporta `andarHasta(context, desde, hasta, { factorVelocidad, pasosPorSegundo })`:
+mueve la geolocalización del contexto de un punto a otro en varios pasos
+intermedios -no un salto-, al mismo ritmo humano (1.3 m/s) y con el mismo
+`factorVelocidad` que `PASO_HUMANO_MPS`/`FACTOR_VELOCIDAD_DEFECTO` del banco
+de Python (`backend/app/runtime/simulation_bench.py`) — un paseo real de
+minutos se comprime a segundos de prueba, sin dejar de ser un paseo.
+`offline-descargado-antes` ya lo usa. **Pendiente**: `team-relay-cobertura`
+sigue teletransportando (pone la geolocalización una vez, al crear el
+contexto) — no se ha retocado ese escenario para usar `andarHasta()`, y
+tampoco existe todavía un escenario para `bearing_hunt` (el minijuego que
+más depende de la posición EN VIVO, no solo de llegar).
 
 ## Sobre la Raspberry Pi
 
