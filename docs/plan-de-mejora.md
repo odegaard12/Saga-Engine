@@ -31,6 +31,14 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.16 Hueco entre la barra de título y la isla del iPhone — 4.9.74
+
+"La barra que pone SAGA o O ECO hay que subirla más arriba, hay hueco
+entre eso y la isla del iPhone." `getTopOverlayStyle()` ya respetaba el
+área segura del notch (`env(safe-area-inset-top)`), pero le sumaba 16px
+extra por encima -pensados como aire, pero se veían como un hueco muerto
+entre la isla y el contenido-. Bajado a 6px.
+
 ## 1.15 🔴 Error real de React (#310) al entrar como jugador — ✅ arreglado en 4.9.73
 
 Reportado por Óscar en persona: al darle a un jugador, error. React
