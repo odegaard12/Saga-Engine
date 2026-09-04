@@ -250,7 +250,10 @@ export function getTopOverlayStyle(mobile: boolean): CSSProperties {
     top: 0,
     left: 0,
     right: 0,
-    padding: mobile ? 'calc(env(safe-area-inset-top, 0px) + 16px) 10px 0' : '10px 0 0',
+    // 6px, no 16px: con el margen del área segura del notch/isla dinámica
+    // ya puesto por env(safe-area-inset-top), 16px de más dejaba un hueco
+    // visible entre la barra "SAGA"/título y la isla del iPhone.
+    padding: mobile ? 'calc(env(safe-area-inset-top, 0px) + 6px) 10px 0' : '10px 0 0',
     zIndex: 1200,
     pointerEvents: 'auto',
   }
