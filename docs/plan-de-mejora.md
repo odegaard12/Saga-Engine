@@ -31,6 +31,49 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.10 El GPS que fallaba en el monte pese al permiso — dos bugs reales, no uno — ✅ en 4.9.67
+
+Reportado en persona: en la ruta, a bastante gente le falló el GPS o nunca
+le llegó a funcionar aunque hubiera dado el permiso. Se investigó de
+verdad, con Playwright contra `sagagia.es`, no a ojo -y salieron DOS
+problemas, no uno-.
+
+**1) Un error de JavaScript real, en producción, en cada actualización de
+posición.** `Cannot access 'ln' before initialization`, reproducido de
+forma determinista moviendo la geolocalización varias veces seguidas: dispara
+en TODOS los `onSuccess` del watch de posición. `ln` es
+`hasOfflineMission` minificado -el nombre corto choca con el de otra
+variable del mismo componente en el bundle final, aunque el ORDEN en el
+código fuente es correcto (se declara antes de usarse)-. Existe desde el
+commit fundacional del árbol actual (9 de agosto), nunca se había
+detectado porque nadie había mirado la consola mientras el GPS actualizaba
+posición de verdad. Arreglado con un ref (`hasOfflineMissionRef`), el mismo
+patrón que ya usa `browserGpsStatusRef` en el mismo fichero para este
+exacto problema -no depender del orden de cierre de un componente enorme-.
+
+**2) Sin respaldo cuando el chip de precisión no responde.** El código
+solo pedía `enableHighAccuracy: true` -fix por satélite-, y un TIMEOUT se
+trataba siempre como "sigue buscando", nunca como "prueba otra cosa". Bajo
+monte cerrado o entre paredes de piedra el chip puede no conseguir fix
+NUNCA, no es que tarde: con el permiso ya concedido, el jugador se quedaba
+sin ubicación toda la ruta. Ahora, tras 2 fallos seguidos en modo preciso
+(TIMEOUT o POSITION_UNAVAILABLE, nunca con el permiso denegado), se cambia
+a ubicación por red (`enableHighAccuracy: false`, wifi/antena, mucho menos
+precisa pero mucho más disponible bajo cobertura de árboles), con un aviso
+una sola vez. Cada 90s, si sigue en modo por red, se reintenta el modo
+preciso por si las condiciones mejoraron -el jugador salió del monte
+cerrado-.
+
+⚠️ **Sin verificar con hardware GPS real** -reproducido y verificado el
+bug del `ln` con Playwright/CDP contra producción, pero el respaldo de
+precisión en sí (el cambio de modo, el reintento periódico) no se ha
+probado con un chip GPS de verdad bajo cobertura mala, solo razonado
+contra el código y verificado que compila y no rompe nada existente.
+
+Verificado: `tsc -b` / `vite build` limpios. El bug del `ln` reproducido
+ANTES del arreglo (determinista, con traza completa) y confirmado que no
+reaparece después, contra el bundle minificado real desplegado.
+
 ## 1.9 Perfil de GPS aislado, y el desplegable de cobertura por fin agrupado — ✅ en 4.9.66
 
 "Mejorar simulaciones, orden, análisis más potente" -concretado en dos

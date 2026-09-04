@@ -370,6 +370,23 @@ export default function PlayerApp() {
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
+
+  /**
+   * De precisión (chip GPS) a por red, y vuelta, según lo que responda.
+   *
+   * En el monte, bajo árboles o entre paredes de piedra, el chip GPS puede
+   * no conseguir un fix NUNCA -no es lento, no llega-, mientras que la
+   * ubicación por red (wifi/antena, mucho menos precisa) sí suele
+   * responder. Antes `enableHighAccuracy: true` era la única vía: un
+   * TIMEOUT (código 3) se trataba siempre como "sigue buscando", nunca
+   * como "prueba otra cosa". El síntoma real reportado: varios jugadores
+   * con el permiso YA concedido y sin ubicación en toda la ruta, en zona
+   * de monte cerrado.
+   */
+  const gpsTimeoutsSeguidosRef = useRef(0)
+  const gpsModoRef = useRef<'preciso' | 'por_red'>('preciso')
+  const gpsAvisoModoRef = useRef(false)
+  const gpsReintentoPrecisoTimerRef = useRef<number | null>(null)
   const handleRequestLiveGpsRef = useRef<
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
   >(null)
@@ -454,6 +471,22 @@ export default function PlayerApp() {
     // se medía jamás. Una vez engachado a 'ready' no hace falta reenganchar
     // por cambiar de nodo: el propio observador sigue avisando solo.
   }, [state.status])
+
+  /**
+   * Si se cayó a ubicación por red, probar de vez en cuando si el GPS de
+   * precisión ya responde -el jugador puede haber salido del monte cerrado
+   * desde entonces-. `handleRequestLiveGps` ya limpia el watch actual y
+   * arranca uno de precisión desde cero cada vez que se llama; aquí solo se
+   * decide CUÁNDO merece la pena intentarlo, no cómo.
+   */
+  useEffect(() => {
+    const intervalo = window.setInterval(() => {
+      if (gpsModoRef.current === 'por_red') {
+        void handleRequestLiveGpsRef.current?.({ silent: true })
+      }
+    }, 90000)
+    return () => window.clearInterval(intervalo)
+  }, [])
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -1494,6 +1527,19 @@ export default function PlayerApp() {
         !(currentStage as any).physical_qr))
 
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  // Ref, no la const directa: dentro del watchPosition de handleRequestLiveGps
+  // (ver más abajo) leer `hasOfflineMission` disparaba en producción "Cannot
+  // access 'ln' before initialization" -minificado, reproducido moviendo la
+  // geolocalización varias veces seguidas con Playwright contra el servidor
+  // real-, en cada actualización de posición. El orden en el CÓDIGO FUENTE es
+  // correcto -esta constante se declara antes que handleRequestLiveGps-, pero
+  // algo en cómo el minificador junta ámbitos de un componente tan grande
+  // colisionaba los nombres cortos de dos variables distintas. Un ref, como ya
+  // se hace con browserGpsStatusRef, evita depender de ese orden del todo.
+  const hasOfflineMissionRef = useRef(hasOfflineMission)
+  useEffect(() => {
+    hasOfflineMissionRef.current = hasOfflineMission
+  }, [hasOfflineMission])
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
     ? 'Activar GPS'
@@ -1951,6 +1997,9 @@ export default function PlayerApp() {
         return
       }
 
+      // Un fix -en el modo que sea- demuestra que la vía actual funciona.
+      gpsTimeoutsSeguidosRef.current = 0
+
       const next = {
         lat: position.coords.latitude,
         lon: position.coords.longitude,
@@ -1976,7 +2025,7 @@ export default function PlayerApp() {
         accuracy: nextAccuracy ?? undefined,
         capturedAt,
       })
-      if (hasOfflineMission) setOfflinePrepVisible(false)
+      if (hasOfflineMissionRef.current) setOfflinePrepVisible(false)
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
@@ -1998,12 +2047,53 @@ export default function PlayerApp() {
       }
     }
 
+    // Bajar de precisión: el chip GPS pide fix de satélite, que bajo monte
+    // cerrado o entre paredes de piedra puede no llegar NUNCA -no es que
+    // tarde-. La ubicación por red (wifi/antena) es mucho menos precisa
+    // -puede que no baste para entrar en un radio de 50m-, pero suele
+    // responder donde el chip no lo hace, y es mejor tener un punto
+    // aproximado que ninguno.
+    const cambiarAModoPorRed = () => {
+      if (gpsModoRef.current === 'por_red') return
+      gpsModoRef.current = 'por_red'
+
+      if (gpsWatchRef.current !== null) {
+        window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+      }
+      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: false,
+        maximumAge: 15000,
+        timeout: 20000,
+      })
+
+      if (!gpsAvisoModoRef.current) {
+        gpsAvisoModoRef.current = true
+        showNotice(
+          'El GPS de precisión no responde aquí -zona de monte o cobertura densa-. Usando ubicación aproximada por red mientras tanto.',
+          'info'
+        )
+      }
+    }
+
     const onError = (error: GeolocationPositionError) => {
       // TIMEOUT (code 3) while watching means the hardware GPS is still acquiring signal
       // (e.g. airplane mode with GPS chip active, or first cold fix outdoors).
       // Keep 'searching' so the UI shows "Buscando señal…" instead of a hard error.
       const isTimeout = error.code === 3 // GeolocationPositionError.TIMEOUT
+      const sinSenal = error.code === error.POSITION_UNAVAILABLE
       const denied = error.code === error.PERMISSION_DENIED
+
+      // Ni denegado ni un timeout puntual: el chip -o el navegador- ya ha
+      // tirado la toalla en modo preciso. Cada fallo de este tipo cuenta;
+      // dos seguidos (o el equivalente en tiempo con TIMEOUT) y se cambia
+      // a ubicación por red en vez de seguir insistiendo con lo mismo.
+      if ((isTimeout || sinSenal) && gpsModoRef.current === 'preciso') {
+        gpsTimeoutsSeguidosRef.current += 1
+        if (gpsTimeoutsSeguidosRef.current >= 2) {
+          cambiarAModoPorRed()
+          return
+        }
+      }
 
       if (isTimeout) {
         // GPS hardware still working - don't flag as error
@@ -2014,6 +2104,8 @@ export default function PlayerApp() {
         return
       }
 
+      // sinSenal en modo por_red: ni el chip ni la red han dado nada. Esto
+      // sí es un error de verdad, no una vía que probar aparte -ya se probó-.
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
       if (!options.silent) {
@@ -2036,6 +2128,8 @@ export default function PlayerApp() {
     if (gpsWatchRef.current === null) {
       // watchPosition: long timeout so the GPS chip can finish a cold fix
       // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
+      gpsModoRef.current = 'preciso'
+      gpsTimeoutsSeguidosRef.current = 0
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
         enableHighAccuracy: true,
         maximumAge: 5000,
