@@ -35,6 +35,19 @@ export default defineConfig(({ mode }) => {
     define: {
       __SAGA_VERSION__: JSON.stringify(readAppVersion()),
     },
+    build: {
+      // esbuild (el minificador por defecto) renombra variables locales a
+      // 1-2 caracteres, y en un componente tan grande como PlayerApp.tsx
+      // (miles de bindings locales) se vio de verdad colisionando dos
+      // variables DISTINTAS con el mismo nombre corto en ámbitos que sí se
+      // solapan -"Cannot access 'X' before initialization" en producción,
+      // en cada actualización de posición del GPS, reproducido con
+      // Playwright/CDP-. Cambiar SOLO el nombre en duda no lo arregló: el
+      // mismo fallo saltó en la siguiente variable que ocupó esa posición.
+      // terser es más lento pero mucho más conservador con el ámbito;
+      // sigue minificando igual de bien, solo que sin este fallo.
+      minify: 'terser',
+    },
     server: {
       host: '0.0.0.0',
       port: 5173,
