@@ -31,6 +31,50 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.13 GPS por distancia (batería), y el sonido de iPhone que se callaba solo — 4.9.71
+
+**Batería: modo barato por defecto, preciso solo cerca del nodo.** Antes
+`watchPosition` siempre pedía `enableHighAccuracy: true` -el chip GPS
+activo sin parar, lo que más gasta de toda la app-, sin importar si el
+jugador estaba a 3km del siguiente nodo o a 20m. Ahora arranca en modo
+barato (ubicación por red) si no hay ningún punto de referencia o está a
+más de 250m; a esa distancia o menos, preciso desde el principio. Si se
+aleja de nuevo -más de 400m, con margen a propósito para no oscilar cerca
+del borde- vuelve a modo barato. Subir de barato a preciso al acercarse lo
+sigue cubriendo el reintento periódico de 1.10 (cada 90s) y no un efecto
+aparte: forzarlo al vuelo con cada lectura podía entrar en bucle si el
+jugador estaba cerca de un nodo con cobertura mala de verdad -un fallback
+por fallo real peleándose con un intento de subida inmediata-.
+
+**El sonido de iPhone que dejaba de sonar a media ruta.** `haptics.ts` ya
+tenía un desbloqueo de `AudioContext` al primer toque -pensado a propósito
+para la política de audio de iOS-, pero solo se disparaba UNA vez por
+sesión. iOS puede volver a suspender el contexto más adelante -pedir
+permiso de cámara o GPS, minimizar Safari un momento, ya basta-, y nada lo
+reactivaba después: `playTone()` se callaba en silencio, sin error, el
+resto de la sesión. "Superaste el nodo" sin sonido era justo esto. Ahora
+`playTone()` reintenta `resume()` antes de rendirse, y un listener de
+`visibilitychange` reactiva el contexto en cuanto la pantalla vuelve a
+primer plano.
+
+⏳ **Notificaciones y clasificación en pantalla de bloqueo -investigado,
+no construido.** Preguntado directamente: ¿se puede avisar al llegar a un
+nodo con la app cerrada, o ver los 3 primeros en la pantalla de bloqueo?
+Investigado (no adivinado): desde iOS 16.4 (marzo 2023), Web Push SÍ
+funciona en PWAs -pero solo si están instaladas de verdad en pantalla de
+inicio ("Compartir → Añadir a pantalla de inicio"), nunca en una pestaña
+de Safari normal, y el permiso hay que pedirlo tras un gesto real del
+jugador. Con eso, avisar al llegar a un nodo es viable -aviso normal, no
+en pantalla de bloqueo con contenido propio-, pero hace falta
+infraestructura nueva: claves VAPID, un endpoint que guarde la
+suscripción de cada jugador, y el propio servidor decidiendo cuándo
+avisar. **La clasificación en pantalla de bloqueo con los 3 primeros NO es
+posible -el propio Óscar lo sospechaba bien-: los widgets de pantalla de
+bloqueo (WidgetKit) son función exclusiva de apps nativas, ninguna
+tecnología web puede dibujar ahí.** Fuentes:
+[MagicBell](https://www.magicbell.com/blog/pwa-ios-limitations-safari-support-complete-guide),
+[Pushpad](https://pushpad.xyz/blog/ios-special-requirements-for-web-push-notifications).
+
 ## 1.12 1.11 TAMBIÉN se equivocó: no era el minificador — ✅ de verdad en 4.9.70
 
 1.11 daba el cambio a terser por bueno con UNA prueba. Al repetir con más
