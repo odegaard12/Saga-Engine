@@ -568,7 +568,7 @@ export default function LoginApp() {
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
-                        borderRadius: 'var(--theme-radius-pill)',
+                        borderRadius: 'var(--theme-radius-avatar)',
                         display: 'block',
                       }}
                     />
@@ -581,9 +581,14 @@ export default function LoginApp() {
                   <div style={playerName}>
                     {loggingInId === profile.id ? '⏳' : profile.display_name}
                   </div>
-                  <div style={identityBottom}>
-                    <span style={modePill}>{isTeam ? copy.team : copy.solo}</span>
-                  </div>
+                  {/* La etiqueta sólo cuando dice algo: con catorce jugadores
+                      en solo, catorce "SÓ" idénticos son ruido puro y encima
+                      añaden una línea a cada tarjeta. En equipo sí importa. */}
+                  {isTeam ? (
+                    <div style={identityBottom}>
+                      <span style={modePill}>{copy.team}</span>
+                    </div>
+                  ) : null}
                   {meta ? <div style={playerMetaInline}>{meta}</div> : null}
                 </div>
               </button>
@@ -702,8 +707,18 @@ const adminButton: CSSProperties = {
 // Alineado a la izquierda, no centrado: el rótulo se apoya sobre la franja
 // de foto como un titular, no como un cartel. Centrado, con la foto detrás,
 // quedaba flotando en medio de la nada.
+/**
+ * Sin margen de reserva arriba.
+ *
+ * Tenía 74-96px para dejar respirar una franja de foto de portada... que NO
+ * EXISTE: `/login-fondo.jpg` devuelve 404 en producción (comprobado, no
+ * supuesto). Resultado: un hueco muerto enorme sobre el título, exactamente
+ * lo que Óscar señaló. La portada no puede reservar sitio para algo que a lo
+ * mejor no está; si algún día se sube la foto, se ve igual detrás del
+ * título, pero sin dejar el agujero cuando falta.
+ */
 const heroCenter: CSSProperties = {
-  marginTop: 96,
+  marginTop: 0,
   display: 'grid',
   justifyItems: 'start',
   textAlign: 'left',
@@ -810,8 +825,11 @@ const fondoFoto: CSSProperties = {
 const fondoVelo: CSSProperties = {
   position: 'fixed',
   inset: 0,
+  // Suave arriba (si algún día HAY foto, se ve) y opaco de la mitad para
+  // abajo. Sin foto -que es el caso hoy: /login-fondo.jpg da 404- esto sólo
+  // matiza el degradado de `pageWrap` y no deja ningún hueco raro.
   background:
-    'linear-gradient(180deg, rgba(0,0,0,.20) 0%, rgba(0,0,0,.30) 16%, rgba(0,0,0,.86) 34%, rgba(0,0,0,.95) 55%, rgba(0,0,0,.97) 100%)',
+    'linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,.55) 30%, rgba(0,0,0,.88) 62%, rgba(0,0,0,.95) 100%)',
   pointerEvents: 'none',
 }
 
@@ -916,9 +934,9 @@ const playerCard: CSSProperties = {
 }
 
 const avatar: CSSProperties = {
-  width: 54,
-  height: 54,
-  borderRadius: 'var(--theme-radius-pill)',
+  width: 50,
+  height: 50,
+  borderRadius: 'var(--theme-radius-avatar)',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
