@@ -542,3 +542,14 @@ body.theme-flame-red .saga-hud-dock button span {
      en linea gana. Sin esto la regla no pinta nada. */
   filter: var(--theme-icon-filter, drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))) !important;
 }
+
+/* El velo que disuelve la carga en el juego (PlayerApp.tsx, `velo`).
+   Cuando el mapa ya estaba guardado, la pantalla de carga desaparecia de
+   golpe y el mapa la sustituia sin transicion -"queda feo, muy brusco"-.
+   Este velo hereda el mismo fondo de la pantalla de carga y se disuelve
+   sobre el juego ya montado debajo, en vez de cortar de una pantalla a otra. */
+@keyframes sagaVeloDisolver {
+  0% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { opacity: 0; }
+}

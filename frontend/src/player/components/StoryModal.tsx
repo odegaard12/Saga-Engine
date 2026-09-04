@@ -17,7 +17,10 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(var(--theme-ink-deep), 0.4)',
+        // .82, no .4: un velo tan fino dejaba ver CUALQUIER OTRO overlay que
+        // se abriera detrás -paso de verdad con "antes de salir"-. El
+        // prólogo es un momento propio, tapa del todo lo de debajo.
+        backgroundColor: 'rgba(var(--theme-ink-deep), 0.82)',
         backdropFilter: 'var(--theme-blur)',
         WebkitBackdropFilter: 'var(--theme-blur)',
         zIndex: 9999,
@@ -39,7 +42,10 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
           backdropFilter: 'var(--theme-blur)',
           WebkitBackdropFilter: 'var(--theme-blur)',
-          borderRadius: '28px',
+          // Del tema, no 28px clavado: en fuego las esquinas se cortan, no
+          // se redondean, y aquí quedaba igual de curvo que en cualquier
+          // otro tema por mucho que el CSS del tema dijese otra cosa.
+          borderRadius: 'var(--theme-radius-panel, 28px)',
           boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
           display: 'flex',
           flexDirection: 'column',
@@ -81,7 +87,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
               background: 'linear-gradient(180deg, rgba(var(--theme-ok), 0.85) 0%, rgba(var(--theme-ok-deep), 0.95) 100%)',
               color: '#fff',
               border: '1px solid rgba(255,255,255,0.25)',
-              borderRadius: '16px',
+              borderRadius: 'var(--theme-radius-card, 16px)',
               fontSize: '1.1rem',
               fontWeight: 900,
               cursor: 'pointer',
