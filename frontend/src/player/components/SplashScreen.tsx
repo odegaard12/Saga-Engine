@@ -26,7 +26,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const pctFino =
     known && progress < 10 ? Math.max(0, Math.round(progress * 10) / 10) : pct
 
-  const haiContas = typeof done === 'number' && typeof total === 'number' && total > 0
+  // `done`/`total` siguen llegando como props -quien llama los calcula igual-
+  // pero ya no se pintan crudos: ver la nota de más abajo, en la fase de
+  // cálculo son un marcador de escala, no teselas de verdad.
+  void done
+  void total
 
   return (
     <div
@@ -184,18 +188,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             />
           </div>
 
-          {haiContas ? (
-            <div
-              style={{
-                marginLeft: 28,
-                fontSize: 10.5,
-                color: 'rgba(var(--theme-line), .7)',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {done} / {total} trozos
-            </div>
-          ) : null}
+          {/* Aquí había un "{done} / {total} trozos" que yo mismo añadí y era
+              MENTIRA a ratos: en la fase "Calculando mapa",
+              mapTileCache.ts manda `done: 0, total: 100` como marcador de
+              escala, no como cuenta de teselas. Se leía "0 / 100 trozos"
+              cuando no había ni plan de teselas todavía. El porcentaje sale
+              de ese mismo par y sí es correcto una vez empieza la descarga
+              de verdad; la cuenta cruda no, así que fuera. */}
         </div>
       </div>
 
