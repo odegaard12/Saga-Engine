@@ -202,7 +202,12 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
                       style={{
                         width: 42,
                         height: 42,
-                        borderRadius: 'var(--theme-radius-pill)',
+                        // La CARA va redonda en los dos temas. Con
+                        // --theme-radius-pill salía cuadrada en fuego (ahí
+                        // vale 3px a propósito, el tema corta esquinas), y
+                        // una cara recortada en cuadrado parece foto de
+                        // carnet mal hecha. Ver --theme-radius-avatar.
+                        borderRadius: 'var(--theme-radius-avatar)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
