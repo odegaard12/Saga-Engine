@@ -82,6 +82,8 @@
   --theme-radius-panel: 24px;
   --theme-radius-card: 16px;
   --theme-radius-pill: 999px;
+  /* Ver la nota en el tema de fuego: las caras van redondas en los dos. */
+  --theme-radius-avatar: 999px;
   --theme-blur: blur(22px) saturate(1.12);
   --theme-border-w: 1px;
   --theme-panel-cut: 0px;
@@ -269,6 +271,11 @@ body.theme-flame-red {
    * usan cosas que SI son pildoras -la de SOLO, la de la cuenta- y ahi el 999
    * es correcto. */
   --theme-radius-dot: 3px;
+
+  /* Las CARAS no. Una cara recortada en cuadrado parece foto de carnet mal
+   * hecha: es el unico sitio donde la esquina cortada del tema estorba en vez
+   * de aportar. Redonda en los dos temas, a proposito. */
+  --theme-radius-avatar: 999px;
   --theme-blur: none;
   --theme-border-w: 1px;
   /* La esquina cortada, encendida.
