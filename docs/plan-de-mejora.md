@@ -31,6 +31,47 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.15 🔴 Error real de React (#310) al entrar como jugador — ✅ arreglado en 4.9.73
+
+Reportado por Óscar en persona: al darle a un jugador, error. React
+minificado #310 = "Rendered more hooks than during the previous render"
+-una violación de las reglas de hooks-.
+
+**Causa: dos arreglos míos de HOY (1.13 y 1.14) colocaron `useEffect` en
+la zona del componente que sólo se ejecuta con `state.status === 'ready'`**
+-después de los "return" tempranos de "cargando"/"error"-. En el primer
+render, con `state.status` todavía en `'loading'`, esos efectos NUNCA se
+llaman -el componente vuelve antes de llegar a ellos-; en un render
+posterior, ya `'ready'`, SÍ se llaman. Distinto número de hooks entre dos
+renders del mismo componente: exactamente lo que React prohíbe.
+
+Tres hooks afectados, dos formas de arreglarlo según lo que hacía cada uno:
+- El que sólo mantenía un ref al día (`distanciaAlNodoRef.current = distanceMeters`,
+  de 1.13): no necesitaba ser un efecto -escribir en un ref durante el
+  render, sin que afecte a lo pintado, es seguro sin hook-. Asignación
+  directa.
+- El que sube/baja de modo GPS según la distancia (de 1.13) y el que cierra
+  el panel de misión offline al tener GPS fresco (de 1.14, el mismo que
+  arregló el bug del `ln`/`pn` de 1.10-1.12): sí necesitan ser efectos de
+  verdad -disparan una llamada, un `setState`-. Movidos a la zona segura,
+  ANTES de los "return" tempranos -sus datos (`offlinePrepState`,
+  `offlineSummary`, `browserGpsFresh`) ya estaban disponibles ahí, no hacía
+  falta esperar a 'ready'-. El de subir/bajar de modo se fundió en el
+  intervalo periódico que ya vivía ahí, leyendo refs en vez de una const
+  del render.
+
+Comprobación exhaustiva, no sólo "arreglar y ya": barrido de TODO el
+fichero buscando cualquier `useEffect`/`useState`/`useRef` después del
+primer `return` temprano. Cero encontrados tras el arreglo.
+
+⚠️ **Lección de fondo, van tres veces en un día:** cualquier hook nuevo en
+un componente de este tamaño hay que comprobar EXPLÍCITAMENTE en qué zona
+cae -antes o después de los `return` tempranos-, no basta con que compile
+o pase `tsc`. TypeScript no avisa de esto; sólo lo dice React en
+producción, y sólo cuando el camino que lo dispara de verdad se ejecuta.
+
+Verificado: `tsc -b` / `vite build` limpios.
+
 ## 1.14 El verde de "en línea" salía naranja en fuego, y una caja para el texto del login — 4.9.72
 
 **"No me convence el rojo de clasificación."** Encontrado con la causa

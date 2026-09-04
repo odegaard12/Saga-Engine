@@ -488,20 +488,52 @@ export default function PlayerApp() {
   }, [state.status])
 
   /**
-   * Si se cayó a ubicación por red, probar de vez en cuando si el GPS de
-   * precisión ya responde -el jugador puede haber salido del monte cerrado
-   * desde entonces-. `handleRequestLiveGps` ya limpia el watch actual y
-   * arranca uno de precisión desde cero cada vez que se llama; aquí solo se
-   * decide CUÁNDO merece la pena intentarlo, no cómo.
+   * Cada 90s, en los dos sentidos -sube a preciso si está cerca y en modo
+   * barato, baja a barato si está lejos y en modo preciso-. Los dos casos
+   * leen refs (`gpsModoRef`, `distanciaAlNodoRef`), nunca una const del
+   * render: por eso este efecto puede vivir aquí, antes de cualquier
+   * "return" temprano, sin depender de que el componente ya esté 'ready'.
+   *
+   * Subir: si se cayó a ubicación por red, probar de vez en cuando si el
+   * GPS de precisión ya responde -el jugador puede haber salido del monte
+   * cerrado desde entonces-. `handleRequestLiveGps` ya limpia el watch
+   * actual y arranca uno de precisión desde cero cada vez que se llama.
+   *
+   * Bajar: ahorra batería de forma activa, no sólo como reacción a un
+   * fallo. 400m de margen -no los mismos 250 de subir- para no oscilar de
+   * modo cerca del borde, y para no pelearse con un fallback a por_red por
+   * fallo real cerca de un nodo con cobertura mala.
    */
   useEffect(() => {
     const intervalo = window.setInterval(() => {
       if (gpsModoRef.current === 'por_red') {
         void handleRequestLiveGpsRef.current?.({ silent: true })
+        return
+      }
+      const distancia = distanciaAlNodoRef.current
+      if (gpsModoRef.current === 'preciso' && distancia !== null && distancia > 400) {
+        void handleRequestLiveGpsRef.current?.({ silent: true })
       }
     }, 90000)
     return () => window.clearInterval(intervalo)
   }, [])
+
+  // Movida aquí desde la zona 'ready' -offlinePrepState/offlineSummary ya
+  // están disponibles desde el principio, no hacía falta esperar-. Antes
+  // esto se decidía A MANO dentro del callback de watchPosition
+  // (handleRequestLiveGps más abajo): en cuanto llegaba GPS fresco, si ya
+  // había misión offline, cerrar el panel "antes de salir". Leer una
+  // variable de fuera del propio callback ahí dentro disparaba en
+  // producción "Cannot access 'X' before initialization" en cada
+  // actualización de posición -reproducido de forma determinista, y
+  // persistente pasara lo que pasara con el nombre, el tipo de declaración
+  // o el minificador-. Como efecto normal de React, reaccionando al mismo
+  // cambio de estado (`browserGpsFresh`) en vez de leerlo a mano dentro de
+  // una API nativa del navegador, el problema desaparece del todo.
+  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  useEffect(() => {
+    if (browserGpsFresh && hasOfflineMission) setOfflinePrepVisible(false)
+  }, [browserGpsFresh, hasOfflineMission])
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -1406,28 +1438,18 @@ export default function PlayerApp() {
       ? Math.round(getDistanceMeters(displayPosition, stagePosition))
       : null
 
-  useEffect(() => {
-    distanciaAlNodoRef.current = distanceMeters
-  }, [distanceMeters])
-
-  /**
-   * Bajar a modo barato al alejarse -ahorra batería de forma activa, no
-   * solo como reacción a un fallo-. Solo el sentido "lejos", a propósito:
-   * el sentido contrario -subir a preciso al acercarse- ya lo cubre el
-   * reintento periódico de más arriba (cada 90s). Forzarlo aquí también,
-   * al vuelo con cada lectura de posición, podía entrar en bucle: cerca de
-   * un nodo con cobertura mala, un fallback a por_red por fallo real haría
-   * que este efecto quisiera subir a preciso otra vez de inmediato, fallara
-   * otra vez, bajara otra vez... 400m de margen sobre los 250 de subida
-   * evita además que el ruido normal del GPS haga oscilar el modo cerca
-   * del borde.
-   */
-  useEffect(() => {
-    if (distanceMeters === null || gpsWatchRef.current === null) return
-    if (gpsModoRef.current === 'preciso' && distanceMeters > 400) {
-      void handleRequestLiveGpsRef.current?.({ silent: true })
-    }
-  }, [distanceMeters])
+  // Asignación directa, SIN useEffect: esta zona del componente sólo se
+  // ejecuta con state.status === 'ready' -está después de los "return"
+  // tempranos de arriba-, así que un hook aquí se llama unas veces sí y
+  // otras no según el render, justo lo que React prohíbe ("Rendered more
+  // hooks than during the previous render", error #310 en producción,
+  // encontrado por Óscar al entrar como jugador). Escribir en un ref
+  // durante el render, sin que afecte a lo que se pinta, es un patrón
+  // seguro -no hace falta que sea un efecto para esto-. La lógica que sí
+  // necesita disparar una llamada (bajar a modo barato al alejarse) vive en
+  // el intervalo periódico de más arriba, que sólo lee refs y por eso puede
+  // estar antes de cualquier "return" sin problema.
+  distanciaAlNodoRef.current = distanceMeters
 
   const unlockDistanceMeters =
     stagePosition && unlockPosition
@@ -1563,22 +1585,6 @@ export default function PlayerApp() {
       ) &&
         !(currentStage as any).qr_payload &&
         !(currentStage as any).physical_qr))
-
-  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
-
-  // Antes esto se decidía A MANO dentro del callback de watchPosition
-  // (handleRequestLiveGps más abajo): en cuanto llegaba GPS fresco, si ya
-  // había misión offline, cerrar el panel "antes de salir". Leer una
-  // variable de fuera del propio callback ahí dentro disparaba en
-  // producción "Cannot access 'X' before initialization" en cada
-  // actualización de posición -reproducido de forma determinista, y
-  // persistente pasara lo que pasara con el nombre, el tipo de declaración
-  // o el minificador-. Como efecto normal de React, reaccionando al mismo
-  // cambio de estado (`browserGpsFresh`) en vez de leerlo a mano dentro de
-  // una API nativa del navegador, el problema desaparece del todo.
-  useEffect(() => {
-    if (browserGpsFresh && hasOfflineMission) setOfflinePrepVisible(false)
-  }, [browserGpsFresh, hasOfflineMission])
 
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
