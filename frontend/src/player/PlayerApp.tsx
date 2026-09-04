@@ -1527,19 +1527,21 @@ export default function PlayerApp() {
         !(currentStage as any).physical_qr))
 
   const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
-  // Ref, no la const directa: dentro del watchPosition de handleRequestLiveGps
-  // (ver más abajo) leer `hasOfflineMission` disparaba en producción "Cannot
-  // access 'ln' before initialization" -minificado, reproducido moviendo la
-  // geolocalización varias veces seguidas con Playwright contra el servidor
-  // real-, en cada actualización de posición. El orden en el CÓDIGO FUENTE es
-  // correcto -esta constante se declara antes que handleRequestLiveGps-, pero
-  // algo en cómo el minificador junta ámbitos de un componente tan grande
-  // colisionaba los nombres cortos de dos variables distintas. Un ref, como ya
-  // se hace con browserGpsStatusRef, evita depender de ese orden del todo.
-  const hasOfflineMissionRef = useRef(hasOfflineMission)
+
+  // Antes esto se decidía A MANO dentro del callback de watchPosition
+  // (handleRequestLiveGps más abajo): en cuanto llegaba GPS fresco, si ya
+  // había misión offline, cerrar el panel "antes de salir". Leer una
+  // variable de fuera del propio callback ahí dentro disparaba en
+  // producción "Cannot access 'X' before initialization" en cada
+  // actualización de posición -reproducido de forma determinista, y
+  // persistente pasara lo que pasara con el nombre, el tipo de declaración
+  // o el minificador-. Como efecto normal de React, reaccionando al mismo
+  // cambio de estado (`browserGpsFresh`) en vez de leerlo a mano dentro de
+  // una API nativa del navegador, el problema desaparece del todo.
   useEffect(() => {
-    hasOfflineMissionRef.current = hasOfflineMission
-  }, [hasOfflineMission])
+    if (browserGpsFresh && hasOfflineMission) setOfflinePrepVisible(false)
+  }, [browserGpsFresh, hasOfflineMission])
+
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
     ? 'Activar GPS'
@@ -2034,7 +2036,18 @@ export default function PlayerApp() {
         accuracy: nextAccuracy ?? undefined,
         capturedAt,
       })
-      if (hasOfflineMissionRef.current) setOfflinePrepVisible(false)
+      // El cierre del panel "misión offline lista" al conseguir GPS vive en
+      // un efecto aparte (más abajo, sobre browserGpsFresh) y no aquí
+      // dentro. Aquí dentro -en el propio callback del navegador- cualquier
+      // variable adicional de fuera de handleRequestLiveGps, sea const o
+      // ref, disparaba en producción "Cannot access 'X' before
+      // initialization" en cada actualización de posición -reproducido de
+      // forma determinista con Playwright/CDP, persistente cambiando el
+      // nombre, el tipo de declaración Y el minificador (esbuild y
+      // terser)-. Sea cual sea la causa exacta, la forma robusta de
+      // evitarlo es no depender de nada ahí dentro que no sea del propio
+      // handleRequestLiveGps: dejar que React reaccione al cambio de
+      // estado, no leerlo a mano en un callback nativo del navegador.
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
