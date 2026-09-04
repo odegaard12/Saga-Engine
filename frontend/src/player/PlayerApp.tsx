@@ -2233,6 +2233,44 @@ export default function PlayerApp() {
 
   handleRequestLiveGpsRef.current = handleRequestLiveGps
 
+  /**
+   * Volver a bajar el mapa, a mano.
+   *
+   * Hacía falta por dos motivos, no por capricho: (1) si la ruta cambia
+   * -nodos movidos, un nodo nuevo- el mapa guardado se queda con las teselas
+   * viejas y nada lo vuelve a pedir, porque la comprobación de arranque sólo
+   * mira si está completo, no si está al día; (2) no había ninguna forma de
+   * VER la pantalla de carga una vez el mapa estaba guardado, así que no se
+   * podía comprobar que funciona sin borrar los datos del navegador entero.
+   */
+  async function handleRedownloadMap() {
+    if (state.status !== 'ready') return
+    const stages = Array.isArray(state.payload.stages) ? state.payload.stages : []
+    if (stages.length === 0) return
+
+    const payloadActual = state.payload
+    const configActual = state.config
+
+    setState({
+      status: 'loading',
+      mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
+    })
+
+    try {
+      await prefetchMissionMapTiles(stages, (progress) => {
+        setState({
+          status: 'loading',
+          mapProgress: { done: progress.done, total: progress.total, detail: progress.detail },
+        })
+      })
+    } catch (err) {
+      console.error('No se pudo volver a guardar el mapa', err)
+    } finally {
+      setState({ status: 'ready', payload: payloadActual, config: configActual })
+      setMapRefreshToken((value) => value + 1)
+    }
+  }
+
   async function handlePrepareOfflinePack() {
     try {
       setOfflinePrepState('saving')
@@ -2891,6 +2929,7 @@ export default function PlayerApp() {
         permisoMovimiento={permisoMovimiento}
         onRequestCamera={() => void pedirCamara()}
         onRequestMotion={() => void pedirMovimiento()}
+        onRedownloadMap={() => void handleRedownloadMap()}
       />
 
       {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
