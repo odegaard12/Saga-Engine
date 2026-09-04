@@ -25,6 +25,8 @@ interface FieldPrepPanelProps {
   permisoMovimiento: EstadoPermiso
   onRequestCamera: () => void
   onRequestMotion: () => void
+  /** Volver a bajar el mapa: la ruta pudo cambiar desde que se guardó. */
+  onRedownloadMap?: () => void
 }
 
 /**
@@ -47,6 +49,7 @@ export function FieldPrepPanel({
   permisoMovimiento,
   onRequestCamera,
   onRequestMotion,
+  onRedownloadMap,
 }: FieldPrepPanelProps) {
   if (!visible) return null
 
@@ -165,6 +168,26 @@ export function FieldPrepPanel({
           </button>
         </header>
 
+        {/* Cuánto llevas, de un vistazo. Mismo lenguaje que el filo de
+            progreso de la barra de arriba: un tramo por cosa, encendido lo
+            que ya está. Antes sólo se sabía contando las filas que quedaban. */}
+        <div style={riel}>
+          {Array.from({ length: listos.length + pendientes.length }).map((_, i) => (
+            <span
+              key={i}
+              style={{
+                ...rielTramo,
+                background:
+                  i < listos.length ? 'rgb(var(--theme-done))' : 'rgba(255,255,255,.16)',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Filas sin caja: icono, texto y botón sobre una línea fina.
+            Antes cada fila era un recuadro de cristal DENTRO de la tarjeta de
+            cristal -recuadro dentro de recuadro, lo mismo que ensuciaba el
+            login-, y el texto de apoyo iba a 10.5px, ilegible en el monte. */}
         {pendientes.map((f) => (
           <div key={f.clave} style={fila}>
             <span style={icono}>{f.icono}</span>
@@ -181,6 +204,15 @@ export function FieldPrepPanel({
         ))}
 
         {listos.length > 0 ? <div style={hecho}>✓ {listos.join(' · ')}</div> : null}
+
+        {/* Con la misión ya guardada: poder volver a bajar el mapa. Si la
+            ruta cambió -un nodo movido, uno nuevo- el mapa guardado se queda
+            con las teselas viejas y nada lo vuelve a pedir solo. */}
+        {hasOfflineMission && onRedownloadMap ? (
+          <button type="button" style={botonSecundario} onClick={onRedownloadMap}>
+            Volver a bajar el mapa
+          </button>
+        ) : null}
       </section>
     </div>
   )
@@ -269,59 +301,91 @@ const cerrar: CSSProperties = {
   cursor: 'pointer',
 }
 
+// Un tramo por cosa que hace falta, encendido lo ya listo.
+const riel: CSSProperties = {
+  display: 'flex',
+  gap: 3,
+  height: 3,
+  marginTop: 2,
+  marginBottom: 4,
+}
+
+const rielTramo: CSSProperties = {
+  flex: 1,
+  height: '100%',
+  borderRadius: 2,
+}
+
+// Sin caja: sólo una línea fina de separación. Ver la nota del JSX.
 const fila: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 10,
-  padding: '10px 11px',
-  borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(255,255,255,.14)',
-  // Cristal también dentro: el degradado y el desenfoque hacen que la fila
-  // flote sobre la tarjeta en vez de parecer un recuadro plano pegado encima.
-  background:
-    'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035))',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14)',
+  gap: 12,
+  padding: '11px 2px',
+  borderTop: '0.5px solid rgba(255,255,255,.12)',
 }
 
 const icono: CSSProperties = {
   flex: '0 0 auto',
-  fontSize: 17,
+  fontSize: 22,
   lineHeight: 1,
+  width: 26,
+  textAlign: 'center',
 }
 
 const queEs: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
+  fontSize: 15,
+  fontWeight: 900,
   lineHeight: 1.2,
+  color: '#ffffff',
 }
 
+// 12px, no 10.5: esto se lee de pie, en la calle, antes de salir a andar.
 const paraQue: CSSProperties = {
-  fontSize: 10.5,
-  lineHeight: 1.3,
-  color: 'rgba(var(--theme-line-soft), .68)',
+  fontSize: 12,
+  lineHeight: 1.35,
+  marginTop: 2,
+  color: 'rgba(var(--theme-line-soft), .72)',
 }
 
 const falloTexto: CSSProperties = {
   color: 'rgba(253,224,71,.92)',
 }
 
+// Del tema, no azul fijo: con el tema de fuego el único botón de esta
+// pantalla salía azul cielo, de otra aplicación.
 const boton: CSSProperties = {
   flex: '0 0 auto',
-  minHeight: 34,
-  padding: '0 13px',
-  borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(var(--theme-info-soft), .55)',
-  background: 'linear-gradient(180deg,rgba(var(--theme-info), .92),rgba(var(--theme-info-deep), .92))',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3), 0 6px 16px rgba(2,132,199,.35)',
-  color: '#fff',
-  fontSize: 12,
-  fontWeight: 850,
+  minHeight: 38,
+  padding: '0 16px',
+  borderRadius: 'var(--theme-radius-card)',
+  border: 0,
+  background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
+  color: '#ffffff',
+  fontSize: 12.5,
+  fontWeight: 900,
+  letterSpacing: '.02em',
+  cursor: 'pointer',
+}
+
+const botonSecundario: CSSProperties = {
+  marginTop: 2,
+  width: '100%',
+  minHeight: 38,
+  borderRadius: 'var(--theme-radius-card)',
+  border: '1px solid rgba(255,255,255,.20)',
+  background: 'rgba(255,255,255,.06)',
+  color: 'rgba(255,255,255,.88)',
+  fontSize: 12.5,
+  fontWeight: 800,
   cursor: 'pointer',
 }
 
 const hecho: CSSProperties = {
-  fontSize: 10.5,
-  color: 'rgba(var(--theme-line), .75)',
+  marginTop: 2,
+  paddingTop: 10,
+  borderTop: '0.5px solid rgba(255,255,255,.12)',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'rgb(var(--theme-done))',
 }
