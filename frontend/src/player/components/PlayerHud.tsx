@@ -297,7 +297,7 @@ export function PlayerHud({
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
-          padding: compact ? 12 : 14,
+          padding: compact ? '14px 14px 10px' : '16px 16px 12px',
         }}
       >
         <button
@@ -313,18 +313,18 @@ export function PlayerHud({
 
         <div style={helper}>{helperCopy}</div>
 
-        {/* Dock unido, no dos botones sueltos con hueco entre medias -asi era
-            la maqueta que se aprobo-. Un solo bloque partido por un filete
-            interior; el que esta activo se enciende con el color del tema en
-            vez del azul de siempre, que en fuego desentonaba. */}
+        {/* Version aprobada tras varias rondas de maquetas: sueltos, no en
+            caja -sin fondo ni borde propio, solo la linea fina del medio-,
+            centrados y juntos, y SIN icono: solo texto. Un icono al lado de
+            "Mochila" y otro al lado de "Ferramentas" eran ruido repetido,
+            no informacion -el texto ya dice que es cada uno-. */}
         <div className="saga-hud-dock" style={dock}>
           <button
             type="button"
             style={detailsOpen ? dockButtonActive : dockButton}
             onClick={onToggleDetails}
           >
-            <span style={dockIcono} aria-hidden="true">🎒</span>
-            <span>{detailsOpen ? 'Cerrar' : 'Mochila'}</span>
+            {detailsOpen ? 'Cerrar' : 'Mochila'}
           </button>
 
           <span style={dockDivisor} aria-hidden="true" />
@@ -334,8 +334,7 @@ export function PlayerHud({
             style={toolsOpen ? dockButtonActive : dockButton}
             onClick={onOpenTools}
           >
-            <span style={dockIcono} aria-hidden="true">🛠️</span>
-            <span>{toolsOpen ? t('player.tools.close', locale) : 'Herramientas'}</span>
+            {toolsOpen ? t('player.tools.close', locale) : 'Ferramentas'}
           </button>
         </div>
       </section>
@@ -695,23 +694,27 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
   return {
     ...primaryBase,
     background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
-    border: '1px solid var(--theme-primary-border)',
+    border: 0,
     color: '#ffffff',
     boxShadow: 'var(--saga-accent-glow)',
   }
 }
 
+/**
+ * Sin caja: velo, no tarjeta.
+ *
+ * Version final tras varias rondas de maquetas -"mas fluido, mas como el
+ * login"-: nada de panel de cristal con borde y sombra propia. Un degradado
+ * que se apaga hacia arriba, igual que el `fondoVelo` del login, para que el
+ * boton y el dock floten sobre el mapa en vez de vivir dentro de una tarjeta.
+ */
 const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
   display: 'grid',
-  gap: 10,
-  borderRadius: 'var(--theme-radius-panel)',
-  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
-  border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  gap: 0,
+  background:
+    'linear-gradient(0deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.42) 55%, transparent 100%)',
 }
 
 
@@ -735,66 +738,71 @@ const chipBase: CSSProperties = {
 
 
 
+/**
+ * Pildora, no la esquina cortada del tema -a proposito, aprobado en maqueta.
+ *
+ * El resto de la interfaz de fuego corta esquinas (theme-radius-card = 2px);
+ * este boton es la UNICA accion primaria de toda la pantalla de jugador y
+ * el propio Oscar pidio "mas fluido, mas como el login" y aprobo la version
+ * en pildora tras varias rondas -misma logica que ya se aplico al avatar,
+ * que tampoco seguia el radio del tema por ser la cara de una persona-.
+ */
 const primaryBase: CSSProperties = {
   width: '100%',
-  minHeight: 48,
-  borderRadius: 'var(--theme-radius-card)',
-  fontSize: 14,
+  minHeight: 50,
+  borderRadius: 999,
+  fontSize: 13,
   fontWeight: 900,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
 }
 
 const helper: CSSProperties = {
-  color: 'rgba(255,255,255,.82)',
-  fontSize: 13,
-  lineHeight: 1.45,
+  marginTop: 9,
+  textAlign: 'center',
+  color: 'rgba(255,255,255,.6)',
+  fontSize: 11.5,
+  fontWeight: 600,
+  lineHeight: 1.4,
 }
-// Bloque unico: un solo fondo y un solo borde para los dos botones, partidos
-// por un filete interior -no dos tarjetas con hueco entre medias-. Es el
-// dock de la maqueta que se aprobo, no dos "ghost buttons" sueltos.
+/**
+ * Sueltos, no en caja -version final tras varias rondas de maquetas-.
+ *
+ * Ni fondo ni borde propios: Mochila y Ferramentas flotan sobre el mismo
+ * velo oscuro que ya lleva la barra inferior entera, centrados y juntos
+ * -no repartidos a todo el ancho-, separados solo por una linea fina.
+ * Mismo idioma que la fila de iconos de la camara/historial/ranking/brujula
+ * sobre el mapa: nada de tarjetas, todo flotando sobre el velo.
+ */
 const dock: CSSProperties = {
   display: 'flex',
-  alignItems: 'stretch',
-  borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(var(--theme-ink), .32)',
-  overflow: 'hidden',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 22,
+  marginTop: 11,
 }
 
 const dockDivisor: CSSProperties = {
   width: 1,
-  alignSelf: 'stretch',
-  background: 'rgba(255,255,255,.10)',
-}
-
-const dockIcono: CSSProperties = {
-  fontSize: 16,
-  lineHeight: 1,
+  height: 16,
+  background: 'rgba(255,255,255,.16)',
 }
 
 const dockButton: CSSProperties = {
-  flex: 1,
-  minHeight: 46,
+  minHeight: 32,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 7,
   border: 0,
   background: 'transparent',
   color: '#ffffff',
-  fontSize: 12,
+  fontSize: 12.5,
   fontWeight: 800,
 }
 
 // Encendido con el color del tema, no un azul fijo: en fuego desentonaba
 // -misma correccion que ya se hizo en el boton del panel "antes de salir".
-// `--theme-tint-strong` y no un rgba a mano: `--theme-primary` es un hex
-// completo (#ef8a5c en fuego, no un trio r,g,b), asi que no se puede meter
-// dentro de un rgba(); el tinte ya viene calculado por tema para esto mismo.
 const dockButtonActive: CSSProperties = {
   ...dockButton,
-  background: 'var(--theme-tint-strong)',
   color: 'var(--theme-primary)',
 }
 

@@ -8,100 +8,82 @@ interface StoryModalProps {
   onClose: () => void
 }
 
+/**
+ * Rehecho al idioma "fluido" del login E -maqueta aprobada tras varias
+ * rondas de bocetos.
+ *
+ * Antes era una tarjeta de cristal (fondo con degradado, borde y sombra
+ * propios) centrada en un velo, con el título centrado y el botón en
+ * mayúsculas con degradado verde. Ahora no hay tarjeta: el texto vive
+ * directamente sobre el fondo sólido, alineado a la izquierda como el
+ * título del login, y el botón es la misma píldora naranja que "Abrir
+ * nodo" en la barra de jugador -misma familia visual en toda la app-.
+ */
 export function StoryModal({ title, subtitle, body, buttonText, onClose }: StoryModalProps) {
   return (
     <div
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        // .82, no .4: un velo tan fino dejaba ver CUALQUIER OTRO overlay que
-        // se abriera detrás -paso de verdad con "antes de salir"-. El
-        // prólogo es un momento propio, tapa del todo lo de debajo.
-        backgroundColor: 'rgba(var(--theme-ink-deep), 0.82)',
-        backdropFilter: 'var(--theme-blur)',
-        WebkitBackdropFilter: 'var(--theme-blur)',
+        inset: 0,
+        // Solido, no un velo sobre el mapa: el prologo es un momento propio,
+        // no una capa flotando sobre el juego -y un fondo solido tambien
+        // evita el problema de fondo que tuvo esta pantalla una vez: dejar
+        // ver cualquier otro overlay que se abriera detras.
+        background: 'var(--theme-bg)',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: '28px 26px',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 28px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
         color: '#fff',
         overflowY: 'auto',
       }}
     >
-      <div
-        className="saga-story-panel"
-        style={{
-          width: '100%',
-          maxWidth: '580px',
-          maxHeight: '85vh',
-          background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
-          backdropFilter: 'var(--theme-blur)',
-          WebkitBackdropFilter: 'var(--theme-blur)',
-          // Del tema, no 28px clavado: en fuego las esquinas se cortan, no
-          // se redondean, y aquí quedaba igual de curvo que en cualquier
-          // otro tema por mucho que el CSS del tema dijese otra cosa.
-          borderRadius: 'var(--theme-radius-panel, 28px)',
-          boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
-          display: 'flex',
-          flexDirection: 'column',
-          border: '1px solid rgba(255, 255, 255, 0.22)',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ padding: '28px 24px 16px', textAlign: 'center' }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: '1.8rem',
-              fontWeight: 900,
-              color: '#f8fafc',
-              letterSpacing: '-0.02em',
-              textShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            }}
-          >
-            {title}
-          </h1>
-          {subtitle && (
-            <h2 style={{ margin: '8px 0 0 0', fontSize: '1.1rem', fontWeight: 600, color: 'rgb(var(--theme-info))' }}>
-              {subtitle}
-            </h2>
-          )}
+      <div style={{ width: '100%', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.2em', color: 'var(--theme-primary)', textTransform: 'uppercase', marginBottom: 10 }}>
+          {subtitle || 'Historia'}
         </div>
 
-        <div style={{ padding: '0 24px 16px', flex: 1, overflowY: 'auto', fontSize: '1.05rem', color: '#e2e8f0', lineHeight: 1.6 }}>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 'clamp(26px, 7vw, 36px)',
+            lineHeight: 1.05,
+            fontWeight: 1000,
+            letterSpacing: '-0.03em',
+            color: '#ffffff',
+            marginBottom: 20,
+          }}
+        >
+          {title}
+        </h1>
+
+        <div style={{ fontSize: 15, color: 'rgba(255,255,255,.78)', lineHeight: 1.65, marginBottom: 32 }}>
           {renderMarkdown(body)}
         </div>
 
-        <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'center', background: 'rgba(0,0,0,0.15)' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: '100%',
-              padding: '16px',
-              background: 'linear-gradient(180deg, rgba(var(--theme-ok), 0.85) 0%, rgba(var(--theme-ok-deep), 0.95) 100%)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.25)',
-              borderRadius: 'var(--theme-radius-card, 16px)',
-              fontSize: '1.1rem',
-              fontWeight: 900,
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              boxShadow: '0 8px 24px rgba(var(--theme-ok), 0.35)',
-              transition: 'transform 0.15s, background 0.15s',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.01)')}
-            onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            {buttonText}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: '100%',
+            minHeight: 52,
+            padding: '0 16px',
+            background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
+            color: '#ffffff',
+            border: 0,
+            borderRadius: 999,
+            fontSize: 14,
+            fontWeight: 900,
+            letterSpacing: '.02em',
+            cursor: 'pointer',
+            boxShadow: 'var(--saga-accent-glow)',
+          }}
+        >
+          {buttonText}
+        </button>
       </div>
     </div>
   )

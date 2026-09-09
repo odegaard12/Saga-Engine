@@ -45,18 +45,17 @@ export function getMapQuickControlsStyle(mobile: boolean, altoTarjetaInferior?: 
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    // Sin hueco entre iconos: lo que los separa ahora es la linea fina que
-    // lleva cada uno a su izquierda, no el aire.
-    gap: 0,
+    /**
+     * Sueltos, no en barra -maqueta aprobada tras varias rondas.
+     *
+     * Esto era una unica tarjeta de cristal (fondo, borde y sombra propios)
+     * con los iconos pegados unos a otros y una raya vertical de separador.
+     * Ahora cada icono flota solo, con su propio halo circular (ver
+     * `mapRouteToggleInlineButton`), juntos pero con aire entre ellos -no
+     * repartidos a todo el ancho-. Sin fondo ni borde en el contenedor.
+     */
+    gap: 9,
     padding: 0,
-    overflow: 'hidden',
-    borderRadius: 'var(--theme-radius-panel)',
-    // Exactamente el mismo estilo que la barra inferior (Mochila / Herramientas / Nodos)
-    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.52 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.42 * var(--theme-solid))))',
-    border: '1px solid rgba(255,255,255,.22)',
-    boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
-    backdropFilter: 'var(--theme-blur)',
-    WebkitBackdropFilter: 'var(--theme-blur)',
     pointerEvents: 'auto',
   }
 }

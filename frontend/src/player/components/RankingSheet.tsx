@@ -82,7 +82,6 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
     return a.display_name.localeCompare(b.display_name)
   })
 
-  const maxTime = Math.max(1, ...sorted.map((p) => p.total_time_ms || 0))
   const liveCount = sorted.filter((p) => p.presence === 'live').length
 
   return (
@@ -154,175 +153,107 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
             const levelStr = finished ? '¡FINALIZADO!' : `Nodo ${levelNum}`
             const color = getPlayerColor(player)
 
-            // Calculate progress bar percentage relative to maxTime
-            const timePercent = Math.min(100, Math.max(10, Math.round((currentMs / maxTime) * 100)))
             const isFirst = idx === 0
+
+            // El primero destaca por TAMAÑO -avatar mas grande, nombre mas
+            // grande-, no por una caja de color detras. Maqueta aprobada
+            // tras varias rondas: "mas fluido, mas como el login" -mismo
+            // idioma que las filas del login, sin tarjeta ni degradado.
+            const avatarSize = isFirst ? 46 : idx === 1 || idx === 2 ? 38 : 32
+            const nameSize = isFirst ? 16 : idx === 1 || idx === 2 ? 14 : 13
 
             return (
               <article
                 key={player.user}
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  padding: '12px 14px',
-                  borderRadius: 'var(--theme-radius-card)',
-                  border: '1px solid',
-                  borderColor: isFirst
-                    ? 'rgba(251,191,36,0.4)'
-                    : isLive
-                    ? 'rgba(34,211,238,0.25)'
-                    : 'rgba(255,255,255,0.08)',
-                  background: isFirst
-                    ? 'linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(var(--theme-ink), 0.4) 100%)'
-                    : isLive
-                    ? 'rgba(34,211,238,0.05)'
-                    : 'rgba(255,255,255,0.03)',
-                  boxShadow: isFirst ? '0 4px 16px rgba(251,191,36,0.15)' : 'none',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: isFirst ? '11px 0' : '9px 0',
+                  borderBottom: '0.5px solid rgba(255,255,255,.12)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {/* Position Badge */}
+                <span
+                  style={{
+                    fontSize: isFirst ? 15 : 12,
+                    fontWeight: 900,
+                    color: isFirst
+                      ? undefined
+                      : idx === 1 || idx === 2
+                        ? 'rgba(255,255,255,.55)'
+                        : 'rgba(255,255,255,.35)',
+                    width: 18,
+                    textAlign: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {isFirst ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                </span>
+
+                <div style={{ position: 'relative', flexShrink: 0 }}>
                   <div
                     style={{
-                      fontSize: 14,
-                      fontWeight: 900,
-                      color: isFirst ? '#fbbf24' : idx === 1 ? 'rgb(var(--theme-line-soft))' : idx === 2 ? '#cd7f32' : 'rgb(var(--theme-sheen-a))',
-                      width: 24,
-                      textAlign: 'center',
-                      flexShrink: 0,
+                      width: avatarSize,
+                      height: avatarSize,
+                      // La CARA va redonda en los dos temas: ver
+                      // --theme-radius-avatar (--theme-radius-pill es 3px
+                      // en fuego a propósito, para todo lo que no sea cara).
+                      borderRadius: 'var(--theme-radius-avatar)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: color,
+                      overflow: 'hidden',
                     }}
                   >
-                    {isFirst ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                  </div>
-
-                  {/* Avatar */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div
-                      style={{
-                        width: 42,
-                        height: 42,
-                        // La CARA va redonda en los dos temas. Con
-                        // --theme-radius-pill salía cuadrada en fuego (ahí
-                        // vale 3px a propósito, el tema corta esquinas), y
-                        // una cara recortada en cuadrado parece foto de
-                        // carnet mal hecha. Ver --theme-radius-avatar.
-                        borderRadius: 'var(--theme-radius-avatar)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: color,
-                        overflow: 'hidden',
-                        boxShadow: isLive ? `0 0 0 2px ${pres.color}, 0 0 10px ${pres.glow}` : '0 0 0 1px rgba(255,255,255,0.1)',
-                      }}
-                    >
-                      {avatarSrc ? (
-                        <img
-                          src={avatarSrc}
-                          alt=""
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            display: 'block',
-                          }}
-                          // Sin foto se caía a /default-avatar.png, que NO existe
-                          // (404): todos los jugadores sin retrato salían con una
-                          // imagen rota. Las iniciales sobre su color siempre están.
-                          onError={(event) => {
-                            event.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: 15, fontWeight: 900, color: '#0b1220' }}>
-                          {getPlayerAvatarInitials(player)}
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        right: 0,
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: pres.dot,
-                        border: '2px solid rgba(17,24,39,0.95)',
-                        boxShadow: isLive ? `0 0 6px ${pres.dot}` : 'none',
-                      }}
-                    />
-                  </div>
-
-                  {/* Player Name and Node info */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                      <span
-                        style={{
-                          color: '#f8fafc',
-                          fontSize: 15,
-                          fontWeight: 800,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                    {avatarSrc ? (
+                      <img
+                        src={avatarSrc}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        // Sin foto se caía a /default-avatar.png, que NO existe
+                        // (404): todos los jugadores sin retrato salían con una
+                        // imagen rota. Las iniciales sobre su color siempre están.
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none'
                         }}
-                      >
-                        {player.display_name || player.user}
+                      />
+                    ) : (
+                      <span style={{ fontSize: avatarSize * 0.36, fontWeight: 900, color: '#0b1220' }}>
+                        {getPlayerAvatarInitials(player)}
                       </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 800,
-                          color: finished ? 'rgb(var(--theme-ok))' : 'rgb(var(--theme-info))',
-                          background: finished ? 'rgba(var(--theme-ok), 0.15)' : 'rgba(var(--theme-info), 0.12)',
-                          padding: '2px 8px',
-                          borderRadius: 'var(--theme-radius-pill)',
-                          border: `1px solid ${finished ? 'rgba(var(--theme-ok), 0.3)' : 'rgba(var(--theme-info), 0.25)'}`,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {levelStr}
-                      </span>
-                    </div>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      right: -1,
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      background: pres.dot,
+                      border: '2px solid var(--theme-bg)',
+                    }}
+                  />
+                </div>
 
-                    {/* Live Timer display */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        ⏱️ {timeStr}
-                      </span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: pres.color }}>{pres.label}</span>
-                    </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ color: '#f8fafc', fontSize: nameSize, fontWeight: isFirst ? 900 : 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {player.display_name || player.user}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>
+                    {levelStr}
                   </div>
                 </div>
 
-                {/* Relative Visual Graph / Bar Chart */}
-                <div style={{ width: '100%', marginTop: 2 }}>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: 7,
-                      borderRadius: 'var(--theme-radius-pill)',
-                      background: 'rgba(255,255,255,0.06)',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${timePercent}%`,
-                        borderRadius: 'var(--theme-radius-pill)',
-                        background: finished
-                          ? 'linear-gradient(90deg, rgb(var(--theme-ok)) 0%, rgb(var(--theme-ok-soft)) 100%)'
-                          : isFirst
-                          ? 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)'
-                          : 'linear-gradient(90deg, #0284c7 0%, rgb(var(--theme-info)) 100%)',
-                        boxShadow: '0 0 10px rgba(var(--theme-info), 0.4)',
-                        transition: 'width 0.8s ease-out',
-                      }}
-                    />
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: isFirst ? 13 : 11, fontWeight: 800, color: finished ? 'var(--theme-primary)' : 'rgba(255,255,255,.7)' }}>
+                    {timeStr}
                   </div>
+                  {isLive ? (
+                    <div style={{ fontSize: 9, fontWeight: 700, color: pres.color, marginTop: 2 }}>{pres.label}</div>
+                  ) : null}
                 </div>
               </article>
             )

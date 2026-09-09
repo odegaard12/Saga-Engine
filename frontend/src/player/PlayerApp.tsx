@@ -1637,7 +1637,7 @@ export default function PlayerApp() {
     : !runtime.canEnter
       ? runtime.primaryLabel
       : isMapCollectible
-        ? `RECOGER ${String((currentStage as any).physical_item_label || currentStage!.title || 'OBJETO').toUpperCase()}`
+        ? `Recoger ${String((currentStage as any).physical_item_label || currentStage!.title || 'objeto')}`
         : currentStageIsPhysicalQr
           ? 'Abrir QR'
           : runtime.primaryLabel
@@ -3139,47 +3139,49 @@ export default function PlayerApp() {
 //
 // El area de toque se queda en 44x40: es lo minimo para el dedo y no depende
 // de que se vea un recuadro.
+/**
+ * Redondo y suelto, con su propio halo -maqueta aprobada tras varias rondas.
+ *
+ * Antes era una celda cuadrada dentro de una barra compartida, separada de
+ * la siguiente por una raya vertical. Ahora cada icono es su propia burbuja
+ * -mismo idioma que las fotos redondas del login-, con el velo oscuro de
+ * fondo puesto en cada uno en vez de en un contenedor comun.
+ */
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 44,
-  height: 40,
-  minWidth: 44,
-  minHeight: 40,
+  width: 38,
+  height: 38,
+  minWidth: 38,
+  minHeight: 38,
   padding: 0,
-  borderRadius: 0,
-  border: 'none',
-  borderLeft: '1px solid rgba(var(--theme-line), .22)',
-  background: 'transparent',
+  borderRadius: '50%',
+  border: 0,
+  background: 'rgba(var(--theme-ink), .55)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
+  boxShadow: '0 4px 14px rgba(0,0,0,.35)',
   color: '#f1f5f9',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 4,
-  fontSize: 18,
+  fontSize: 16,
   lineHeight: 1,
-  fontWeight: 900,
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-  textShadow: '0 1px 4px rgba(0,0,0,.5)',
   position: 'relative',
-  overflow: 'hidden',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
   cursor: 'pointer',
   userSelect: 'none',
-  transition: 'background 0.15s ease, border-color 0.15s ease',
+  transition: 'background 0.15s ease',
 }
 
 const mapPrologueButton: CSSProperties = {
   ...mapRouteToggleInlineButton,
 }
 
-// Activo: se marca con un filo encendido abajo, no devolviendole el recuadro.
-// Y del tema, que este llevaba un azul cielo clavado (#bae6fd) heredado de
-// cristal.
+// Activo: tinte del color del tema en el propio halo, no un azul fijo ni un
+// filo abajo -eso solo tenia sentido cuando eran celdas de una barra-.
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'var(--theme-tint)',
-  borderBottom: '2px solid var(--theme-primary)',
+  background: 'var(--theme-tint-strong)',
   color: 'var(--theme-primary)',
 }
 
