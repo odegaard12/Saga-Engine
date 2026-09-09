@@ -31,6 +31,56 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.19 El bug de verdad: mapProgress hacia falsear "mapa completo", y el prologo tapado por "antes de salir" — 4.9.79 a 4.9.82
+
+Cuatro fallos reales seguidos, todos encontrados MIDIENDO -sesion limpia,
+capturas de pantalla en vivo- y no a ojo.
+
+**"La pestaña de carga pasa muy rapido."** No era estetico:
+`getOfflineMapTileSummary()?.saved` es un NUMERO -cuantas teselas hay
+guardadas-, y `PlayerApp` hacia `Boolean(resumen?.saved)`. Con UNA sola
+tesela bajada el Boolean daba `true` y la app se saltaba la espera entera.
+Quien cerrase la app al 3% la siguiente vez entraba directo al monte con
+el mapa casi vacio. Arreglo: comparar `saved` contra `requested` (98%, una
+tesela suelta puede fallar por red sin merecer repetir la espera).
+Verificado con sesion limpia contra sagagia.es: 12% -> 27% -> 48% -> 68%
+-> 87% -> dentro, 15s, avance real, 0 errores.
+
+**Un contador que yo mismo puse mentia.** "0 / 100 trozos" y luego
+"1015 / 100 trozos" en pantalla: en la fase "Calculando mapa",
+`total: 100` es un marcador de ESCALA, no una cuenta de teselas. Quitada
+la linea.
+
+**Icono de carga mas pequeño y quieto** (116px con 2 anillos -> 72px sin
+animacion): "queda feo entre medias" en una carga que dura segundos.
+
+**BUG REAL, encontrado con captura de pantalla real:** el prologo
+(StoryModal) y el panel "antes de salir" (FieldPrepPanel) podian abrirse
+A LA VEZ -el segundo si faltaba algun permiso-, los dos overlays de
+pantalla completa centrados, y el velo del prologo era semitransparente
+(rgba .4): no tapaba el otro, y la tarjeta "ANTES DE SALIR" salia
+incrustada a media historia del prologo, dos pantallas asomando una a
+traves de la otra. Eso es lo que se leyo como "otro diseño", no que el
+codigo estuviera desactualizado -eran DOS pantallas encima, ninguna
+completa-. Arreglo: `FieldPrepPanel` espera a `!showPrologue`. Ademas el
+velo del prologo sube a .82 (un momento de historia tapa del todo lo de
+detras) y sus radios pasan a los tokens del tema.
+
+**El salto de carga a juego era brusco cuando el mapa ya estaba
+guardado** -loading->ready en el mismo tick-: nuevo velo que hereda el
+fondo de la pantalla de carga y se disuelve sobre el juego ya montado en
+480ms, sin alargar la espera real.
+
+**"Antes de salir" rediseñado**, mismos problemas que tenia el login
+antes de arreglarse: filas en caja dentro de tarjeta en caja, texto de
+apoyo a 10.5px (esto se lee de pie, en la calle), boton fuera del color
+del tema. Y boton nuevo "Volver a bajar el mapa": si la ruta cambia -nodo
+movido o nuevo- el mapa guardado no se actualiza solo, la comprobacion de
+arranque solo mira si esta completo.
+
+Leccion que se repite: medir con captura/sesion limpia encuentra bugs
+reales que "parece que funciona" no encuentra.
+
 ## 1.18 Login "E", carga por pasos, y el bug de las caras cuadradas — 4.9.76 a 4.9.78
 
 **Brasa (1.17) salió mal, y por un motivo que debí comprobar antes.** El
