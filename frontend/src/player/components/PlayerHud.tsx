@@ -313,21 +313,29 @@ export function PlayerHud({
 
         <div style={helper}>{helperCopy}</div>
 
-        <div className="saga-hud-dock" style={actionRow}>
+        {/* Dock unido, no dos botones sueltos con hueco entre medias -asi era
+            la maqueta que se aprobo-. Un solo bloque partido por un filete
+            interior; el que esta activo se enciende con el color del tema en
+            vez del azul de siempre, que en fuego desentonaba. */}
+        <div className="saga-hud-dock" style={dock}>
           <button
             type="button"
-            style={detailsOpen ? ghostButtonActive : ghostButton}
+            style={detailsOpen ? dockButtonActive : dockButton}
             onClick={onToggleDetails}
           >
-            {detailsOpen ? 'Cerrar mochila' : 'Mochila'}
+            <span style={dockIcono} aria-hidden="true">🎒</span>
+            <span>{detailsOpen ? 'Cerrar' : 'Mochila'}</span>
           </button>
+
+          <span style={dockDivisor} aria-hidden="true" />
 
           <button
             type="button"
-            style={toolsOpen ? ghostButtonActive : ghostButton}
+            style={toolsOpen ? dockButtonActive : dockButton}
             onClick={onOpenTools}
           >
-            {toolsOpen ? t('player.tools.close', locale) : 'Herramientas'}
+            <span style={dockIcono} aria-hidden="true">🛠️</span>
+            <span>{toolsOpen ? t('player.tools.close', locale) : 'Herramientas'}</span>
           </button>
         </div>
       </section>
@@ -742,30 +750,52 @@ const helper: CSSProperties = {
   fontSize: 13,
   lineHeight: 1.45,
 }
-const actionRow: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const ghostButton: CSSProperties = {
-  minHeight: 42,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+// Bloque unico: un solo fondo y un solo borde para los dos botones, partidos
+// por un filete interior -no dos tarjetas con hueco entre medias-. Es el
+// dock de la maqueta que se aprobo, no dos "ghost buttons" sueltos.
+const dock: CSSProperties = {
+  display: 'flex',
+  alignItems: 'stretch',
   borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.10)',
   background: 'rgba(var(--theme-ink), .32)',
+  overflow: 'hidden',
+}
+
+const dockDivisor: CSSProperties = {
+  width: 1,
+  alignSelf: 'stretch',
+  background: 'rgba(255,255,255,.10)',
+}
+
+const dockIcono: CSSProperties = {
+  fontSize: 16,
+  lineHeight: 1,
+}
+
+const dockButton: CSSProperties = {
+  flex: 1,
+  minHeight: 46,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  border: 0,
+  background: 'transparent',
   color: '#ffffff',
   fontSize: 12,
   fontWeight: 800,
 }
 
-const ghostButtonActive: CSSProperties = {
-  ...ghostButton,
-  background: 'rgba(var(--theme-pin), .16)',
-  border: '1px solid rgba(96,165,250,.18)',
-  color: '#dbeafe',
+// Encendido con el color del tema, no un azul fijo: en fuego desentonaba
+// -misma correccion que ya se hizo en el boton del panel "antes de salir".
+// `--theme-tint-strong` y no un rgba a mano: `--theme-primary` es un hex
+// completo (#ef8a5c en fuego, no un trio r,g,b), asi que no se puede meter
+// dentro de un rgba(); el tinte ya viene calculado por tema para esto mismo.
+const dockButtonActive: CSSProperties = {
+  ...dockButton,
+  background: 'var(--theme-tint-strong)',
+  color: 'var(--theme-primary)',
 }
 
 function getOverlayStyle(compact: boolean): CSSProperties {
