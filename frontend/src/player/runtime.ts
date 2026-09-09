@@ -68,7 +68,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'finished',
-      primaryLabel: 'MISIÓN COMPLETA',
+      primaryLabel: 'Misión completa',
       primaryTone: 'done',
       helperText: 'Xa completaches todos os nodos da travesía.',
     }
@@ -78,7 +78,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'missing_stage',
-      primaryLabel: 'AGARDANDO NODO',
+      primaryLabel: 'Agardando nodo',
       primaryTone: 'locked',
       helperText: 'Non hai ningún nodo activo agora mesmo.',
     }
@@ -93,7 +93,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'missing_item',
-      primaryLabel: 'FALTA UN OBXECTO',
+      primaryLabel: 'Falta un obxecto',
       primaryTone: 'locked',
       helperText:
         currentStage.messages?.locked ||
@@ -120,7 +120,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: true,
       reason: 'free_entry',
-      primaryLabel: 'ABRIR NODO',
+      primaryLabel: 'Abrir nodo',
       primaryTone: 'ready',
       helperText: currentStage.messages?.hint || currentStage.content || 'Nodo dispoñible.',
     }
@@ -130,7 +130,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'gps_unavailable',
-      primaryLabel: debugEnabled ? 'TOCA O MAPA' : 'GPS NECESARIO',
+      primaryLabel: debugEnabled ? 'Toca o mapa' : 'GPS necesario',
       primaryTone: 'gps',
       helperText: debugEnabled
         ? 'Toca o mapa para colocar unha posición simulada.'
@@ -152,7 +152,7 @@ export function deriveStageRuntime(args: {
       return {
         canEnter: true,
         reason: 'gps_rendido',
-        primaryLabel: 'ABRIR NODO',
+        primaryLabel: 'Abrir nodo',
         primaryTone: 'warn',
         helperText:
           'Sen posición fiable despois dun bo anaco. Podes abrir o nodo igual: ' +
@@ -163,7 +163,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: false,
       reason: 'distance_unknown',
-      primaryLabel: 'LOCALIZANDO...',
+      primaryLabel: 'Localizando...',
       primaryTone: 'gps',
       helperText: 'Agardando unha posición fiable.',
     }
@@ -173,7 +173,7 @@ export function deriveStageRuntime(args: {
     return {
       canEnter: true,
       reason: 'within_radius',
-      primaryLabel: 'ABRIR NODO',
+      primaryLabel: 'Abrir nodo',
       primaryTone: 'ready',
       helperText: currentStage.messages?.hint || currentStage.content || 'Estás dentro do radio.',
     }
@@ -182,7 +182,7 @@ export function deriveStageRuntime(args: {
   return {
     canEnter: false,
     reason: 'out_of_range',
-    primaryLabel: 'ACHÉGATE MÁIS',
+    primaryLabel: 'Achégate máis',
     primaryTone: 'warn',
     helperText:
       currentStage.messages?.locked ||
