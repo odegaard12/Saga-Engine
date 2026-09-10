@@ -609,52 +609,39 @@ export function PlayerHud({
             </button>
           </div>
 
-          {/* Selector de Idioma (Español / Galego) */}
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgb(var(--theme-line))', marginBottom: 8, letterSpacing: '0.05em' }}>
-              🌐 {t('player.tools.language', locale)}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/**
+           * Selector de idioma: UN control, no dos botones sueltos.
+           *
+           * Lo de antes tenia tres cosas mal, y ninguna era de gusto:
+           * - El activo cambiaba de COLOR segun el idioma -verde para
+           *   español, azul para galego-. El color decia "que idioma es",
+           *   que no significa nada, en vez de "cual esta puesto".
+           * - Usaba 🟦 como bandera de Galicia. Es un cuadrado azul.
+           * - Y la marca de puesto era un ✓ metido dentro del texto, asi
+           *   que los dos botones cambiaban de ancho al cambiar de idioma.
+           *
+           * Ahora es un selector de dos tramos sobre un carril: el puesto
+           * se enciende con el color del tema, el otro queda apagado. Se
+           * ve cual esta activo sin leer nada.
+           */}
+          <div style={idiomaBloque}>
+            <div style={idiomaEtiqueta}>{t('player.tools.language', locale)}</div>
+            <div style={idiomaCarril}>
               <button
                 type="button"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 'var(--theme-radius-card)',
-                  border: locale === 'es' ? '1px solid rgba(var(--theme-ok-soft), 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'es' ? 'rgba(var(--theme-ok), 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'es' ? 'rgb(var(--theme-ok-soft))' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={locale === 'es' ? idiomaTramoActivo : idiomaTramo}
                 onClick={() => chooseLocale('es')}
+                aria-pressed={locale === 'es'}
               >
-                🇪🇸 Español {locale === 'es' ? '✓' : ''}
+                Español
               </button>
-
               <button
                 type="button"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 'var(--theme-radius-card)',
-                  border: locale === 'gl' ? '1px solid rgba(var(--theme-info), 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'gl' ? 'rgba(var(--theme-info-mid), 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'gl' ? 'rgb(var(--theme-info))' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={locale === 'gl' ? idiomaTramoActivo : idiomaTramo}
                 onClick={() => chooseLocale('gl')}
+                aria-pressed={locale === 'gl'}
               >
-                🟦 Galego {locale === 'gl' ? '✓' : ''}
+                Galego
               </button>
             </div>
           </div>
@@ -808,6 +795,46 @@ const dockDivisor: CSSProperties = {
   width: 1,
   height: 13,
   background: 'var(--theme-hairline)',
+}
+
+const idiomaBloque: CSSProperties = {
+  marginTop: 14,
+  paddingTop: 14,
+  borderTop: `1px solid var(--theme-hairline)`,
+}
+
+const idiomaEtiqueta: CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,.6)',
+  marginBottom: 9,
+}
+
+// El carril: un solo bloque partido en dos, no dos botones con hueco.
+const idiomaCarril: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 3,
+  padding: 3,
+  borderRadius: 12,
+  background: 'var(--theme-card-inset)',
+}
+
+const idiomaTramo: CSSProperties = {
+  minHeight: 36,
+  border: 0,
+  borderRadius: 9,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.6)',
+  fontSize: 12.5,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const idiomaTramoActivo: CSSProperties = {
+  ...idiomaTramo,
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
 }
 
 const dockButton: CSSProperties = {
