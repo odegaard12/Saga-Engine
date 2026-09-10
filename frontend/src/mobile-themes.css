@@ -558,7 +558,12 @@ body.theme-flame-red .saga-hud-dock button span {
 }
 
 @keyframes sagaVeloDisolver {
-  0% { opacity: 1; }
-  60% { opacity: 1; }
-  100% { opacity: 0; }
+  /* Se disuelve DESDE EL PRIMER FOTOGRAMA y se abre un poco al hacerlo.
+   *
+   * Antes aguantaba opaco el 60% del tiempo y se iba en los ultimos 190ms:
+   * eso no es una transicion, es una espera y luego un corte. Ahora baja
+   * desde el principio y crece un 6%, que es lo que da la sensacion de que
+   * la pantalla de carga se abre y deja ver el juego, en vez de apagarse. */
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.06); }
 }

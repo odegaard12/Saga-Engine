@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -37,10 +38,10 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
     currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
 
-  const totalMs = payload.live_status?.total_time_ms || 0
-  const minutes = Math.floor(totalMs / 60000)
-  const seconds = Math.floor((totalMs % 60000) / 1000)
-  const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  const perfil = { ...(payload.profile || {}), user: payload.user, display_name: playerName }
+  const avatarUrl = getPlayerAvatarUrl(perfil as never)
+  const iniciales = getPlayerAvatarInitials(perfil as never)
+  const colorPerfil = getPlayerColor(perfil as never)
 
   return (
     <div style={wrap}>
@@ -62,22 +63,40 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
           padding: compact ? '9px 11px' : '11px 14px',
         }}
       >
+        {/**
+         * Tu FOTO, y el nodo como texto principal.
+         *
+         * Antes empezaba por el nombre de usuario -"SIM_01", "odi23"-, que no
+         * le dice nada a nadie y encima ocupaba el sitio de lo unico que de
+         * verdad hace falta saber andando: a que nodo vas. La cara se
+         * reconoce sin leer.
+         *
+         * Y FUERA EL RELOJ. Nadie mira el crono mientras camina, y el tiempo
+         * ya esta en la clasificacion, que es donde se compara. Quitarlo deja
+         * respirar al nombre del nodo, que antes se cortaba con puntos
+         * suspensivos para no empujarlo fuera.
+         */}
         <div style={topRow}>
-          <div style={eyebrow}>{playerName}</div>
-          {/* El nodo, en la MISMA linea. Estuvo un rato colgando de su alfiler
-              en el mapa y no funciono: choca con las fotos de los nodos y tapa
-              el camino, que es lo que hay que ver. Aqui cabe, porque la barra
-              ya no lleva ni titulo aparte ni tira de puntos. */}
+          <div style={{ ...retratoAro, background: colorPerfil }} title={playerName}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: 9, fontWeight: 900, color: '#0b1220' }}>{iniciales}</span>
+            )}
+          </div>
+
           <div style={nodoEnLinea} title={stageName}>{stageName}</div>
 
-          {/* Texto suelto, no pastillas con borde: sobre un velo, tres cajitas
-              redondas seguidas eran justo el ruido que se quito del login. */}
-          <div style={pillRow}>
-            <div style={tiempoTexto}>{timeDisplay}</div>
-            {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
-            <div className="saga-shell-count-pill" style={contadorTexto}>
-              {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
-            </div>
+          {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
+          <div className="saga-shell-count-pill" style={contadorTexto}>
+            {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
           </div>
         </div>
 
@@ -171,38 +190,13 @@ const topRow: CSSProperties = {
 const nodoEnLinea: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: 12.5,
-  fontWeight: 700,
-  color: 'rgba(255,255,255,.62)',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-}
-
-const pillRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-}
-
-const eyebrow: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 11,
+  fontSize: 14,
   fontWeight: 900,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  maxWidth: 110,
+  letterSpacing: '-.015em',
+  color: '#ffffff',
+  whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  flex: '0 0 auto',
-}
-
-const tiempoTexto: CSSProperties = {
-  color: 'rgba(255,255,255,.62)',
-  fontSize: 11,
-  fontWeight: 800,
-  fontVariantNumeric: 'tabular-nums',
 }
 
 const equipoTexto: CSSProperties = {
@@ -226,6 +220,17 @@ const equipoTexto: CSSProperties = {
 
 // El contador en el color del tema: es el unico dato de la barra que dice
 // cuanto llevas, y sobre un velo se pierde si va del mismo gris que el resto.
+const retratoAro: CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: 'var(--theme-radius-avatar)',
+  overflow: 'hidden',
+  display: 'grid',
+  placeItems: 'center',
+  flexShrink: 0,
+  background: 'var(--theme-card-inset)',
+}
+
 const contadorTexto: CSSProperties = {
   color: 'var(--theme-primary)',
   fontSize: 12,
