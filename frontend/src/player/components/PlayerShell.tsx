@@ -51,7 +51,14 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
         data-saga-player-shell="top"
         style={{
           ...card,
-          width: compact ? '100%' : 'min(100%, 760px)',
+          // 420px en pantalla grande, no 760.
+          //
+          // SAGA solo se juega en vertical -hay una pantalla que lo dice si
+          // giras el movil-, asi que en un ordenador esto es una interfaz de
+          // movil estirada. A 760px el nombre quedaba pegado a la izquierda,
+          // el reloj y el contador a la derecha, y medio metro de vacio en
+          // medio. A ancho de telefono se lee como lo que es.
+          width: compact ? '100%' : 'min(100%, 420px)',
           padding: compact ? '9px 11px' : '11px 14px',
         }}
       >
