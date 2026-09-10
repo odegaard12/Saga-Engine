@@ -418,11 +418,14 @@ const inputChip: CSSProperties = {
   alignItems: 'center',
   gap: 8,
   width: '100%',
-  background: 'var(--theme-card)',
+  // Relleno propio, no el mismo color que la hoja: puestas sobre la tarjeta
+  // solida con `--theme-card` se volvian invisibles -mismo color exacto- y
+  // solo se adivinaban por el filo de la izquierda.
+  background: 'var(--theme-card-inset)',
   // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
   borderLeft: '3px solid var(--theme-hairline)',
   borderRadius: 10,
-  padding: '10px 12px',
+  padding: '11px 12px',
 }
 
 const inputChipReady: CSSProperties = {
