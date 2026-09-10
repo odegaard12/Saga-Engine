@@ -322,7 +322,9 @@ export function PlayerHud({
         data-saga-player-hud="bottom"
         style={{
           ...card,
-          width: compact ? '100%' : 'min(100%, 720px)',
+          // Ver la nota de PlayerShell.tsx: a 720px el boton "Abrir nodo"
+          // media medio metro de ancho. Ancho de telefono tambien aqui.
+          width: compact ? '100%' : 'min(100%, 420px)',
           // Mas apretada: 140px de alto para un boton, una linea de ayuda y
           // dos palabras era demasiada tarjeta comiendose el mapa.
           padding: compact ? '11px 13px 9px' : '13px 15px 11px',
