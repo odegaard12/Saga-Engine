@@ -29,43 +29,28 @@ export function getMobileBrowserChromeLift(mobile: boolean): number {
 const ALTO_TARJETA_POR_DEFECTO = 138
 const HUECO_SOBRE_TARJETA = 22
 
-export function getMapQuickControlsStyle(mobile: boolean, altoTarjetaInferior?: number | null): CSSProperties {
-  const browserChromeLift = getMobileBrowserChromeLift(mobile)
-  const alto = altoTarjetaInferior && altoTarjetaInferior > 0 ? altoTarjetaInferior : ALTO_TARJETA_POR_DEFECTO
-  /**
-   * El hueco se suma SIEMPRE, se haya medido o no.
-   *
-   * Antes solo se sumaba cuando la medida en vivo existia: sin medida, los
-   * iconos se colocaban a exactamente 138px del suelo, que es el alto
-   * SUPUESTO de la tarjeta, o sea pegados a su borde. Medido en produccion
-   * con la tarjeta real (140px de alto): quedaban 12px de aire, y eso solo
-   * por casualidad -si la tarjeta crece dos pixeles mas, se solapan-. Con
-   * un mensaje de ayuda largo la tarjeta pasa de 160px y los tapaba.
-   */
-  const desplazamiento = alto + HUECO_SOBRE_TARJETA
-
+/**
+ * La fila de iconos ya NO se coloca sola.
+ *
+ * Tenia `position: fixed` y una cuenta desde el suelo -alto supuesto de la
+ * tarjeta de abajo mas un hueco-. Esa cuenta fallo dos veces seguidas,
+ * medido en produccion: 12px de aire la primera y 16px la segunda, cuando
+ * la tarjeta mide lo que mida segun el largo del texto de ayuda y la medida
+ * en vivo llega tarde o no llega. Los iconos acababan pegados a la tarjeta.
+ *
+ * Ahora la fila va DENTRO del contenedor de la barra de abajo y se apila
+ * encima de la tarjeta por flujo normal. El hueco es real y no hay numero
+ * magico que mantener. Los dos parametros se quedan para no tocar a quien
+ * la llama, pero ya no hacen falta.
+ */
+export function getMapQuickControlsStyle(_mobile: boolean, _altoTarjetaInferior?: number | null): CSSProperties {
   return {
-    position: 'fixed',
-    left: '50%',
-    bottom: mobile ? `calc(env(safe-area-inset-bottom, 0px) + ${desplazamiento + browserChromeLift}px)` : 148,
-    transform: 'translateX(-50%)',
-    zIndex: 1600,
-    display: 'inline-flex',
+    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'nowrap',
-    /**
-     * Sueltos, no en barra -maqueta aprobada tras varias rondas.
-     *
-     * Esto era una unica tarjeta de cristal (fondo, borde y sombra propios)
-     * con los iconos pegados unos a otros y una raya vertical de separador.
-     * Ahora cada icono flota solo, con su propio halo circular (ver
-     * `mapRouteToggleInlineButton`), juntos pero con aire entre ellos -no
-     * repartidos a todo el ancho-. Sin fondo ni borde en el contenedor.
-     */
     gap: 9,
-    padding: 0,
     pointerEvents: 'auto',
   }
 }
