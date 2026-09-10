@@ -128,7 +128,20 @@ const wrap: CSSProperties = {
  * a ser el mapa con la informacion encima.
  */
 const card: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(0,0,0,.58) 0%, rgba(0,0,0,.32) 60%, transparent 100%)',
+  /**
+   * El velo va en el ROJO del tema, no en negro.
+   *
+   * Primer intento: `rgba(0,0,0,...)`. En el login se ve rojo porque el
+   * fondo de la pagina YA es rojo (--theme-bg) y el velo solo lo oscurece.
+   * Aqui debajo no hay pagina: hay un mapa de satelite verde. Un velo negro
+   * sobre verde da GRIS, y la pantalla de juego perdia el rojo entero -"veo
+   * los cambios pero no era transparente, era rojo con otro estilo"-.
+   *
+   * Con los tonos de brasa del tema se mantiene el rojo Y sigue siendo un
+   * velo que se apaga, no la placa con borde de antes.
+   */
+  background:
+    'linear-gradient(180deg, rgba(var(--theme-shell-b), .97) 0%, rgba(var(--theme-shell-a), .86) 58%, rgba(var(--theme-shell-a), 0) 100%)',
   color: '#ffffff',
   display: 'grid',
   gap: 0,
