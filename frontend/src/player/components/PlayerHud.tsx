@@ -713,8 +713,10 @@ const card: CSSProperties = {
   margin: '0 auto',
   display: 'grid',
   gap: 0,
+  // En el ROJO del tema, no en negro: debajo hay un mapa de satelite verde y
+  // un velo negro daba gris. Ver la nota larga en PlayerShell.tsx.
   background:
-    'linear-gradient(0deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.42) 55%, transparent 100%)',
+    'linear-gradient(0deg, rgba(var(--theme-shell-b), .97) 0%, rgba(var(--theme-shell-a), .86) 58%, rgba(var(--theme-shell-a), 0) 100%)',
 }
 
 
