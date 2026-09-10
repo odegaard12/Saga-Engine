@@ -286,6 +286,7 @@ function tarjeta(mobile: boolean): CSSProperties {
     borderRadius: 18,
     background: 'var(--theme-card)',
     boxShadow: 'var(--theme-card-shadow)',
+    animation: 'sagaPanelEntra 260ms cubic-bezier(0.22, 1, 0.36, 1)',
   }
 }
 

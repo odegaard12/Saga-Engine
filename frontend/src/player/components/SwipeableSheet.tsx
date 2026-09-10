@@ -85,8 +85,8 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: saliendo ? 'translateY(100%)' : `translateY(${offsetY}px)`,
-    transition: isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+    transform: saliendo ? 'translateY(100%)' : 'translateY(0)',
+    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
     // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
     // un salto hacia arriba justo antes de bajar.
     animation: saliendo ? 'none' : undefined,
@@ -97,7 +97,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
       <div
         style={{
           ...backdrop,
-          opacity: open && !saliendo ? Math.max(0, 1 - offsetY / 300) : 0,
+          opacity: open && !saliendo ? 1 : 0,
         }}
         onClick={onClose}
       />
@@ -114,12 +114,11 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <div
-          style={dragHandleWrapper}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        />
+        {/* La zona de arrastre se fue: al mover la hoja con el dedo quedaba
+            mal -se despegaba a medias y volvia de golpe- y ya no aportaba
+            nada, porque el boton de cerrar vuelve a verse (antes se
+            escondia solo y arrastrar era la unica salida). Se cierra con la
+            X o tocando fuera. De paso se recuperan los 22px que ocupaba. */}
         <div
           style={{
             flex: 1,
