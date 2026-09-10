@@ -148,13 +148,14 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
   return (
     <section style={panel}>
-      {/* Header */}
+      {/* La cabecera "MOCHILA · N objetos" se fue: repetia el nombre de la
+          pestaña que ya esta activa y subrayada justo encima. El recuento
+          pasa al lado del signo de interrogacion, que es lo unico que hacia
+          falta conservar de esta fila. */}
       <div style={headerRow}>
-        <div style={headerLeft}>
-          <span style={headerLabel}>MOCHILA</span>
-          <span style={headerCount}>{totalItems} {totalItems === 1 ? 'objeto' : 'objetos'}</span>
-          {updatedLabel && <span style={syncBadge}>· {updatedLabel}</span>}
-        </div>
+        <span style={headerCount}>
+          {totalItems} {totalItems === 1 ? 'obxecto' : 'obxectos'}
+        </span>
         <button
           type="button"
           onClick={() => setShowGuide((v) => !v)}
