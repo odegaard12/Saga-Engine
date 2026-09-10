@@ -383,25 +383,17 @@ body.theme-flame-red .saga-mesa-pieza {
   );
 }
 
-body.theme-flame-red .saga-hoja {
-  /* La hoja de Mochila y Herramientas.
-   *
-   * Es el panel MAS GRANDE que se abre en la pantalla, y no llevaba ninguna
-   * clase: ni el corte ni la brasa podian alcanzarla, asi que se quedaba
-   * redondeada y plana dijera lo que dijera el tema. Mientras siguiera asi,
-   * cualquier cambio de dentro se leia como "sigue el disenio antiguo",
-   * porque lo que domina la vista es ella. */
-  background: var(--theme-brasa) !important;
-  clip-path: polygon(
-    var(--theme-panel-cut) 0,
-    100% 0,
-    100% calc(100% - var(--theme-panel-cut)),
-    calc(100% - var(--theme-panel-cut)) 100%,
-    0 100%,
-    0 var(--theme-panel-cut)
-  );
-  border-top: var(--theme-border-w) solid var(--theme-primary);
-}
+/* La hoja de Mochila y Herramientas YA NO SE PINTA AQUI.
+ *
+ * Tenia `background: var(--theme-brasa) !important` y el corte de esquina, y
+ * eso volvia a ganarle a los estilos en linea: la hoja del diseño "B"
+ * -tarjeta solida de --theme-card- se escribio en el componente y seguia
+ * saliendo con el degradado de brasa y la esquina cortada.
+ *
+ * Es la CUARTA vez en este repo que un `!important` del tema mata un cambio
+ * visual (el alfiler del mapa, el radio de la barra, las tres superficies de
+ * la pantalla de juego, y esto). El corte de esquina sigue vivo donde toca:
+ * los minijuegos, que si son placas de cristal. */
 
 body.theme-flame-red .saga-glass-panel {
   /* La brasa en diagonal, tambien en los paneles.
@@ -507,20 +499,8 @@ body.theme-flame-red .saga-mesa-ficha {
  * El arreglo va aquí y no en el componente, a propósito: lo en línea sigue
  * ganando en cristal (nada cambia), y estas reglas -con !important, que es
  * lo único que le gana a lo en línea- sólo entran en fuego. */
-body.theme-flame-red .saga-story-panel {
-  background: var(--theme-brasa) !important;
-  border: none !important;
-  border-top: var(--theme-border-w) solid var(--theme-primary) !important;
-  border-radius: var(--theme-radius-panel) !important;
-  clip-path: polygon(
-    var(--theme-panel-cut) 0,
-    100% 0,
-    100% calc(100% - var(--theme-panel-cut)),
-    calc(100% - var(--theme-panel-cut)) 100%,
-    0 100%,
-    0 var(--theme-panel-cut)
-  );
-}
+/* La regla de `.saga-story-panel` se fue con el prologo: ese panel ahora es
+   una tarjeta solida propia (StoryModal.tsx) y ya no lleva esa clase. */
 
 /* La píldora del contador (1/2, 2/2) en la barra de arriba.
  *
