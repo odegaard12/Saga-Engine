@@ -2806,139 +2806,6 @@ export default function PlayerApp() {
       />
 
 
-      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
-        <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}>
-          <QuickProofPanel
-            user={user}
-            mobile={isPhone}
-            hidden={false}
-            openSignal={quickQrOpenSignal}
-            showLauncher={false}
-            // El escáner manda sólo el tiempo de cámara; la penalización de 2
-            // minutos por usar el respaldo se suma aquí, una sola vez.
-            onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
-            activeQrPayload={
-              String(
-                (currentStage as any)?.qr_payload ||
-                  (currentStage as any)?.config?.qr_payload ||
-                  (currentStage as any)?.physical_qr?.payload ||
-                  ''
-              ) || null
-            }
-            onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
-          />
-
-          <button
-            type="button"
-            style={mapRouteToggleInlineButton}
-            disabled={fieldPhotoUploading}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleOpenFieldCamera()
-            }}
-            aria-label="Hacer foto de campo"
-            title="Hacer foto de campo"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              {fieldPhotoUploading ? '⏳' : '📷'}
-            </span>
-          </button>
-
-          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
-            <button
-              type="button"
-              style={mapPrologueButton}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                setShowPrologue(true)
-              }}
-              aria-label="Historia"
-              title="Leer historia"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>
-                📖
-              </span>
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            style={rankingOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              openRanking()
-            }}
-            aria-label="Trofeo"
-            title="Clasificación"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              🏆
-            </span>
-          </button>
-
-          <button
-            type="button"
-            style={routeOverviewActive ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleToggleRouteOverview()
-            }}
-            aria-label={
-              routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
-            }
-            title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              {routeOverviewActive ? '📍' : '🧭'}
-            </span>
-          </button>
-
-
-
-          <button
-            type="button"
-            /**
-             * Una burbuja mas de la fila, no una pastilla verde.
-             *
-             * Heredaba la burbuja redonda y luego la deformaba: fondo verde
-             * translucido, `width: auto`, relleno de 12 y la palabra
-             * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
-             * una pildora verde ancha de otra aplicacion, y encima la
-             * animacion era de ANCHO -la burbuja se estiraba y encogia y
-             * empujaba a las demas de lado-.
-             *
-             * Ahora es del mismo tamaño y color que sus vecinas, con el
-             * icono de diana, y aparece con opacidad y escala: no mueve a
-             * nadie de sitio.
-             */
-            style={{
-              ...mapRouteToggleInlineButton,
-              color: 'var(--theme-primary)',
-              transition: 'opacity .22s ease, transform .22s cubic-bezier(0.16, 1, 0.3, 1)',
-              opacity: !followPlayer ? 1 : 0,
-              transform: !followPlayer ? 'scale(1)' : 'scale(.6)',
-              pointerEvents: !followPlayer ? 'auto' : 'none',
-            }}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              setFollowPlayer(true)
-              void handleRequestLiveGps({ forceFocus: true })
-            }}
-            aria-label="Centrar en mi ubicación"
-            title="Centrar en mi ubicación"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              ◎
-            </span>
-          </button>
-        </div>
-      ) : null}
-      {/* saga-map-quick-controls-row-v1 */}
 
       <FieldPrepPanel
         /**
@@ -3012,12 +2879,158 @@ export default function PlayerApp() {
         />
       ) : null}
 
-      <div style={getBottomOverlayStyle(isPhone)}>
+      {/**
+       * La fila de iconos vive DENTRO del contenedor de la barra de abajo.
+       *
+       * Estaba suelta, colocada con `position: fixed` y una cuenta desde el
+       * suelo: alto supuesto de la tarjeta + un hueco. Esa cuenta fallo dos
+       * veces seguidas -medido en produccion: 12px de aire primero, 16px
+       * despues- porque el alto de la tarjeta cambia con el texto de ayuda y
+       * la medida en vivo llega tarde o no llega.
+       *
+       * Aqui no hay cuenta: van una encima de otra en el flujo normal, con
+       * su hueco de verdad. No se pueden tocar aunque la tarjeta crezca.
+       */}
+      <div style={{ ...getBottomOverlayStyle(isPhone), display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/*
           Se esconde con cualquier pantalla encima: la clasificación, la mochila
           o la hoja del reto lo taparían a medias, que es justo el estorbo que
           tenía cuando vivía pegado al botón del nodo.
         */}
+        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
+          <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}>
+            <QuickProofPanel
+              user={user}
+              mobile={isPhone}
+              hidden={false}
+              openSignal={quickQrOpenSignal}
+              showLauncher={false}
+              // El escáner manda sólo el tiempo de cámara; la penalización de 2
+              // minutos por usar el respaldo se suma aquí, una sola vez.
+              onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
+              activeQrPayload={
+                String(
+                  (currentStage as any)?.qr_payload ||
+                    (currentStage as any)?.config?.qr_payload ||
+                    (currentStage as any)?.physical_qr?.payload ||
+                    ''
+                ) || null
+              }
+              onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
+            />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleOpenFieldCamera()
+              }}
+              aria-label="Hacer foto de campo"
+              title="Hacer foto de campo"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                {fieldPhotoUploading ? '⏳' : '📷'}
+              </span>
+            </button>
+
+            {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+              <button
+                type="button"
+                style={mapPrologueButton}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setShowPrologue(true)
+                }}
+                aria-label="Historia"
+                title="Leer historia"
+              >
+                <span aria-hidden="true" style={mapQuickIcon}>
+                  📖
+                </span>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              style={rankingOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                openRanking()
+              }}
+              aria-label="Trofeo"
+              title="Clasificación"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                🏆
+              </span>
+            </button>
+
+            <button
+              type="button"
+              style={routeOverviewActive ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleToggleRouteOverview()
+              }}
+              aria-label={
+                routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
+              }
+              title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                {routeOverviewActive ? '📍' : '🧭'}
+              </span>
+            </button>
+
+
+
+            <button
+              type="button"
+              /**
+               * Una burbuja mas de la fila, no una pastilla verde.
+               *
+               * Heredaba la burbuja redonda y luego la deformaba: fondo verde
+               * translucido, `width: auto`, relleno de 12 y la palabra
+               * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
+               * una pildora verde ancha de otra aplicacion, y encima la
+               * animacion era de ANCHO -la burbuja se estiraba y encogia y
+               * empujaba a las demas de lado-.
+               *
+               * Ahora es del mismo tamaño y color que sus vecinas, con el
+               * icono de diana, y aparece con opacidad y escala: no mueve a
+               * nadie de sitio.
+               */
+              style={{
+                ...mapRouteToggleInlineButton,
+                color: 'var(--theme-primary)',
+                transition: 'opacity .22s ease, transform .22s cubic-bezier(0.16, 1, 0.3, 1)',
+                opacity: !followPlayer ? 1 : 0,
+                transform: !followPlayer ? 'scale(1)' : 'scale(.6)',
+                pointerEvents: !followPlayer ? 'auto' : 'none',
+              }}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setFollowPlayer(true)
+                void handleRequestLiveGps({ forceFocus: true })
+              }}
+              aria-label="Centrar en mi ubicación"
+              title="Centrar en mi ubicación"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                ◎
+              </span>
+            </button>
+          </div>
+        ) : null}
+        {/* saga-map-quick-controls-row-v1 */}
+
         {qrPayloadActual && !interactionOpen && !rankingOpen && activePanel !== 'details' ? (
           <QrScanClock ms={qrMs} />
         ) : null}
