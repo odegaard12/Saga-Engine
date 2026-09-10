@@ -27,7 +27,7 @@ export function getMobileBrowserChromeLift(mobile: boolean): number {
 // 138px y toca la barra de iconos (foto/historia/clasificación) que está
 // posicionada aparte, con este número fijo, sin saber nada de la tarjeta.
 const ALTO_TARJETA_POR_DEFECTO = 138
-const HUECO_SOBRE_TARJETA = 14
+const HUECO_SOBRE_TARJETA = 22
 
 export function getMapQuickControlsStyle(mobile: boolean, altoTarjetaInferior?: number | null): CSSProperties {
   const browserChromeLift = getMobileBrowserChromeLift(mobile)
@@ -306,9 +306,17 @@ export function getQuietOverlayStyle(mobile: boolean): CSSProperties {
 export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    left: mobile ? 10 : 12,
-    right: mobile ? 10 : 12,
-    bottom: mobile ? 0 : 12,
+    left: mobile ? 9 : 12,
+    right: mobile ? 9 : 12,
+    /**
+     * Despegada del borde -diseño "B": es una tarjeta que flota, no una
+     * barra de sistema pegada abajo-.
+     *
+     * El `env(safe-area-inset-bottom)` no es decoracion: con `bottom: 0` la
+     * fila de Mochila/Ferramentas caia justo debajo de la raya del indicador
+     * de inicio del iPhone, que se dibuja ENCIMA de la pagina.
+     */
+    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }
