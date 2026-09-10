@@ -225,7 +225,25 @@ export function PlayerHud({
         )
         .forEach(hideElement)
 
+      /**
+       * TODO MENOS LO QUE HAY DENTRO DE LA HOJA.
+       *
+       * Este barrido esconde los mandos del mapa para que no se queden por
+       * encima del panel abierto, y decide por el texto del boton: si es un
+       * simbolo de uno o dos caracteres, fuera.
+       *
+       * El boton de cerrar la hoja dice "×". Un simbolo de un caracter. Asi
+       * que la hoja SE ESCONDIA SU PROPIA X nada mas abrirse, y Ferramentas
+       * y Mochila se quedaban sin forma visible de cerrarse: solo arrastrando
+       * o tocando fuera, y eso no lo adivina nadie.
+       *
+       * Lo de dentro de la hoja no puede estorbar a la hoja, asi que no se
+       * toca. El barrido sigue valiendo para lo de fuera, que es su trabajo.
+       */
+      const hojaAbierta = document.querySelector('.saga-hoja')
+
       document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+        if (hojaAbierta?.contains(button)) return
         if (shouldHideButton(button)) hideElement(button)
       })
     }

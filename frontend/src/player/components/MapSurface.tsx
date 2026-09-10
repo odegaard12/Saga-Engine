@@ -2218,37 +2218,50 @@ export const MapSurface = React.memo(function MapSurface({
  * a la primera, y como sólo aparece estando fuera del camino no tapa nada que
  * haga falta: la línea verde a la que hay que volver queda alrededor.
  */
+/**
+ * El aviso de "saliste del camino": tarjeta solida y ARRIBA, no en el medio.
+ *
+ * Dos cosas mal. Era cristal del viejo -degradado, desenfoque, brillo de
+ * canto y borde amarillo-, el ultimo trozo de la pantalla de juego que
+ * seguia asi. Y estaba clavado en el centro exacto del mapa: justo encima
+ * de tu propia flecha y de la linea verde a la que te esta diciendo que
+ * vuelvas. El aviso tapaba la respuesta.
+ *
+ * Ahora es la misma tarjeta solida que el resto del diseño "B", colgada
+ * bajo la barra de arriba, donde no estorba a lo que hay que mirar.
+ */
 const avisoFueraDeRuta: React.CSSProperties = {
   position: 'absolute',
-  top: '50%',
+  top: 'calc(env(safe-area-inset-top, 0px) + 74px)',
   left: '50%',
-  transform: 'translate(-50%, -50%)',
+  transform: 'translateX(-50%)',
   zIndex: 620,
-  maxWidth: 'calc(100% - 40px)',
+  maxWidth: 'calc(100% - 36px)',
   display: 'flex',
   alignItems: 'center',
   gap: 11,
-  padding: '11px 17px 11px 14px',
-  borderRadius: 'var(--theme-radius-panel)',
-  border: '1px solid rgba(253,224,71,.42)',
-  background: 'linear-gradient(180deg, rgba(var(--theme-ink-soft), .90), rgba(var(--theme-ink), .90))',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14), 0 18px 44px rgba(var(--theme-ink-deep), .55)',
+  padding: '10px 15px 10px 12px',
+  borderRadius: 13,
+  border: 0,
+  background: 'var(--theme-card)',
+  boxShadow: 'var(--theme-card-shadow)',
   color: '#f8fafc',
   animation: 'sagaAvisoEntra 220ms ease-out',
   pointerEvents: 'none',
 }
 
+// Ambar: es un AVISO, y eso es una señal, no decoracion de marca. Se queda
+// en el ambar universal y no pasa al color del tema -en fuego el naranja
+// del tema y el ambar de aviso son casi el mismo color y no se distinguiria
+// de un boton normal-. Mismo criterio que el verde de "hecho".
 const avisoIcono: React.CSSProperties = {
   flex: '0 0 auto',
-  width: 30,
-  height: 30,
+  width: 28,
+  height: 28,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 'var(--theme-radius-pill)',
+  borderRadius: '50%',
   background: 'rgba(253,224,71,.16)',
-  border: '1px solid rgba(253,224,71,.38)',
   color: 'rgba(254,240,138,.98)',
   fontSize: 15,
   lineHeight: 1,
@@ -2263,11 +2276,11 @@ const avisoTitulo: React.CSSProperties = {
 }
 
 const avisoDetalle: React.CSSProperties = {
-  marginTop: 1,
+  marginTop: 2,
   fontSize: 11,
   fontWeight: 600,
   lineHeight: 1.25,
-  color: 'rgba(var(--theme-line-soft), .82)',
+  color: 'rgba(255,255,255,.62)',
   whiteSpace: 'nowrap',
 }
 
