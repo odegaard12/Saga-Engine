@@ -371,17 +371,13 @@ body[class*='theme-'] .admin-cms-side-action--save:hover {
  * Todo bajo `body.theme-flame-red`, asi que `cristal` no se entera.
  */
 
-body.theme-flame-red .saga-mesa-pieza {
-  /* Cada pieza, con el corte pequenio y el filo encendido a la izquierda: el
-     estado se cuenta con luz en el borde, no con un borde punteado. */
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - 7px),
-    calc(100% - 7px) 100%,
-    0 100%
-  );
-}
+/* Las piezas de la mesa YA NO SE RECORTAN.
+ *
+ * Llevaban el corte de esquina del tema viejo, y era lo unico que quedaba de
+ * esa forma en toda la pantalla de jugador: por eso la Mesa seguia
+ * leyendose como "el diseño antiguo" aunque sus colores ya estuvieran
+ * cambiados. El estado de cada pieza lo sigue contando el filo de la
+ * izquierda, que es informacion; el corte era solo decoracion. */
 
 /* La hoja de Mochila y Herramientas YA NO SE PINTA AQUI.
  *

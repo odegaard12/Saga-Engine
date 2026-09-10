@@ -2891,7 +2891,7 @@ export default function PlayerApp() {
        * Aqui no hay cuenta: van una encima de otra en el flujo normal, con
        * su hueco de verdad. No se pueden tocar aunque la tarjeta crezca.
        */}
-      <div style={{ ...getBottomOverlayStyle(isPhone), display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ ...getBottomOverlayStyle(isPhone), display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/*
           Se esconde con cualquier pantalla encima: la clasificación, la mochila
           o la hoja del reto lo taparían a medias, que es justo el estorbo que
