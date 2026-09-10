@@ -31,6 +31,45 @@ exactamente el que usa un móvil con el permiso ya dado.
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
 
+## 1.20 Modo jugador: rediseño fluido acorde con el login — 4.9.83 a 4.9.84
+
+Costo VARIAS rondas de maquetas rechazadas antes de acertar. Lo que NO
+funciono, dicho para no repetirlo:
+- Boton circular flotante con glow + podio con cajas de color = "horrible",
+  demasiado redondo y recargado, choca con el idioma de esquina cortada.
+- Version plana total (sin sombras, divisores duros por todas partes) =
+  "fatal", parecia traducida elemento a elemento, no reimaginada.
+- Refinar la estructura actual sin mas = "peor", seguia siendo cajas.
+
+Lo que se aprobo: **como el login E** -sin cajas, sin cristal, sin circulos
+salvo la foto, todo flotando sobre un velo, pildoras para las acciones-.
+
+Cambios (4.9.84):
+- Boton primario ("Abrir nodo"): pildora (999px), a proposito, saltandose
+  la esquina cortada del tema -es la unica accion primaria de la pantalla,
+  misma logica que el avatar es la unica cara. Ver comentario en
+  `primaryBase` (PlayerHud.tsx).
+- Mochila / Ferramentas: sueltos, centrados, juntos, separados por una
+  linea fina, SIN icono junto al texto.
+- Fila de iconos sobre el mapa: de barra compartida con separadores a
+  burbujas redondas sueltas, cada una con su halo.
+- La tarjeta de cristal de la barra inferior -> velo que se apaga hacia
+  arriba, igual que el `fondoVelo` del login.
+- Etiquetas del boton primario a frase normal ("Abrir nodo", no
+  "ABRIR NODO") en runtime.ts y PlayerApp.tsx.
+- Prologo (StoryModal): de tarjeta centrada a pantalla completa solida,
+  texto a la izquierda, boton pildora. Confirmado con captura en vivo.
+- Clasificacion: el primero destaca por TAMAÑO (avatar y nombre mas
+  grandes), no por una caja de color. Fuera la barra de progreso relativa.
+- Mochila (cuadricula de objetos con seleccion/detalle/QR): SE DEJA TAL
+  CUAL. Logica delicada, nunca fue motivo de queja, cambiarla a ciegas era
+  mas riesgo que beneficio.
+
+⚠️ Este arbol de trabajo lo comparte otra sesion con cambios sin
+commitear (backend/, admin/, tests/). Cada commit de esta tanda se hizo
+con `git add <archivos concretos>` + `git diff --cached` para NO
+arrastrar ese trabajo ajeno. Un `git add -A` casi se lo lleva por delante.
+
 ## 1.19 El bug de verdad: mapProgress hacia falsear "mapa completo", y el prologo tapado por "antes de salir" — 4.9.79 a 4.9.82
 
 Cuatro fallos reales seguidos, todos encontrados MIDIENDO -sesion limpia,
