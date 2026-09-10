@@ -321,15 +321,23 @@ const recipeCard: CSSProperties = {
   transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
 }
 
+/**
+ * La receta sigue SIN FICHA: ver la nota de `recipeCard` justo arriba.
+ *
+ * Se probo a darles fondo solido para que casaran con el diseño "B", y era
+ * volver al recuadro dentro de recuadro: la ficha dentro de la hoja dentro
+ * del panel. La superficie la llevan las piezas (`inputChip`); la receta
+ * solo se apaga cuando le faltan ingredientes.
+ */
 const recipeCardReady: CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'transparent',
+  border: 0,
 }
 
 const recipeCardLocked: CSSProperties = {
-  background: 'rgba(255,255,255,0.025)',
-  border: '1px solid rgba(255,255,255,0.06)',
-  opacity: 0.65,
+  background: 'transparent',
+  border: 0,
+  opacity: 0.5,
 }
 
 const recipeOutputRow: CSSProperties = {
@@ -341,7 +349,7 @@ const recipeOutputRow: CSSProperties = {
 const recipeOutputIcon: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 'var(--theme-radius-card)',
+  borderRadius: 12,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -410,16 +418,19 @@ const inputChip: CSSProperties = {
   alignItems: 'center',
   gap: 8,
   width: '100%',
-  background: 'rgba(var(--theme-sheen-b), calc(.5 * var(--theme-solid)))',
+  background: 'var(--theme-card)',
   // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
-  borderLeft: '3px solid rgba(var(--theme-line), .35)',
-  borderRadius: 'var(--theme-radius-card)',
+  borderLeft: '3px solid var(--theme-hairline)',
+  borderRadius: 10,
   padding: '10px 12px',
 }
 
 const inputChipReady: CSSProperties = {
-  borderLeft: '3px solid rgb(var(--theme-done))',
-  background: 'rgba(var(--theme-done-soft), .14)',
+  // Verde universal de "lo tienes", no --theme-done: en fuego ese token es
+  // naranja y no se distinguia de lo que falta. Mismo criterio que las
+  // etiquetas de "antes de salir".
+  borderLeft: '3px solid #22c55e',
+  background: 'rgba(34,197,94,.10)',
 }
 
 const inputChipMissing: CSSProperties = {
@@ -435,20 +446,20 @@ const inputChipLabel: CSSProperties = {
 
 // Apagado mientras faltan piezas: se ve a donde vas, pero no invita a pulsarlo.
 const craftBtnApagado: CSSProperties = {
-  background: 'rgba(var(--theme-line), .14)',
-  color: 'rgba(var(--theme-line-soft), .45)',
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.35)',
   boxShadow: 'none',
   cursor: 'default',
 }
 
 const craftBtn: CSSProperties = {
   width: '100%',
-  padding: '14px 0',
-  borderRadius: 'var(--theme-radius-card)',
+  padding: '13px 0',
+  borderRadius: 11,
   border: 'none',
   // Era morado -#a78bfa a #7c3aed- en un tema rojo. Del tema, ahora.
   background: 'var(--theme-primary)',
-  color: 'rgb(var(--theme-ink-deep))',
+  color: 'var(--theme-card)',
   fontWeight: 900,
   fontSize: 14,
   letterSpacing: '0.05em',
