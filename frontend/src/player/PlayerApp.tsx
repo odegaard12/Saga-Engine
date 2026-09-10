@@ -2981,7 +2981,6 @@ export default function PlayerApp() {
         permisoMovimiento={permisoMovimiento}
         onRequestCamera={() => void pedirCamara()}
         onRequestMotion={() => void pedirMovimiento()}
-        onRedownloadMap={() => void handleRedownloadMap()}
       />
 
       {overlayState ? <CelebrationOverlay state={overlayState} /> : null}
@@ -3045,6 +3044,7 @@ export default function PlayerApp() {
           onCloseTools={closeTools}
           onToggleDebug={handleToggleDebug}
           onDownloadFieldProofs={handleDownloadFieldProofs}
+          onRedownloadMap={() => void handleRedownloadMap()}
           fieldPhotoCount={todasAsFotos.length}
           pendingFieldPhotoCount={fotosPendentes.length}
           submitting={submitting}

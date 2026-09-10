@@ -38,6 +38,13 @@ interface PlayerHudProps {
   onCloseTools: () => void
   onToggleDebug: () => void
   onDownloadFieldProofs?: () => void
+  /**
+   * Volver a bajar el mapa. Vive AQUI y no en "antes de salir": este es el
+   * grupo de "Operacion sen conexion", donde ya esta todo lo del mapa
+   * guardado. Alli era el boton mas grande de la tarjeta para algo que casi
+   * nunca se usa, y ademas duplicaba lo que ya habia en esta hoja.
+   */
+  onRedownloadMap?: () => void
   fieldPhotoCount?: number
   pendingFieldPhotoCount?: number
   submitting?: boolean
@@ -92,6 +99,7 @@ export function PlayerHud({
   onCloseTools,
   onToggleDebug,
   onDownloadFieldProofs,
+  onRedownloadMap,
   fieldPhotoCount = 0,
   pendingFieldPhotoCount = 0,
   submitting = false,
@@ -448,6 +456,11 @@ export function PlayerHud({
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
           <MissionPackPanel user={user} payload={missionPayload} />
+          {onRedownloadMap ? (
+            <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
+              🗺️ Volver a bajar o mapa
+            </button>
+          ) : null}
         </section>
 
         {/* CARD 2: ACCIONES DE CAMPO */}
