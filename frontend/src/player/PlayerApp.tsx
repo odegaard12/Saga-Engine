@@ -2990,6 +2990,7 @@ export default function PlayerApp() {
 
 
 
+            {!followPlayer ? (
             <button
               type="button"
               /**
@@ -2998,21 +2999,16 @@ export default function PlayerApp() {
                * Heredaba la burbuja redonda y luego la deformaba: fondo verde
                * translucido, `width: auto`, relleno de 12 y la palabra
                * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
-               * una pildora verde ancha de otra aplicacion, y encima la
-               * animacion era de ANCHO -la burbuja se estiraba y encogia y
-               * empujaba a las demas de lado-.
+               * una pildora verde ancha de otra aplicacion.
                *
-               * Ahora es del mismo tamaño y color que sus vecinas, con el
-               * icono de diana, y aparece con opacidad y escala: no mueve a
-               * nadie de sitio.
+               * Y SE QUITA DEL TODO cuando no hace falta, no se deja
+               * invisible: con `opacity: 0` seguia ocupando sus 38px y su
+               * hueco, asi que las otras cuatro burbujas quedaban descuadradas
+               * hacia la izquierda. Invisible no es lo mismo que ausente.
                */
               style={{
                 ...mapRouteToggleInlineButton,
                 color: 'var(--theme-primary)',
-                transition: 'opacity .22s ease, transform .22s cubic-bezier(0.16, 1, 0.3, 1)',
-                opacity: !followPlayer ? 1 : 0,
-                transform: !followPlayer ? 'scale(1)' : 'scale(.6)',
-                pointerEvents: !followPlayer ? 'auto' : 'none',
               }}
               onClick={(event) => {
                 event.preventDefault()
@@ -3027,6 +3023,7 @@ export default function PlayerApp() {
                 ◎
               </span>
             </button>
+            ) : null}
           </div>
         ) : null}
         {/* saga-map-quick-controls-row-v1 */}
