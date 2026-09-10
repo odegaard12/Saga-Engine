@@ -25,8 +25,6 @@ interface FieldPrepPanelProps {
   permisoMovimiento: EstadoPermiso
   onRequestCamera: () => void
   onRequestMotion: () => void
-  /** Volver a bajar el mapa: la ruta pudo cambiar desde que se guardó. */
-  onRedownloadMap?: () => void
 }
 
 /**
@@ -49,7 +47,6 @@ export function FieldPrepPanel({
   permisoMovimiento,
   onRequestCamera,
   onRequestMotion,
-  onRedownloadMap,
 }: FieldPrepPanelProps) {
   if (!visible) return null
 
@@ -191,9 +188,15 @@ export function FieldPrepPanel({
                 {f.fallo ? 'Lo denegaste. Ajustes del móvil › Safari.' : f.para}
               </div>
             </div>
-            <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
-              {f.etiqueta}
-            </button>
+            {/* El boton va en la fila SOLO si falta mas de una cosa: con dos
+                permisos pendientes hace falta poder dar uno u otro. Si solo
+                falta uno, la accion sube al boton grande de abajo -ahi se
+                ve, y aqui se leia como algo secundario-. */}
+            {pendientes.length > 1 ? (
+              <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
+                {f.etiqueta}
+              </button>
+            ) : null}
           </div>
         ))}
 
@@ -211,19 +214,35 @@ export function FieldPrepPanel({
           </div>
         ) : null}
 
-        {/* Con la misión ya guardada: poder volver a bajar el mapa. Si la
-            ruta cambió -un nodo movido, uno nuevo- el mapa guardado se queda
-            con las teselas viejas y nada lo vuelve a pedir solo. */}
-        {hasOfflineMission && onRedownloadMap ? (
-          <button type="button" style={botonSecundario} onClick={onRedownloadMap}>
-            Volver a bajar el mapa
+        {/**
+         * Dos botones, y en este orden -opcion "C", elegida por Oscar.
+         *
+         * Antes la jerarquia estaba del reves: "Permitir" era un boton
+         * pequeño dentro de la fila, y el boton GRANDE de la tarjeta era
+         * "Volver a bajar el mapa", que casi no se usa. Lo que hay que
+         * pulsar tiene que ser lo mas grande.
+         *
+         * "Volver a bajar el mapa" ya no esta aqui: se fue a Ferramentas,
+         * al grupo de "Operacion sen conexion", que es donde vive todo lo
+         * del mapa guardado -y donde ya estaba duplicado-.
+         */}
+        {pendientes.length === 1 ? (
+          <button
+            type="button"
+            style={botonPrimario}
+            disabled={pendientes[0].ocupado}
+            onClick={pendientes[0].accion}
+          >
+            {pendientes[0].ocupado
+              ? pendientes[0].etiqueta
+              : `Permitir ${pendientes[0].que.toLowerCase()}`}
           </button>
         ) : null}
 
         {/* Salida explicita. La X de arriba ya cerraba, pero era el unico
             camino y no todo el mundo la busca: con permisos denegados desde
             los ajustes del movil, esta pantalla era un callejon aparente. */}
-        <button type="button" style={seguirSinEso} onClick={onDismiss}>
+        <button type="button" style={botonSecundario} onClick={onDismiss}>
           Seguir sen iso
         </button>
       </section>
@@ -370,6 +389,20 @@ const boton: CSSProperties = {
   cursor: 'pointer',
 }
 
+// La accion principal de la tarjeta, a lo ancho y en naranja plano.
+const botonPrimario: CSSProperties = {
+  width: '100%',
+  minHeight: 46,
+  borderRadius: 12,
+  border: 0,
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
+  fontSize: 12.5,
+  fontWeight: 900,
+  cursor: 'pointer',
+  marginBottom: 9,
+}
+
 const botonSecundario: CSSProperties = {
   width: '100%',
   minHeight: 44,
@@ -377,21 +410,8 @@ const botonSecundario: CSSProperties = {
   border: `1px solid var(--theme-card-inset)`,
   background: 'transparent',
   color: 'rgba(255,255,255,.78)',
-  fontSize: 12.5,
-  fontWeight: 800,
-  cursor: 'pointer',
-}
-
-// Sin caja ni borde: es una salida, no una accion que se recomiende.
-const seguirSinEso: CSSProperties = {
-  marginTop: 16,
-  width: '100%',
-  padding: 0,
-  border: 0,
-  background: 'transparent',
-  color: 'rgba(255,255,255,.45)',
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 800,
   cursor: 'pointer',
 }
 
