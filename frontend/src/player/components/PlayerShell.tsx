@@ -109,22 +109,17 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
   )
 }
 
+// Con margen a los lados: la tarjeta FLOTA sobre el mapa -diseño "B"-. A
+// sangre y con esquinas cuadradas arriba se leia como una barra de sistema
+// pegada, no como una tarjeta.
 const wrap: CSSProperties = {
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
   pointerEvents: 'auto',
+  padding: '0 9px',
 }
 
-/**
- * Velo, no tarjeta -maqueta aprobada tras varias rondas.
- *
- * Era una placa de brasa con borde, sombra y esquinas cortadas flotando
- * sobre el mapa. Ahora el texto va directamente sobre un degradado que se
- * apaga hacia abajo, igual que el `fondoVelo` del login y que la barra de
- * abajo: la pantalla de juego deja de ser tres cajas sobre un mapa y pasa
- * a ser el mapa con la informacion encima.
- */
 /**
  * Tarjeta flotante SOLIDA -diseno "B", aprobado tras varias rondas.
  *

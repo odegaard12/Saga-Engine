@@ -146,7 +146,10 @@ export function FieldPrepPanel({
   const panel = (
     <div style={capa} onClick={onDismiss}>
       <section
-        className="saga-glass-panel"
+        // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
+        // esquina cortada y `!important`, y le ganaba a la tarjeta solida
+        // del diseño "B". La clase se queda donde sigue habiendo cristal
+        // de verdad: los minijuegos.
         style={tarjeta(mobile)}
         onClick={(e) => e.stopPropagation()}
       >
