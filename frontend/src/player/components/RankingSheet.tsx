@@ -88,12 +88,14 @@ export function RankingSheet({ open, players, onClose }: RankingSheetProps) {
     <SwipeableSheet
       open={open}
       onClose={onClose}
+      // Tarjeta solida, igual que la mochila y las herramientas: era la
+      // ultima hoja que seguia con el cristal viejo -degradado, borde y
+      // desenfoque-, y abierta sobre el mapa daba el mismo barro que ya se
+      // quito del resto. Ver la nota de PlayerShell.tsx.
       sheetStyle={{
-        background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
-        border: '1px solid rgba(255,255,255,.22)',
-        boxShadow: '0 22px 60px rgba(var(--theme-ink), .18)',
-        backdropFilter: 'var(--theme-blur)',
-        WebkitBackdropFilter: 'var(--theme-blur)',
+        background: 'var(--theme-card)',
+        border: 0,
+        boxShadow: 'var(--theme-card-shadow)',
       }}
     >
       <div style={headerRow}>

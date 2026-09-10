@@ -289,12 +289,15 @@ const actions: CSSProperties = {
   gap: 7,
 }
 
+// Contorno neutro, como el resto de botones de la hoja de Ferramentas: sobre
+// la tarjeta solida el relleno de cristal ya no se distinguia del fondo.
 const secondary: CSSProperties = {
   ...button,
-  minHeight: 38,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(var(--theme-sheen-a), calc(.34 * var(--theme-solid)))',
-  color: '#f8fafc',
+  minHeight: 44,
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
 }
 
 const messageBase: CSSProperties = {
