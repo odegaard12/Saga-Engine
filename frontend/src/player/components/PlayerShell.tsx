@@ -52,22 +52,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 760px)',
-          // Fina a proposito: con una sola fila, el relleno de 12/16 dejaba
-          // una caja grande y medio vacia, que se veia peor que la de antes.
-          padding: compact ? '8px 12px' : '9px 14px',
-          /**
-           * El radio, del tema, con el de siempre como respaldo.
-           *
-           * Aqui habia un 22/28 clavado, y un numero en linea gana a la regla
-           * del tema: la barra seguia redonda en un tema de esquinas duras por
-           * mucho que el CSS dijese otra cosa. Es el mismo empate que ya dejo
-           * muerta la regla del alfiler del mapa.
-           *
-           * El respaldo entre parentesis es el valor exacto de antes, asi que
-           * un tema que no declare `--theme-radius-shell` -cristal- se ve
-           * igual que siempre.
-           */
-          borderRadius: `var(--theme-radius-shell, ${compact ? 22 : 28}px)`,
+          padding: compact ? '10px 16px 9px' : '12px 18px 10px',
         }}
       >
         <div style={topRow}>
@@ -78,14 +63,12 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
               ya no lleva ni titulo aparte ni tira de puntos. */}
           <div style={nodoEnLinea} title={stageName}>{stageName}</div>
 
+          {/* Texto suelto, no pastillas con borde: sobre un velo, tres cajitas
+              redondas seguidas eran justo el ruido que se quito del login. */}
           <div style={pillRow}>
-            <div style={{...soloPill, borderColor: 'rgba(var(--theme-info), 0.4)', color: 'rgb(var(--theme-info-soft))', background: 'rgba(var(--theme-info-mid), 0.15)' }}>
-              ⏱️ {timeDisplay}
-            </div>
-            {mode === 'team' ? (
-              <div style={soloPill}>EQUIPO</div>
-            ) : null}
-            <div className="saga-shell-count-pill" style={countPill}>
+            <div style={tiempoTexto}>{timeDisplay}</div>
+            {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
+            <div className="saga-shell-count-pill" style={contadorTexto}>
               {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
             </div>
           </div>
@@ -97,7 +80,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
             Esto lo cuenta en 3 px: una regla partida en tantos tramos como
             nodos, encendida hasta donde estas. A sangre, pegada al borde de
             abajo, porque un filo no es una fila: no ocupa alto propio. */}
-        <div style={{ ...rielProgreso, margin: compact ? '6px -12px -8px' : '7px -14px -9px' }}>
+        <div style={{ ...rielProgreso, margin: '9px 0 0' }}>
           {Array.from({ length: Math.max(progress.total, 1) }).map((_, i) => (
             <div
               key={i}
@@ -135,12 +118,17 @@ const wrap: CSSProperties = {
   pointerEvents: 'auto',
 }
 
+/**
+ * Velo, no tarjeta -maqueta aprobada tras varias rondas.
+ *
+ * Era una placa de brasa con borde, sombra y esquinas cortadas flotando
+ * sobre el mapa. Ahora el texto va directamente sobre un degradado que se
+ * apaga hacia abajo, igual que el `fondoVelo` del login y que la barra de
+ * abajo: la pantalla de juego deja de ser tres cajas sobre un mapa y pasa
+ * a ser el mapa con la informacion encima.
+ */
 const card: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(var(--theme-shell-a), calc(.72 * var(--theme-solid))) 0%, rgba(var(--theme-shell-b), calc(.64 * var(--theme-solid))) 100%)',
-  border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 20px 48px rgba(var(--theme-ink), .18), inset 0 1px 0 rgba(255,255,255,.12)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  background: 'linear-gradient(180deg, rgba(0,0,0,.58) 0%, rgba(0,0,0,.32) 60%, transparent 100%)',
   color: '#ffffff',
   display: 'grid',
   gap: 0,
@@ -169,9 +157,9 @@ const topRow: CSSProperties = {
 const nodoEnLinea: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: 14,
-  fontWeight: 800,
-  color: '#ffffff',
+  fontSize: 12.5,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,.62)',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -184,30 +172,30 @@ const pillRow: CSSProperties = {
 }
 
 const eyebrow: CSSProperties = {
-  color: 'rgb(var(--theme-ok-soft))',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  maxWidth: 150,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const soloPill: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(255,255,255,.16)',
-  border: '1px solid rgba(255,255,255,.18)',
   color: '#ffffff',
   fontSize: 11,
   fontWeight: 900,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  maxWidth: 110,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  flex: '0 0 auto',
+}
+
+const tiempoTexto: CSSProperties = {
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 11,
+  fontWeight: 800,
+  fontVariantNumeric: 'tabular-nums',
+}
+
+const equipoTexto: CSSProperties = {
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 9.5,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
 }
 
 
@@ -222,18 +210,12 @@ const soloPill: CSSProperties = {
 
 
 
-const countPill: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 'var(--theme-radius-pill)',
-  background: 'rgba(255,255,255,.12)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: 'rgba(255,255,255,0.9)',
-  fontSize: 10,
+// El contador en el color del tema: es el unico dato de la barra que dice
+// cuanto llevas, y sobre un velo se pierde si va del mismo gris que el resto.
+const contadorTexto: CSSProperties = {
+  color: 'var(--theme-primary)',
+  fontSize: 12,
   fontWeight: 900,
-  letterSpacing: '0.05em',
+  fontVariantNumeric: 'tabular-nums',
 }
 
