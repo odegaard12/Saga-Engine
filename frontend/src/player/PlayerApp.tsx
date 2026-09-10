@@ -3155,12 +3155,10 @@ const mapRouteToggleInlineButton: CSSProperties = {
   padding: 0,
   borderRadius: '50%',
   border: 0,
-  // Brasa, no tinta negra: flotan sobre el mapa verde y en negro se leian
-  // como botones de cualquier otra aplicacion. Ver PlayerShell.tsx.
-  background: 'rgba(var(--theme-shell-b), .94)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
-  boxShadow: '0 4px 14px rgba(0,0,0,.35)',
+  // SOLIDO, no translucido: mismo motivo que las dos tarjetas -ver la nota
+  // de PlayerShell.tsx-. Translucido sobre el mapa daba barro.
+  background: 'var(--theme-card)',
+  boxShadow: '0 4px 12px rgba(0,0,0,.5)',
   color: '#f1f5f9',
   display: 'inline-flex',
   alignItems: 'center',

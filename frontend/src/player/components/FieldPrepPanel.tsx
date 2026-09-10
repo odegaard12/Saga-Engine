@@ -150,16 +150,23 @@ export function FieldPrepPanel({
         style={tarjeta(mobile)}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* El titulo DICE QUE FALTA, no cuantas cosas faltan.
+            "Falta un permiso" obligaba a bajar la vista para saber cual;
+            con el nombre delante se resuelve sin leer mas. El recuento va
+            debajo en texto pequeño, que es su sitio: es el detalle. */}
         <header style={cabecera}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={antetitulo}>ANTES DE SALIR</div>
             <strong style={titulo}>
               {pendientes.length === 0
                 ? 'Todo listo'
                 : pendientes.length === 1
-                  ? 'Falta un permiso'
-                  : `Faltan ${pendientes.length}`}
+                  ? `Falta ${pendientes[0].que.toLowerCase()}`
+                  : `Faltan ${pendientes.length} permisos`}
             </strong>
+            <div style={recuento}>
+              {listos.length} de {listos.length + pendientes.length} listos
+            </div>
           </div>
 
           {/* Cierra siempre, pase lo que pase con los permisos. */}
@@ -168,23 +175,7 @@ export function FieldPrepPanel({
           </button>
         </header>
 
-        {/* Cuánto llevas, de un vistazo. Mismo lenguaje que el filo de
-            progreso de la barra de arriba: un tramo por cosa, encendido lo
-            que ya está. Antes sólo se sabía contando las filas que quedaban. */}
-        <div style={riel}>
-          {Array.from({ length: listos.length + pendientes.length }).map((_, i) => (
-            <span
-              key={i}
-              style={{
-                ...rielTramo,
-                background:
-                  i < listos.length ? 'rgb(var(--theme-done))' : 'rgba(255,255,255,.16)',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Filas sin caja: icono, texto y botón sobre una línea fina.
+        {/* Filas sin caja: icono, texto y botón entre dos líneas finas.
             Antes cada fila era un recuadro de cristal DENTRO de la tarjeta de
             cristal -recuadro dentro de recuadro, lo mismo que ensuciaba el
             login-, y el texto de apoyo iba a 10.5px, ilegible en el monte. */}
@@ -203,7 +194,19 @@ export function FieldPrepPanel({
           </div>
         ))}
 
-        {listos.length > 0 ? <div style={hecho}>✓ {listos.join(' · ')}</div> : null}
+        {/* Una etiqueta por cosa, no una linea de texto separada por puntos:
+            asi se lee de un vistazo QUE hay resuelto, sin tener que leer la
+            frase entera. Verde universal de "hecho", no el color del tema
+            -aqui es una señal, no decoracion de marca-. */}
+        {listos.length > 0 ? (
+          <div style={hechoFila}>
+            {listos.map((nombre) => (
+              <span key={String(nombre)} style={hechoEtiqueta}>
+                ✓ {nombre}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {/* Con la misión ya guardada: poder volver a bajar el mapa. Si la
             ruta cambió -un nodo movido, uno nuevo- el mapa guardado se queda
@@ -213,6 +216,13 @@ export function FieldPrepPanel({
             Volver a bajar el mapa
           </button>
         ) : null}
+
+        {/* Salida explicita. La X de arriba ya cerraba, pero era el unico
+            camino y no todo el mundo la busca: con permisos denegados desde
+            los ajustes del movil, esta pantalla era un callejon aparente. */}
+        <button type="button" style={seguirSinEso} onClick={onDismiss}>
+          Seguir sen iso
+        </button>
       </section>
     </div>
   )
@@ -233,32 +243,27 @@ const capa: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 16,
-  // Velo neutro: antes era azul marino y teñia la pantalla entera.
-  background: 'radial-gradient(circle at 50% 42%, rgba(0,0,0,.42), rgba(0,0,0,.68))',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  // Fondo difuminado, no solo oscurecido: se sigue adivinando el mapa detras
+  // -"que difumine todo el fondo y se vea todo eso"- pero nada de lo de
+  // debajo compite con la tarjeta.
+  background: 'rgba(var(--theme-ink-deep), .84)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
+// Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
+// las herramientas. Ver la nota larga en PlayerShell.tsx sobre por que los
+// translucidos daban barro.
 function tarjeta(mobile: boolean): CSSProperties {
   return {
-    width: mobile ? 'min(100%, 340px)' : 'min(100%, 400px)',
+    width: mobile ? 'min(100%, 360px)' : 'min(100%, 420px)',
     display: 'grid',
-    gap: 10,
-    padding: 16,
+    gap: 0,
+    padding: '22px 19px 19px',
     color: '#e2e8f0',
-    borderRadius: 'var(--theme-radius-panel)',
-    // El cristal va aquí y no sólo en la clase: comprobado en el navegador,
-    // backdrop-filter salía en "none" porque la hoja global no llegaba a
-    // aplicarse sobre este elemento, y la tarjeta quedaba opaca y plana.
-    background:
-      'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.34 * var(--theme-solid))), rgba(var(--theme-ink-soft), .42))',
-    border: '1px solid rgba(255,255,255,.24)',
-    backdropFilter: 'var(--theme-blur)',
-    WebkitBackdropFilter: 'var(--theme-blur)',
-    // Brillo de canto arriba y sombra ancha abajo: es lo que separa una lámina
-    // de cristal de un rectángulo translúcido.
-    boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,.24), 0 26px 60px rgba(var(--theme-ink-deep), .55)',
+    borderRadius: 18,
+    background: 'var(--theme-card)',
+    boxShadow: 'var(--theme-card-shadow)',
   }
 }
 
@@ -270,71 +275,65 @@ const cabecera: CSSProperties = {
 }
 
 const antetitulo: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
   letterSpacing: '.18em',
-  color: 'rgb(var(--theme-info-soft))',
+  color: 'var(--theme-primary)',
 }
 
 const titulo: CSSProperties = {
   display: 'block',
-  marginTop: 3,
-  fontSize: 17,
-  fontWeight: 850,
-  letterSpacing: '-.015em',
+  margin: '6px 0 4px',
+  fontSize: 21,
+  fontWeight: 900,
+  letterSpacing: '-.025em',
+  color: '#ffffff',
+}
+
+const recuento: CSSProperties = {
+  fontSize: 12,
+  color: 'rgba(255,255,255,.6)',
+  marginBottom: 20,
 }
 
 const cerrar: CSSProperties = {
   flex: '0 0 auto',
-  width: 32,
-  height: 32,
+  width: 30,
+  height: 30,
   display: 'grid',
   placeItems: 'center',
   padding: 0,
-  borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(255,255,255,.2)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#e2e8f0',
-  fontSize: 19,
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 17,
   fontWeight: 900,
   lineHeight: 1,
   cursor: 'pointer',
 }
 
-// Un tramo por cosa que hace falta, encendido lo ya listo.
-const riel: CSSProperties = {
-  display: 'flex',
-  gap: 3,
-  height: 3,
-  marginTop: 2,
-  marginBottom: 4,
-}
-
-const rielTramo: CSSProperties = {
-  flex: 1,
-  height: '100%',
-  borderRadius: 2,
-}
-
-// Sin caja: sólo una línea fina de separación. Ver la nota del JSX.
+// Entre DOS lineas finas, no solo con una arriba: la fila del permiso es lo
+// unico accionable de la tarjeta y asi queda enmarcada sin necesitar caja.
 const fila: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 12,
-  padding: '11px 2px',
-  borderTop: '0.5px solid rgba(255,255,255,.12)',
+  gap: 14,
+  padding: '16px 0',
+  borderTop: `1px solid var(--theme-hairline)`,
+  borderBottom: `1px solid var(--theme-hairline)`,
 }
 
 const icono: CSSProperties = {
   flex: '0 0 auto',
-  fontSize: 22,
+  fontSize: 26,
   lineHeight: 1,
-  width: 26,
+  width: 30,
   textAlign: 'center',
 }
 
 const queEs: CSSProperties = {
-  fontSize: 15,
+  fontSize: 16,
   fontWeight: 900,
   lineHeight: 1.2,
   color: '#ffffff',
@@ -343,25 +342,25 @@ const queEs: CSSProperties = {
 // 12px, no 10.5: esto se lee de pie, en la calle, antes de salir a andar.
 const paraQue: CSSProperties = {
   fontSize: 12,
-  lineHeight: 1.35,
-  marginTop: 2,
-  color: 'rgba(var(--theme-line-soft), .72)',
+  lineHeight: 1.4,
+  marginTop: 3,
+  color: 'rgba(255,255,255,.6)',
 }
 
 const falloTexto: CSSProperties = {
   color: 'rgba(253,224,71,.92)',
 }
 
-// Del tema, no azul fijo: con el tema de fuego el único botón de esta
-// pantalla salía azul cielo, de otra aplicación.
+// Naranja PLANO con texto oscuro: el degradado se leia apagado sobre la
+// tarjeta solida. Es la accion que se espera que pulses, tiene que cantar.
 const boton: CSSProperties = {
   flex: '0 0 auto',
-  minHeight: 38,
+  minHeight: 40,
   padding: '0 16px',
-  borderRadius: 'var(--theme-radius-card)',
+  borderRadius: 11,
   border: 0,
-  background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
-  color: '#ffffff',
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
   fontSize: 12.5,
   fontWeight: 900,
   letterSpacing: '.02em',
@@ -369,23 +368,46 @@ const boton: CSSProperties = {
 }
 
 const botonSecundario: CSSProperties = {
-  marginTop: 2,
   width: '100%',
-  minHeight: 38,
-  borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(255,255,255,.20)',
-  background: 'rgba(255,255,255,.06)',
-  color: 'rgba(255,255,255,.88)',
+  minHeight: 44,
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
   fontSize: 12.5,
   fontWeight: 800,
   cursor: 'pointer',
 }
 
-const hecho: CSSProperties = {
-  marginTop: 2,
-  paddingTop: 10,
-  borderTop: '0.5px solid rgba(255,255,255,.12)',
+// Sin caja ni borde: es una salida, no una accion que se recomiende.
+const seguirSinEso: CSSProperties = {
+  marginTop: 16,
+  width: '100%',
+  padding: 0,
+  border: 0,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.45)',
   fontSize: 12,
   fontWeight: 700,
-  color: 'rgb(var(--theme-done))',
+  cursor: 'pointer',
+}
+
+const hechoFila: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 7,
+  margin: '17px 0 20px',
+}
+
+// Verde universal de "hecho", no --theme-done: en fuego ese token es naranja
+// terracota, y "conseguido" leido en el color de la marca no se distingue de
+// lo que aun falta. Es una señal, no decoracion. Mismo criterio que el punto
+// de "EN LINEA" de la clasificacion.
+const hechoEtiqueta: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  color: '#7ecb8f',
+  background: 'rgba(34,197,94,.13)',
+  borderRadius: 7,
+  padding: '6px 10px',
 }
