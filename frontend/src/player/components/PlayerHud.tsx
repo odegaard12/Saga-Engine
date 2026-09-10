@@ -330,18 +330,27 @@ export function PlayerHud({
           padding: compact ? '11px 13px 9px' : '13px 15px 11px',
         }}
       >
+        {/**
+         * La ayuda va DENTRO del boton, como segunda linea.
+         *
+         * Estaba debajo, en su propia fila: una linea entera de tarjeta para
+         * una frase que solo tiene sentido junto al boton que describe
+         * -"Radio 50 m. Ya puedes abrir este nodo" habla del boton de abrir-.
+         * Metida dentro se ahorra la fila y se lee donde importa.
+         */}
         <button
           type="button"
           style={getPrimaryStyle(primaryTone, primaryDisabled)}
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
         >
-          {!finished && !inRange && distanceLabel
-            ? `${primaryLabel} · ${distanceLabel}`
-            : primaryLabel}
+          <span style={primaryTitulo}>
+            {!finished && !inRange && distanceLabel
+              ? `${primaryLabel} · ${distanceLabel}`
+              : primaryLabel}
+          </span>
+          {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
         </button>
-
-        <div style={helper}>{helperCopy}</div>
 
         {/* Version aprobada tras varias rondas de maquetas: sueltos, no en
             caja -sin fondo ni borde propio, solo la linea fina del medio-,
@@ -411,30 +420,9 @@ export function PlayerHud({
           </button>
         </div>
 
-        <div style={statusRow}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '10px' }}>
-              {[1, 2, 3, 4].map((bar) => (
-                <div
-                  key={bar}
-                  style={{
-                    width: '3px',
-                    height: `${bar * 2.5}px`,
-                    background: bar <= getGpsAccuracyBars(gpsAccuracy) ? getGpsAccuracyColor(gpsAccuracy) : 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: '1px',
-                  }}
-                />
-              ))}
-            </div>
-            <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
-            {gpsAccuracy && distanceMeters === null && <span style={{ opacity: 0.7, fontSize: '0.9em' }}>({Math.round(gpsAccuracy)}m)</span>}
-          </div>
-          <span>
-            {typeof currentStage?.radius === 'number'
-              ? `Radio ${currentStage.radius} m`
-              : 'Sin radio'}
-          </span>
-        </div>
+        {/* La fila de estado se fue: ponia ".ıl 0 M PRETO 0 · RAIO 50 M."
+            y parece telemetria de depuracion. En el monte no le dice nada
+            a nadie, y el radio del nodo ya lo cuenta el boton de abajo. */}
 
         <div style={tabPanel}>
           {backpackTab === 'requirements' ? (
@@ -605,27 +593,21 @@ export function PlayerHud({
           <div style={{ marginTop: 12 }}>
             <button
               type="button"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: 'var(--theme-radius-card)',
-                background: 'rgba(239, 68, 68, 0.12)',
-                color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
+              /**
+               * Texto discreto, no un boton rojo a dos lineas.
+               *
+               * Era lo UNICO rojo de toda la hoja -el color de "peligro" para
+               * algo que no lo es-, partia en dos lineas y decia lo mismo dos
+               * veces: "Cambiar de Xogador / Volver a Seleccion". Salir de tu
+               * partida no es destructivo, es solo salir.
+               */
+              style={salirTexto}
               onClick={() => {
                 onCloseTools()
                 window.location.href = '/player/'
               }}
             >
-              🚪 {t('player.tools.switchPlayer', locale)}
+              Cambiar de xogador
             </button>
           </div>
 
@@ -778,6 +760,12 @@ const chipBase: CSSProperties = {
 const primaryBase: CSSProperties = {
   width: '100%',
   minHeight: 48,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 2,
+  padding: '9px 12px',
   // 11px, no pildora: dentro de una tarjeta de esquina 15 una pildora
   // completa desentona. La maqueta aprobada lleva boton de esquina suave.
   borderRadius: 11,
@@ -786,13 +774,20 @@ const primaryBase: CSSProperties = {
   letterSpacing: '0.03em',
 }
 
-const helper: CSSProperties = {
-  marginTop: 7,
+const primaryTitulo: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '0.03em',
+}
+
+// Hereda el color del boton y baja la opacidad: sobre el naranja lleno un
+// gris fijo se ensuciaria, y sobre el boton apagado un blanco no se leeria.
+const primaryAyuda: CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 700,
+  opacity: 0.72,
+  lineHeight: 1.3,
   textAlign: 'center',
-  color: 'rgba(255,255,255,.6)',
-  fontSize: 11.5,
-  fontWeight: 600,
-  lineHeight: 1.4,
 }
 /**
  * Sueltos, no en caja -version final tras varias rondas de maquetas-.
@@ -815,6 +810,22 @@ const dockDivisor: CSSProperties = {
   width: 1,
   height: 13,
   background: 'var(--theme-hairline)',
+}
+
+const salirTexto: CSSProperties = {
+  width: '100%',
+  marginTop: 14,
+  paddingTop: 14,
+  borderTop: `1px solid var(--theme-hairline)`,
+  border: 0,
+  borderTopWidth: 1,
+  borderTopStyle: 'solid',
+  borderTopColor: 'var(--theme-hairline)',
+  background: 'transparent',
+  color: 'rgba(255,255,255,.5)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
 }
 
 const idiomaBloque: CSSProperties = {
@@ -966,8 +977,7 @@ const tabButton: CSSProperties = {
   color: 'rgba(var(--theme-line-soft), .55)',
   fontSize: 13,
   fontWeight: 800,
-  letterSpacing: '.02em',
-  textTransform: 'uppercase',
+  letterSpacing: '.01em',
   cursor: 'pointer',
   borderBottom: '2px solid transparent',
   marginBottom: -1,

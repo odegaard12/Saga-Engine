@@ -1378,7 +1378,7 @@ export default function PlayerApp() {
     if (state.status === 'ready' && !fueListoRef.current) {
       fueListoRef.current = true
       setVelo(true)
-      const id = window.setTimeout(() => setVelo(false), 480)
+      const id = window.setTimeout(() => setVelo(false), 640)
       return () => window.clearTimeout(id)
     }
     if (state.status !== 'ready') {
@@ -2682,7 +2682,7 @@ export default function PlayerApp() {
               'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
               'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
               'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
-            animation: 'sagaVeloDisolver 480ms ease-out forwards',
+            animation: 'sagaVeloDisolver 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
           }}
         />
       ) : null}
@@ -3066,7 +3066,12 @@ export default function PlayerApp() {
         />
       </div>
 
-      <RankingSheet open={rankingOpen} players={rankingPlayers} onClose={closeRanking} />
+      <RankingSheet
+        open={rankingOpen}
+        players={rankingPlayers}
+        onClose={closeRanking}
+        selfUser={payload.user}
+      />
 
       <InteractionSheet
         open={interactionOpen}
