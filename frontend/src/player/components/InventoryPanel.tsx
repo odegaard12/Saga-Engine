@@ -430,11 +430,14 @@ const guideTip: CSSProperties = {
   borderTop: '1px solid rgba(255,255,255,0.06)',
 }
 
+// Celda SOLIDA, sin borde -diseno "B", aprobado-. Un relleno plano se
+// recorta contra la tarjeta; el borde de 1px sobre un fondo casi
+// transparente hacia que la rejilla se leyera como una tabla vacia.
 const cell: CSSProperties = {
   position: 'relative',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 'var(--theme-radius-card)',
+  background: 'var(--theme-card-inset)',
+  border: 0,
+  borderRadius: 14,
   padding: '10px 4px 8px',
   display: 'flex',
   flexDirection: 'column',
@@ -495,7 +498,7 @@ const qrNoise: CSSProperties = {
 const cellIcon: CSSProperties = {
   width: 40,
   height: 40,
-  borderRadius: 'var(--theme-radius-card)',
+  borderRadius: 12,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

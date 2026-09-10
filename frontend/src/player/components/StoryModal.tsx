@@ -9,15 +9,16 @@ interface StoryModalProps {
 }
 
 /**
- * Rehecho al idioma "fluido" del login E -maqueta aprobada tras varias
- * rondas de bocetos.
+ * Tarjeta flotante sobre el fondo difuminado -diseno "B", aprobado.
  *
- * Antes era una tarjeta de cristal (fondo con degradado, borde y sombra
- * propios) centrada en un velo, con el título centrado y el botón en
- * mayúsculas con degradado verde. Ahora no hay tarjeta: el texto vive
- * directamente sobre el fondo sólido, alineado a la izquierda como el
- * título del login, y el botón es la misma píldora naranja que "Abrir
- * nodo" en la barra de jugador -misma familia visual en toda la app-.
+ * Antes: pantalla completa solida, sin tarjeta. Ahora la historia vive en su
+ * propia tarjeta de color plano, con el mapa detras desenfocado: sigue
+ * tapando lo de debajo -que es lo que hay que hacer con un momento de
+ * historia- pero se ve que hay un juego esperando detras.
+ *
+ * Mismo lenguaje exacto que "antes de salir", la mochila y las herramientas:
+ * `--theme-card` de fondo, esquina 18, sombra del tema, kicker en naranja,
+ * titulo grande y boton solido con texto oscuro.
  */
 export function StoryModal({ title, subtitle, body, buttonText, onClose }: StoryModalProps) {
   return (
@@ -25,42 +26,72 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
       style={{
         position: 'fixed',
         inset: 0,
-        // Solido, no un velo sobre el mapa: el prologo es un momento propio,
-        // no una capa flotando sobre el juego -y un fondo solido tambien
-        // evita el problema de fondo que tuvo esta pantalla una vez: dejar
-        // ver cualquier otro overlay que se abriera detras.
-        background: 'var(--theme-bg)',
         zIndex: 9999,
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'center',
-        padding: '28px 26px',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 28px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
+        padding: 16,
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+        // Fondo difuminado, no un velo fino: el prologo tapa lo de debajo
+        // -ya paso una vez que se viera otro panel a traves-, pero se
+        // adivina el mapa.
+        background: 'rgba(var(--theme-ink-deep), .84)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         color: '#fff',
-        overflowY: 'auto',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, margin: '0 auto' }}>
-        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.2em', color: 'var(--theme-primary)', textTransform: 'uppercase', marginBottom: 10 }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 460,
+          maxHeight: '100%',
+          background: 'var(--theme-card)',
+          borderRadius: 18,
+          boxShadow: 'var(--theme-card-shadow)',
+          padding: '22px 19px 19px',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 9.5,
+            letterSpacing: '.18em',
+            color: 'var(--theme-primary)',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+          }}
+        >
           {subtitle || 'Historia'}
         </div>
 
         <h1
           style={{
-            margin: 0,
-            fontSize: 'clamp(26px, 7vw, 36px)',
-            lineHeight: 1.05,
-            fontWeight: 1000,
-            letterSpacing: '-0.03em',
+            margin: '6px 0 14px',
+            fontSize: 'clamp(21px, 5.6vw, 26px)',
+            lineHeight: 1.08,
+            fontWeight: 900,
+            letterSpacing: '-0.025em',
             color: '#ffffff',
-            marginBottom: 20,
           }}
         >
           {title}
         </h1>
 
-        <div style={{ fontSize: 15, color: 'rgba(255,255,255,.78)', lineHeight: 1.65, marginBottom: 32 }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            fontSize: 13.5,
+            color: 'rgba(255,255,255,.72)',
+            lineHeight: 1.6,
+            marginBottom: 18,
+          }}
+        >
           {renderMarkdown(body)}
         </div>
 
@@ -69,17 +100,17 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           onClick={onClose}
           style={{
             width: '100%',
-            minHeight: 52,
+            minHeight: 48,
             padding: '0 16px',
-            background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
-            color: '#ffffff',
+            background: 'var(--theme-primary)',
+            color: 'var(--theme-card)',
             border: 0,
-            borderRadius: 999,
-            fontSize: 14,
+            borderRadius: 11,
+            fontSize: 13,
             fontWeight: 900,
             letterSpacing: '.02em',
             cursor: 'pointer',
-            boxShadow: 'var(--saga-accent-glow)',
+            flexShrink: 0,
           }}
         >
           {buttonText}
