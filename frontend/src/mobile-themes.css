@@ -453,27 +453,25 @@ body.theme-flame-red .saga-mesa-ficha {
   border-left: 2px solid var(--theme-primary);
 }
 
-body.theme-flame-red [data-saga-player-shell='top'],
-body.theme-flame-red .saga-hud-quick,
-body.theme-flame-red .saga-hud-dock {
-  background: var(--theme-brasa) !important;
-  /* El mismo corte que los paneles, en las TRES superficies grandes de la
-   * pantalla principal. Encender la variable no bastaba: el corte va en una
-   * regla de `.saga-glass-panel`, y en el mapa eso es UN solo elemento. Estas
-   * tres suman 137 000 px2 y son las que hacen que el tema se lea distinto.
-   *
-   * Va aqui dentro, limitado a fuego, y no en el componente: en cristal la
-   * variable vale 0 y un poligono rectangular le borraria las esquinas
-   * redondas. */
-  clip-path: polygon(
-    var(--theme-panel-cut) 0,
-    100% 0,
-    100% calc(100% - var(--theme-panel-cut)),
-    calc(100% - var(--theme-panel-cut)) 100%,
-    0 100%,
-    0 var(--theme-panel-cut)
-  );
-}
+/* AQUI ESTABA EL EMPATE QUE HIZO INUTIL TODO EL REDISENIO.
+ *
+ * Esta regla forzaba `background: var(--theme-brasa) !important` y un
+ * `clip-path` de esquinas cortadas sobre las TRES superficies de la pantalla
+ * de juego: la barra de arriba, la fila de iconos y el dock. Con `!important`
+ * gana incluso a los estilos en linea, asi que el redisenio aprobado -velo en
+ * vez de tarjeta, iconos como burbujas sueltas, dock sin caja- se escribio en
+ * los componentes y NO SE VEIA NADA: la pantalla seguia saliendo con las tres
+ * placas de brasa recortadas de siempre.
+ *
+ * Es el mismo empate que ya dejo muerta la regla del alfiler del mapa y el
+ * radio de la barra superior, documentado en PlayerShell.tsx. Van dos veces.
+ *
+ * Ahora esas tres superficies YA NO SON PLACAS: la barra de arriba y la de
+ * abajo son velos que se apagan, y los iconos son burbujas redondas sueltas.
+ * No hay superficie grande que recortar, asi que la regla se va entera. Lo
+ * que le da caracter al tema de fuego -el corte de esquina- sigue vivo donde
+ * si hay placas: `.saga-glass-panel` y los paneles de hojas.
+ */
 
 /* El prólogo y los textos de historia (StoryModal.tsx).
  *
