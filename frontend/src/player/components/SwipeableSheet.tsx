@@ -13,15 +13,43 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
-  // Reset offset when opened
+  /**
+   * La hoja ahora SE CIERRA, no desaparece.
+   *
+   * Antes: `if (!open && offsetY === 0) return null`. Al pulsar la X o el
+   * fondo, `open` pasaba a falso con el desplazamiento a cero, asi que la
+   * condicion se cumplia en el mismo instante y la hoja se DESMONTABA de
+   * golpe: el panel mas grande de la pantalla se esfumaba sin transicion.
+   * La animacion de bajada solo existia arrastrandola con el dedo mas de
+   * 100px, que es el unico camino que alguien habia probado.
+   *
+   * Ahora se queda montada mientras se desliza hacia abajo y se desmonta
+   * cuando termina. Entra y sale por el mismo sitio.
+   */
+  const [montada, setMontada] = useState(open)
+  const [saliendo, setSaliendo] = useState(false)
+
   useEffect(() => {
     if (open) {
+      setMontada(true)
+      setSaliendo(false)
       setOffsetY(0)
       setIsDragging(false)
+      return undefined
     }
-  }, [open])
 
-  if (!open && offsetY === 0) return null
+    if (!montada) return undefined
+
+    setSaliendo(true)
+    const id = window.setTimeout(() => {
+      setMontada(false)
+      setSaliendo(false)
+      setOffsetY(0)
+    }, 280)
+    return () => window.clearTimeout(id)
+  }, [open, montada])
+
+  if (!montada) return null
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true)
@@ -57,8 +85,11 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: `translateY(${offsetY}px)`,
-    transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+    transform: saliendo ? 'translateY(100%)' : `translateY(${offsetY}px)`,
+    transition: isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+    // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
+    // un salto hacia arriba justo antes de bajar.
+    animation: saliendo ? 'none' : undefined,
   }
 
   return (
@@ -66,16 +97,17 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
       <div
         style={{
           ...backdrop,
-          opacity: open ? Math.max(0, 1 - offsetY / 300) : 0,
+          opacity: open && !saliendo ? Math.max(0, 1 - offsetY / 300) : 0,
         }}
         onClick={onClose}
       />
 
       <aside
         ref={sheetRef}
-        // La clase es lo que permite al tema darle forma y fondo. Sin ella esta
-        // hoja -la de Mochila y Herramientas, el panel mas grande que se abre-
-        // se queda redondeada y plana pase lo que pase en el tema.
+        // La clase ya NO la pinta el tema: su regla -brasa y esquina cortada
+        // con !important- se quito al pasar esta hoja a tarjeta solida del
+        // diseño "B", porque le ganaba a los estilos en linea. Se conserva
+        // como gancho para poder encontrarla desde fuera (pruebas, medidas).
         className="saga-hoja"
         style={dynamicSheetStyle}
         aria-modal="true"
