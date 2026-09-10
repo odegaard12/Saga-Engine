@@ -305,7 +305,9 @@ export function PlayerHud({
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 720px)',
-          padding: compact ? '14px 14px 10px' : '16px 16px 12px',
+          // Mas apretada: 140px de alto para un boton, una linea de ayuda y
+          // dos palabras era demasiada tarjeta comiendose el mapa.
+          padding: compact ? '11px 13px 9px' : '13px 15px 11px',
         }}
       >
         <button
@@ -778,7 +780,7 @@ const primaryBase: CSSProperties = {
 }
 
 const helper: CSSProperties = {
-  marginTop: 9,
+  marginTop: 7,
   textAlign: 'center',
   color: 'rgba(255,255,255,.6)',
   fontSize: 11.5,
@@ -799,7 +801,7 @@ const dock: CSSProperties = {
   justifyContent: 'center',
   alignItems: 'center',
   gap: 22,
-  marginTop: 11,
+  marginTop: 8,
 }
 
 const dockDivisor: CSSProperties = {
@@ -809,7 +811,7 @@ const dockDivisor: CSSProperties = {
 }
 
 const dockButton: CSSProperties = {
-  minHeight: 32,
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',

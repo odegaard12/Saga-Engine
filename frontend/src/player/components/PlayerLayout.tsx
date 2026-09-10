@@ -32,7 +32,17 @@ const HUECO_SOBRE_TARJETA = 22
 export function getMapQuickControlsStyle(mobile: boolean, altoTarjetaInferior?: number | null): CSSProperties {
   const browserChromeLift = getMobileBrowserChromeLift(mobile)
   const alto = altoTarjetaInferior && altoTarjetaInferior > 0 ? altoTarjetaInferior : ALTO_TARJETA_POR_DEFECTO
-  const desplazamiento = altoTarjetaInferior ? alto + HUECO_SOBRE_TARJETA : alto
+  /**
+   * El hueco se suma SIEMPRE, se haya medido o no.
+   *
+   * Antes solo se sumaba cuando la medida en vivo existia: sin medida, los
+   * iconos se colocaban a exactamente 138px del suelo, que es el alto
+   * SUPUESTO de la tarjeta, o sea pegados a su borde. Medido en produccion
+   * con la tarjeta real (140px de alto): quedaban 12px de aire, y eso solo
+   * por casualidad -si la tarjeta crece dos pixeles mas, se solapan-. Con
+   * un mensaje de ayuda largo la tarjeta pasa de 160px y los tapaba.
+   */
+  const desplazamiento = alto + HUECO_SOBRE_TARJETA
 
   return {
     position: 'fixed',

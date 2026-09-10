@@ -2901,27 +2901,27 @@ export default function PlayerApp() {
 
           <button
             type="button"
+            /**
+             * Una burbuja mas de la fila, no una pastilla verde.
+             *
+             * Heredaba la burbuja redonda y luego la deformaba: fondo verde
+             * translucido, `width: auto`, relleno de 12 y la palabra
+             * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
+             * una pildora verde ancha de otra aplicacion, y encima la
+             * animacion era de ANCHO -la burbuja se estiraba y encogia y
+             * empujaba a las demas de lado-.
+             *
+             * Ahora es del mismo tamaño y color que sus vecinas, con el
+             * icono de diana, y aparece con opacidad y escala: no mueve a
+             * nadie de sitio.
+             */
             style={{
               ...mapRouteToggleInlineButton,
-              background: 'rgba(var(--theme-ok-soft), 0.2)',
-              borderColor: 'rgba(var(--theme-ok-soft), 0.4)',
-              color: 'rgb(var(--theme-ok-soft))',
-              fontWeight: 800,
-              fontSize: 13,
-              letterSpacing: '0.04em',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              transition:
-                'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, padding 0.3s ease',
-              maxWidth: !followPlayer ? '100px' : '0px',
-              minWidth: !followPlayer ? '44px' : '0px',
-              width: !followPlayer ? 'auto' : '0px',
+              color: 'var(--theme-primary)',
+              transition: 'opacity .22s ease, transform .22s cubic-bezier(0.16, 1, 0.3, 1)',
               opacity: !followPlayer ? 1 : 0,
-              paddingLeft: !followPlayer ? 12 : 0,
-              paddingRight: !followPlayer ? 12 : 0,
-              borderWidth: !followPlayer ? 1 : 0,
+              transform: !followPlayer ? 'scale(1)' : 'scale(.6)',
               pointerEvents: !followPlayer ? 'auto' : 'none',
-              marginLeft: 0,
             }}
             onClick={(event) => {
               event.preventDefault()
@@ -2930,8 +2930,11 @@ export default function PlayerApp() {
               void handleRequestLiveGps({ forceFocus: true })
             }}
             aria-label="Centrar en mi ubicación"
+            title="Centrar en mi ubicación"
           >
-            CENTRAR
+            <span aria-hidden="true" style={mapQuickIcon}>
+              ◎
+            </span>
           </button>
         </div>
       ) : null}
