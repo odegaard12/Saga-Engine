@@ -312,22 +312,24 @@ const overlay: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 12,
-  background: 'rgba(var(--theme-ink-deep), 0.65)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  // Fondo difuminado, como el prologo y "antes de salir".
+  background: 'rgba(var(--theme-ink-deep), .84)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
+// Tarjeta solida del diseño "B", como el resto: era el ultimo panel grande
+// que seguia con el cristal viejo -degradado, borde y desenfoque-.
 const sheet: CSSProperties = {
-  width: 'min(100%, 540px)',
+  width: 'min(100%, 420px)',
   height: 'min(94vh, 760px)',
   margin: '0 auto',
   padding: 16,
-  borderRadius: 'var(--theme-radius-panel)',
-  border: '1px solid rgba(255, 255, 255, 0.22)',
-  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.52 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.42 * var(--theme-solid))))',
-  boxShadow: '0 25px 60px rgba(var(--theme-ink), .35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  borderRadius: 18,
+  border: 0,
+  background: 'var(--theme-card)',
+  boxShadow: 'var(--theme-card-shadow)',
+  animation: 'sagaPanelEntra 240ms cubic-bezier(0.22, 1, 0.36, 1)',
   color: '#fff',
   display: 'flex',
   flexDirection: 'column',
@@ -367,9 +369,9 @@ const cameraFrame: CSSProperties = {
   flex: 1,
   width: '100%',
   minHeight: 280,
-  borderRadius: 'var(--theme-radius-panel)',
-  background: 'rgba(var(--theme-ink), 0.4)',
-  border: '1px solid rgba(255, 255, 255, 0.16)',
+  borderRadius: 14,
+  background: 'var(--theme-card-inset)',
+  border: 0,
   overflow: 'hidden',
 }
 
@@ -386,16 +388,15 @@ const topControlsGroup: CSSProperties = {
 }
 
 const pillControlBtn: CSSProperties = {
-  minHeight: 34,
+  minHeight: 36,
   padding: '0 14px',
-  borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(255,255,255,.25)',
-  background: 'rgba(var(--theme-ink), .70)',
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card)',
   color: '#fff',
   fontWeight: 800,
   fontSize: 12,
-  backdropFilter: 'var(--theme-blur)',
-  boxShadow: '0 2px 10px rgba(0,0,0,.3)',
+  boxShadow: '0 4px 12px rgba(0,0,0,.45)',
 }
 
 const video: CSSProperties = {

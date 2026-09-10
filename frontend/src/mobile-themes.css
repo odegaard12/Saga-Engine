@@ -255,9 +255,12 @@ body.theme-flame-red {
 
   /* Tarjetas flotantes del diseno "B": los valores exactos de la maqueta
      aprobada. Ver la nota larga en el bloque :root. */
-  --theme-card: #2a1512;
-  --theme-card-inset: #3d2620;
-  --theme-hairline: #3d2620;
+  /* Mas claro que el primer intento (#2a1512 / #3d2620): sobre el mapa
+     quedaba casi negro y el tema se leia apagado, no rojo. Estos suben el
+     ladrillo sin perder el contraste del texto blanco encima. */
+  --theme-card: #3d1e18;
+  --theme-card-inset: #55302a;
+  --theme-hairline: #55302a;
   --theme-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
 
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
@@ -544,6 +547,16 @@ body.theme-flame-red .saga-hud-dock button span {
    golpe y el mapa la sustituia sin transicion -"queda feo, muy brusco"-.
    Este velo hereda el mismo fondo de la pantalla de carga y se disuelve
    sobre el juego ya montado debajo, en vez de cortar de una pantalla a otra. */
+/* Los paneles ENTRAN, no aparecen.
+ *
+ * El prologo, "antes de salir" y la camara se montaban de golpe justo
+ * cuando se apagaba la pantalla de carga: dos cortes secos seguidos. Con
+ * esto la carga se disuelve (sagaVeloDisolver) y el panel sube detras. */
+@keyframes sagaPanelEntra {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes sagaVeloDisolver {
   0% { opacity: 1; }
   60% { opacity: 1; }

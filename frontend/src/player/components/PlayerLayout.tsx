@@ -311,7 +311,16 @@ export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
      * fila de Mochila/Ferramentas caia justo debajo de la raya del indicador
      * de inicio del iPhone, que se dibuja ENCIMA de la pagina.
      */
-    bottom: mobile ? 'calc(env(safe-area-inset-bottom, 0px) + 8px)' : 12,
+    /**
+     * Pegada mas al borde en iPhone.
+     *
+     * Estaba en `safe-area-inset-bottom + 8`, y en un iPhone con isla ese
+     * inset son 34px: 42px de aire muerto entre la tarjeta y el borde de la
+     * pantalla. Se le restan 12 y se pone un suelo de 4px, asi que en un
+     * iPhone quedan 22px -suficiente para no chocar con la raya del
+     * indicador de inicio- y en un movil sin isla, 4px.
+     */
+    bottom: mobile ? 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 12px))' : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }
