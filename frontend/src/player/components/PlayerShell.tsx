@@ -52,7 +52,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
         style={{
           ...card,
           width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? '10px 16px 9px' : '12px 18px 10px',
+          padding: compact ? '9px 11px' : '11px 14px',
         }}
       >
         <div style={topRow}>
@@ -87,9 +87,7 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
               style={{
                 ...rielTramo,
                 background:
-                  i < progress.current
-                    ? 'var(--theme-primary)'
-                    : 'rgba(var(--theme-line), .22)',
+                  i < progress.current ? 'var(--theme-primary)' : 'var(--theme-card-inset)',
               }}
             />
           ))}
@@ -127,21 +125,21 @@ const wrap: CSSProperties = {
  * abajo: la pantalla de juego deja de ser tres cajas sobre un mapa y pasa
  * a ser el mapa con la informacion encima.
  */
+/**
+ * Tarjeta flotante SOLIDA -diseno "B", aprobado tras varias rondas.
+ *
+ * Historial de lo que NO funciono, para no repetirlo: primero era una placa
+ * de cristal con borde; luego un velo negro con degradado (sobre el mapa
+ * verde daba gris y la pantalla perdia el tema); luego un velo en rojo
+ * (seguia siendo degradado translucido = barro marron sin bordes limpios).
+ *
+ * Lo que funciona es lo mismo que hace funcionar el login: color PLANO y
+ * sombra real. Se recorta contra el mapa y se lee de un vistazo.
+ */
 const card: CSSProperties = {
-  /**
-   * El velo va en el ROJO del tema, no en negro.
-   *
-   * Primer intento: `rgba(0,0,0,...)`. En el login se ve rojo porque el
-   * fondo de la pagina YA es rojo (--theme-bg) y el velo solo lo oscurece.
-   * Aqui debajo no hay pagina: hay un mapa de satelite verde. Un velo negro
-   * sobre verde da GRIS, y la pantalla de juego perdia el rojo entero -"veo
-   * los cambios pero no era transparente, era rojo con otro estilo"-.
-   *
-   * Con los tonos de brasa del tema se mantiene el rojo Y sigue siendo un
-   * velo que se apaga, no la placa con borde de antes.
-   */
-  background:
-    'linear-gradient(180deg, rgba(var(--theme-shell-b), .97) 0%, rgba(var(--theme-shell-a), .86) 58%, rgba(var(--theme-shell-a), 0) 100%)',
+  background: 'var(--theme-card)',
+  borderRadius: 13,
+  boxShadow: 'var(--theme-card-shadow)',
   color: '#ffffff',
   display: 'grid',
   gap: 0,
@@ -157,6 +155,7 @@ const rielProgreso: CSSProperties = {
 const rielTramo: CSSProperties = {
   flex: 1,
   height: '100%',
+  borderRadius: 2,
 }
 
 const topRow: CSSProperties = {

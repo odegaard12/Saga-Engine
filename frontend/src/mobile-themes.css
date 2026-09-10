@@ -40,6 +40,21 @@
   --theme-wash: rgba(34, 197, 94, 0.05);
   --theme-backdrop: blur(16px);
 
+  /* Las tarjetas flotantes de la pantalla de jugador (diseno "B", aprobado).
+   *
+   * SOLIDAS, no translucidas: el intento anterior las hizo con velos de
+   * degradado sobre el mapa y el resultado era barro -sin bordes limpios y
+   * todo lavado-. Un color plano con sombra real se recorta contra el mapa
+   * y se lee de un vistazo, que es lo que hace que el login funcione.
+   *
+   * `-card` es la superficie de la tarjeta; `-card-inset` lo que va DENTRO
+   * de ella (celdas de objetos, botones apagados); `-hairline` la linea de
+   * separacion. Tres tonos, no veinte rgba sueltos repetidos por el codigo. */
+  --theme-card: #16203a;
+  --theme-card-inset: #24304e;
+  --theme-hairline: #2c3a5c;
+  --theme-card-shadow: 0 14px 36px rgba(2, 6, 23, 0.6);
+
   /* Respaldo: si algo se pinta fuera de un body con tema, sale como siempre. */
   /* Cuanto tapan las superficies -barras, hojas, paneles-.
    *
@@ -237,6 +252,13 @@ body.theme-flame-red {
   --theme-primary-border: rgba(239, 138, 92, 0.3);
   --theme-wash: rgba(239, 138, 92, 0.07);
   --theme-backdrop: none;
+
+  /* Tarjetas flotantes del diseno "B": los valores exactos de la maqueta
+     aprobada. Ver la nota larga en el bloque :root. */
+  --theme-card: #2a1512;
+  --theme-card-inset: #3d2620;
+  --theme-hairline: #3d2620;
+  --theme-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
 
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
      marcado y una esquina cortada. Se distingue de un vistazo desde lejos, que

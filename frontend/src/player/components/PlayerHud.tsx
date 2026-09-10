@@ -691,12 +691,15 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
     }
   }
 
+  // Naranja PLANO y texto oscuro encima -maqueta aprobada-. El degradado con
+  // glow y texto blanco se leia apagado sobre la tarjeta; el color plano con
+  // texto oscuro es el contraste mas alto posible y es la unica accion
+  // primaria de la pantalla: tiene que cantar.
   return {
     ...primaryBase,
-    background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
+    background: 'var(--theme-primary)',
     border: 0,
-    color: '#ffffff',
-    boxShadow: 'var(--saga-accent-glow)',
+    color: 'var(--theme-card)',
   }
 }
 
@@ -708,15 +711,16 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
  * que se apaga hacia arriba, igual que el `fondoVelo` del login, para que el
  * boton y el dock floten sobre el mapa en vez de vivir dentro de una tarjeta.
  */
+// Tarjeta flotante SOLIDA, como la de arriba. Ver la nota de PlayerShell.tsx:
+// los velos con degradado sobre el mapa daban barro, el color plano no.
 const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
   display: 'grid',
   gap: 0,
-  // En el ROJO del tema, no en negro: debajo hay un mapa de satelite verde y
-  // un velo negro daba gris. Ver la nota larga en PlayerShell.tsx.
-  background:
-    'linear-gradient(0deg, rgba(var(--theme-shell-b), .97) 0%, rgba(var(--theme-shell-a), .86) 58%, rgba(var(--theme-shell-a), 0) 100%)',
+  background: 'var(--theme-card)',
+  borderRadius: 15,
+  boxShadow: 'var(--theme-card-shadow)',
 }
 
 
@@ -751,11 +755,13 @@ const chipBase: CSSProperties = {
  */
 const primaryBase: CSSProperties = {
   width: '100%',
-  minHeight: 50,
-  borderRadius: 999,
+  minHeight: 48,
+  // 11px, no pildora: dentro de una tarjeta de esquina 15 una pildora
+  // completa desentona. La maqueta aprobada lleva boton de esquina suave.
+  borderRadius: 11,
   fontSize: 13,
   fontWeight: 900,
-  letterSpacing: '0.04em',
+  letterSpacing: '0.03em',
 }
 
 const helper: CSSProperties = {
@@ -785,8 +791,8 @@ const dock: CSSProperties = {
 
 const dockDivisor: CSSProperties = {
   width: 1,
-  height: 16,
-  background: 'rgba(255,255,255,.16)',
+  height: 13,
+  background: 'var(--theme-hairline)',
 }
 
 const dockButton: CSSProperties = {
@@ -835,15 +841,14 @@ function getSheetStyle(compact: boolean): CSSProperties {
     overflowY: 'auto',
     overflowX: 'hidden',
     overscrollBehavior: 'contain',
-    borderRadius: compact ? '24px 24px 0 0' : 30,
-    border: '1px solid rgba(255,255,255,.22)',
-    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.22)',
-    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
+    // Tarjeta SOLIDA, no cristal -diseno "B", aprobado-. Ver la nota larga
+    // de PlayerShell.tsx: los translucidos sobre el mapa daban barro.
+    borderRadius: compact ? '18px 18px 0 0' : 18,
+    border: 0,
+    background: 'var(--theme-card)',
     color: '#f8fafc',
-    boxShadow: '0 -15px 35px rgba(var(--theme-info-mid), .08), 0 24px 70px rgba(0,0,0,.6)',
-    backdropFilter: 'var(--theme-blur)',
-    WebkitBackdropFilter: 'var(--theme-blur)',
-    padding: '0 14px',
+    boxShadow: 'var(--theme-card-shadow)',
+    padding: '0 18px',
     paddingBottom: compact
       ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
       : 'calc(14px + env(safe-area-inset-bottom, 0px))',
@@ -859,9 +864,9 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  padding: '0 0 12px 0',
-  background: 'transparent',
-  borderBottom: '1px solid rgba(255,255,255,.10)',
+  padding: '0 0 14px 0',
+  background: 'var(--theme-card)',
+  borderBottom: `1px solid var(--theme-hairline)`,
 }
 
 
@@ -941,10 +946,8 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
     ...getSheetStyle(compact),
     width: compact ? '100%' : 'min(100%, 460px)',
     maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
-    gap: 14,
-    background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.46 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.34 * var(--theme-solid))))',
-    border: '1px solid rgba(255, 255, 255, 0.22)',
-    boxShadow: '0 -15px 40px rgba(var(--theme-info-mid), .08), 0 24px 70px rgba(0,0,0,.7)',
+    gap: 0,
+    // Hereda la tarjeta solida de getSheetStyle: aqui solo el ancho y el alto.
   }
 }
 
@@ -966,8 +969,8 @@ const toolsTitle: CSSProperties = {
 }
 
 const toolsSubtitle: CSSProperties = {
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 11,
+  color: 'rgba(255,255,255,.6)',
+  fontSize: 11.5,
   lineHeight: 1.35,
 }
 
@@ -1023,11 +1026,13 @@ const toolsLoginLink: CSSProperties = {
 
 const toolsQuietButton: CSSProperties = {
   ...toolsButton,
-  minHeight: 36,
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: 'rgba(226,232,240,.78)',
-  fontSize: 10,
+  minHeight: 44,
+  borderRadius: 12,
+  background: 'transparent',
+  border: `1px solid var(--theme-card-inset)`,
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
 }
 
 
@@ -1035,19 +1040,21 @@ const toolsQuietButton: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  minWidth: 40,
-  width: 40,
-  height: 40,
+  minWidth: 30,
+  width: 30,
+  height: 30,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 'var(--theme-radius-pill)',
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(var(--theme-ink), .70)',
-  color: '#f8fafc',
-  fontSize: 22,
-  fontWeight: 950,
+  // Cuadrado de esquina suave, no pildora ni circulo: dentro de una tarjeta
+  // de esquina 18 un circulo con sombra propia pide mas atencion que el
+  // contenido. Maqueta aprobada.
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 17,
+  fontWeight: 900,
   cursor: 'pointer',
-  boxShadow: '0 12px 28px rgba(var(--theme-ink-deep), .24)',
 }
 
 
@@ -1060,16 +1067,14 @@ const fallbackToolHead: CSSProperties = {
 }
 
 const fallbackToolButton: CSSProperties = {
-  minHeight: 40,
+  minHeight: 44,
   width: '100%',
-  borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(251,191,36,.24)',
-  background: 'rgba(251,191,36,.13)',
-  color: '#fef3c7',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
   marginTop: 8,
 }
 
@@ -1120,43 +1125,44 @@ const fallbackToolError: CSSProperties = {
 const toolsCardGroup: CSSProperties = {
   display: 'grid',
   gap: 8,
-  padding: '14px 0',
-  borderBottom: '1px solid rgba(255,255,255,.05)',
+  padding: '16px 0 4px',
 }
 
+// La etiqueta de grupo, en el color del tema: es lo que ordena esta hoja de
+// arriba abajo -"Operacion offline", "Acciones de campo", "Ajustes"- y en
+// gris se perdia contra el resto del texto.
 const toolsCardGroupLabel: CSSProperties = {
-  color: 'rgb(var(--theme-ok-soft))',
-  fontSize: 10,
+  color: 'var(--theme-primary)',
+  fontSize: 9,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  marginBottom: 4,
+  marginBottom: 6,
 }
 
+// Contorno neutro, no verde: en esta hoja hay tres botones seguidos y cada
+// uno tiraba de un color distinto -verde, ambar, rojo-. Con el mismo
+// contorno se leen como lo que son, una lista de acciones; el color queda
+// para lo que de verdad es una señal.
 const toolsGreenButton: CSSProperties = {
-  minHeight: 40,
+  minHeight: 44,
   padding: '0 12px',
-  borderRadius: 'var(--theme-radius-card)',
-  border: '1px solid rgba(var(--theme-ok-soft), 0.3)',
-  background: 'rgba(var(--theme-ok), 0.12)',
-  color: 'rgb(var(--theme-ok-soft))',
-  fontSize: 11,
-  fontWeight: 900,
-  boxShadow: '0 4px 12px rgba(var(--theme-ok), 0.08)',
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
 }
 
 const toolsGreenActiveButton: CSSProperties = {
   ...toolsGreenButton,
-  background: 'rgba(var(--theme-ok), 0.22)',
-  border: '1px solid rgba(var(--theme-ok-soft), 0.45)',
-  color: 'rgb(var(--theme-ok-soft))',
+  color: '#ffffff',
 }
 
 const toolsGreenDisabledButton: CSSProperties = {
   ...toolsGreenButton,
-  background: 'rgba(255, 255, 255, 0.02)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  color: 'rgba(255, 255, 255, 0.3)',
+  color: 'rgba(255,255,255,.3)',
   cursor: 'not-allowed',
 }
 
