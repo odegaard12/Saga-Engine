@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { PlayerGpsStatus } from '../../types/player'
 
@@ -48,7 +48,32 @@ export function FieldPrepPanel({
   onRequestCamera,
   onRequestMotion,
 }: FieldPrepPanelProps) {
-  if (!visible) return null
+  /**
+   * "Cierra de golpe sin animación" -y con razón: era `if (!visible) return
+   * null`, el mismo fallo que ya se corrigió una vez en SwipeableSheet
+   * (Mochila/Herramientas/Clasificación) pero que aquí, al ser un panel
+   * distinto con su propio portal, no heredó el arreglo. Mismo patrón:
+   * se queda montado mientras sale y se desmonta cuando termina.
+   */
+  const [montado, setMontado] = useState(visible)
+  const [saliendo, setSaliendo] = useState(false)
+
+  useEffect(() => {
+    if (visible) {
+      setMontado(true)
+      setSaliendo(false)
+      return undefined
+    }
+    if (!montado) return undefined
+    setSaliendo(true)
+    const id = window.setTimeout(() => {
+      setMontado(false)
+      setSaliendo(false)
+    }, 240)
+    return () => window.clearTimeout(id)
+  }, [visible, montado])
+
+  if (!montado) return null
 
   type Fila = {
     clave: string
@@ -141,13 +166,19 @@ export function FieldPrepPanel({
    * ancestros que lo encierren.
    */
   const panel = (
-    <div style={capa} onClick={onDismiss}>
+    <div style={{ ...capa, opacity: saliendo ? 0 : 1 }} onClick={onDismiss}>
       <section
         // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
         // esquina cortada y `!important`, y le ganaba a la tarjeta solida
         // del diseño "B". La clase se queda donde sigue habiendo cristal
         // de verdad: los minijuegos.
-        style={tarjeta(mobile)}
+        style={{
+          ...tarjeta(mobile),
+          transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
+          opacity: saliendo ? 0 : 1,
+          transition: saliendo ? 'transform 220ms ease, opacity 220ms ease' : undefined,
+          animation: saliendo ? 'none' : tarjeta(mobile).animation,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* El titulo DICE QUE FALTA, no cuantas cosas faltan.
@@ -271,6 +302,7 @@ const capa: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .84)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
+  transition: 'opacity 220ms ease',
 }
 
 // Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
