@@ -325,9 +325,21 @@ export function PlayerHud({
           // Ver la nota de PlayerShell.tsx: a 720px el boton "Abrir nodo"
           // media medio metro de ancho. Ancho de telefono tambien aqui.
           width: compact ? '100%' : 'min(100%, 420px)',
+          /**
+           * En movil se apoya en el borde: esquinas redondeadas SOLO arriba.
+           * Redondear las cuatro cuando el borde de abajo esta pegado a la
+           * pantalla deja dos muescas de fondo en las esquinas inferiores.
+           */
+          borderRadius: compact ? '20px 20px 0 0' : 20,
           // Mas apretada: 140px de alto para un boton, una linea de ayuda y
           // dos palabras era demasiada tarjeta comiendose el mapa.
-          padding: compact ? '11px 13px 9px' : '13px 15px 11px',
+          //
+          // El relleno de abajo se lleva el area segura: la barra llega hasta
+          // el borde de la pantalla -que es lo pedido- pero su contenido no
+          // se mete debajo de la raya del indicador de inicio del iPhone.
+          padding: compact
+            ? '11px 13px calc(9px + env(safe-area-inset-bottom, 0px))'
+            : '13px 15px 11px',
         }}
       >
         {/**

@@ -301,8 +301,22 @@ export function getQuietOverlayStyle(mobile: boolean): CSSProperties {
 export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
   return {
     position: 'absolute',
-    left: mobile ? 9 : 12,
-    right: mobile ? 9 : 12,
+    /**
+     * En movil, PEGADA AL BORDE: "que la barra inferior esté abajo tocando
+     * abajo sin espacio (la de arriba espacio sí)".
+     *
+     * Deja de ser una tarjeta flotante con margen por los cuatro lados y
+     * pasa a ser una barra apoyada en el borde inferior, con las esquinas
+     * de arriba redondeadas y las de abajo a escuadra -que es como se
+     * apoya algo en un borde-. La de arriba no cambia: sigue flotando.
+     *
+     * El hueco para la raya del indicador de inicio del iPhone no
+     * desaparece, se muda: ahora es relleno DENTRO de la barra
+     * (`paddingBottom` en PlayerHud), asi que el color llega hasta el
+     * borde de la pantalla pero el texto no se mete debajo del indicador.
+     */
+    left: mobile ? 0 : 12,
+    right: mobile ? 0 : 12,
     /**
      * Despegada del borde -diseño "B": es una tarjeta que flota, no una
      * barra de sistema pegada abajo-.
@@ -320,13 +334,7 @@ export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
      * iPhone quedan 22px -suficiente para no chocar con la raya del
      * indicador de inicio- y en un movil sin isla, 4px.
      */
-    /**
-     * Bajada un poco mas: "puede bajarse algo, que toque el fondo abajo".
-     * Restaba 12 del inset (22px de aire en un iPhone con isla); resta 22,
-     * dejando 12px -sigue librando la raya del indicador de inicio, que es
-     * lo que este calculo existe para evitar, pero con menos hueco muerto-.
-     */
-    bottom: mobile ? 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 22px))' : 12,
+    bottom: mobile ? 0 : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }

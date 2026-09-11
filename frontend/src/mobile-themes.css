@@ -557,6 +557,23 @@ body.theme-flame-red .saga-hud-dock button span {
  * El prologo, "antes de salir" y la camara se montaban de golpe justo
  * cuando se apagaba la pantalla de carga: dos cortes secos seguidos. Con
  * esto la carga se disuelve (sagaVeloDisolver) y el panel sube detras. */
+/* El ritmo del movimiento, en un solo sitio.
+ *
+ * "Que todo sea uniforme": cada panel tenia su propia duracion y su propia
+ * curva -300ms el prologo, 260 "antes de salir", 240 la camara, 280 las
+ * hojas, y tres curvas distintas entre ellas, incluida un `ease` suelto-.
+ * Cuatro paneles que hacen lo mismo moviendose cada uno a su ritmo se
+ * notan como cuatro aplicaciones. Estas tres variables son ahora la unica
+ * fuente: cambiarlas aqui cambia el movimiento de toda la pantalla de
+ * jugador a la vez.
+ *
+ * Van en `:root` y no en cada tema: el ritmo no es cosa del color. */
+:root {
+  --saga-motion-entra: 260ms;
+  --saga-motion-sale: 220ms;
+  --saga-motion-curva: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @keyframes sagaPanelEntra {
   from { opacity: 0; transform: translateY(14px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
