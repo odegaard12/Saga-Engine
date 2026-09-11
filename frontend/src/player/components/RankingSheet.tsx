@@ -300,8 +300,9 @@ const subtitulo: CSSProperties = {
 }
 
 const closeBtn: CSSProperties = {
-  width: 30,
-  height: 30,
+  // Ver la nota de PlayerHud.tsx: area de toque.
+  width: 36,
+  height: 36,
   borderRadius: 10,
   border: 0,
   background: 'var(--theme-card-inset)',
