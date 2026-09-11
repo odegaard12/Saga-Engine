@@ -354,7 +354,9 @@ const podioNombreGanador: CSSProperties = {
 
 const podioTiempo: CSSProperties = {
   marginTop: 2,
-  fontSize: 10.5,
+  // 11.5: el tiempo del segundo y del tercero es el dato de la pantalla, no
+  // un adorno. Lo caza la auditoria del banco por debajo de 11px.
+  fontSize: 11.5,
   fontWeight: 800,
   color: 'rgba(255,255,255,.5)',
 }
@@ -400,7 +402,8 @@ const nombre: CSSProperties = {
 }
 
 const etiquetaNodo: CSSProperties = {
-  fontSize: 10,
+  // 11: dice por donde va quien aun no ha acabado. Se lee.
+  fontSize: 11,
   fontWeight: 800,
   color: 'rgba(255,255,255,.5)',
   flexShrink: 0,

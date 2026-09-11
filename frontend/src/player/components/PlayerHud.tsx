@@ -502,7 +502,9 @@ export function PlayerHud({
               {/* Fallback de nodo CÓDIGO FALLBACK */}
               <div style={fallbackToolHead}>
                 <strong style={{ color: '#fbbf24' }}>🔑 {t('player.tools.altCode', locale)}</strong>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                {/* 11.5, no 10: explica cuando usar el codigo a mano, que es
+                    justo lo que se lee cuando el QR no escanea y hay prisa. */}
+                <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>
                   {t('player.tools.altCodeHelp', locale)}
                 </span>
               </div>
