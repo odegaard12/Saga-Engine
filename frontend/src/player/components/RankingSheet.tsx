@@ -177,16 +177,25 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
            * esto es una carrera: los tres de cabeza tienen que verse de un
            * vistazo. El del MEDIO es el ganador -mas grande y con el aro del
            * tema-, no el de la izquierda, que es como se lee un podio.
+           *
+           * "Se ve mal sin números y tiempo": el puesto solo se contaba por
+           * el color del aro y el tamaño -sutil, no se lee de un vistazo-, y
+           * el tiempo iba pequeño. Ahora cada avatar lleva su numero en una
+           * insignia propia (1/2/3, con el mismo color que antes solo tenia
+           * el aro), y el tiempo sube de tamaño y color.
            */}
           {hayPodio ? (
             <div style={podioFila}>
               {[
-                { jugador: podio[1], aro: '#c0c0c0', ganador: false },
-                { jugador: podio[0], aro: 'var(--theme-primary)', ganador: true },
-                { jugador: podio[2], aro: '#cd7f32', ganador: false },
-              ].map(({ jugador, aro, ganador }) => (
+                { jugador: podio[1], aro: '#c0c0c0', puesto: 2, ganador: false },
+                { jugador: podio[0], aro: 'var(--theme-primary)', puesto: 1, ganador: true },
+                { jugador: podio[2], aro: '#cd7f32', puesto: 3, ganador: false },
+              ].map(({ jugador, aro, puesto, ganador }) => (
                 <div key={jugador.user} style={podioColumna}>
-                  <Retrato jugador={jugador} medida={ganador ? 54 : 42} aro={aro} />
+                  <div style={{ position: 'relative' }}>
+                    <Retrato jugador={jugador} medida={ganador ? 54 : 42} aro={aro} />
+                    <span style={{ ...podioInsignia, background: aro }}>{puesto}</span>
+                  </div>
                   <div style={ganador ? podioNombreGanador : podioNombre}>
                     {selfUser && jugador.user === selfUser
                       ? 'Ti'
@@ -354,17 +363,38 @@ const podioNombreGanador: CSSProperties = {
 
 const podioTiempo: CSSProperties = {
   marginTop: 2,
-  // 11.5: el tiempo del segundo y del tercero es el dato de la pantalla, no
-  // un adorno. Lo caza la auditoria del banco por debajo de 11px.
-  fontSize: 11.5,
-  fontWeight: 800,
-  color: 'rgba(255,255,255,.5)',
+  // 13: subido de 11.5. "Se ve mal sin... tiempo" -era el dato mas
+  // importante del podio y salia mas pequeño que el nombre.
+  fontSize: 13,
+  fontWeight: 900,
+  color: 'rgba(255,255,255,.72)',
+  fontVariantNumeric: 'tabular-nums',
 }
 
 const podioTiempoGanador: CSSProperties = {
   ...podioTiempo,
-  fontSize: 12,
+  fontSize: 14.5,
   color: 'var(--theme-primary)',
+}
+
+// La insignia de puesto: numero sobre el color que antes solo llevaba el
+// aro. Sin esto, "quien es el primero" solo se notaba por el tamaño -un
+// matiz, no algo que se lea de un vistazo-.
+const podioInsignia: CSSProperties = {
+  position: 'absolute',
+  bottom: -3,
+  right: -3,
+  minWidth: 18,
+  height: 18,
+  padding: '0 4px',
+  borderRadius: 9,
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 10.5,
+  fontWeight: 900,
+  color: 'var(--theme-card)',
+  border: '2px solid var(--theme-card)',
+  fontVariantNumeric: 'tabular-nums',
 }
 
 const fila: CSSProperties = {

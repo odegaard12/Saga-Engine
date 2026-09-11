@@ -33,6 +33,7 @@ import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoUbicacion, IconoDiana } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
@@ -305,10 +306,23 @@ export default function PlayerApp() {
   // en la mesa de trabajo o al recoger un objeto). Sin este latido, el botón del
   // nodo final seguía diciendo "falta un objeto" después de haber forjado el
   // fabricado, hasta recargar. Mismo intervalo que usa la mesa de trabajo.
+  //
+  // Este `setInventoryTick` re-renderiza TODO PlayerApp -es el componente que
+  // dibuja la pantalla entera-, cada vez que salta. A 2s son 30 veces por
+  // minuto, de fondo, jugando o no. El mapa está protegido de esto -tiene su
+  // propio filtro que evita redibujarse si sus props no cambian de verdad-,
+  // pero el resto del árbol sí se recalcula entero cada vez. Subido a 4s: la
+  // mochila sigue actualizándose casi al instante desde su propio intervalo
+  // (misma nota, mesa de trabajo), así que este solo es una red de seguridad
+  // por si acaso, y no hace falta que sea tan frecuente.
+  //
+  // Dicho sin adornar: esto es un candidato a la sensación de lentitud, no
+  // una prueba. Reduce trabajo de fondo, medible; que el móvil "se sienta
+  // más fluido" solo se confirma jugando de verdad, no leyendo código.
   const [inventoryTick, setInventoryTick] = useState(0)
   useEffect(() => {
     const bump = () => setInventoryTick((value) => value + 1)
-    const id = window.setInterval(bump, 2_000)
+    const id = window.setInterval(bump, 4_000)
     window.addEventListener('storage', bump)
     return () => {
       window.clearInterval(id)
@@ -2944,7 +2958,7 @@ export default function PlayerApp() {
               title="Hacer foto de campo"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                {fieldPhotoUploading ? '⏳' : '📷'}
+                {fieldPhotoUploading ? '⏳' : <IconoCamara />}
               </span>
             </button>
 
@@ -2961,7 +2975,7 @@ export default function PlayerApp() {
                 title="Leer historia"
               >
                 <span aria-hidden="true" style={mapQuickIcon}>
-                  📖
+                  <IconoLibro />
                 </span>
               </button>
             ) : null}
@@ -2978,7 +2992,7 @@ export default function PlayerApp() {
               title="Clasificación"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                🏆
+                <IconoTrofeo />
               </span>
             </button>
 
@@ -2996,7 +3010,7 @@ export default function PlayerApp() {
               title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                {routeOverviewActive ? '📍' : '🧭'}
+                {routeOverviewActive ? <IconoUbicacion /> : <IconoBrujula />}
               </span>
             </button>
 
@@ -3032,7 +3046,7 @@ export default function PlayerApp() {
               title="Centrar en mi ubicación"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                ◎
+                <IconoDiana />
               </span>
             </button>
             ) : null}
@@ -3215,14 +3229,13 @@ const mapQuickButtonActive: CSSProperties = {
   color: 'var(--theme-primary)',
 }
 
+// Ya no envuelve un emoji, envuelve un SVG de trazo (PlayerIcons.tsx) que
+// hereda `color` del botón vía `currentColor`. El drop-shadow y el tamaño de
+// letra eran para el emoji del sistema; el SVG no los necesita.
 const mapQuickIcon: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 17,
-  lineHeight: 1,
-  filter: 'drop-shadow(0 1px 3px rgba(var(--theme-ink), .24))',
-  transform: 'translateY(-0.5px)',
 }
 
 const mapQuickCountPill: CSSProperties = {
