@@ -258,9 +258,14 @@ body.theme-flame-red {
   /* Mas claro que el primer intento (#2a1512 / #3d2620): sobre el mapa
      quedaba casi negro y el tema se leia apagado, no rojo. Estos suben el
      ladrillo sin perder el contraste del texto blanco encima. */
-  --theme-card: #3d1e18;
-  --theme-card-inset: #55302a;
-  --theme-hairline: #55302a;
+  /* Segundo intento de subirlo, tras el primero (#2a1512 -> #3d1e18): "sigue
+     muy oscuro/apagado", dicho por Óscar mirándolo en el móvil, no a ojo
+     mío. Este salto es mayor a propósito -no otro +10% tímido-: más rojo
+     de verdad (más saturación) y más claro (más valor), no solo un marrón
+     más pálido. El texto blanco encima sigue con contraste de sobra. */
+  --theme-card: #6e2e1f;
+  --theme-card-inset: #8a4530;
+  --theme-hairline: #8a4530;
   --theme-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
 
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
@@ -552,18 +557,35 @@ body.theme-flame-red .saga-hud-dock button span {
  * El prologo, "antes de salir" y la camara se montaban de golpe justo
  * cuando se apagaba la pantalla de carga: dos cortes secos seguidos. Con
  * esto la carga se disuelve (sagaVeloDisolver) y el panel sube detras. */
+/* El ritmo del movimiento, en un solo sitio.
+ *
+ * "Que todo sea uniforme": cada panel tenia su propia duracion y su propia
+ * curva -300ms el prologo, 260 "antes de salir", 240 la camara, 280 las
+ * hojas, y tres curvas distintas entre ellas, incluida un `ease` suelto-.
+ * Cuatro paneles que hacen lo mismo moviendose cada uno a su ritmo se
+ * notan como cuatro aplicaciones. Estas tres variables son ahora la unica
+ * fuente: cambiarlas aqui cambia el movimiento de toda la pantalla de
+ * jugador a la vez.
+ *
+ * Van en `:root` y no en cada tema: el ritmo no es cosa del color. */
+:root {
+  --saga-motion-entra: 260ms;
+  --saga-motion-sale: 220ms;
+  --saga-motion-curva: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @keyframes sagaPanelEntra {
   from { opacity: 0; transform: translateY(14px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes sagaVeloDisolver {
-  /* Se disuelve DESDE EL PRIMER FOTOGRAMA y se abre un poco al hacerlo.
-   *
-   * Antes aguantaba opaco el 60% del tiempo y se iba en los ultimos 190ms:
-   * eso no es una transicion, es una espera y luego un corte. Ahora baja
-   * desde el principio y crece un 6%, que es lo que da la sensacion de que
-   * la pantalla de carga se abre y deja ver el juego, en vez de apagarse. */
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.06); }
-}
+/* `sagaVeloDisolver` se fue: el velo de carga ya no anima con `@keyframes` a
+ * ciegas. "La pantalla de carga cierra de golpe" tenia una causa real -una
+ * animacion CSS de duracion fija corriendo en paralelo con un `setTimeout`
+ * de JS que desmontaba el velo por su cuenta, y si el hilo principal iba
+ * cargado montando el mapa por primera vez, los dos relojes se
+ * desincronizaban y el corte se veia brusco-. Ahora el velo usa `transition`
+ * y el propio `onTransitionEnd` avisa a React cuando el fundido termina de
+ * verdad (PlayerApp.tsx). Un `@keyframes` con duracion fija no puede avisar
+ * de nada; una `transition` con evento, si.
+ */

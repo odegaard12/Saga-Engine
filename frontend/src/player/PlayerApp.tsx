@@ -33,6 +33,7 @@ import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoUbicacion, IconoDiana } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
@@ -305,10 +306,23 @@ export default function PlayerApp() {
   // en la mesa de trabajo o al recoger un objeto). Sin este latido, el botón del
   // nodo final seguía diciendo "falta un objeto" después de haber forjado el
   // fabricado, hasta recargar. Mismo intervalo que usa la mesa de trabajo.
+  //
+  // Este `setInventoryTick` re-renderiza TODO PlayerApp -es el componente que
+  // dibuja la pantalla entera-, cada vez que salta. A 2s son 30 veces por
+  // minuto, de fondo, jugando o no. El mapa está protegido de esto -tiene su
+  // propio filtro que evita redibujarse si sus props no cambian de verdad-,
+  // pero el resto del árbol sí se recalcula entero cada vez. Subido a 4s: la
+  // mochila sigue actualizándose casi al instante desde su propio intervalo
+  // (misma nota, mesa de trabajo), así que este solo es una red de seguridad
+  // por si acaso, y no hace falta que sea tan frecuente.
+  //
+  // Dicho sin adornar: esto es un candidato a la sensación de lentitud, no
+  // una prueba. Reduce trabajo de fondo, medible; que el móvil "se sienta
+  // más fluido" solo se confirma jugando de verdad, no leyendo código.
   const [inventoryTick, setInventoryTick] = useState(0)
   useEffect(() => {
     const bump = () => setInventoryTick((value) => value + 1)
-    const id = window.setInterval(bump, 2_000)
+    const id = window.setInterval(bump, 4_000)
     window.addEventListener('storage', bump)
     return () => {
       window.clearInterval(id)
@@ -1373,13 +1387,40 @@ export default function PlayerApp() {
   // el mapa. Esto no evita la carga -sigue durando lo que tenga que durar-,
   // solo disuelve el cambio de una pantalla a la otra en vez de cortarlo.
   const fueListoRef = useRef(false)
+  /**
+   * "La pantalla de carga cierra de golpe": tenia razon, y era una carrera.
+   *
+   * El velo se apagaba con una `animation` de CSS (620ms) mientras un
+   * `setTimeout` de JS (640ms) lo desmontaba por su cuenta, en un momento en
+   * el que el hilo principal esta OCUPADO montando el mapa de verdad
+   * -Leaflet, teselas, marcadores- por primera vez. Si el navegador se
+   * retrasa aunque sea un poco pintando los fotogramas intermedios de la
+   * animacion, el `setTimeout` no espera: llega a los 640ms de reloj y
+   * desmonta el velo aunque el fundido no se haya visto, y el corte se lee
+   * de golpe en vez de un fundido.
+   *
+   * Ahora el propio navegador avisa cuando el fundido TERMINA DE VERDAD
+   * (`transitionend`), y el temporizador es solo una red de seguridad muy
+   * holgada por si ese aviso no llegara nunca.
+   */
   const [velo, setVelo] = useState(false)
+  const [veloSaliendo, setVeloSaliendo] = useState(false)
   useEffect(() => {
     if (state.status === 'ready' && !fueListoRef.current) {
       fueListoRef.current = true
       setVelo(true)
-      const id = window.setTimeout(() => setVelo(false), 640)
-      return () => window.clearTimeout(id)
+      setVeloSaliendo(false)
+      // Un frame antes de empezar a apagarlo: si se pone opacity:0 en el
+      // MISMO render que lo monta, el navegador puede fundir el `mount` y el
+      // `unmount` en un solo frame y no se ve transicion ninguna.
+      const idInicio = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setVeloSaliendo(true))
+      })
+      const idRespaldo = window.setTimeout(() => setVelo(false), 1400)
+      return () => {
+        window.cancelAnimationFrame(idInicio)
+        window.clearTimeout(idRespaldo)
+      }
     }
     if (state.status !== 'ready') {
       fueListoRef.current = false
@@ -2673,6 +2714,14 @@ export default function PlayerApp() {
       {velo ? (
         <div
           aria-hidden="true"
+          // `onTransitionEnd`, no un `setTimeout` adivinando cuanto tarda:
+          // ver la nota larga junto al estado `velo`. El navegador avisa
+          // cuando el fundido termina DE VERDAD, con el reloj que el
+          // navegador usa para pintarlo, no con uno aparte que puede ir por
+          // libre si el hilo principal va cargado.
+          onTransitionEnd={(event) => {
+            if (event.propertyName === 'opacity') setVelo(false)
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2682,7 +2731,9 @@ export default function PlayerApp() {
               'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
               'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
               'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
-            animation: 'sagaVeloDisolver 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
+            opacity: veloSaliendo ? 0 : 1,
+            transform: veloSaliendo ? 'scale(1.06)' : 'scale(1)',
+            transition: 'opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         />
       ) : null}
@@ -2827,8 +2878,20 @@ export default function PlayerApp() {
          * se veían LOS DOS A LA VEZ, uno asomando a través del otro, con la
          * tarjeta "ANTES DE SALIR" incrustada a media historia del prólogo.
          * Ahora el panel espera a que se cierre el prólogo primero.
+         *
+         * `!velo`: BUG REAL, "no hay animación al entrar".
+         *
+         * El panel SÍ tiene animación de entrada (sagaPanelEntra, 260ms), y
+         * SÍ se estaba disparando -React lo monta de nuevo cada vez que
+         * `visible` pasa a true-. El problema es que se montaba AL MISMO
+         * TIEMPO que el velo que disuelve la pantalla de carga, y ese velo
+         * dura 620ms a z-index 999999: la animación del panel (260ms)
+         * terminaba entera mientras el velo todavía lo tapaba del todo. Para
+         * cuando el velo se iba, el panel ya estaba quieto, así que se veía
+         * aparecer de golpe. La animación existía; nunca se llegó a ver.
          */
         visible={
+          !velo &&
           !showPrologue &&
           !prepCerrada &&
           (offlinePrepVisible ||
@@ -2932,7 +2995,7 @@ export default function PlayerApp() {
               title="Hacer foto de campo"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                {fieldPhotoUploading ? '⏳' : '📷'}
+                {fieldPhotoUploading ? '⏳' : <IconoCamara />}
               </span>
             </button>
 
@@ -2949,7 +3012,7 @@ export default function PlayerApp() {
                 title="Leer historia"
               >
                 <span aria-hidden="true" style={mapQuickIcon}>
-                  📖
+                  <IconoLibro />
                 </span>
               </button>
             ) : null}
@@ -2966,7 +3029,7 @@ export default function PlayerApp() {
               title="Clasificación"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                🏆
+                <IconoTrofeo />
               </span>
             </button>
 
@@ -2984,7 +3047,7 @@ export default function PlayerApp() {
               title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                {routeOverviewActive ? '📍' : '🧭'}
+                {routeOverviewActive ? <IconoUbicacion /> : <IconoBrujula />}
               </span>
             </button>
 
@@ -3020,7 +3083,7 @@ export default function PlayerApp() {
               title="Centrar en mi ubicación"
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                ◎
+                <IconoDiana />
               </span>
             </button>
             ) : null}
@@ -3203,14 +3266,13 @@ const mapQuickButtonActive: CSSProperties = {
   color: 'var(--theme-primary)',
 }
 
+// Ya no envuelve un emoji, envuelve un SVG de trazo (PlayerIcons.tsx) que
+// hereda `color` del botón vía `currentColor`. El drop-shadow y el tamaño de
+// letra eran para el emoji del sistema; el SVG no los necesita.
 const mapQuickIcon: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 17,
-  lineHeight: 1,
-  filter: 'drop-shadow(0 1px 3px rgba(var(--theme-ink), .24))',
-  transform: 'translateY(-0.5px)',
 }
 
 const mapQuickCountPill: CSSProperties = {

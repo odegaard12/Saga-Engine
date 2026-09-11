@@ -54,9 +54,21 @@ function RecipeCard({
         <span style={canCraft ? availablePill : lockedPill}>{canCraft ? 'LISTO' : 'FALTAN'}</span>
       </div>
 
-      {/* Ingredientes: se distingue lo que YA tienes de lo que falta.
-          Antes se listaban todos igual bajo el cartel "FALTAN", así que
-          parecía que faltaban también los que llevabas en la mochila. */}
+      {/**
+       * Ingredientes en FILAS, como el resto de la aplicacion.
+       *
+       * "El diseño de ensamblar y toda esa parte no sigue el diseño de Mesa
+       * y parece aparte": tenia razon, y la causa era concreta. Cada pieza
+       * era una CAJA rellena con una barra de color de 3px a la izquierda,
+       * y ese "filo de color al lado" no existe en ningun otro sitio de la
+       * aplicacion: en "antes de salir", en la clasificacion y en el login
+       * todo son filas separadas por una linea fina. Una pantalla con dos
+       * idiomas visuales se lee como dos pantallas pegadas.
+       *
+       * Ahora: fila, linea fina, icono, nombre en blanco, y el estado a la
+       * derecha -verde si lo llevas, cuenta si te falta-. Sin `opacity`
+       * apagando el texto, que es lo mismo que ya se quito del titulo.
+       */}
       <div style={inputsRow}>
         {recipe.inputs.map((inp) => {
           const owned = inventoryItems.find((item) => item.item_id === inp.item_id)
@@ -64,15 +76,15 @@ function RecipeCard({
           const enough = have >= inp.quantity
 
           return (
-            <div
-              key={inp.item_id}
-              className={CLASE_PIEZA_MESA}
-              style={{ ...inputChip, ...(enough ? inputChipReady : inputChipMissing) }}
-            >
-              <ItemIconSvg itemId={inp.item_id} size={16} />
-              <span style={inputChipLabel}>
-                {enough ? '✓' : `${have}/${inp.quantity}`} {inp.quantity}×{' '}
-                {(owned?.label || inp.item_id.replace(/_/g, ' '))}
+            <div key={inp.item_id} className={CLASE_PIEZA_MESA} style={filaPieza}>
+              <span style={filaPiezaIcono}>
+                <ItemIconSvg itemId={inp.item_id} size={18} />
+              </span>
+              <span style={filaPiezaNombre}>
+                {inp.quantity}× {owned?.label || inp.item_id.replace(/_/g, ' ')}
+              </span>
+              <span style={enough ? filaPiezaListo : filaPiezaFalta}>
+                {enough ? '✓' : `${have}/${inp.quantity}`}
               </span>
             </div>
           )
@@ -171,12 +183,12 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
 
   return (
     <section style={panel}>
-      {/* Header */}
+      {/* La cabecera "MESA DE TRABAJO" se fue: repetia la pestaña "Mesa" que
+          ya esta seleccionada y subrayada justo encima -mismo fallo, y mismo
+          arreglo, que ya se hizo en Mochila con el titulo "MOCHILA"
+          duplicado-. Se queda solo el recuento, que si es informacion. */}
       <div style={headerRow}>
-        <div style={headerLeft}>
-          <span style={headerLabel}>MESA DE TRABAJO</span>
-          <span style={headerCount}>{activeRecipes.length} recetas</span>
-        </div>
+        <span style={headerCount}>{activeRecipes.length} recetas</span>
         {readyCount > 0 && (
           <span style={readyBadge}>
             {readyCount} disponible{readyCount !== 1 ? 's' : ''}
@@ -253,35 +265,23 @@ const headerRow: CSSProperties = {
   padding: '0 2px',
 }
 
-const headerLeft: CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: 8,
-}
-
-const headerLabel: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
-  color: '#fde68a',
-}
-
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   color: 'rgba(255,255,255,0.4)',
 }
 
+// Sólido y redondo de verdad, no el radio del tema (ver la nota larga en
+// availablePill/lockedPill un poco más abajo).
 const readyBadge: CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.08em',
-  color: 'rgb(var(--theme-done-soft))',
-  background: 'rgba(var(--theme-done), 0.15)',
-  border: '1px solid rgba(var(--theme-done), 0.3)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 10px',
+  letterSpacing: '0.05em',
+  color: '#0b1220',
+  background: '#22c55e',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 10px',
 }
 
 const toastBanner: CSSProperties = {
@@ -326,7 +326,7 @@ const recipeCard: CSSProperties = {
  *
  * Se probo a darles fondo solido para que casaran con el diseño "B", y era
  * volver al recuadro dentro de recuadro: la ficha dentro de la hoja dentro
- * del panel. La superficie la llevan las piezas (`inputChip`); la receta
+ * del panel. La superficie la llevan las filas de piezas; la receta
  * solo se apaga cuando le faltan ingredientes.
  */
 const recipeCardReady: CSSProperties = {
@@ -334,10 +334,15 @@ const recipeCardReady: CSSProperties = {
   border: 0,
 }
 
+// Sin opacidad rebajada: "Forjar el Sello no se lee bien, debe leerse todo
+// bien y no estar opacado" -y tenia razon-. El `opacity: 0.5` de antes
+// apagaba la tarjeta ENTERA, titulo incluido, justo en el caso mas comun
+// -mientras aun faltan piezas-. El estado de "no listo" ya lo cuenta la
+// etiqueta "FALTAN" (lockedPill) y el boton apagado (craftBtnApagado); no
+// hacia falta apagar tambien el nombre de lo que se esta fabricando.
 const recipeCardLocked: CSSProperties = {
   background: 'transparent',
   border: 0,
-  opacity: 0.5,
 }
 
 const recipeOutputRow: CSSProperties = {
@@ -381,27 +386,36 @@ const recipeOutputMeta: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+/**
+ * "Anticuado": estos dos chips llevaban borde + relleno traslucido + el
+ * radio de pildora del TEMA -que en fuego es 3px, casi cuadrado, hecho a
+ * proposito para otros elementos-, mezclando dos lenguajes visuales en la
+ * misma pantalla. Ahora son solidos y de verdad redondos (999px fijo,
+ * como las insignias del podio), sin borde: el resto de la pantalla ya
+ * no lleva bordes translucidos en ningun sitio.
+ */
 const availablePill: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
-  letterSpacing: '0.12em',
-  color: 'rgb(var(--theme-done-soft))',
-  background: 'rgba(var(--theme-done), 0.15)',
-  border: '1px solid rgba(var(--theme-done), 0.3)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 8px',
+  letterSpacing: '0.08em',
+  // Verde universal de "listo", no del tema: es una señal, no decoracion.
+  color: '#0b1220',
+  background: '#22c55e',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 9px',
   flexShrink: 0,
 }
 
 const lockedPill: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
-  letterSpacing: '0.12em',
-  color: 'rgb(var(--theme-line))',
-  background: 'rgba(var(--theme-line), 0.1)',
-  border: '1px solid rgba(var(--theme-line), 0.2)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 8px',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,.6)',
+  background: 'var(--theme-card-inset)',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 9px',
   flexShrink: 0,
 }
 
@@ -410,47 +424,69 @@ const lockedPill: CSSProperties = {
 const inputsRow: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  // Sin hueco: ahora lo que separa una pieza de otra es su linea fina, no
+  // el aire entre cajas. Igual que las filas de la clasificacion.
+  gap: 0,
 }
 
-const inputChip: CSSProperties = {
+// Fila, no caja: exactamente el mismo patron que las filas de "antes de
+// salir" -linea fina arriba, icono, texto, estado a la derecha-.
+const filaPieza: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
+  gap: 12,
   width: '100%',
-  // Relleno propio, no el mismo color que la hoja: puestas sobre la tarjeta
-  // solida con `--theme-card` se volvian invisibles -mismo color exacto- y
-  // solo se adivinaban por el filo de la izquierda.
-  background: 'var(--theme-card-inset)',
-  // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
-  borderLeft: '3px solid var(--theme-hairline)',
-  borderRadius: 10,
-  padding: '11px 12px',
+  padding: '11px 0',
+  borderTop: '1px solid var(--theme-hairline)',
 }
 
-const inputChipReady: CSSProperties = {
-  // Verde universal de "lo tienes", no --theme-done: en fuego ese token es
-  // naranja y no se distinguia de lo que falta. Mismo criterio que las
-  // etiquetas de "antes de salir".
-  borderLeft: '3px solid #22c55e',
-  background: 'rgba(34,197,94,.10)',
+const filaPiezaIcono: CSSProperties = {
+  width: 22,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
 }
 
-const inputChipMissing: CSSProperties = {
-  opacity: 0.62,
-}
-
-const inputChipLabel: CSSProperties = {
+const filaPiezaNombre: CSSProperties = {
   flex: 1,
-  fontSize: 13,
+  minWidth: 0,
+  fontSize: 13.5,
   fontWeight: 700,
-  color: 'rgba(var(--theme-line-soft), 0.9)',
+  color: '#ffffff',
 }
 
-// Apagado mientras faltan piezas: se ve a donde vas, pero no invita a pulsarlo.
+// Verde universal de "lo tienes", no --theme-done: en fuego ese token es
+// naranja y no se distinguiria de lo que falta. Mismo criterio que las
+// etiquetas de "antes de salir".
+const filaPiezaListo: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: '#22c55e',
+  flexShrink: 0,
+}
+
+const filaPiezaFalta: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: 'rgba(255,255,255,.5)',
+  fontVariantNumeric: 'tabular-nums',
+  flexShrink: 0,
+}
+
+/**
+ * Apagado, pero SIGUE PARECIENDO UN BOTON.
+ *
+ * Usaba `--theme-card-inset`, el mismo color exacto que tenian las piezas
+ * de arriba: el boton apagado se leia como una pieza mas de la lista, no
+ * como el boton al que lleva todo lo demas. Ahora va con contorno -la
+ * misma forma que los botones secundarios de Ferramentas y de "antes de
+ * salir"-, que se lee como boton aunque este desactivado.
+ */
 const craftBtnApagado: CSSProperties = {
-  background: 'var(--theme-card-inset)',
-  color: 'rgba(255,255,255,.35)',
+  background: 'transparent',
+  border: '1px solid var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.42)',
   boxShadow: 'none',
   cursor: 'default',
 }

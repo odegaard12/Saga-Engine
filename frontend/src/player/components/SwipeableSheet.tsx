@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
+import { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
 
 interface SwipeableSheetProps {
   open: boolean
@@ -8,9 +8,6 @@ interface SwipeableSheetProps {
 }
 
 export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
-  const [offsetY, setOffsetY] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -33,60 +30,29 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (open) {
       setMontada(true)
       setSaliendo(false)
-      setOffsetY(0)
-      setIsDragging(false)
       return undefined
     }
 
     if (!montada) return undefined
 
     setSaliendo(true)
+    // 260, el mismo numero que `--saga-motion-entra`: el temporizador que
+    // desmonta y la transicion que se ve tienen que durar lo mismo, o se
+    // corta el movimiento antes de acabar (o se queda un hueco despues).
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-      setOffsetY(0)
-    }, 280)
+    }, 260)
     return () => window.clearTimeout(id)
   }, [open, montada])
 
   if (!montada) return null
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setIsDragging(true)
-    startYRef.current = e.touches[0].clientY
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return
-    const touchY = e.touches[0].clientY
-    const deltaY = touchY - startYRef.current
-
-    // Only allow pulling downwards
-    if (deltaY > 0) {
-      setOffsetY(deltaY)
-    } else {
-      setOffsetY(0)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-    // If dragged down more than 100px, close it
-    if (offsetY > 100) {
-      onClose()
-      // Wait for animation to finish before resetting
-      setTimeout(() => setOffsetY(0), 300)
-    } else {
-      // Snap back
-      setOffsetY(0)
-    }
-  }
-
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
     transform: saliendo ? 'translateY(100%)' : 'translateY(0)',
-    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+    transition: 'transform var(--saga-motion-entra) var(--saga-motion-curva)',
     // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
     // un salto hacia arriba justo antes de bajar.
     animation: saliendo ? 'none' : undefined,
@@ -120,9 +86,19 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
             escondia solo y arrastrar era la unica salida). Se cierra con la
             X o tocando fuera. De paso se recuperan los 22px que ocupaba. */}
         <div
+          className="saga-sin-scrollbar"
           style={{
             flex: 1,
             overflowY: 'auto',
+            // "Se desplaza hacia los datos si muevo el dedo" -en la
+            // clasificación, arrastrando con el dedo el podio se corría de
+            // lado-. Sin `overflowX: hidden` ni `touchAction`, iOS deja que
+            // un scroll vertical arrastre tambien el contenido en horizontal
+            // si algo se desborda un pixel -aqui, el podio con tres avatares
+            // de tamaños distintos y separadores, justo en el borde del
+            // ancho disponible-. Bloqueado en las dos direcciones a la vez.
+            overflowX: 'hidden',
+            touchAction: 'pan-y',
             display: 'flex',
             flexDirection: 'column',
             WebkitOverflowScrolling: 'touch',
@@ -146,12 +122,19 @@ const overlay: CSSProperties = {
   pointerEvents: 'none', // Let children capture events
 }
 
+// "Difumina el fondo al estar abierto": lo pedia con razon. Este fondo
+// usaba `var(--theme-blur)`, y esa variable vale `none` en el tema de fuego
+// -es la unica de las tres que si lo desactiva-, asi que Mochila,
+// Ferramentas y Clasificacion se abrian sobre un velo oscuro SIN desenfoque
+// ninguno, mientras que el prologo y "antes de salir" -que no dependen de
+// esta variable- si difuminaban. Mismo valor fijo que esos dos, para que
+// las cinco hojas se comporten igual sin depender de que tema este puesto.
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(var(--theme-ink-deep), .34)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  background: 'rgba(var(--theme-ink-deep), .5)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
   pointerEvents: 'auto',
   transition: 'opacity 0.3s ease',
 }
@@ -172,13 +155,3 @@ const sheet: CSSProperties = {
   pointerEvents: 'auto',
 }
 
-// Zona de arrastre para cerrar deslizando. Llevaba un tirador visual -una
-// pildora blanca fija que no seguia al tema y se veia mal sobre la brasa de
-// fuego-; se quito el dibujo y se dejo la zona de arrastre, que sigue
-// funcionando igual.
-const dragHandleWrapper: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'center',
-  padding: '10px 0 12px',
-  cursor: 'grab',
-}
