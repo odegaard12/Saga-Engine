@@ -236,36 +236,46 @@ const title: CSSProperties = {
   letterSpacing: '-0.02em',
 }
 
+/**
+ * 11.5px y solidos, no 8px con borde translucido.
+ *
+ * Lo canto la auditoria del banco: "Preparado" salia a 8px. Eso no es un
+ * rotulo de seccion -que si va pequeño a proposito-, es el ESTADO del mapa
+ * guardado, o sea justo el dato por el que alguien abre esta hoja.
+ *
+ * Y de paso al mismo idioma que el resto: solidos y redondos de verdad, sin
+ * borde translucido ni el radio de pildora del tema -3px en fuego, casi
+ * cuadrado-, igual que ya se hizo con los chips de la mesa de trabajo.
+ */
 const badge: CSSProperties = {
   minHeight: 23,
   display: 'inline-flex',
   alignItems: 'center',
-  padding: '0 8px',
-  borderRadius: 'var(--theme-radius-pill)',
-  fontSize: 8,
-  fontWeight: 950,
+  padding: '0 10px',
+  borderRadius: 999,
+  border: 0,
+  fontSize: 11.5,
+  fontWeight: 900,
   whiteSpace: 'nowrap',
 }
 
 const readyBadge: CSSProperties = {
   ...badge,
-  background: 'rgba(var(--theme-done), .14)',
-  border: '1px solid rgba(var(--theme-done-soft), .20)',
-  color: '#dcfce7',
+  // Verde universal de "listo", no el del tema: es una señal, no marca.
+  background: '#22c55e',
+  color: '#0b1220',
 }
 
 const pendingBadge: CSSProperties = {
   ...badge,
-  background: 'rgba(255,255,255,.08)',
-  border: '1px solid rgba(255,255,255,.12)',
-  color: '#e2e8f0',
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.7)',
 }
 
 const offlineBadge: CSSProperties = {
   ...badge,
-  background: 'rgba(245,158,11,.13)',
-  border: '1px solid rgba(251,191,36,.18)',
-  color: '#fef3c7',
+  background: 'rgba(245,158,11,.9)',
+  color: '#2a1205',
 }
 
 const button: CSSProperties = {
