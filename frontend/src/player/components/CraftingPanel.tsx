@@ -54,9 +54,21 @@ function RecipeCard({
         <span style={canCraft ? availablePill : lockedPill}>{canCraft ? 'LISTO' : 'FALTAN'}</span>
       </div>
 
-      {/* Ingredientes: se distingue lo que YA tienes de lo que falta.
-          Antes se listaban todos igual bajo el cartel "FALTAN", así que
-          parecía que faltaban también los que llevabas en la mochila. */}
+      {/**
+       * Ingredientes en FILAS, como el resto de la aplicacion.
+       *
+       * "El diseño de ensamblar y toda esa parte no sigue el diseño de Mesa
+       * y parece aparte": tenia razon, y la causa era concreta. Cada pieza
+       * era una CAJA rellena con una barra de color de 3px a la izquierda,
+       * y ese "filo de color al lado" no existe en ningun otro sitio de la
+       * aplicacion: en "antes de salir", en la clasificacion y en el login
+       * todo son filas separadas por una linea fina. Una pantalla con dos
+       * idiomas visuales se lee como dos pantallas pegadas.
+       *
+       * Ahora: fila, linea fina, icono, nombre en blanco, y el estado a la
+       * derecha -verde si lo llevas, cuenta si te falta-. Sin `opacity`
+       * apagando el texto, que es lo mismo que ya se quito del titulo.
+       */}
       <div style={inputsRow}>
         {recipe.inputs.map((inp) => {
           const owned = inventoryItems.find((item) => item.item_id === inp.item_id)
@@ -64,15 +76,15 @@ function RecipeCard({
           const enough = have >= inp.quantity
 
           return (
-            <div
-              key={inp.item_id}
-              className={CLASE_PIEZA_MESA}
-              style={{ ...inputChip, ...(enough ? inputChipReady : inputChipMissing) }}
-            >
-              <ItemIconSvg itemId={inp.item_id} size={16} />
-              <span style={inputChipLabel}>
-                {enough ? '✓' : `${have}/${inp.quantity}`} {inp.quantity}×{' '}
-                {(owned?.label || inp.item_id.replace(/_/g, ' '))}
+            <div key={inp.item_id} className={CLASE_PIEZA_MESA} style={filaPieza}>
+              <span style={filaPiezaIcono}>
+                <ItemIconSvg itemId={inp.item_id} size={18} />
+              </span>
+              <span style={filaPiezaNombre}>
+                {inp.quantity}× {owned?.label || inp.item_id.replace(/_/g, ' ')}
+              </span>
+              <span style={enough ? filaPiezaListo : filaPiezaFalta}>
+                {enough ? '✓' : `${have}/${inp.quantity}`}
               </span>
             </div>
           )
@@ -314,7 +326,7 @@ const recipeCard: CSSProperties = {
  *
  * Se probo a darles fondo solido para que casaran con el diseño "B", y era
  * volver al recuadro dentro de recuadro: la ficha dentro de la hoja dentro
- * del panel. La superficie la llevan las piezas (`inputChip`); la receta
+ * del panel. La superficie la llevan las filas de piezas; la receta
  * solo se apaga cuando le faltan ingredientes.
  */
 const recipeCardReady: CSSProperties = {
@@ -412,47 +424,69 @@ const lockedPill: CSSProperties = {
 const inputsRow: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  // Sin hueco: ahora lo que separa una pieza de otra es su linea fina, no
+  // el aire entre cajas. Igual que las filas de la clasificacion.
+  gap: 0,
 }
 
-const inputChip: CSSProperties = {
+// Fila, no caja: exactamente el mismo patron que las filas de "antes de
+// salir" -linea fina arriba, icono, texto, estado a la derecha-.
+const filaPieza: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
+  gap: 12,
   width: '100%',
-  // Relleno propio, no el mismo color que la hoja: puestas sobre la tarjeta
-  // solida con `--theme-card` se volvian invisibles -mismo color exacto- y
-  // solo se adivinaban por el filo de la izquierda.
-  background: 'var(--theme-card-inset)',
-  // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
-  borderLeft: '3px solid var(--theme-hairline)',
-  borderRadius: 10,
-  padding: '11px 12px',
+  padding: '11px 0',
+  borderTop: '1px solid var(--theme-hairline)',
 }
 
-const inputChipReady: CSSProperties = {
-  // Verde universal de "lo tienes", no --theme-done: en fuego ese token es
-  // naranja y no se distinguia de lo que falta. Mismo criterio que las
-  // etiquetas de "antes de salir".
-  borderLeft: '3px solid #22c55e',
-  background: 'rgba(34,197,94,.10)',
+const filaPiezaIcono: CSSProperties = {
+  width: 22,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
 }
 
-const inputChipMissing: CSSProperties = {
-  opacity: 0.62,
-}
-
-const inputChipLabel: CSSProperties = {
+const filaPiezaNombre: CSSProperties = {
   flex: 1,
-  fontSize: 13,
+  minWidth: 0,
+  fontSize: 13.5,
   fontWeight: 700,
-  color: 'rgba(var(--theme-line-soft), 0.9)',
+  color: '#ffffff',
 }
 
-// Apagado mientras faltan piezas: se ve a donde vas, pero no invita a pulsarlo.
+// Verde universal de "lo tienes", no --theme-done: en fuego ese token es
+// naranja y no se distinguiria de lo que falta. Mismo criterio que las
+// etiquetas de "antes de salir".
+const filaPiezaListo: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: '#22c55e',
+  flexShrink: 0,
+}
+
+const filaPiezaFalta: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: 'rgba(255,255,255,.5)',
+  fontVariantNumeric: 'tabular-nums',
+  flexShrink: 0,
+}
+
+/**
+ * Apagado, pero SIGUE PARECIENDO UN BOTON.
+ *
+ * Usaba `--theme-card-inset`, el mismo color exacto que tenian las piezas
+ * de arriba: el boton apagado se leia como una pieza mas de la lista, no
+ * como el boton al que lleva todo lo demas. Ahora va con contorno -la
+ * misma forma que los botones secundarios de Ferramentas y de "antes de
+ * salir"-, que se lee como boton aunque este desactivado.
+ */
 const craftBtnApagado: CSSProperties = {
-  background: 'var(--theme-card-inset)',
-  color: 'rgba(255,255,255,.35)',
+  background: 'transparent',
+  border: '1px solid var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.42)',
   boxShadow: 'none',
   cursor: 'default',
 }
