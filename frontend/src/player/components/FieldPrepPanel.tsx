@@ -321,8 +321,9 @@ const recuento: CSSProperties = {
 
 const cerrar: CSSProperties = {
   flex: '0 0 auto',
-  width: 30,
-  height: 30,
+  // Ver la nota de PlayerHud.tsx: area de toque.
+  width: 36,
+  height: 36,
   display: 'grid',
   placeItems: 'center',
   padding: 0,

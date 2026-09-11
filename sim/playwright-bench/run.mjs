@@ -8,6 +8,10 @@
 //                               cobertura de verdad: ¿recarga el shell desde
 //                               caché? ¿se completa un nodo sin red? ¿sincroniza
 //                               solo al volver la señal?
+//   album-diseno             — una captura de CADA pantalla del jugador, para
+//                               revisar la interfaz entera de golpe
+//   auditoria-interfaz       — busca fallos de interfaz MEDIBLES: botones de
+//                               0x0, elementos que se solapan, texto ilegible
 
 const nombre = process.argv[2] || 'team-relay-cobertura'
 
@@ -16,6 +20,8 @@ const escenarios = {
   'solo-screenshot': () => import('./scenarios/solo-screenshot.mjs'),
   'diagnose-tiles': () => import('./scenarios/diagnose-tiles.mjs'),
   'offline-descargado-antes': () => import('./scenarios/offline-descargado-antes.mjs'),
+  'album-diseno': () => import('./scenarios/album-diseno.mjs'),
+  'auditoria-interfaz': () => import('./scenarios/auditoria-interfaz.mjs'),
 }
 
 const cargar = escenarios[nombre]
