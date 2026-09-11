@@ -39,6 +39,69 @@
      la pantalla entera. Subirlo de aqui tiñe el mundo. */
   --theme-wash: rgba(34, 197, 94, 0.05);
   --theme-backdrop: blur(16px);
+
+  /* Las tarjetas flotantes de la pantalla de jugador (diseno "B", aprobado).
+   *
+   * SOLIDAS, no translucidas: el intento anterior las hizo con velos de
+   * degradado sobre el mapa y el resultado era barro -sin bordes limpios y
+   * todo lavado-. Un color plano con sombra real se recorta contra el mapa
+   * y se lee de un vistazo, que es lo que hace que el login funcione.
+   *
+   * `-card` es la superficie de la tarjeta; `-card-inset` lo que va DENTRO
+   * de ella (celdas de objetos, botones apagados); `-hairline` la linea de
+   * separacion. Tres tonos, no veinte rgba sueltos repetidos por el codigo. */
+  --theme-card: #16203a;
+  --theme-card-inset: #24304e;
+  --theme-hairline: #2c3a5c;
+  --theme-card-shadow: 0 14px 36px rgba(2, 6, 23, 0.6);
+
+  /* Respaldo: si algo se pinta fuera de un body con tema, sale como siempre. */
+  /* Cuanto tapan las superficies -barras, hojas, paneles-.
+   *
+   * La opacidad de cada una esta escrita en su sitio (.46, .52, .72...), y no
+   * son iguales entre si a proposito. En vez de tocar veinte numeros uno a
+   * uno, cada una se multiplica por esto. En cristal vale 1: sale el mismo
+   * numero exacto de antes, asi que el tema viejo no cambia. En fuego sube y
+   * el navegador recorta en 1 lo que se pase, que es justo lo que se quiere:
+   * esto es una placa y no se ve el mapa a traves.
+   */
+  --theme-solid: 1;
+  --theme-sheen-a: 100, 116, 139;
+  --theme-sheen-b: 71, 85, 105;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 56, 189, 248;
+  --theme-ring-a: 56, 189, 248;
+  --theme-ring-b: 74, 222, 128;
+  --theme-ink: 15, 23, 42;
+  --theme-ink-deep: 2, 6, 23;
+  --theme-ink-soft: 30, 41, 59;
+  --theme-ink-mid: 51, 65, 85;
+  --theme-line: 148, 163, 184;
+  --theme-shell-a: 84, 91, 104;
+  --theme-shell-b: 110, 116, 128;
+  --theme-info-deep: 14, 116, 190;
+  --theme-info-soft: 125, 211, 252;
+  /* El verde de progreso: los puntos y las lineas del recorrido. */
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 203, 213, 225;
+  --theme-info-mid: 14, 165, 233;
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
+  /* --- Las FORMAS, que es lo que hace que un tema sea otro diseño --- */
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+  /* Ver la nota en el tema de fuego: las caras van redondas en los dos. */
+  --theme-radius-avatar: 999px;
+  --theme-blur: blur(22px) saturate(1.12);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
 }
 
 /* --- Los temas ------------------------------------------------------------
@@ -49,8 +112,59 @@
  * que compara las dos listas.
  */
 
-/* Cristal: azul de noche. */
+/* Cristal: azul de noche.
+ *
+ * Las variables se declaran para el `html` y para el `body` a la vez: el
+ * servidor pone la clase en los dos, y así el elemento de más afuera —el que
+ * asoma al rebotar el desplazamiento en un móvil— tiene los mismos valores sin
+ * repetir ni un color.
+ *
+ * Los tonos que se repiten por todo el jugador van en crudo (sin la opacidad)
+ * para poder escribir rgba(var(--theme-sheen-a), .46) y conservar cada
+ * transparencia tal cual estaba:
+ *
+ *   sheen-a / sheen-b   el barniz de los paneles. Medido en el banco, es lo
+ *                       que hacía que todo se viese «glass» dijera lo que
+ *                       dijera el tema: cuatro degradados grises del tamaño de
+ *                       la pantalla, uno encima de otro.
+ *   ok / -deep / -soft  el verde de «esto va bien» (COMEZAR A TRAVESÍA, objeto
+ *                       recogido, nodo hecho). Son TRES: colapsarlos en uno
+ *                       aplana los degradados a un color liso.
+ *   info                el azul de los botones de permisos.
+ *
+ * En cristal valen exactamente lo que valían, así que el tema viejo no cambia
+ * ni un píxel. */
+html.theme-glass,
 body.theme-glass {
+  --theme-solid: 1;
+  --theme-sheen-a: 100, 116, 139;
+  --theme-sheen-b: 71, 85, 105;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 56, 189, 248;
+  --theme-ink: 15, 23, 42;
+  --theme-ink-deep: 2, 6, 23;
+  --theme-ink-soft: 30, 41, 59;
+  --theme-ink-mid: 51, 65, 85;
+  --theme-line: 148, 163, 184;
+  --theme-shell-a: 84, 91, 104;
+  --theme-shell-b: 110, 116, 128;
+  --theme-info-deep: 14, 116, 190;
+  --theme-info-soft: 125, 211, 252;
+  /* Los dos aros de la carga: azul cielo y verde, los de siempre. */
+  --theme-ring-a: 56, 189, 248;
+  --theme-ring-b: 74, 222, 128;
+  /* El verde de progreso: los puntos y las lineas del recorrido. */
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 203, 213, 225;
+  --theme-info-mid: 14, 165, 233;
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
   --theme-bg: #0f172a;
   --theme-primary: #38bdf8;
   --theme-primary-hover: #0284c7;
@@ -64,28 +178,161 @@ body.theme-glass {
   --theme-primary-border: rgba(56, 189, 248, 0.26);
   --theme-wash: rgba(56, 189, 248, 0.06);
   --theme-backdrop: blur(20px);
+
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+
+  /* La forma de los alfileres y de los puntos de la barra. Redondos: es el
+     disenio de cristal, y este 999px es exactamente lo que ya se veia. */
+  --theme-radius-dot: 999px;
+  --theme-blur: blur(22px) saturate(1.12);
+  --theme-border-w: 1px;
+  --theme-panel-cut: 0px;
+
+  /* El radio de la barra de arriba, DECLARADO y no heredado del respaldo.
+   *
+   * 28 px es exactamente lo que ya se veia: `PlayerShell.tsx` la lee con
+   * `var(--theme-radius-shell, 28px)` y nadie la declaraba, asi que cristal no
+   * cambia ni un pixel. Lo que cambia es que ahora esta escrito.
+   *
+   * Se declara porque hay una prueba que exige que los dos temas declaren el
+   * mismo juego de variables, y tiene razon: una variable en un tema y no en el
+   * otro es justo el fallo que se estaba arreglando -el que hereda se lleva un
+   * valor que nadie eligio para el-. */
+  --theme-radius-shell: 28px;
 }
 
 /* Fuego: rojo brasa. El fondo es muy oscuro a propósito —el texto va en
  * blanco encima y esto se lee al sol, en el monte, con el brillo a tope—. */
+html.theme-flame-red,
 body.theme-flame-red {
-  --theme-bg: #2f0a0a;
-  --theme-primary: #f87171;
-  --theme-primary-hover: #ef4444;
-  --theme-glass: rgba(60, 12, 12, 0.74);
-  --theme-glass-soft: rgba(94, 22, 22, 0.52);
+  /* El barniz, en ladrillo. El «ok» pasa de esmeralda a brasa naranja: sigue
+     leyéndose como «adelante» pero es de esta misión, no de la otra. */
+  --theme-solid: 2.8;
+  --theme-sheen-a: 128, 62, 48;
+  --theme-sheen-b: 92, 44, 36;
+  --theme-ok: 214, 124, 70;
+  --theme-ok-deep: 176, 88, 48;
+  --theme-ok-soft: 236, 164, 116;
+  --theme-info: 216, 112, 96;
+  --theme-ink: 34, 14, 12;
+  --theme-ink-deep: 22, 9, 8;
+  --theme-ink-soft: 64, 28, 22;
+  --theme-ink-mid: 74, 34, 30;
+  --theme-line: 198, 142, 130;
+  --theme-shell-a: 116, 56, 44;
+  --theme-shell-b: 138, 70, 52;
+  --theme-info-deep: 168, 66, 56;
+  --theme-info-soft: 240, 168, 156;
+  --theme-ring-a: 224, 106, 106;
+  --theme-ring-b: 176, 88, 48;
+  --theme-done: 214, 124, 70;
+  --theme-done-soft: 236, 164, 116;
+  --theme-line-soft: 232, 190, 182;
+  --theme-info-mid: 200, 96, 82;
+  /* Los alfileres NO siguen al tema: ahi el color dice si un nodo esta
+     hecho, si es el que toca o si falta. Es informacion, no decoracion,
+     y cambiarla obliga a reaprender el mapa. Los mismos de cristal. */
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
+  --theme-bg: #331613;
+  --theme-primary: #ef8a5c;
+  --theme-primary-hover: #d4703f;
+  --theme-glass: rgba(58, 27, 22, 0.97);
+  --theme-glass-soft: rgba(76, 35, 27, 0.95);
   --theme-glass-border: rgba(248, 113, 113, 0.22);
-  --theme-surface: #3b1414;
-  --theme-glow: rgba(248, 113, 113, 0.42);
-  --theme-tint: rgba(248, 113, 113, 0.13);
-  --theme-tint-strong: rgba(248, 113, 113, 0.21);
-  --theme-primary-border: rgba(248, 113, 113, 0.28);
-  --theme-wash: rgba(248, 113, 113, 0.07);
-  --theme-backdrop: blur(16px);
+  --theme-surface: #3f1d18;
+  --theme-glow: rgba(239, 138, 92, 0.42);
+  --theme-tint: rgba(239, 138, 92, 0.14);
+  --theme-tint-strong: rgba(239, 138, 92, 0.24);
+  --theme-primary-border: rgba(239, 138, 92, 0.3);
+  --theme-wash: rgba(239, 138, 92, 0.07);
+  --theme-backdrop: none;
+
+  /* Tarjetas flotantes del diseno "B": los valores exactos de la maqueta
+     aprobada. Ver la nota larga en el bloque :root. */
+  /* Mas claro que el primer intento (#2a1512 / #3d2620): sobre el mapa
+     quedaba casi negro y el tema se leia apagado, no rojo. Estos suben el
+     ladrillo sin perder el contraste del texto blanco encima. */
+  --theme-card: #3d1e18;
+  --theme-card-inset: #55302a;
+  --theme-hairline: #55302a;
+  --theme-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+
+  /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
+     marcado y una esquina cortada. Se distingue de un vistazo desde lejos, que
+     es justo lo que un tema tiene que hacer. */
+  /* Cuadrado de verdad.
+   *
+   * Estaba en 14 y 11 -cristal tiene 24 y 16-, y once pixeles SIGUEN SIENDO
+   * redondos. Se estuvieron aniadiendo cortes con clip-path ENCIMA de esquinas
+   * redondeadas: se cortaban dos y las otras dos seguian curvas, asi que la
+   * pantalla se leia igual por mucho corte que se pusiera.
+   *
+   * El corte y el redondeo son la misma decision y tienen que ir juntos: si el
+   * tema corta esquinas, no puede redondear las demas. */
+  --theme-radius-panel: 2px;
+  --theme-radius-card: 2px;
+  /* Ni las pildoras son pildoras aqui.
+   *
+   * Era 999px, igual que cristal, y la llevan el reloj, la de SOLO, la cuenta
+   * 6/10 y el FALTAN de la mesa. En un tema que corta esquinas, una gragea
+   * perfecta canta: era lo ultimo que quedaba redondo en la pantalla. */
+  --theme-radius-pill: 3px;
+
+  /* Chapas, no pelotas.
+   *
+   * 4.9.4 dijo que los alfileres del mapa "dejan de ser pelotas y pasan a ser
+   * chapas" y no era verdad en el codigo: el alfiler llevaba border-radius 999px
+   * clavado, la insignia un 50% clavado, y los puntos de la barra usaban
+   * --theme-radius-pill, que vale 999px en LOS DOS temas. Tres formas redondas
+   * que ningun tema podia cambiar.
+   *
+   * Va en variable propia y no reutilizando --theme-radius-pill porque esa la
+   * usan cosas que SI son pildoras -la de SOLO, la de la cuenta- y ahi el 999
+   * es correcto. */
+  --theme-radius-dot: 3px;
+
+  /* Las CARAS no. Una cara recortada en cuadrado parece foto de carnet mal
+   * hecha: es el unico sitio donde la esquina cortada del tema estorba en vez
+   * de aportar. Redonda en los dos temas, a proposito. */
+  --theme-radius-avatar: 999px;
+  --theme-blur: none;
+  --theme-border-w: 1px;
+  /* La esquina cortada, encendida.
+   *
+   * Estaba a 0, y con 0 la clip-path de mas abajo es un rectangulo exacto: el
+   * corte no aparecia nunca y el CSS no daba ningun error. El disenio de 4.9.4
+   * dice que la esquina cortada es una de sus TRES ideas -con la brasa en
+   * diagonal y el filo encendido-; las otras dos estaban puestas y esta llevaba
+   * apagada desde entonces. Por eso el tema se leia como el mismo disenio con
+   * otro color.
+   *
+   * 12 px con un radio de panel de 14: se nota sin comerse la esquina. Cristal
+   * se queda en 0 a proposito, que es el tema redondo. */
+  --theme-panel-cut: 18px;
+
+  /* El radio de la barra de arriba, que NADIE declaraba.
+   *
+   * `PlayerShell.tsx` la lee con `var(--theme-radius-shell, 28px)`, y ningun
+   * tema declaraba esa variable: siempre ganaba el respaldo de 28 y la barra
+   * seguia siendo una pildora en los dos temas. El arreglo de 4.9.4 la engancho
+   * a la variable y nunca le dio valor.
+   *
+   * Es el elemento mas grande de la pantalla -medido: 97 767 px2, tres veces la
+   * barra de abajo-, asi que mientras siguiera redonda el tema se leia igual.
+   *
+   * Cristal NO la declara a proposito: su respaldo es su disenio. */
+  --theme-radius-shell: 4px;
 }
 
 /* --- Y esto es lo que pinta ---------------------------------------------- */
 
+html[class*='theme-'],
 body[class*='theme-'],
 body[class*='theme-'] #root {
   background-color: var(--theme-bg);
@@ -116,4 +363,207 @@ body[class*='theme-'] .admin-cms-side-action--save {
 body[class*='theme-'] button.primary:hover,
 body[class*='theme-'] .admin-cms-side-action--save:hover {
   background-color: var(--theme-primary-hover);
+}
+
+/* --- Rasgos propios del tema de fuego -------------------------------------
+ *
+ * Un tema no es una paleta. Esto es lo que hace que, con la misma pantalla,
+ * `fuego` no se parezca a `cristal`: placas con una esquina cortada, una linea
+ * de brasa arriba, y los titulos en versalitas separadas.
+ *
+ * Todo bajo `body.theme-flame-red`, asi que `cristal` no se entera.
+ */
+
+/* Las piezas de la mesa YA NO SE RECORTAN.
+ *
+ * Llevaban el corte de esquina del tema viejo, y era lo unico que quedaba de
+ * esa forma en toda la pantalla de jugador: por eso la Mesa seguia
+ * leyendose como "el diseño antiguo" aunque sus colores ya estuvieran
+ * cambiados. El estado de cada pieza lo sigue contando el filo de la
+ * izquierda, que es informacion; el corte era solo decoracion. */
+
+/* La hoja de Mochila y Herramientas YA NO SE PINTA AQUI.
+ *
+ * Tenia `background: var(--theme-brasa) !important` y el corte de esquina, y
+ * eso volvia a ganarle a los estilos en linea: la hoja del diseño "B"
+ * -tarjeta solida de --theme-card- se escribio en el componente y seguia
+ * saliendo con el degradado de brasa y la esquina cortada.
+ *
+ * Es la CUARTA vez en este repo que un `!important` del tema mata un cambio
+ * visual (el alfiler del mapa, el radio de la barra, las tres superficies de
+ * la pantalla de juego, y esto). El corte de esquina sigue vivo donde toca:
+ * los minijuegos, que si son placas de cristal. */
+
+body.theme-flame-red .saga-glass-panel {
+  /* La brasa en diagonal, tambien en los paneles.
+   *
+   * Estaba en DOS sitios de todo el CSS: su declaracion y la regla de las tres
+   * barras. Los paneles de dentro -los minijuegos, la guia, la preparacion- eran
+   * planos, asi que una de las tres ideas del disenio de 4.9.4 solo la veia una
+   * parte de la pantalla, y el tema se leia como un color de fondo. */
+  background: var(--theme-brasa) !important;
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+  border-top: var(--theme-border-w) solid var(--theme-primary);
+}
+
+body.theme-flame-red h1,
+body.theme-flame-red h2,
+body.theme-flame-red h3 {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body.theme-flame-red button {
+  letter-spacing: 0.08em;
+}
+
+
+/* --- El fuego, sin adorno -------------------------------------------------
+ *
+ * Aqui hubo llamas colgando del filo de las barras y brasas en las esquinas.
+ * Se descartaron al verlas: las barras quedaban raras. Dos intentos de adorno
+ * -placas industriales primero, llamas despues- y los dos fuera.
+ *
+ * Lo que queda es lo que si funciona: el degradado en diagonal por debajo, que
+ * es lo que hace que no se vea un rectangulo pintado, y nada mas.
+ */
+
+body.theme-flame-red {
+  --theme-brasa: linear-gradient(
+    135deg,
+    rgba(var(--theme-sheen-b), calc(0.97 * var(--theme-solid))) 0%,
+    rgba(var(--theme-sheen-a), calc(0.95 * var(--theme-solid))) 52%,
+    rgba(var(--theme-ink-soft), calc(0.97 * var(--theme-solid))) 100%
+  );
+}
+
+/* La mesa de trabajo.
+ *
+ * Es la pantalla que quedaba fuera: no lleva `.saga-glass-panel` ni las clases
+ * del HUD, asi que ni el corte ni la brasa le llegaban. Y por dentro tenia
+ * morado -rgba(167,139,250)- y gris pizarra clavados, de otro tema.
+ *
+ * La regla va aqui, limitada a fuego, y no en el componente: en cristal
+ * --theme-panel-cut vale 0 y un poligono rectangular le borraria las esquinas
+ * redondas a las fichas. */
+body.theme-flame-red .saga-mesa-ficha {
+  background: var(--theme-brasa) !important;
+  clip-path: polygon(
+    var(--theme-panel-cut) 0,
+    100% 0,
+    100% calc(100% - var(--theme-panel-cut)),
+    calc(100% - var(--theme-panel-cut)) 100%,
+    0 100%,
+    0 var(--theme-panel-cut)
+  );
+  border-left: 2px solid var(--theme-primary);
+}
+
+/* AQUI ESTABA EL EMPATE QUE HIZO INUTIL TODO EL REDISENIO.
+ *
+ * Esta regla forzaba `background: var(--theme-brasa) !important` y un
+ * `clip-path` de esquinas cortadas sobre las TRES superficies de la pantalla
+ * de juego: la barra de arriba, la fila de iconos y el dock. Con `!important`
+ * gana incluso a los estilos en linea, asi que el redisenio aprobado -velo en
+ * vez de tarjeta, iconos como burbujas sueltas, dock sin caja- se escribio en
+ * los componentes y NO SE VEIA NADA: la pantalla seguia saliendo con las tres
+ * placas de brasa recortadas de siempre.
+ *
+ * Es el mismo empate que ya dejo muerta la regla del alfiler del mapa y el
+ * radio de la barra superior, documentado en PlayerShell.tsx. Van dos veces.
+ *
+ * Ahora esas tres superficies YA NO SON PLACAS: la barra de arriba y la de
+ * abajo son velos que se apagan, y los iconos son burbujas redondas sueltas.
+ * No hay superficie grande que recortar, asi que la regla se va entera. Lo
+ * que le da caracter al tema de fuego -el corte de esquina- sigue vivo donde
+ * si hay placas: `.saga-glass-panel` y los paneles de hojas.
+ */
+
+/* El prólogo y los textos de historia (StoryModal.tsx).
+ *
+ * Llevaba su forma entera en línea -color, radio, borde, sombra-, escrita a
+ * mano con las variables de brasa de cristal (--theme-sheen-*) en vez de
+ * apoyarse en .saga-glass-panel. En cristal daba la casualidad de que
+ * coincidía en píxeles, así que nunca se notó; en fuego se quedaba
+ * completamente plano, sin el corte ni la brasa: ni un solo elemento fuera
+ * del tema, medido, y aun así se leía como el diseño de otro sitio.
+ *
+ * El arreglo va aquí y no en el componente, a propósito: lo en línea sigue
+ * ganando en cristal (nada cambia), y estas reglas -con !important, que es
+ * lo único que le gana a lo en línea- sólo entran en fuego. */
+/* La regla de `.saga-story-panel` se fue con el prologo: ese panel ahora es
+   una tarjeta solida propia (StoryModal.tsx) y ya no lleva esa clase. */
+
+/* La píldora del contador (1/2, 2/2) en la barra de arriba.
+ *
+ * Llevaba un blanco al 12% pensado para asentar sobre el azul noche de
+ * cristal. Sobre la brasa de fuego -un degradado que ya es cálido- ese mismo
+ * blanco casi no cambia el matiz: medido, el fondo de la píldora
+ * (rgba(255,255,255,.12) sobre rgb(92,44,36)) cae dentro del mismo rango de
+ * la barra (64-128, 28-62, 22-48). No es que se lea mal: no se lee como
+ * píldora, se lee como el número flotando sobre la barra sin más.
+ *
+ * El reloj de al lado no tiene este problema porque usa un color con tinte
+ * propio (--theme-info-mid), no un blanco translúcido. Aquí el arreglo es el
+ * mismo principio: oscurecer en vez de aclarar, que sí separa en cualquier
+ * matiz de fondo, y un borde con el color de acento del tema. */
+body.theme-flame-red .saga-shell-count-pill {
+  background: rgba(0, 0, 0, 0.32) !important;
+  border-color: rgba(var(--theme-ok), 0.5) !important;
+  color: #fff !important;
+}
+
+/* Los iconos, con su color y separados del fondo.
+ *
+ * Antes iban con `grayscale(1) brightness(2.4)`, y eso no los «pone en blanco»:
+ * les BORRA el dibujo. Una camara 📷 se queda en una mancha blanca sin detalle,
+ * y sobre la brasa hay que adivinar cual es cual. Quedaba feo y ademas costaba
+ * usarlo.
+ *
+ * Un emoticono ya viene disenado para leerse sobre cualquier fondo. Lo que
+ * necesita sobre el rojo no es perder el color, sino despegarse: una sombra
+ * oscura corta y basta.
+ *
+ * Va por variable para que se pueda cambiar de tema en tema sin tocar esto. Si
+ * algun dia se quiere volver a los monocromos, se declara `--theme-icon-filter`
+ * en el bloque del tema y ya esta; aqui solo esta el respaldo.
+ */
+body.theme-flame-red .saga-hud-quick button span,
+body.theme-flame-red .saga-hud-dock button span {
+  /* `!important` porque el emoticono puede llevar su propio `filter` en linea y
+     en linea gana. Sin esto la regla no pinta nada. */
+  filter: var(--theme-icon-filter, drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))) !important;
+}
+
+/* El velo que disuelve la carga en el juego (PlayerApp.tsx, `velo`).
+   Cuando el mapa ya estaba guardado, la pantalla de carga desaparecia de
+   golpe y el mapa la sustituia sin transicion -"queda feo, muy brusco"-.
+   Este velo hereda el mismo fondo de la pantalla de carga y se disuelve
+   sobre el juego ya montado debajo, en vez de cortar de una pantalla a otra. */
+/* Los paneles ENTRAN, no aparecen.
+ *
+ * El prologo, "antes de salir" y la camara se montaban de golpe justo
+ * cuando se apagaba la pantalla de carga: dos cortes secos seguidos. Con
+ * esto la carga se disuelve (sagaVeloDisolver) y el panel sube detras. */
+@keyframes sagaPanelEntra {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sagaVeloDisolver {
+  /* Se disuelve DESDE EL PRIMER FOTOGRAMA y se abre un poco al hacerlo.
+   *
+   * Antes aguantaba opaco el 60% del tiempo y se iba en los ultimos 190ms:
+   * eso no es una transicion, es una espera y luego un corte. Ahora baja
+   * desde el principio y crece un 6%, que es lo que da la sensacion de que
+   * la pantalla de carga se abre y deja ver el juego, en vez de apagarse. */
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.06); }
 }

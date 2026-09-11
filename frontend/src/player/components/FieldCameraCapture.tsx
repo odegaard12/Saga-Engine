@@ -49,7 +49,7 @@ export function FieldCameraCapture({
           position: absolute;
           width: 28px;
           height: 28px;
-          border: 3px solid #38bdf8;
+          border: 3px solid rgb(var(--theme-info));
         }
         .saga-camera-corner--tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 20px; }
         .saga-camera-corner--tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 20px; }
@@ -85,8 +85,8 @@ export function FieldCameraCapture({
           width: 52px;
           height: 52px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-          box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+          background: linear-gradient(135deg, rgb(var(--theme-info)) 0%, #0284c7 100%);
+          box-shadow: 0 0 12px rgba(var(--theme-info), 0.6);
         }
       `
       document.head.appendChild(style)
@@ -224,7 +224,7 @@ export function FieldCameraCapture({
                   type="button"
                   style={{
                     ...pillControlBtn,
-                    background: torchOn ? '#facc15' : 'rgba(15,23,42,.70)',
+                    background: torchOn ? '#facc15' : 'rgba(var(--theme-ink), .70)',
                     color: torchOn ? '#000' : '#fff',
                     border: torchOn ? '1px solid #facc15' : '1px solid rgba(255,255,255,.25)'
                   }}
@@ -312,22 +312,24 @@ const overlay: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 12,
-  background: 'rgba(2, 6, 23, 0.65)',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+  // Fondo difuminado, como el prologo y "antes de salir".
+  background: 'rgba(var(--theme-ink-deep), .84)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
+// Tarjeta solida del diseño "B", como el resto: era el ultimo panel grande
+// que seguia con el cristal viejo -degradado, borde y desenfoque-.
 const sheet: CSSProperties = {
-  width: 'min(100%, 540px)',
+  width: 'min(100%, 420px)',
   height: 'min(94vh, 760px)',
   margin: '0 auto',
   padding: 16,
-  borderRadius: 24,
-  border: '1px solid rgba(255, 255, 255, 0.22)',
-  background: 'linear-gradient(180deg, rgba(100,116,139,.52), rgba(71,85,105,.42))',
-  boxShadow: '0 25px 60px rgba(15,23,42,.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+  borderRadius: 18,
+  border: 0,
+  background: 'var(--theme-card)',
+  boxShadow: 'var(--theme-card-shadow)',
+  animation: 'sagaPanelEntra 240ms cubic-bezier(0.22, 1, 0.36, 1)',
   color: '#fff',
   display: 'flex',
   flexDirection: 'column',
@@ -351,7 +353,7 @@ const headerTitle: CSSProperties = {
 const closeBtnStyle: CSSProperties = {
   width: 36,
   height: 36,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.20)',
   background: 'rgba(255,255,255,.10)',
   color: '#f8fafc',
@@ -367,9 +369,9 @@ const cameraFrame: CSSProperties = {
   flex: 1,
   width: '100%',
   minHeight: 280,
-  borderRadius: 20,
-  background: 'rgba(15, 23, 42, 0.4)',
-  border: '1px solid rgba(255, 255, 255, 0.16)',
+  borderRadius: 14,
+  background: 'var(--theme-card-inset)',
+  border: 0,
   overflow: 'hidden',
 }
 
@@ -386,16 +388,15 @@ const topControlsGroup: CSSProperties = {
 }
 
 const pillControlBtn: CSSProperties = {
-  minHeight: 34,
+  minHeight: 36,
   padding: '0 14px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.25)',
-  background: 'rgba(15,23,42,.70)',
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card)',
   color: '#fff',
   fontWeight: 800,
   fontSize: 12,
-  backdropFilter: 'blur(10px)',
-  boxShadow: '0 2px 10px rgba(0,0,0,.3)',
+  boxShadow: '0 4px 12px rgba(0,0,0,.45)',
 }
 
 const video: CSSProperties = {
@@ -415,7 +416,7 @@ const errorBox: CSSProperties = {
   right: 12,
   bottom: 12,
   padding: 12,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   background: 'rgba(127,29,29,.90)',
   color: '#fee2e2',
   fontSize: 13,
@@ -434,9 +435,9 @@ const controlsBottomContainer: CSSProperties = {
 const noteInput: CSSProperties = {
   width: '100%',
   minHeight: 44,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255, 255, 255, 0.18)',
-  background: 'rgba(15, 23, 42, 0.45)',
+  background: 'rgba(var(--theme-ink), 0.45)',
   color: '#fff',
   padding: '0 14px',
   fontSize: 14,
@@ -461,9 +462,9 @@ const previewActionsGroup: CSSProperties = {
 
 const primaryBtnStyle: CSSProperties = {
   minHeight: 46,
-  borderRadius: 16,
-  border: '1px solid rgba(125,211,252,.35)',
-  background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+  borderRadius: 'var(--theme-radius-card)',
+  border: '1px solid rgba(var(--theme-info-soft), .35)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-info)) 0%, #2563eb 100%)',
   color: '#fff',
   fontSize: 14,
   fontWeight: 950,
@@ -472,7 +473,7 @@ const primaryBtnStyle: CSSProperties = {
 
 const secondaryBtnStyle: CSSProperties = {
   minHeight: 46,
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.15)',
   background: 'rgba(255,255,255,.10)',
   color: '#e2e8f0',

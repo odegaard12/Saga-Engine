@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
@@ -16,7 +16,7 @@ async def get_state(user: str):
 
 
 @router.get("/api/game/{user}")
-async def get_game_payload(user: str, request: Request, offline_pack: bool = False):
+async def get_game_payload(user: str, request: Request, offline_pack: bool = False, fotos_por_url: bool = False):
     import main
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
@@ -28,10 +28,10 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
 
     current_stage = None
     if not finished and 0 <= lvl < len(runtime_stages):
-        current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True)
+        current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True, fotos_por_url=fotos_por_url)
 
     stages = [
-        main.project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)))
+        main.project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)), fotos_por_url=fotos_por_url)
         for i, stage in enumerate(runtime_stages)
     ]
 
@@ -116,6 +116,71 @@ def construir_tabla_de_equipo(user):
 @router.get("/api/team/{user}")
 async def get_team_payload(user: str):
     return construir_tabla_de_equipo(user)
+
+
+@router.get("/media/nodo/{stage_id}/{huella}.{extension}")
+async def stage_image(stage_id: str, huella: str, extension: str):
+    """La foto de un nodo, por su propia URL y cacheable para siempre.
+
+    Medido el 2026-08-20: el paquete del jugador eran 203 KB y 160 de ellos una
+    sola foto -el mosaico del nodo final-, metida como base64 dentro del JSON.
+    Ahi dentro no la puede cachear nadie: ni el navegador ni Cloudflare, porque
+    va en una respuesta distinta para cada jugador.
+
+    Lo que cambia sacarla: quince moviles abriendo a la vez en el aparcadoiro
+    dejan de tirar quince veces de la subida de la Raspberry -que es el cuello,
+    medido: la Pi esta al 0,18 % de CPU- y la piden al borde de Cloudflare, que
+    la sirve una vez y la reparte.
+
+    La huella va EN LA URL a proposito. Asi la respuesta puede declararse
+    inmutable y cachearse un anio: si la foto cambia, cambia la URL. Una URL
+    fija con la foto cambiante obligaria a revalidar cada vez, que es la mitad
+    del viaje que queriamos ahorrar.
+
+    Y va en /media/ con extension, NO en /api/. Medido el 2026-08-20: sirviendola
+    en /api/stage-image/... Cloudflare contestaba CF-Cache-Status: DYNAMIC aunque
+    la respuesta pidiera cache de un anio. Trata /api/ como dinamico por defecto
+    y la cabecera sola no le hace cambiar de idea. Con una ruta que parece lo que
+    es -un fichero de imagen- si entra en su cache, que era todo el objetivo.
+
+    Efecto secundario bueno: el service worker se salta /api/ (`shouldBypass`),
+    asi que desde /media/ SI puede precachearla para jugar sin cobertura.
+    """
+    import base64
+    import main
+
+    for stage in main.get_runtime_stages():
+        if _as_str(stage.get("id")) != _as_str(stage_id):
+            continue
+
+        # `get_runtime_stages` da el nodo NORMALIZADO, no la proyeccion que
+        # recibe el jugador: aqui la configuracion vive en `interaction`.
+        interaccion = stage.get("interaction") if isinstance(stage.get("interaction"), dict) else {}
+        config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
+        dato = _as_str(config.get("image_data_url"))
+        if not dato.startswith("data:"):
+            break
+
+        try:
+            cabecera, cuerpo = dato.split(",", 1)
+            tipo = cabecera[5:].split(";")[0] or "application/octet-stream"
+            crudo = base64.b64decode(cuerpo)
+        except (ValueError, TypeError):
+            break
+
+        if huella != main.huella_de_imagen(dato):
+            # La foto cambio y esta URL es de la anterior. No se sirve la nueva
+            # con la direccion vieja: el que la tenga cacheada se quedaria con
+            # ella para siempre.
+            return JSONResponse(status_code=404, content={"status": "error", "detail": "stale image"})
+
+        return Response(
+            content=crudo,
+            media_type=tipo,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+
+    return JSONResponse(status_code=404, content={"status": "error", "detail": "not found"})
 
 
 @router.post("/api/events/sync")
@@ -344,6 +409,13 @@ async def advance(request: Request):
 
     stages = main.get_runtime_stages()
     lvl = main.get_player_progress_level(profile_id, main.get_player_progress_level(user, 0))
+
+    # La misión puede tener fecha de inicio (ver runtime/mission_schedule.py):
+    # se puede descargar y prepararse con días de antelación, pero no
+    # completar nodos hasta esa hora. El código ni se comprueba -si vale o no
+    # es indiferente antes de tiempo-, y el nivel no se toca.
+    if main.mission_is_locked():
+        return {"status": "fail", "user": profile_id, "level": lvl, "reason": "mission_not_started_yet"}
 
     # ¿Desde qué nodo cree el jugador que está avanzando?
     #

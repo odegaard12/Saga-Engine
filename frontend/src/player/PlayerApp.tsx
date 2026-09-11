@@ -2,6 +2,7 @@ import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
+import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
 import { usePlayerStore } from './store/usePlayerStore'
 import { useGpsTracker } from './store/useGpsTracker'
@@ -27,12 +28,12 @@ import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
 import { InteractionSheet } from './components/InteractionSheet'
-import { TeamSheet } from './components/TeamSheet'
 import { RankingSheet } from './components/RankingSheet'
 import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
+import { MissionLockScreen } from './components/MissionLockScreen'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
 import { deriveStageRuntime, type PlayerPanel } from './runtime'
@@ -86,6 +87,7 @@ import {
   getTopOverlayStyle,
   getTopScrimStyle,
   getToastOverlayStyle,
+  getQuietOverlayStyle,
   floatingTrophyButton,
   type OverlayState,
 } from './components/PlayerLayout'
@@ -186,16 +188,6 @@ function mantenerNivel(
   return { ...siguiente, level: nivelAnterior, current_stage: anterior.current_stage }
 }
 
-/**
- * El tema, antes de que React pinte nada.
- *
- * Aqui, al cargar el modulo: una sola vez y sin parpadeo. Estaba dentro del
- * componente, o sea que corria con cada render -y este se repinta con cada
- * lectura del GPS-, y ademas asignaba `className` entero, que borraba las
- * clases del escaner de QR.
- */
-aplicarTema(getCachedPublicConfig()?.player_theme)
-
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
 
@@ -225,6 +217,10 @@ export default function PlayerApp() {
    */
   const esperandoGpsRef = useRef<{ nodo: string; desde: number } | null>(null)
   const [showPrologue, setShowPrologue] = useState(false)
+  // Empieza en false: si hay mission_launch_at, la cortina se ve desde el
+  // primer render y MissionLockScreen decide en su propio efecto si ya tocaba
+  // o no -sin eso habría un parpadeo con el mapa de fondo antes de taparlo.
+  const [missionUnlocked, setMissionUnlocked] = useState(false)
 
   /**
    * El prólogo se enseña SIEMPRE que se entra estando en el primer nodo.
@@ -289,17 +285,21 @@ export default function PlayerApp() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
+  const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
   const [dismissedFinishScreen, setDismissedFinishScreen] = useState(false)
   const toolsOpen = usePlayerStore((s) => s.toolsOpen)
   const setToolsOpen = usePlayerStore((s) => s.setToolsOpen)
-  const teamOpen = usePlayerStore((s) => s.teamOpen)
-  const setTeamOpen = usePlayerStore((s) => s.setTeamOpen)
   const rankingOpen = usePlayerStore((s) => s.rankingOpen)
   const setRankingOpen = usePlayerStore((s) => s.setRankingOpen)
 
   const addTrackerPoint = useGpsTracker((s) => s.addPoint)
-  const [teamProfiles, setTeamProfiles] = useState<TeamProfileLiveStatus[]>([])
+  // En el store compartido, no en un useState suelto: los minijuegos de
+  // equipo -Relevo de Equipo- necesitan saber dónde va el resto del grupo,
+  // y antes no había forma de que llegaran hasta ahí. Ver la nota en
+  // usePlayerStore.ts.
+  const teamProfiles = usePlayerStore((s) => s.teamProfiles)
+  const setTeamProfiles = usePlayerStore((s) => s.setTeamProfiles)
 
   // La mochila vive en localStorage y cambia sin que React se entere (al forjar
   // en la mesa de trabajo o al recoger un objeto). Sin este latido, el botón del
@@ -365,10 +365,43 @@ export default function PlayerApp() {
   // Removed gpsLoaded state and 20s timeout
 
   const noticeTimerRef = useRef<number | null>(null)
+  const quietTimerRef = useRef<number | null>(null)
   const overlayTimerRef = useRef<number | null>(null)
   const gpsWatchRef = useRef<number | null>(null)
   const gpsCenteredRef = useRef(false)
   const gpsNoticeShownRef = useRef(false)
+
+  /**
+   * De precisión (chip GPS) a por red, y vuelta, según lo que responda.
+   *
+   * En el monte, bajo árboles o entre paredes de piedra, el chip GPS puede
+   * no conseguir un fix NUNCA -no es lento, no llega-, mientras que la
+   * ubicación por red (wifi/antena, mucho menos precisa) sí suele
+   * responder. Antes `enableHighAccuracy: true` era la única vía: un
+   * TIMEOUT (código 3) se trataba siempre como "sigue buscando", nunca
+   * como "prueba otra cosa". El síntoma real reportado: varios jugadores
+   * con el permiso YA concedido y sin ubicación en toda la ruta, en zona
+   * de monte cerrado.
+   */
+  const gpsTimeoutsSeguidosRef = useRef(0)
+  const gpsModoRef = useRef<'preciso' | 'por_red'>('preciso')
+  const gpsAvisoModoRef = useRef(false)
+  const gpsReintentoPrecisoTimerRef = useRef<number | null>(null)
+
+  /**
+   * Batería: el chip GPS de precisión (`enableHighAccuracy: true`) en
+   * `watchPosition` continuo es lo que más consume, con diferencia, de
+   * toda la app. La mayor parte de una ruta se anda LEJOS de cualquier
+   * nodo -no hace falta precisión de satélite para saber que quedan 800m,
+   * solo hace falta saberlo, no acertar el metro-. Solo al acercarse de
+   * verdad (radio de nodo típico: 50m, aquí 250m de margen) hace falta la
+   * precisión que sí gasta batería. `null` -sin nodo o sin fix todavía- se
+   * trata como "lejos": mejor arrancar en modo barato y subir a preciso en
+   * cuanto haya un primer punto de referencia, que arrancar gastando de más
+   * sin necesidad.
+   */
+  const DISTANCIA_MODO_PRECISO_M = 250
+  const distanciaAlNodoRef = useRef<number | null>(null)
   const handleRequestLiveGpsRef = useRef<
     ((options?: { silent?: boolean; forceFocus?: boolean }) => Promise<void>) | null
   >(null)
@@ -409,6 +442,98 @@ export default function PlayerApp() {
   }, [idiomaDeLaMision])
 
   const isPhone = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
+
+  /**
+   * Alto REAL de la tarjeta inferior (Mochila/Herramientas + el texto de
+   * ayuda debajo del botón principal), para que la barra de iconos de
+   * arriba (foto/historia/clasificación) se coloque justo encima -nunca
+   * pisándola-, sea cual sea el largo del mensaje de ayuda de este nodo.
+   *
+   * Antes ese hueco era un número fijo (138px), calibrado para un mensaje
+   * corto: con una indicación larga la tarjeta crece más de esos 138px y
+   * su borde de arriba tocaba -o tapaba- los iconos, que ni se enteran de
+   * cuánto mide la tarjeta porque están posicionados aparte.
+   */
+  const [hudBottomHeight, setHudBottomHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined
+
+    let frame = 0
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      // rAF: ResizeObserver puede disparar varias veces por el mismo cambio
+      // de layout; con setState directo ahí dentro, React avisaba de
+      // actualizaciones en cascada dentro del propio observador.
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        setHudBottomHeight(Math.round(entry.contentRect.height))
+      })
+    })
+
+    const elemento = document.querySelector('[data-saga-player-hud="bottom"]')
+    if (elemento) observer.observe(elemento)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+    // state.status, no [] a secas: en el primer montaje real la app está en
+    // 'loading' -pantalla de carga del mapa, sin PlayerHud todavía en el
+    // DOM- y el querySelector no encuentra nada. Sin este disparador, el
+    // observador se quedaba enganchado a nada para siempre y la altura no
+    // se medía jamás. Una vez engachado a 'ready' no hace falta reenganchar
+    // por cambiar de nodo: el propio observador sigue avisando solo.
+  }, [state.status])
+
+  /**
+   * Cada 90s, en los dos sentidos -sube a preciso si está cerca y en modo
+   * barato, baja a barato si está lejos y en modo preciso-. Los dos casos
+   * leen refs (`gpsModoRef`, `distanciaAlNodoRef`), nunca una const del
+   * render: por eso este efecto puede vivir aquí, antes de cualquier
+   * "return" temprano, sin depender de que el componente ya esté 'ready'.
+   *
+   * Subir: si se cayó a ubicación por red, probar de vez en cuando si el
+   * GPS de precisión ya responde -el jugador puede haber salido del monte
+   * cerrado desde entonces-. `handleRequestLiveGps` ya limpia el watch
+   * actual y arranca uno de precisión desde cero cada vez que se llama.
+   *
+   * Bajar: ahorra batería de forma activa, no sólo como reacción a un
+   * fallo. 400m de margen -no los mismos 250 de subir- para no oscilar de
+   * modo cerca del borde, y para no pelearse con un fallback a por_red por
+   * fallo real cerca de un nodo con cobertura mala.
+   */
+  useEffect(() => {
+    const intervalo = window.setInterval(() => {
+      if (gpsModoRef.current === 'por_red') {
+        void handleRequestLiveGpsRef.current?.({ silent: true })
+        return
+      }
+      const distancia = distanciaAlNodoRef.current
+      if (gpsModoRef.current === 'preciso' && distancia !== null && distancia > 400) {
+        void handleRequestLiveGpsRef.current?.({ silent: true })
+      }
+    }, 90000)
+    return () => window.clearInterval(intervalo)
+  }, [])
+
+  // Movida aquí desde la zona 'ready' -offlinePrepState/offlineSummary ya
+  // están disponibles desde el principio, no hacía falta esperar-. Antes
+  // esto se decidía A MANO dentro del callback de watchPosition
+  // (handleRequestLiveGps más abajo): en cuanto llegaba GPS fresco, si ya
+  // había misión offline, cerrar el panel "antes de salir". Leer una
+  // variable de fuera del propio callback ahí dentro disparaba en
+  // producción "Cannot access 'X' before initialization" en cada
+  // actualización de posición -reproducido de forma determinista, y
+  // persistente pasara lo que pasara con el nombre, el tipo de declaración
+  // o el minificador-. Como efecto normal de React, reaccionando al mismo
+  // cambio de estado (`browserGpsFresh`) en vez de leerlo a mano dentro de
+  // una API nativa del navegador, el problema desaparece del todo.
+  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
+  useEffect(() => {
+    if (browserGpsFresh && hasOfflineMission) setOfflinePrepVisible(false)
+  }, [browserGpsFresh, hasOfflineMission])
 
   useEffect(() => {
     const playerUrl = `/player/${encodeURIComponent(user)}`
@@ -583,7 +708,28 @@ export default function PlayerApp() {
          * sí se espera: entrar al monte sin mapa es peor que esperar un rato,
          * y para eso está la pantalla.
          */
-        const hayMapa = Boolean(getOfflineMapTileSummary()?.saved)
+        /**
+         * "Hay mapa" = está ENTERO, no "hay alguna tesela".
+         *
+         * Esto era `Boolean(resumen?.saved)`, y `saved` es un NÚMERO -cuántas
+         * teselas hay guardadas-, no un sí/no. Con una sola tesela bajada, el
+         * `Boolean` daba `true` y la app se saltaba la espera entera: quien
+         * hubiera cerrado la app al 3 % la siguiente vez entraba directo, con
+         * el mapa casi vacío, y la pantalla de carga pasaba en un suspiro.
+         * Justo lo que el comentario de arriba dice que hay que evitar -entrar
+         * al monte sin mapa-, y justo lo que Óscar veía: "pasa muy rápido".
+         *
+         * Se pide el 98 %, no el 100 %: alguna tesela suelta puede fallar por
+         * la red y no merece repetir la espera entera por eso. `recortado`
+         * -el plan no cabía en el tope y se cortó a propósito- ya está guardado
+         * como completo: lo que hay es todo lo que va a haber.
+         */
+        const resumenMapa = getOfflineMapTileSummary()
+        const hayMapa = Boolean(
+          resumenMapa &&
+            resumenMapa.requested > 0 &&
+            resumenMapa.saved >= resumenMapa.requested * 0.98
+        )
 
         const guardarMapa = async () => {
           try {
@@ -662,9 +808,28 @@ export default function PlayerApp() {
       if (!initialLoadDoneRef.current) return
       if (interactionOpen || submitting) return
 
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return
-      }
+      /**
+       * Con la pantalla apagada la cola SI sube; lo que no se hace es el
+       * refresco pesado.
+       *
+       * Antes este `return` cortaba las dos cosas a la vez, y medido el
+       * 2026-08-17 eso significaba que un movil en el bolsillo no subia nada:
+       * ocho segundos con red perfecta y servidor sano, el servidor en 0 y el
+       * movil en 1. Solo se reconciliaba al volver a mirar la pantalla. Quien
+       * acaba la ruta y guarda el movil podia dejar su tiempo sin registrar
+       * todo el dia.
+       *
+       * Pero no son dos cosas del mismo precio: vaciar la cola es un POST
+       * diminuto -y con la cola vacia, ni eso-, mientras que `pedirPartida` son
+       * 214 KB. Lo caro se salta; lo barato, no.
+       *
+       * OJO CON LO QUE ESTO NO ARREGLA: si el navegador CONGELA la pagina -app
+       * en segundo plano un rato largo en Android- aqui no corre nada, ni esto
+       * ni ninguna otra cosa. Para ese caso hace falta Background Sync de
+       * verdad, con service worker. Esto cubre la pantalla apagada con la
+       * pagina viva, que es el caso corriente al guardarse el movil un momento.
+       */
+      const oculto = typeof document !== 'undefined' && document.visibilityState !== 'visible'
 
       running = true
 
@@ -682,6 +847,10 @@ export default function PlayerApp() {
           await syncPendingOfflineEvents(user).catch(() => undefined)
           await flushOfflineEvents(user).catch(() => undefined)
         }
+
+        // Hasta aqui llega el movil guardado en el bolsillo. Lo de abajo es
+        // para cuando hay alguien mirando.
+        if (oculto) return
 
         /**
          * Repasar tambien las fotos que estaban esperando.
@@ -861,7 +1030,22 @@ export default function PlayerApp() {
       }
 
       try {
-        const effectivePosition = heartbeatPositionRef.current
+        /**
+         * Con la mision terminada NO se manda donde esta la gente.
+         *
+         * Medido sobre la mision real: de 14 posiciones guardadas, 9 estaban a
+         * mas de 3 km de la ruta -hasta 70 km-, y una de hacia poco mas de un
+         * dia, con la ruta jugada una semana antes. No eran posiciones de
+         * juego: eran casas y trabajos, de gente que abrio la aplicacion para
+         * mirar la clasificacion.
+         *
+         * El latido sigue yendo, porque es lo que trae la tabla del grupo. Lo
+         * que deja de ir son las coordenadas. Contra los datos de personas lo
+         * que protege de verdad no es el permiso firmado, sino no tener lo que
+         * no hace falta.
+         */
+        const misionRematada = Boolean(payloadRef.current?.finished)
+        const effectivePosition = misionRematada ? null : heartbeatPositionRef.current
 
         const respuesta = await sendHeartbeat({
           user,
@@ -939,6 +1123,9 @@ export default function PlayerApp() {
       if (noticeTimerRef.current !== null) {
         window.clearTimeout(noticeTimerRef.current)
       }
+      if (quietTimerRef.current !== null) {
+        window.clearTimeout(quietTimerRef.current)
+      }
       if (overlayTimerRef.current !== null) {
         window.clearTimeout(overlayTimerRef.current)
       }
@@ -988,19 +1175,51 @@ export default function PlayerApp() {
     localDebugPosition?.lon,
   ])
 
+  /**
+   * Dos destinos, no uno.
+   *
+   * Antes habia un solo sitio -el cartel- y para no llenar la pantalla de
+   * carteles esta funcion se tragaba en silencio todo lo que llegara con tono
+   * `info` o `success`:
+   *
+   *     const normalizedTone = tone === 'success' ? 'info' : tone
+   *     if (normalizedTone === 'info') return
+   *
+   * Medido contra produccion el 2026-08-17, mismo nodo y mismo boton: con un
+   * 500 del servidor el aviso salia a los 101 ms, y quedandose SIN COBERTURA no
+   * salia nunca. El caso raro avisaba y el caso normal del monte era mudo,
+   * porque `avisoDeAvanceSinServidor` devuelve `success` justo en esa rama.
+   *
+   * Ahora lo que interrumpe va al cartel y lo que solo se cuenta va a una linea
+   * discreta abajo. Nada se descarta.
+   */
   function showNotice(message: string, tone: NoticeTone) {
-    const normalizedTone: NoticeTone = tone === 'success' ? 'info' : tone
-    if (normalizedTone === 'info') return
-    setUiNotice({ message, tone: normalizedTone })
+    if (tone === 'warn') {
+      setUiNotice({ message, tone })
 
-    if (noticeTimerRef.current !== null) {
-      window.clearTimeout(noticeTimerRef.current)
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current)
+      }
+
+      noticeTimerRef.current = window.setTimeout(() => {
+        setUiNotice(null)
+        noticeTimerRef.current = null
+      }, 3000)
+      return
     }
 
-    noticeTimerRef.current = window.setTimeout(() => {
-      setUiNotice(null)
-      noticeTimerRef.current = null
-    }, 3000)
+    // Calla, pero se lee. Mas tiempo que el cartel: no interrumpe, asi que hay
+    // que darle margen a que alguien la vea sin mirar aposta.
+    setUiQuiet({ message })
+
+    if (quietTimerRef.current !== null) {
+      window.clearTimeout(quietTimerRef.current)
+    }
+
+    quietTimerRef.current = window.setTimeout(() => {
+      setUiQuiet(null)
+      quietTimerRef.current = null
+    }, 5000)
   }
 
   function showOverlay(nextState: OverlayState) {
@@ -1144,6 +1363,30 @@ export default function PlayerApp() {
     return () => window.clearInterval(id)
   }, [qrPayloadActual, user])
 
+  // El velo que disuelve la carga en el juego. ANTES del return de arriba a
+  // proposito -misma regla que ya costo el error #310 una vez: ningun hook
+  // despues de un return condicional-.
+  //
+  // "Queda feo el salto, es muy brusco": cuando el mapa YA estaba guardado,
+  // `state.status` pasaba de 'loading' a 'ready' en el mismo tick y la
+  // pantalla de carga desaparecia de golpe, sustituida sin transicion por
+  // el mapa. Esto no evita la carga -sigue durando lo que tenga que durar-,
+  // solo disuelve el cambio de una pantalla a la otra en vez de cortarlo.
+  const fueListoRef = useRef(false)
+  const [velo, setVelo] = useState(false)
+  useEffect(() => {
+    if (state.status === 'ready' && !fueListoRef.current) {
+      fueListoRef.current = true
+      setVelo(true)
+      const id = window.setTimeout(() => setVelo(false), 640)
+      return () => window.clearTimeout(id)
+    }
+    if (state.status !== 'ready') {
+      fueListoRef.current = false
+    }
+    return undefined
+  }, [state.status])
+
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
     // total 0 quiere decir "trabajando, pero aun no se cuanto queda": ahi no
@@ -1239,6 +1482,19 @@ export default function PlayerApp() {
     stagePosition && displayPosition
       ? Math.round(getDistanceMeters(displayPosition, stagePosition))
       : null
+
+  // Asignación directa, SIN useEffect: esta zona del componente sólo se
+  // ejecuta con state.status === 'ready' -está después de los "return"
+  // tempranos de arriba-, así que un hook aquí se llama unas veces sí y
+  // otras no según el render, justo lo que React prohíbe ("Rendered more
+  // hooks than during the previous render", error #310 en producción,
+  // encontrado por Óscar al entrar como jugador). Escribir en un ref
+  // durante el render, sin que afecte a lo que se pinta, es un patrón
+  // seguro -no hace falta que sea un efecto para esto-. La lógica que sí
+  // necesita disparar una llamada (bajar a modo barato al alejarse) vive en
+  // el intervalo periódico de más arriba, que sólo lee refs y por eso puede
+  // estar antes de cualquier "return" sin problema.
+  distanciaAlNodoRef.current = distanceMeters
 
   const unlockDistanceMeters =
     stagePosition && unlockPosition
@@ -1375,14 +1631,13 @@ export default function PlayerApp() {
         !(currentStage as any).qr_payload &&
         !(currentStage as any).physical_qr))
 
-  const hasOfflineMission = offlinePrepState === 'saved' || Boolean(offlineSummary?.hasPack)
   const hasBrowserGps = Boolean(hasFreshBrowserGps)
   const primaryLabel = gpsActionRequired
     ? 'Activar GPS'
     : !runtime.canEnter
       ? runtime.primaryLabel
       : isMapCollectible
-        ? `RECOGER ${String((currentStage as any).physical_item_label || currentStage!.title || 'OBJETO').toUpperCase()}`
+        ? `Recoger ${String((currentStage as any).physical_item_label || currentStage!.title || 'objeto')}`
         : currentStageIsPhysicalQr
           ? 'Abrir QR'
           : runtime.primaryLabel
@@ -1605,13 +1860,11 @@ export default function PlayerApp() {
 
   function togglePanel(panel: Exclude<PlayerPanel, null>) {
     setToolsOpen(false)
-    setTeamOpen(false)
     setActivePanel((current) => (current === panel ? null : panel))
   }
 
   function openTools() {
     setActivePanel(null)
-    setTeamOpen(false)
     setToolsOpen(!toolsOpen)
   }
 
@@ -1619,21 +1872,9 @@ export default function PlayerApp() {
     setToolsOpen(false)
   }
 
-  function openTeam() {
-    setActivePanel(null)
-    setToolsOpen(false)
-    setRankingOpen(false)
-    setTeamOpen(!teamOpen)
-  }
-
-  function closeTeam() {
-    setTeamOpen(false)
-  }
-
   function openRanking() {
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setRankingOpen(!rankingOpen)
   }
 
@@ -1797,7 +2038,6 @@ export default function PlayerApp() {
     setSubmitError(null)
     setActivePanel(null)
     setToolsOpen(false)
-    setTeamOpen(false)
     setInteractionOpen(true)
   }
 
@@ -1843,10 +2083,22 @@ export default function PlayerApp() {
     if (!options.silent)
       showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
 
-    const onSuccess = (position: GeolocationPosition) => {
+    // function, no const con flecha: onSuccess, cambiarAModoPorRed y onError
+    // se referencian entre sí -cambiarAModoPorRed llama a onError dentro de
+    // watchPosition, onError llama a cambiarAModoPorRed-. Con `const` eso
+    // seguía dando en producción "Cannot access 'X' before initialization"
+    // en CADA actualización de posición -reproducido y comprobado que
+    // persistía tanto con esbuild como con terser, dos minificadores
+    // distintos: no era cosa de uno en concreto, era este cruce en sí-. Una
+    // `function` está izada entera (nombre Y cuerpo) en todo el ámbito, así
+    // que el orden en que se escriban ya no puede importarle a nada.
+    function onSuccess(position: GeolocationPosition) {
       if (localDebugEnabled) {
         return
       }
+
+      // Un fix -en el modo que sea- demuestra que la vía actual funciona.
+      gpsTimeoutsSeguidosRef.current = 0
 
       const next = {
         lat: position.coords.latitude,
@@ -1873,7 +2125,18 @@ export default function PlayerApp() {
         accuracy: nextAccuracy ?? undefined,
         capturedAt,
       })
-      if (hasOfflineMission) setOfflinePrepVisible(false)
+      // El cierre del panel "misión offline lista" al conseguir GPS vive en
+      // un efecto aparte (más abajo, sobre browserGpsFresh) y no aquí
+      // dentro. Aquí dentro -en el propio callback del navegador- cualquier
+      // variable adicional de fuera de handleRequestLiveGps, sea const o
+      // ref, disparaba en producción "Cannot access 'X' before
+      // initialization" en cada actualización de posición -reproducido de
+      // forma determinista con Playwright/CDP, persistente cambiando el
+      // nombre, el tipo de declaración Y el minificador (esbuild y
+      // terser)-. Sea cual sea la causa exacta, la forma robusta de
+      // evitarlo es no depender de nada ahí dentro que no sea del propio
+      // handleRequestLiveGps: dejar que React reaccione al cambio de
+      // estado, no leerlo a mano en un callback nativo del navegador.
       setLocalDebugEnabled(false)
       setLocalDebugPosition(null)
 
@@ -1895,12 +2158,53 @@ export default function PlayerApp() {
       }
     }
 
-    const onError = (error: GeolocationPositionError) => {
+    // Bajar de precisión: el chip GPS pide fix de satélite, que bajo monte
+    // cerrado o entre paredes de piedra puede no llegar NUNCA -no es que
+    // tarde-. La ubicación por red (wifi/antena) es mucho menos precisa
+    // -puede que no baste para entrar en un radio de 50m-, pero suele
+    // responder donde el chip no lo hace, y es mejor tener un punto
+    // aproximado que ninguno.
+    function cambiarAModoPorRed() {
+      if (gpsModoRef.current === 'por_red') return
+      gpsModoRef.current = 'por_red'
+
+      if (gpsWatchRef.current !== null) {
+        window.navigator.geolocation.clearWatch(gpsWatchRef.current)
+      }
+      gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: false,
+        maximumAge: 15000,
+        timeout: 20000,
+      })
+
+      if (!gpsAvisoModoRef.current) {
+        gpsAvisoModoRef.current = true
+        showNotice(
+          'El GPS de precisión no responde aquí -zona de monte o cobertura densa-. Usando ubicación aproximada por red mientras tanto.',
+          'info'
+        )
+      }
+    }
+
+    function onError(error: GeolocationPositionError) {
       // TIMEOUT (code 3) while watching means the hardware GPS is still acquiring signal
       // (e.g. airplane mode with GPS chip active, or first cold fix outdoors).
       // Keep 'searching' so the UI shows "Buscando señal…" instead of a hard error.
       const isTimeout = error.code === 3 // GeolocationPositionError.TIMEOUT
+      const sinSenal = error.code === error.POSITION_UNAVAILABLE
       const denied = error.code === error.PERMISSION_DENIED
+
+      // Ni denegado ni un timeout puntual: el chip -o el navegador- ya ha
+      // tirado la toalla en modo preciso. Cada fallo de este tipo cuenta;
+      // dos seguidos (o el equivalente en tiempo con TIMEOUT) y se cambia
+      // a ubicación por red en vez de seguir insistiendo con lo mismo.
+      if ((isTimeout || sinSenal) && gpsModoRef.current === 'preciso') {
+        gpsTimeoutsSeguidosRef.current += 1
+        if (gpsTimeoutsSeguidosRef.current >= 2) {
+          cambiarAModoPorRed()
+          return
+        }
+      }
 
       if (isTimeout) {
         // GPS hardware still working - don't flag as error
@@ -1911,6 +2215,8 @@ export default function PlayerApp() {
         return
       }
 
+      // sinSenal en modo por_red: ni el chip ni la red han dado nada. Esto
+      // sí es un error de verdad, no una vía que probar aparte -ya se probó-.
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
       if (!options.silent) {
@@ -1931,17 +2237,63 @@ export default function PlayerApp() {
     })
 
     if (gpsWatchRef.current === null) {
+      // Lejos del nodo (o todavía sin ningún punto de referencia): arrancar
+      // ya en modo barato ahorra batería desde el primer segundo, no solo
+      // tras fallar en preciso. Cerca, al revés: preciso desde ya, porque
+      // ahí sí hace falta acertar el radio del nodo.
+      const lejos =
+        distanciaAlNodoRef.current === null || distanciaAlNodoRef.current > DISTANCIA_MODO_PRECISO_M
+      gpsModoRef.current = lejos ? 'por_red' : 'preciso'
+      gpsTimeoutsSeguidosRef.current = 0
       // watchPosition: long timeout so the GPS chip can finish a cold fix
       // even in airplane mode (GPS satellite signal is independent of cellular/wifi)
       gpsWatchRef.current = window.navigator.geolocation.watchPosition(onSuccess, onError, {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
+        enableHighAccuracy: !lejos,
+        maximumAge: lejos ? 15000 : 5000,
         timeout: 20000,
       })
     }
   }
 
   handleRequestLiveGpsRef.current = handleRequestLiveGps
+
+  /**
+   * Volver a bajar el mapa, a mano.
+   *
+   * Hacía falta por dos motivos, no por capricho: (1) si la ruta cambia
+   * -nodos movidos, un nodo nuevo- el mapa guardado se queda con las teselas
+   * viejas y nada lo vuelve a pedir, porque la comprobación de arranque sólo
+   * mira si está completo, no si está al día; (2) no había ninguna forma de
+   * VER la pantalla de carga una vez el mapa estaba guardado, así que no se
+   * podía comprobar que funciona sin borrar los datos del navegador entero.
+   */
+  async function handleRedownloadMap() {
+    if (state.status !== 'ready') return
+    const stages = Array.isArray(state.payload.stages) ? state.payload.stages : []
+    if (stages.length === 0) return
+
+    const payloadActual = state.payload
+    const configActual = state.config
+
+    setState({
+      status: 'loading',
+      mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
+    })
+
+    try {
+      await prefetchMissionMapTiles(stages, (progress) => {
+        setState({
+          status: 'loading',
+          mapProgress: { done: progress.done, total: progress.total, detail: progress.detail },
+        })
+      })
+    } catch (err) {
+      console.error('No se pudo volver a guardar el mapa', err)
+    } finally {
+      setState({ status: 'ready', payload: payloadActual, config: configActual })
+      setMapRefreshToken((value) => value + 1)
+    }
+  }
 
   async function handlePrepareOfflinePack() {
     try {
@@ -2318,6 +2670,22 @@ export default function PlayerApp() {
 
   return (
     <ScreenFrame mobile={isPhone}>
+      {velo ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            pointerEvents: 'none',
+            background:
+              'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
+              'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
+              'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
+            animation: 'sagaVeloDisolver 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
+          }}
+        />
+      ) : null}
       <MapSurface
         currentStage={currentStage}
         missionStages={payload.stages || []}
@@ -2397,14 +2765,29 @@ export default function PlayerApp() {
       <div style={getTopScrimStyle(isPhone)} />
 
       <div style={getTopOverlayStyle(isPhone)}>
-        <PlayerShell
-          payload={payload}
-          currentStage={currentStage}
-        />
+        <PlayerShell payload={payload} currentStage={currentStage} />
       </div>
 
       <div style={getToastOverlayStyle(isPhone)}>
         <ToastNotice notice={uiNotice} />
+      </div>
+
+      {/*
+        Mientras el avance esta EN VUELO, la linea callada lo dice.
+
+        Medido con red lenta: el jugador pulsaba, se cerraba la historia y la
+        pantalla no cambiaba en 11,8 segundos. El indicador de `submitting`
+        existia, pero vive dentro del panel de interaccion, que para entonces ya
+        se ha cerrado: en el mapa no quedaba ninguna senal, y doce segundos son
+        de sobra para pensar que no ha funcionado y volver a pulsar.
+
+        Va como expresion de render y NO como hook nuevo: `submitting` ya
+        existe, y un hook detras de un `return` temprano tira esta pantalla
+        entera con el error 310. Al resolverse el envio vuelve `uiQuiet`, que
+        para entonces ya lleva el aviso de «superado sin conexion» si lo hubo.
+      */}
+      <div style={getQuietOverlayStyle(isPhone)}>
+        <QuietNotice notice={submitting ? { message: 'Rexistrando…' } : uiQuiet} />
       </div>
 
       <FieldPhotoViewer
@@ -2423,152 +2806,6 @@ export default function PlayerApp() {
       />
 
 
-      {!interactionOpen && activePanel !== 'details' && !toolsOpen && !teamOpen && !rankingOpen && !overlayState ? (
-        <div style={getMapQuickControlsStyle(isPhone)}>
-          <QuickProofPanel
-            user={user}
-            mobile={isPhone}
-            hidden={false}
-            openSignal={quickQrOpenSignal}
-            showLauncher={false}
-            // El escáner manda sólo el tiempo de cámara; la penalización de 2
-            // minutos por usar el respaldo se suma aquí, una sola vez.
-            onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
-            activeQrPayload={
-              String(
-                (currentStage as any)?.qr_payload ||
-                  (currentStage as any)?.config?.qr_payload ||
-                  (currentStage as any)?.physical_qr?.payload ||
-                  ''
-              ) || null
-            }
-            onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
-          />
-
-          <button
-            type="button"
-            style={mapRouteToggleInlineButton}
-            disabled={fieldPhotoUploading}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleOpenFieldCamera()
-            }}
-            aria-label="Hacer foto de campo"
-            title="Hacer foto de campo"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              {fieldPhotoUploading ? '⏳' : '📷'}
-            </span>
-          </button>
-
-          {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
-            <button
-              type="button"
-              style={mapPrologueButton}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                setShowPrologue(true)
-              }}
-              aria-label="Historia"
-              title="Leer historia"
-            >
-              <span aria-hidden="true" style={mapQuickIcon}>
-                📖
-              </span>
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            style={rankingOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              openRanking()
-            }}
-            aria-label="Trofeo"
-            title="Clasificación"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              🏆
-            </span>
-          </button>
-
-          <button
-            type="button"
-            style={teamOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              openTeam()
-            }}
-            aria-label="Jugadores"
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              👥
-            </span>
-            <span style={mapQuickCountPill}>{teamVisibleCount}</span>
-          </button>
-
-          <button
-            type="button"
-            style={routeOverviewActive ? mapQuickButtonActive : mapRouteToggleInlineButton}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              handleToggleRouteOverview()
-            }}
-            aria-label={
-              routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
-            }
-            title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
-          >
-            <span aria-hidden="true" style={mapQuickIcon}>
-              {routeOverviewActive ? '📍' : '🧭'}
-            </span>
-          </button>
-
-
-
-          <button
-            type="button"
-            style={{
-              ...mapRouteToggleInlineButton,
-              background: 'rgba(52, 211, 153, 0.2)',
-              borderColor: 'rgba(52, 211, 153, 0.4)',
-              color: '#34d399',
-              fontWeight: 800,
-              fontSize: 13,
-              letterSpacing: '0.04em',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              transition:
-                'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, padding 0.3s ease',
-              maxWidth: !followPlayer ? '100px' : '0px',
-              minWidth: !followPlayer ? '44px' : '0px',
-              width: !followPlayer ? 'auto' : '0px',
-              opacity: !followPlayer ? 1 : 0,
-              paddingLeft: !followPlayer ? 12 : 0,
-              paddingRight: !followPlayer ? 12 : 0,
-              borderWidth: !followPlayer ? 1 : 0,
-              pointerEvents: !followPlayer ? 'auto' : 'none',
-              marginLeft: 0,
-            }}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              setFollowPlayer(true)
-              void handleRequestLiveGps({ forceFocus: true })
-            }}
-            aria-label="Centrar en mi ubicación"
-          >
-            CENTRAR
-          </button>
-        </div>
-      ) : null}
-      {/* saga-map-quick-controls-row-v1 */}
 
       <FieldPrepPanel
         /**
@@ -2580,7 +2817,19 @@ export default function PlayerApp() {
          * ahí mientras faltase un permiso, la X no hacía nada y no se podía
          * quitar de en medio: si el permiso de cámara fallaba, quedaba fija.
          */
+        /**
+         * `!showPrologue`: BUG REAL, visto en captura.
+         *
+         * El prólogo (StoryModal) se abre solo al entrar, y este panel podía
+         * abrirse en el mismo instante -falta la cámara, por ejemplo-. Los
+         * dos son overlays de pantalla completa centrados; el velo del
+         * prólogo es semitransparente (rgba .4), así que no tapaba al otro:
+         * se veían LOS DOS A LA VEZ, uno asomando a través del otro, con la
+         * tarjeta "ANTES DE SALIR" incrustada a media historia del prólogo.
+         * Ahora el panel espera a que se cierre el prólogo primero.
+         */
         visible={
+          !showPrologue &&
           !prepCerrada &&
           (offlinePrepVisible ||
             permisoMovimiento !== 'ok' ||
@@ -2630,12 +2879,155 @@ export default function PlayerApp() {
         />
       ) : null}
 
-      <div style={getBottomOverlayStyle(isPhone)}>
+      {/**
+       * La fila de iconos vive DENTRO del contenedor de la barra de abajo.
+       *
+       * Estaba suelta, colocada con `position: fixed` y una cuenta desde el
+       * suelo: alto supuesto de la tarjeta + un hueco. Esa cuenta fallo dos
+       * veces seguidas -medido en produccion: 12px de aire primero, 16px
+       * despues- porque el alto de la tarjeta cambia con el texto de ayuda y
+       * la medida en vivo llega tarde o no llega.
+       *
+       * Aqui no hay cuenta: van una encima de otra en el flujo normal, con
+       * su hueco de verdad. No se pueden tocar aunque la tarjeta crezca.
+       */}
+      <div style={{ ...getBottomOverlayStyle(isPhone), display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/*
           Se esconde con cualquier pantalla encima: la clasificación, la mochila
           o la hoja del reto lo taparían a medias, que es justo el estorbo que
           tenía cuando vivía pegado al botón del nodo.
         */}
+        {!interactionOpen && activePanel !== 'details' && !toolsOpen && !rankingOpen && !overlayState ? (
+          <div className="saga-hud-quick" style={getMapQuickControlsStyle(isPhone, hudBottomHeight)}>
+            <QuickProofPanel
+              user={user}
+              mobile={isPhone}
+              hidden={false}
+              openSignal={quickQrOpenSignal}
+              showLauncher={false}
+              // El escáner manda sólo el tiempo de cámara; la penalización de 2
+              // minutos por usar el respaldo se suma aquí, una sola vez.
+              onRescueCode={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs, 120000, true)}
+              activeQrPayload={
+                String(
+                  (currentStage as any)?.qr_payload ||
+                    (currentStage as any)?.config?.qr_payload ||
+                    (currentStage as any)?.physical_qr?.payload ||
+                    ''
+                ) || null
+              }
+              onQrValidated={(code, timeSpentMs) => handleSubmitCode(code, timeSpentMs)}
+            />
+
+            <button
+              type="button"
+              style={mapRouteToggleInlineButton}
+              disabled={fieldPhotoUploading}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleOpenFieldCamera()
+              }}
+              aria-label="Hacer foto de campo"
+              title="Hacer foto de campo"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                {fieldPhotoUploading ? '⏳' : '📷'}
+              </span>
+            </button>
+
+            {(state.config?.prologue_body || state.config?.prologue_title || state.config?.prologue_subtitle) ? (
+              <button
+                type="button"
+                style={mapPrologueButton}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setShowPrologue(true)
+                }}
+                aria-label="Historia"
+                title="Leer historia"
+              >
+                <span aria-hidden="true" style={mapQuickIcon}>
+                  📖
+                </span>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              style={rankingOpen ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                openRanking()
+              }}
+              aria-label="Trofeo"
+              title="Clasificación"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                🏆
+              </span>
+            </button>
+
+            <button
+              type="button"
+              style={routeOverviewActive ? mapQuickButtonActive : mapRouteToggleInlineButton}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                handleToggleRouteOverview()
+              }}
+              aria-label={
+                routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'
+              }
+              title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                {routeOverviewActive ? '📍' : '🧭'}
+              </span>
+            </button>
+
+
+
+            {!followPlayer ? (
+            <button
+              type="button"
+              /**
+               * Una burbuja mas de la fila, no una pastilla verde.
+               *
+               * Heredaba la burbuja redonda y luego la deformaba: fondo verde
+               * translucido, `width: auto`, relleno de 12 y la palabra
+               * "CENTRAR" dentro. Entre cuatro circulos oscuros de 38px salia
+               * una pildora verde ancha de otra aplicacion.
+               *
+               * Y SE QUITA DEL TODO cuando no hace falta, no se deja
+               * invisible: con `opacity: 0` seguia ocupando sus 38px y su
+               * hueco, asi que las otras cuatro burbujas quedaban descuadradas
+               * hacia la izquierda. Invisible no es lo mismo que ausente.
+               */
+              style={{
+                ...mapRouteToggleInlineButton,
+                color: 'var(--theme-primary)',
+              }}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setFollowPlayer(true)
+                void handleRequestLiveGps({ forceFocus: true })
+              }}
+              aria-label="Centrar en mi ubicación"
+              title="Centrar en mi ubicación"
+            >
+              <span aria-hidden="true" style={mapQuickIcon}>
+                ◎
+              </span>
+            </button>
+            ) : null}
+          </div>
+        ) : null}
+        {/* saga-map-quick-controls-row-v1 */}
+
         {qrPayloadActual && !interactionOpen && !rankingOpen && activePanel !== 'details' ? (
           <QrScanClock ms={qrMs} />
         ) : null}
@@ -2665,20 +3057,21 @@ export default function PlayerApp() {
           onCloseTools={closeTools}
           onToggleDebug={handleToggleDebug}
           onDownloadFieldProofs={handleDownloadFieldProofs}
+          onRedownloadMap={() => void handleRedownloadMap()}
           fieldPhotoCount={todasAsFotos.length}
+          pendingFieldPhotoCount={fotosPendentes.length}
           submitting={submitting}
           errorMessage={submitError}
           onSubmitCode={handleSubmitCode}
         />
       </div>
 
-      <TeamSheet
-        open={teamOpen}
-        players={teamOtherProfiles}
-        currentPosition={playerPosition}
-        onClose={closeTeam}
+      <RankingSheet
+        open={rankingOpen}
+        players={rankingPlayers}
+        onClose={closeRanking}
+        selfUser={payload.user}
       />
-      <RankingSheet open={rankingOpen} players={rankingPlayers} onClose={closeRanking} />
 
       <InteractionSheet
         open={interactionOpen}
@@ -2717,6 +3110,24 @@ export default function PlayerApp() {
         />
       )}
 
+      {/* La misión puede tener fecha de inicio (mission_launch_at, panel de
+          admin). El bloqueo de VERDAD es del servidor -/api/advance y
+          node_completed lo rechazan igual-; esto es la cortina que lo avisa
+          y deja preparar todo mientras tanto. */}
+      {!missionUnlocked && state.status === 'ready' && state.config?.mission_launch_at && (
+        <MissionLockScreen
+          launchAtRaw={state.config.mission_launch_at}
+          serverTimeMs={state.config.server_time_ms}
+          mobile={isPhone}
+          displayName={payload.display_name || payload.user}
+          onUnlocked={() => setMissionUnlocked(true)}
+          onOpenDownload={() => {
+            setPrepCerrada(false)
+            setOfflinePrepVisible(true)
+          }}
+        />
+      )}
+
       {activeStageIntro && currentStage && (
         <StoryModal
           title={currentStage.intro_title || currentStage.title || 'Historia'}
@@ -2737,46 +3148,59 @@ export default function PlayerApp() {
   )
 }
 
+// SIN CAPSULA.
+//
+// Cada icono llevaba su propio marco -borde, fondo y un radio de 18 clavado-
+// DENTRO de otro marco: tres bordes por boton en una barra de cinco. Ahora el
+// icono va suelto y lo que separa es una linea fina, que es lo que hace una
+// barra de herramientas de verdad.
+//
+// El area de toque se queda en 44x40: es lo minimo para el dedo y no depende
+// de que se vea un recuadro.
+/**
+ * Redondo y suelto, con su propio halo -maqueta aprobada tras varias rondas.
+ *
+ * Antes era una celda cuadrada dentro de una barra compartida, separada de
+ * la siguiente por una raya vertical. Ahora cada icono es su propia burbuja
+ * -mismo idioma que las fotos redondas del login-, con el velo oscuro de
+ * fondo puesto en cada uno en vez de en un contenedor comun.
+ */
 const mapRouteToggleInlineButton: CSSProperties = {
-  width: 44,
-  height: 40,
-  minWidth: 44,
-  minHeight: 40,
+  width: 38,
+  height: 38,
+  minWidth: 38,
+  minHeight: 38,
   padding: 0,
-  borderRadius: 18,
-  border: '1px solid rgba(255, 255, 255, 0.18)',
-  background: 'rgba(255, 255, 255, 0.10)',
+  borderRadius: '50%',
+  border: 0,
+  // SOLIDO, no translucido: mismo motivo que las dos tarjetas -ver la nota
+  // de PlayerShell.tsx-. Translucido sobre el mapa daba barro.
+  background: 'var(--theme-card)',
+  boxShadow: '0 4px 12px rgba(0,0,0,.5)',
   color: '#f1f5f9',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 4,
-  fontSize: 18,
+  fontSize: 16,
   lineHeight: 1,
-  fontWeight: 900,
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-  textShadow: '0 1px 4px rgba(0,0,0,.5)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)',
   position: 'relative',
-  overflow: 'hidden',
   pointerEvents: 'auto',
   touchAction: 'manipulation',
   cursor: 'pointer',
   userSelect: 'none',
-  transition: 'background 0.15s ease, border-color 0.15s ease',
+  transition: 'background 0.15s ease',
 }
 
 const mapPrologueButton: CSSProperties = {
   ...mapRouteToggleInlineButton,
 }
 
+// Activo: tinte del color del tema en el propio halo, no un azul fijo ni un
+// filo abajo -eso solo tenia sentido cuando eran celdas de una barra-.
 const mapQuickButtonActive: CSSProperties = {
   ...mapRouteToggleInlineButton,
-  background: 'rgba(56, 189, 248, 0.28)',
-  border: '1px solid rgba(56, 189, 248, 0.55)',
-  color: '#bae6fd',
-  boxShadow: '0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+  background: 'var(--theme-tint-strong)',
+  color: 'var(--theme-primary)',
 }
 
 const mapQuickIcon: CSSProperties = {
@@ -2785,7 +3209,7 @@ const mapQuickIcon: CSSProperties = {
   justifyContent: 'center',
   fontSize: 17,
   lineHeight: 1,
-  filter: 'drop-shadow(0 1px 3px rgba(15,23,42,.24))',
+  filter: 'drop-shadow(0 1px 3px rgba(var(--theme-ink), .24))',
   transform: 'translateY(-0.5px)',
 }
 
@@ -2800,7 +3224,7 @@ const mapQuickCountPill: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(15,23,42,.56)',
+  background: 'rgba(var(--theme-ink), .56)',
   border: '1px solid rgba(255,255,255,.16)',
   color: '#ffffff',
   fontSize: 8,

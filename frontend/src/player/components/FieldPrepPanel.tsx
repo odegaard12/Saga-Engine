@@ -143,20 +143,30 @@ export function FieldPrepPanel({
   const panel = (
     <div style={capa} onClick={onDismiss}>
       <section
-        className="saga-glass-panel"
+        // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
+        // esquina cortada y `!important`, y le ganaba a la tarjeta solida
+        // del diseño "B". La clase se queda donde sigue habiendo cristal
+        // de verdad: los minijuegos.
         style={tarjeta(mobile)}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* El titulo DICE QUE FALTA, no cuantas cosas faltan.
+            "Falta un permiso" obligaba a bajar la vista para saber cual;
+            con el nombre delante se resuelve sin leer mas. El recuento va
+            debajo en texto pequeño, que es su sitio: es el detalle. */}
         <header style={cabecera}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={antetitulo}>ANTES DE SALIR</div>
             <strong style={titulo}>
               {pendientes.length === 0
                 ? 'Todo listo'
                 : pendientes.length === 1
-                  ? 'Falta un permiso'
-                  : `Faltan ${pendientes.length}`}
+                  ? `Falta ${pendientes[0].que.toLowerCase()}`
+                  : `Faltan ${pendientes.length} permisos`}
             </strong>
+            <div style={recuento}>
+              {listos.length} de {listos.length + pendientes.length} listos
+            </div>
           </div>
 
           {/* Cierra siempre, pase lo que pase con los permisos. */}
@@ -165,6 +175,10 @@ export function FieldPrepPanel({
           </button>
         </header>
 
+        {/* Filas sin caja: icono, texto y botón entre dos líneas finas.
+            Antes cada fila era un recuadro de cristal DENTRO de la tarjeta de
+            cristal -recuadro dentro de recuadro, lo mismo que ensuciaba el
+            login-, y el texto de apoyo iba a 10.5px, ilegible en el monte. */}
         {pendientes.map((f) => (
           <div key={f.clave} style={fila}>
             <span style={icono}>{f.icono}</span>
@@ -174,13 +188,63 @@ export function FieldPrepPanel({
                 {f.fallo ? 'Lo denegaste. Ajustes del móvil › Safari.' : f.para}
               </div>
             </div>
-            <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
-              {f.etiqueta}
-            </button>
+            {/* El boton va en la fila SOLO si falta mas de una cosa: con dos
+                permisos pendientes hace falta poder dar uno u otro. Si solo
+                falta uno, la accion sube al boton grande de abajo -ahi se
+                ve, y aqui se leia como algo secundario-. */}
+            {pendientes.length > 1 ? (
+              <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
+                {f.etiqueta}
+              </button>
+            ) : null}
           </div>
         ))}
 
-        {listos.length > 0 ? <div style={hecho}>✓ {listos.join(' · ')}</div> : null}
+        {/* Una etiqueta por cosa, no una linea de texto separada por puntos:
+            asi se lee de un vistazo QUE hay resuelto, sin tener que leer la
+            frase entera. Verde universal de "hecho", no el color del tema
+            -aqui es una señal, no decoracion de marca-. */}
+        {listos.length > 0 ? (
+          <div style={hechoFila}>
+            {listos.map((nombre) => (
+              <span key={String(nombre)} style={hechoEtiqueta}>
+                ✓ {nombre}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {/**
+         * Dos botones, y en este orden -opcion "C", elegida por Oscar.
+         *
+         * Antes la jerarquia estaba del reves: "Permitir" era un boton
+         * pequeño dentro de la fila, y el boton GRANDE de la tarjeta era
+         * "Volver a bajar el mapa", que casi no se usa. Lo que hay que
+         * pulsar tiene que ser lo mas grande.
+         *
+         * "Volver a bajar el mapa" ya no esta aqui: se fue a Ferramentas,
+         * al grupo de "Operacion sen conexion", que es donde vive todo lo
+         * del mapa guardado -y donde ya estaba duplicado-.
+         */}
+        {pendientes.length === 1 ? (
+          <button
+            type="button"
+            style={botonPrimario}
+            disabled={pendientes[0].ocupado}
+            onClick={pendientes[0].accion}
+          >
+            {pendientes[0].ocupado
+              ? pendientes[0].etiqueta
+              : `Permitir ${pendientes[0].que.toLowerCase()}`}
+          </button>
+        ) : null}
+
+        {/* Salida explicita. La X de arriba ya cerraba, pero era el unico
+            camino y no todo el mundo la busca: con permisos denegados desde
+            los ajustes del movil, esta pantalla era un callejon aparente. */}
+        <button type="button" style={botonSecundario} onClick={onDismiss}>
+          Seguir sen iso
+        </button>
       </section>
     </div>
   )
@@ -201,31 +265,28 @@ const capa: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 16,
-  background: 'radial-gradient(circle at 50% 42%, rgba(2,6,23,.42), rgba(2,6,23,.68))',
-  backdropFilter: 'blur(5px)',
-  WebkitBackdropFilter: 'blur(5px)',
+  // Fondo difuminado, no solo oscurecido: se sigue adivinando el mapa detras
+  // -"que difumine todo el fondo y se vea todo eso"- pero nada de lo de
+  // debajo compite con la tarjeta.
+  background: 'rgba(var(--theme-ink-deep), .84)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
+// Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
+// las herramientas. Ver la nota larga en PlayerShell.tsx sobre por que los
+// translucidos daban barro.
 function tarjeta(mobile: boolean): CSSProperties {
   return {
-    width: mobile ? 'min(100%, 340px)' : 'min(100%, 400px)',
+    width: mobile ? 'min(100%, 360px)' : 'min(100%, 420px)',
     display: 'grid',
-    gap: 10,
-    padding: 16,
+    gap: 0,
+    padding: '22px 19px 19px',
     color: '#e2e8f0',
-    borderRadius: 24,
-    // El cristal va aquí y no sólo en la clase: comprobado en el navegador,
-    // backdrop-filter salía en "none" porque la hoja global no llegaba a
-    // aplicarse sobre este elemento, y la tarjeta quedaba opaca y plana.
-    background:
-      'linear-gradient(180deg, rgba(100,116,139,.34), rgba(30,41,59,.42))',
-    border: '1px solid rgba(255,255,255,.24)',
-    backdropFilter: 'blur(22px) saturate(1.25)',
-    WebkitBackdropFilter: 'blur(22px) saturate(1.25)',
-    // Brillo de canto arriba y sombra ancha abajo: es lo que separa una lámina
-    // de cristal de un rectángulo translúcido.
-    boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,.24), 0 26px 60px rgba(2,6,23,.55)',
+    borderRadius: 18,
+    background: 'var(--theme-card)',
+    boxShadow: 'var(--theme-card-shadow)',
+    animation: 'sagaPanelEntra 260ms cubic-bezier(0.22, 1, 0.36, 1)',
   }
 }
 
@@ -237,90 +298,141 @@ const cabecera: CSSProperties = {
 }
 
 const antetitulo: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
   letterSpacing: '.18em',
-  color: '#7dd3fc',
+  color: 'var(--theme-primary)',
 }
 
 const titulo: CSSProperties = {
   display: 'block',
-  marginTop: 3,
-  fontSize: 17,
-  fontWeight: 850,
-  letterSpacing: '-.015em',
+  margin: '6px 0 4px',
+  fontSize: 21,
+  fontWeight: 900,
+  letterSpacing: '-.025em',
+  color: '#ffffff',
+}
+
+const recuento: CSSProperties = {
+  fontSize: 12,
+  color: 'rgba(255,255,255,.6)',
+  marginBottom: 20,
 }
 
 const cerrar: CSSProperties = {
   flex: '0 0 auto',
-  width: 32,
-  height: 32,
+  // Ver la nota de PlayerHud.tsx: area de toque.
+  width: 36,
+  height: 36,
   display: 'grid',
   placeItems: 'center',
   padding: 0,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.2)',
-  background: 'rgba(255,255,255,.08)',
-  color: '#e2e8f0',
-  fontSize: 19,
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 17,
   fontWeight: 900,
   lineHeight: 1,
   cursor: 'pointer',
 }
 
+// Entre DOS lineas finas, no solo con una arriba: la fila del permiso es lo
+// unico accionable de la tarjeta y asi queda enmarcada sin necesitar caja.
 const fila: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 10,
-  padding: '10px 11px',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.14)',
-  // Cristal también dentro: el degradado y el desenfoque hacen que la fila
-  // flote sobre la tarjeta en vez de parecer un recuadro plano pegado encima.
-  background:
-    'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035))',
-  backdropFilter: 'blur(8px) saturate(1.1)',
-  WebkitBackdropFilter: 'blur(8px) saturate(1.1)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14)',
+  gap: 14,
+  padding: '16px 0',
+  borderTop: `1px solid var(--theme-hairline)`,
+  borderBottom: `1px solid var(--theme-hairline)`,
 }
 
 const icono: CSSProperties = {
   flex: '0 0 auto',
-  fontSize: 17,
+  fontSize: 26,
   lineHeight: 1,
+  width: 30,
+  textAlign: 'center',
 }
 
 const queEs: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
+  fontSize: 16,
+  fontWeight: 900,
   lineHeight: 1.2,
+  color: '#ffffff',
 }
 
+// 12px, no 10.5: esto se lee de pie, en la calle, antes de salir a andar.
 const paraQue: CSSProperties = {
-  fontSize: 10.5,
-  lineHeight: 1.3,
-  color: 'rgba(203,213,225,.68)',
+  fontSize: 12,
+  lineHeight: 1.4,
+  marginTop: 3,
+  color: 'rgba(255,255,255,.6)',
 }
 
 const falloTexto: CSSProperties = {
   color: 'rgba(253,224,71,.92)',
 }
 
+// Naranja PLANO con texto oscuro: el degradado se leia apagado sobre la
+// tarjeta solida. Es la accion que se espera que pulses, tiene que cantar.
 const boton: CSSProperties = {
   flex: '0 0 auto',
-  minHeight: 34,
-  padding: '0 13px',
-  borderRadius: 999,
-  border: '1px solid rgba(125,211,252,.55)',
-  background: 'linear-gradient(180deg,rgba(56,189,248,.92),rgba(14,116,190,.92))',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3), 0 6px 16px rgba(2,132,199,.35)',
-  color: '#fff',
-  fontSize: 12,
-  fontWeight: 850,
+  minHeight: 40,
+  padding: '0 16px',
+  borderRadius: 11,
+  border: 0,
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
+  fontSize: 12.5,
+  fontWeight: 900,
+  letterSpacing: '.02em',
   cursor: 'pointer',
 }
 
-const hecho: CSSProperties = {
-  fontSize: 10.5,
-  color: 'rgba(148,163,184,.75)',
+// La accion principal de la tarjeta, a lo ancho y en naranja plano.
+const botonPrimario: CSSProperties = {
+  width: '100%',
+  minHeight: 46,
+  borderRadius: 12,
+  border: 0,
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
+  fontSize: 12.5,
+  fontWeight: 900,
+  cursor: 'pointer',
+  marginBottom: 9,
+}
+
+const botonSecundario: CSSProperties = {
+  width: '100%',
+  minHeight: 44,
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const hechoFila: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 7,
+  margin: '17px 0 20px',
+}
+
+// Verde universal de "hecho", no --theme-done: en fuego ese token es naranja
+// terracota, y "conseguido" leido en el color de la marca no se distingue de
+// lo que aun falta. Es una señal, no decoracion. Mismo criterio que el punto
+// de "EN LINEA" de la clasificacion.
+const hechoEtiqueta: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  color: '#7ecb8f',
+  background: 'rgba(34,197,94,.13)',
+  borderRadius: 7,
+  padding: '6px 10px',
 }

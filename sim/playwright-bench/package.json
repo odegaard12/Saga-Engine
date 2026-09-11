@@ -1,0 +1,13 @@
+{
+  "name": "saga-playwright-bench",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Segundo banco de pruebas: navegadores de verdad (Playwright), no solo peticiones HTTP. Ver README.md.",
+  "scripts": {
+    "team-relay": "node run.mjs team-relay-cobertura"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

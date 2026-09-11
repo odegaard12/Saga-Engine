@@ -1,10 +1,6 @@
 import type { CircuitMatrixConfig } from '../../core/family-types'
 import type { CircuitMatrixDefinition } from '../../core/registry-types'
-import type {
-  MinigameController,
-  MinigamePreflightResult,
-  MinigameRuntimeBindings,
-} from '../../core/types'
+import type { MinigamePreflightResult, MinigameRuntimeBindings } from '../../core/types'
 
 export const circuitMatrixDefinition: CircuitMatrixDefinition = {
   family: 'circuit_matrix',
@@ -389,9 +385,4 @@ async function runCircuitMatrixPreflight(
         ? ['Matriz de circuitos preparada.']
         : ['Se necesita interacción táctil para jugar.'],
   }
-}
-
-export const circuitMatrixController: MinigameController<CircuitMatrixConfig> = {
-  validateConfig: validateCircuitMatrixConfig,
-  runPreflight: runCircuitMatrixPreflight,
 }

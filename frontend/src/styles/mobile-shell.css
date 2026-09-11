@@ -233,11 +233,11 @@ html.saga-route-player .saga-tools-language-row {
      Se conserva lo que la segunda mejoraba -radio de 28 y el desenfoque con
      saturacion- y el color pasa a venir del tema. */
   background: var(--saga-glass-bg);
-  border: 1px solid var(--saga-glass-border);
-  border-radius: 28px;
+  border: var(--theme-border-w) solid var(--saga-glass-border);
+  border-radius: var(--theme-radius-panel);
   box-shadow: var(--saga-glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.12);
-  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+  backdrop-filter: var(--theme-blur);
+  -webkit-backdrop-filter: var(--theme-blur);
   color: #f8fafc;
 }
 

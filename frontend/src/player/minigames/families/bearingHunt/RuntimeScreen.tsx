@@ -595,9 +595,23 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
     return undefined
   }
 
+  // 'target_bearing_deg' y 'tolerance_deg' son los nombres reales del
+  // campo (family-types.ts / getDefaultAdminConfigForFamily('bearing_hunt')
+  // en el admin) - faltaban en esta lista, así que lo que configurara un
+  // organizador nunca llegaba aquí: siempre caía en 90°/±18° por defecto.
+  // Encontrado auditando, no reportado por nadie -el juego "funcionaba",
+  // solo que siempre igual, pasara lo que pasara en el editor-.
   const targetBearing = normalizeDegrees(
     pickNumber(
-      read('targetBearing', 'target_bearing', 'target', 'bearing', 'azimuth', 'targetAzimuth'),
+      read(
+        'target_bearing_deg',
+        'targetBearing',
+        'target_bearing',
+        'target',
+        'bearing',
+        'azimuth',
+        'targetAzimuth'
+      ),
       90
     ) ?? 90
   )
@@ -607,7 +621,7 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
     Math.min(
       90,
       pickNumber(
-        read('tolerance', 'toleranceDeg', 'tolerance_degrees', 'window', 'windowDeg'),
+        read('tolerance_deg', 'tolerance', 'toleranceDeg', 'tolerance_degrees', 'window', 'windowDeg'),
         18
       ) ?? 18
     )

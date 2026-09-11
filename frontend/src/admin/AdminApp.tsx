@@ -30,6 +30,7 @@ import {
 } from './lib/playerDrafts'
 import {
   buildRawStagesFromOverview,
+  jugadoresDesprazadosPolGardado,
   mergeOverviewIntoRawStages,
   stageSaveIdentity,
   verifyPersistedStages,
@@ -39,7 +40,7 @@ import { TEMA_POR_DEFECTO } from '../shared/tema'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation'
 
 function slugifyMissionItemId(value: string): string {
   return value
@@ -224,6 +225,7 @@ export default function AdminApp() {
       prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
       prologue_image_url: getConfigTextValue(source, 'prologue_image_url', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
+      mission_launch_at: getConfigTextValue(source, 'mission_launch_at', ''),
       player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || TEMA_POR_DEFECTO),
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
       mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
@@ -281,6 +283,7 @@ export default function AdminApp() {
       prologue_subtitle: missionDraft.prologue_subtitle || '',
       prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
+      mission_launch_at: missionDraft.mission_launch_at || '',
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
@@ -645,6 +648,28 @@ export default function AdminApp() {
 
       if (raw.status === 'ok') {
         persistedStages = mergeOverviewIntoRawStages(raw.stages || [], overview.stages || [])
+
+        const desplazados = jugadoresDesprazadosPolGardado(
+          raw.stages || [],
+          persistedStages,
+          overview.profiles || []
+        )
+
+        if (desplazados.length > 0) {
+          const detalle = desplazados
+            .map((j) => `${j.display_name || j.id} (nivel ${j.level})`)
+            .join('\n')
+          const continuar = window.confirm(
+            `Este guardado desplaza a ${desplazados.length} jugador(es):\n\n${detalle}\n\n` +
+              'Verán un nodo distinto del que esperaban, o la misión dada por ' +
+              'terminada sin jugar el último. ¿Guardar de todos modos?'
+          )
+          if (!continuar) {
+            setSaveState('idle')
+            setLocalNotice('Guardado cancelado: desplazaba a jugadores en curso.')
+            return
+          }
+        }
       } else {
         usedFallback = true
         persistedStages = buildRawStagesFromOverview(overview.stages || [])
@@ -944,7 +969,7 @@ export default function AdminApp() {
     const nextIndex = stages.length
     const nextLat = typeof lat === 'number' ? lat : routeCenter[0]
     const nextLon = typeof lon === 'number' ? lon : routeCenter[1]
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -978,7 +1003,7 @@ export default function AdminApp() {
   }
 
   function insertLocalNodeAt(lat: number, lon: number, index: number) {
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     const nextStage: EditableAdminStage = {
       id: `local-${Date.now()}`,
@@ -1048,7 +1073,7 @@ export default function AdminApp() {
           ]
         : mapCenter
 
-    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_antenna_charge')
+    const defaultGamePatch = getDefaultAdminStagePatchForGame('shake_charge')
 
     itemsToCreate.forEach((item, idx) => {
       const offset = (idx - (itemsToCreate.length - 1) / 2) * 0.00035

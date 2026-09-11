@@ -21,16 +21,16 @@ const ICON_MAP: [RegExp, string, string][] = [
   [/cinta|tape|adhesiv/i, '🩹', '#84cc16'],
   [/arma|pistol|rifle/i, '🔫', '#ef4444'],
   [/escudo|shield/i, '🛡️', '#06b6d4'],
-  [/map|mapa/i, '🗺️', '#10b981'],
+  [/map|mapa/i, '🗺️', 'rgb(var(--theme-ok))'],
   [/radio|señal|signal/i, '📡', '#a855f7'],
   [/herramienta|tool|alicate|pinza/i, '🔧', '#f97316'],
   [/linterna|luz|flashlight/i, '🔦', '#fbbf24'],
-  [/comida|agua|food|water/i, '🍶', '#34d399'],
+  [/comida|agua|food|water/i, '🍶', 'rgb(var(--theme-ok-soft))'],
   [/nota|papel|doc|informe/i, '📄', '#e2e8f0'],
   [/medic|pastilla|jeringa/i, '💊', '#fb7185'],
   [/bomb|explosiv/i, '💣', '#ef4444'],
-  [/cerrojo|candado|lock/i, '🔒', '#94a3b8'],
-  [/flecha|arrow/i, '➡️', '#38bdf8'],
+  [/cerrojo|candado|lock/i, '🔒', 'rgb(var(--theme-line))'],
+  [/flecha|arrow/i, '➡️', 'rgb(var(--theme-info))'],
   [/cristal|glass|gema|gem/i, '💎', '#22d3ee'],
   [/moneda|coin|dinero/i, '🪙', '#facc15'],
   [/hueso|bone/i, '🦴', '#e2e8f0'],
@@ -148,13 +148,14 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
 
   return (
     <section style={panel}>
-      {/* Header */}
+      {/* La cabecera "MOCHILA · N objetos" se fue: repetia el nombre de la
+          pestaña que ya esta activa y subrayada justo encima. El recuento
+          pasa al lado del signo de interrogacion, que es lo unico que hacia
+          falta conservar de esta fila. */}
       <div style={headerRow}>
-        <div style={headerLeft}>
-          <span style={headerLabel}>MOCHILA</span>
-          <span style={headerCount}>{totalItems} {totalItems === 1 ? 'objeto' : 'objetos'}</span>
-          {updatedLabel && <span style={syncBadge}>· {updatedLabel}</span>}
-        </div>
+        <span style={headerCount}>
+          {totalItems} {totalItems === 1 ? 'obxecto' : 'obxectos'}
+        </span>
         <button
           type="button"
           onClick={() => setShowGuide((v) => !v)}
@@ -282,7 +283,7 @@ export function InventoryPanel({ user }: InventoryPanelProps) {
               ...cellIcon,
               width: 52,
               height: 52,
-              borderRadius: 14,
+              borderRadius: 'var(--theme-radius-card)',
               background: `${getItemIcon(selected).color}22`,
               border: `1px solid ${getItemIcon(selected).color}44`,
               fontSize: 28,
@@ -369,7 +370,7 @@ const grid: CSSProperties = {
 const guideToggleBtn: CSSProperties = {
   background: 'rgba(255,255,255,0.07)',
   border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   color: 'rgba(255,255,255,0.6)',
   fontSize: 11,
   fontWeight: 800,
@@ -380,9 +381,9 @@ const guideToggleBtn: CSSProperties = {
 }
 
 const guideBox: CSSProperties = {
-  background: 'rgba(14, 165, 233, 0.07)',
-  border: '1px solid rgba(125,211,252,0.18)',
-  borderRadius: 14,
+  background: 'rgba(var(--theme-info-mid), 0.07)',
+  border: '1px solid rgba(var(--theme-info-soft), 0.18)',
+  borderRadius: 'var(--theme-radius-card)',
   padding: '12px 14px',
   display: 'flex',
   flexDirection: 'column',
@@ -392,7 +393,7 @@ const guideBox: CSSProperties = {
 const guideTitle: CSSProperties = {
   fontSize: 11,
   fontWeight: 900,
-  color: '#7dd3fc',
+  color: 'rgb(var(--theme-info-soft))',
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
 }
@@ -407,9 +408,9 @@ const guideStep: CSSProperties = {
 }
 
 const guideNum: CSSProperties = {
-  background: 'rgba(125,211,252,0.18)',
-  color: '#7dd3fc',
-  borderRadius: 999,
+  background: 'rgba(var(--theme-info-soft), 0.18)',
+  color: 'rgb(var(--theme-info-soft))',
+  borderRadius: 'var(--theme-radius-pill)',
   width: 20,
   height: 20,
   minWidth: 20,
@@ -430,10 +431,13 @@ const guideTip: CSSProperties = {
   borderTop: '1px solid rgba(255,255,255,0.06)',
 }
 
+// Celda SOLIDA, sin borde -diseno "B", aprobado-. Un relleno plano se
+// recorta contra la tarjeta; el borde de 1px sobre un fondo casi
+// transparente hacia que la rejilla se leyera como una tabla vacia.
 const cell: CSSProperties = {
   position: 'relative',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'var(--theme-card-inset)',
+  border: 0,
   borderRadius: 14,
   padding: '10px 4px 8px',
   display: 'flex',
@@ -453,8 +457,8 @@ const cellSelected: CSSProperties = {
 }
 
 const cellFeedback: CSSProperties = {
-  background: 'rgba(34,197,94,0.15)',
-  borderColor: 'rgba(34,197,94,0.4)',
+  background: 'rgba(var(--theme-done), 0.15)',
+  borderColor: 'rgba(var(--theme-done), 0.4)',
 }
 
 const cellUsed: CSSProperties = {
@@ -474,7 +478,7 @@ const qrEye: CSSProperties = {
   position: 'absolute',
   width: 9,
   height: 9,
-  border: '2.5px solid #0f172a',
+  border: '2.5px solid rgb(var(--theme-ink))',
   borderRadius: 2,
 }
 
@@ -486,8 +490,8 @@ const qrNoise: CSSProperties = {
   height: 11,
   // Damero de 3x3: sugiere los módulos de datos sin dibujarlos uno a uno.
   backgroundImage:
-    'linear-gradient(90deg, #0f172a 33%, transparent 33% 66%, #0f172a 66%),' +
-    'linear-gradient(0deg, #0f172a 33%, transparent 33% 66%, #0f172a 66%)',
+    'linear-gradient(90deg, rgb(var(--theme-ink)) 33%, transparent 33% 66%, rgb(var(--theme-ink)) 66%),' +
+    'linear-gradient(0deg, rgb(var(--theme-ink)) 33%, transparent 33% 66%, rgb(var(--theme-ink)) 66%)',
   backgroundSize: '100% 100%',
   opacity: 0.85,
 }
@@ -511,7 +515,7 @@ const qtyBadge: CSSProperties = {
   color: '#1c1008',
   fontSize: 9,
   fontWeight: 900,
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   minWidth: 16,
   height: 16,
   display: 'flex',
@@ -526,7 +530,7 @@ const usedOverlay: CSSProperties = {
   top: 5,
   left: 6,
   fontSize: 9,
-  color: '#4ade80',
+  color: 'rgb(var(--theme-done-soft))',
   fontWeight: 900,
 }
 
@@ -547,14 +551,14 @@ const cellName: CSSProperties = {
 const emptyCell: CSSProperties = {
   background: 'rgba(255,255,255,0.02)',
   border: '1px dashed rgba(255,255,255,0.05)',
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   minHeight: 72,
 }
 
 const detailCard: CSSProperties = {
   background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   padding: 14,
   display: 'flex',
   flexDirection: 'column',
@@ -586,9 +590,9 @@ const sourcePill: CSSProperties = {
   fontWeight: 900,
   letterSpacing: '0.1em',
   color: '#93c5fd',
-  background: 'rgba(59,130,246,0.15)',
-  border: '1px solid rgba(59,130,246,0.25)',
-  borderRadius: 999,
+  background: 'rgba(var(--theme-pin), 0.15)',
+  border: '1px solid rgba(var(--theme-pin), 0.25)',
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '2px 7px',
 }
 
@@ -599,7 +603,7 @@ const nodePill: CSSProperties = {
   color: '#a5f3fc',
   background: 'rgba(6,182,212,0.12)',
   border: '1px solid rgba(6,182,212,0.2)',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '2px 7px',
 }
 
@@ -612,15 +616,15 @@ const qtyText: CSSProperties = {
 const useBtn: CSSProperties = {
   width: '100%',
   padding: '11px 0',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   border: 'none',
-  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-done)), rgb(var(--theme-done)))',
   color: '#fff',
   fontWeight: 900,
   fontSize: 13,
   letterSpacing: '0.06em',
   cursor: 'pointer',
-  boxShadow: '0 4px 14px rgba(34,197,94,0.35)',
+  boxShadow: '0 4px 14px rgba(var(--theme-done), 0.35)',
   transition: 'transform 0.15s, box-shadow 0.15s',
 }
 

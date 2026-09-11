@@ -268,7 +268,7 @@ export function SparkRadarRuntimeScreen({
       ...radar,
       boxShadow:
         flash === 'good'
-          ? '0 0 0 2px rgba(74,222,128,.75), inset 0 0 60px rgba(74,222,128,.25)'
+          ? '0 0 0 2px rgba(var(--theme-done-soft), .75), inset 0 0 60px rgba(var(--theme-done-soft), .25)'
           : flash === 'bad'
             ? '0 0 0 2px rgba(248,113,113,.8), inset 0 0 60px rgba(248,113,113,.3)'
             : 'inset 0 0 60px rgba(15,118,110,.25)',
@@ -338,11 +338,11 @@ export function SparkRadarRuntimeScreen({
               top: `${spark.y}%`,
               background:
                 spark.kind === 'signal'
-                  ? 'radial-gradient(circle at 35% 30%, #bbf7d0, #22c55e 55%, #15803d)'
+                  ? 'radial-gradient(circle at 35% 30%, #bbf7d0, rgb(var(--theme-done)) 55%, #15803d)'
                   : 'radial-gradient(circle at 35% 30%, #fecaca, #ef4444 55%, #991b1b)',
               boxShadow:
                 spark.kind === 'signal'
-                  ? '0 0 24px rgba(34,197,94,.85)'
+                  ? '0 0 24px rgba(var(--theme-done), .85)'
                   : '0 0 24px rgba(239,68,68,.85)',
             }}
           >
@@ -356,7 +356,7 @@ export function SparkRadarRuntimeScreen({
               <>
                 <strong style={overlayTitle}>Caza-Señales</strong>
                 <p style={overlayText}>
-                  Toca as chispas <span style={{ color: '#4ade80' }}>verdes</span>. Evita as{' '}
+                  Toca as chispas <span style={{ color: 'rgb(var(--theme-done-soft))' }}>verdes</span>. Evita as{' '}
                   <span style={{ color: '#f87171' }}>vermellas</span>: son sinais falsas.
                   Cada vermella e cada toque ao aire soman {echoPenaltyS}s.
                 </p>
@@ -396,11 +396,11 @@ export function SparkRadarRuntimeScreen({
                   </div>
                   <div style={resumoFila}>
                     <span>Falsas tocadas</span>
-                    <b style={{ color: misses > 0 ? '#fbbf24' : '#4ade80' }}>{misses}</b>
+                    <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>{misses}</b>
                   </div>
                   <div style={{ ...resumoFila, ...resumoTotal }}>
                     <span>Penalización</span>
-                    <b style={{ color: misses > 0 ? '#fbbf24' : '#4ade80' }}>
+                    <b style={{ color: misses > 0 ? '#fbbf24' : 'rgb(var(--theme-done-soft))' }}>
                       {misses > 0 ? `+${misses * echoPenaltyS}s` : 'ningunha'}
                     </b>
                   </div>
@@ -470,9 +470,9 @@ const hudBlock: CSSProperties = {
   display: 'grid',
   gap: 2,
   padding: '8px 10px',
-  borderRadius: 14,
-  background: 'rgba(15,23,42,.72)',
-  border: '1px solid rgba(148,163,184,.2)',
+  borderRadius: 'var(--theme-radius-card, 14px)',
+  background: 'rgba(var(--theme-ink), .72)',
+  border: '1px solid rgba(var(--theme-line), .2)',
   textAlign: 'center',
 }
 
@@ -480,7 +480,7 @@ const hudLabel: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '.14em',
-  color: '#94a3b8',
+  color: 'rgb(var(--theme-line))',
 }
 
 const hudValue: CSSProperties = {
@@ -493,22 +493,28 @@ const hudValue: CSSProperties = {
 const hudTotal: CSSProperties = {
   fontSize: 13,
   fontWeight: 800,
-  color: '#64748b',
+  color: 'rgb(var(--theme-sheen-a))',
 }
 
 const progressTrack: CSSProperties = {
   height: 6,
-  borderRadius: 999,
-  background: 'rgba(148,163,184,.18)',
+  borderRadius: 'var(--theme-radius-pill, 999px)',
+  background: 'rgba(var(--theme-line), .18)',
   overflow: 'hidden',
 }
 
 const progressFill: CSSProperties = {
   height: '100%',
-  background: 'linear-gradient(90deg,#34d399,#4ade80)',
+  background: 'linear-gradient(90deg,rgb(var(--theme-ok-soft)),rgb(var(--theme-done-soft)))',
   transition: 'width .18s ease-out',
 }
 
+/**
+ * El radar, sus anillos y el barrido NO siguen al tema, a propósito: son un
+ * radar, tienen que leerse como un radar en cualquier tema. Es información
+ * (la forma del propio juego), no decoración, igual que la bola de tiltMaze
+ * o los alfileres del mapa en mobile-themes.css.
+ */
 const radar: CSSProperties = {
   position: 'relative',
   width: '100%',
@@ -518,7 +524,7 @@ const radar: CSSProperties = {
   borderRadius: '50%',
   overflow: 'hidden',
   border: '2px solid rgba(45,212,191,.35)',
-  background: 'radial-gradient(circle at 50% 50%, #042f2e, #020617 72%)',
+  background: 'radial-gradient(circle at 50% 50%, #042f2e, rgb(var(--theme-ink-deep)) 72%)',
   touchAction: 'manipulation',
   transition: 'box-shadow .12s ease-out',
 }
@@ -567,6 +573,8 @@ const sweep: CSSProperties = {
   pointerEvents: 'none',
 }
 
+// El blip que se toca tampoco sigue al tema: es un punto en el radar, redondo
+// en cualquier tema por la misma razón que el radar de arriba.
 const sparkButton: CSSProperties = {
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
@@ -591,7 +599,7 @@ const overlay: CSSProperties = {
   gap: 8,
   padding: 22,
   textAlign: 'center',
-  background: 'rgba(2,6,23,.86)',
+  background: 'rgba(var(--theme-ink-deep), .86)',
   backdropFilter: 'blur(3px)',
 }
 
@@ -624,7 +632,7 @@ const resumo: CSSProperties = {
   gap: 6,
   margin: '4px 0 12px',
   padding: '10px 12px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card, 16px)',
   border: '1px solid rgba(255,255,255,.14)',
   background: 'linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04))',
 }
@@ -649,9 +657,9 @@ const primaryButton: CSSProperties = {
   marginTop: 6,
   minHeight: 48,
   padding: '0 26px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card, 16px)',
   border: 'none',
-  background: 'linear-gradient(135deg,#34d399,#059669)',
+  background: 'linear-gradient(135deg,rgb(var(--theme-ok-soft)),rgb(var(--theme-ok-deep)))',
   color: '#022c22',
   fontSize: 15,
   fontWeight: 950,
@@ -662,6 +670,6 @@ const helper: CSSProperties = {
   margin: 0,
   fontSize: 12,
   lineHeight: 1.35,
-  color: '#94a3b8',
+  color: 'rgb(var(--theme-line))',
   textAlign: 'center',
 }

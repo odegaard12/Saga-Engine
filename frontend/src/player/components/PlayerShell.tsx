@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { PlayerGamePayload, PlayerStage } from '../../types/player'
+import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../../shared/playerIdentity'
 
 interface PlayerShellProps {
   payload: PlayerGamePayload
@@ -37,12 +38,10 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
     currentStage?.title || (payload.finished ? 'Misión completada' : 'Esperando nodo')
   const progress = getProgress(payload)
 
-  const totalMs = payload.live_status?.total_time_ms || 0
-  const minutes = Math.floor(totalMs / 60000)
-  const seconds = Math.floor((totalMs % 60000) / 1000)
-  const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-
-  const nodes = Array.from({ length: progress.total })
+  const perfil = { ...(payload.profile || {}), user: payload.user, display_name: playerName }
+  const avatarUrl = getPlayerAvatarUrl(perfil as never)
+  const iniciales = getPlayerAvatarInitials(perfil as never)
+  const colorPerfil = getPlayerColor(perfil as never)
 
   return (
     <div style={wrap}>
@@ -53,226 +52,189 @@ export function PlayerShell({ payload, currentStage }: PlayerShellProps) {
         data-saga-player-shell="top"
         style={{
           ...card,
-          width: compact ? '100%' : 'min(100%, 760px)',
-          padding: compact ? 12 : 16,
-          borderRadius: compact ? 22 : 28,
+          // 420px en pantalla grande, no 760.
+          //
+          // SAGA solo se juega en vertical -hay una pantalla que lo dice si
+          // giras el movil-, asi que en un ordenador esto es una interfaz de
+          // movil estirada. A 760px el nombre quedaba pegado a la izquierda,
+          // el reloj y el contador a la derecha, y medio metro de vacio en
+          // medio. A ancho de telefono se lee como lo que es.
+          width: compact ? '100%' : 'min(100%, 420px)',
+          padding: compact ? '9px 11px' : '11px 14px',
         }}
       >
+        {/**
+         * Tu FOTO, y el nodo como texto principal.
+         *
+         * Antes empezaba por el nombre de usuario -"SIM_01", "odi23"-, que no
+         * le dice nada a nadie y encima ocupaba el sitio de lo unico que de
+         * verdad hace falta saber andando: a que nodo vas. La cara se
+         * reconoce sin leer.
+         *
+         * Y FUERA EL RELOJ. Nadie mira el crono mientras camina, y el tiempo
+         * ya esta en la clasificacion, que es donde se compara. Quitarlo deja
+         * respirar al nombre del nodo, que antes se cortaba con puntos
+         * suspensivos para no empujarlo fuera.
+         */}
         <div style={topRow}>
-          <div style={eyebrow}>{playerName}</div>
-
-          <div style={pillRow}>
-            <div style={{...soloPill, borderColor: 'rgba(56,189,248,0.4)', color: '#e0f2fe', background: 'rgba(14,165,233,0.15)' }}>
-              ⏱️ {timeDisplay}
-            </div>
-            {mode === 'team' ? (
-              <div style={soloPill}>EQUIPO</div>
-            ) : null}
-          </div>
-        </div>
-
-        <div style={{ ...playerTitle, fontSize: compact ? 17 : 19 }}>{stageName}</div>
-
-        <div style={progressRow}>
-          <div style={routeWrap}>
-            {nodes.length > 0 ? (
-              nodes.map((_, index) => {
-                const nodeDone = payload.finished || index < progress.current - 1
-                const nodeActive = index === progress.activeIndex && !payload.finished
-                const connectorDone = payload.finished || index < progress.current - 1
-
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      ...routeSegment,
-                      flex: index === nodes.length - 1 ? '0 0 auto' : 1,
-                    }}
-                  >
-                    <span
-                      style={{
-                        ...routeNode,
-                        ...(nodeActive
-                          ? routeNodeActive
-                          : nodeDone
-                            ? routeNodeDone
-                            : routeNodeIdle),
-                      }}
-                    />
-
-                    {index < nodes.length - 1 ? (
-                      <span
-                        style={{
-                          ...routeConnector,
-                          ...(connectorDone ? routeConnectorDone : routeConnectorIdle),
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                )
-              })
+          <div style={{ ...retratoAro, background: colorPerfil }} title={playerName}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none'
+                }}
+              />
             ) : (
-              <span style={progressEmpty}>Sin ruta</span>
+              <span style={{ fontSize: 9, fontWeight: 900, color: '#0b1220' }}>{iniciales}</span>
             )}
           </div>
 
-          <div style={countPill}>
+          <div style={nodoEnLinea} title={stageName}>{stageName}</div>
+
+          {mode === 'team' ? <div style={equipoTexto}>EQUIPO</div> : null}
+          <div className="saga-shell-count-pill" style={contadorTexto}>
             {progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'}
           </div>
         </div>
+
+        {/* El progreso ES el filo de la barra.
+            El 6/10 dice en que nodo vas, pero no se VE cuanto llevas. La tira
+            de puntos si lo enseniaba y se comia el tercio inferior de la barra.
+            Esto lo cuenta en 3 px: una regla partida en tantos tramos como
+            nodos, encendida hasta donde estas. A sangre, pegada al borde de
+            abajo, porque un filo no es una fila: no ocupa alto propio. */}
+        <div style={{ ...rielProgreso, margin: '9px 0 0' }}>
+          {Array.from({ length: Math.max(progress.total, 1) }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                ...rielTramo,
+                background:
+                  i < progress.current ? 'var(--theme-primary)' : 'var(--theme-card-inset)',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* El nombre del nodo YA NO va aqui.
+            Vivia a media pantalla del punto al que se refiere, y habia que
+            saltar la vista de la barra al mapa para saber a donde vas. Ahora
+            cuelga de su propio alfiler (`saga-mission-node-etiqueta`). */}
+
+        {/* La tira de nodos YA NO va aqui.
+            El mapa ya cuenta que nodo esta hecho con el color de cada alfiler
+            -hecho / el que toca / pendiente-, asi que la tira repetia esa misma
+            informacion ocupando el tercio inferior de la barra. La cuenta 6/10
+            sube a la linea de estado, que es el resumen que si hacia falta. */}
+
       </section>
     </div>
   )
 }
 
+// Con margen a los lados: la tarjeta FLOTA sobre el mapa -diseño "B"-. A
+// sangre y con esquinas cuadradas arriba se leia como una barra de sistema
+// pegada, no como una tarjeta.
 const wrap: CSSProperties = {
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
   pointerEvents: 'auto',
+  padding: '0 9px',
 }
 
+/**
+ * Tarjeta flotante SOLIDA -diseno "B", aprobado tras varias rondas.
+ *
+ * Historial de lo que NO funciono, para no repetirlo: primero era una placa
+ * de cristal con borde; luego un velo negro con degradado (sobre el mapa
+ * verde daba gris y la pantalla perdia el tema); luego un velo en rojo
+ * (seguia siendo degradado translucido = barro marron sin bordes limpios).
+ *
+ * Lo que funciona es lo mismo que hace funcionar el login: color PLANO y
+ * sombra real. Se recorta contra el mapa y se lee de un vistazo.
+ */
 const card: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(84,91,104,.72) 0%, rgba(110,116,128,.64) 100%)',
-  border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 20px 48px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.12)',
-  backdropFilter: 'blur(20px) saturate(135%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(135%)',
+  background: 'var(--theme-card)',
+  borderRadius: 13,
+  boxShadow: 'var(--theme-card-shadow)',
   color: '#ffffff',
   display: 'grid',
-  gap: 8,
+  gap: 0,
+}
+
+// El filo de progreso: a sangre y de 3 px, para que cuente sin ocupar una fila.
+const rielProgreso: CSSProperties = {
+  display: 'flex',
+  gap: 2,
+  height: 3,
+}
+
+const rielTramo: CSSProperties = {
+  flex: 1,
+  height: '100%',
+  borderRadius: 2,
 }
 
 const topRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
+  gap: 10,
 }
 
-const pillRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-}
-
-const eyebrow: CSSProperties = {
-  color: '#c8ffe1',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  maxWidth: 150,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const soloPill: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.16)',
-  border: '1px solid rgba(255,255,255,.18)',
-  color: '#ffffff',
-  fontSize: 11,
-  fontWeight: 900,
-  letterSpacing: '0.08em',
-}
-
-
-const playerTitle: CSSProperties = {
-  fontWeight: 900,
-  lineHeight: 1.05,
-  letterSpacing: '-0.03em',
-  color: '#ffffff',
-  maxWidth: '100%',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const progressRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginTop: 4,
-}
-
-const routeWrap: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
+// El nombre del nodo se come el sitio que sobre, y se corta con puntos suspensivos
+// antes que empujar al reloj fuera de la pantalla.
+const nodoEnLinea: CSSProperties = {
   flex: 1,
   minWidth: 0,
-}
-
-const routeSegment: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '10px minmax(10px, 1fr)',
-  alignItems: 'center',
-  gap: 6,
-  minWidth: 10,
-}
-
-const routeNode: CSSProperties = {
-  width: 10,
-  height: 10,
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.18)',
-  flex: '0 0 auto',
-}
-
-const routeNodeIdle: CSSProperties = {
-  background: 'rgba(255,255,255,.18)',
-}
-
-const routeNodeDone: CSSProperties = {
-  background: 'rgba(34,197,94,.88)',
-  border: '1px solid rgba(134,239,172,.55)',
-  boxShadow: '0 0 0 3px rgba(34,197,94,.12)',
-}
-
-const routeNodeActive: CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid rgba(255,255,255,.92)',
-  boxShadow: '0 0 0 4px rgba(255,255,255,.12)',
-}
-
-const routeConnector: CSSProperties = {
-  height: 3,
-  borderRadius: 999,
-  width: '100%',
-}
-
-const routeConnectorIdle: CSSProperties = {
-  background: 'rgba(255,255,255,.16)',
-}
-
-const routeConnectorDone: CSSProperties = {
-  background: 'linear-gradient(90deg, rgba(34,197,94,.88), rgba(134,239,172,.64))',
-}
-
-const countPill: CSSProperties = {
-  minHeight: 28,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 12px',
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.12)',
-  border: '1px solid rgba(255,255,255,.16)',
-  color: 'rgba(255,255,255,0.9)',
-  fontSize: 10,
+  fontSize: 14,
   fontWeight: 900,
-  letterSpacing: '0.05em',
+  letterSpacing: '-.015em',
+  color: '#ffffff',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 }
 
-const progressEmpty: CSSProperties = {
-  color: 'rgba(255,255,255,.72)',
-  fontSize: 11,
-  fontWeight: 800,
+const equipoTexto: CSSProperties = {
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 9.5,
+  fontWeight: 900,
+  letterSpacing: '0.12em',
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// El contador en el color del tema: es el unico dato de la barra que dice
+// cuanto llevas, y sobre un velo se pierde si va del mismo gris que el resto.
+const retratoAro: CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: 'var(--theme-radius-avatar)',
+  overflow: 'hidden',
+  display: 'grid',
+  placeItems: 'center',
+  flexShrink: 0,
+  background: 'var(--theme-card-inset)',
+}
+
+const contadorTexto: CSSProperties = {
+  color: 'var(--theme-primary)',
+  fontSize: 12,
+  fontWeight: 900,
+  fontVariantNumeric: 'tabular-nums',
+}
+

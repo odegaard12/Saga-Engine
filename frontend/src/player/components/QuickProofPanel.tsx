@@ -190,7 +190,7 @@ export function QuickProofPanel({
           width: 90%;
           aspect-ratio: 1 / 1;
           max-height: 90%;
-          border: 2px solid rgba(74, 222, 128, 0.55);
+          border: 2px solid rgba(var(--theme-done-soft), 0.55);
           border-radius: 18px;
           box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
           pointer-events: none;
@@ -243,7 +243,7 @@ export function QuickProofPanel({
           right: 0;
           height: 3px;
           background: linear-gradient(90deg, transparent, #4ade80, transparent);
-          box-shadow: 0 0 16px rgba(74, 222, 128, 0.75);
+          box-shadow: 0 0 16px rgba(var(--theme-done-soft), 0.75);
           pointer-events: none;
           z-index: 3;
           animation: sagaScanline 2.6s infinite ease-in-out;
@@ -774,9 +774,9 @@ export function QuickProofPanel({
                   top: 10,
                   left: 10,
                   zIndex: 5,
-                  background: 'rgba(2,6,23,.72)',
-                  border: '1px solid rgba(74,222,128,.4)',
-                  borderRadius: 999,
+                  background: 'rgba(var(--theme-ink-deep), .72)',
+                  border: '1px solid rgba(var(--theme-done-soft), .4)',
+                  borderRadius: 'var(--theme-radius-pill)',
                   padding: '4px 11px',
                   color: '#4ade80',
                   fontSize: 12,
@@ -900,12 +900,12 @@ const dock: CSSProperties = {
   alignItems: 'center',
   gap: 6,
   padding: 6,
-  borderRadius: 19,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(148,163,184,.19), rgba(100,116,139,.16))',
-  boxShadow: '0 14px 30px rgba(15,23,42,.20)',
-  backdropFilter: 'blur(20px) saturate(1.10)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.10)',
+  background: 'linear-gradient(180deg, rgba(var(--theme-line), .19), rgba(var(--theme-sheen-a), calc(.16 * var(--theme-solid))))',
+  boxShadow: '0 14px 30px rgba(var(--theme-ink), .20)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
 }
 
 const dockButton: CSSProperties = {
@@ -914,9 +914,9 @@ const dockButton: CSSProperties = {
   padding: '0 12px',
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.08)',
-  background: 'rgba(51,65,85,.42)',
+  background: 'rgba(var(--theme-ink-mid), .42)',
   color: 'rgba(248,250,252,.90)',
   fontSize: 10,
   lineHeight: 1,
@@ -929,7 +929,7 @@ const dockButton: CSSProperties = {
 
 const dockButtonWide: CSSProperties = {
   ...dockButton,
-  background: 'rgba(51,65,85,.42)',
+  background: 'rgba(var(--theme-ink-mid), .42)',
   border: '1px solid rgba(255,255,255,.08)',
   color: 'rgba(248,250,252,.90)',
 }
@@ -941,9 +941,9 @@ const carteFondo: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 22,
-  background: 'radial-gradient(circle at 50% 40%, rgba(6,40,26,.62), rgba(2,6,23,.82))',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  background: 'radial-gradient(circle at 50% 40%, rgba(6,40,26,.62), rgba(var(--theme-ink-deep), .82))',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   animation: 'sagaCarteEntra 220ms ease-out',
 }
 
@@ -953,12 +953,12 @@ const carteCaixa: CSSProperties = {
   justifyItems: 'center',
   gap: 10,
   padding: '24px 20px 20px',
-  borderRadius: 26,
-  border: '1px solid rgba(74,222,128,.45)',
+  borderRadius: 'var(--theme-radius-panel)',
+  border: '1px solid rgba(var(--theme-done-soft), .45)',
   background: 'linear-gradient(180deg, rgba(30,58,44,.78), rgba(15,32,24,.78))',
-  backdropFilter: 'blur(20px) saturate(1.3)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.18), 0 24px 56px rgba(2,6,23,.55)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.18), 0 24px 56px rgba(var(--theme-ink-deep), .55)',
   textAlign: 'center',
 }
 
@@ -967,9 +967,9 @@ const carteMarca: CSSProperties = {
   height: 64,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 999,
-  border: '2px solid rgba(74,222,128,.6)',
-  background: 'rgba(74,222,128,.18)',
+  borderRadius: 'var(--theme-radius-pill)',
+  border: '2px solid rgba(var(--theme-done-soft), .6)',
+  background: 'rgba(var(--theme-done-soft), .18)',
   color: '#bbf7d0',
   fontSize: 32,
   fontWeight: 900,
@@ -994,9 +994,9 @@ const carteBoton: CSSProperties = {
   marginTop: 6,
   width: '100%',
   minHeight: 46,
-  borderRadius: 999,
-  border: '1px solid rgba(134,239,172,.6)',
-  background: 'linear-gradient(180deg, rgba(74,222,128,.95), rgba(21,128,61,.95))',
+  borderRadius: 'var(--theme-radius-pill)',
+  border: '1px solid rgba(var(--theme-done-soft), .6)',
+  background: 'linear-gradient(180deg, rgba(var(--theme-done-soft), .95), rgba(21,128,61,.95))',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.32), 0 10px 24px rgba(21,128,61,.4)',
   color: '#04220f',
   fontSize: 14.5,
@@ -1009,7 +1009,7 @@ const scannerBackdrop: CSSProperties = {
   inset: 0,
   // Opaco y a pantalla completa: la barra de clasificación del jugador se
   // colaba por debajo cuando esto era sólo una tarjeta flotante.
-  background: '#020617',
+  background: 'rgb(var(--theme-ink-deep))',
   zIndex: 2147483000,
   display: 'flex',
   justifyContent: 'center',
@@ -1019,7 +1019,7 @@ const rescueBox: CSSProperties = {
   display: 'grid',
   gap: 6,
   padding: '10px 12px',
-  borderRadius: 16,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(251,191,36,.35)',
   background: 'rgba(251,191,36,.08)',
 }
@@ -1039,13 +1039,13 @@ const rescueNote: CSSProperties = {
 const captureButton: CSSProperties = {
   minHeight: 58,
   border: 'none',
-  borderRadius: 18,
-  background: 'linear-gradient(135deg, #34d399, #059669)',
+  borderRadius: 'var(--theme-radius-card)',
+  background: 'linear-gradient(135deg, rgb(var(--theme-ok-soft)), rgb(var(--theme-ok-deep)))',
   color: '#022c22',
   fontSize: 17,
   fontWeight: 950,
   letterSpacing: '-.01em',
-  boxShadow: '0 12px 28px rgba(16,185,129,.35)',
+  boxShadow: '0 12px 28px rgba(var(--theme-ok), .35)',
   cursor: 'pointer',
 }
 
@@ -1057,9 +1057,9 @@ const manualRow: CSSProperties = {
 const manualInput: CSSProperties = {
   flex: 1,
   minHeight: 46,
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(251,191,36,.5)',
-  background: 'rgba(2,6,23,.6)',
+  background: 'rgba(var(--theme-ink-deep), .6)',
   color: '#fff',
   padding: '0 12px',
   fontSize: 15,
@@ -1069,7 +1069,7 @@ const manualInput: CSSProperties = {
 const manualButton: CSSProperties = {
   minHeight: 46,
   padding: '0 18px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   border: 'none',
   background: '#fbbf24',
   color: '#422006',
@@ -1123,15 +1123,15 @@ const closeButton: CSSProperties = {
   padding: 0,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.56)',
+  background: 'rgba(var(--theme-ink), .56)',
   color: '#ffffff',
   fontSize: 18,
   lineHeight: 1,
   fontWeight: 950,
   textAlign: 'center',
-  boxShadow: '0 10px 24px rgba(2,6,23,.20)',
+  boxShadow: '0 10px 24px rgba(var(--theme-ink-deep), .20)',
 }
 
 const torchButton: CSSProperties = {
@@ -1141,12 +1141,12 @@ const torchButton: CSSProperties = {
   zIndex: 10,
   minHeight: 34,
   padding: '0 12px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.2)',
   background: 'rgba(0,0,0,.5)',
   color: '#fff',
   fontWeight: 900,
-  backdropFilter: 'blur(10px)',
+  backdropFilter: 'var(--theme-blur)',
   fontSize: 10,
   cursor: 'pointer',
 }
@@ -1169,8 +1169,8 @@ const scannerBox: CSSProperties = {
   maxWidth: '100%',
   maxHeight: '100%',
   aspectRatio: '1 / 1',
-  borderRadius: 26,
-  border: '2px solid rgba(74,222,128,.40)',
+  borderRadius: 'var(--theme-radius-panel)',
+  border: '2px solid rgba(var(--theme-done-soft), .40)',
   background: '#000',
   boxShadow: '0 24px 60px rgba(0,0,0,.6)',
 }
@@ -1201,7 +1201,7 @@ const hintText: CSSProperties = {
 
 
 function noticeBox(tone: 'success' | 'info'): CSSProperties {
-  const accent = tone === 'success' ? '#4ade80' : '#94a3b8'
+  const accent = tone === 'success' ? '#4ade80' : 'rgb(var(--theme-line))'
   return {
     position: 'fixed',
     left: '50%',
@@ -1213,16 +1213,16 @@ function noticeBox(tone: 'success' | 'info'): CSSProperties {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 18,
+    borderRadius: 'var(--theme-radius-card)',
     border: `1px solid ${accent}55`,
     borderLeft: `4px solid ${accent}`,
-    background: 'linear-gradient(180deg, rgba(15,23,42,.97), rgba(2,6,23,.97))',
+    background: 'linear-gradient(180deg, rgba(var(--theme-ink), .97), rgba(var(--theme-ink-deep), .97))',
     color: '#f8fafc',
     padding: '12px 14px',
     textAlign: 'left',
-    boxShadow: '0 18px 40px rgba(2,6,23,.45)',
-    backdropFilter: 'blur(18px) saturate(1.1)',
-    WebkitBackdropFilter: 'blur(18px) saturate(1.1)',
+    boxShadow: '0 18px 40px rgba(var(--theme-ink-deep), .45)',
+    backdropFilter: 'var(--theme-blur)',
+    WebkitBackdropFilter: 'var(--theme-blur)',
     zIndex: 2147483000,
     animation: 'sagaNoticeIn .22s ease-out',
   }

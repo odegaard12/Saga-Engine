@@ -9,6 +9,7 @@ Sacarlo aquí quita cinco símbolos de la superficie que los routers piden a
 import circular.
 """
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -43,11 +44,76 @@ def saga_asset_file_response(filename: str, media_type: str):
     )
 
 
+# El color de la barra del navegador en Android: la franja de arriba, fuera de
+# la página, que ningún CSS puede tocar. Estaba clavado en verde en el
+# `index.html`, así que una misión roja se abría con una banda verde encima.
+#
+# Tiene que valer lo mismo que `--theme-bg` de cada tema en `mobile-themes.css`.
+# Son dos sitios porque uno es CSS y el otro es una etiqueta que se manda antes
+# de que exista ningún CSS; hay una prueba que compara los dos valores.
+COLOR_DE_BARRA = {
+    "theme-glass": "#0f172a",
+    "theme-flame-red": "#331613",
+}
+
+
+def tema_de_la_mision() -> str:
+    """La clase de tema que lleva esta misión, para el `<body>`.
+
+    Se pregunta al servidor porque la configuración es suya. Si algo falla se
+    devuelve cadena vacía y la página sale sin clase: los valores por defecto
+    del CSS son los de siempre, así que no se rompe nada.
+    """
+    try:
+        import main
+
+        tema = main.normalize_player_theme((main.load_config() or {}).get("player_theme"))
+        limpio = "".join(c for c in str(tema) if c.isalnum() or c == "-")
+        return "theme-%s" % limpio if limpio else ""
+    except Exception:
+        return ""
+
+
 def react_index_or_missing():
-    """La aplicación, o una página que explica que falta compilarla."""
+    """La aplicación, o una página que explica que falta compilarla.
+
+    La página sale del servidor CON EL TEMA PUESTO en el `<body>`.
+
+    Antes se entregaba el fichero tal cual y la clase la ponía JavaScript al
+    arrancar. Eso dejaba un hueco: la pantalla de carga -el anillo y la barra de
+    "Primera vez: se guarda el mapa"- se pinta antes de que exista ninguna
+    configuración, así que salía siempre con los colores por defecto dijera lo
+    que dijera la misión. Y cuando por fin llegaba el tema, se veía cambiar: el
+    parpadeo.
+
+    Poniéndolo aquí no hay ningún instante sin tema.
+    """
     if REACT_INDEX_FILE.exists():
-        return FileResponse(
-            REACT_INDEX_FILE,
+        html = REACT_INDEX_FILE.read_text(encoding="utf-8")
+        clase = tema_de_la_mision()
+
+        if clase:
+            if "<body" in html and 'class="' not in html.split("<body", 1)[1][:120]:
+                html = html.replace("<body", '<body class="%s"' % clase, 1)
+
+            # También en el `<html>`. El `body` lo tapa casi siempre, pero al
+            # rebotar el desplazamiento en un móvil asoma por arriba o por
+            # abajo la franja del elemento de más afuera, y esa se quedaba con
+            # el color por defecto: azul marino en una misión roja.
+            if "<html" in html and 'class="' not in html.split("<html", 1)[1][:120]:
+                html = html.replace("<html", '<html class="%s"' % clase, 1)
+
+            color = COLOR_DE_BARRA.get(clase)
+            if color:
+                html = re.sub(
+                    r'(<meta name="theme-color" content=")[^"]*(")',
+                    r"\g<1>%s\g<2>" % color,
+                    html,
+                    count=1,
+                )
+
+        return HTMLResponse(
+            html,
             headers={**SIN_CACHE, "Pragma": "no-cache", "Expires": "0"},
         )
 

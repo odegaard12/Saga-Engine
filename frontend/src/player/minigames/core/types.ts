@@ -17,22 +17,7 @@ export type CapabilityRequirement = 'required' | 'preferred' | 'optional' | 'for
 
 export type ValidationMode = 'client' | 'server' | 'hybrid'
 
-export type MinigameRuntimeState =
-  | 'idle'
-  | 'preflight'
-  | 'permissions'
-  | 'briefing'
-  | 'calibrating'
-  | 'active'
-  | 'paused'
-  | 'fallback'
-  | 'success'
-  | 'failed'
-  | 'error'
-
 export type MinigameRunMode = 'normal' | 'degraded' | 'fallback' | 'blocked'
-
-export type MinigameResult = 'success' | 'failed'
 
 export type FallbackPolicy = 'none' | 'manual_code' | 'alternate_minigame' | 'degraded_mode'
 
@@ -88,29 +73,8 @@ export interface MinigameSessionContext {
   userAgent?: string
 }
 
-export interface MinigameCompletionPayload {
-  family: MinigameFamily
-  version: MinigameVersion
-
-  result: MinigameResult
-  mode: MinigameRunMode
-
-  elapsed_ms: number
-  attempts: number
-  score?: number
-
-  telemetry?: Record<string, unknown>
-}
-
 export interface MinigameRuntimeBindings<TConfig extends Record<string, unknown>> {
   definition: MinigameDefinitionBase<MinigameFamily, TConfig>
   config: TConfig
   session: MinigameSessionContext
-}
-
-export interface MinigameController<TConfig extends Record<string, unknown>> {
-  runPreflight: (bindings: MinigameRuntimeBindings<TConfig>) => Promise<MinigamePreflightResult>
-  validateConfig: (
-    config: unknown
-  ) => { ok: true; value: TConfig } | { ok: false; errors: string[] }
 }

@@ -230,33 +230,6 @@ def _normalize_circuit_path_cells(value, rows, cols):
 
 
 
-def _normalize_sequence_tokens(value):
-    if not isinstance(value, list):
-        return []
-
-    if len(value) < 3 or len(value) > 10:
-        return []
-
-    tokens = []
-    seen = set()
-
-    for raw_item in value:
-        token = _as_str(raw_item).strip()
-
-        if not token or len(token) > 32:
-            return []
-
-        identity = token.casefold()
-
-        if identity in seen:
-            return []
-
-        tokens.append(token)
-        seen.add(identity)
-
-    return tokens
-
-
 def _normalize_mosaic_choices(value):
     if not isinstance(value, list):
         return [
@@ -296,6 +269,15 @@ def normalize_minigame_config(minigame_type, raw_cfg):
                 out[field] = _as_bool(raw[field])
             else:
                 out[field] = _as_str(raw[field]).strip()
+    # required_members: solo lo usa team_relay (un game_id de signal_hunt,
+    # no un campo real de esa familia -ver frontend/.../family-types.ts-),
+    # así que va aquí, junto a game_id, y no en el whitelist de campos de
+    # signal_hunt de _normalize_minigame_config_raw. Sin esto, admin.py
+    # guardaba el número pero normalize_stage lo tiraba al leer: el jugador
+    # nunca veía el umbral que puso el organizador, siempre el 2 de
+    # siempre. Encontrado con sim/playwright-bench, no a ojo.
+    if "required_members" in raw:
+        out["required_members"] = _clamp_int(raw.get("required_members"), 2, 1, 20)
     return out
 
 
@@ -810,7 +792,17 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
         out = {
             "objective": _as_str(raw.get("objective") or "shake_charge").strip().lower() or "shake_charge",
-            "game_id": _as_str(raw.get("game_id") or "shake_antenna_charge").strip() or "shake_antenna_charge",
+            # No "shake_antenna_charge": esa cadena la usa runtime-bridge.ts
+            # (React, jugador) para redirigir misiones VIEJAS de signal_hunt
+            # a circuit_matrix/logic_circuit -una migracion real, de antes de
+            # que existiera este objetivo-. motion_challenge la reutilizaba
+            # por accidente como su propio game_id por defecto: cualquier
+            # nodo motion_challenge con el valor de siempre acababa
+            # mostrando un puzle de circuitos en vez del reto de movimiento.
+            # Verificado que ningun dato real en produccion usa
+            # "shake_antenna_charge" (grep sobre saga.sqlite3, 0 resultados)
+            # antes de renombrar: no hace falta migrar nada.
+            "game_id": _as_str(raw.get("game_id") or "shake_charge").strip() or "shake_charge",
             "difficulty": difficulty,
             "duration_mode": duration_mode,
             "penalty_mode": penalty_mode,

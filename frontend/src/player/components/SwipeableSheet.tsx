@@ -13,15 +13,43 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
-  // Reset offset when opened
+  /**
+   * La hoja ahora SE CIERRA, no desaparece.
+   *
+   * Antes: `if (!open && offsetY === 0) return null`. Al pulsar la X o el
+   * fondo, `open` pasaba a falso con el desplazamiento a cero, asi que la
+   * condicion se cumplia en el mismo instante y la hoja se DESMONTABA de
+   * golpe: el panel mas grande de la pantalla se esfumaba sin transicion.
+   * La animacion de bajada solo existia arrastrandola con el dedo mas de
+   * 100px, que es el unico camino que alguien habia probado.
+   *
+   * Ahora se queda montada mientras se desliza hacia abajo y se desmonta
+   * cuando termina. Entra y sale por el mismo sitio.
+   */
+  const [montada, setMontada] = useState(open)
+  const [saliendo, setSaliendo] = useState(false)
+
   useEffect(() => {
     if (open) {
+      setMontada(true)
+      setSaliendo(false)
       setOffsetY(0)
       setIsDragging(false)
+      return undefined
     }
-  }, [open])
 
-  if (!open && offsetY === 0) return null
+    if (!montada) return undefined
+
+    setSaliendo(true)
+    const id = window.setTimeout(() => {
+      setMontada(false)
+      setSaliendo(false)
+      setOffsetY(0)
+    }, 280)
+    return () => window.clearTimeout(id)
+  }, [open, montada])
+
+  if (!montada) return null
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true)
@@ -57,8 +85,11 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: `translateY(${offsetY}px)`,
-    transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+    transform: saliendo ? 'translateY(100%)' : 'translateY(0)',
+    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+    // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
+    // un salto hacia arriba justo antes de bajar.
+    animation: saliendo ? 'none' : undefined,
   }
 
   return (
@@ -66,26 +97,28 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
       <div
         style={{
           ...backdrop,
-          opacity: open ? Math.max(0, 1 - offsetY / 300) : 0,
+          opacity: open && !saliendo ? 1 : 0,
         }}
         onClick={onClose}
       />
 
       <aside
         ref={sheetRef}
+        // La clase ya NO la pinta el tema: su regla -brasa y esquina cortada
+        // con !important- se quito al pasar esta hoja a tarjeta solida del
+        // diseño "B", porque le ganaba a los estilos en linea. Se conserva
+        // como gancho para poder encontrarla desde fuera (pruebas, medidas).
+        className="saga-hoja"
         style={dynamicSheetStyle}
         aria-modal="true"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <div
-          style={dragHandleWrapper}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div style={dragHandle} />
-        </div>
+        {/* La zona de arrastre se fue: al mover la hoja con el dedo quedaba
+            mal -se despegaba a medias y volvia de golpe- y ya no aportaba
+            nada, porque el boton de cerrar vuelve a verse (antes se
+            escondia solo y arrastrar era la unica salida). Se cierra con la
+            X o tocando fuera. De paso se recuperan los 22px que ocupaba. */}
         <div
           style={{
             flex: 1,
@@ -116,9 +149,9 @@ const overlay: CSSProperties = {
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(2,6,23,.34)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  background: 'rgba(var(--theme-ink-deep), .34)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
   transition: 'opacity 0.3s ease',
 }
@@ -127,28 +160,25 @@ const sheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
   width: 'min(100%, 520px)',
-  borderRadius: 28,
-  background: 'rgba(2,6,23,.95)',
+  borderRadius: 'var(--theme-radius-panel)',
+  background: 'rgba(var(--theme-ink-deep), .95)',
   padding: '8px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
   display: 'flex',
   flexDirection: 'column',
   maxHeight: '85vh',
   color: '#f8fafc',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
 }
 
+// Zona de arrastre para cerrar deslizando. Llevaba un tirador visual -una
+// pildora blanca fija que no seguia al tema y se veia mal sobre la brasa de
+// fuego-; se quito el dibujo y se dejo la zona de arrastre, que sigue
+// funcionando igual.
 const dragHandleWrapper: CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
-  paddingBottom: 16,
+  padding: '10px 0 12px',
   cursor: 'grab',
-}
-
-const dragHandle: CSSProperties = {
-  width: 40,
-  height: 5,
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.25)',
 }

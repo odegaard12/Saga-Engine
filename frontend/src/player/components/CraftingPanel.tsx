@@ -28,6 +28,7 @@ function RecipeCard({
 
   return (
     <div
+      className={CLASE_FICHA_MESA}
       style={{
         ...recipeCard,
         ...(canCraft ? recipeCardReady : recipeCardLocked),
@@ -65,6 +66,7 @@ function RecipeCard({
           return (
             <div
               key={inp.item_id}
+              className={CLASE_PIEZA_MESA}
               style={{ ...inputChip, ...(enough ? inputChipReady : inputChipMissing) }}
             >
               <ItemIconSvg itemId={inp.item_id} size={16} />
@@ -77,11 +79,15 @@ function RecipeCard({
         })}
       </div>
 
-      {/* Craft button */}
-      {canCraft && (
-        <button
+      {/* El boton, SIEMPRE.
+          Antes solo aparecia cuando ya podias fabricar, asi que mientras
+          juntabas piezas no habia nada que te dijera hacia donde ibas: la
+          seccion terminaba en la ultima pieza y ya. Ahora esta desde el
+          principio, apagado, y se enciende al completar la receta. */}
+      <button
           type="button"
-          style={craftBtn}
+          disabled={!canCraft}
+          style={canCraft ? craftBtn : { ...craftBtn, ...craftBtnApagado }}
           onPointerDown={() => setPressed(true)}
           onPointerUp={() => setPressed(false)}
           onPointerLeave={() => setPressed(false)}
@@ -95,7 +101,6 @@ function RecipeCard({
         >
           <span>⚒</span> Ensamblar
         </button>
-      )}
     </div>
   )
 }
@@ -223,19 +228,21 @@ const panel: CSSProperties = {
   overflowY: 'auto',
 }
 
+// La ayuda, en voz baja.
+//
+// Era una caja con fondo y borde, y en una pantalla de 375 px de ancho se comia
+// el sitio de lo unico que importa aqui: la receta. Se queda el texto -hace
+// falta la primera vez- pero sin caja, para que mande la ficha.
 const infoBox: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: 8,
-  background: 'rgba(167,139,250,0.08)',
-  border: '1px solid rgba(167,139,250,0.18)',
-  borderRadius: 12,
-  padding: '10px 12px',
+  gap: 6,
+  padding: '0 2px',
 }
 
 const infoText: CSSProperties = {
   fontSize: 12,
-  color: 'rgba(226,232,240,0.75)',
+  color: 'rgba(var(--theme-line-soft), 0.75)',
   lineHeight: 1.5,
 }
 
@@ -270,19 +277,19 @@ const readyBadge: CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
   letterSpacing: '0.08em',
-  color: '#4ade80',
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
-  borderRadius: 999,
+  color: 'rgb(var(--theme-done-soft))',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 10px',
 }
 
 const toastBanner: CSSProperties = {
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
   color: '#bbf7d0',
   padding: '9px 14px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 13,
   fontWeight: 800,
   textAlign: 'center',
@@ -295,24 +302,42 @@ const recipeList: CSSProperties = {
   gap: 10,
 }
 
+// La clase es lo que permite al tema darle FORMA. Sin ella no hay manera: el
+// corte de fuego tiene que ir en una regla limitada a ese tema, porque en
+// cristal la variable vale 0 y un poligono rectangular le borraria las esquinas
+// redondas.
+export const CLASE_FICHA_MESA = 'saga-mesa-ficha'
+export const CLASE_PIEZA_MESA = 'saga-mesa-pieza'
+
+// SIN FICHA.
+//
+// Era una tarjeta dentro de la hoja dentro del panel: tres marcos para un
+// contenido, en una pantalla de 375 px. Ahora la receta es una seccion plana y
+// el sitio se lo quedan las piezas, que es lo que se mira.
 const recipeCard: CSSProperties = {
-  borderRadius: 16,
-  padding: '14px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 12,
+  gap: 10,
   transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
 }
 
+/**
+ * La receta sigue SIN FICHA: ver la nota de `recipeCard` justo arriba.
+ *
+ * Se probo a darles fondo solido para que casaran con el diseño "B", y era
+ * volver al recuadro dentro de recuadro: la ficha dentro de la hoja dentro
+ * del panel. La superficie la llevan las piezas (`inputChip`); la receta
+ * solo se apaga cuando le faltan ingredientes.
+ */
 const recipeCardReady: CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'transparent',
+  border: 0,
 }
 
 const recipeCardLocked: CSSProperties = {
-  background: 'rgba(255,255,255,0.025)',
-  border: '1px solid rgba(255,255,255,0.06)',
-  opacity: 0.65,
+  background: 'transparent',
+  border: 0,
+  opacity: 0.5,
 }
 
 const recipeOutputRow: CSSProperties = {
@@ -350,7 +375,7 @@ const recipeOutputMeta: CSSProperties = {
   marginTop: 2,
   fontSize: 11,
   fontWeight: 700,
-  color: 'rgba(226,232,240,0.55)',
+  color: 'rgba(var(--theme-line-soft), 0.55)',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
@@ -360,10 +385,10 @@ const availablePill: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.12em',
-  color: '#4ade80',
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.3)',
-  borderRadius: 999,
+  color: 'rgb(var(--theme-done-soft))',
+  background: 'rgba(var(--theme-done), 0.15)',
+  border: '1px solid rgba(var(--theme-done), 0.3)',
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
 }
@@ -372,33 +397,43 @@ const lockedPill: CSSProperties = {
   fontSize: 9,
   fontWeight: 900,
   letterSpacing: '0.12em',
-  color: '#94a3b8',
-  background: 'rgba(148,163,184,0.1)',
-  border: '1px solid rgba(148,163,184,0.2)',
-  borderRadius: 999,
+  color: 'rgb(var(--theme-line))',
+  background: 'rgba(var(--theme-line), 0.1)',
+  border: '1px solid rgba(var(--theme-line), 0.2)',
+  borderRadius: 'var(--theme-radius-pill)',
   padding: '3px 8px',
   flexShrink: 0,
 }
 
+// Una pieza por fila y a todo el ancho: se leen en vertical de un vistazo, y
+// con guantes se distinguen. En horizontal se envolvian y quedaban a medias.
 const inputsRow: CSSProperties = {
   display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
+  flexDirection: 'column',
+  gap: 4,
 }
 
 const inputChip: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 5,
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 8,
-  padding: '4px 9px',
+  gap: 8,
+  width: '100%',
+  // Relleno propio, no el mismo color que la hoja: puestas sobre la tarjeta
+  // solida con `--theme-card` se volvian invisibles -mismo color exacto- y
+  // solo se adivinaban por el filo de la izquierda.
+  background: 'var(--theme-card-inset)',
+  // El estado se cuenta con el filo de la izquierda, no con un borde alrededor.
+  borderLeft: '3px solid var(--theme-hairline)',
+  borderRadius: 10,
+  padding: '11px 12px',
 }
 
 const inputChipReady: CSSProperties = {
-  borderColor: 'rgba(74,222,128,.45)',
-  background: 'rgba(74,222,128,.12)',
+  // Verde universal de "lo tienes", no --theme-done: en fuego ese token es
+  // naranja y no se distinguia de lo que falta. Mismo criterio que las
+  // etiquetas de "antes de salir".
+  borderLeft: '3px solid #22c55e',
+  background: 'rgba(34,197,94,.10)',
 }
 
 const inputChipMissing: CSSProperties = {
@@ -406,18 +441,28 @@ const inputChipMissing: CSSProperties = {
 }
 
 const inputChipLabel: CSSProperties = {
-  fontSize: 11,
+  flex: 1,
+  fontSize: 13,
   fontWeight: 700,
-  color: 'rgba(226,232,240,0.7)',
+  color: 'rgba(var(--theme-line-soft), 0.9)',
+}
+
+// Apagado mientras faltan piezas: se ve a donde vas, pero no invita a pulsarlo.
+const craftBtnApagado: CSSProperties = {
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.35)',
+  boxShadow: 'none',
+  cursor: 'default',
 }
 
 const craftBtn: CSSProperties = {
   width: '100%',
-  padding: '11px 0',
-  borderRadius: 12,
+  padding: '13px 0',
+  borderRadius: 11,
   border: 'none',
-  background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
-  color: '#fff',
+  // Era morado -#a78bfa a #7c3aed- en un tema rojo. Del tema, ahora.
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
   fontWeight: 900,
   fontSize: 14,
   letterSpacing: '0.05em',
@@ -426,7 +471,7 @@ const craftBtn: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: 8,
-  boxShadow: '0 4px 18px rgba(124,58,237,0.4)',
+  boxShadow: '0 4px 18px rgba(var(--theme-ink-deep), 0.45)',
   transition: 'transform 0.15s, box-shadow 0.15s',
 }
 

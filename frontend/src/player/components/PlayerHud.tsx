@@ -38,7 +38,15 @@ interface PlayerHudProps {
   onCloseTools: () => void
   onToggleDebug: () => void
   onDownloadFieldProofs?: () => void
+  /**
+   * Volver a bajar el mapa. Vive AQUI y no en "antes de salir": este es el
+   * grupo de "Operacion sen conexion", donde ya esta todo lo del mapa
+   * guardado. Alli era el boton mas grande de la tarjeta para algo que casi
+   * nunca se usa, y ademas duplicaba lo que ya habia en esta hoja.
+   */
+  onRedownloadMap?: () => void
   fieldPhotoCount?: number
+  pendingFieldPhotoCount?: number
   submitting?: boolean
   errorMessage?: string | null
   onSubmitCode?: (
@@ -91,7 +99,9 @@ export function PlayerHud({
   onCloseTools,
   onToggleDebug,
   onDownloadFieldProofs,
+  onRedownloadMap,
   fieldPhotoCount = 0,
+  pendingFieldPhotoCount = 0,
   submitting = false,
   errorMessage = null,
   onSubmitCode,
@@ -215,7 +225,25 @@ export function PlayerHud({
         )
         .forEach(hideElement)
 
+      /**
+       * TODO MENOS LO QUE HAY DENTRO DE LA HOJA.
+       *
+       * Este barrido esconde los mandos del mapa para que no se queden por
+       * encima del panel abierto, y decide por el texto del boton: si es un
+       * simbolo de uno o dos caracteres, fuera.
+       *
+       * El boton de cerrar la hoja dice "×". Un simbolo de un caracter. Asi
+       * que la hoja SE ESCONDIA SU PROPIA X nada mas abrirse, y Ferramentas
+       * y Mochila se quedaban sin forma visible de cerrarse: solo arrastrando
+       * o tocando fuera, y eso no lo adivina nadie.
+       *
+       * Lo de dentro de la hoja no puede estorbar a la hoja, asi que no se
+       * toca. El barrido sigue valiendo para lo de fuera, que es su trabajo.
+       */
+      const hojaAbierta = document.querySelector('.saga-hoja')
+
       document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+        if (hojaAbierta?.contains(button)) return
         if (shouldHideButton(button)) hideElement(button)
       })
     }
@@ -294,38 +322,58 @@ export function PlayerHud({
         data-saga-player-hud="bottom"
         style={{
           ...card,
-          width: compact ? '100%' : 'min(100%, 720px)',
-          padding: compact ? 12 : 14,
+          // Ver la nota de PlayerShell.tsx: a 720px el boton "Abrir nodo"
+          // media medio metro de ancho. Ancho de telefono tambien aqui.
+          width: compact ? '100%' : 'min(100%, 420px)',
+          // Mas apretada: 140px de alto para un boton, una linea de ayuda y
+          // dos palabras era demasiada tarjeta comiendose el mapa.
+          padding: compact ? '11px 13px 9px' : '13px 15px 11px',
         }}
       >
+        {/**
+         * La ayuda va DENTRO del boton, como segunda linea.
+         *
+         * Estaba debajo, en su propia fila: una linea entera de tarjeta para
+         * una frase que solo tiene sentido junto al boton que describe
+         * -"Radio 50 m. Ya puedes abrir este nodo" habla del boton de abrir-.
+         * Metida dentro se ahorra la fila y se lee donde importa.
+         */}
         <button
           type="button"
           style={getPrimaryStyle(primaryTone, primaryDisabled)}
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
         >
-          {!finished && !inRange && distanceLabel
-            ? `${primaryLabel} · ${distanceLabel}`
-            : primaryLabel}
+          <span style={primaryTitulo}>
+            {!finished && !inRange && distanceLabel
+              ? `${primaryLabel} · ${distanceLabel}`
+              : primaryLabel}
+          </span>
+          {helperCopy ? <span style={primaryAyuda}>{helperCopy}</span> : null}
         </button>
 
-        <div style={helper}>{helperCopy}</div>
-
-        <div style={actionRow}>
+        {/* Version aprobada tras varias rondas de maquetas: sueltos, no en
+            caja -sin fondo ni borde propio, solo la linea fina del medio-,
+            centrados y juntos, y SIN icono: solo texto. Un icono al lado de
+            "Mochila" y otro al lado de "Ferramentas" eran ruido repetido,
+            no informacion -el texto ya dice que es cada uno-. */}
+        <div className="saga-hud-dock" style={dock}>
           <button
             type="button"
-            style={detailsOpen ? ghostButtonActive : ghostButton}
+            style={detailsOpen ? dockButtonActive : dockButton}
             onClick={onToggleDetails}
           >
-            {detailsOpen ? 'Cerrar mochila' : 'Mochila'}
+            {detailsOpen ? 'Cerrar' : 'Mochila'}
           </button>
+
+          <span style={dockDivisor} aria-hidden="true" />
 
           <button
             type="button"
-            style={toolsOpen ? ghostButtonActive : ghostButton}
+            style={toolsOpen ? dockButtonActive : dockButton}
             onClick={onOpenTools}
           >
-            {toolsOpen ? t('player.tools.close', locale) : 'Herramientas'}
+            {toolsOpen ? t('player.tools.close', locale) : 'Ferramentas'}
           </button>
         </div>
       </section>
@@ -335,22 +383,10 @@ export function PlayerHud({
         onClose={onToggleDetails}
         sheetStyle={getSheetStyle(compact)}
       >
-        <div style={sheetHeader}>
-          <div>
-            <div style={sheetEyebrow}>MOCHILA</div>
-            <div style={sheetTitle}>Guia, objetos y respaldo</div>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Cerrar mochila"
-            style={closeButton}
-            onClick={onToggleDetails}
-          >
-            ×
-          </button>
-        </div>
-
+        {/* La cabecera «MOCHILA / Guia, objetos y respaldo» se fue.
+            Ocupaba dos lineas para decir lo que las pestanias ya dicen, y en
+            una hoja de movil eso es sitio que le quitas al contenido. El boton
+            de cerrar se queda, en la misma linea que las pestanias. */}
         <div style={tabs}>
           <button
             type="button"
@@ -373,32 +409,20 @@ export function PlayerHud({
           >
             Mesa
           </button>
+
+          <button
+            type="button"
+            aria-label="Cerrar mochila"
+            style={closeButton}
+            onClick={onToggleDetails}
+          >
+            ×
+          </button>
         </div>
 
-        <div style={statusRow}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '10px' }}>
-              {[1, 2, 3, 4].map((bar) => (
-                <div
-                  key={bar}
-                  style={{
-                    width: '3px',
-                    height: `${bar * 2.5}px`,
-                    background: bar <= getGpsAccuracyBars(gpsAccuracy) ? getGpsAccuracyColor(gpsAccuracy) : 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: '1px',
-                  }}
-                />
-              ))}
-            </div>
-            <span>{distanceMeters === null ? gpsDisplay : rangeDisplay}</span>
-            {gpsAccuracy && distanceMeters === null && <span style={{ opacity: 0.7, fontSize: '0.9em' }}>({Math.round(gpsAccuracy)}m)</span>}
-          </div>
-          <span>
-            {typeof currentStage?.radius === 'number'
-              ? `Radio ${currentStage.radius} m`
-              : 'Sin radio'}
-          </span>
-        </div>
+        {/* La fila de estado se fue: ponia ".ıl 0 M PRETO 0 · RAIO 50 M."
+            y parece telemetria de depuracion. En el monte no le dice nada
+            a nadie, y el radio del nodo ya lo cuenta el boton de abajo. */}
 
         <div style={tabPanel}>
           {backpackTab === 'requirements' ? (
@@ -442,6 +466,11 @@ export function PlayerHud({
         <section style={toolsCardGroup}>
           <div style={toolsCardGroupLabel}>{t('player.tools.offlineOp', locale)}</div>
           <MissionPackPanel user={user} payload={missionPayload} />
+          {onRedownloadMap ? (
+            <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
+              🗺️ Volver a bajar o mapa
+            </button>
+          ) : null}
         </section>
 
         {/* CARD 2: ACCIONES DE CAMPO */}
@@ -460,6 +489,11 @@ export function PlayerHud({
                   ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
                   : `📥 ${t('player.tools.noPhotos', locale)}`}
               </button>
+            ) : null}
+            {pendingFieldPhotoCount > 0 ? (
+              <div style={pendingPhotosBadge}>
+                ⏳ {pendingFieldPhotoCount} {t('player.tools.photosPending', locale)}
+              </div>
             ) : null}
           </div>
 
@@ -559,76 +593,57 @@ export function PlayerHud({
           <div style={{ marginTop: 12 }}>
             <button
               type="button"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: 12,
-                background: 'rgba(239, 68, 68, 0.12)',
-                color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
+              /**
+               * Texto discreto, no un boton rojo a dos lineas.
+               *
+               * Era lo UNICO rojo de toda la hoja -el color de "peligro" para
+               * algo que no lo es-, partia en dos lineas y decia lo mismo dos
+               * veces: "Cambiar de Xogador / Volver a Seleccion". Salir de tu
+               * partida no es destructivo, es solo salir.
+               */
+              style={salirTexto}
               onClick={() => {
                 onCloseTools()
                 window.location.href = '/player/'
               }}
             >
-              🚪 {t('player.tools.switchPlayer', locale)}
+              Cambiar de xogador
             </button>
           </div>
 
-          {/* Selector de Idioma (Español / Galego) */}
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.05em' }}>
-              🌐 {t('player.tools.language', locale)}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/**
+           * Selector de idioma: UN control, no dos botones sueltos.
+           *
+           * Lo de antes tenia tres cosas mal, y ninguna era de gusto:
+           * - El activo cambiaba de COLOR segun el idioma -verde para
+           *   español, azul para galego-. El color decia "que idioma es",
+           *   que no significa nada, en vez de "cual esta puesto".
+           * - Usaba 🟦 como bandera de Galicia. Es un cuadrado azul.
+           * - Y la marca de puesto era un ✓ metido dentro del texto, asi
+           *   que los dos botones cambiaban de ancho al cambiar de idioma.
+           *
+           * Ahora es un selector de dos tramos sobre un carril: el puesto
+           * se enciende con el color del tema, el otro queda apagado. Se
+           * ve cual esta activo sin leer nada.
+           */}
+          <div style={idiomaBloque}>
+            <div style={idiomaEtiqueta}>{t('player.tools.language', locale)}</div>
+            <div style={idiomaCarril}>
               <button
                 type="button"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 12,
-                  border: locale === 'es' ? '1px solid rgba(52, 211, 153, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'es' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'es' ? '#34d399' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={locale === 'es' ? idiomaTramoActivo : idiomaTramo}
                 onClick={() => chooseLocale('es')}
+                aria-pressed={locale === 'es'}
               >
-                🇪🇸 Español {locale === 'es' ? '✓' : ''}
+                Español
               </button>
-
               <button
                 type="button"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 12,
-                  border: locale === 'gl' ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: locale === 'gl' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: locale === 'gl' ? '#38bdf8' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                style={locale === 'gl' ? idiomaTramoActivo : idiomaTramo}
                 onClick={() => chooseLocale('gl')}
+                aria-pressed={locale === 'gl'}
               >
-                🟦 Galego {locale === 'gl' ? '✓' : ''}
+                Galego
               </button>
             </div>
           </div>
@@ -646,7 +661,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
   if (disabled || tone === 'locked') {
     return {
       ...primaryBase,
-      background: 'rgba(148,163,184,.22)',
+      background: 'rgba(var(--theme-line), .22)',
       border: '1px solid rgba(255,255,255,.12)',
       color: 'rgba(255,255,255,.72)',
     }
@@ -655,7 +670,7 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
   if (tone === 'gps') {
     return {
       ...primaryBase,
-      background: 'rgba(59,130,246,.18)',
+      background: 'rgba(var(--theme-pin), .18)',
       border: '1px solid rgba(96,165,250,.26)',
       color: '#dbeafe',
     }
@@ -680,26 +695,36 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
     }
   }
 
+  // Naranja PLANO y texto oscuro encima -maqueta aprobada-. El degradado con
+  // glow y texto blanco se leia apagado sobre la tarjeta; el color plano con
+  // texto oscuro es el contraste mas alto posible y es la unica accion
+  // primaria de la pantalla: tiene que cantar.
   return {
     ...primaryBase,
-    background: 'linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover))',
-    border: '1px solid var(--theme-primary-border)',
-    color: '#ffffff',
-    boxShadow: 'var(--saga-accent-glow)',
+    background: 'var(--theme-primary)',
+    border: 0,
+    color: 'var(--theme-card)',
   }
 }
 
+/**
+ * Sin caja: velo, no tarjeta.
+ *
+ * Version final tras varias rondas de maquetas -"mas fluido, mas como el
+ * login"-: nada de panel de cristal con borde y sombra propia. Un degradado
+ * que se apaga hacia arriba, igual que el `fondoVelo` del login, para que el
+ * boton y el dock floten sobre el mapa en vez de vivir dentro de una tarjeta.
+ */
+// Tarjeta flotante SOLIDA, como la de arriba. Ver la nota de PlayerShell.tsx:
+// los velos con degradado sobre el mapa daban barro, el color plano no.
 const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
   display: 'grid',
-  gap: 10,
-  borderRadius: 28,
-  background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
-  border: '1px solid rgba(255,255,255,.22)',
-  boxShadow: '0 22px 60px rgba(15,23,42,.18)',
-  backdropFilter: 'blur(24px) saturate(1.12)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.12)',
+  gap: 0,
+  background: 'var(--theme-card)',
+  borderRadius: 15,
+  boxShadow: 'var(--theme-card-shadow)',
 }
 
 
@@ -711,7 +736,7 @@ const chipBase: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 10px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   border: '1px solid rgba(255,255,255,.12)',
   fontSize: 10,
   fontWeight: 900,
@@ -723,45 +748,146 @@ const chipBase: CSSProperties = {
 
 
 
+/**
+ * Pildora, no la esquina cortada del tema -a proposito, aprobado en maqueta.
+ *
+ * El resto de la interfaz de fuego corta esquinas (theme-radius-card = 2px);
+ * este boton es la UNICA accion primaria de toda la pantalla de jugador y
+ * el propio Oscar pidio "mas fluido, mas como el login" y aprobo la version
+ * en pildora tras varias rondas -misma logica que ya se aplico al avatar,
+ * que tampoco seguia el radio del tema por ser la cara de una persona-.
+ */
 const primaryBase: CSSProperties = {
   width: '100%',
   minHeight: 48,
-  borderRadius: 16,
-  fontSize: 14,
-  fontWeight: 900,
-  letterSpacing: '0.10em',
-  textTransform: 'uppercase',
-}
-
-const helper: CSSProperties = {
-  color: 'rgba(255,255,255,.82)',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 2,
+  padding: '9px 12px',
+  // 11px, no pildora: dentro de una tarjeta de esquina 15 una pildora
+  // completa desentona. La maqueta aprobada lleva boton de esquina suave.
+  borderRadius: 11,
   fontSize: 13,
-  lineHeight: 1.45,
-}
-const actionRow: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
+  fontWeight: 900,
+  letterSpacing: '0.03em',
 }
 
-const ghostButton: CSSProperties = {
-  minHeight: 42,
+const primaryTitulo: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '0.03em',
+}
+
+// Hereda el color del boton y baja la opacidad: sobre el naranja lleno un
+// gris fijo se ensuciaria, y sobre el boton apagado un blanco no se leeria.
+const primaryAyuda: CSSProperties = {
+  // 11.5, no 10.5: lo caza la auditoria de interfaz del banco, y con razon.
+  // Esta frase se lee de pie, al sol, con el movil en la mano -no es una
+  // etiqueta decorativa, dice si puedes abrir el nodo o no-.
+  fontSize: 11.5,
+  fontWeight: 700,
+  opacity: 0.72,
+  lineHeight: 1.3,
+  textAlign: 'center',
+}
+/**
+ * Sueltos, no en caja -version final tras varias rondas de maquetas-.
+ *
+ * Ni fondo ni borde propios: Mochila y Ferramentas flotan sobre el mismo
+ * velo oscuro que ya lleva la barra inferior entera, centrados y juntos
+ * -no repartidos a todo el ancho-, separados solo por una linea fina.
+ * Mismo idioma que la fila de iconos de la camara/historial/ranking/brujula
+ * sobre el mapa: nada de tarjetas, todo flotando sobre el velo.
+ */
+const dock: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 22,
+  marginTop: 8,
+}
+
+const dockDivisor: CSSProperties = {
+  width: 1,
+  height: 13,
+  background: 'var(--theme-hairline)',
+}
+
+const salirTexto: CSSProperties = {
+  width: '100%',
+  marginTop: 14,
+  paddingTop: 14,
+  borderTop: `1px solid var(--theme-hairline)`,
+  border: 0,
+  borderTopWidth: 1,
+  borderTopStyle: 'solid',
+  borderTopColor: 'var(--theme-hairline)',
+  background: 'transparent',
+  color: 'rgba(255,255,255,.5)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const idiomaBloque: CSSProperties = {
+  marginTop: 14,
+  paddingTop: 14,
+  borderTop: `1px solid var(--theme-hairline)`,
+}
+
+const idiomaEtiqueta: CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,.6)',
+  marginBottom: 9,
+}
+
+// El carril: un solo bloque partido en dos, no dos botones con hueco.
+const idiomaCarril: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 3,
+  padding: 3,
+  borderRadius: 12,
+  background: 'var(--theme-card-inset)',
+}
+
+const idiomaTramo: CSSProperties = {
+  minHeight: 36,
+  border: 0,
+  borderRadius: 9,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.6)',
+  fontSize: 12.5,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const idiomaTramoActivo: CSSProperties = {
+  ...idiomaTramo,
+  background: 'var(--theme-primary)',
+  color: 'var(--theme-card)',
+}
+
+const dockButton: CSSProperties = {
+  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(15,23,42,.32)',
+  border: 0,
+  background: 'transparent',
   color: '#ffffff',
-  fontSize: 12,
+  fontSize: 12.5,
   fontWeight: 800,
 }
 
-const ghostButtonActive: CSSProperties = {
-  ...ghostButton,
-  background: 'rgba(59,130,246,.16)',
-  border: '1px solid rgba(96,165,250,.18)',
-  color: '#dbeafe',
+// Encendido con el color del tema, no un azul fijo: en fuego desentonaba
+// -misma correccion que ya se hizo en el boton del panel "antes de salir".
+const dockButtonActive: CSSProperties = {
+  ...dockButton,
+  color: 'var(--theme-primary)',
 }
 
 function getOverlayStyle(compact: boolean): CSSProperties {
@@ -783,21 +909,22 @@ function getSheetStyle(compact: boolean): CSSProperties {
     position: 'relative',
     zIndex: 1,
     display: 'grid',
-    gap: 10,
+    // Sin hueco: los dos hijos son el tirador y el contenido, y el tirador ya
+    // se pone su propio aire. El hueco solo lo duplicaba.
+    gap: 0,
     width: compact ? '100%' : 'min(100%, 480px)',
     maxHeight: compact ? '84dvh' : 'min(66vh, 590px)',
     overflowY: 'auto',
     overflowX: 'hidden',
     overscrollBehavior: 'contain',
-    borderRadius: compact ? '24px 24px 0 0' : 30,
-    border: '1px solid rgba(255,255,255,.22)',
-    borderBottom: compact ? 'none' : '1px solid rgba(255,255,255,.22)',
-    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
+    // Tarjeta SOLIDA, no cristal -diseno "B", aprobado-. Ver la nota larga
+    // de PlayerShell.tsx: los translucidos sobre el mapa daban barro.
+    borderRadius: compact ? '18px 18px 0 0' : 18,
+    border: 0,
+    background: 'var(--theme-card)',
     color: '#f8fafc',
-    boxShadow: '0 -15px 35px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.6)',
-    backdropFilter: 'blur(20px) saturate(1.2)',
-    WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
-    padding: 14,
+    boxShadow: 'var(--theme-card-shadow)',
+    padding: '0 18px',
     paddingBottom: compact
       ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
       : 'calc(14px + env(safe-area-inset-bottom, 0px))',
@@ -813,18 +940,11 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  padding: '0 0 12px 0',
-  background: 'transparent',
-  borderBottom: '1px solid rgba(255,255,255,.10)',
+  padding: '0 0 14px 0',
+  background: 'var(--theme-card)',
+  borderBottom: `1px solid var(--theme-hairline)`,
 }
 
-const sheetEyebrow: CSSProperties = {
-  color: '#bbf7d0',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-}
 
 const sheetTitle: CSSProperties = {
   marginTop: 4,
@@ -835,46 +955,56 @@ const sheetTitle: CSSProperties = {
   letterSpacing: '-0.03em',
 }
 
+// Cintas, no cajas.
+//
+// Eran tres cajas dentro de otra caja con su propio fondo y borde: cuatro
+// marcos para elegir entre tres cosas. Ahora son texto, y la activa se marca
+// con un subrayado encendido. Se lee igual de rapido y no gasta altura.
 const tabs: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 6,
-  padding: 4,
-  borderRadius: 18,
-  background: 'rgba(0,0,0,.2)',
-  border: '1px solid rgba(255,255,255,.05)',
+  display: 'flex',
+  alignItems: 'stretch',
+  gap: 0,
+  borderBottom: '1px solid rgba(var(--theme-line), .18)',
 }
 
+// Cada pestania se lleva su tercio del ancho.
+//
+// Alineadas a la izquierda dejaban medio ancho muerto: tres palabras cortas y
+// un vacio hasta el boton de cerrar. Repartidas, el subrayado ocupa su tramo y
+// se leen como pestanias, no como tres enlaces sueltos.
 const tabButton: CSSProperties = {
-  minHeight: 40,
+  flex: 1,
   border: 'none',
-  borderRadius: 14,
   background: 'transparent',
-  color: 'rgba(226,232,240,.70)',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
+  padding: '9px 0 7px',
+  color: 'rgba(var(--theme-line-soft), .55)',
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '.01em',
+  cursor: 'pointer',
+  borderBottom: '2px solid transparent',
+  marginBottom: -1,
 }
+
 
 const tabActive: CSSProperties = {
   ...tabButton,
-  background: 'linear-gradient(135deg, var(--theme-tint-strong), var(--theme-tint))',
-  color: '#a7f3d0',
-  border: '1px solid rgba(52, 211, 153, 0.35)',
-  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+  color: '#ffffff',
+  borderBottom: '2px solid var(--theme-primary)',
 }
+
 
 const statusRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 8,
-  borderRadius: 999,
-  background: 'rgba(255,255,255,.10)',
-  color: 'rgba(248,250,252,.82)',
-  padding: '8px 12px',
-  fontSize: 11,
+  // Sin pastilla: era un bloque blanco del ancho entero para dos datos de
+  // servicio, justo debajo de las pestanias. Ahora es una linea y ya.
+  background: 'transparent',
+  color: 'rgba(var(--theme-line-soft), .6)',
+  padding: '7px 2px 2px',
+  fontSize: 10,
   fontWeight: 950,
   letterSpacing: '0.02em',
   textTransform: 'uppercase',
@@ -891,10 +1021,8 @@ function getToolsSheetStyle(compact: boolean): CSSProperties {
     ...getSheetStyle(compact),
     width: compact ? '100%' : 'min(100%, 460px)',
     maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
-    gap: 14,
-    background: 'linear-gradient(180deg, rgba(100,116,139,.46), rgba(71,85,105,.34))',
-    border: '1px solid rgba(255, 255, 255, 0.22)',
-    boxShadow: '0 -15px 40px rgba(14,165,233,.08), 0 24px 70px rgba(0,0,0,.7)',
+    gap: 0,
+    // Hereda la tarjeta solida de getSheetStyle: aqui solo el ancho y el alto.
   }
 }
 
@@ -916,8 +1044,8 @@ const toolsTitle: CSSProperties = {
 }
 
 const toolsSubtitle: CSSProperties = {
-  color: 'rgba(226,232,240,.72)',
-  fontSize: 11,
+  color: 'rgba(255,255,255,.6)',
+  fontSize: 11.5,
   lineHeight: 1.35,
 }
 
@@ -936,9 +1064,9 @@ const toolsActionGrid: CSSProperties = {
 const toolsButton: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.12)',
-  background: 'linear-gradient(180deg, rgba(100,116,139,.54), rgba(71,85,105,.54))',
+  background: 'linear-gradient(180deg, rgba(var(--theme-sheen-a), calc(.54 * var(--theme-solid))), rgba(var(--theme-sheen-b), calc(.54 * var(--theme-solid))))',
   color: '#f8fafc',
   fontSize: 11,
   fontWeight: 900,
@@ -961,7 +1089,7 @@ const toolsLoginLink: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0 14px',
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(187,247,208,.18)',
   background: 'var(--theme-tint)',
   color: '#dcfce7',
@@ -973,11 +1101,13 @@ const toolsLoginLink: CSSProperties = {
 
 const toolsQuietButton: CSSProperties = {
   ...toolsButton,
-  minHeight: 36,
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: 'rgba(226,232,240,.78)',
-  fontSize: 10,
+  minHeight: 44,
+  borderRadius: 12,
+  background: 'transparent',
+  border: `1px solid var(--theme-card-inset)`,
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
 }
 
 
@@ -985,19 +1115,23 @@ const toolsQuietButton: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  minWidth: 40,
-  width: 40,
-  height: 40,
+  // 36, no 30: es la unica salida visible de la hoja y estaba por debajo del
+  // area de toque que piden Apple y Google. Lo canta la auditoria del banco.
+  minWidth: 36,
+  width: 36,
+  height: 36,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,.14)',
-  background: 'rgba(15,23,42,.70)',
-  color: '#f8fafc',
-  fontSize: 22,
-  fontWeight: 950,
+  // Cuadrado de esquina suave, no pildora ni circulo: dentro de una tarjeta
+  // de esquina 18 un circulo con sombra propia pide mas atencion que el
+  // contenido. Maqueta aprobada.
+  borderRadius: 10,
+  border: 0,
+  background: 'var(--theme-card-inset)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 17,
+  fontWeight: 900,
   cursor: 'pointer',
-  boxShadow: '0 12px 28px rgba(2,6,23,.24)',
 }
 
 
@@ -1010,16 +1144,14 @@ const fallbackToolHead: CSSProperties = {
 }
 
 const fallbackToolButton: CSSProperties = {
-  minHeight: 40,
+  minHeight: 44,
   width: '100%',
-  borderRadius: 14,
-  border: '1px solid rgba(251,191,36,.24)',
-  background: 'rgba(251,191,36,.13)',
-  color: '#fef3c7',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
   marginTop: 8,
 }
 
@@ -1037,9 +1169,9 @@ const fallbackToolForm: CSSProperties = {
 const fallbackToolInput: CSSProperties = {
   width: '100%',
   minHeight: 42,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(255,255,255,.16)',
-  background: 'rgba(15,23,42,.52)',
+  background: 'rgba(var(--theme-ink), .52)',
   color: '#ffffff',
   padding: '0 12px',
   fontSize: 13,
@@ -1049,7 +1181,7 @@ const fallbackToolInput: CSSProperties = {
 
 const fallbackToolSubmit: CSSProperties = {
   minHeight: 42,
-  borderRadius: 14,
+  borderRadius: 'var(--theme-radius-card)',
   border: '1px solid rgba(187,247,208,.22)',
   background: 'var(--theme-tint-strong)',
   color: '#dcfce7',
@@ -1070,44 +1202,59 @@ const fallbackToolError: CSSProperties = {
 const toolsCardGroup: CSSProperties = {
   display: 'grid',
   gap: 8,
-  padding: '14px 0',
-  borderBottom: '1px solid rgba(255,255,255,.05)',
+  padding: '16px 0 4px',
 }
 
+// La etiqueta de grupo, en el color del tema: es lo que ordena esta hoja de
+// arriba abajo -"Operacion offline", "Acciones de campo", "Ajustes"- y en
+// gris se perdia contra el resto del texto.
 const toolsCardGroupLabel: CSSProperties = {
-  color: '#34d399',
-  fontSize: 10,
+  color: 'var(--theme-primary)',
+  fontSize: 9,
   fontWeight: 900,
-  letterSpacing: '0.12em',
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  marginBottom: 4,
+  marginBottom: 6,
 }
 
+// Contorno neutro, no verde: en esta hoja hay tres botones seguidos y cada
+// uno tiraba de un color distinto -verde, ambar, rojo-. Con el mismo
+// contorno se leen como lo que son, una lista de acciones; el color queda
+// para lo que de verdad es una señal.
 const toolsGreenButton: CSSProperties = {
-  minHeight: 40,
+  minHeight: 44,
   padding: '0 12px',
-  borderRadius: 14,
-  border: '1px solid rgba(52, 211, 153, 0.3)',
-  background: 'rgba(16, 185, 129, 0.12)',
-  color: '#34d399',
-  fontSize: 11,
-  fontWeight: 900,
-  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)',
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 12.5,
+  fontWeight: 800,
 }
 
 const toolsGreenActiveButton: CSSProperties = {
   ...toolsGreenButton,
-  background: 'rgba(16, 185, 129, 0.22)',
-  border: '1px solid rgba(52, 211, 153, 0.45)',
-  color: '#34d399',
+  color: '#ffffff',
 }
 
 const toolsGreenDisabledButton: CSSProperties = {
   ...toolsGreenButton,
-  background: 'rgba(255, 255, 255, 0.02)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  color: 'rgba(255, 255, 255, 0.3)',
+  color: 'rgba(255,255,255,.3)',
   cursor: 'not-allowed',
+}
+
+
+const pendingPhotosBadge: CSSProperties = {
+  gridColumn: '1 / -1',
+  marginTop: 2,
+  padding: '0.35rem 0.6rem',
+  borderRadius: 'var(--theme-radius-card)',
+  border: '1px solid rgba(251, 191, 36, 0.35)',
+  background: 'rgba(251, 191, 36, 0.1)',
+  color: '#fbbf24',
+  fontSize: '0.72rem',
+  fontWeight: 700,
+  textAlign: 'center',
 }
 
 

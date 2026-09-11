@@ -6,6 +6,46 @@ from backend.app.runtime.core_engine import _as_str, _as_bool
 router = APIRouter()
 
 
+def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
+    """Todo lo que significa «reiniciar a este jugador», en un solo sitio.
+
+    Había DOS reinicios y no hacían lo mismo:
+
+        /api/admin/profile-action  nivel + relojes + mochila con reset_at + posición
+        /api/reset                 sólo el nivel
+
+    Medido en el banco de ensayo con el segundo: el servidor se ponía a 0 y el
+    móvil seguía marcando 2/10, con su IndexedDB en el nivel 1. El organizador
+    reiniciaba a alguien y esa persona seguía jugando como si nada.
+
+    La razón es `reset_at`. El móvil manda sobre su propio progreso -tiene que
+    ser así, porque en el monte avanza sin cobertura-, y la ÚNICA señal que le
+    hace ceder es esa marca dentro del inventario. Sin ella no hay reinicio que
+    valga: el cliente da por buena su copia y sigue.
+
+    Los cronómetros y la posición van aquí por lo mismo: un jugador reiniciado
+    volvía al nodo 1 con el reloj de la partida anterior corriendo, y su última
+    coordenada seguía en el mapa de los demás como si ya estuviera en la ruta.
+    """
+    main.clear_all_player_timers(profile_id)
+
+    # La mochila de verdad vive en el móvil: el cliente compara su marca con
+    # ésta y se vacía solo. Sin esto sólo se limpia el servidor y el jugador
+    # sigue viendo sus objetos viejos -llegaba al nodo final con el Sello ya
+    # forjado y se saltaba media misión-.
+    main.save_player_inventory(
+        profile_id,
+        {
+            "user": profile_id,
+            "updated_at": "",
+            "items": [],
+            "reset_at": int(time.time() * 1000),
+        },
+    )
+
+    main.clear_live_position(profile_id)
+
+
 MAX_PERFILES = 60
 MAX_AVATAR_CHARS = 400_000  # ~300 KB de foto ya comprimida en data URI
 
@@ -312,6 +352,9 @@ async def save_config_endpoint(request: Request):
         "prologue_image_url": _as_str(incoming.get("prologue_image_url") if "prologue_image_url" in incoming else cfg.get("prologue_image_url", "")).strip(),
         "mapbox_token": _as_str(incoming.get("mapbox_token") if "mapbox_token" in incoming else cfg.get("mapbox_token", "")).strip(),
         "mapbox_style": _as_str(incoming.get("mapbox_style") if "mapbox_style" in incoming else cfg.get("mapbox_style", "")).strip(),
+        # Fecha desde la que se puede completar un nodo (ver
+        # runtime/mission_schedule.py). Vacío = sin bloqueo.
+        "mission_launch_at": _as_str(incoming.get("mission_launch_at") if "mission_launch_at" in incoming else cfg.get("mission_launch_at", "")).strip(),
     }
 
     raw_center = incoming.get("map_center")
@@ -369,7 +412,11 @@ async def reset(request: Request):
     if not user:
         raise HTTPException(status_code=400, detail="user is required")
 
+    # El mismo reinicio que el del panel de perfiles, no una versión corta.
+    # Aquí sólo se bajaba el nivel, y eso no llega al móvil: ver
+    # `reiniciar_jugador_por_completo`.
     main.set_player_progress_level(user, 0)
+    reiniciar_jugador_por_completo(main, user)
     return {"status": "ok"}
 
 
@@ -427,31 +474,7 @@ async def admin_profile_action(request: Request):
 
     if action == "reset_profile":
         new_level = 0
-        # Explicitly wipe all accumulated timer data on a full reset.
-        main.clear_all_player_timers(profile_id)
-
-        # Y la mochila. Un jugador en el nodo 1 no puede llevar encima los
-        # objetos de la partida anterior: llegaba al nodo final con el Sello ya
-        # forjado y se saltaba media misión. "Reset" es empezar de cero.
-        #
-        # reset_at va en el propio inventario porque la mochila de verdad vive
-        # en el móvil: el cliente compara su marca con ésta y se vacía solo. Sin
-        # esto sólo se limpiaría el servidor y el jugador seguiría viendo sus
-        # objetos viejos.
-        main.save_player_inventory(
-            profile_id,
-            {
-                "user": profile_id,
-                "updated_at": "",
-                "items": [],
-                "reset_at": int(time.time() * 1000),
-            },
-        )
-
-        # Y la posición. Un jugador reseteado no ha estado en ningún sitio: si se
-        # le deja la última coordenada, aparece en el mapa de los demás como si
-        # ya estuviese en la ruta antes de haber abierto siquiera la app.
-        main.clear_live_position(profile_id)
+        reiniciar_jugador_por_completo(main, profile_id)
     elif action == "level_prev":
         new_level = max(0, previous_level - 1)
     elif action == "restore_node":
@@ -593,7 +616,14 @@ async def save_stages_endpoint(request: Request):
             content={"status": "error", "detail": "invalid stages", "errors": errors}
         )
 
+    # El nivel guardado de cada jugador es un índice en esta lista, no un id
+    # de nodo: hay que leer la lista VIEJA antes de pisarla, para poder decir
+    # a qué nodo apuntaba cada jugador antes del cambio. Ver
+    # backend/app/runtime/mision_reindex.py.
+    old_stages = main.load_stages(main.STAGES_DB)
+
     main.save_stages(main.STAGES_DB, stages)
+    main.reindex_player_levels_on_save(old_stages, stages)
     return {"status": "ok"}
 
 
@@ -927,3 +957,156 @@ async def admin_datos_personales(request: Request):
         },
         "queda": _contar_datos_personales(),
     }
+
+
+@router.post("/api/admin/simulation/run")
+async def run_simulation_endpoint(request: Request):
+    """El banco de pruebas del panel: N jugadores simulados recorriendo la
+    misión real -no una de mentira-. Ver backend/app/runtime/simulation_bench.py
+    para el cómo y el porqué."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    stages = main.get_runtime_stages()
+    if not stages:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "no hay nodos guardados: no hay ruta que simular"},
+        )
+
+    forzar = _as_bool(data.get("force"))
+    if not forzar:
+        en_marcha = main.simulation_bench_jugadores_reales_en_marcha()
+        if en_marcha:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "error",
+                    "detail": "hay jugadores de verdad con la ruta empezada",
+                    "players_in_progress": en_marcha,
+                },
+            )
+
+    jugadores = data.get("player_count", 3)
+    dispositivo = _as_str(data.get("device") or "mixed").strip().lower()
+    red = _as_str(data.get("network") or "mala").strip().lower()
+
+    try:
+        jugadores = int(jugadores)
+    except (TypeError, ValueError):
+        jugadores = 3
+
+    informe = await main.run_simulation_bench(jugadores, dispositivo, red)
+    return {"status": "ok", "report": informe}
+
+
+@router.post("/api/admin/simulation/long-session")
+async def run_long_session_pause_endpoint(request: Request):
+    """"¿Se guarda bien todo?": un jugador de mentira juega hasta la mitad
+    de la ruta, cierra esa sesión, y retoma con un token nuevo desde donde
+    dice el SERVIDOR que se quedó. Ver
+    backend/app/runtime/simulation_bench.py::simular_partida_larga_con_pausa."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    stages = main.get_runtime_stages()
+    if not stages:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "detail": "no hay nodos guardados: no hay ruta que simular"},
+        )
+
+    forzar = _as_bool(data.get("force"))
+    if not forzar:
+        en_marcha = main.simulation_bench_jugadores_reales_en_marcha()
+        if en_marcha:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "error",
+                    "detail": "hay jugadores de verdad con la ruta empezada",
+                    "players_in_progress": en_marcha,
+                },
+            )
+
+    dispositivo = _as_str(data.get("device") or "mixed").strip().lower()
+    punto_de_pausa = data.get("pause_at", 0.5)
+    try:
+        punto_de_pausa = max(0.1, min(0.9, float(punto_de_pausa)))
+    except (TypeError, ValueError):
+        punto_de_pausa = 0.5
+
+    informe = await main.run_long_session_pause_bench(dispositivo, punto_de_pausa)
+    return {"status": "ok", "report": informe}
+
+
+@router.post("/api/admin/simulation/cleanup")
+async def cleanup_simulation_endpoint(request: Request):
+    """Borra el rastro (SIM_*) que deja el banco de pruebas: nivel, cronómetros
+    y posición en vivo. Nunca toca jugadores de verdad -sólo mira el prefijo-."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+
+    borrados = main.limpiar_rastro_de_simulacion()
+    return {"status": "ok", "cleaned": borrados}
+
+
+@router.post("/api/admin/simulation/browser-session/start")
+async def start_browser_simulation_session_endpoint(request: Request):
+    """Abre la puerta para un navegador DE VERDAD -Playwright u otra
+    herramienta externa, no el banco httpx-en-proceso-: registra N SIM_XX
+    como perfiles conocidos y devuelve un token de sesión de jugador ya
+    firmado para cada uno, listo para meter como cookie `saga_player_session`
+    en un contexto de navegador real. A diferencia de .../run, aquí no se
+    ejecuta ni se mueve nada -solo se entregan las llaves-. Ver
+    `main.registrar_jugadores_de_simulacion`. Hay que llamar a .../stop al
+    terminar, o los SIM_XX se quedan como perfiles conocidos."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+    if main.admin_password_change_required():
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "password change required"})
+
+    jugadores = data.get("player_count", 1)
+    try:
+        jugadores = int(jugadores)
+    except (TypeError, ValueError):
+        jugadores = 1
+
+    nombres = main.registrar_jugadores_de_simulacion(jugadores)
+    tokens = main.mint_simulation_player_tokens(nombres)
+    return {
+        "status": "ok",
+        "cookie_name": main.PLAYER_SESSION_COOKIE,
+        "players": [{"name": nombre, "token": tokens[nombre]} for nombre in nombres],
+    }
+
+
+@router.post("/api/admin/simulation/browser-session/stop")
+async def stop_browser_simulation_session_endpoint(request: Request):
+    """Cierra lo que abrió .../start: quita los SIM_XX de la lista de
+    perfiles conocidos. No borra progreso ni posición -para eso sigue
+    haciendo falta /api/admin/simulation/cleanup-."""
+    import main
+
+    data = await request.json()
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error"})
+
+    main.quitar_jugadores_de_simulacion()
+    return {"status": "ok"}

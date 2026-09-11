@@ -218,6 +218,28 @@ export default function SettingsPanel({
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
+          <strong style={{ color: '#f59e0b' }}>🕒 Fecha y Hora de Inicio</strong>
+          <span>
+            Deja que la gente descargue la misión y conceda permisos con días de antelación,
+            pero no dejes que se complete ningún nodo hasta esta fecha. Vacío = sin bloqueo,
+            la misión se puede jugar en cuanto se entra.
+          </span>
+        </div>
+
+        <div className="admin-settings-grid-modern">
+          <label>
+            La misión empieza el
+            <input
+              type="datetime-local"
+              value={missionDraft.mission_launch_at || ''}
+              onChange={(event) => onUpdateMissionDraft('mission_launch_at', event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
           <strong style={{ color: '#22c55e' }}>🔐 Pantalla de Inicio de Sesión (Login de Jugador)</strong>
           <span>Personaliza el texto de bienvenida, subtítulo e instrucciones que ven los jugadores al entrar</span>
         </div>

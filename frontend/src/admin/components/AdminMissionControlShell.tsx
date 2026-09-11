@@ -6,6 +6,7 @@ import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
 import PlayersPanel from './PlayersPanel'
 import SettingsPanel from './SettingsPanel'
+import SimulationBenchPanel from './SimulationBenchPanel'
 import MissionBuilderPanel from './MissionBuilderPanel'
 import type {
   AdminProfileAction,
@@ -25,7 +26,7 @@ import ReleaseNotesModal from './ReleaseNotesModal'
 import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation'
 type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
 type MissionSaveState = StandardSaveState | 'dirty'
 
@@ -602,6 +603,13 @@ export default function AdminMissionControlShell({
           >
             {t('admin.settings')}
           </button>
+          <button
+            type="button"
+            className={cmsPanel === 'simulation' ? 'active' : ''}
+            onClick={() => togglePanel('simulation')}
+          >
+            Banco de pruebas 🧪
+          </button>
         </div>
 
         <section className="saga-route-list" aria-label="Route nodes">
@@ -1013,7 +1021,9 @@ export default function AdminMissionControlShell({
                     ? t('admin.builder')
                     : cmsPanel === 'objects'
                       ? 'Objetos y Recetas'
-                      : t('admin.settings')}
+                      : cmsPanel === 'simulation'
+                        ? 'Banco de pruebas'
+                        : t('admin.settings')}
             </strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>
               {t('common.close')}
@@ -1069,6 +1079,8 @@ export default function AdminMissionControlShell({
                 onSaveSettings={onSaveSettings}
               />
             ) : null}
+
+            {cmsPanel === 'simulation' ? <SimulationBenchPanel /> : null}
           </div>
         </aside>
       ) : null}

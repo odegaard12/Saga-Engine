@@ -1,10 +1,6 @@
 import type { MotionChallengeConfig } from '../../core/family-types'
 import type { MotionChallengeDefinition } from '../../core/registry-types'
-import type {
-  MinigameController,
-  MinigamePreflightResult,
-  MinigameRuntimeBindings,
-} from '../../core/types'
+import type { MinigamePreflightResult, MinigameRuntimeBindings } from '../../core/types'
 
 export const motionChallengeDefinition: MotionChallengeDefinition = {
   family: 'motion_challenge',
@@ -33,7 +29,15 @@ export const motionChallengeDefinition: MotionChallengeDefinition = {
 
   default_config: {
     objective: 'shake_charge',
-    game_id: 'shake_antenna_charge',
+    // No 'shake_antenna_charge': esa cadena la usa
+    // ../../core/runtime-bridge.ts para redirigir misiones VIEJAS de
+    // signal_hunt a circuit_matrix/logic_circuit -una migracion real,
+    // anterior a que existiera esta familia-. Este game_id la reutilizaba
+    // por accidente: cualquier nodo motion_challenge con el valor de
+    // siempre acababa mostrando un puzle de circuitos en vez del reto de
+    // movimiento. Verificado que ningun dato real en produccion usaba
+    // "shake_antenna_charge" antes de renombrar.
+    game_id: 'shake_charge',
     difficulty: 'normal',
     duration_mode: 'normal',
     penalty_mode: 'normal',
@@ -142,9 +146,4 @@ async function runMotionChallengePreflight(
     missing_preferred: missing_preferred as never[],
     messages: messages.length > 0 ? messages : ['Reto de movimiento listo.'],
   }
-}
-
-export const motionChallengeController: MinigameController<MotionChallengeConfig> = {
-  validateConfig: validateMotionChallengeConfig,
-  runPreflight: runMotionChallengePreflight,
 }

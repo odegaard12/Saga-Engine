@@ -241,7 +241,7 @@ const badge: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   padding: '0 8px',
-  borderRadius: 999,
+  borderRadius: 'var(--theme-radius-pill)',
   fontSize: 8,
   fontWeight: 950,
   whiteSpace: 'nowrap',
@@ -249,8 +249,8 @@ const badge: CSSProperties = {
 
 const readyBadge: CSSProperties = {
   ...badge,
-  background: 'rgba(34,197,94,.14)',
-  border: '1px solid rgba(74,222,128,.20)',
+  background: 'rgba(var(--theme-done), .14)',
+  border: '1px solid rgba(var(--theme-done-soft), .20)',
   color: '#dcfce7',
 }
 
@@ -270,7 +270,7 @@ const offlineBadge: CSSProperties = {
 
 const button: CSSProperties = {
   minHeight: 42,
-  borderRadius: 15,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 11,
   fontWeight: 950,
 }
@@ -278,7 +278,7 @@ const button: CSSProperties = {
 const primary: CSSProperties = {
   ...button,
   border: '1px solid rgba(187,247,208,.22)',
-  background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+  background: 'linear-gradient(180deg, rgb(var(--theme-done)), rgb(var(--theme-done)))',
   color: '#ffffff',
   boxShadow: '0 12px 26px rgba(22,163,74,.18)',
 }
@@ -289,24 +289,27 @@ const actions: CSSProperties = {
   gap: 7,
 }
 
+// Contorno neutro, como el resto de botones de la hoja de Ferramentas: sobre
+// la tarjeta solida el relleno de cristal ya no se distinguia del fondo.
 const secondary: CSSProperties = {
   ...button,
-  minHeight: 38,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(100,116,139,.34)',
-  color: '#f8fafc',
+  minHeight: 44,
+  borderRadius: 12,
+  border: `1px solid var(--theme-card-inset)`,
+  background: 'transparent',
+  color: 'rgba(255,255,255,.78)',
 }
 
 const messageBase: CSSProperties = {
   padding: '8px 10px',
-  borderRadius: 12,
+  borderRadius: 'var(--theme-radius-card)',
   fontSize: 10,
   fontWeight: 850,
 }
 
 const messageOk: CSSProperties = {
   ...messageBase,
-  background: 'rgba(34,197,94,.11)',
+  background: 'rgba(var(--theme-done), .11)',
   color: '#dcfce7',
 }
 

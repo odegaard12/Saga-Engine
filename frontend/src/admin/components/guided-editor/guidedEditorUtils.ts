@@ -127,6 +127,11 @@ export const CONFIG_FIELD_META: Record<
     help: 'Valor de señal o precisión necesario para dar el nodo por válido.',
     type: 'number',
   },
+  required_members: {
+    label: 'Compañeros necesarios',
+    help: 'Cuántos jugadores del equipo (aparte de quien juega) deben estar en el punto a la vez para desbloquearlo. Solo se usa en Relevo de equipo.',
+    type: 'number',
+  },
   hold_ms: {
     label: 'Tiempo de espera',
     help: 'Milisegundos que debe mantenerse la condición antes de completar.',
@@ -190,6 +195,7 @@ export const CONFIG_ORDER = [
   'source_radius_m',
   'lock_threshold',
   'hold_ms',
+  'required_members',
   'target_bearing_deg',
   'tolerance_deg',
   'grid_cols',
@@ -273,11 +279,11 @@ export function gameFromStage(stage: StageLike): AdminGameCatalogItem {
   if (byGameType) return byGameType
 
   // Legacy: los nodos antiguos signal_hunt sin game_id eran GPS/señal.
-  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer signal_hunt físico/QR.
+  // Como hemos quitado GPS del catálogo visible, NO deben caer en el primer
+  // signal_hunt físico/QR. Misma migración que runtime-bridge.ts en el
+  // jugador: al puzle de circuitos.
   if (stage.type === 'signal_hunt' && !hasExplicitQrMarker(stage)) {
-    return (
-      adminGameCatalog.find((game) => game.id === 'shake_antenna_charge') || adminGameCatalog[0]
-    )
+    return adminGameCatalog.find((game) => game.id === 'logic_circuit') || adminGameCatalog[0]
   }
 
   return (
@@ -304,6 +310,19 @@ export function isMapCollectibleStage(stage: StageLike): boolean {
   if (kind === 'collectible' && (stage.physical_item_id || stage.physical_item_label)) {
     return true
   }
+
+  // reward_item_id NO basta por sí solo: cualquier minijuego normal
+  // (circuit_matrix, tilt_maze...) también lo lleva en cuanto se le pone un
+  // premio desde "¿Entrega algún objeto de regalo al superar el juego?"
+  // (ver AdminGameEditor). Antes esto lo enviaba aquí igual que a un
+  // coleccionable de mapa de verdad: el admin daba un premio a un
+  // minijuego, guardaba, y al reabrir el nodo GuidedNodeEditorFlow montaba
+  // AdminCollectibleEditor en vez de AdminGameEditor -el minijuego
+  // "desaparecía" detrás de la pantalla de recogida GPS, sin forma de
+  // volver a ver su configuración-. Sólo cuenta como señal de coleccionable
+  // cuando NO hay ya un game_id de un minijuego real detrás.
+  const gameId = typeof config.game_id === 'string' ? config.game_id : ''
+  if (gameId && gameId !== 'qr_collectible') return false
 
   return Boolean(config.reward_item_id)
 }
@@ -617,7 +636,7 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     game.completionMethod === 'hold' ||
     game.completionMethod === 'team'
   ) {
-    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms']) {
+    for (const key of ['source_radius_m', 'lock_threshold', 'hold_ms', 'required_members']) {
       if (key in config) keys.add(key)
     }
   }

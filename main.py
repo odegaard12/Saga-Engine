@@ -15,7 +15,6 @@ import secrets
 import sqlite3
 import time
 import ipaddress
-import urllib.parse
 from datetime import datetime
 from pathlib import Path
 try:
@@ -30,14 +29,8 @@ from backend.app.storage.game_state_store import (
     get_player_level,
     load_game_state,
     reset_player_level,
+    save_game_state,
     set_player_level,
-)
-from backend.app.storage.positions_store import (
-    get_live_position as get_live_position_state,
-    load_live_positions_state,
-    save_live_positions_state,
-    upsert_live_position as upsert_live_position_state,
-    guardar_posicion_sin_leer_todas,
 )
 from backend.app.storage.event_store import append_event, list_events, mark_event_status
 from backend.app.security import admin_auth as admin_auth_security
@@ -53,6 +46,13 @@ from backend.app.runtime.minigames import (
     _clean_code,
     build_stage_minigame_runtime
 )
+from backend.app.runtime import player_timers as _player_timers
+from backend.app.runtime import player_profiles as _player_profiles
+from backend.app.runtime import mision_reindex as _mision_reindex
+from backend.app.runtime import live_positions as _live_positions
+from backend.app.runtime import player_events as _player_events
+from backend.app.runtime import admin_overview as _admin_overview
+from backend.app.runtime import mission_schedule as _mission_schedule
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -189,6 +189,31 @@ def _iso_a_ms(valor):
         return 0
 
 
+def huella_de_imagen(dato_uri) -> str:
+    """Huella corta del contenido de una foto, para meterla en su URL.
+
+    Va en la URL para que la respuesta pueda declararse inmutable y cachearse un
+    anio entero. Si la foto cambia, cambia la URL, y nadie se queda con la
+    vieja. Una direccion fija con contenido cambiante obligaria al navegador a
+    preguntar cada vez, que es justo el viaje que se quiere ahorrar.
+    """
+    texto = _as_str(dato_uri)
+    if not texto:
+        return ""
+    return hashlib.sha1(texto.encode("utf-8")).hexdigest()[:12]
+
+
+def player_reset_at(user) -> int:
+    """El milisegundo del último reinicio de este jugador. 0 si nunca lo han reiniciado."""
+    record = load_inventory_state().get(user)
+    if not isinstance(record, dict):
+        return 0
+    try:
+        return int(record.get("reset_at") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def save_player_inventory(user: str, inventory_snapshot: dict):
     """Guarda la mochila que sube el jugador, respetando el último reset.
 
@@ -292,10 +317,6 @@ def ensure_admin_auth():
 
 
 ensure_admin_auth()
-
-
-def _now_ts():
-    return admin_auth_security.now_ts()
 
 
 def prune_admin_sessions(now=None):
@@ -609,495 +630,146 @@ from backend.app.runtime.minigames import (
     validate_minigame_config,
 )
 
-VALID_PROFILE_MODES = {"solo", "team"}
+VALID_PROFILE_MODES = _player_profiles.VALID_PROFILE_MODES
 
 def parse_player_entries(raw_players):
-    if isinstance(raw_players, str):
-        items = [line.strip() for line in raw_players.splitlines() if line.strip()]
-    elif isinstance(raw_players, list):
-        items = raw_players
-    else:
-        return ["PLAYER 1", "PLAYER 2"]
-
-    parsed = []
-    for item in items:
-        if isinstance(item, dict):
-            parsed.append(item)
-            continue
-
-        text = _as_str(item).strip()
-        if not text:
-            continue
-
-        if text.startswith("{") and text.endswith("}"):
-            try:
-                obj = json.loads(text)
-                if isinstance(obj, dict):
-                    parsed.append(obj)
-                    continue
-            except Exception:
-                pass
-
-        parsed.append(text)
-
-    return parsed or ["PLAYER 1", "PLAYER 2"]
+    return _player_profiles.parse_player_entries(raw_players)
 
 def normalize_player_profile(raw, index=0):
-    if isinstance(raw, dict):
-        display_name = _as_str(
-            raw.get("display_name") or raw.get("name") or raw.get("id") or f"PLAYER {index + 1}"
-        ).strip() or f"PLAYER {index + 1}"
-
-        profile_id = _as_str(raw.get("id") or display_name).strip() or display_name
-
-        mode = _as_str(raw.get("mode") or "solo").strip().lower()
-        if mode not in VALID_PROFILE_MODES:
-            mode = "solo"
-
-        members_raw = raw.get("members") or []
-        if isinstance(members_raw, str):
-            members = [m.strip() for m in members_raw.split(",") if m.strip()]
-        elif isinstance(members_raw, list):
-            members = [_as_str(m).strip() for m in members_raw if _as_str(m).strip()]
-        else:
-            members = []
-
-        status = _as_str(raw.get("status") or "active").strip().lower() or "active"
-
-        if mode == "solo" and not members and display_name:
-            members = [display_name]
-
-        color = _as_str(raw.get("color") or "").strip()
-        avatar_url = _as_str(raw.get("avatar_url") or "").strip()
-        avatar_initials = _as_str(raw.get("avatar_initials") or "").strip()[:3].upper()
-
-        return {
-            "id": profile_id,
-            "display_name": display_name,
-            "mode": mode,
-            "members": members,
-            "status": status,
-            "color": color,
-            "avatar_url": avatar_url,
-            "avatar_initials": avatar_initials,
-        }
-
-    display_name = _as_str(raw, f"PLAYER {index + 1}").strip() or f"PLAYER {index + 1}"
-    return {
-        "id": display_name,
-        "display_name": display_name,
-        "mode": "solo",
-        "members": [display_name],
-        "status": "active",
-        "color": "",
-        "avatar_url": "",
-        "avatar_initials": "",
-    }
+    return _player_profiles.normalize_player_profile(raw, index=index)
 
 def get_player_profiles(cfg=None):
-    cfg = cfg or load_config()
-
-    raw_profiles = cfg.get("player_profiles")
-    if isinstance(raw_profiles, list) and raw_profiles:
-        return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_profiles)]
-
-    raw_players = parse_player_entries(cfg.get("players", ["PLAYER 1", "PLAYER 2"]))
-    return [normalize_player_profile(item, index=i) for i, item in enumerate(raw_players)]
+    return _player_profiles.get_player_profiles(cfg or load_config())
 
 def profile_matches_user(profile, user_text):
-    user_text = _as_str(user_text).strip()
-    if not user_text:
-        return False
-
-    if _as_str(profile.get("id")).strip() == user_text:
-        return True
-
-    if _as_str(profile.get("display_name")).strip() == user_text:
-        return True
-
-    for member in profile.get("members", []):
-        if _as_str(member).strip() == user_text:
-            return True
-
-    return False
+    return _player_profiles.profile_matches_user(profile, user_text)
 
 
 def get_player_profile(user, cfg=None):
-    cfg = cfg or load_config()
-    user_text = _as_str(user).strip()
-    profiles = get_player_profiles(cfg)
+    return _player_profiles.get_player_profile(cfg or load_config(), user)
 
-    # 1) exact stable-id match first
-    for profile in profiles:
-        if _as_str(profile.get("id")).strip() == user_text:
-            return profile
+HEARTBEAT_STALE_SECONDS = _live_positions.HEARTBEAT_STALE_SECONDS
+HEARTBEAT_MIN_INTERVAL_SECONDS = _live_positions.HEARTBEAT_MIN_INTERVAL_SECONDS
+HEARTBEAT_RATE_WINDOW_SECONDS = _live_positions.HEARTBEAT_RATE_WINDOW_SECONDS
+# MISMO diccionario que el del módulo, no una copia: game.py lo muta
+# directamente (main.HEARTBEAT_LAST_SEEN_BY_KEY[clave] = ahora).
+HEARTBEAT_LAST_SEEN_BY_KEY = _live_positions.HEARTBEAT_LAST_SEEN_BY_KEY
 
-    # 2) then visible display-name match
-    for profile in profiles:
-        if _as_str(profile.get("display_name")).strip() == user_text:
-            return profile
-
-    # 3) then team member alias -> canonical team profile
-    for profile in profiles:
-        if profile_matches_user(profile, user_text):
-            return profile
-
-    return normalize_player_profile(user_text or "PLAYER 1", 0)
-
-HEARTBEAT_STALE_SECONDS = 180
-HEARTBEAT_MIN_INTERVAL_SECONDS = 2
-HEARTBEAT_RATE_WINDOW_SECONDS = 3600
-HEARTBEAT_LAST_SEEN_BY_KEY = {}
-
-VALID_HEARTBEAT_GPS_STATUS = {
-    "ok",
-    "unknown",
-    "unavailable",
-    "stale",
-    "searching",
-    "error",
-    "denied",
-}
-
-VALID_HEARTBEAT_SOURCES = {
-    "player",
-    "device",
-    "react",
-    "pwa",
-    "browser_gps",
-}
+VALID_HEARTBEAT_GPS_STATUS = _live_positions.VALID_HEARTBEAT_GPS_STATUS
+VALID_HEARTBEAT_SOURCES = _live_positions.VALID_HEARTBEAT_SOURCES
 
 def get_heartbeat_client_ip(request: Request):
     return get_client_ip(request)
 
 
 def prune_heartbeat_rate_state(now=None):
-    now = now or time.time()
-    stale_keys = [
-        key for key, ts in HEARTBEAT_LAST_SEEN_BY_KEY.items()
-        if now - float(ts or 0) > HEARTBEAT_RATE_WINDOW_SECONDS
-    ]
-    for key in stale_keys:
-        HEARTBEAT_LAST_SEEN_BY_KEY.pop(key, None)
+    _live_positions.prune_heartbeat_rate_state(now or time.time())
 
 def normalize_heartbeat_gps_status(value):
-    status = _as_str(value or "unknown").strip().lower() or "unknown"
-    return status if status in VALID_HEARTBEAT_GPS_STATUS else "unknown"
+    return _live_positions.normalize_heartbeat_gps_status(value)
 
 def normalize_heartbeat_source(value):
-    source = _as_str(value or "player").strip().lower() or "player"
-    return source if source in VALID_HEARTBEAT_SOURCES else "player"
+    return _live_positions.normalize_heartbeat_source(value)
 
 def resolve_known_player_profile(user, cfg=None):
-    cfg = cfg or load_config()
-    user_text = _as_str(user).strip()
-    if not user_text:
-        return None
-
-    for profile in get_player_profiles(cfg):
-        if profile_matches_user(profile, user_text):
-            return profile
-
-    return None
+    return _live_positions.resolve_known_player_profile(cfg or load_config(), user)
 
 def load_live_positions():
-    return load_live_positions_state(POSITIONS_DB)
+    return _live_positions.load_live_positions(POSITIONS_DB)
 
 def save_live_positions(data):
-    save_live_positions_state(POSITIONS_DB, data)
+    _live_positions.save_live_positions(POSITIONS_DB, data)
 
 
 def get_live_position(user):
-    return get_live_position_state(POSITIONS_DB, user)
+    return _live_positions.get_live_position(POSITIONS_DB, user)
 
 
 def upsert_live_position_for_user(user, position):
-    """Guarda dónde está un jugador.
-
-    No devuelve nada: quien llama a esto —el latido, trece móviles cada cinco
-    segundos— no usaba el resultado, y calcularlo obligaba a leer la tabla
-    entera de posiciones cada vez. Para la tabla del grupo está
-    `load_live_positions`.
-    """
-    return guardar_posicion_sin_leer_todas(POSITIONS_DB, user, position)
+    return _live_positions.upsert_live_position_for_user(POSITIONS_DB, user, position)
 
 
 def _hash_corto(texto: str) -> str:
-    return hashlib.sha256(texto.encode("utf-8", errors="replace")).hexdigest()[:10]
+    return _live_positions._hash_corto(texto)
 
 
 def aligerar_avatar(perfil: dict) -> dict:
-    """Cambia la foto incrustada por una referencia a /api/player-avatar.
-
-    Las fotos se guardan como data URI en base64 dentro del perfil. La tabla de
-    equipo se pide cada 5 segundos, y con las fotos dentro esa respuesta era el
-    87 % foto: 43 KB con dos jugadores retratados, y proyectando las catorce,
-    271 KB por petición. Trece móviles a ese ritmo son 700 KB/s saliendo de la
-    Raspberry por el túnel, cada segundo de la travesía, para mandar una y otra
-    vez las mismas caras.
-
-    Ahora va la URL de un endpoint aparte que el navegador y el service worker
-    cachean: se descarga una vez por jugador y se olvida. El `v=` es el hash de
-    la imagen, así que si se cambia una foto en administración la URL cambia y se
-    vuelve a bajar sola.
-    """
-    if not isinstance(perfil, dict):
-        return perfil
-
-    foto = _as_str(perfil.get("avatar_url") or "")
-    if not foto.startswith("data:"):
-        # URL externa o sin foto: no hay nada que aligerar.
-        return perfil
-
-    pid = _as_str(perfil.get("id") or perfil.get("user") or "").strip()
-    if not pid:
-        return perfil
-
-    ligero = dict(perfil)
-    ligero["avatar_url"] = ""
-    ligero["avatar_ref"] = (
-        f"/api/player-avatar/{urllib.parse.quote(pid, safe='')}?v={_hash_corto(foto)}"
-    )
-    return ligero
+    return _live_positions.aligerar_avatar(perfil)
 
 
 def buscar_avatar_de(profile_id: str):
-    """Data URI de la foto de un jugador, o None."""
-    objetivo = _as_str(profile_id).strip()
-    if not objetivo:
-        return None
-
-    for perfil in get_player_profiles(load_config()):
-        if _as_str(perfil.get("id")).strip() == objetivo:
-            foto = _as_str(perfil.get("avatar_url") or "")
-            return foto if foto.startswith("data:") else None
-    return None
+    return _live_positions.buscar_avatar_de(load_config(), profile_id)
 
 
 def clear_live_position(user):
-    """Borra la última posición conocida de un jugador.
-
-    Se usa al resetear: un jugador a cero no ha estado en ninguna parte todavía,
-    y dejarle la posición de la partida anterior lo pintaba en el mapa —a veces
-    en mitad de la ruta— como si ya estuviese andando.
-    """
-    user_key = _as_str(user).strip()
-    if not user_key:
-        return
-
-    estado = load_live_positions()
-    if not isinstance(estado, dict) or user_key not in estado:
-        return
-
-    estado.pop(user_key, None)
-    save_live_positions(estado)
+    _live_positions.clear_live_position(POSITIONS_DB, user)
 
 
 def load_player_progress():
-    return load_game_state(GAME_DB)
+    return _player_timers.load_player_progress(GAME_DB)
 
 
 def load_player_timers():
-    return load_json(TIMERS_DB, {})
+    return _player_timers.load_player_timers(TIMERS_DB)
 
 def save_player_timers(timers):
-    save_json(TIMERS_DB, timers)
+    _player_timers.save_player_timers(TIMERS_DB, timers)
 
 def record_player_stage_time(user, level, time_ms):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-    if user_key not in timers:
-        timers[user_key] = {"stage_times_ms": {}}
-    
-    stage_times = timers[user_key].setdefault("stage_times_ms", {})
-    lvl_str = str(level)
-    
-    # SET the time for this level - do not accumulate across retries.
-    # The client sends the correct elapsed time; penalties are added explicitly.
-    # Using the max of existing vs new prevents regression when called multiple times.
-    existing = stage_times.get(lvl_str, 0)
-    stage_times[lvl_str] = max(existing, int(time_ms or 0))
-    save_player_timers(timers)
+    _player_timers.record_player_stage_time(TIMERS_DB, user, level, time_ms)
 
 
 def _now_ms():
-    return int(time.time() * 1000)
+    return _player_timers._now_ms()
 
 
 def mark_player_started(user):
-    """Guarda cuándo empezó a jugar, la primera vez que completa algo.
-
-    El tiempo total era la suma de lo que se pasaba DENTRO de cada pantalla, así
-    que caminar siete kilómetros entre nodos contaba cero: una ruta entera daba
-    veinticinco segundos y la clasificación no medía nada. Lo que cuenta es el
-    reloj: desde que arrancas hasta que acabas.
-    """
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-
-    entrada = timers.setdefault(user_key, {"stage_times_ms": {}})
-    if not entrada.get("started_at"):
-        entrada["started_at"] = _now_ms()
-        save_player_timers(timers)
+    _player_timers.mark_player_started(TIMERS_DB, user)
 
 
 def mark_player_finished(user):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return
-
-    timers[user_key]["finished_at"] = _now_ms()
-    save_player_timers(timers)
+    _player_timers.mark_player_finished(TIMERS_DB, user)
 
 
 def add_player_penalty(user, penalty_ms):
-    """Suma una penalización al tiempo total (código de respaldo, fallos...)."""
-    penalty = int(penalty_ms or 0)
-    if penalty <= 0:
-        return
-
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-
-    entrada = timers.setdefault(user_key, {"stage_times_ms": {}})
-    entrada["penalties_ms"] = int(entrada.get("penalties_ms") or 0) + penalty
-    save_player_timers(timers)
+    _player_timers.add_player_penalty(TIMERS_DB, user, penalty_ms)
 
 
 def clear_all_player_timers(user):
-    """Completely wipe all stage timer data for a player. Called on full profile reset."""
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key:
-        return
-    if user_key in timers:
-        timers[user_key]["stage_times_ms"] = {}
-        # Las penalizaciones y las marcas de inicio y fin también: si no, un
-        # jugador reiniciado arrancaba la partida nueva con los minutos que le
-        # habían caído en la anterior.
-        timers[user_key].pop("penalties_ms", None)
-        timers[user_key].pop("started_at", None)
-        timers[user_key].pop("finished_at", None)
-        timers[user_key].pop("current_stage_started_at", None)
-        save_player_timers(timers)
+    _player_timers.clear_all_player_timers(TIMERS_DB, user)
 
 def clear_player_stage_time(user, level):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return
-    stage_times = timers[user_key].setdefault("stage_times_ms", {})
-    lvl_str = str(level)
-    if lvl_str in stage_times:
-        stage_times[lvl_str] = 0
-    save_player_timers(timers)
+    _player_timers.clear_player_stage_time(TIMERS_DB, user, level)
 
 def get_player_progress_level(user, default=0):
-    return get_player_level(GAME_DB, user, default=default)
+    return _player_timers.get_player_progress_level(GAME_DB, user, default=default)
 
 def set_player_progress_level(user, level, penalty_ms=0, desde_admin=False):
-    if penalty_ms > 0:
-        record_player_stage_time(user, level, penalty_ms)
+    return _player_timers.set_player_progress_level(
+        TIMERS_DB, GAME_DB, user, level, penalty_ms=penalty_ms, desde_admin=desde_admin
+    )
 
-    objetivo = int(level or 0)
+def reindex_player_levels_on_save(old_stages, new_stages):
+    """Recoloca el nivel guardado de cada jugador cuando se edita la misión.
 
-    # Volver al nodo 1 es empezar de cero, tambien en el reloj.
-    #
-    # Al resetear se borraban los tiempos de los nodos pero NO las
-    # penalizaciones, asi que un jugador reseteado arrancaba la partida nueva
-    # arrastrando los minutos que le habian caido en la anterior.
-    if objetivo <= 0:
-        clear_all_player_timers(user)
-        return set_player_level(GAME_DB, user, 0)
+    Se llama desde `save_stages_endpoint` justo después de guardar los nodos
+    nuevos, con la lista de ANTES y la de DESPUÉS. Ver
+    backend/app/runtime/mision_reindex.py para el porqué y el cómo.
+    """
+    niveles = load_game_state(GAME_DB)
+    reindexados = _mision_reindex.reindex_player_levels(old_stages, new_stages, niveles)
+    if reindexados != niveles:
+        save_game_state(GAME_DB, reindexados)
 
-    # HACIA ATRAS NO SE VA.
-    #
-    # Este es el fallo que se persiguio todo el dia: un nodo ya superado que de
-    # pronto volvia a estar por hacer, la pantalla en la salida con el tiempo a
-    # cero, y al rato todo de vuelta en su sitio. Pasaba jugando en casa y con
-    # wifi, asi que no era cobertura.
-    #
-    # Da igual de donde venga el numero mas bajo -una respuesta que llega tarde,
-    # una peticion repetida, un movil que guardo datos de antes-: lo hecho,
-    # hecho esta. Para deshacerlo esta el reset, que entra por el camino de
-    # arriba con un cero explicito.
-    #
-    # Menos cuando lo pide el organizador desde el panel: ahi el numero mas bajo
-    # no es un rebote, es una correccion a mano y tiene que entrar.
-    actual = int(get_player_progress_level(user, 0) or 0)
-    if objetivo < actual and not desde_admin:
-        return load_game_state(GAME_DB)
-
-    # Retroceder desde el panel borra el reloj de lo que se va a repetir.
-    #
-    # Se devolvia al jugador a un nodo anterior y los tiempos de los nodos que
-    # tenia que rehacer seguian guardados: el marcador arrancaba la repeticion
-    # con segundos de una partida que ya no cuenta -un 00:04 de la nada- y al
-    # superar el nodo otra vez se quedaba el mayor de los dos, no el nuevo.
-    # Si se vuelve atras es para rehacerlo, y rehacerlo empieza en cero.
-    if objetivo < actual and desde_admin:
-        for nivel in range(objetivo, actual + 1):
-            clear_player_stage_time(user, nivel)
-
-    # Volver al nodo 1 es empezar de cero, tambien en el reloj.
-    #
-    # Al resetear se borraban los tiempos de los nodos pero NO las
-    # penalizaciones, asi que un jugador reseteado arrancaba la partida nueva
-    # arrastrando los minutos que le habian caido en la anterior: dos minutos de
-    # un codigo de respaldo, por ejemplo, sin que nada lo dijera en pantalla.
-    if int(level or 0) <= 0:
-        clear_all_player_timers(user)
-        return set_player_level(GAME_DB, user, level)
-
-    # If the level is explicitly set (e.g. by an admin), we should clear any future stage times
-    # to avoid the timer holding onto times from nodes they are replaying.
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if user_key and user_key in timers:
-        stage_times = timers[user_key].get("stage_times_ms", {})
-        keys_to_remove = [k for k in list(stage_times.keys()) if k.isdigit() and int(k) >= level]
-        for k in keys_to_remove:
-            del stage_times[k]
-        save_player_timers(timers)
-
-    return set_player_level(GAME_DB, user, level)
 
 def get_player_total_time_ms(user):
-    """Tiempo dentro de las pruebas más las penalizaciones.
-
-    NO es reloj de pared. Todos los equipos hacen la ruta juntos y a la vez, así
-    que el tiempo de caminar es el mismo para todos y no distingue a nadie: lo
-    que decide la clasificación es lo que cuesta cada reto. Cuenta desde que se
-    abre el nodo hasta que se supera —incluido el rato mirando el patrón del
-    laberinto o la foto del mosaico, y cada vez que se vuelve a mirar— más lo
-    que sumen los fallos y los códigos de respaldo.
-    """
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return 0
-
-    entrada = timers[user_key]
-    penalizaciones = int(entrada.get("penalties_ms") or 0)
-    return sum(entrada.get("stage_times_ms", {}).values()) + penalizaciones
+    return _player_timers.get_player_total_time_ms(TIMERS_DB, user)
 
 def get_player_is_playing(user):
-    # Sin timers en backend, podemos devolver False. El cliente gestiona su propio estado interactivo.
-    return False
+    return _player_timers.get_player_is_playing(user)
 
 def get_player_stage_time_ms(user, level):
-    timers = load_player_timers()
-    user_key = str(user or "").strip()
-    if not user_key or user_key not in timers:
-        return 0
-    return timers[user_key].get("stage_times_ms", {}).get(str(level), 0)
+    return _player_timers.get_player_stage_time_ms(TIMERS_DB, user, level)
 
 
 def project_live_profile_status(
@@ -1256,6 +928,12 @@ from backend.app.runtime.mision import (  # noqa: E402
 from backend.app.runtime import mision as _mision  # noqa: E402
 
 
+def mission_is_locked(cfg=None):
+    """¿Toca esperar todavía para completar nodos? Ver runtime/mission_schedule.py."""
+    cfg = cfg or load_config()
+    return _mission_schedule.mission_is_locked(cfg.get("mission_launch_at"))
+
+
 def get_runtime_stages():
     """Los nodos de la mision, normalizados.
 
@@ -1274,94 +952,22 @@ def stages_revision(runtime_stages=None):
     return _mision.stages_revision(stages)
 
 
-PLAYER_EVENT_TYPES = {
-    "node_opened",
-    "node_completed",
-    "qr_scanned",
-    "nfc_url_opened",
-    "team_ready",
-    "team_proof_created",
-    "team_proof_accepted",
-    "inventory_item_collected",
-    "inventory_item_used",
-    "offline_sync_received",
-}
-
-EVENT_PAYLOAD_MAX_KEYS = 32
-EVENT_PAYLOAD_MAX_TEXT_LENGTH = 500
+PLAYER_EVENT_TYPES = _player_events.PLAYER_EVENT_TYPES
+EVENT_PAYLOAD_MAX_KEYS = _player_events.EVENT_PAYLOAD_MAX_KEYS
+EVENT_PAYLOAD_MAX_TEXT_LENGTH = _player_events.EVENT_PAYLOAD_MAX_TEXT_LENGTH
 
 def sanitize_event_text(value, max_length=EVENT_PAYLOAD_MAX_TEXT_LENGTH):
-    text = _as_str(value).strip()
-    if len(text) > max_length:
-        return text[:max_length]
-    return text
+    return _player_events.sanitize_event_text(value, max_length)
 
 def sanitize_event_payload(value):
-    if not isinstance(value, dict):
-        return {}
-
-    clean = {}
-    for index, (key, raw_value) in enumerate(value.items()):
-        if index >= EVENT_PAYLOAD_MAX_KEYS:
-            break
-
-        clean_key = sanitize_event_text(key, 80)
-        if not clean_key:
-            continue
-
-        if isinstance(raw_value, bool) or raw_value is None:
-            clean[clean_key] = raw_value
-        elif isinstance(raw_value, (int, float)):
-            clean[clean_key] = raw_value
-        elif isinstance(raw_value, list):
-            clean[clean_key] = [
-                sanitize_event_text(item)
-                for item in raw_value[:20]
-            ]
-        elif isinstance(raw_value, dict):
-            nested = {}
-            for nested_index, (nested_key, nested_value) in enumerate(raw_value.items()):
-                if nested_index >= 20:
-                    break
-                nested_clean_key = sanitize_event_text(nested_key, 80)
-                if nested_clean_key:
-                    nested[nested_clean_key] = sanitize_event_text(nested_value)
-            clean[clean_key] = nested
-        else:
-            clean[clean_key] = sanitize_event_text(raw_value)
-
-    return clean
+    return _player_events.sanitize_event_payload(value)
 
 def normalize_player_event(raw_event, user, profile):
-    raw_event = raw_event if isinstance(raw_event, dict) else {}
-    event_type = sanitize_event_text(raw_event.get("type"), 80)
-
-    if event_type not in PLAYER_EVENT_TYPES:
-        raise HTTPException(status_code=400, detail=f"unsupported event type: {event_type or 'missing'}")
-
-    node_id = sanitize_event_text(raw_event.get("node_id"), 120)
-    team_id = sanitize_event_text(raw_event.get("team_id") or profile.get("id"), 120)
-    client_event_id = sanitize_event_text(raw_event.get("client_event_id"), 160)
-
-    return {
-        "type": event_type,
-        "status": "pending",
-        "source": sanitize_event_text(raw_event.get("source") or "offline_queue", 80),
-        "user": user,
-        "team_id": team_id,
-        "node_id": node_id,
-        "client_event_id": client_event_id,
-        "payload": sanitize_event_payload(raw_event.get("payload")),
-    }
+    return _player_events.normalize_player_event(raw_event, user, profile)
 
 
 def _event_payload_code(payload):
-    payload = payload if isinstance(payload, dict) else {}
-    for key in ("code", "manual_code", "answer", "raw_value"):
-        value = _as_str(payload.get(key)).strip()
-        if value:
-            return value
-    return ""
+    return _player_events.event_payload_code(payload)
 
 def find_existing_player_client_event(user, client_event_id):
     client_event_id = sanitize_event_text(client_event_id, 160)
@@ -1412,6 +1018,28 @@ def apply_synced_player_event(normalized_event, user, profile):
     if current_level < 0:
         current_level = 0
 
+    # La misión puede tener fecha de inicio (ver runtime/mission_schedule.py):
+    # se puede descargar y prepararse con días de antelación, pero no
+    # completar nodos hasta esa hora.
+    #
+    # A PROPOSITO no se guarda con append_event: si quedara escrito con este
+    # client_event_id, el PRÓXIMO intento lo encontraría por
+    # find_existing_player_client_event y lo cerraría como "duplicate" antes
+    # de volver a pasar por aquí -el mismo camino que ya usa
+    # already_advanced-, y el nodo no se completaría NUNCA aunque llegase la
+    # hora. Sin guardar nada, cada reintento de la cola vuelve a mirar el
+    # reloj desde cero.
+    #
+    # "failed", no "ignored": según syncPendingOfflineEvents en
+    # missionPack.ts, "ignored" cierra el hueco local como si ya estuviera
+    # resuelto y deja de reintentarse. "failed" con un motivo que no está en
+    # RECHAZOS_DEFINITIVOS es justo lo que hace que el móvil lo vuelva a
+    # mandar en el siguiente ciclo, solo.
+    if mission_is_locked():
+        event["status"] = "failed"
+        event["error"] = "mission_not_started_yet"
+        return event
+
     # Idempotencia: el jugador encola node_completed cuando /api/advance falla
     # (timeout con mala cobertura). Si la petición sí llegó al servidor, al
     # sincronizar la cola se avanzaba OTRA VEZ y se saltaba un nodo entero
@@ -1434,6 +1062,34 @@ def apply_synced_player_event(normalized_event, user, profile):
             **raw_payload,
             "server_level": current_level,
             "duplicate_of_level": level_before,
+        }
+        return append_event(EVENT_LOG_DB, event)
+
+    # Un reinicio tiene que aguantar a la cola vieja del móvil.
+    #
+    # El candado de arriba es por NIVEL y protege contra avances repetidos: si el
+    # servidor ya va por delante, el evento es un eco. Pero después de reiniciar a
+    # alguien a 0, un evento de la partida ANTERIOR con `level_before: 0` encaja
+    # perfectamente —el servidor está en 0, el evento dice que venía del 0— y le
+    # vuelve a avanzar.
+    #
+    # Visto en producción el 2026-08-17: se reinicia a un jugador con el móvil
+    # abierto y al rato el servidor está otra vez en 1 él solo. El móvil seguía
+    # marcando 2/10 hasta borrarle localStorage y las tres bases de IndexedDB. En
+    # día de ruta eso deja al organizador sin forma de arreglar nada.
+    #
+    # Lo que distingue una cosa de la otra ya viajaba y nadie lo miraba: el móvil
+    # manda `payload.local_created_at` con la fecha en que encoló el avance, y
+    # aquí está `reset_at`. Anterior al reinicio = partida borrada.
+    reset_at = player_reset_at(profile_id) or player_reset_at(user)
+    creado_ms = _iso_a_ms(raw_payload.get("local_created_at"))
+    if reset_at and creado_ms and creado_ms < reset_at:
+        event["status"] = "ignored"
+        event["error"] = "stale_before_reset"
+        event["payload"] = {
+            **raw_payload,
+            "reset_at": reset_at,
+            "event_created_ms": creado_ms,
         }
         return append_event(EVENT_LOG_DB, event)
 
@@ -1483,181 +1139,12 @@ def apply_synced_player_event(normalized_event, user, profile):
     return append_event(EVENT_LOG_DB, event)
 
 
-def _safe_runtime_json_file(global_names, fallback):
-    for name in global_names:
-        path = globals().get(name)
-        if not path:
-            continue
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            if isinstance(fallback, dict) and isinstance(data, dict):
-                return data
-            if isinstance(fallback, list) and isinstance(data, list):
-                return data
-        except Exception:
-            continue
-    return fallback
-
-
 def _admin_react_stage_summary(stage, index):
-    raw = stage if isinstance(stage, dict) else {}
-
-    # get_runtime_stages() returns normalized runtime nodes.
-    # Raw admin stages may still come through in tests, so support both shapes.
-    node = raw if isinstance(raw, dict) and raw.get("version") == 2 else normalize_stage(raw)
-
-    presentation = node.get("presentation") if isinstance(node.get("presentation"), dict) else {}
-    location = node.get("location") if isinstance(node.get("location"), dict) else {}
-    entry = node.get("entry") if isinstance(node.get("entry"), dict) else {}
-    interaction = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
-    messages = node.get("messages") if isinstance(node.get("messages"), dict) else {}
-
-    raw_minigame = raw.get("minigame") if isinstance(raw.get("minigame"), dict) else {}
-
-    family_type = _as_str(
-        interaction.get("type")
-        or raw_minigame.get("type")
-        or raw.get("type")
-        or "signal_hunt"
-    ).strip().lower() or "signal_hunt"
-
-    if family_type not in SUPPORTED_MINIGAME_TYPES:
-        family_type = "signal_hunt"
-
-    raw_config = (
-        interaction.get("config")
-        if isinstance(interaction.get("config"), dict)
-        else raw_minigame.get("config")
-        if isinstance(raw_minigame.get("config"), dict)
-        else raw.get("config")
-        if isinstance(raw.get("config"), dict)
-        else {}
-    )
-    config = normalize_minigame_config(family_type, raw_config)
-
-    label = (
-        _as_str(raw_minigame.get("label")).strip()
-        or MINIGAME_SPECS.get(family_type, {}).get("label")
-        or family_type.replace("_", " ").title()
-    )
-
-    title = _as_str(
-        presentation.get("title")
-        or raw.get("title")
-        or f"NODE {index + 1}"
-    ).strip()
-
-    content = _as_str(
-        presentation.get("content")
-        or raw.get("content")
-        or ""
-    ).strip()
-
-    lat = location.get("lat")
-    if lat is None:
-        lat = raw.get("lat")
-
-    lon = location.get("lon")
-    if lon is None:
-        lon = raw.get("lon")
-
-    radius = location.get("radius_m")
-    if radius is None:
-        radius = raw.get("radius", 50)
-
-    entry_mode = _as_str(
-        entry.get("mode")
-        or raw.get("entry_mode")
-        or "gps"
-    ).strip().lower() or "gps"
-
-    require_proximity = entry.get("require_proximity")
-    if require_proximity is None:
-        require_proximity = raw.get("require_proximity", entry_mode != "free")
-
-    hint = _as_str(
-        messages.get("hint")
-        or raw.get("hint")
-        or ""
-    ).strip()
-
-    gps_unavailable = _as_str(
-        messages.get("gps_unavailable")
-        or raw.get("gps_unavailable_message")
-        or ""
-    ).strip()
-
-    locked = _as_str(
-        messages.get("locked")
-        or raw.get("locked_message")
-        or ""
-    ).strip()
-
-    summary = {
-        "id": raw.get("id", index),
-        "index": index,
-        "title": title,
-        "type": family_type,
-        "label": label,
-        "lat": lat,
-        "lon": lon,
-        "radius": radius,
-        "entry_mode": entry_mode,
-        "require_proximity": bool(require_proximity),
-        "has_hint": bool(hint),
-        "has_manual_fallback": bool(_as_str(raw.get("answer") or raw.get("rune") or "").strip()),
-        "content": content,
-        "objective": _as_str(config.get("objective") or "").strip(),
-        "config_summary": sorted(str(key) for key in config.keys())[:12],
-        "config": config,
-        "messages": {
-            "hint": hint,
-            "gps_unavailable": gps_unavailable,
-            "locked": locked,
-        },
-    }
-
-    return preserve_physical_stage_fields(stage, summary)
+    return _admin_overview.admin_stage_summary(stage, index)
 
 
 def _admin_react_profile_summary(profile, gamestate, positions, inventory_state=None):
-    if inventory_state is None:
-        inventory_state = {}
-    profile = profile or {}
-    profile_id = str(profile.get("id") or profile.get("display_name") or "")
-    raw_state = gamestate.get(profile_id, {}) if isinstance(gamestate, dict) else {}
-    pos = positions.get(profile_id, {}) if isinstance(positions, dict) else {}
-
-    if isinstance(raw_state, dict):
-        state = raw_state
-        level = state.get("level", 0)
-        finished = bool(state.get("finished", False))
-    else:
-        state = {}
-        try:
-            level = int(raw_state)
-        except Exception:
-            level = 0
-        finished = False
-
-    if not isinstance(pos, dict):
-        pos = {}
-
-    return {
-        "id": profile_id,
-        "display_name": profile.get("display_name") or profile_id,
-        "mode": profile.get("mode") or "solo",
-        "status": profile.get("status") or "active",
-        "level": level,
-        "finished": finished,
-        "presence": pos.get("presence") or state.get("presence") or "unknown",
-        "gps_status": pos.get("gps_status") or state.get("gps_status") or "unknown",
-        "lat": pos.get("lat"),
-        "lon": pos.get("lon"),
-        "last_seen": pos.get("last_seen") or pos.get("ts") or state.get("last_seen"),
-        "inventory_snapshot": inventory_state.get(profile_id, {}),
-    }
+    return _admin_overview.admin_profile_summary(profile, gamestate, positions, inventory_state)
 
 
 # Las cuatro rutas de administracion que vivian aqui (react-overview,
@@ -1734,5 +1221,167 @@ def append_inventory_item_used_event(user, profile_id, current_node, requirement
             },
         },
     )
+
+
+# El banco de pruebas del panel: jugadores simulados recorriendo la misión
+# real. Ver backend/app/runtime/simulation_bench.py.
+from backend.app.runtime import simulation_bench as _simulation_bench  # noqa: E402
+
+
+async def run_simulation_bench(jugadores, dispositivo, red):
+    """Registra los SIM_XX como perfiles conocidos MIENTRAS dura la
+    simulación, y devuelve la configuración exactamente a como estaba pase lo
+    que pase.
+
+    Hace falta porque `/api/events/sync` -el camino sin cobertura- exige un
+    perfil CONOCIDO (`resolve_known_player_profile`); `/api/advance` no,
+    porque `get_player_profile` cae a un perfil sintético para cualquier
+    nombre. Son dos guardias distintas para el mismo caso, y el banco tiene
+    que pasar las dos para probar los dos caminos de verdad.
+
+    Efecto colateral bienvenido: mientras corre, un admin con el panel
+    abierto en otra pestaña ve aparecer y moverse a los SIM_XX -es la
+    confirmación visual de que el banco está haciendo algo de verdad, no un
+    número en una consola-.
+    """
+    cfg_original = load_config()
+
+    jugadores_n = max(1, min(int(jugadores or 3), _simulation_bench.MAX_JUGADORES))
+    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
+
+    perfiles_base = cfg_original.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg_original))
+    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
+
+    save_config({
+        **cfg_original,
+        "player_profiles": perfiles_temporales,
+        "players": [p["id"] for p in perfiles_temporales],
+    })
+
+    try:
+        return await _simulation_bench.ejecutar_simulacion(
+            app=app,
+            stages=get_runtime_stages(),
+            jugadores=jugadores_n,
+            dispositivo=dispositivo,
+            red=red,
+            cookie_name=PLAYER_SESSION_COOKIE,
+            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
+            session_secret=get_session_signing_secret(),
+            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
+        )
+    finally:
+        # SIEMPRE, pase lo que pase durante la simulación -incluida una
+        # excepción a mitad-: si un SIM_XX se quedara registrado de verdad,
+        # aparecería en la lista de jugadores del panel como si lo fuera.
+        save_config(cfg_original)
+
+
+async def run_long_session_pause_bench(dispositivo, punto_de_pausa=0.5):
+    """"¿Se guarda bien todo?" -partida larga con una pausa real en medio,
+    sesión nueva para retomar-. Mismo patrón de alta/baja de perfil que
+    `run_simulation_bench`, ver ahí el porqué. Solo un jugador -SIM_01-,
+    porque esto prueba la costura entre dos sesiones de UN jugador, no
+    concurrencia."""
+    cfg_original = load_config()
+
+    nombres_sim = [_simulation_bench.nombre_simulado(0)]
+    perfiles_base = cfg_original.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg_original))
+    perfiles_temporales = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
+
+    save_config({
+        **cfg_original,
+        "player_profiles": perfiles_temporales,
+        "players": [p["id"] for p in perfiles_temporales],
+    })
+
+    try:
+        return await _simulation_bench.simular_partida_larga_con_pausa(
+            app=app,
+            stages=get_runtime_stages(),
+            dispositivo=dispositivo,
+            cookie_name=PLAYER_SESSION_COOKIE,
+            session_ttl_s=PLAYER_SESSION_TTL_SECONDS,
+            session_secret=get_session_signing_secret(),
+            obtener_nivel=lambda nombre: get_player_progress_level(nombre, 0),
+            punto_de_pausa=punto_de_pausa,
+        )
+    finally:
+        save_config(cfg_original)
+
+
+def registrar_jugadores_de_simulacion(n):
+    """Para una sesión de navegador DE VERDAD (Playwright u otra herramienta
+    externa, no la simulación httpx-en-proceso): registra N SIM_XX como
+    perfiles conocidos y los DEJA registrados -a diferencia de
+    `run_simulation_bench`, que corre entero dentro de una petición y los
+    quita al momento con un `finally`-. Aquí quien pregunta va a controlar
+    un navegador real durante minutos, así que el alta y la baja son dos
+    pasos sueltos: hay que llamar a `quitar_jugadores_de_simulacion()` al
+    terminar, o el panel se queda viendo SIM_XX como si fueran de verdad.
+    Devuelve los nombres registrados, en orden.
+    """
+    cfg = load_config()
+    jugadores_n = max(1, min(int(n or 1), _simulation_bench.MAX_JUGADORES))
+    nombres_sim = [_simulation_bench.nombre_simulado(i) for i in range(jugadores_n)]
+
+    perfiles_base = cfg.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        perfiles_base = list(get_player_profiles(cfg))
+    perfiles_base = _simulation_bench.quitar_perfiles_sim(perfiles_base)
+    perfiles = _simulation_bench.perfiles_temporales_con_sim(perfiles_base, nombres_sim)
+
+    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
+    return nombres_sim
+
+
+def quitar_jugadores_de_simulacion():
+    """Deshace `registrar_jugadores_de_simulacion`: quita cualquier SIM_*
+    de la lista de perfiles conocidos. No toca progreso ni posición -para
+    eso ya está `limpiar_rastro_de_simulacion`-."""
+    cfg = load_config()
+    perfiles_base = cfg.get("player_profiles")
+    if not isinstance(perfiles_base, list):
+        return
+    perfiles = _simulation_bench.quitar_perfiles_sim(perfiles_base)
+    save_config({**cfg, "player_profiles": perfiles, "players": [p["id"] for p in perfiles]})
+
+
+def mint_simulation_player_tokens(nombres):
+    """Un token de sesión de jugador ya firmado por nombre -mismo mecanismo
+    que usa el banco httpx, pero para entregárselo a un navegador de
+    verdad en vez de meterlo en una cookie de `httpx.AsyncClient`-."""
+    secret = get_session_signing_secret()
+    return {
+        nombre: player_session_security.create_player_session_token(
+            nombre, ttl_seconds=PLAYER_SESSION_TTL_SECONDS, secret=secret
+        )
+        for nombre in nombres
+    }
+
+
+def simulation_bench_jugadores_reales_en_marcha():
+    cfg = load_config()
+    perfiles = get_player_profiles(cfg)
+    niveles = load_game_state(GAME_DB)
+    return _simulation_bench.hay_progreso_real_en_marcha(perfiles, niveles)
+
+
+def limpiar_rastro_de_simulacion():
+    niveles = load_game_state(GAME_DB)
+    timers = load_player_timers()
+    posiciones = load_live_positions()
+    borrados = _simulation_bench.borrar_rastro_de_simulacion(
+        niveles=niveles, timers=timers, posiciones=posiciones
+    )
+    if borrados:
+        save_game_state(GAME_DB, niveles)
+        save_player_timers(timers)
+        save_live_positions(posiciones)
+    return borrados
 
 

@@ -13,7 +13,7 @@ interface Props {
 type Phase = 'idle' | 'showing' | 'input' | 'failed' | 'won'
 
 const ALL_PADS = [
-  { id: 0, name: 'Verde', base: '#15803d', lit: '#4ade80', tone: 329.6 },
+  { id: 0, name: 'Verde', base: '#15803d', lit: 'rgb(var(--theme-done-soft))', tone: 329.6 },
   { id: 1, name: 'Rojo', base: '#b91c1c', lit: '#f87171', tone: 261.6 },
   { id: 2, name: 'Azul', base: '#1d4ed8', lit: '#60a5fa', tone: 220.0 },
   { id: 3, name: 'Ámbar', base: '#b45309', lit: '#fbbf24', tone: 392.0 },
@@ -273,7 +273,7 @@ const STYLES = `
   width: 22px; height: 5px; border-radius: 999px;
   background: rgba(255,255,255,.16);
 }
-.simon-levels i.done { background: #4ade80; }
+.simon-levels i.done { background: rgb(var(--theme-done-soft)); }
 .simon-levels i.current { background: #fbbf24; }
 .simon-message {
   margin: 0;
@@ -308,12 +308,12 @@ const STYLES = `
   width: 9px; height: 9px; border-radius: 999px;
   background: rgba(255,255,255,.18);
 }
-.simon-progress i.ok { background: #4ade80; }
+.simon-progress i.ok { background: rgb(var(--theme-done-soft)); }
 .simon-start {
   min-height: 50px;
   border: none;
   border-radius: 16px;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, rgb(var(--theme-ok)), rgb(var(--theme-ok-deep)));
   color: #022c22;
   font-size: 15px;
   font-weight: 900;

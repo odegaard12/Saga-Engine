@@ -133,6 +133,15 @@ export type SignalHuntConfig = {
     lon: number
     radius_m: number
   }>
+  /**
+   * Solo lo usa team_relay (un game_id dentro de esta familia, no un campo
+   * de signal_hunt de verdad). Cuántos compañeros -aparte de quien juega-
+   * hacen falta en el punto para desbloquear. Antes estaba fijo en 2 dentro
+   * de TeamRelayRuntimeScreen; con grupos de más de 3-4 jugadores, "solo
+   * dos" no siempre tiene sentido -mejor que lo decida quien monta la
+   * misión, nodo a nodo.
+   */
+  required_members?: number
 }
 
 export type AudioChallengeObjective = 'blow_charge'
