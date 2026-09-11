@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
+import { useRef, useState, useEffect, CSSProperties, ReactNode } from 'react'
 
 interface SwipeableSheetProps {
   open: boolean
@@ -8,9 +8,6 @@ interface SwipeableSheetProps {
 }
 
 export function SwipeableSheet({ open, onClose, children, sheetStyle }: SwipeableSheetProps) {
-  const [offsetY, setOffsetY] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const startYRef = useRef(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -33,8 +30,6 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (open) {
       setMontada(true)
       setSaliendo(false)
-      setOffsetY(0)
-      setIsDragging(false)
       return undefined
     }
 
@@ -44,43 +39,11 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-      setOffsetY(0)
     }, 280)
     return () => window.clearTimeout(id)
   }, [open, montada])
 
   if (!montada) return null
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setIsDragging(true)
-    startYRef.current = e.touches[0].clientY
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return
-    const touchY = e.touches[0].clientY
-    const deltaY = touchY - startYRef.current
-
-    // Only allow pulling downwards
-    if (deltaY > 0) {
-      setOffsetY(deltaY)
-    } else {
-      setOffsetY(0)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-    // If dragged down more than 100px, close it
-    if (offsetY > 100) {
-      onClose()
-      // Wait for animation to finish before resetting
-      setTimeout(() => setOffsetY(0), 300)
-    } else {
-      // Snap back
-      setOffsetY(0)
-    }
-  }
 
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
@@ -123,6 +86,15 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
           style={{
             flex: 1,
             overflowY: 'auto',
+            // "Se desplaza hacia los datos si muevo el dedo" -en la
+            // clasificación, arrastrando con el dedo el podio se corría de
+            // lado-. Sin `overflowX: hidden` ni `touchAction`, iOS deja que
+            // un scroll vertical arrastre tambien el contenido en horizontal
+            // si algo se desborda un pixel -aqui, el podio con tres avatares
+            // de tamaños distintos y separadores, justo en el borde del
+            // ancho disponible-. Bloqueado en las dos direcciones a la vez.
+            overflowX: 'hidden',
+            touchAction: 'pan-y',
             display: 'flex',
             flexDirection: 'column',
             WebkitOverflowScrolling: 'touch',

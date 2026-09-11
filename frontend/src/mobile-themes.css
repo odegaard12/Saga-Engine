@@ -258,9 +258,14 @@ body.theme-flame-red {
   /* Mas claro que el primer intento (#2a1512 / #3d2620): sobre el mapa
      quedaba casi negro y el tema se leia apagado, no rojo. Estos suben el
      ladrillo sin perder el contraste del texto blanco encima. */
-  --theme-card: #3d1e18;
-  --theme-card-inset: #55302a;
-  --theme-hairline: #55302a;
+  /* Segundo intento de subirlo, tras el primero (#2a1512 -> #3d1e18): "sigue
+     muy oscuro/apagado", dicho por Óscar mirándolo en el móvil, no a ojo
+     mío. Este salto es mayor a propósito -no otro +10% tímido-: más rojo
+     de verdad (más saturación) y más claro (más valor), no solo un marrón
+     más pálido. El texto blanco encima sigue con contraste de sobra. */
+  --theme-card: #6e2e1f;
+  --theme-card-inset: #8a4530;
+  --theme-hairline: #8a4530;
   --theme-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
 
   /* Nada de cristal: esto es una placa. Esquinas duras, sin desenfoque, borde
