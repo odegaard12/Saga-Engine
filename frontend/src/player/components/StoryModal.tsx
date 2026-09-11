@@ -50,7 +50,7 @@ export function StoryModal({ title, subtitle, body, buttonText, onClose }: Story
           background: 'var(--theme-card)',
           borderRadius: 18,
           boxShadow: 'var(--theme-card-shadow)',
-          animation: 'sagaPanelEntra 300ms cubic-bezier(0.22, 1, 0.36, 1)',
+          animation: 'sagaPanelEntra var(--saga-motion-entra) var(--saga-motion-curva)',
           padding: '22px 19px 19px',
           display: 'flex',
           flexDirection: 'column',

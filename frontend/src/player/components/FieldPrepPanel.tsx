@@ -66,10 +66,11 @@ export function FieldPrepPanel({
     }
     if (!montado) return undefined
     setSaliendo(true)
+    // 220 = `--saga-motion-sale`: mismo numero que la transicion de salida.
     const id = window.setTimeout(() => {
       setMontado(false)
       setSaliendo(false)
-    }, 240)
+    }, 220)
     return () => window.clearTimeout(id)
   }, [visible, montado])
 
@@ -176,7 +177,9 @@ export function FieldPrepPanel({
           ...tarjeta(mobile),
           transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
           opacity: saliendo ? 0 : 1,
-          transition: saliendo ? 'transform 220ms ease, opacity 220ms ease' : undefined,
+          transition: saliendo
+            ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
+            : undefined,
           animation: saliendo ? 'none' : tarjeta(mobile).animation,
         }}
         onClick={(e) => e.stopPropagation()}
@@ -302,7 +305,7 @@ const capa: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .84)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
-  transition: 'opacity 220ms ease',
+  transition: 'opacity var(--saga-motion-sale) var(--saga-motion-curva)',
 }
 
 // Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
@@ -318,7 +321,7 @@ function tarjeta(mobile: boolean): CSSProperties {
     borderRadius: 18,
     background: 'var(--theme-card)',
     boxShadow: 'var(--theme-card-shadow)',
-    animation: 'sagaPanelEntra 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+    animation: 'sagaPanelEntra var(--saga-motion-entra) var(--saga-motion-curva)',
   }
 }
 

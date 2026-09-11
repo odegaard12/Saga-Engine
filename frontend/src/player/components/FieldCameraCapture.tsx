@@ -329,7 +329,7 @@ const sheet: CSSProperties = {
   border: 0,
   background: 'var(--theme-card)',
   boxShadow: 'var(--theme-card-shadow)',
-  animation: 'sagaPanelEntra 240ms cubic-bezier(0.22, 1, 0.36, 1)',
+  animation: 'sagaPanelEntra var(--saga-motion-entra) var(--saga-motion-curva)',
   color: '#fff',
   display: 'flex',
   flexDirection: 'column',

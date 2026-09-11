@@ -36,10 +36,13 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (!montada) return undefined
 
     setSaliendo(true)
+    // 260, el mismo numero que `--saga-motion-entra`: el temporizador que
+    // desmonta y la transicion que se ve tienen que durar lo mismo, o se
+    // corta el movimiento antes de acabar (o se queda un hueco despues).
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-    }, 280)
+    }, 260)
     return () => window.clearTimeout(id)
   }, [open, montada])
 
@@ -49,7 +52,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     ...sheet,
     ...sheetStyle,
     transform: saliendo ? 'translateY(100%)' : 'translateY(0)',
-    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+    transition: 'transform var(--saga-motion-entra) var(--saga-motion-curva)',
     // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
     // un salto hacia arriba justo antes de bajar.
     animation: saliendo ? 'none' : undefined,
@@ -152,13 +155,3 @@ const sheet: CSSProperties = {
   pointerEvents: 'auto',
 }
 
-// Zona de arrastre para cerrar deslizando. Llevaba un tirador visual -una
-// pildora blanca fija que no seguia al tema y se veia mal sobre la brasa de
-// fuego-; se quito el dibujo y se dejo la zona de arrastre, que sigue
-// funcionando igual.
-const dragHandleWrapper: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'center',
-  padding: '10px 0 12px',
-  cursor: 'grab',
-}
