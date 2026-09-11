@@ -783,7 +783,10 @@ const primaryTitulo: CSSProperties = {
 // Hereda el color del boton y baja la opacidad: sobre el naranja lleno un
 // gris fijo se ensuciaria, y sobre el boton apagado un blanco no se leeria.
 const primaryAyuda: CSSProperties = {
-  fontSize: 10.5,
+  // 11.5, no 10.5: lo caza la auditoria de interfaz del banco, y con razon.
+  // Esta frase se lee de pie, al sol, con el movil en la mano -no es una
+  // etiqueta decorativa, dice si puedes abrir el nodo o no-.
+  fontSize: 11.5,
   fontWeight: 700,
   opacity: 0.72,
   lineHeight: 1.3,
@@ -1112,9 +1115,11 @@ const toolsQuietButton: CSSProperties = {
 const closeButton: CSSProperties = {
   position: 'relative',
   zIndex: 10,
-  minWidth: 30,
-  width: 30,
-  height: 30,
+  // 36, no 30: es la unica salida visible de la hoja y estaba por debajo del
+  // area de toque que piden Apple y Google. Lo canta la auditoria del banco.
+  minWidth: 36,
+  width: 36,
+  height: 36,
   display: 'grid',
   placeItems: 'center',
   // Cuadrado de esquina suave, no pildora ni circulo: dentro de una tarjeta
