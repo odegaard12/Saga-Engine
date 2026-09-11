@@ -2827,8 +2827,20 @@ export default function PlayerApp() {
          * se veían LOS DOS A LA VEZ, uno asomando a través del otro, con la
          * tarjeta "ANTES DE SALIR" incrustada a media historia del prólogo.
          * Ahora el panel espera a que se cierre el prólogo primero.
+         *
+         * `!velo`: BUG REAL, "no hay animación al entrar".
+         *
+         * El panel SÍ tiene animación de entrada (sagaPanelEntra, 260ms), y
+         * SÍ se estaba disparando -React lo monta de nuevo cada vez que
+         * `visible` pasa a true-. El problema es que se montaba AL MISMO
+         * TIEMPO que el velo que disuelve la pantalla de carga, y ese velo
+         * dura 620ms a z-index 999999: la animación del panel (260ms)
+         * terminaba entera mientras el velo todavía lo tapaba del todo. Para
+         * cuando el velo se iba, el panel ya estaba quieto, así que se veía
+         * aparecer de golpe. La animación existía; nunca se llegó a ver.
          */
         visible={
+          !velo &&
           !showPrologue &&
           !prepCerrada &&
           (offlinePrepVisible ||
