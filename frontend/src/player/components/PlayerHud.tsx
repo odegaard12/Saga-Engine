@@ -386,29 +386,35 @@ export function PlayerHud({
         {/* La cabecera «MOCHILA / Guia, objetos y respaldo» se fue.
             Ocupaba dos lineas para decir lo que las pestanias ya dicen, y en
             una hoja de movil eso es sitio que le quitas al contenido. El boton
-            de cerrar se queda, en la misma linea que las pestanias. */}
-        <div style={tabs}>
-          <button
-            type="button"
-            style={backpackTab === 'requirements' ? tabActive : tabButton}
-            onClick={() => setBackpackTab('requirements')}
-          >
-            Guia
-          </button>
-          <button
-            type="button"
-            style={backpackTab === 'inventory' ? tabActive : tabButton}
-            onClick={() => setBackpackTab('inventory')}
-          >
-            Objetos
-          </button>
-          <button
-            type="button"
-            style={backpackTab === 'crafting' ? tabActive : tabButton}
-            onClick={() => setBackpackTab('crafting')}
-          >
-            Mesa
-          </button>
+            de cerrar se queda, en la misma linea que las pestanias.
+            "La X en Mochila fatal": iba DENTRO del mismo flex de las tres
+            pestañas, con `align-items: stretch` y sin hueco propio -pegada a
+            "Mesa", sin aire-. Ahora las pestañas viven en su propio grupo y
+            la X en el suyo, con margen y centrada aparte. */}
+        <div style={tabsFila}>
+          <div style={tabsGrupo}>
+            <button
+              type="button"
+              style={backpackTab === 'requirements' ? tabActive : tabButton}
+              onClick={() => setBackpackTab('requirements')}
+            >
+              Guia
+            </button>
+            <button
+              type="button"
+              style={backpackTab === 'inventory' ? tabActive : tabButton}
+              onClick={() => setBackpackTab('inventory')}
+            >
+              Objetos
+            </button>
+            <button
+              type="button"
+              style={backpackTab === 'crafting' ? tabActive : tabButton}
+              onClick={() => setBackpackTab('crafting')}
+            >
+              Mesa
+            </button>
+          </div>
 
           <button
             type="button"
@@ -725,7 +731,11 @@ const card: CSSProperties = {
   display: 'grid',
   gap: 0,
   background: 'var(--theme-card)',
-  borderRadius: 15,
+  // 20, no 15: "no se redondea bien con la pantalla". La tarjeta flota
+  // pegada casi al borde inferior curvo del movil, y una esquina de 15px se
+  // ve angulosa al lado de la curva mucho mas cerrada de la pantalla. 20
+  // acompaña mejor esa curva sin llegar a verse una pildora.
+  borderRadius: 20,
   boxShadow: 'var(--theme-card-shadow)',
 }
 
@@ -962,7 +972,20 @@ const sheetTitle: CSSProperties = {
 // Eran tres cajas dentro de otra caja con su propio fondo y borde: cuatro
 // marcos para elegir entre tres cosas. Ahora son texto, y la activa se marca
 // con un subrayado encendido. Se lee igual de rapido y no gasta altura.
-const tabs: CSSProperties = {
+// El grupo entero (pestañas + X): centrado en cruz, no estirado. Con
+// `stretch` la X se deformaba a la altura de las pestañas en vez de quedar
+// el cuadrado de 36x36 que es.
+const tabsFila: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+}
+
+// Las tres pestañas, en su propio flex: se llevan el ancho sobrante y la
+// linea de abajo, sin arrastrar a la X con ellas.
+const tabsGrupo: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
   display: 'flex',
   alignItems: 'stretch',
   gap: 0,

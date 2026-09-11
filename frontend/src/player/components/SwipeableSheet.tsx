@@ -83,6 +83,7 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
             escondia solo y arrastrar era la unica salida). Se cierra con la
             X o tocando fuera. De paso se recuperan los 22px que ocupaba. */}
         <div
+          className="saga-sin-scrollbar"
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -118,12 +119,19 @@ const overlay: CSSProperties = {
   pointerEvents: 'none', // Let children capture events
 }
 
+// "Difumina el fondo al estar abierto": lo pedia con razon. Este fondo
+// usaba `var(--theme-blur)`, y esa variable vale `none` en el tema de fuego
+// -es la unica de las tres que si lo desactiva-, asi que Mochila,
+// Ferramentas y Clasificacion se abrian sobre un velo oscuro SIN desenfoque
+// ninguno, mientras que el prologo y "antes de salir" -que no dependen de
+// esta variable- si difuminaban. Mismo valor fijo que esos dos, para que
+// las cinco hojas se comporten igual sin depender de que tema este puesto.
 const backdrop: CSSProperties = {
   position: 'absolute',
   inset: 0,
-  background: 'rgba(var(--theme-ink-deep), .34)',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
+  background: 'rgba(var(--theme-ink-deep), .5)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
   pointerEvents: 'auto',
   transition: 'opacity 0.3s ease',
 }
