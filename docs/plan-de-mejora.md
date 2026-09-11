@@ -5,7 +5,7 @@ se hace. No es una lista de deseos: cada punto dice **qué se mide primero**,
 porque aquí ya nos ha pasado arreglar cosas que no estaban rotas y dar por
 buenas otras sin comprobarlas.
 
-Estado a 21 de agosto de 2026 (actualizado el 30 con 0.0). Producción: **4.9.37**.
+Estado a 21 de agosto de 2026 (actualizado el 11 de septiembre con 1.21). Producción: **5.0.0**.
 
 ---
 
@@ -30,6 +30,98 @@ exactamente el que usa un móvil con el permiso ya dado.
 **Arreglo:** el efecto que centra el mapa ahora invalida el tamaño sin
 animar en cuanto lo detecta a 0×0, antes de calcular ningún centro. Medido:
 3 de 3 caídas antes, 0 de 2 después, mismo camino exacto.
+
+## 1.21 Rediseño del modo jugador, y un banco que mira la interfaz — 4.9.83 a 5.0.0
+
+Nueve pantallas rehechas y, sobre todo, **un escenario nuevo en el banco que
+caza lo que mirar la pantalla no caza**.
+
+### Lo que costo acertar con el diseño
+
+Cuatro rondas de maquetas rechazadas antes de dar con ello. Dicho para no
+repetirlo:
+
+- Boton circular flotante con brillo y podio con cajas de color: "horrible".
+- Version plana total, sin sombras: "fatal", parecia traducida elemento a
+  elemento.
+- Refinar la estructura sin mas: "peor", seguian siendo cajas.
+- Velos con degradado sobre el mapa: **barro marron**. Y en negro, ademas,
+  la pantalla perdia el rojo entero -en el login el velo se ve rojo porque
+  debajo hay una pagina roja; aqui debajo hay un mapa de satelite verde-.
+
+Lo que funciono: **color plano y sombra real**, que es lo que hace funcionar
+el login. Tres tokens nuevos por tema (`--theme-card`, `--theme-card-inset`,
+`--theme-hairline`) en vez de repetir rgba sueltos.
+
+### Los `!important` del tema, cuatro veces
+
+**Van CUATRO** veces que una regla con `!important` mata un cambio visual en
+este repo: el alfiler del mapa, el radio de la barra, las tres superficies de
+la pantalla de juego (`[data-saga-player-shell]`, `.saga-hud-quick`,
+`.saga-hud-dock`), y las hojas (`.saga-hoja`, `.saga-glass-panel`). El
+redisenio se escribia en los componentes y **no se veia nada**.
+
+**Regla para la proxima: antes de dar por bueno un cambio visual, grep del
+selector buscando `!important`.**
+
+### Los fallos que solo salieron MIDIENDO
+
+Ninguno de estos se ve mirando la pantalla:
+
+1. **La hoja se escondia su propia X.** El boton de cerrar existia y media
+   0x0 con `display: none`, y ninguna regla de CSS lo tocaba: lo escondia un
+   barrido del propio codigo que oculta botones cuyo texto sea un simbolo, y
+   ese boton dice "×". Ferramentas y Mochila quedaban sin salida visible.
+2. **La fila de iconos tocaba la tarjeta de abajo.** Se colocaba con una
+   cuenta desde el suelo usando el alto SUPUESTO de la tarjeta. Medido: 12px
+   de aire un dia, 16px despues de "arreglarlo". Se arreglo por ESTRUCTURA
+   -ahora se apilan por flujo- porque la aritmetica no puede funcionar: el
+   alto cambia con el largo del texto de ayuda.
+3. **El boton de centrar descuadraba a sus vecinos.** Se ocultaba con
+   `opacity: 0` pero seguia ocupando sus 38px. Invisible no es ausente.
+4. **Las hojas no se cerraban, se desmontaban.** La animacion de bajada solo
+   se alcanzaba arrastrando con el dedo; cerrando con el boton no se veia.
+5. **`mapProgress` falseaba "mapa completo"**: `Boolean(resumen?.saved)` con
+   `saved` siendo un NUMERO. Con una tesela bajada, la app daba el mapa por
+   completo y entrabas al monte sin mapa.
+
+### El banco, potenciado
+
+Dos escenarios nuevos en `sim/playwright-bench`:
+
+    node run.mjs auditoria-interfaz   fallos MEDIBLES en las 9 pantallas
+    node run.mjs album-diseno         una captura de cada pantalla
+
+La auditoria mira: botones de tamaño cero, botones escondidos por codigo,
+hojas sin salida pulsable, solapes entre las barras fijas, desborde
+horizontal, area de toque bajo 44px y texto bajo 11px. **No** mira si algo es
+bonito: eso no se automatiza.
+
+Tres corridas, 22 -> 6 -> **0** fallos graves. Encontro texto a 10px en sitios
+que se leen de pie y al sol (el aviso de radio del nodo, los tiempos del 2º y
+3º del podio, "Nodo 9", la ayuda del codigo alternativo).
+
+**Dos lecciones sobre la propia prueba**, que valen tanto como los fallos:
+
+- La primera version canto "sin-salida" en dos pantallas. Era **falso
+  positivo**: buscaba el texto "×" literal. **Una prueba que miente es peor
+  que no tenerla**; ahora busca lo que define al boton y comprueba que la
+  hoja se cierre de verdad.
+- No canta los rotulos en versalitas ("ANTES DE SALIR", "GUIA PASO A PASO"):
+  van pequeños a proposito. **Si una prueba salta veinte veces por pantalla,
+  se deja de leer.**
+
+### Contenido, no solo forma
+
+Cosas que no informaban de nada y se fueron: "¡FINALIZADO!" repetido NUEVE
+veces en la clasificacion; la fila ".ıl 0 M PRETO 0 · RAIO 50 M." de la
+mochila, que parecia telemetria; el titulo "MOCHILA" que repetia la pestaña
+ya subrayada encima; el reloj de la barra superior -nadie mira el crono
+andando y ya esta en la clasificacion-; y "Cambiar de Xogador / Volver a
+Seleccion", que era lo unico rojo de la hoja y decia lo mismo dos veces.
+
+Y algo que faltaba: en la clasificacion **no habia forma de saber cual eras
+tu** entre quince, que es lo primero que se busca al abrirla.
 
 ## 1.20 Modo jugador: rediseño fluido acorde con el login — 4.9.83 a 4.9.84
 
