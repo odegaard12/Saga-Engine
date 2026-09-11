@@ -320,7 +320,13 @@ export function getBottomOverlayStyle(mobile: boolean): CSSProperties {
      * iPhone quedan 22px -suficiente para no chocar con la raya del
      * indicador de inicio- y en un movil sin isla, 4px.
      */
-    bottom: mobile ? 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 12px))' : 12,
+    /**
+     * Bajada un poco mas: "puede bajarse algo, que toque el fondo abajo".
+     * Restaba 12 del inset (22px de aire en un iPhone con isla); resta 22,
+     * dejando 12px -sigue librando la raya del indicador de inicio, que es
+     * lo que este calculo existe para evitar, pero con menos hueco muerto-.
+     */
+    bottom: mobile ? 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 22px))' : 12,
     zIndex: 1200,
     pointerEvents: 'auto',
   }

@@ -171,12 +171,12 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
 
   return (
     <section style={panel}>
-      {/* Header */}
+      {/* La cabecera "MESA DE TRABAJO" se fue: repetia la pestaña "Mesa" que
+          ya esta seleccionada y subrayada justo encima -mismo fallo, y mismo
+          arreglo, que ya se hizo en Mochila con el titulo "MOCHILA"
+          duplicado-. Se queda solo el recuento, que si es informacion. */}
       <div style={headerRow}>
-        <div style={headerLeft}>
-          <span style={headerLabel}>MESA DE TRABAJO</span>
-          <span style={headerCount}>{activeRecipes.length} recetas</span>
-        </div>
+        <span style={headerCount}>{activeRecipes.length} recetas</span>
         {readyCount > 0 && (
           <span style={readyBadge}>
             {readyCount} disponible{readyCount !== 1 ? 's' : ''}
@@ -253,35 +253,23 @@ const headerRow: CSSProperties = {
   padding: '0 2px',
 }
 
-const headerLeft: CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: 8,
-}
-
-const headerLabel: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
-  color: '#fde68a',
-}
-
 const headerCount: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   color: 'rgba(255,255,255,0.4)',
 }
 
+// Sólido y redondo de verdad, no el radio del tema (ver la nota larga en
+// availablePill/lockedPill un poco más abajo).
 const readyBadge: CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
-  letterSpacing: '0.08em',
-  color: 'rgb(var(--theme-done-soft))',
-  background: 'rgba(var(--theme-done), 0.15)',
-  border: '1px solid rgba(var(--theme-done), 0.3)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 10px',
+  letterSpacing: '0.05em',
+  color: '#0b1220',
+  background: '#22c55e',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 10px',
 }
 
 const toastBanner: CSSProperties = {
@@ -334,10 +322,15 @@ const recipeCardReady: CSSProperties = {
   border: 0,
 }
 
+// Sin opacidad rebajada: "Forjar el Sello no se lee bien, debe leerse todo
+// bien y no estar opacado" -y tenia razon-. El `opacity: 0.5` de antes
+// apagaba la tarjeta ENTERA, titulo incluido, justo en el caso mas comun
+// -mientras aun faltan piezas-. El estado de "no listo" ya lo cuenta la
+// etiqueta "FALTAN" (lockedPill) y el boton apagado (craftBtnApagado); no
+// hacia falta apagar tambien el nombre de lo que se esta fabricando.
 const recipeCardLocked: CSSProperties = {
   background: 'transparent',
   border: 0,
-  opacity: 0.5,
 }
 
 const recipeOutputRow: CSSProperties = {
@@ -381,27 +374,36 @@ const recipeOutputMeta: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+/**
+ * "Anticuado": estos dos chips llevaban borde + relleno traslucido + el
+ * radio de pildora del TEMA -que en fuego es 3px, casi cuadrado, hecho a
+ * proposito para otros elementos-, mezclando dos lenguajes visuales en la
+ * misma pantalla. Ahora son solidos y de verdad redondos (999px fijo,
+ * como las insignias del podio), sin borde: el resto de la pantalla ya
+ * no lleva bordes translucidos en ningun sitio.
+ */
 const availablePill: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
-  letterSpacing: '0.12em',
-  color: 'rgb(var(--theme-done-soft))',
-  background: 'rgba(var(--theme-done), 0.15)',
-  border: '1px solid rgba(var(--theme-done), 0.3)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 8px',
+  letterSpacing: '0.08em',
+  // Verde universal de "listo", no del tema: es una señal, no decoracion.
+  color: '#0b1220',
+  background: '#22c55e',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 9px',
   flexShrink: 0,
 }
 
 const lockedPill: CSSProperties = {
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 900,
-  letterSpacing: '0.12em',
-  color: 'rgb(var(--theme-line))',
-  background: 'rgba(var(--theme-line), 0.1)',
-  border: '1px solid rgba(var(--theme-line), 0.2)',
-  borderRadius: 'var(--theme-radius-pill)',
-  padding: '3px 8px',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,.6)',
+  background: 'var(--theme-card-inset)',
+  border: 0,
+  borderRadius: 999,
+  padding: '4px 9px',
   flexShrink: 0,
 }
 

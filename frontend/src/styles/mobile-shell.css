@@ -274,3 +274,21 @@ html.saga-route-player .saga-tools-language-row {
   -webkit-backface-visibility: hidden;
 }
 
+/* La barra de deslizar (scrollbar nativo), fuera de las hojas.
+ *
+ * "Borrala, no quiero que se vea al deslizar en clasificación" / "en
+ * ferramentas eliminarle la barra del lado". El scroll sigue funcionando
+ * igual -esto solo quita el dibujo del scrollbar-, en las dos direcciones
+ * de motor que hay que cubrir: `scrollbar-width` (Firefox, y ya cubre
+ * Chrome/Safari nuevos) y `::-webkit-scrollbar` (Safari/Chrome viejos, que
+ * ignoran la propiedad estándar). */
+.saga-sin-scrollbar {
+  scrollbar-width: none;
+}
+
+.saga-sin-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+

@@ -1387,13 +1387,40 @@ export default function PlayerApp() {
   // el mapa. Esto no evita la carga -sigue durando lo que tenga que durar-,
   // solo disuelve el cambio de una pantalla a la otra en vez de cortarlo.
   const fueListoRef = useRef(false)
+  /**
+   * "La pantalla de carga cierra de golpe": tenia razon, y era una carrera.
+   *
+   * El velo se apagaba con una `animation` de CSS (620ms) mientras un
+   * `setTimeout` de JS (640ms) lo desmontaba por su cuenta, en un momento en
+   * el que el hilo principal esta OCUPADO montando el mapa de verdad
+   * -Leaflet, teselas, marcadores- por primera vez. Si el navegador se
+   * retrasa aunque sea un poco pintando los fotogramas intermedios de la
+   * animacion, el `setTimeout` no espera: llega a los 640ms de reloj y
+   * desmonta el velo aunque el fundido no se haya visto, y el corte se lee
+   * de golpe en vez de un fundido.
+   *
+   * Ahora el propio navegador avisa cuando el fundido TERMINA DE VERDAD
+   * (`transitionend`), y el temporizador es solo una red de seguridad muy
+   * holgada por si ese aviso no llegara nunca.
+   */
   const [velo, setVelo] = useState(false)
+  const [veloSaliendo, setVeloSaliendo] = useState(false)
   useEffect(() => {
     if (state.status === 'ready' && !fueListoRef.current) {
       fueListoRef.current = true
       setVelo(true)
-      const id = window.setTimeout(() => setVelo(false), 640)
-      return () => window.clearTimeout(id)
+      setVeloSaliendo(false)
+      // Un frame antes de empezar a apagarlo: si se pone opacity:0 en el
+      // MISMO render que lo monta, el navegador puede fundir el `mount` y el
+      // `unmount` en un solo frame y no se ve transicion ninguna.
+      const idInicio = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setVeloSaliendo(true))
+      })
+      const idRespaldo = window.setTimeout(() => setVelo(false), 1400)
+      return () => {
+        window.cancelAnimationFrame(idInicio)
+        window.clearTimeout(idRespaldo)
+      }
     }
     if (state.status !== 'ready') {
       fueListoRef.current = false
@@ -2687,6 +2714,14 @@ export default function PlayerApp() {
       {velo ? (
         <div
           aria-hidden="true"
+          // `onTransitionEnd`, no un `setTimeout` adivinando cuanto tarda:
+          // ver la nota larga junto al estado `velo`. El navegador avisa
+          // cuando el fundido termina DE VERDAD, con el reloj que el
+          // navegador usa para pintarlo, no con uno aparte que puede ir por
+          // libre si el hilo principal va cargado.
+          onTransitionEnd={(event) => {
+            if (event.propertyName === 'opacity') setVelo(false)
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2696,7 +2731,9 @@ export default function PlayerApp() {
               'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
               'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
               'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
-            animation: 'sagaVeloDisolver 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
+            opacity: veloSaliendo ? 0 : 1,
+            transform: veloSaliendo ? 'scale(1.06)' : 'scale(1)',
+            transition: 'opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         />
       ) : null}
