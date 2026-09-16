@@ -10,10 +10,21 @@
  * pasivo deja pintar un fotograma desnudo antes de montar el velo. Nada de
  * eso se ve leyendo; todo se ve midiendo.
  *
- * Así que esto graba la opacidad y la posición reales -las calculadas por el
- * navegador- en CADA fotograma, y después pregunta lo único que importa:
- * ¿hubo valores intermedios? Un movimiento que va de 0 a 1 sin pasar por en
- * medio es un corte, diga lo que diga la hoja de estilos.
+ * La primera versión contaba fotogramas: grababa la opacidad y la posición
+ * reales en cada `requestAnimationFrame` y miraba si había valores a medio
+ * camino. Y MENTÍA: para el mismo código sin tocar, tres pasadas seguidas
+ * dieron 7, 6 y 0 en la misma hoja. En Chromium sin ventana el bucle va
+ * irregular y cada llamada del guión le roba fotogramas, así que un cero no
+ * significaba "no se movió" sino "no miré mientras se movía".
+ *
+ * Ahora la pregunta se le hace al navegador, que no necesita que nadie mire:
+ * `transitionend` y `animationend` se disparan cuando el movimiento TERMINA
+ * de verdad, y traen `elapsedTime`. Si no hay evento, no hubo movimiento; no
+ * hay forma de que el navegador avise del final de algo que no ha empezado.
+ *
+ * El muestreo por fotogramas se queda sólo para una cosa que no va de
+ * suavidad sino de presencia: comprobar que entre que la pantalla de carga
+ * se va y el velo se pone no queda NI UN fotograma con el juego desnudo.
  */
 import { chromium } from 'playwright'
 import { SagaClient } from '../lib/sagaClient.mjs'
@@ -22,25 +33,12 @@ const BASE_URL = process.env.SAGA_BASE_URL
 const OUT = process.env.SHOT_DIR || 'out'
 
 /**
- * Fotogramas intermedios que exigimos para dar un movimiento por visto.
- *
- * Cuatro, y no mas, porque el suelo lo pone el propio grabador: en Chromium
- * sin ventana el bucle de `requestAnimationFrame` no va a 60 por segundo, asi
- * que un movimiento de 260ms que en un telefono daria unos quince fotogramas
- * aqui se queda en cinco o seis. Lo que esta prueba distingue de verdad es
- * CERO -no se ha movido, ha aparecido- de un puñado. No sirve para afinar
- * duraciones: para eso hay que mirar el numero de la ficha de tiempo, no el
- * recuento de fotogramas.
- */
-const MINIMO_INTERMEDIOS = 4
-
-/**
  * El grabador vive en la página y arranca ANTES de que cargue nada: el
  * relevo de la pantalla de carga ocurre una sola vez y no avisa.
  */
 function grabador() {
   const TOPE = 2400
-  const estado = { frames: [], siguiente: 0 }
+  const estado = { frames: [], eventos: [], siguiente: 0 }
   window.__sagaAnim = estado
 
   const objetivos = {
@@ -82,6 +80,45 @@ function grabador() {
     requestAnimationFrame(bucle)
   }
   requestAnimationFrame(bucle)
+
+  /**
+   * Y ademas -de hecho, sobre todo- los EVENTOS de verdad del navegador.
+   *
+   * Contar fotogramas resulto ser una prueba que miente. Para el mismo
+   * codigo sin tocar, tres pasadas seguidas dieron 7, 6 y 0 fotogramas
+   * intermedios en la misma hoja: en Chromium sin ventana el bucle de
+   * `requestAnimationFrame` va irregular, y cada `page.evaluate` del guion
+   * le roba fotogramas encima. Un cero ahi no significaba "no se movio",
+   * significaba "no mire mientras se movia".
+   *
+   * `transitionend` y `animationend` no dependen de que nadie mire: los
+   * dispara el navegador cuando la transicion TERMINA DE VERDAD, y traen
+   * `elapsedTime`, o sea cuanto duro. Eso responde la pregunta entera -¿se
+   * movio?, ¿que propiedad?, ¿cuanto?- sin muestreo y sin suerte.
+   */
+  const quien = (el) => {
+    if (!(el instanceof Element)) return null
+    const marca = el.getAttribute('data-saga-anim')
+    if (marca) return marca
+    if (el.classList && el.classList.contains('saga-hoja')) return 'hoja'
+    return null
+  }
+
+  const anotarEvento = (evento, tipo) => {
+    const nombre = quien(evento.target)
+    if (!nombre) return
+    estado.eventos.push({
+      i: estado.siguiente,
+      quien: nombre,
+      tipo,
+      prop: evento.propertyName || evento.animationName || '',
+      ms: Math.round((evento.elapsedTime || 0) * 1000),
+    })
+    if (estado.eventos.length > TOPE) estado.eventos.shift()
+  }
+
+  document.addEventListener('transitionend', (e) => anotarEvento(e, 'transicion'), true)
+  document.addEventListener('animationend', (e) => anotarEvento(e, 'animacion'), true)
 }
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -94,23 +131,23 @@ async function framesDesde(page, desde) {
   return page.evaluate((d) => (window.__sagaAnim?.frames || []).filter((f) => f.i >= d), desde)
 }
 
-/**
- * Cuenta los fotogramas en los que un valor está A MEDIO CAMINO.
- *
- * Es la única pregunta honesta: da igual cuánto dure la transición o qué
- * curva tenga, si el elemento nunca se ve a medias es que no se ha movido,
- * ha aparecido.
- */
-function intermedios(frames, clave, campo, minimo, maximo) {
-  let cuenta = 0
-  for (const f of frames) {
-    const v = f[clave]
-    if (!v) continue
-    const valor = v[campo]
-    if (valor > minimo && valor < maximo) cuenta += 1
-  }
-  return cuenta
+async function eventosDesde(page, desde) {
+  return page.evaluate((d) => (window.__sagaAnim?.eventos || []).filter((e) => e.i >= d), desde)
 }
+
+/**
+ * ¿Termino un movimiento de esta propiedad, en este elemento, y cuanto duro?
+ *
+ * Devuelve el evento o `null`. `null` significa que el movimiento no ocurrio:
+ * no hay forma de que el navegador dispare `transitionend` de algo que no ha
+ * transicionado.
+ */
+function movimiento(eventos, quien, prop) {
+  return eventos.find((e) => e.quien === quien && e.prop === prop) || null
+}
+
+/** Duracion minima para no dar por buena una transicion de adorno. */
+const MS_MINIMOS = 150
 
 function presente(frames, clave) {
   return frames.filter((f) => f[clave]).length
@@ -156,15 +193,16 @@ export async function run() {
     }
 
     const relevo = await framesDesde(page, 0)
+    const eventosRelevo = await eventosDesde(page, 0)
 
     if (!vioVelo) {
       anotar('relevo.velo', false, 'el velo de salida de la carga no llegó a existir')
     } else {
-      const fundido = intermedios(relevo, 'velo', 'o', 0.05, 0.95)
+      const fundido = movimiento(eventosRelevo, 'velo', 'opacity')
       anotar(
         'relevo.fundido',
-        fundido >= MINIMO_INTERMEDIOS,
-        `${fundido} fotogramas con el velo a media opacidad (mínimo ${MINIMO_INTERMEDIOS})`
+        Boolean(fundido) && fundido.ms >= MS_MINIMOS,
+        fundido ? `el velo se fundió durante ${fundido.ms}ms` : 'el velo NO se fundió: apareció y desapareció'
       )
 
       /**
@@ -213,23 +251,26 @@ export async function run() {
     if (presente(framesPrep, 'prepCapa') === 0) {
       medidas['prep.entrada'] = 'no salió el panel "antes de salir" (puede que no faltara nada)'
     } else {
-      const entraFondo = intermedios(framesPrep, 'prepCapa', 'o', 0.05, 0.95)
+      const eventosPrep = await eventosDesde(page, desdePrep)
+      const entraFondo = movimiento(eventosPrep, 'prep-capa', 'sagaCapaEntra')
       anotar(
         'prep.entradaFondo',
-        entraFondo >= MINIMO_INTERMEDIOS,
-        `${entraFondo} fotogramas con el fondo a media opacidad (mínimo ${MINIMO_INTERMEDIOS})`
+        Boolean(entraFondo) && entraFondo.ms >= MS_MINIMOS,
+        entraFondo
+          ? `el fondo entró durante ${entraFondo.ms}ms`
+          : 'el fondo NO entró: la pantalla se oscurece de un tirón'
       )
 
       const desdeCierre = await indiceActual(page)
       const salir = page.locator('button', { hasText: /seguir sen iso|seguir sin/i }).first()
       if (await salir.count()) await salir.click().catch(() => {})
       await esperar(1000)
-      const framesCierre = await framesDesde(page, desdeCierre)
-      const saleFondo = intermedios(framesCierre, 'prepCapa', 'o', 0.05, 0.95)
+      const eventosCierre = await eventosDesde(page, desdeCierre)
+      const saleFondo = movimiento(eventosCierre, 'prep-capa', 'opacity')
       anotar(
         'prep.salidaFondo',
-        saleFondo >= MINIMO_INTERMEDIOS,
-        `${saleFondo} fotogramas a media opacidad al cerrar (mínimo ${MINIMO_INTERMEDIOS})`
+        Boolean(saleFondo) && saleFondo.ms >= MS_MINIMOS,
+        saleFondo ? `el fondo salió durante ${saleFondo.ms}ms` : 'el fondo NO salió: desaparece de golpe'
       )
     }
 
@@ -271,15 +312,13 @@ export async function run() {
         continue
       }
 
-      const alto = Math.max(...framesAbrir.filter((f) => f.hoja).map((f) => f.hoja.alto))
-      alturas[nombre] = alto
-      // "A medio camino" para una hoja que sube es su `translateY`: entre un
-      // 5% y un 95% de su propia altura.
-      const subiendo = intermedios(framesAbrir, 'hoja', 'y', alto * 0.05, alto * 0.95)
+      alturas[nombre] = Math.max(...framesAbrir.filter((f) => f.hoja).map((f) => f.hoja.alto))
+
+      const subiendo = movimiento(await eventosDesde(page, desdeAbrir), 'hoja', 'transform')
       anotar(
         `hoja.${nombre}.entrada`,
-        subiendo >= MINIMO_INTERMEDIOS,
-        `${subiendo} fotogramas a medio subir (mínimo ${MINIMO_INTERMEDIOS})`
+        Boolean(subiendo) && subiendo.ms >= MS_MINIMOS,
+        subiendo ? `subió durante ${subiendo.ms}ms` : 'NO subió: aparece ya colocada'
       )
 
       // El hueco de abajo: la hoja tiene que apoyarse en el borde.
@@ -297,12 +336,11 @@ export async function run() {
       const desdeCerrar = await indiceActual(page)
       await cerrarHoja()
       await esperar(800)
-      const framesCerrar = await framesDesde(page, desdeCerrar)
-      const bajando = intermedios(framesCerrar, 'hoja', 'y', alto * 0.05, alto * 0.95)
+      const bajando = movimiento(await eventosDesde(page, desdeCerrar), 'hoja', 'transform')
       anotar(
         `hoja.${nombre}.salida`,
-        bajando >= MINIMO_INTERMEDIOS,
-        `${bajando} fotogramas a medio bajar (mínimo ${MINIMO_INTERMEDIOS})`
+        Boolean(bajando) && bajando.ms >= MS_MINIMOS,
+        bajando ? `bajó durante ${bajando.ms}ms` : 'NO bajó: desaparece de golpe'
       )
       await esperar(400)
     }
