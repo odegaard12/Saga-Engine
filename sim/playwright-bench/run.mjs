@@ -12,6 +12,8 @@
 //                               revisar la interfaz entera de golpe
 //   auditoria-interfaz       — busca fallos de interfaz MEDIBLES: botones de
 //                               0x0, elementos que se solapan, texto ilegible
+//   animaciones              — graba opacidad y posicion FOTOGRAMA A FOTOGRAMA:
+//                               ¿se mueve de verdad o aparece de golpe?
 
 const nombre = process.argv[2] || 'team-relay-cobertura'
 
@@ -22,6 +24,7 @@ const escenarios = {
   'offline-descargado-antes': () => import('./scenarios/offline-descargado-antes.mjs'),
   'album-diseno': () => import('./scenarios/album-diseno.mjs'),
   'auditoria-interfaz': () => import('./scenarios/auditoria-interfaz.mjs'),
+  animaciones: () => import('./scenarios/animaciones.mjs'),
 }
 
 const cargar = escenarios[nombre]
