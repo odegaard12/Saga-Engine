@@ -36,7 +36,11 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
    * se plantaba entera, de una pieza. Ahora las tres entran igual, deslizando
    * desde abajo, con las mismas fichas de tiempo que todo lo demas.
    */
-  const [entrando, setEntrando] = useState(false)
+  // Arranca en `open`, no en falso: hay hojas que se montan YA abiertas
+  // -quien las usa las renderiza solo cuando toca-, y con el valor falso el
+  // primer fotograma ya se pintaba colocada. Naciendo fuera, entra igual
+  // dandole igual si el padre la monta antes o a la vez.
+  const [entrando, setEntrando] = useState(open)
 
   useEffect(() => {
     if (open) {
