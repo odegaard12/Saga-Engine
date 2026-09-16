@@ -337,8 +337,14 @@ export function PlayerHud({
           // El relleno de abajo se lleva el area segura: la barra llega hasta
           // el borde de la pantalla -que es lo pedido- pero su contenido no
           // se mete debajo de la raya del indicador de inicio del iPhone.
+          // "Bajar algo la altura: mucho espacio entre Mochila/Ferramentas y
+          // el final de la pantalla". El hueco no eran los 9px que se leen
+          // aqui: en el iPhone `env(safe-area-inset-bottom)` son 34px MAS, o
+          // sea 43px de aire bajo dos palabras. Se respeta media area segura
+          // -bastante para no meter el texto debajo de la raya del indicador
+          // de inicio- en vez de la entera: 22px en el telefono, 5 en el resto.
           padding: compact
-            ? '11px 13px calc(9px + env(safe-area-inset-bottom, 0px))'
+            ? '10px 13px calc(5px + env(safe-area-inset-bottom, 0px) / 2)'
             : '13px 15px 11px',
         }}
       >
@@ -830,7 +836,7 @@ const dock: CSSProperties = {
   justifyContent: 'center',
   alignItems: 'center',
   gap: 22,
-  marginTop: 8,
+  marginTop: 6,
 }
 
 const dockDivisor: CSSProperties = {
@@ -937,22 +943,37 @@ function getSheetStyle(compact: boolean): CSSProperties {
     // se pone su propio aire. El hueco solo lo duplicaba.
     gap: 0,
     width: compact ? '100%' : 'min(100%, 480px)',
-    maxHeight: compact ? '84dvh' : 'min(66vh, 590px)',
-    overflowY: 'auto',
-    overflowX: 'hidden',
+    /**
+     * ALTO FIJO, no `maxHeight`: "dejar alturas uniformes de los 3
+     * submenus". Con un maximo, cada pestaña de la Mochila medía lo que
+     * midiese su contenido -Guia corta, Mesa larga- y la hoja pegaba un
+     * estiron o un encogimiento al cambiar de pestaña, con las pestañas
+     * saltando de sitio bajo el dedo. Fijandolo, las tres abren igual y lo
+     * unico que cambia es lo de dentro.
+     */
+    height: compact ? '78dvh' : 'min(66vh, 590px)',
+    maxHeight: compact ? '78dvh' : 'min(66vh, 590px)',
+    // El que rueda es el hijo de dentro (SwipeableSheet le pone `flex: 1`),
+    // no la hoja: asi la cabecera pegajosa se queda pegada a ALGO que rueda.
+    overflow: 'hidden',
     overscrollBehavior: 'contain',
     // Tarjeta SOLIDA, no cristal -diseno "B", aprobado-. Ver la nota larga
     // de PlayerShell.tsx: los translucidos sobre el mapa daban barro.
-    borderRadius: compact ? '18px 18px 0 0' : 18,
+    // 20, el mismo par que la barra de abajo: las dos se apoyan en el mismo
+    // borde de pantalla y con 18 contra 20 se notaba el desajuste al abrir.
+    borderRadius: compact ? '20px 20px 0 0' : 18,
     border: 0,
     background: 'var(--theme-card)',
     color: '#f8fafc',
     boxShadow: 'var(--theme-card-shadow)',
     padding: '0 18px',
     paddingBottom: compact
-      ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
+      ? 'calc(14px + env(safe-area-inset-bottom, 0px) / 2)'
       : 'calc(14px + env(safe-area-inset-bottom, 0px))',
-    animation: 'sagaLoginRise 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+    // Sin `animation` propia: la entrada y la salida las hace SwipeableSheet
+    // con una `transform`, y una animacion de fotogramas clave le gana a esa
+    // propiedad mientras corre. Habia dos movimientos peleando por la misma
+    // hoja, y el resultado era que al cerrar no se veia ninguno.
   }
 }
 
@@ -964,7 +985,16 @@ const sheetHeader: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  padding: '0 0 14px 0',
+  /**
+   * "En Ferramentas el titulo queda casi cortado arriba del todo".
+   *
+   * Literal: la hoja tiene `padding: '0 18px'` -relleno ARRIBA cero- y esta
+   * cabecera tampoco ponia nada, asi que el titulo de 21px arrancaba en el
+   * pixel 0 de la tarjeta, pegado al borde curvo. Las 14 de arriba son el
+   * aire que faltaba, y van en la cabecera y no en la hoja para que sigan
+   * ahi cuando la cabecera se queda pegada al rodar.
+   */
+  padding: '14px 0 12px 0',
   background: 'var(--theme-card)',
   borderBottom: `1px solid var(--theme-hairline)`,
 }
@@ -991,6 +1021,14 @@ const tabsFila: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 10,
+  // Misma cabecera que Ferramentas: aire arriba y se queda pegada al rodar.
+  // Antes las tres pestañas y la X nacian pegadas al borde curvo de la hoja,
+  // y al bajar por la Mesa de trabajo se perdian de vista.
+  position: 'sticky',
+  top: 0,
+  zIndex: 4,
+  paddingTop: 14,
+  background: 'var(--theme-card)',
 }
 
 // Las tres pestañas, en su propio flex: se llevan el ancho sobrante y la
