@@ -52,13 +52,13 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (!montada) return undefined
 
     setSaliendo(true)
-    // 220 = `--saga-motion-sale`: el temporizador que desmonta y la
+    // 260 = `--saga-motion-sale`: el temporizador que desmonta y la
     // transicion que se ve tienen que durar lo mismo, o se corta el
     // movimiento antes de acabar (o se queda un hueco despues).
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-    }, 220)
+    }, 260)
     return () => window.clearTimeout(id)
   }, [open, montada])
 

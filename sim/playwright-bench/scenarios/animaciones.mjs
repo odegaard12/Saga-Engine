@@ -21,7 +21,17 @@ import { SagaClient } from '../lib/sagaClient.mjs'
 const BASE_URL = process.env.SAGA_BASE_URL
 const OUT = process.env.SHOT_DIR || 'out'
 
-/** Fotogramas intermedios que exigimos para dar un movimiento por visto. */
+/**
+ * Fotogramas intermedios que exigimos para dar un movimiento por visto.
+ *
+ * Cuatro, y no mas, porque el suelo lo pone el propio grabador: en Chromium
+ * sin ventana el bucle de `requestAnimationFrame` no va a 60 por segundo, asi
+ * que un movimiento de 260ms que en un telefono daria unos quince fotogramas
+ * aqui se queda en cinco o seis. Lo que esta prueba distingue de verdad es
+ * CERO -no se ha movido, ha aparecido- de un puñado. No sirve para afinar
+ * duraciones: para eso hay que mirar el numero de la ficha de tiempo, no el
+ * recuento de fotogramas.
+ */
 const MINIMO_INTERMEDIOS = 4
 
 /**
