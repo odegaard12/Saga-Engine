@@ -105,8 +105,18 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
     return () => clearInterval(timer)
   }, [open])
 
-  if (!open) return null
-
+  /**
+   * NO se hace `if (!open) return null`.
+   *
+   * Lo hacia, y por eso la Clasificacion era la unica de las tres hojas que
+   * ni entraba ni salia: al cerrarla, este `return` desmontaba la hoja ENTERA
+   * un nivel por encima de SwipeableSheet, asi que la animacion de bajada no
+   * llegaba a existir nunca. Es exactamente el mismo fallo que ya se corrigio
+   * DENTRO de SwipeableSheet, reintroducido desde fuera. Medido por el banco:
+   * 0 fotogramas a medio subir y 0 a medio bajar, contra 6 y 4 de las otras.
+   *
+   * Quien decide cuando montar y cuando desmontar es la hoja, y solo ella.
+   */
   const sorted = [...players].sort((a, b) => {
     const pointsA = readNumericStat(a, ['score', 'points', 'total_points'])
     const pointsB = readNumericStat(b, ['score', 'points', 'total_points'])

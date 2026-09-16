@@ -26,7 +26,37 @@ export class SagaClient {
     return respuesta
   }
 
+  /**
+   * Sesion de navegador SIN contraseña de admin.
+   *
+   * `/api/admin/simulation/browser-session/start` pide la contraseña de
+   * admin, y esa contraseña no esta escrita en ningun fichero a proposito
+   * -Oscar la tiene y la usa desde la web-. Resultado: el banco no se podia
+   * lanzar sin pararse a pedirla, que es justo lo que hace que un banco de
+   * pruebas deje de lanzarse.
+   *
+   * Los mismos tokens se pueden acuñar dentro del contenedor, con las mismas
+   * funciones que usa el endpoint (`main.registrar_jugadores_de_simulacion`
+   * y `main.mint_simulation_player_tokens`):
+   *
+   *   ssh PI "docker exec -w /app saga_engine_app python -c '...'"
+   *
+   * y pasarlos aqui en SAGA_PLAYER_SESSION, que es un JSON con la misma
+   * forma que devuelve el endpoint. Si esa variable esta puesta, ni se
+   * intenta el login.
+   */
+  _sesionPrefabricada() {
+    const crudo = process.env.SAGA_PLAYER_SESSION
+    if (!crudo) return null
+    try {
+      return JSON.parse(crudo)
+    } catch (error) {
+      throw new Error(`SAGA_PLAYER_SESSION no es JSON valido: ${error.message}`)
+    }
+  }
+
   async login(adminPassword) {
+    if (this._sesionPrefabricada()) return { status: 'ok', prefabricada: true }
     const respuesta = await this._fetch('/api/admin/login', {
       method: 'POST',
       body: JSON.stringify({ password: adminPassword }),
@@ -38,6 +68,9 @@ export class SagaClient {
   }
 
   async startBrowserSession(playerCount) {
+    const prefabricada = this._sesionPrefabricada()
+    if (prefabricada) return prefabricada
+
     const respuesta = await this._fetch('/api/admin/simulation/browser-session/start', {
       method: 'POST',
       body: JSON.stringify({ player_count: playerCount }),
@@ -49,6 +82,10 @@ export class SagaClient {
   }
 
   async stopBrowserSession() {
+    // Con sesion prefabricada no hay nada que cerrar por HTTP: los SIM_XX se
+    // quitan con el mismo `docker exec` que los creo.
+    if (this._sesionPrefabricada()) return true
+
     const respuesta = await this._fetch('/api/admin/simulation/browser-session/stop', {
       method: 'POST',
       body: JSON.stringify({}),
@@ -57,6 +94,8 @@ export class SagaClient {
   }
 
   async cleanupTrace() {
+    if (this._sesionPrefabricada()) return null
+
     const respuesta = await this._fetch('/api/admin/simulation/cleanup', {
       method: 'POST',
       body: JSON.stringify({}),
