@@ -1405,28 +1405,58 @@ export default function PlayerApp() {
    */
   const [velo, setVelo] = useState(false)
   const [veloSaliendo, setVeloSaliendo] = useState(false)
+  const ultimoDetalleRef = useRef('Preparando la misión…')
+
+  /**
+   * CAUSA REAL DEL SALTO, medida en el codigo, no supuesta.
+   *
+   * Esto vivia en un `useEffect`. Los efectos de `useEffect` son PASIVOS: se
+   * ejecutan DESPUES de que el navegador pinte. Asi que la secuencia era:
+   *
+   *   1. `status` pasa a `ready` -> React pinta el juego entero, con velo a
+   *      falso, porque el estado todavia no ha cambiado.
+   *   2. EL NAVEGADOR PINTA ESE FOTOGRAMA: mapa, barras y botones, desnudos.
+   *   3. Recien entonces corre el efecto, pone el velo, y otro repintado lo
+   *      planta encima a opacidad 1.
+   *   4. El velo se funde.
+   *
+   * O sea: la pantalla de carga desaparecia de golpe, asomaba el juego, y
+   * encima caia un velo que luego se iba. Tres cortes donde tenia que haber
+   * un fundido. Y con Leaflet montandose en medio, el paso 2 no dura un
+   * fotograma: dura lo que tarde el mapa.
+   *
+   * Decidirlo durante el render -patron admitido de "ajustar estado cuando
+   * cambian las props"- hace que React descarte ese render y vuelva a
+   * renderizar ANTES de tocar el DOM. El navegador no llega a pintar nunca
+   * el juego sin velo.
+   */
+  if (state.status === 'ready' && !fueListoRef.current) {
+    fueListoRef.current = true
+    if (!velo) setVelo(true)
+    if (veloSaliendo) setVeloSaliendo(false)
+  }
+  if (state.status !== 'ready' && fueListoRef.current) {
+    fueListoRef.current = false
+  }
+
   useEffect(() => {
-    if (state.status === 'ready' && !fueListoRef.current) {
-      fueListoRef.current = true
-      setVelo(true)
-      setVeloSaliendo(false)
-      // Un frame antes de empezar a apagarlo: si se pone opacity:0 en el
-      // MISMO render que lo monta, el navegador puede fundir el `mount` y el
-      // `unmount` en un solo frame y no se ve transicion ninguna.
-      const idInicio = window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => setVeloSaliendo(true))
-      })
-      const idRespaldo = window.setTimeout(() => setVelo(false), 1400)
-      return () => {
-        window.cancelAnimationFrame(idInicio)
-        window.clearTimeout(idRespaldo)
-      }
+    if (!velo) return undefined
+    // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
+    // MISMO render que lo monta, el navegador funde el `mount` y el cambio en
+    // un solo fotograma y no se ve transicion ninguna.
+    const idInicio = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setVeloSaliendo(true))
+    })
+    // Red de seguridad holgada: si `transitionend` no llegara nunca, el velo
+    // no puede quedarse pegado. 2600 y no 1400 porque los dos fotogramas de
+    // arriba pueden tardar si el hilo principal esta montando el mapa, y un
+    // temporizador corto cortaba el fundido por la mitad.
+    const idRespaldo = window.setTimeout(() => setVelo(false), 2600)
+    return () => {
+      window.cancelAnimationFrame(idInicio)
+      window.clearTimeout(idRespaldo)
     }
-    if (state.status !== 'ready') {
-      fueListoRef.current = false
-    }
-    return undefined
-  }, [state.status])
+  }, [velo])
 
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
@@ -1437,6 +1467,11 @@ export default function PlayerApp() {
     const ratio = hayTotal
       ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100))
       : undefined
+
+    // Se guarda para que el velo de salida siga diciendo lo mismo que decia
+    // la pantalla un instante antes: si cambia el texto a la vez que empieza
+    // el fundido, se nota el relevo.
+    ultimoDetalleRef.current = mapProgress?.detail || 'Preparando la misión…'
 
     return (
       <SplashScreen
@@ -2714,6 +2749,7 @@ export default function PlayerApp() {
       {velo ? (
         <div
           aria-hidden="true"
+          data-saga-anim="velo"
           // `onTransitionEnd`, no un `setTimeout` adivinando cuanto tarda:
           // ver la nota larga junto al estado `velo`. El navegador avisa
           // cuando el fundido termina DE VERDAD, con el reloj que el
@@ -2727,15 +2763,22 @@ export default function PlayerApp() {
             inset: 0,
             zIndex: 999999,
             pointerEvents: 'none',
-            background:
-              'radial-gradient(circle at 50% 22%, var(--theme-tint-strong), transparent 46%),' +
-              'radial-gradient(circle at 50% 88%, var(--theme-tint), transparent 44%),' +
-              'linear-gradient(180deg, var(--theme-surface) 0%, var(--theme-bg) 100%)',
             opacity: veloSaliendo ? 0 : 1,
             transform: veloSaliendo ? 'scale(1.06)' : 'scale(1)',
             transition: 'opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
-        />
+        >
+          {/**
+           * Dentro va LA MISMA pantalla de carga, no una copia de su fondo.
+           *
+           * El velo era solo el degradado. El logo, el porcentaje y el texto
+           * se esfumaban en seco en el instante del relevo, asi que aunque el
+           * fondo se fundiera bien, lo que el ojo miraba -el centro- pegaba un
+           * corte. Ahora se funde la pantalla entera, con su contenido: los
+           * mismos pixeles que habia, apagandose.
+           */}
+          <SplashScreen progress={100} detail={ultimoDetalleRef.current} />
+        </div>
       ) : null}
       <MapSurface
         currentStage={currentStage}

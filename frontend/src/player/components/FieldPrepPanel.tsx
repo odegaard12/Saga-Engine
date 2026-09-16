@@ -66,7 +66,8 @@ export function FieldPrepPanel({
     }
     if (!montado) return undefined
     setSaliendo(true)
-    // 220 = `--saga-motion-sale`: mismo numero que la transicion de salida.
+    // 220 = `--saga-motion-sale`: mismo numero que la transicion de salida
+    // de la tarjeta Y la del fondo, que ahora tambien se funde.
     const id = window.setTimeout(() => {
       setMontado(false)
       setSaliendo(false)
@@ -166,9 +167,30 @@ export function FieldPrepPanel({
    * siguen dibujandose por encima. Sacandolo a document.body deja de tener
    * ancestros que lo encierren.
    */
+  /**
+   * SEGUNDA CAUSA DEL "SALE DE GOLPE", y esta se ve leyendo el estilo.
+   *
+   * La tarjeta SI tenia entrada (`sagaPanelEntra`). El fondo NO: `opacity:
+   * saliendo ? 0 : 1` vale 1 desde el primer fotograma, y una `transition`
+   * sin cambio de valor no transiciona nada. O sea que al abrirse este panel
+   * la pantalla entera se oscurecia y se desenfocaba DE UN TIRON -que es lo
+   * que se ve, porque ocupa todo- mientras la tarjetita del medio hacia su
+   * animacion de 260ms que nadie llegaba a mirar.
+   *
+   * Ahora el fondo tambien entra, con la misma curva y el mismo tiempo.
+   */
+  const capaDinamica: CSSProperties = {
+    ...capa,
+    opacity: saliendo ? 0 : 1,
+    animation: saliendo
+      ? 'none'
+      : 'sagaCapaEntra var(--saga-motion-entra) var(--saga-motion-curva)',
+  }
+
   const panel = (
-    <div style={{ ...capa, opacity: saliendo ? 0 : 1 }} onClick={onDismiss}>
+    <div data-saga-anim="prep-capa" style={capaDinamica} onClick={onDismiss}>
       <section
+        data-saga-anim="prep-tarjeta"
         // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
         // esquina cortada y `!important`, y le ganaba a la tarjeta solida
         // del diseño "B". La clase se queda donde sigue habiendo cristal

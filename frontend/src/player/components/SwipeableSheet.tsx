@@ -25,6 +25,18 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
    */
   const [montada, setMontada] = useState(open)
   const [saliendo, setSaliendo] = useState(false)
+  /**
+   * TERCERA CAUSA DEL "TODO DE GOLPE": entraba sin entrar.
+   *
+   * Salir ya estaba resuelto, pero ENTRAR no: al montarse, `saliendo` es
+   * falso, asi que el primer fotograma ya se pintaba en `translateY(0)`. La
+   * hoja aparecia colocada. Mochila y Ferramentas lo disimulaban porque su
+   * `sheetStyle` traia una `animation` propia (`sagaLoginRise`) -que ademas
+   * peleaba con esta `transform`-, pero la Clasificacion no traia ninguna:
+   * se plantaba entera, de una pieza. Ahora las tres entran igual, deslizando
+   * desde abajo, con las mismas fichas de tiempo que todo lo demas.
+   */
+  const [entrando, setEntrando] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -36,34 +48,53 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (!montada) return undefined
 
     setSaliendo(true)
-    // 260, el mismo numero que `--saga-motion-entra`: el temporizador que
-    // desmonta y la transicion que se ve tienen que durar lo mismo, o se
-    // corta el movimiento antes de acabar (o se queda un hueco despues).
+    // 220 = `--saga-motion-sale`: el temporizador que desmonta y la
+    // transicion que se ve tienen que durar lo mismo, o se corta el
+    // movimiento antes de acabar (o se queda un hueco despues).
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-    }, 260)
+    }, 220)
     return () => window.clearTimeout(id)
   }, [open, montada])
 
+  useEffect(() => {
+    if (!open) return undefined
+    setEntrando(true)
+    // Dos fotogramas: uno para que el navegador pinte la hoja abajo del todo
+    // y otro para cambiarla de sitio. En uno solo los dos estados se funden
+    // en el mismo repintado y no hay nada que animar.
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setEntrando(false))
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [open])
+
   if (!montada) return null
+
+  const fuera = saliendo || entrando
 
   const dynamicSheetStyle: CSSProperties = {
     ...sheet,
     ...sheetStyle,
-    transform: saliendo ? 'translateY(100%)' : 'translateY(0)',
-    transition: 'transform var(--saga-motion-entra) var(--saga-motion-curva)',
-    // Sin la animacion de entrada mientras sale: se pisaban y la hoja daba
-    // un salto hacia arriba justo antes de bajar.
-    animation: saliendo ? 'none' : undefined,
+    transform: fuera ? 'translateY(100%)' : 'translateY(0)',
+    transition: `transform ${
+      saliendo ? 'var(--saga-motion-sale)' : 'var(--saga-motion-entra)'
+    } var(--saga-motion-curva)`,
+    // Ninguna `animation` de CSS, nunca: una animacion con fotogramas clave
+    // GANA a la propiedad `transform` de la linea de arriba mientras corre, y
+    // lo que se veia entonces era la animacion de quien pasase el estilo, no
+    // este deslizamiento. Un solo movimiento, definido en un solo sitio.
+    animation: 'none',
   }
 
   return (
     <div style={overlay}>
       <div
+        data-saga-anim="hoja-fondo"
         style={{
           ...backdrop,
-          opacity: open && !saliendo ? 1 : 0,
+          opacity: open && !fuera ? 1 : 0,
         }}
         onClick={onClose}
       />
@@ -118,7 +149,10 @@ const overlay: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
-  padding: 12,
+  // Sin relleno: "clasificacion pegar abajo tambien sin espacio". La hoja se
+  // apoya en el borde de la pantalla igual que la barra de abajo; la curva
+  // se la queda solo arriba, que es donde se ve.
+  padding: 0,
   pointerEvents: 'none', // Let children capture events
 }
 
@@ -143,15 +177,20 @@ const sheet: CSSProperties = {
   position: 'relative',
   zIndex: 2,
   width: 'min(100%, 520px)',
-  borderRadius: 'var(--theme-radius-panel)',
-  background: 'rgba(var(--theme-ink-deep), .95)',
-  padding: '8px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
+  // 20 arriba y 0 abajo, el mismo par que la barra inferior. Redondear las
+  // cuatro esquinas con el borde de abajo pegado a la pantalla dejaba dos
+  // muescas de fondo; `--theme-radius-panel` ademas vale 3px en el tema de
+  // fuego -esquina cortada-, que aqui no es lo pedido ("dejar bordes curvos").
+  borderRadius: '20px 20px 0 0',
+  // Tarjeta solida del diseño "B", no un cristal teñido de tinta: es lo que
+  // ya hacen la barra de abajo, el prologo y "antes de salir".
+  background: 'var(--theme-card)',
+  boxShadow: 'var(--theme-card-shadow)',
+  padding: '0 16px calc(14px + env(safe-area-inset-bottom, 0px))',
   display: 'flex',
   flexDirection: 'column',
-  maxHeight: '85vh',
+  maxHeight: '85dvh',
   color: '#f8fafc',
-  backdropFilter: 'var(--theme-blur)',
-  WebkitBackdropFilter: 'var(--theme-blur)',
   pointerEvents: 'auto',
 }
 

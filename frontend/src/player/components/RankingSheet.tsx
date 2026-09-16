@@ -138,9 +138,11 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
       open={open}
       onClose={onClose}
       sheetStyle={{
-        background: 'var(--theme-card)',
-        border: 0,
-        boxShadow: 'var(--theme-card-shadow)',
+        // Alto fijo, igual que la Mochila y Ferramentas: la clasificacion
+        // crece con cada jugador que termina, y una hoja que mide distinto
+        // cada vez que se abre no se lee como la misma hoja.
+        height: '78dvh',
+        maxHeight: '78dvh',
       }}
     >
       {/* Cabecera sin gritos: "Clasificación", no "🏆 CLASIFICACIÓN" a 26px
@@ -290,7 +292,16 @@ const headerRow: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
-  marginBottom: 16,
+  // La hoja ya no trae relleno arriba -se apoya en el borde de la pantalla y
+  // solo redondea arriba-, asi que el aire del titulo lo pone la cabecera, y
+  // se queda pegada al rodar la lista para no perder de vista la X.
+  position: 'sticky',
+  top: 0,
+  zIndex: 4,
+  paddingTop: 14,
+  paddingBottom: 14,
+  marginBottom: 2,
+  background: 'var(--theme-card)',
 }
 
 const title: CSSProperties = {
