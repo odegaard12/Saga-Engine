@@ -31,10 +31,9 @@ _(vacío)_
 ## P3 — limpieza / documentación
 
 - [ ] `docs/plan-de-mejora.md` va por §1.21; recoger en él el bloque 5.1.0.
-- [ ] `getOverlayStyle` en `PlayerHud.tsx` puede haber quedado sin uso desde
-      que `SwipeableSheet` monta su propia capa. Comprobar y borrar.
-- [ ] Revisar si `sagaLoginRise` sigue usándose en algún sitio tras quitarla
-      de las hojas.
+- [x] `getOverlayStyle` estaba sin usar en `PlayerHud.tsx`: borrado.
+- [x] `sagaLoginRise` **nunca existió como `@keyframes`**: las hojas pedían una
+      animación que no estaba definida. Otra razón por la que no se movían.
 
 ## Hecho recientemente
 

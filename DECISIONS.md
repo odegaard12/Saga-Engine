@@ -35,6 +35,14 @@
   `--saga-motion-sale` (220ms), `--saga-motion-curva`. Todo temporizador de
   JavaScript que desmonte algo tiene que llevar el mismo número que su
   transición.
+- **Quien monta y desmonta un panel es el panel, nunca quien lo usa.** Un
+  `if (!open) return null` por encima de un componente que tiene animación de
+  salida la anula: el elemento desaparece antes de poder irse. Ha pasado tres
+  veces (SwipeableSheet, FieldPrepPanel, y otra vez la Clasificación desde
+  fuera).
+- **Un efecto que monta algo visible va durante el render, no en un
+  `useEffect`.** Los efectos pasivos corren DESPUÉS de pintar: lo que montan
+  llega un fotograma tarde, y ese fotograma es el salto que se ve.
 - **Los iconos son SVG en línea**, nunca una fuente de iconos: una aplicación
   que promete "juega sin cobertura" no puede depender de una fuente externa.
 
