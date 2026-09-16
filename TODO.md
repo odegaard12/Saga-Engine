@@ -10,8 +10,9 @@ _(vacío)_
 
 ## P1 — funcionalidad importante
 
-- [ ] **Respaldo `.103` desfasado.** Comprobar versión y sincronizar tras cada
-      despliegue a `.104`. Hoy no hay nada que avise si se queda atrás.
+- [ ] **Nada avisa si `.103` se queda atrás.** Hoy se sincroniza a mano tras
+      cada despliegue (hecho: 5.0.3 → 5.1.3). Falta la comprobación
+      automática que lo cante.
 - [ ] **Túnel de Cloudflare apunta sólo a `.104`.** Si cae la titular, el
       dominio público cae con ella aunque `.103` esté sana.
 
@@ -37,6 +38,12 @@ _(vacío)_
 
 ## Hecho recientemente
 
+- [x] 5.1.3 — El temporizador que desmonta corría la misma carrera que la
+      transición y la ganaba siempre: ahora manda `onTransitionEnd`.
+- [x] 5.1.3 — El escenario `animaciones` reescrito sobre eventos del
+      navegador, porque contando fotogramas mentía.
+- [x] 5.1.1 — La Clasificación se desmontaba desde fuera de la hoja.
+- [x] `.103` sincronizada a 5.1.3.
 - [x] 5.1.0 — Las tres causas del "todo de golpe" en las animaciones.
 - [x] 5.1.0 — Barra inferior más baja, hojas apoyadas en el borde, alturas
       uniformes en la Mochila, aire sobre el título de Ferramentas.
