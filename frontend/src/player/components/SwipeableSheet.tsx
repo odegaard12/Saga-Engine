@@ -52,13 +52,24 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
     if (!montada) return undefined
 
     setSaliendo(true)
-    // 260 = `--saga-motion-sale`: el temporizador que desmonta y la
-    // transicion que se ve tienen que durar lo mismo, o se corta el
-    // movimiento antes de acabar (o se queda un hueco despues).
+    /**
+     * El temporizador es RED DE SEGURIDAD, no el reloj.
+     *
+     * Duraba exactamente lo mismo que la transicion (260ms), y eso es una
+     * carrera que el temporizador gana SIEMPRE: la transicion no arranca en
+     * el instante en que cambia el estado, sino un fotograma despues, cuando
+     * React ha vuelto a pintar. Asi que a los 260ms la hoja se desmontaba con
+     * el movimiento aun sin terminar. El banco lo dejo sin discusion: las
+     * entradas daban `transitionend` de 260ms y las salidas NO DISPARABAN
+     * NINGUNO -no hay evento de final de algo que se borro antes de acabar-.
+     *
+     * Ahora quien manda es `onTransitionEnd`, que es el propio navegador
+     * diciendo que ya ha terminado, y esto solo salta si ese aviso no llega.
+     */
     const id = window.setTimeout(() => {
       setMontada(false)
       setSaliendo(false)
-    }, 260)
+    }, 700)
     return () => window.clearTimeout(id)
   }, [open, montada])
 
@@ -111,6 +122,15 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
         // como gancho para poder encontrarla desde fuera (pruebas, medidas).
         className="saga-hoja"
         style={dynamicSheetStyle}
+        onTransitionEnd={(event) => {
+          // Solo el de la propia hoja: `transitionend` burbujea, y cualquier
+          // cosa de dentro que se mueva desmontaria la hoja entera.
+          if (event.target !== event.currentTarget) return
+          if (event.propertyName !== 'transform') return
+          if (!saliendo) return
+          setMontada(false)
+          setSaliendo(false)
+        }}
         aria-modal="true"
         role="dialog"
         onClick={(event) => event.stopPropagation()}

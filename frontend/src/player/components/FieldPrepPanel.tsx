@@ -66,12 +66,14 @@ export function FieldPrepPanel({
     }
     if (!montado) return undefined
     setSaliendo(true)
-    // 260 = `--saga-motion-sale`: mismo numero que la transicion de salida
-    // de la tarjeta Y la del fondo, que ahora tambien se funde.
+    // Red de seguridad, no reloj: ver la nota larga en SwipeableSheet. Un
+    // temporizador que dura lo mismo que la transicion la corta siempre,
+    // porque la transicion arranca un fotograma mas tarde. Quien avisa del
+    // final es `onTransitionEnd`.
     const id = window.setTimeout(() => {
       setMontado(false)
       setSaliendo(false)
-    }, 260)
+    }, 700)
     return () => window.clearTimeout(id)
   }, [visible, montado])
 
@@ -188,7 +190,18 @@ export function FieldPrepPanel({
   }
 
   const panel = (
-    <div data-saga-anim="prep-capa" style={capaDinamica} onClick={onDismiss}>
+    <div
+      data-saga-anim="prep-capa"
+      style={capaDinamica}
+      onClick={onDismiss}
+      onTransitionEnd={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.propertyName !== 'opacity') return
+        if (!saliendo) return
+        setMontado(false)
+        setSaliendo(false)
+      }}
+    >
       <section
         data-saga-anim="prep-tarjeta"
         // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
