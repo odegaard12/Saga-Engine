@@ -920,18 +920,6 @@ const dockButtonActive: CSSProperties = {
   color: 'var(--theme-primary)',
 }
 
-function getOverlayStyle(compact: boolean): CSSProperties {
-  return {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 3600,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    padding: compact ? '0px' : '0 10px calc(8px + env(safe-area-inset-bottom, 0px))',
-    pointerEvents: 'auto',
-  }
-}
 
 
 function getSheetStyle(compact: boolean): CSSProperties {

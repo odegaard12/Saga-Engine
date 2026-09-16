@@ -570,7 +570,13 @@ body.theme-flame-red .saga-hud-dock button span {
  * Van en `:root` y no en cada tema: el ritmo no es cosa del color. */
 :root {
   --saga-motion-entra: 260ms;
-  --saga-motion-sale: 220ms;
+  /* 260, igual que la entrada, y no 220.
+     Eran los 220ms lo mas corto de toda la pantalla de jugador, y cerrar era
+     precisamente lo que se seguia notando "de golpe" despues de arreglar el
+     resto. Medido por el banco: las entradas daban 5-7 fotogramas intermedios
+     y las salidas 2-4, o sea la mitad de movimiento visible. Un solo ritmo
+     para abrir y para cerrar. */
+  --saga-motion-sale: 260ms;
   --saga-motion-curva: cubic-bezier(0.22, 1, 0.36, 1);
 }
 

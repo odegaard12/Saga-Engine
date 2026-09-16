@@ -66,12 +66,12 @@ export function FieldPrepPanel({
     }
     if (!montado) return undefined
     setSaliendo(true)
-    // 220 = `--saga-motion-sale`: mismo numero que la transicion de salida
+    // 260 = `--saga-motion-sale`: mismo numero que la transicion de salida
     // de la tarjeta Y la del fondo, que ahora tambien se funde.
     const id = window.setTimeout(() => {
       setMontado(false)
       setSaliendo(false)
-    }, 220)
+    }, 260)
     return () => window.clearTimeout(id)
   }, [visible, montado])
 
