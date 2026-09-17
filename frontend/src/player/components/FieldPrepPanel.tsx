@@ -1,4 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  IconoBrujula,
+  IconoCamara,
+  IconoDescarga,
+  IconoUbicacion,
+} from './PlayerIcons'
 import { createPortal } from 'react-dom'
 import type { PlayerGpsStatus } from '../../types/player'
 
@@ -7,6 +13,13 @@ export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
 interface FieldPrepPanelProps {
   visible: boolean
   mobile: boolean
+  /**
+   * Incrustado dentro de la pantalla de carga, no flotando sobre el juego.
+   *
+   * Sin su velo propio ni su portal: la pantalla de carga YA es el fondo, y
+   * poner otro encima seria oscurecer lo que ya esta oscuro. Solo la tarjeta.
+   */
+  incrustado?: boolean
   hasOfflineMission: boolean
   hasBrowserGps: boolean
   offlinePrepState: 'idle' | 'saving' | 'saved' | 'error'
@@ -36,6 +49,7 @@ interface FieldPrepPanelProps {
 export function FieldPrepPanel({
   visible,
   mobile,
+  incrustado = false,
   hasOfflineMission,
   hasBrowserGps,
   offlinePrepState,
@@ -81,7 +95,7 @@ export function FieldPrepPanel({
 
   type Fila = {
     clave: string
-    icono: string
+    icono: ReactNode
     que: string
     para: string
     etiqueta: string
@@ -95,7 +109,7 @@ export function FieldPrepPanel({
   if (!hasOfflineMission) {
     pendientes.push({
       clave: 'mision',
-      icono: '📥',
+      icono: <IconoDescarga />,
       que: 'Misión offline',
       para: 'Para jugar sin cobertura',
       etiqueta: offlinePrepState === 'saving' ? 'Descargando…' : 'Descargar',
@@ -108,7 +122,7 @@ export function FieldPrepPanel({
   if (!hasBrowserGps) {
     pendientes.push({
       clave: 'gps',
-      icono: '📍',
+      icono: <IconoUbicacion />,
       que: 'Ubicación',
       para: 'Tu flecha y la línea al siguiente nodo',
       etiqueta: browserGpsStatus === 'searching' ? 'Buscando…' : 'Permitir',
@@ -129,7 +143,7 @@ export function FieldPrepPanel({
   if (permisoMovimiento !== 'ok') {
     pendientes.push({
       clave: 'movimiento',
-      icono: '🧭',
+      icono: <IconoBrujula />,
       que: 'Movemento',
       para: 'A brúxula e o labirinto',
       etiqueta: permisoMovimiento === 'pidiendo' ? 'Esperando…' : 'Permitir',
@@ -142,7 +156,7 @@ export function FieldPrepPanel({
   if (permisoCamara !== 'ok') {
     pendientes.push({
       clave: 'camara',
-      icono: '📷',
+      icono: <IconoCamara />,
       que: 'Cámara',
       para: 'Escanear as pegatinas QR',
       etiqueta: permisoCamara === 'pidiendo' ? 'Esperando…' : 'Permitir',
@@ -189,36 +203,8 @@ export function FieldPrepPanel({
       : 'sagaCapaEntra var(--saga-motion-entra) var(--saga-motion-curva)',
   }
 
-  const panel = (
-    <div
-      data-saga-anim="prep-capa"
-      style={capaDinamica}
-      onClick={onDismiss}
-      onTransitionEnd={(event) => {
-        if (event.target !== event.currentTarget) return
-        if (event.propertyName !== 'opacity') return
-        if (!saliendo) return
-        setMontado(false)
-        setSaliendo(false)
-      }}
-    >
-      <section
-        data-saga-anim="prep-tarjeta"
-        // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
-        // esquina cortada y `!important`, y le ganaba a la tarjeta solida
-        // del diseño "B". La clase se queda donde sigue habiendo cristal
-        // de verdad: los minijuegos.
-        style={{
-          ...tarjeta(mobile),
-          transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
-          opacity: saliendo ? 0 : 1,
-          transition: saliendo
-            ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
-            : undefined,
-          animation: saliendo ? 'none' : tarjeta(mobile).animation,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+  const cuerpo = (
+    <>
         {/* El titulo DICE QUE FALTA, no cuantas cosas faltan.
             "Falta un permiso" obligaba a bajar la vista para saber cual;
             con el nombre delante se resuelve sin leer mas. El recuento va
@@ -238,10 +224,15 @@ export function FieldPrepPanel({
             </div>
           </div>
 
-          {/* Cierra siempre, pase lo que pase con los permisos. */}
-          <button type="button" style={cerrar} onClick={onDismiss} aria-label="Cerrar">
-            ×
-          </button>
+          {/* Cierra siempre, pase lo que pase con los permisos. Salvo dentro
+              de la pantalla de carga: alli no hay nada detras que descubrir
+              -la X y "Seguir sen iso" harian lo mismo, y dos salidas para lo
+              mismo en la esquina de una tarjeta es ruido-. */}
+          {incrustado ? null : (
+            <button type="button" style={cerrar} onClick={onDismiss} aria-label="Cerrar">
+              ×
+            </button>
+          )}
         </header>
 
         {/* Filas sin caja: icono, texto y botón entre dos líneas finas.
@@ -314,7 +305,51 @@ export function FieldPrepPanel({
         <button type="button" style={botonSecundario} onClick={onDismiss}>
           Seguir sen iso
         </button>
-      </section>
+    </>
+  )
+
+  const tarjeta = (
+    <section
+      data-saga-anim="prep-tarjeta"
+      style={{
+        ...tarjetaEstilo(mobile),
+        transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
+        opacity: saliendo ? 0 : 1,
+        transition: saliendo
+          ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
+          : undefined,
+        animation: saliendo ? 'none' : tarjetaEstilo(mobile).animation,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {cuerpo}
+    </section>
+  )
+
+  /**
+   * Incrustado: solo la tarjeta, sin velo ni portal.
+   *
+   * Vive dentro de la pantalla de carga, que ya es el fondo de todo. Ponerle
+   * su propia capa oscura encima seria oscurecer lo que ya esta oscuro, y
+   * sacarlo por un portal a `document.body` lo arrancaria justamente del
+   * sitio donde ahora tiene que estar.
+   */
+  if (incrustado) return tarjeta
+
+  const panel = (
+    <div
+      data-saga-anim="prep-capa"
+      style={capaDinamica}
+      onClick={onDismiss}
+      onTransitionEnd={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.propertyName !== 'opacity') return
+        if (!saliendo) return
+        setMontado(false)
+        setSaliendo(false)
+      }}
+    >
+      {tarjeta}
     </div>
   )
 
@@ -346,7 +381,7 @@ const capa: CSSProperties = {
 // Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
 // las herramientas. Ver la nota larga en PlayerShell.tsx sobre por que los
 // translucidos daban barro.
-function tarjeta(mobile: boolean): CSSProperties {
+function tarjetaEstilo(mobile: boolean): CSSProperties {
   return {
     width: mobile ? 'min(100%, 360px)' : 'min(100%, 420px)',
     display: 'grid',
@@ -418,12 +453,15 @@ const fila: CSSProperties = {
   borderBottom: `1px solid var(--theme-hairline)`,
 }
 
+// Ya no es un emoji de 26px sino un SVG de trazo: el hueco se ajusta a eso
+// y el color lo hereda del tema, que es lo que un emoji nunca hizo.
 const icono: CSSProperties = {
   flex: '0 0 auto',
-  fontSize: 26,
-  lineHeight: 1,
   width: 30,
-  textAlign: 'center',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'var(--theme-primary)',
 }
 
 const queEs: CSSProperties = {

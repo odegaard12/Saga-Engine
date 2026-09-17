@@ -908,7 +908,9 @@ const dockButton: CSSProperties = {
   border: 0,
   background: 'transparent',
   color: '#ffffff',
-  fontSize: 12.5,
+  // 14, no 12.5: "hay que aumentar el tamaño de esos textos". Son las dos
+  // palabras que mas se leen de la pantalla, en marcha y a contraluz.
+  fontSize: 14,
   fontWeight: 800,
   /**
    * 44 de zona pulsable, 28 de sitio ocupado.
@@ -945,15 +947,23 @@ function getSheetStyle(compact: boolean): CSSProperties {
     gap: 0,
     width: compact ? '100%' : 'min(100%, 480px)',
     /**
-     * ALTO FIJO, no `maxHeight`: "dejar alturas uniformes de los 3
-     * submenus". Con un maximo, cada pestaña de la Mochila medía lo que
-     * midiese su contenido -Guia corta, Mesa larga- y la hoja pegaba un
-     * estiron o un encogimiento al cambiar de pestaña, con las pestañas
-     * saltando de sitio bajo el dedo. Fijandolo, las tres abren igual y lo
-     * unico que cambia es lo de dentro.
+     * Alto ACOTADO, ni fijo ni libre.
+     *
+     * Fijo en 78dvh igualaba las tres pestañas -que era lo pedido- pero
+     * dejaba un pedazo de tarjeta vacia debajo del contenido corto: "en
+     * guia hay muchisimo espacio vacio, se ve todo pegado hacia arriba".
+     * Libre del todo devuelve el estiron al cambiar de pestaña, que es lo
+     * que se corrigio antes.
+     *
+     * Entre un minimo y un maximo se cumplen las dos cosas: Guia y Obxectos
+     * llegan al minimo sin hueco muerto, la Mesa crece hasta donde le haga
+     * falta, y la diferencia entre unas y otras se queda en un escalon
+     * pequeño en vez de media pantalla. Y como la hoja esta anclada abajo,
+     * lo que crece lo hace hacia arriba, que es de donde se espera.
      */
-    height: compact ? '78dvh' : 'min(66vh, 590px)',
-    maxHeight: compact ? '78dvh' : 'min(66vh, 590px)',
+    height: 'auto',
+    minHeight: compact ? '54dvh' : '42vh',
+    maxHeight: compact ? '86dvh' : 'min(66vh, 590px)',
     // El que rueda es el hijo de dentro (SwipeableSheet le pone `flex: 1`),
     // no la hoja: asi la cabecera pegajosa se queda pegada a ALGO que rueda.
     overflow: 'hidden',
@@ -1090,13 +1100,22 @@ const tabPanel: CSSProperties = {
   display: 'grid',
   gap: 10,
   minHeight: 0,
+  // Se queda con el sitio sobrante en vez de dejarlo como tarjeta desnuda
+  // debajo: asi el relleno de abajo de la hoja se lee como margen y no como
+  // hueco olvidado. El contenido sigue arrancando arriba.
+  flex: 1,
+  alignContent: 'start',
+  paddingTop: 12,
 }
 
 function getToolsSheetStyle(compact: boolean): CSSProperties {
   return {
     ...getSheetStyle(compact),
     width: compact ? '100%' : 'min(100%, 460px)',
-    maxHeight: compact ? '84dvh' : 'min(76dvh, 680px)', // maxHeight: 'min(76dvh, 680px)'
+      // Ferramentas trae siempre lo mismo, asi que no necesita minimo: lo que
+    // necesita es no pasarse.
+    minHeight: 0,
+    maxHeight: compact ? '86dvh' : 'min(76dvh, 680px)',
     gap: 0,
     // Hereda la tarjeta solida de getSheetStyle: aqui solo el ancho y el alto.
   }
