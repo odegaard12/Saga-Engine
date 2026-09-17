@@ -2128,15 +2128,38 @@ export const MapSurface = React.memo(function MapSurface({
         const distance = map.distance(currentCenter, targetLatLng)
         const zoomDiff = Math.abs(map.getZoom() - 18)
 
-        flyToEndTimeRef.current = Date.now() + 1500
+        /**
+         * "Al desampliar la animacion es brusca". Y con razon: no habia.
+         *
+         * La condicion era `distance > 500 || zoomDiff > 3`, y volver de la
+         * vista de toda la ruta cumple SIEMPRE la segunda -la ruta entera se
+         * ve sobre el zoom 14 y el nodo esta en el 18, cuatro niveles-. O
+         * sea que el camino de vuelta tomaba invariablemente la rama de
+         * `animate: false`: un corte seco, mientras que la ida (`flyToBounds`
+         * con 1,5s) si se movia. Por eso ampliar estaba bien y desampliar no.
+         *
+         * El salto seco esta ahi por una razon de verdad, no por descuido:
+         * `flyTo` calcula posiciones intermedias y en trayectos largos deja
+         * al mapa pidiendo y soltando teselas por el camino, que parpadea. La
+         * razon vale para la DISTANCIA, no para el zoom: cambiar de zoom
+         * sobre el mismo sitio no recorre nada, y es justo lo que pasa al
+         * volver al nodo. Se queda el corte solo para saltos de verdad
+         * largos, y el resto se mueve.
+         *
+         * Y mas corto que la ida: volver a donde ya estabas no necesita
+         * contarte el camino.
+         */
+        void zoomDiff
 
-        if (distance > 500 || zoomDiff > 3) {
+        if (distance > 1500) {
           map.setView(targetLatLng, 18, { animate: false })
+          flyToEndTimeRef.current = Date.now() + 200
         } else {
+          flyToEndTimeRef.current = Date.now() + 1000
           map.flyTo(targetLatLng, 18, {
             animate: true,
-            duration: 1.5,
-            easeLinearity: 0.22,
+            duration: 0.95,
+            easeLinearity: 0.25,
           })
         }
         consumed = true

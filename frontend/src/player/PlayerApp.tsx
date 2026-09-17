@@ -2797,11 +2797,24 @@ export default function PlayerApp() {
            * mismos pixeles que habia, apagandose.
            */}
           <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
-            {permisosPendientes && !payload.finished ? (
+            {payload.finished ? null : (
               <div style={{ pointerEvents: 'auto' }}>
                 <FieldPrepPanel
                   incrustado
-                  visible
+                  /**
+                   * `visible`, NO un `? :` que la borra.
+                   *
+                   * Estaba puesta con renderizado condicional: al conceder el
+                   * ultimo permiso, `permisosPendientes` pasaba a falso y la
+                   * tarjeta se BORRABA en el mismo fotograma, y solo despues
+                   * empezaba a fundirse el velo. De ahi "al dar los permisos
+                   * se cierra de golpe": lo que se cerraba de golpe no era el
+                   * velo, era la tarjeta desapareciendo antes que el.
+                   *
+                   * Con `visible` manda el propio panel, que ya sabe salir
+                   * -se queda montado mientras se va, como las hojas-.
+                   */
+                  visible={permisosPendientes}
                   mobile={isPhone}
                   hasOfflineMission={hasOfflineMission}
                   hasBrowserGps={hasBrowserGps}
@@ -2819,7 +2832,7 @@ export default function PlayerApp() {
                   onRequestMotion={() => void pedirMovimiento()}
                 />
               </div>
-            ) : null}
+            )}
           </SplashScreen>
         </div>
       ) : null}

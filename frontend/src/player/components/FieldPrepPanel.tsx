@@ -93,6 +93,19 @@ export function FieldPrepPanel({
 
   if (!montado) return null
 
+  /**
+   * LAS CUATRO FILAS, SIEMPRE. Lo que cambia es su estado.
+   *
+   * Antes solo se pintaban las que faltaban, y la lista encogia sola segun
+   * iban resolviendose: se abria con cuatro y a los pocos segundos quedaban
+   * dos, con la tarjeta pegando un salto y el boton de abajo cambiandose de
+   * sitio bajo el dedo. "Primero salen 4 pero luego quedan 2, es bruto."
+   *
+   * Con las cuatro puestas desde el primer fotograma no hay salto ninguno:
+   * la altura de la tarjeta es la misma todo el rato y cada fila cambia su
+   * boton por un visto cuando le toca. Ademas se ve lo que YA esta hecho,
+   * que antes se resumia en unas etiquetas sueltas al final.
+   */
   type Fila = {
     clave: string
     icono: ReactNode
@@ -102,12 +115,14 @@ export function FieldPrepPanel({
     accion: () => void
     ocupado: boolean
     fallo: boolean
+    hecho: boolean
   }
 
-  const pendientes: Fila[] = []
+  const filas: Fila[] = []
 
-  if (!hasOfflineMission) {
-    pendientes.push({
+  {
+    filas.push({
+      hecho: hasOfflineMission,
       clave: 'mision',
       icono: <IconoDescarga />,
       que: 'Misión offline',
@@ -119,8 +134,9 @@ export function FieldPrepPanel({
     })
   }
 
-  if (!hasBrowserGps) {
-    pendientes.push({
+  {
+    filas.push({
+      hecho: hasBrowserGps,
       clave: 'gps',
       icono: <IconoUbicacion />,
       que: 'Ubicación',
@@ -140,8 +156,9 @@ export function FieldPrepPanel({
    * "lo denegaste" encima de un permiso que acababas de dar. Son dos avisos
    * distintos del sistema y tienen que verse como dos cosas distintas.
    */
-  if (permisoMovimiento !== 'ok') {
-    pendientes.push({
+  {
+    filas.push({
+      hecho: permisoMovimiento === 'ok',
       clave: 'movimiento',
       icono: <IconoBrujula />,
       que: 'Movemento',
@@ -153,8 +170,9 @@ export function FieldPrepPanel({
     })
   }
 
-  if (permisoCamara !== 'ok') {
-    pendientes.push({
+  {
+    filas.push({
+      hecho: permisoCamara === 'ok',
       clave: 'camara',
       icono: <IconoCamara />,
       que: 'Cámara',
@@ -166,12 +184,8 @@ export function FieldPrepPanel({
     })
   }
 
-  const listos = [
-    hasOfflineMission ? 'misión' : null,
-    hasBrowserGps ? 'ubicación' : null,
-    permisoMovimiento === 'ok' ? 'movemento' : null,
-    permisoCamara === 'ok' ? 'cámara' : null,
-  ].filter(Boolean)
+  const pendientes = filas.filter((f) => !f.hecho)
+  const listos = filas.filter((f) => f.hecho)
 
   /**
    * El panel se saca al final del documento.
@@ -239,40 +253,45 @@ export function FieldPrepPanel({
             Antes cada fila era un recuadro de cristal DENTRO de la tarjeta de
             cristal -recuadro dentro de recuadro, lo mismo que ensuciaba el
             login-, y el texto de apoyo iba a 10.5px, ilegible en el monte. */}
-        {pendientes.map((f) => (
+        {filas.map((f) => (
           <div key={f.clave} style={fila}>
-            <span style={icono}>{f.icono}</span>
+            <span style={{ ...icono, color: f.hecho ? VERDE_HECHO : 'var(--theme-primary)' }}>
+              {f.icono}
+            </span>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={queEs}>{f.que}</div>
-              <div style={{ ...paraQue, ...(f.fallo ? falloTexto : null) }}>
-                {f.fallo ? 'Lo denegaste. Ajustes del móvil › Safari.' : f.para}
+              <div style={{ ...queEs, opacity: f.hecho ? 0.55 : 1 }}>{f.que}</div>
+              <div
+                style={{
+                  ...paraQue,
+                  ...(f.fallo && !f.hecho ? falloTexto : null),
+                  opacity: f.hecho ? 0.45 : 1,
+                }}
+              >
+                {f.hecho
+                  ? 'Listo'
+                  : f.fallo
+                    ? 'Lo denegaste. Ajustes del móvil › Safari.'
+                    : f.para}
               </div>
             </div>
-            {/* El boton va en la fila SOLO si falta mas de una cosa: con dos
-                permisos pendientes hace falta poder dar uno u otro. Si solo
-                falta uno, la accion sube al boton grande de abajo -ahi se
-                ve, y aqui se leia como algo secundario-. */}
-            {pendientes.length > 1 ? (
+            {/**
+             * Un visto cuando esta hecho, su boton cuando no.
+             *
+             * Ocupan el mismo hueco a proposito: asi conceder un permiso no
+             * mueve nada de sitio. Antes la fila entera desaparecia y la
+             * tarjeta encogia de golpe con el dedo todavia encima.
+             */}
+            {f.hecho ? (
+              <span style={vistoFila} aria-label="Listo">
+                ✓
+              </span>
+            ) : (
               <button type="button" style={boton} disabled={f.ocupado} onClick={f.accion}>
                 {f.etiqueta}
               </button>
-            ) : null}
+            )}
           </div>
         ))}
-
-        {/* Una etiqueta por cosa, no una linea de texto separada por puntos:
-            asi se lee de un vistazo QUE hay resuelto, sin tener que leer la
-            frase entera. Verde universal de "hecho", no el color del tema
-            -aqui es una señal, no decoracion de marca-. */}
-        {listos.length > 0 ? (
-          <div style={hechoFila}>
-            {listos.map((nombre) => (
-              <span key={String(nombre)} style={hechoEtiqueta}>
-                ✓ {nombre}
-              </span>
-            ))}
-          </div>
-        ) : null}
 
         {/**
          * Dos botones, y en este orden -opcion "C", elegida por Oscar.
@@ -318,7 +337,21 @@ export function FieldPrepPanel({
         transition: saliendo
           ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
           : undefined,
-        animation: saliendo ? 'none' : tarjetaEstilo(mobile).animation,
+        /**
+         * Dentro de la carga entra MAS TARDE y con mas recorrido.
+         *
+         * "Sale de golpe y no animado": la animacion corria, pero corria a la
+         * vez que se rehacia la pantalla de carga entera -al pasar a `ready`
+         * se cambia de rama y se vuelve a montar todo-, asi que los 260ms de
+         * la tarjeta quedaban escondidos dentro de un cambio de pantalla. Con
+         * 200ms de espera primero, lo que se ve es: la carga se queda quieta,
+         * y ENTONCES sube la tarjeta. Dos momentos en vez de uno confuso.
+         */
+        animation: saliendo
+          ? 'none'
+          : incrustado
+            ? 'sagaPanelEntra 380ms var(--saga-motion-curva) 200ms both'
+            : tarjetaEstilo(mobile).animation,
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -525,22 +558,29 @@ const botonSecundario: CSSProperties = {
   cursor: 'pointer',
 }
 
-const hechoFila: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 7,
-  margin: '17px 0 20px',
-}
+/**
+ * Verde universal de "hecho", no `--theme-done`.
+ *
+ * En el tema de fuego ese token es naranja terracota, y "conseguido" leido en
+ * el color de la marca no se distingue de lo que aun falta. Es una señal, no
+ * decoracion. Mismo criterio que el punto de "EN LIÑA" de la clasificacion.
+ *
+ * Las etiquetas sueltas de abajo (`hechoFila`/`hechoEtiqueta`) se fueron: lo
+ * ya conseguido se ve ahora en su propia fila, con su visto, en vez de
+ * resumido aparte al final.
+ */
+const VERDE_HECHO = '#7ecb8f'
 
-// Verde universal de "hecho", no --theme-done: en fuego ese token es naranja
-// terracota, y "conseguido" leido en el color de la marca no se distingue de
-// lo que aun falta. Es una señal, no decoracion. Mismo criterio que el punto
-// de "EN LINEA" de la clasificacion.
-const hechoEtiqueta: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 800,
-  color: '#7ecb8f',
-  background: 'rgba(34,197,94,.13)',
-  borderRadius: 7,
-  padding: '6px 10px',
+// Ocupa el mismo sitio que el boton al que sustituye, para que conceder un
+// permiso no mueva nada de la tarjeta.
+const vistoFila: CSSProperties = {
+  flex: '0 0 auto',
+  minWidth: 44,
+  height: 34,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 15,
+  fontWeight: 900,
+  color: VERDE_HECHO,
 }

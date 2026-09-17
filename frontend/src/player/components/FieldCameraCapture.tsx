@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { IconoCamara } from './PlayerIcons'
 
 type FieldCameraCaptureProps = {
   open: boolean
@@ -15,6 +16,27 @@ export function FieldCameraCapture({
 }: FieldCameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [montada, setMontada] = useState(open)
+  const [saliendo, setSaliendo] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMontada(true)
+      setSaliendo(false)
+      return undefined
+    }
+    if (!montada) return undefined
+    setSaliendo(true)
+    // Red de seguridad holgada: quien manda es `onTransitionEnd`. Un
+    // temporizador que dure lo mismo que la transicion la corta siempre,
+    // porque la transicion arranca un fotograma mas tarde.
+    const id = window.setTimeout(() => {
+      setMontada(false)
+      setSaliendo(false)
+    }, 700)
+    return () => window.clearTimeout(id)
+  }, [open, montada])
+
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
   const [note, setNote] = useState('')
@@ -156,7 +178,21 @@ export function FieldCameraCapture({
     }
   }, [open, facingMode])
 
-  if (!open) return null
+  /**
+   * "La camara se abre y se cierra muy brusco".
+   *
+   * Era `if (!open) return null`: el mismo fallo, por cuarta vez en este
+   * repositorio. Cerrar no es una animacion, es un borrado: el panel mas
+   * grande de la pantalla desaparecia de un fotograma al siguiente. Y al
+   * abrir, la tarjeta SI tenia entrada, pero el fondo oscuro y desenfocado
+   * -que es lo que ocupa toda la pantalla- se plantaba de golpe.
+   *
+   * Mismo patron que SwipeableSheet y FieldPrepPanel: se queda montada
+   * mientras sale, el fondo entra y sale con ella, y quien decide cuando
+   * desmontar es `onTransitionEnd`, no un cronometro corriendo una carrera
+   * contra la transicion.
+   */
+  if (!montada) return null
 
   function captureFrame() {
     const video = videoRef.current
@@ -205,11 +241,41 @@ export function FieldCameraCapture({
   }
 
   return (
-    <div style={overlay}>
-      <section style={sheet} aria-label="Cámara de campo">
+    <div
+      data-saga-anim="camara-capa"
+      style={{
+        ...overlay,
+        opacity: saliendo ? 0 : 1,
+        animation: saliendo
+          ? 'none'
+          : 'sagaCapaEntra var(--saga-motion-entra) var(--saga-motion-curva)',
+      }}
+      onTransitionEnd={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.propertyName !== 'opacity') return
+        if (!saliendo) return
+        setMontada(false)
+        setSaliendo(false)
+      }}
+    >
+      <section
+        data-saga-anim="camara-tarjeta"
+        style={{
+          ...sheet,
+          transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
+          opacity: saliendo ? 0 : 1,
+          transition: saliendo
+            ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
+            : undefined,
+          animation: saliendo ? 'none' : sheet.animation,
+        }}
+        aria-label="Cámara de campo"
+      >
         {/* Header bar */}
         <div style={header}>
-          <strong style={headerTitle}>📸 Foto de campo</strong>
+          <strong style={headerTitle}>
+            <IconoCamara size={18} /> Foto de campo
+          </strong>
           <button type="button" style={closeBtnStyle} onClick={onClose} disabled={busy} aria-label="Cerrar">
             ✕
           </button>
@@ -316,6 +382,7 @@ const overlay: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .84)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
+  transition: 'opacity var(--saga-motion-sale) var(--saga-motion-curva)',
 }
 
 // Tarjeta solida del diseño "B", como el resto: era el ultimo panel grande
