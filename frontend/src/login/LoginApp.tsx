@@ -527,27 +527,52 @@ export default function LoginApp() {
                 disabled={loggingInId !== null}
                 style={{
                   ...playerCard,
-                  animationDelay: `${index * 35}ms`,
-                  opacity: loggingInId === profile.id ? 0.65 : 1,
+                  // 55, no 35: con catorce jugadores, 35ms los enciende todos
+                  // en menos de medio segundo y no da tiempo a leer la caida.
+                  animationDelay: `${index * 55}ms`,
+                  ...(loggingInId === profile.id
+                    ? {
+                        animation: 'sagaFilaEntrando 900ms ease-in-out infinite',
+                        animationDelay: '0ms',
+                        background: 'rgba(255,255,255,.07)',
+                      }
+                    : null),
+                  // La que no es no se apaga del todo: apagarlas todas menos
+                  // una hace parecer que la pantalla se ha colgado.
+                  opacity: loggingInId && loggingInId !== profile.id ? 0.4 : 1,
                 }}
                 onClick={() => {
                   setLoggingInId(profile.id)
                   const loginId = Date.now()
                   const href = `/player/${encodeURIComponent(profile.id)}?login=${loginId}`
 
-                  const proceed = () => {
-                    window.history.pushState(null, '', href)
-                    window.dispatchEvent(new CustomEvent('saga:navigate'))
+                  /**
+                   * SE ENTRA YA. El GPS se pide por detras.
+                   *
+                   * Antes esto esperaba a `getCurrentPosition` -hasta 4
+                   * segundos de espera permitida- ANTES de navegar: se pulsaba
+                   * un jugador y no pasaba nada durante un segundo largo, sin
+                   * nada en pantalla que dijera que se habia registrado el
+                   * toque. Y la espera ya no sirve para lo que servia: los
+                   * permisos se piden ahora en la pantalla de carga, que es
+                   * donde el jugador los ve y los concede.
+                   *
+                   * Se sigue disparando la peticion, pero sin esperarla: sirve
+                   * para que el navegador vaya calentando la posicion mientras
+                   * se monta la mision.
+                   */
+                  try {
+                    window.navigator.geolocation?.getCurrentPosition(
+                      () => {},
+                      () => {},
+                      { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
+                    )
+                  } catch {
+                    /* sin geolocalizacion tampoco pasa nada: se entra igual */
                   }
 
-                  window.navigator.geolocation.getCurrentPosition(
-                    () => proceed(),
-                    (err) => {
-                      console.warn('GPS request at login failed or denied, proceeding anyway.', err)
-                      proceed()
-                    },
-                    { timeout: 4000, enableHighAccuracy: false, maximumAge: 60000 }
-                  )
+                  window.history.pushState(null, '', href)
+                  window.dispatchEvent(new CustomEvent('saga:navigate'))
                 }}
               >
                 <div
@@ -925,8 +950,20 @@ const playerCard: CSSProperties = {
   font: 'inherit',
   textAlign: 'left',
   cursor: 'pointer',
-  animation: 'sagaFadeIn 260ms ease-out',
+  /**
+   * Caen, no aparecen.
+   *
+   * Ya habia escalonado (`animationDelay` por indice), pero la animacion era
+   * `sagaFadeIn`: solo opacidad. Catorce nombres encendiendose casi a la vez
+   * se leen como "salieron todos de golpe", que es justo lo que se veia. Con
+   * un palmo de recorrido hacia abajo y el paso un poco mas largo, la lista
+   * se lee CAYENDO: primero el de arriba, luego el siguiente.
+   */
+  animation: 'sagaFilaCae 320ms cubic-bezier(0.22, 1, 0.36, 1)',
   animationFillMode: 'both',
+  // La respuesta al dedo tiene que ser instantanea aunque lo que venga
+  // detras tarde: es lo unico que dice "te he oido".
+  transition: 'transform 120ms ease-out, background 120ms ease-out',
 }
 
 // Sin borde: el aro alrededor de la foto era otro marco más. La foto se
@@ -1037,5 +1074,15 @@ const loginAnimations = `
   @keyframes sagaFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes sagaFilaCae {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* Mientras se entra: la fila elegida late despacio, para que se vea que
+     algo esta pasando aunque el mapa tarde en montarse. */
+  @keyframes sagaFilaEntrando {
+    0%, 100% { opacity: .58; }
+    50% { opacity: .9; }
   }
 `
