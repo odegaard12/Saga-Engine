@@ -57,13 +57,37 @@ async function auditar(page, pantalla) {
         const etiqueta =
           (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30) || '(sin texto)'
 
-        // Montado pero con tamaño cero: el caso del "×" que se escondía solo.
+        /**
+         * Montado pero escondido a mano: el caso del "×" que se tapaba solo.
+         *
+         * PERO no todo `display:none` en línea es un fallo. Al abrir un panel,
+         * PlayerHud barre los mandos del mapa y los esconde a propósito para
+         * que no se queden por encima; y los marca con `data-saga-panel-hidden`
+         * al hacerlo, precisamente para poder devolverlos después.
+         *
+         * Sin distinguir las dos cosas, esta prueba daba cuatro fallos graves
+         * en cada pasada por el barrido haciendo su trabajo. Cuatro fallos que
+         * no había que arreglar son cuatro fallos que se aprenden a ignorar, y
+         * a partir de ahí la prueba ya no sirve para nada.
+         *
+         * Lo que SÍ sigue siendo grave es lo mismo de siempre: algo escondido
+         * DENTRO de la hoja abierta -ahí el barrido no debe entrar-, o
+         * escondido sin que nadie se haya hecho responsable con la marca.
+         */
         if (cs.display === 'none' && el.style.display === 'none') {
-          fallos.push({
-            pantalla,
-            tipo: 'boton-oculto-por-codigo',
-            detalle: `"${etiqueta}" está en el DOM con display:none puesto en línea`,
-          })
+          const hoja = document.querySelector('.saga-hoja')
+          const loEscondioElBarrido = el.dataset && el.dataset.sagaPanelHidden === '1'
+          const dentroDeLaHoja = Boolean(hoja && hoja.contains(el))
+
+          if (!loEscondioElBarrido || dentroDeLaHoja) {
+            fallos.push({
+              pantalla,
+              tipo: 'boton-oculto-por-codigo',
+              detalle: dentroDeLaHoja
+                ? `"${etiqueta}" está escondido DENTRO de la hoja abierta`
+                : `"${etiqueta}" está en el DOM con display:none puesto en línea y sin marca de quién lo escondió`,
+            })
+          }
           return
         }
 

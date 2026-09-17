@@ -902,7 +902,6 @@ const idiomaTramoActivo: CSSProperties = {
 }
 
 const dockButton: CSSProperties = {
-  minHeight: 28,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -911,6 +910,20 @@ const dockButton: CSSProperties = {
   color: '#ffffff',
   fontSize: 12.5,
   fontWeight: 800,
+  /**
+   * 44 de zona pulsable, 28 de sitio ocupado.
+   *
+   * Median 72x28 y 110x28: por debajo de lo que piden Apple y Google, y son
+   * los dos botones que mas se pulsan de la aplicacion -en marcha, con el
+   * telefono en una mano-. Subirlos a 44 de alto de verdad engordaba la
+   * barra justo despues de bajarla, que era lo pedido. Con relleno y margen
+   * negativo el dedo tiene sus 44 y la maquetacion sigue viendo 28.
+   */
+  minHeight: 44,
+  paddingTop: 8,
+  paddingBottom: 8,
+  marginTop: -8,
+  marginBottom: -8,
 }
 
 // Encendido con el color del tema, no un azul fijo: en fuego desentonaba

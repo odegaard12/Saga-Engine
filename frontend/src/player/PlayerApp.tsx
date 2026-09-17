@@ -2820,6 +2820,7 @@ export default function PlayerApp() {
             <div style={insecureNoticeTitle}>⚠️ ENTORNO NO SEGURO (HTTP)</div>
             <button
               type="button"
+              aria-label="Pechar aviso"
               onClick={() => setHideInsecureNotice(true)}
               style={{
                 background: 'none',
@@ -2828,8 +2829,17 @@ export default function PlayerApp() {
                 fontSize: 16,
                 fontWeight: 900,
                 cursor: 'pointer',
-                padding: '0 4px',
-                margin: '-4px -4px 0 0',
+                // Medido por el banco: 20x23, el area de toque mas pequeña de
+                // toda la aplicacion, y sin etiqueta. El relleno agranda la
+                // zona pulsable a 44 y el margen negativo se lo devuelve a la
+                // maquetacion, asi que la cruz se ve donde se veia.
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 44,
+                minHeight: 44,
+                padding: 10,
+                margin: '-12px -14px 0 0',
               }}
             >
               ×
