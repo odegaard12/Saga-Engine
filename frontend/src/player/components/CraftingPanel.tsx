@@ -111,9 +111,37 @@ function RecipeCard({
             }
           }}
         >
-          <span>⚒</span> Ensamblar
+          <IconoYunque /> Ensamblar
         </button>
     </div>
+  )
+}
+
+/**
+ * Yunque de trazo, no el emoji.
+ *
+ * El emoji lo dibuja cada sistema a su manera -en iOS sale un pico y un
+ * martillo a todo color-, no hereda el color del tema y no tiene nada que ver
+ * con el resto de iconos de la aplicacion, que son trazo fino. Era la mitad
+ * de lo que hacia que esta pantalla se viera "de otra epoca".
+ */
+function IconoYunque({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 9h7l2.5 2.5H18a3 3 0 0 0 3-3" />
+      <path d="M10 11.5V15" />
+      <path d="M6 20h11l-1.5-5H7.5L6 20Z" />
+    </svg>
   )
 }
 
@@ -188,7 +216,10 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
           arreglo, que ya se hizo en Mochila con el titulo "MOCHILA"
           duplicado-. Se queda solo el recuento, que si es informacion. */}
       <div style={headerRow}>
-        <span style={headerCount}>{activeRecipes.length} recetas</span>
+        {/* "1 recetas" era lo primero que se leia al abrir la Mesa. */}
+        <span style={headerCount}>
+          {activeRecipes.length} {activeRecipes.length === 1 ? 'receta' : 'recetas'}
+        </span>
         {readyCount > 0 && (
           <span style={readyBadge}>
             {readyCount} disponible{readyCount !== 1 ? 's' : ''}
@@ -196,14 +227,20 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
         )}
       </div>
 
-      {/* Info box */}
-      <div style={infoBox}>
-        <span style={{ fontSize: 15 }}>⚒️</span>
-        <span style={infoText}>
-          Combina objetos de tu mochila para fabricar piezas más potentes que desbloquean nuevos
-          nodos. Si tienes todos los ingredientes, el botón <strong>Ensamblar</strong> se activará.
-        </span>
-      </div>
+      {/**
+       * Tres lineas de instrucciones se leen una vez y estorban siempre.
+       *
+       * Decian lo que la propia pantalla ya enseña: debajo esta la receta con
+       * sus ingredientes y su cuenta (0/1), y el boton se enciende solo cuando
+       * estan todos. Se queda una linea, y unicamente mientras no haya nada
+       * listo -que es el unico momento en que hace falta explicar por que el
+       * boton esta apagado-.
+       */}
+      {readyCount === 0 && activeRecipes.length > 0 ? (
+        <div style={infoBox}>
+          <span style={infoText}>Reúne los ingredientes y el botón se activará.</span>
+        </div>
+      ) : null}
 
       {/* Feedback toast */}
       {feedback && <div style={toastBanner}>{feedback.msg}</div>}
@@ -222,7 +259,9 @@ export function CraftingPanel({ user, stages }: CraftingPanelProps) {
 
       {activeRecipes.length === 0 && (
         <div style={emptyMsg}>
-          <span style={{ fontSize: 32 }}>⚒</span>
+          <span style={{ opacity: 0.45 }}>
+            <IconoYunque size={30} />
+          </span>
           <div>No hay recetas en esta ruta</div>
         </div>
       )}

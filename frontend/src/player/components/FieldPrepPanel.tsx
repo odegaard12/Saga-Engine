@@ -1,4 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  IconoBrujula,
+  IconoCamara,
+  IconoDescarga,
+  IconoUbicacion,
+} from './PlayerIcons'
 import { createPortal } from 'react-dom'
 import type { PlayerGpsStatus } from '../../types/player'
 
@@ -89,7 +95,7 @@ export function FieldPrepPanel({
 
   type Fila = {
     clave: string
-    icono: string
+    icono: ReactNode
     que: string
     para: string
     etiqueta: string
@@ -103,7 +109,7 @@ export function FieldPrepPanel({
   if (!hasOfflineMission) {
     pendientes.push({
       clave: 'mision',
-      icono: '📥',
+      icono: <IconoDescarga />,
       que: 'Misión offline',
       para: 'Para jugar sin cobertura',
       etiqueta: offlinePrepState === 'saving' ? 'Descargando…' : 'Descargar',
@@ -116,7 +122,7 @@ export function FieldPrepPanel({
   if (!hasBrowserGps) {
     pendientes.push({
       clave: 'gps',
-      icono: '📍',
+      icono: <IconoUbicacion />,
       que: 'Ubicación',
       para: 'Tu flecha y la línea al siguiente nodo',
       etiqueta: browserGpsStatus === 'searching' ? 'Buscando…' : 'Permitir',
@@ -137,7 +143,7 @@ export function FieldPrepPanel({
   if (permisoMovimiento !== 'ok') {
     pendientes.push({
       clave: 'movimiento',
-      icono: '🧭',
+      icono: <IconoBrujula />,
       que: 'Movemento',
       para: 'A brúxula e o labirinto',
       etiqueta: permisoMovimiento === 'pidiendo' ? 'Esperando…' : 'Permitir',
@@ -150,7 +156,7 @@ export function FieldPrepPanel({
   if (permisoCamara !== 'ok') {
     pendientes.push({
       clave: 'camara',
-      icono: '📷',
+      icono: <IconoCamara />,
       que: 'Cámara',
       para: 'Escanear as pegatinas QR',
       etiqueta: permisoCamara === 'pidiendo' ? 'Esperando…' : 'Permitir',
@@ -218,10 +224,15 @@ export function FieldPrepPanel({
             </div>
           </div>
 
-          {/* Cierra siempre, pase lo que pase con los permisos. */}
-          <button type="button" style={cerrar} onClick={onDismiss} aria-label="Cerrar">
-            ×
-          </button>
+          {/* Cierra siempre, pase lo que pase con los permisos. Salvo dentro
+              de la pantalla de carga: alli no hay nada detras que descubrir
+              -la X y "Seguir sen iso" harian lo mismo, y dos salidas para lo
+              mismo en la esquina de una tarjeta es ruido-. */}
+          {incrustado ? null : (
+            <button type="button" style={cerrar} onClick={onDismiss} aria-label="Cerrar">
+              ×
+            </button>
+          )}
         </header>
 
         {/* Filas sin caja: icono, texto y botón entre dos líneas finas.
@@ -442,12 +453,15 @@ const fila: CSSProperties = {
   borderBottom: `1px solid var(--theme-hairline)`,
 }
 
+// Ya no es un emoji de 26px sino un SVG de trazo: el hueco se ajusta a eso
+// y el color lo hereda del tema, que es lo que un emoji nunca hizo.
 const icono: CSSProperties = {
   flex: '0 0 auto',
-  fontSize: 26,
-  lineHeight: 1,
   width: 30,
-  textAlign: 'center',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'var(--theme-primary)',
 }
 
 const queEs: CSSProperties = {

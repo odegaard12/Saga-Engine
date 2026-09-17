@@ -41,6 +41,17 @@ export function IconoCamara({ size = 20, style }: IconoProps) {
   )
 }
 
+/** Mapa que se guarda: una flecha que baja a una bandeja. */
+export function IconoDescarga({ size = 20, style }: IconoProps) {
+  return (
+    <svg width={size} height={size} {...base} style={style} aria-hidden="true">
+      <path d="M12 3v11" />
+      <path d="m7.5 9.5 4.5 4.5 4.5-4.5" />
+      <path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
+    </svg>
+  )
+}
+
 export function IconoLibro({ size = 20, style }: IconoProps) {
   return (
     <svg width={size} height={size} {...base} style={style} aria-hidden="true">
