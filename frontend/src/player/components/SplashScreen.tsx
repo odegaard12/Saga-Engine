@@ -34,6 +34,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 
   return (
     <div
+      // Gancho de medida: el banco graba fotograma a fotograma la salida de
+      // esta pantalla para comprobar que se funde en vez de desaparecer.
+      data-saga-anim="splash"
       style={{
         position: 'fixed',
         inset: 0,
