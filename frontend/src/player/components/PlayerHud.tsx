@@ -9,6 +9,7 @@ import { SwipeableSheet } from './SwipeableSheet'
 import { getLocale, setLocale, t, type Locale } from '../../i18n'
 import { BuildInfoBadge } from '../../shared/BuildInfoBadge'
 import { usePlayerStore } from '../store/usePlayerStore'
+import { IconoDescarga, IconoLlave, IconoMapa, IconoProbeta } from './PlayerIcons'
 
 type BackpackTab = 'requirements' | 'inventory' | 'crafting'
 
@@ -492,7 +493,7 @@ export function PlayerHud({
           <MissionPackPanel user={user} payload={missionPayload} />
           {onRedownloadMap ? (
             <button type="button" style={toolsGreenButton} onClick={onRedownloadMap}>
-              🗺️ Volver a bajar o mapa
+              <IconoMapa size={17} /> Volver a bajar o mapa
             </button>
           ) : null}
         </section>
@@ -509,9 +510,10 @@ export function PlayerHud({
                 disabled={fieldPhotoCount <= 0}
                 onClick={fieldPhotoCount > 0 ? onDownloadFieldProofs : undefined}
               >
+                <IconoDescarga size={17} />
                 {fieldPhotoCount > 0
-                  ? `📥 ${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
-                  : `📥 ${t('player.tools.noPhotos', locale)}`}
+                  ? `${t('player.tools.downloadPhotos', locale)} (${fieldPhotoCount})`
+                  : t('player.tools.noPhotos', locale)}
               </button>
             ) : null}
             {pendingFieldPhotoCount > 0 ? (
@@ -525,7 +527,11 @@ export function PlayerHud({
             <div style={{ marginTop: 12 }}>
               {/* Fallback de nodo CÓDIGO FALLBACK */}
               <div style={fallbackToolHead}>
-                <strong style={{ color: '#fbbf24' }}>🔑 {t('player.tools.altCode', locale)}</strong>
+                <strong
+                  style={{ color: '#fbbf24', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <IconoLlave size={15} /> {t('player.tools.altCode', locale)}
+                </strong>
                 {/* 11.5, no 10: explica cuando usar el codigo a mano, que es
                     justo lo que se lee cuando el QR no escanea y hay prisa. */}
                 <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>
@@ -610,9 +616,10 @@ export function PlayerHud({
                 onCloseTools()
               }}
             >
+              <IconoProbeta size={17} />
               {debugEnabled
-                ? `🛑 ${t('player.tools.exitDebug', locale)}`
-                : `🛠️ ${t('player.tools.debugMode', locale)}`}
+                ? t('player.tools.exitDebug', locale)
+                : t('player.tools.debugMode', locale)}
             </button>
           </div>
 
@@ -977,10 +984,8 @@ function getSheetStyle(compact: boolean): CSSProperties {
     background: 'var(--theme-card)',
     color: '#f8fafc',
     boxShadow: 'var(--theme-card-shadow)',
-    padding: '0 18px',
-    paddingBottom: compact
-      ? 'calc(14px + env(safe-area-inset-bottom, 0px) / 2)'
-      : 'calc(14px + env(safe-area-inset-bottom, 0px))',
+    // Sin relleno abajo: lo pone el contenedor que rueda (ver SwipeableSheet).
+    padding: '0 18px 0',
     // Sin `animation` propia: la entrada y la salida las hace SwipeableSheet
     // con una `transform`, y una animacion de fotogramas clave le gana a esa
     // propiedad mientras corre. Habia dos movimientos peleando por la misma

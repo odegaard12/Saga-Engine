@@ -157,6 +157,10 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
             display: 'flex',
             flexDirection: 'column',
             WebkitOverflowScrolling: 'touch',
+            // El area segura va AQUI, no en la hoja: asi las filas llegan
+            // hasta el borde mientras ruedas, y el margen solo aparece al
+            // final del recorrido, que es donde hace falta.
+            paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
           }}
         >
           {children}
@@ -210,7 +214,11 @@ const sheet: CSSProperties = {
   // ya hacen la barra de abajo, el prologo y "antes de salir".
   background: 'var(--theme-card)',
   boxShadow: 'var(--theme-card-shadow)',
-  padding: '0 16px calc(14px + env(safe-area-inset-bottom, 0px))',
+  // Relleno de abajo CERO: se lo lleva el contenedor que rueda, ahi abajo.
+  // Aqui dejaba una franja de tarjeta roja bajo el ultimo jugador -14px mas
+  // los 34 del area segura del iPhone, casi 50- que no se completaba nunca
+  // por mucho que deslizases, porque no era lista: era la propia tarjeta.
+  padding: '0 16px 0',
   display: 'flex',
   flexDirection: 'column',
   maxHeight: '85dvh',
