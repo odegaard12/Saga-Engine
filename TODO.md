@@ -10,24 +10,53 @@ _(vacío)_
 
 ## P1 — funcionalidad importante
 
-- [ ] **Nada avisa si `.103` se queda atrás.** Hoy se sincroniza a mano tras
-      cada despliegue (hecho: 5.0.3 → 5.1.3). Falta la comprobación
-      automática que lo cante.
-- [ ] **Túnel de Cloudflare apunta sólo a `.104`.** Si cae la titular, el
-      dominio público cae con ella aunque `.103` esté sana.
+### Entrada al juego (bloque 1, lo más gordo)
+- [ ] **Los permisos van DENTRO de la pantalla de carga.** Hoy "antes de
+      salir" aparece *después* de que la carga se funda, y por eso se ve el
+      mapa en blanco por detrás. Movimiento, cámara y brújula se piden en la
+      propia pantalla de carga; al completar o pulsar "seguir", ESO es lo que
+      se difumina, y detrás ya está el mapa guardado. Mata de raíz dos quejas
+      a la vez: "sale muy rápido" y "la animación sale con el mapa en blanco".
+
+### Hojas: hueco vacío (bloque 2)
+- [ ] **Mochila · Guía**: muchísimo espacio vacío, todo pegado arriba.
+- [ ] **Mochila · Obxectos**: igual.
+- [ ] **Mochila · Mesa**: diseño viejo ("Forjar el Sello") y mucho hueco.
+- [ ] **Clasificación**: la lista no llega abajo, queda una franja de tarjeta
+      sin completar y hay que deslizar para ver jugadores que deberían verse.
+- [ ] Causa común probable: el alto fijo de 78dvh que puse para igualar las
+      tres pestañas dejó hueco cuando el contenido es corto. Hay que hacer
+      que el contenido LLENE, no que la hoja encoja.
+
+### Login (bloque 3)
+- [ ] Los nombres aparecen de golpe: deben entrar escalonados, cayendo hacia
+      abajo uno tras otro.
+- [ ] Al pulsar un jugador no pasa nada visible durante ~1s. Hace falta
+      respuesta inmediata al toque.
 
 ## P2 — UX / rendimiento
 
-- [ ] **Áreas de toque por debajo de 44px**: iconos del mapa (38px) y pestañas
-      de la Mochila (36px). La auditoría los avisa. Decidir si se suben o se
-      acepta el aviso con razón escrita.
-- [ ] **Clasificación sin separar** "Terminados" de "En ruta": hoy es una
-      lista sola y el podio manda sobre gente que aún camina.
+### Pulido (bloque 4)
+- [ ] **Cámara**: diseño anticuado, y abre y cierra de golpe.
+- [ ] **Mapa**: al desampliar la animación es brusca (ampliar está bien).
+- [ ] **Ferramentas**: algunos botones quedan feos.
+- [ ] **Barra inferior**: en Mochila y Ferramentas queda demasiado hueco
+      abajo, y los textos de la barra piden más tamaño.
+
+- [ ] **Áreas de toque restantes**: iconos del mapa (38px) y pestañas de la
+      Mochila (36px). Son avisos, no fallos: subirlos cambia un diseño ya
+      aprobado. Decidir con intención, no por el aviso.
 - [ ] **Sensación de lentitud al gestualizar.** El intervalo del inventario
       se subió de 2s a 4s como candidato, no como prueba. Falta medir
       fotogramas perdidos durante un gesto real.
 - [ ] **Icono de recarga del mapa** sigue siendo un emoji (`🗺️`) dentro de
       Ferramentas; el resto ya son SVG en línea.
+
+### Infraestructura
+- [ ] **Nada avisa si `.103` se queda atrás.** Hoy se sincroniza a mano tras
+      cada despliegue. Falta la comprobación automática que lo cante.
+- [ ] **Túnel de Cloudflare apunta sólo a `.104`.** Si cae la titular, el
+      dominio público cae con ella aunque `.103` esté sana.
 
 ## P3 — limpieza / documentación
 

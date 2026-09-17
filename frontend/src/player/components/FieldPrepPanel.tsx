@@ -7,6 +7,13 @@ export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
 interface FieldPrepPanelProps {
   visible: boolean
   mobile: boolean
+  /**
+   * Incrustado dentro de la pantalla de carga, no flotando sobre el juego.
+   *
+   * Sin su velo propio ni su portal: la pantalla de carga YA es el fondo, y
+   * poner otro encima seria oscurecer lo que ya esta oscuro. Solo la tarjeta.
+   */
+  incrustado?: boolean
   hasOfflineMission: boolean
   hasBrowserGps: boolean
   offlinePrepState: 'idle' | 'saving' | 'saved' | 'error'
@@ -36,6 +43,7 @@ interface FieldPrepPanelProps {
 export function FieldPrepPanel({
   visible,
   mobile,
+  incrustado = false,
   hasOfflineMission,
   hasBrowserGps,
   offlinePrepState,
@@ -189,36 +197,8 @@ export function FieldPrepPanel({
       : 'sagaCapaEntra var(--saga-motion-entra) var(--saga-motion-curva)',
   }
 
-  const panel = (
-    <div
-      data-saga-anim="prep-capa"
-      style={capaDinamica}
-      onClick={onDismiss}
-      onTransitionEnd={(event) => {
-        if (event.target !== event.currentTarget) return
-        if (event.propertyName !== 'opacity') return
-        if (!saliendo) return
-        setMontado(false)
-        setSaliendo(false)
-      }}
-    >
-      <section
-        data-saga-anim="prep-tarjeta"
-        // Sin `saga-glass-panel`: esa clase la pinta el tema con brasa y
-        // esquina cortada y `!important`, y le ganaba a la tarjeta solida
-        // del diseño "B". La clase se queda donde sigue habiendo cristal
-        // de verdad: los minijuegos.
-        style={{
-          ...tarjeta(mobile),
-          transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
-          opacity: saliendo ? 0 : 1,
-          transition: saliendo
-            ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
-            : undefined,
-          animation: saliendo ? 'none' : tarjeta(mobile).animation,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+  const cuerpo = (
+    <>
         {/* El titulo DICE QUE FALTA, no cuantas cosas faltan.
             "Falta un permiso" obligaba a bajar la vista para saber cual;
             con el nombre delante se resuelve sin leer mas. El recuento va
@@ -314,7 +294,51 @@ export function FieldPrepPanel({
         <button type="button" style={botonSecundario} onClick={onDismiss}>
           Seguir sen iso
         </button>
-      </section>
+    </>
+  )
+
+  const tarjeta = (
+    <section
+      data-saga-anim="prep-tarjeta"
+      style={{
+        ...tarjetaEstilo(mobile),
+        transform: saliendo ? 'translateY(14px) scale(.97)' : 'translateY(0) scale(1)',
+        opacity: saliendo ? 0 : 1,
+        transition: saliendo
+          ? 'transform var(--saga-motion-sale) var(--saga-motion-curva), opacity var(--saga-motion-sale) var(--saga-motion-curva)'
+          : undefined,
+        animation: saliendo ? 'none' : tarjetaEstilo(mobile).animation,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {cuerpo}
+    </section>
+  )
+
+  /**
+   * Incrustado: solo la tarjeta, sin velo ni portal.
+   *
+   * Vive dentro de la pantalla de carga, que ya es el fondo de todo. Ponerle
+   * su propia capa oscura encima seria oscurecer lo que ya esta oscuro, y
+   * sacarlo por un portal a `document.body` lo arrancaria justamente del
+   * sitio donde ahora tiene que estar.
+   */
+  if (incrustado) return tarjeta
+
+  const panel = (
+    <div
+      data-saga-anim="prep-capa"
+      style={capaDinamica}
+      onClick={onDismiss}
+      onTransitionEnd={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.propertyName !== 'opacity') return
+        if (!saliendo) return
+        setMontado(false)
+        setSaliendo(false)
+      }}
+    >
+      {tarjeta}
     </div>
   )
 
@@ -346,7 +370,7 @@ const capa: CSSProperties = {
 // Tarjeta SOLIDA, no cristal: mismo lenguaje que el prologo, la mochila y
 // las herramientas. Ver la nota larga en PlayerShell.tsx sobre por que los
 // translucidos daban barro.
-function tarjeta(mobile: boolean): CSSProperties {
+function tarjetaEstilo(mobile: boolean): CSSProperties {
   return {
     width: mobile ? 'min(100%, 360px)' : 'min(100%, 420px)',
     display: 'grid',

@@ -1,6 +1,16 @@
-import React from 'react'
+import React, { type ReactNode } from 'react'
 
 interface SplashScreenProps {
+  /**
+   * Lo que va DEBAJO de los pasos, dentro de la misma pantalla.
+   *
+   * Aqui se incrusta la tarjeta de permisos. Antes se pedian despues, con la
+   * carga ya fundida, y se veia el mapa en blanco por detras mientras
+   * aparecia: "la animacion sale cuando el mapa aun esta en blanco". Pedirlos
+   * aqui hace que la pantalla de carga se quede puesta hasta que TODO esta
+   * listo de verdad, y lo que se funde al final ya descubre el mapa hecho.
+   */
+  children?: ReactNode
   progress?: number
   detail?: string
   /** Trozos de mapa guardados y total, para poder decir algo mas que un %. */
@@ -16,6 +26,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   done,
   total,
   primeiraVez,
+  children,
 }) => {
   const known = typeof progress === 'number' && Number.isFinite(progress)
   const pct = known ? Math.max(0, Math.min(100, Math.round(progress))) : 0
@@ -218,6 +229,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             ? ''
             : detail || 'Preparando la misión…'}
       </div>
+
+      {children ? <div style={{ marginTop: 26, width: '100%', display: 'grid', placeItems: 'center' }}>{children}</div> : null}
 
       <style>
         {`

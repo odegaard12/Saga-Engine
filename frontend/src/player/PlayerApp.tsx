@@ -442,6 +442,20 @@ export default function PlayerApp() {
   const permisoCamara = permisos.camara
   const permisoMovimiento = permisos.movimiento
   const prepCerrada = permisos.prepCerrada
+
+  /**
+   * ¿Queda algo que pedir antes de salir al monte?
+   *
+   * Se calcula AQUI y no dentro del render del juego porque quien lo
+   * necesita es el velo de la pantalla de carga, que se decide mucho antes
+   * de que exista `payload`. Mientras esto sea cierto, la carga NO se funde:
+   * los permisos se piden encima de ella, y lo que aparece al fundirse ya es
+   * el mapa hecho. Antes se pedian despues, y se veia el mapa en blanco por
+   * detras de la tarjeta.
+   */
+  const permisosPendientes =
+    !prepCerrada &&
+    (offlinePrepVisible || permisoMovimiento !== 'ok' || permisoCamara !== 'ok')
   const setPrepCerrada = permisos.setPrepCerrada
   const pedirCamara = permisos.pedirCamara
   const pedirMovimiento = permisos.pedirMovimiento
@@ -1441,6 +1455,9 @@ export default function PlayerApp() {
 
   useEffect(() => {
     if (!velo) return undefined
+    // La carga se queda puesta mientras falte un permiso: ahora se piden
+    // DENTRO de ella. Una partida ya terminada no pide nada.
+    if (permisosPendientes && !payloadRef.current?.finished) return undefined
     // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
     // MISMO render que lo monta, el navegador funde el `mount` y el cambio en
     // un solo fotograma y no se ve transicion ninguna.
@@ -1456,7 +1473,7 @@ export default function PlayerApp() {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
     }
-  }, [velo])
+  }, [velo, permisosPendientes])
 
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
@@ -2748,7 +2765,9 @@ export default function PlayerApp() {
     <ScreenFrame mobile={isPhone}>
       {velo ? (
         <div
-          aria-hidden="true"
+          // Deja de ser decorado cuando lleva los permisos dentro: ahi hay
+          // botones que hay que poder pulsar y leer con un lector de pantalla.
+          aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
           data-saga-anim="velo"
           // `onTransitionEnd`, no un `setTimeout` adivinando cuanto tarda:
           // ver la nota larga junto al estado `velo`. El navegador avisa
@@ -2777,7 +2796,31 @@ export default function PlayerApp() {
            * corte. Ahora se funde la pantalla entera, con su contenido: los
            * mismos pixeles que habia, apagandose.
            */}
-          <SplashScreen progress={100} detail={ultimoDetalleRef.current} />
+          <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
+            {permisosPendientes && !payload.finished ? (
+              <div style={{ pointerEvents: 'auto' }}>
+                <FieldPrepPanel
+                  incrustado
+                  visible
+                  mobile={isPhone}
+                  hasOfflineMission={hasOfflineMission}
+                  hasBrowserGps={hasBrowserGps}
+                  offlinePrepState={offlinePrepState}
+                  browserGpsStatus={browserGpsStatus}
+                  onPrepareOfflinePack={handlePrepareOfflinePack}
+                  onRequestGps={() => void handleRequestLiveGps({ forceFocus: true })}
+                  onDismiss={() => {
+                    setPrepCerrada(true)
+                    setOfflinePrepVisible(false)
+                  }}
+                  permisoCamara={permisoCamara}
+                  permisoMovimiento={permisoMovimiento}
+                  onRequestCamera={() => void pedirCamara()}
+                  onRequestMotion={() => void pedirMovimiento()}
+                />
+              </div>
+            ) : null}
+          </SplashScreen>
         </div>
       ) : null}
       <MapSurface
