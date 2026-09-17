@@ -148,11 +148,17 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
       open={open}
       onClose={onClose}
       sheetStyle={{
-        // Alto fijo, igual que la Mochila y Ferramentas: la clasificacion
-        // crece con cada jugador que termina, y una hoja que mide distinto
-        // cada vez que se abre no se lee como la misma hoja.
-        height: '78dvh',
-        maxHeight: '78dvh',
+        /**
+         * Alto acotado, no fijo.
+         *
+         * Con 78dvh clavados quedaba una tira de tarjeta vacia debajo del
+         * ultimo jugador -"abajo hay una tira que no se completa"- y encima
+         * obligaba a deslizar para ver a gente que cabia de sobra. Ahora la
+         * lista manda: crece con los jugadores que haya y para cuando llena
+         * la pantalla.
+         */
+        minHeight: '40dvh',
+        maxHeight: '86dvh',
       }}
     >
       {/* Cabecera sin gritos: "Clasificación", no "🏆 CLASIFICACIÓN" a 26px
