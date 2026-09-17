@@ -151,12 +151,23 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
                 width: 18,
                 textAlign: 'center',
                 fontSize: 14,
-                color: 'var(--theme-primary)',
+                color: pct >= 100 ? 'rgb(var(--theme-done))' : 'var(--theme-primary)',
               }}
             >
-              •
+              {/* Al 100% es un paso HECHO, no uno en marcha: dejarle el punto
+                  naranja al lado de una barra llena decia dos cosas a la vez. */}
+              {pct >= 100 ? '✓' : '•'}
             </span>
-            <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>Mapa</span>
+            <span
+              style={{
+                flex: 1,
+                fontSize: 13,
+                fontWeight: 700,
+                color: pct >= 100 ? 'rgb(var(--theme-line))' : '#f8fafc',
+              }}
+            >
+              Mapa
+            </span>
             {known ? (
               // key={pctFino}: sin esto el número se quedaba clavado tras la
               // primera actualización -medido con sim/playwright-bench: la
