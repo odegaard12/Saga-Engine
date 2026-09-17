@@ -52,6 +52,40 @@ export function IconoDescarga({ size = 20, style }: IconoProps) {
   )
 }
 
+/** Mapa plegado, para "volver a bajar o mapa". */
+export function IconoMapa({ size = 20, style }: IconoProps) {
+  return (
+    <svg width={size} height={size} {...base} style={style} aria-hidden="true">
+      <path d="m3 6.5 6-2.5 6 2.5 6-2.5v13l-6 2.5-6-2.5-6 2.5v-13Z" />
+      <path d="M9 4v13" />
+      <path d="M15 6.5v13" />
+    </svg>
+  )
+}
+
+/** Llave, para el codigo alternativo cuando el QR no se deja leer. */
+export function IconoLlave({ size = 20, style }: IconoProps) {
+  return (
+    <svg width={size} height={size} {...base} style={style} aria-hidden="true">
+      <circle cx="8" cy="8" r="4" />
+      <path d="m11 11 8 8" />
+      <path d="m16 16 2-2" />
+      <path d="m19 19 2-2" />
+    </svg>
+  )
+}
+
+/** Probeta: el modo de pruebas de GPS, que no es para el monte. */
+export function IconoProbeta({ size = 20, style }: IconoProps) {
+  return (
+    <svg width={size} height={size} {...base} style={style} aria-hidden="true">
+      <path d="M9.5 3v7.2L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3l-4.7-7.8V3" />
+      <path d="M8 3h8" />
+      <path d="M7.2 14h9.6" />
+    </svg>
+  )
+}
+
 export function IconoLibro({ size = 20, style }: IconoProps) {
   return (
     <svg width={size} height={size} {...base} style={style} aria-hidden="true">
