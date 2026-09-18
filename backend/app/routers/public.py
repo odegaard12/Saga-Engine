@@ -158,6 +158,13 @@ _BASE_TESELAS = (
 _CABECERAS_TESELAS = {"User-Agent": "SAGA-Engine/2.x tile-proxy"}
 
 
+def _tile_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
+    import main
+
+    carpeta = Path(main.DATA_DIR) / "tile_cache" / str(z) / str(x)
+    return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
+
+
 @router.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
 async def map_tile_proxy(z: int, x: int, y: int):
     """Sirve las teselas desde el mismo origen que la página.
@@ -165,11 +172,36 @@ async def map_tile_proxy(z: int, x: int, y: int):
     Sin esto, Safari en iOS bloquea la mezcla de contenidos cuando la página va
     por HTTP y la tesela por HTTPS. Además, al ser del mismo origen, el service
     worker puede cachearlas para el monte.
+
+    ⚠️ Antes de la caché en disco, CADA tesela era un viaje Esri de verdad,
+    para CADA jugador, cada vez -aunque otro ya hubiera pisado la misma zona
+    un minuto antes-. Al desampliar el mapa se piden muchas teselas nuevas de
+    golpe, así que ese viaje se notaba como parpadeo/hueco en blanco: no era
+    CSS ni la animación, era la red Pi→Esri. Con la caché en disco, la
+    primera petición de cada tesela paga ese viaje; las siguientes -de ese
+    jugador o de cualquier otro- se sirven del disco de la Pi, que es local.
     """
     import main
 
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
+
+    ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
+
+    if ruta_binario.exists():
+        try:
+            contenido = ruta_binario.read_bytes()
+            tipo = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else "image/jpeg"
+            return Response(
+                content=contenido,
+                media_type=tipo or "image/jpeg",
+                headers={
+                    "Cache-Control": "public, max-age=86400",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+        except OSError:
+            pass  # Caché corrupta o no legible: se pide de nuevo como si no existiera.
 
     if not main._HTTPX_AVAILABLE:
         raise HTTPException(status_code=500, detail="httpx not available for proxying")
@@ -186,9 +218,20 @@ async def map_tile_proxy(z: int, x: int, y: int):
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
 
+    tipo_respuesta = resp.headers.get("Content-Type", "image/jpeg")
+
+    # Guardar en disco es un extra: si falla -disco lleno, permisos- la
+    # tesela se sirve igual, solo que no queda cacheada para la próxima vez.
+    try:
+        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
+        ruta_binario.write_bytes(resp.content)
+        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
+    except OSError:
+        pass
+
     return Response(
         content=resp.content,
-        media_type=resp.headers.get("Content-Type", "image/jpeg"),
+        media_type=tipo_respuesta,
         headers={
             "Cache-Control": "public, max-age=86400",
             "Access-Control-Allow-Origin": "*",

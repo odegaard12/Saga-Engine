@@ -23,6 +23,7 @@ data/positions.json
 data/stages.json
 data/saga.sqlite3
 data/runtime_store.json
+data/tile_cache/
 .DS_Store
 .env
 .env.*
