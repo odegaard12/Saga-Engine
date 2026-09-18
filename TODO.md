@@ -78,3 +78,16 @@ _(vacío)_
       uniformes en la Mochila, aire sobre el título de Ferramentas.
 - [x] 5.1.0 — Escenario `animaciones` en el banco.
 - [x] 5.0.5 — La insignia "Preparado" salía a 8px.
+
+## Hecho recientemente (5.4.0)
+
+- [x] Fundido a negro real en el relevo carga→juego (capa negra propia,
+      no un crossfade rápido).
+- [x] Mesa de trabajo con tarjeta sólida real, insignia redonda del tema.
+- [x] Ferramentas no se podía desplazar: `display: grid` rompía el
+      `flex: 1` del contenedor que rueda. Vuelto a `flex column`.
+- [x] Botones "transparentes sin marco": el borde estaba pintado del
+      mismo color que el fondo. Ahora usan `--theme-hairline`.
+- [x] Botones sin estado visual al desactivarse (`disabled` sin CSS).
+- [x] Zoom del mapa poco fluido y en blanco al desampliar: `keepBuffer`
+      de 150 a 4, `updateWhenZooming` a false.
