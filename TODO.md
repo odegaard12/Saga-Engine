@@ -10,11 +10,14 @@ _(vacío)_
 
 ## P1 — funcionalidad importante
 
-- [ ] **Sincronizar `.103` a 5.4.0** (`75eaf47`) — bloqueado a
-      propósito hasta que el usuario confirme que 5.4.0 está bien en
-      `.104`. No replicar una versión sin confirmar dos veces.
-- [ ] **`auditoria-interfaz` y `animaciones` sobre 5.4.0**: no se han
-      vuelto a lanzar desde el bloque de la Mesa/Ferramentas/mapa.
+- [x] **Sincronizar `.103`** — hecho, ambas Pis en 5.5.0 (`4b0cfe6`).
+- [ ] **Arreglar `animaciones.mjs`**: sigue etiquetando el velo viejo
+      (`data-saga-anim="velo"` + opacity) tras el restructurado del
+      fundido a negro en 5.4.0. Da falso negativo en `relevo.fundido`.
+- [ ] **`auditoria-interfaz` sobre 5.5.0**: no se ha vuelto a lanzar desde
+      el bloque de la Mesa/Ferramentas/mapa.
+- [ ] **No más push a `origin`/GitHub** salvo que el usuario lo pida de
+      nuevo explícitamente — instrucción expresa del 2026-09-18.
 
 ### Entrada al juego (bloque 1, lo más gordo)
 - [ ] **Los permisos van DENTRO de la pantalla de carga.** Hoy "antes de
@@ -84,6 +87,19 @@ _(vacío)_
       uniformes en la Mochila, aire sobre el título de Ferramentas.
 - [x] 5.1.0 — Escenario `animaciones` en el banco.
 - [x] 5.0.5 — La insignia "Preparado" salía a 8px.
+
+## Hecho recientemente (5.5.0)
+
+- [x] Parpadeo "4 permisos → 2" al abrir "antes de salir": la tarjeta ahora
+      espera a que la comprobación asíncrona de cámara/movimiento termine
+      antes de su primer render.
+- [x] Entrada suave (900ms) en la pantalla de carga del arranque.
+- [x] Tarjeta de permisos con entrada más lenta (620/280ms).
+- [x] Fundido a negro del relevo alargado a 1500ms.
+- [x] Hueco bajo Mochila/Ferramentas reducido de nuevo (4ª vez): área
+      segura menos 24px, en vez de la mitad.
+- [x] Mesa: insignias redondas por ingrediente, botón en píldora.
+- [x] Cuarto borde invisible corregido ("Introducir código manual").
 
 ## Hecho recientemente (5.4.0)
 

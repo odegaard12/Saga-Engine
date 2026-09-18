@@ -117,6 +117,12 @@
   visual por sí solo** — hace falta un estilo "apagado" explícito
   (`opacity` + `cursor`) aplicado condicionalmente, porque no hay forma de
   escribir `:disabled` en un objeto de estilos React.
+- **El borde-invisible se repitió CUATRO veces** (`secondary` en
+  MissionPackPanel, `toolsQuietButton`, `craftBtnApagado`, y
+  `fallbackToolButton` — este último se coló en la ronda que arregló los
+  otros tres). Antes de dar por cerrado este bug hay que `grep -rn
+  "border:.*theme-card-inset"` en todo `frontend/src/player/`, no confiar
+  en haberlos visto todos a ojo.
 
 ## Mapa (Leaflet)
 
