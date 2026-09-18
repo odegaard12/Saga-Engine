@@ -40,7 +40,7 @@ function RecipeCard({
         <span
           style={{
             ...recipeOutputIcon,
-            background: `rgba(255,255,255,0.08)`,
+            background: 'var(--theme-card)',
           }}
         >
           <ItemIconSvg itemId={recipe.outputs[0]?.label || recipe.label} size={32} />
@@ -348,29 +348,34 @@ const recipeList: CSSProperties = {
 export const CLASE_FICHA_MESA = 'saga-mesa-ficha'
 export const CLASE_PIEZA_MESA = 'saga-mesa-pieza'
 
-// SIN FICHA.
-//
-// Era una tarjeta dentro de la hoja dentro del panel: tres marcos para un
-// contenido, en una pantalla de 375 px. Ahora la receta es una seccion plana y
-// el sitio se lo quedan las piezas, que es lo que se mira.
+/**
+ * OTRA VEZ CON FICHA -y esta vez a proposito, no por descuido.
+ *
+ * "Diseño muy antiguo, mucho espacio vacio": no tenia fondo ni borde, era
+ * una columna suelta sentada en el fondo liso de la hoja. Con una sola
+ * receta en la ruta -el caso mas comun- eso se leia como una fila de texto
+ * flotando en medio de una pantalla vacia, sin nada que dijera "esto es una
+ * ficha": lo de alrededor pasaba a leerse como hueco muerto en vez de
+ * margen. El recuadro-dentro-de-recuadro que se quito en su dia era la
+ * hoja de cristal vieja repitiendose a si misma; esto es la MISMA tarjeta
+ * solida del diseño "B" que ya llevan Ferramentas y Mochila, que no es el
+ * problema que se corrigio entonces.
+ */
 const recipeCard: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 10,
-  transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+  padding: 16,
+  borderRadius: 16,
+  background: 'var(--theme-card-inset)',
+  border: '1px solid var(--theme-hairline)',
+  transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease',
 }
 
-/**
- * La receta sigue SIN FICHA: ver la nota de `recipeCard` justo arriba.
- *
- * Se probo a darles fondo solido para que casaran con el diseño "B", y era
- * volver al recuadro dentro de recuadro: la ficha dentro de la hoja dentro
- * del panel. La superficie la llevan las filas de piezas; la receta
- * solo se apaga cuando le faltan ingredientes.
- */
+// El borde se enciende con el color del tema cuando ya se puede fabricar: la
+// propia tarjeta anuncia que esta lista, no solo la etiqueta pequeña.
 const recipeCardReady: CSSProperties = {
-  background: 'transparent',
-  border: 0,
+  borderColor: 'var(--theme-primary)',
 }
 
 // Sin opacidad rebajada: "Forjar el Sello no se lee bien, debe leerse todo
@@ -379,10 +384,7 @@ const recipeCardReady: CSSProperties = {
 // -mientras aun faltan piezas-. El estado de "no listo" ya lo cuenta la
 // etiqueta "FALTAN" (lockedPill) y el boton apagado (craftBtnApagado); no
 // hacia falta apagar tambien el nombre de lo que se esta fabricando.
-const recipeCardLocked: CSSProperties = {
-  background: 'transparent',
-  border: 0,
-}
+const recipeCardLocked: CSSProperties = {}
 
 const recipeOutputRow: CSSProperties = {
   display: 'flex',
@@ -390,14 +392,17 @@ const recipeOutputRow: CSSProperties = {
   gap: 12,
 }
 
+// Insignia redonda del color del tema, como los avatares y el podio de la
+// clasificacion: mismo lenguaje visual, no un cuadrado propio de esta
+// pantalla.
 const recipeOutputIcon: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 12,
+  width: 46,
+  height: 46,
+  borderRadius: '50%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 22,
+  color: 'var(--theme-primary)',
   flexShrink: 0,
 }
 

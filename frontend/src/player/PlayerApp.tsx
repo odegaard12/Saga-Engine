@@ -1464,11 +1464,11 @@ export default function PlayerApp() {
     const idInicio = window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => setVeloSaliendo(true))
     })
-    // Red de seguridad holgada: si `transitionend` no llegara nunca, el velo
-    // no puede quedarse pegado. 2600 y no 1400 porque los dos fotogramas de
-    // arriba pueden tardar si el hilo principal esta montando el mapa, y un
-    // temporizador corto cortaba el fundido por la mitad.
-    const idRespaldo = window.setTimeout(() => setVelo(false), 2600)
+    // Red de seguridad holgada: si `animationend` no llegara nunca, el velo
+    // no puede quedarse pegado. 3200, no 1400: el fundido a negro dura 950ms
+    // y puede empezar tarde si el hilo principal esta ocupado montando el
+    // mapa; un temporizador corto cortaba el negro a mitad de camino.
+    const idRespaldo = window.setTimeout(() => setVelo(false), 3200)
     return () => {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
@@ -2769,22 +2769,11 @@ export default function PlayerApp() {
           // botones que hay que poder pulsar y leer con un lector de pantalla.
           aria-hidden={permisosPendientes && !payload.finished ? undefined : true}
           data-saga-anim="velo"
-          // `onTransitionEnd`, no un `setTimeout` adivinando cuanto tarda:
-          // ver la nota larga junto al estado `velo`. El navegador avisa
-          // cuando el fundido termina DE VERDAD, con el reloj que el
-          // navegador usa para pintarlo, no con uno aparte que puede ir por
-          // libre si el hilo principal va cargado.
-          onTransitionEnd={(event) => {
-            if (event.propertyName === 'opacity') setVelo(false)
-          }}
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 999999,
             pointerEvents: 'none',
-            opacity: veloSaliendo ? 0 : 1,
-            transform: veloSaliendo ? 'scale(1.06)' : 'scale(1)',
-            transition: 'opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {/**
@@ -2796,6 +2785,18 @@ export default function PlayerApp() {
            * corte. Ahora se funde la pantalla entera, con su contenido: los
            * mismos pixeles que habia, apagandose.
            */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              // Rapido y sin curva rara: esto ya no es lo que se VE
+              // desvanecerse -eso lo hace la capa negra de encima-, es solo
+              // quitar de en medio el contenido antes de que el negro se
+              // levante del todo, para que no se noten los dos a la vez.
+              opacity: veloSaliendo ? 0 : 1,
+              transition: 'opacity 260ms ease-in',
+            }}
+          >
           <SplashScreen progress={100} detail={ultimoDetalleRef.current}>
             {payload.finished ? null : (
               <div style={{ pointerEvents: 'auto' }}>
@@ -2834,6 +2835,37 @@ export default function PlayerApp() {
               </div>
             )}
           </SplashScreen>
+          </div>
+
+          {/**
+           * "Que sea mas fundida en negro y que aparezca mejor."
+           *
+           * Antes esto era un unico crossfade de 620ms de la pantalla de
+           * carga entera contra el mapa: en cuanto la opacidad bajaba un
+           * poco ya se veia el mapa detras, asomando rapido -no un fundido a
+           * negro, un cruce-. Ahora hay una capa negra propia por encima:
+           * sube a opaca, SE QUEDA un instante a negro puro -tapando el
+           * relevo de contenido de arriba, que para entonces ya se ha ido- y
+           * luego se retira ella sola, descubriendo el mapa ya hecho. Eso es
+           * lo que de verdad se lee como "fundido a negro", no un cruce de
+           * dos capas a la vez.
+           */}
+          {veloSaliendo ? (
+            <div
+              data-saga-anim="velo-negro"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: '#000',
+                animation: 'sagaVeloNegro 950ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+              }}
+              onAnimationEnd={(event) => {
+                if (event.target !== event.currentTarget) return
+                if (event.animationName !== 'sagaVeloNegro') return
+                setVelo(false)
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
       <MapSurface

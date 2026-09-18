@@ -583,6 +583,16 @@ body.theme-flame-red .saga-hud-dock button span {
 /* El FONDO de un panel a pantalla completa tambien entra.
    Si solo entra la tarjeta del medio y el velo de detras aparece de golpe,
    lo que se ve es el golpe: el velo ocupa toda la pantalla y la tarjeta no. */
+/* El fundido a negro del relevo carga -> juego: sube a negro puro, se
+   QUEDA un instante -es lo que hace que se lea como un fundido y no un
+   cruce rapido de dos capas-, y se retira ella sola. */
+@keyframes sagaVeloNegro {
+  0% { opacity: 0; }
+  32% { opacity: 1; }
+  62% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @keyframes sagaCapaEntra {
   from { opacity: 0; }
   to { opacity: 1; }
