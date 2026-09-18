@@ -77,8 +77,8 @@ function RecipeCard({
 
           return (
             <div key={inp.item_id} className={CLASE_PIEZA_MESA} style={filaPieza}>
-              <span style={filaPiezaIcono}>
-                <ItemIconSvg itemId={inp.item_id} size={18} />
+              <span style={filaPiezaIcono(enough)}>
+                <ItemIconSvg itemId={inp.item_id} size={16} />
               </span>
               <span style={filaPiezaNombre}>
                 {inp.quantity}× {owned?.label || inp.item_id.replace(/_/g, ' ')}
@@ -484,12 +484,22 @@ const filaPieza: CSSProperties = {
   borderTop: '1px solid var(--theme-hairline)',
 }
 
-const filaPiezaIcono: CSSProperties = {
-  width: 22,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
+// Insignia redonda, no el icono a pelo: mismo lenguaje que la insignia de la
+// receta (arriba) y los avatares de la clasificacion. Cambia de color cuando
+// ya tienes lo que hace falta, asi que se lee de un vistazo sin leer el numero.
+function filaPiezaIcono(enough: boolean): CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    borderRadius: '50%',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    color: enough ? '#22c55e' : 'var(--theme-primary)',
+    background: enough ? 'rgba(34,197,94,.14)' : 'var(--theme-card)',
+    transition: 'background 0.2s ease, color 0.2s ease',
+  }
 }
 
 const filaPiezaNombre: CSSProperties = {
@@ -527,18 +537,23 @@ const filaPiezaFalta: CSSProperties = {
  * misma forma que los botones secundarios de Ferramentas y de "antes de
  * salir"-, que se lee como boton aunque este desactivado.
  */
+// El borde ya no es del mismo color que su fondo -mismo arreglo que en
+// Ferramentas y MissionPackPanel-: era invisible por construccion.
 const craftBtnApagado: CSSProperties = {
   background: 'transparent',
-  border: '1px solid var(--theme-card-inset)',
+  border: '1px solid var(--theme-hairline)',
   color: 'rgba(255,255,255,.42)',
   boxShadow: 'none',
   cursor: 'default',
 }
 
+// Pildora, no rectangulo de esquina suave: mismo lenguaje que el boton
+// primario de "antes de salir" y del login -el boton grande de accion, en
+// toda la aplicacion, es una pildora-.
 const craftBtn: CSSProperties = {
   width: '100%',
   padding: '13px 0',
-  borderRadius: 11,
+  borderRadius: 999,
   border: 'none',
   // Era morado -#a78bfa a #7c3aed- en un tema rojo. Del tema, ahora.
   background: 'var(--theme-primary)',

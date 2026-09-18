@@ -344,8 +344,15 @@ export function PlayerHud({
           // sea 43px de aire bajo dos palabras. Se respeta media area segura
           // -bastante para no meter el texto debajo de la raya del indicador
           // de inicio- en vez de la entera: 22px en el telefono, 5 en el resto.
+          // Cuarta vez que se reporta este hueco: la mitad del area segura
+          // seguia siendo demasiado en un iPhone con Face ID (17px de mas).
+          // Cambiado a "el area segura menos 24px, y nunca negativo": en un
+          // iPhone (34px de area segura) quedan 10px de aire extra -lo
+          // justo para no tapar la raya del indicador de inicio-, y en un
+          // telefono sin area segura (Android, iPhone con boton fisico) no
+          // añade nada de mas.
           padding: compact
-            ? '10px 13px calc(5px + env(safe-area-inset-bottom, 0px) / 2)'
+            ? '10px 13px calc(5px + max(0px, env(safe-area-inset-bottom, 0px) - 24px))'
             : '13px 15px 11px',
         }}
       >
@@ -1264,13 +1271,16 @@ const fallbackToolHead: CSSProperties = {
   lineHeight: 1.35,
 }
 
+// Mismo arreglo que toolsQuietButton/secondary: borde del mismo color que
+// su fondo, invisible por construccion. Esta es "Introducir codigo manual",
+// que se habia quedado fuera de la ronda anterior.
 const fallbackToolButton: CSSProperties = {
   minHeight: 44,
   width: '100%',
   borderRadius: 12,
-  border: `1px solid var(--theme-card-inset)`,
-  background: 'transparent',
-  color: 'rgba(255,255,255,.78)',
+  border: `1px solid var(--theme-hairline)`,
+  background: 'var(--theme-card)',
+  color: 'rgba(255,255,255,.85)',
   fontSize: 12.5,
   fontWeight: 800,
   marginTop: 8,
