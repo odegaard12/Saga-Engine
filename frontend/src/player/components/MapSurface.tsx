@@ -887,9 +887,32 @@ export const MapSurface = React.memo(function MapSurface({
       '/map-tiles/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
-        keepBuffer: 150,         // Mantener un buffer enorme para evitar recargas al alejar/acercar
-        updateWhenZooming: true, // Cargar teselas de forma fluida DURANTE la animación de zoom (tipo Maps)
-        updateWhenIdle: false,   // No esperar a que se pare el mapa para cargar
+        /**
+         * "Al ampliar/desampliar no es fluido, y al desampliar carga en
+         * blanco." Las dos vienen de aqui, no de la red.
+         *
+         * `keepBuffer: 150` significa que Leaflet mantiene en el DOM hasta
+         * 150 FILAS/COLUMNAS de teselas de mas alrededor de lo que se ve
+         * -miles de elementos <img> vivos a la vez-, y los reposiciona TODOS
+         * en cada fotograma de cada zoom o arrastre. Eso es trabajo de
+         * verdad para el hilo principal del telefono en cada gesto, y es la
+         * causa mas probable de la falta de fluidez: no es la red, es
+         * reposicionar de mas.
+         *
+         * `updateWhenZooming: true` pedia teselas NUEVAS en cada fotograma
+         * intermedio de la animacion de zoom, no solo al terminar. Un pellizco
+         * rapido dispara asi una rafaga de peticiones que no le da tiempo a
+         * llegar antes de que la animacion acabe, y lo que se ve mientras
+         * tanto es hueco en blanco donde deberia estar la tesela vieja
+         * agrandada o encogida por CSS. Con esto en `false`, durante la
+         * animacion Leaflet escala las teselas YA CARGADAS -que es instantaneo,
+         * lo hace la GPU- y solo pide las definitivas cuando el zoom se
+         * asienta: se ve movimiento continuo en vez de huecos, aunque tarde
+         * unos milisegundos mas en tener el detalle final nitido.
+         */
+        keepBuffer: 4,
+        updateWhenZooming: false,
+        updateWhenIdle: false,   // No esperar a que se pare el ARRASTRE para cargar
         crossOrigin: false,       // Same-origin proxy, no CORS needed
         attribution:
           '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',

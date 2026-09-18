@@ -193,13 +193,21 @@ export function MissionPackPanel({ user, payload }: Props) {
       </button>
 
       <div style={actions}>
-        <button type="button" style={secondary} disabled={busy} onClick={save}>
+        <button
+          type="button"
+          style={{ ...secondary, ...(busy ? secondaryApagado : null) }}
+          disabled={busy}
+          onClick={save}
+        >
           {action === 'save' ? 'Guardando…' : 'Guardar progreso'}
         </button>
 
         <button
           type="button"
-          style={secondary}
+          style={{
+            ...secondary,
+            ...(busy || !online || pending === 0 ? secondaryApagado : null),
+          }}
           disabled={busy || !online || pending === 0}
           onClick={sync}
         >
@@ -299,15 +307,37 @@ const actions: CSSProperties = {
   gap: 7,
 }
 
-// Contorno neutro, como el resto de botones de la hoja de Ferramentas: sobre
+// SIGUE
 // la tarjeta solida el relleno de cristal ya no se distinguia del fondo.
+/**
+ * "Botones transparentes, sin marco" -y tenian razon: lo eran.
+ *
+ * El borde estaba pintado con `--theme-card-inset`, que es EL MISMO color
+ * que el fondo de la tarjeta que los rodea. Un marco pintado del color de
+ * lo que enmarca no se ve: quedaba fondo transparente sin nada alrededor,
+ * indistinguible del hueco vacio de la hoja. Ahora usa `--theme-hairline`,
+ * que es la linea que SI se ve en el resto de la aplicacion -las filas de
+ * "antes de salir", los separadores de la clasificacion-.
+ */
 const secondary: CSSProperties = {
   ...button,
   minHeight: 44,
   borderRadius: 12,
-  border: `1px solid var(--theme-card-inset)`,
-  background: 'transparent',
-  color: 'rgba(255,255,255,.78)',
+  border: `1px solid var(--theme-hairline)`,
+  background: 'var(--theme-card)',
+  color: 'rgba(255,255,255,.85)',
+}
+
+/**
+ * "Hay botones que no cambian": estaban con `disabled`, pero un atributo
+ * HTML no cambia nada por si solo en un estilo en linea -hacia falta una
+ * regla `:disabled`, que esto no tiene-. Visualmente, "Todo al dia" (sin
+ * nada que sincronizar) se veia IGUAL que "Sincronizar (3)" a punto de
+ * pulsarse. Ahora lo apagado se ve apagado.
+ */
+const secondaryApagado: CSSProperties = {
+  opacity: 0.45,
+  cursor: 'not-allowed',
 }
 
 const messageBase: CSSProperties = {

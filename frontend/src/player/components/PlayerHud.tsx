@@ -948,7 +948,24 @@ function getSheetStyle(compact: boolean): CSSProperties {
   return {
     position: 'relative',
     zIndex: 1,
-    display: 'grid',
+    /**
+     * `flex column`, NO `grid`.
+     *
+     * "En herramientas no puedo desplazar hacia abajo" -y con razon: no
+     * podia nadie-. El hijo que rueda (en SwipeableSheet.tsx) trae `flex:
+     * 1`, pero `flex` no hace nada dentro de un contenedor `grid` -es una
+     * propiedad de flexbox-. En un grid de una sola fila `auto`, la fila
+     * crece para caber TODO el contenido -sin limite-, y como esta hoja
+     * ademas tiene `maxHeight` y `overflow: hidden`, lo que sobraba no se
+     * volvia deslizable: se CORTABA en seco. Ferramentas es la unica hoja
+     * con contenido suficiente para notarlo -Mochila y Clasificacion caben
+     * sin desplazar-, por eso solo alli faltaban botones de golpe.
+     *
+     * Con `flex column`, `flex: 1` si limita al hijo a lo que sobra DESPUES
+     * de la cabecera, y ahi `overflowY: auto` puede hacer su trabajo.
+     */
+    display: 'flex',
+    flexDirection: 'column',
     // Sin hueco: los dos hijos son el tirador y el contenido, y el tirador ya
     // se pone su propio aire. El hueco solo lo duplicaba.
     gap: 0,
@@ -1199,13 +1216,17 @@ const toolsLoginLink: CSSProperties = {
 }
 
 
+// Mismo arreglo que `secondary` en MissionPackPanel.tsx: el borde estaba
+// pintado del mismo color que el fondo que lo rodea -invisible por
+// construccion, no por descuido-. `--theme-hairline` es la linea que si se
+// ve en el resto de la aplicacion.
 const toolsQuietButton: CSSProperties = {
   ...toolsButton,
   minHeight: 44,
   borderRadius: 12,
-  background: 'transparent',
-  border: `1px solid var(--theme-card-inset)`,
-  color: 'rgba(255,255,255,.78)',
+  background: 'var(--theme-card)',
+  border: `1px solid var(--theme-hairline)`,
+  color: 'rgba(255,255,255,.85)',
   fontSize: 12.5,
   fontWeight: 800,
 }
