@@ -18,6 +18,17 @@ interface SplashScreenProps {
   total?: number
   /** Es la primera vez: no hay nada guardado y toca bajarlo todo. */
   primeiraVez?: boolean
+  /**
+   * "La pestaña de carga tiene que abrirse y verse más lentamente."
+   *
+   * Solo se activa donde esta pantalla es la PRIMERA cosa que ve el jugador
+   * -el arranque de la app-. La misma pantalla se reutiliza dentro del velo
+   * de salida (fundido carga->juego), y ahi NO hace falta: esa copia ya
+   * entra en el mismo instante en que aparece el velo, y encima de fundirse
+   * a la salida un instante despues -dos animaciones de opacidad pisandose
+   * en el mismo elemento se ve peor, no mejor-.
+   */
+  entradaSuave?: boolean
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
@@ -27,6 +38,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   total,
   primeiraVez,
   children,
+  entradaSuave = false,
 }) => {
   const known = typeof progress === 'number' && Number.isFinite(progress)
   const pct = known ? Math.max(0, Math.min(100, Math.round(progress))) : 0
@@ -51,6 +63,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
+        animation: entradaSuave ? 'sagaSplashEntra 900ms cubic-bezier(0.22, 1, 0.36, 1) both' : undefined,
         /**
          * Del tema, no de una paleta propia.
          *
@@ -245,6 +258,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 
       <style>
         {`
+          @keyframes sagaSplashEntra {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
           @keyframes sagaSplashPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.045); }
