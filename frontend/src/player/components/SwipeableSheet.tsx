@@ -144,6 +144,12 @@ export function SwipeableSheet({ open, onClose, children, sheetStyle }: Swipeabl
           className="saga-sin-scrollbar"
           style={{
             flex: 1,
+            // Sin esto, un hijo flex no encoge por debajo de su contenido
+            // -es el minimo por defecto-, y entonces nunca le hace falta
+            // desplazarse: crece tanto como necesite y es el padre el que
+            // se pasa de alto. Con 0 aqui, el hueco disponible manda y el
+            // sobrante se desplaza de verdad.
+            minHeight: 0,
             overflowY: 'auto',
             // "Se desplaza hacia los datos si muevo el dedo" -en la
             // clasificación, arrastrando con el dedo el podio se corría de
