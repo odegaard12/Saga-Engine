@@ -453,7 +453,17 @@ export default function PlayerApp() {
    * el mapa hecho. Antes se pedian despues, y se veia el mapa en blanco por
    * detras de la tarjeta.
    */
+  /**
+   * Con `!permisos.comprobado` delante: mientras la comprobacion asincrona de
+   * camara/movimiento no ha terminado, esto se cuenta como "no pendiente" a
+   * proposito -no como "ya concedido"-. Es lo que hace que la tarjeta no
+   * llegue a pintarse con la cuenta vieja: para cuando `comprobado` pasa a
+   * true, `permisoCamara`/`permisoMovimiento` YA tienen su valor de verdad,
+   * asi que el primer render que se ve es el definitivo, sin correccion
+   * despues.
+   */
   const permisosPendientes =
+    permisos.comprobado &&
     !prepCerrada &&
     (offlinePrepVisible || permisoMovimiento !== 'ok' || permisoCamara !== 'ok')
   const setPrepCerrada = permisos.setPrepCerrada
@@ -1468,7 +1478,7 @@ export default function PlayerApp() {
     // no puede quedarse pegado. 3200, no 1400: el fundido a negro dura 950ms
     // y puede empezar tarde si el hilo principal esta ocupado montando el
     // mapa; un temporizador corto cortaba el negro a mitad de camino.
-    const idRespaldo = window.setTimeout(() => setVelo(false), 3200)
+    const idRespaldo = window.setTimeout(() => setVelo(false), 4600)
     return () => {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
@@ -1497,6 +1507,7 @@ export default function PlayerApp() {
         total={hayTotal ? mapProgress!.total : undefined}
         primeiraVez={!initialLoadDoneRef.current}
         detail={mapProgress?.detail || 'Preparando la misión…'}
+        entradaSuave
       />
     )
   }
@@ -2857,7 +2868,11 @@ export default function PlayerApp() {
                 position: 'absolute',
                 inset: 0,
                 background: '#000',
-                animation: 'sagaVeloNegro 950ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                // 950 -> 1500: "el fundido al momento sigue siendo demasiado
+                // rapido". Mismo reparto de porcentajes en el keyframe, asi
+                // que el negro se sostiene proporcionalmente igual, solo que
+                // el conjunto dura medio segundo mas.
+                animation: 'sagaVeloNegro 1500ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
               }}
               onAnimationEnd={(event) => {
                 if (event.target !== event.currentTarget) return

@@ -25,7 +25,6 @@ const escenarios = {
   'album-diseno': () => import('./scenarios/album-diseno.mjs'),
   'auditoria-interfaz': () => import('./scenarios/auditoria-interfaz.mjs'),
   animaciones: () => import('./scenarios/animaciones.mjs'),
-  'sonda-x-oculta': () => import('./scenarios/sonda-x-oculta.mjs'),
 }
 
 const cargar = escenarios[nombre]

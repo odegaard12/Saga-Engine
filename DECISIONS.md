@@ -67,3 +67,66 @@
   `git diff --cached --stat` antes de commitear.
 - `frontend/public/opencv.js` (11 MB) no está en git, vive en el disco de la
   Pi. El Dockerfile falla a propósito si falta.
+
+## Animaciones (sesión 16-18/09, 5.1.0 → 5.4.0)
+
+- **Un panel monta/desmonta cuando `onTransitionEnd`/`onAnimationEnd` lo
+  dice, nunca un `setTimeout` con la misma duración que su transición.**
+  Esa carrera la gana siempre el timer -la transición arranca un fotograma
+  después del cambio de estado-, así que un timer "exacto" corta el
+  movimiento antes de que se vea. El timer se queda solo como red de
+  seguridad, bastante más largo que la animación real (700ms+ para una
+  transición de 260ms).
+- **Medir animaciones con eventos del navegador, no contando fotogramas.**
+  `requestAnimationFrame` en Chromium sin ventana va irregular y una prueba
+  que cuenta fotogramas intermedios puede dar 7, 6 y 0 para el MISMO código
+  sin tocar. `transitionend`/`animationend` con su `elapsedTime` no dependen
+  de que nadie mire: si no hay evento, no hubo movimiento.
+- **Un fundido a negro real necesita una capa negra que se SOSTENGA**, no
+  solo un crossfade de opacidad entre dos capas — un crossfade dejaba
+  asomar lo de abajo en cuanto la opacidad bajaba un poco, que se lee como
+  un cruce, no como un fundido.
+- **Los permisos (movimiento/cámara/mapa) se piden DENTRO de la pantalla de
+  carga**, no después de que se funda: si se piden después, hay una ventana
+  con el mapa en blanco y "antes de salir" apareciendo con retraso.
+
+## Maquetación de las hojas (SwipeableSheet / PlayerHud)
+
+- **El contenedor de una hoja con contenido scrolleable va en
+  `display: flex; flex-direction: column`, nunca `display: grid`.**
+  `flex: 1` en el hijo que rueda no hace nada dentro de un grid: la fila
+  `auto` crece sin límite para caber todo el contenido, y si el padre tiene
+  `overflow: hidden` + `maxHeight`, lo que sobra se CORTA en vez de quedar
+  deslizable. Ya mordió una vez en Ferramentas (era la única hoja con
+  contenido suficiente para notarlo).
+- El hijo que rueda necesita `minHeight: 0` explícito además de `flex: 1`:
+  el mínimo por defecto de un hijo flex es el tamaño de su contenido, así
+  que sin esto tampoco encoge y tampoco hace falta desplazarse.
+- **Alto ACOTADO (`minHeight`+`maxHeight`), nunca fijo ni libre del todo**
+  en las hojas (Mochila/Ferramentas/Clasificación): fijo deja hueco vacío
+  con contenido corto; libre devuelve el estirón al cambiar de pestaña.
+
+## Estilos que se ven mal sin que el código "esté mal"
+
+- **Un borde nunca se pinta del mismo color que el fondo que lo rodea.**
+  Pasó dos veces con `border: 1px solid var(--theme-card-inset)` sobre un
+  fondo que también usa esa variable: el borde existe en el código y es
+  invisible en pantalla. Usar `--theme-hairline` para bordes que deben
+  VERSE.
+- **Un atributo `disabled` en un botón con estilos en línea no cambia nada
+  visual por sí solo** — hace falta un estilo "apagado" explícito
+  (`opacity` + `cursor`) aplicado condicionalmente, porque no hay forma de
+  escribir `:disabled` en un objeto de estilos React.
+
+## Mapa (Leaflet)
+
+- **`keepBuffer` no se sube a lo bruto para "evitar recargas".** Un valor
+  de 150 mantiene miles de teselas `<img>` vivas en el DOM que Leaflet
+  reposiciona TODAS en cada gesto de zoom/arrastre — es la causa más
+  probable de que un mapa "no fluya", no la red. Las recargas al alejar
+  se sirven de todos modos desde la caché del service worker.
+- **`updateWhenZooming: true` puede causar teselas en blanco durante el
+  zoom**: pide teselas nuevas en cada fotograma intermedio de la animación,
+  y en un pellizco rápido no da tiempo a que lleguen antes de que la
+  animación acabe. Con `false`, Leaflet escala con la GPU lo ya cargado
+  durante el gesto y solo pide teselas definitivas al asentarse el zoom.
