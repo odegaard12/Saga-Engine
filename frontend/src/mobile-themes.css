@@ -190,6 +190,17 @@ body.theme-glass {
   --theme-border-w: 1px;
   --theme-panel-cut: 0px;
 
+  /* Declaradas explícitas, con los mismos valores que ya traía el respaldo de
+     :root -cristal no cambia ni un píxel-. Sin esto, cristal las heredaba del
+     respaldo azul en vez de decidirlas: exactamente el fallo que ya se
+     arregló para --theme-radius-shell más abajo, en las otras cinco
+     variables que fuego sí declara y cristal no. */
+  --theme-card: #16203a;
+  --theme-card-inset: #24304e;
+  --theme-hairline: #2c3a5c;
+  --theme-card-shadow: 0 14px 36px rgba(2, 6, 23, 0.6);
+  --theme-radius-avatar: 999px;
+
   /* El radio de la barra de arriba, DECLARADO y no heredado del respaldo.
    *
    * 28 px es exactamente lo que ya se veia: `PlayerShell.tsx` la lee con

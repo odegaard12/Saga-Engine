@@ -31,10 +31,18 @@ def test_a_pildora_leva_a_clase_do_tema():
     )
 
 
-def test_o_cristal_non_cambia():
-    """Lo en línea sigue ahí: cristal no tiene el problema, no se toca."""
-    assert "background: 'rgba(255,255,255,.12)'" in componente(), (
-        "cristal cambiaría de fondo en la píldora si esto se quita"
+def test_o_cristal_xa_non_leva_fondo_en_liña():
+    """Superseded: «diseño B» quitó el fondo en línea de la píldora.
+
+    Ya no hay `background` en el estilo de `contadorTexto` -solo
+    `color: var(--theme-primary)`-, así que en cristal el contador es texto
+    coloreado sin píldora propia. `body.theme-flame-red .saga-shell-count-pill`
+    en mobile-themes.css SÍ sigue forzando un fondo oscuro con `!important`:
+    es una asimetría real entre temas -pendiente en TODO.md-, no algo que
+    esta prueba deba ocultar fingiendo que el fondo en línea sigue ahí.
+    """
+    assert "background: 'rgba(255,255,255,.12)'" not in componente(), (
+        "ha vuelto el fondo en línea viejo de la píldora"
     )
 
 
