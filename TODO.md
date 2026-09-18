@@ -10,6 +10,12 @@ _(vacío)_
 
 ## P1 — funcionalidad importante
 
+- [ ] **Sincronizar `.103` a 5.4.0** (`75eaf47`) — bloqueado a
+      propósito hasta que el usuario confirme que 5.4.0 está bien en
+      `.104`. No replicar una versión sin confirmar dos veces.
+- [ ] **`auditoria-interfaz` y `animaciones` sobre 5.4.0**: no se han
+      vuelto a lanzar desde el bloque de la Mesa/Ferramentas/mapa.
+
 ### Entrada al juego (bloque 1, lo más gordo)
 - [ ] **Los permisos van DENTRO de la pantalla de carga.** Hoy "antes de
       salir" aparece *después* de que la carga se funda, y por eso se ve el
