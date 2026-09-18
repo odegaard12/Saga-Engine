@@ -35,6 +35,22 @@ export function usePermisos() {
   const [camara, setCamara] = useState<EstadoPermiso>('idle')
   const [movimiento, setMovimiento] = useState<EstadoPermiso>('idle')
 
+  /**
+   * "No que ponga cuatro y despues ponga dos."
+   *
+   * `camara` y `movimiento` arrancan en `idle` -que cuenta como pendiente- y
+   * el chequeo de si YA estaban concedidos es asincrono: la primera pintura
+   * los contaba a los dos como pendientes, y un instante despues -a veces un
+   * solo fotograma, a veces unos milisegundos- se corregian a "ok" si ya
+   * estaban dados. Eso es exactamente el parpadeo "4 permisos, luego 2".
+   *
+   * `comprobado` se queda en falso hasta que la comprobacion ha terminado.
+   * Quien pinta la tarjeta espera a esto para su primer render, asi que
+   * cuando aparece ya sabe la cuenta de verdad y no hay nada que corregir
+   * despues.
+   */
+  const [comprobado, setComprobado] = useState(false)
+
   /** El jugador cerró la tarjeta de preparación: no vuelve a salir sola. */
   const [prepCerrada, setPrepCerrada] = useState(false)
 
@@ -102,7 +118,9 @@ export function usePermisos() {
       }
     }
 
-    void comprobar()
+    comprobar().finally(() => {
+      if (!cancelado) setComprobado(true)
+    })
 
     return () => {
       cancelado = true
@@ -112,6 +130,7 @@ export function usePermisos() {
   return {
     camara,
     movimiento,
+    comprobado,
     prepCerrada,
     setPrepCerrada,
     pedirCamara,

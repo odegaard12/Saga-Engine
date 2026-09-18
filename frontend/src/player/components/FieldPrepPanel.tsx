@@ -347,10 +347,13 @@ export function FieldPrepPanel({
          * 200ms de espera primero, lo que se ve es: la carga se queda quieta,
          * y ENTONCES sube la tarjeta. Dos momentos en vez de uno confuso.
          */
+        // 380ms/200ms -> 620ms/280ms: "aparece muy de golpe", seguia
+        // viendose seco. Mas espera y mas recorrido para que se lea como
+        // una entrada de verdad, no un parpadeo.
         animation: saliendo
           ? 'none'
           : incrustado
-            ? 'sagaPanelEntra 380ms var(--saga-motion-curva) 200ms both'
+            ? 'sagaPanelEntra 620ms var(--saga-motion-curva) 280ms both'
             : tarjetaEstilo(mobile).animation,
       }}
       onClick={(e) => e.stopPropagation()}
