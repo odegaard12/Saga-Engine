@@ -4,6 +4,8 @@ type SettingsPanelProps = {
   settingsSaveError: string | null
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
+  missionPassEnabled: boolean
+  onClearMissionPass: () => void
 }
 
 import { useI18n } from '../../i18n/useI18n'
@@ -15,6 +17,8 @@ export default function SettingsPanel({
   settingsSaveError,
   onUpdateMissionDraft,
   onSaveSettings,
+  missionPassEnabled,
+  onClearMissionPass,
 }: SettingsPanelProps) {
   const { t } = useI18n()
 
@@ -88,6 +92,75 @@ export default function SettingsPanel({
               onChange={(event) => onUpdateMissionDraft('login_subtitle', event.target.value)}
             />
           </label>
+        </div>
+      </section>
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong>Contraseña de misión</strong>
+          <span>
+            Una sola clave para todo el grupo. Cierra la entrada: sin ella, saber
+            un nombre bastaba para colarse y ver el mapa y las fotos del grupo.
+          </span>
+        </div>
+
+        <div className="admin-settings-grid-modern" style={{ gridTemplateColumns: '1fr' }}>
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: missionPassEnabled
+                ? 'rgba(34, 197, 94, 0.12)'
+                : 'rgba(148, 163, 184, 0.12)',
+              border: `1px solid ${
+                missionPassEnabled ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.3)'
+              }`,
+              color: missionPassEnabled ? '#4ade80' : '#cbd5e1',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            {missionPassEnabled
+              ? '● Activa — los jugadores tienen que teclear la clave para entrar.'
+              : '○ Desactivada — cualquiera con un nombre puede entrar.'}
+          </div>
+
+          <label className="admin-wide-field">
+            {missionPassEnabled ? 'Nueva clave (deja en blanco para no cambiarla)' : 'Clave de misión'}
+            <input
+              type="password"
+              value={missionDraft.mission_pass || ''}
+              placeholder={missionPassEnabled ? '••••••••' : 'Escribe una clave para activar'}
+              autoComplete="new-password"
+              onChange={(event) => onUpdateMissionDraft('mission_pass', event.target.value)}
+            />
+          </label>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+              Se guarda cifrada, nunca viaja de vuelta. Al cambiarla, las sesiones
+              abiertas caducan y hay que volver a teclearla.
+            </span>
+            {missionPassEnabled ? (
+              <button
+                type="button"
+                onClick={onClearMissionPass}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(248,113,113,0.4)',
+                  background: 'rgba(248,113,113,0.12)',
+                  color: '#fca5a5',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Quitar contraseña
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
 

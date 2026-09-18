@@ -22,8 +22,42 @@ async def get_version():
     return main.get_runtime_version_payload()
 
 
+@router.post("/api/mission/unlock")
+async def mission_unlock(request: Request):
+    """Valida la contraseña de misión y deja la cookie que abre la entrada.
+
+    Apagado mientras MISSION_PASS esté vacía: responde ok sin pedir nada.
+    """
+    import main
+
+    if not main.mission_gate_enabled():
+        return {"status": "ok", "required": False}
+
+    ip = main.get_client_ip(request)
+    remaining = main.mission_unlock_lock_remaining_seconds(ip)
+    if remaining > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="too many attempts; retry in %ds" % remaining,
+        )
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    if not main.check_mission_password((data or {}).get("password")):
+        main.register_mission_unlock_failure(ip)
+        raise HTTPException(status_code=403, detail="wrong mission password")
+
+    main.clear_mission_unlock_state(ip)
+    response = JSONResponse({"status": "ok", "required": True})
+    main.set_mission_cookie(response, request)
+    return response
+
+
 @router.get("/api/config")
-async def get_config():
+async def get_config(request: Request):
     """La configuración pública de la misión.
 
     Sin las fotos de los jugadores dentro. Iban incrustadas en base64 y eran
@@ -31,13 +65,18 @@ async def get_config():
     16 MB por hora y por móvil mandando una y otra vez las mismas caras. Y este
     endpoint es público, así que ahí estaban los retratos de los catorce al
     alcance de cualquiera. Ahora va la URL de /api/player-avatar, que se cachea.
+
+    La lista de jugadores (`players` / `player_profiles`) sólo viaja si la
+    misión está abierta: con MISSION_PASS puesta hay que desbloquear antes con
+    /api/mission/unlock. Sin ella, todo sigue como estaba.
     """
     import main
     import time
 
     cfg = main.load_config()
+    mission_open = main.mission_unlocked(request)
 
-    return {
+    payload = {
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
         # La hora del SERVIDOR, no la del móvil: para la cuenta atrás de
         # mission_launch_at hace falta un reloj que no se cambie en dos
@@ -56,11 +95,19 @@ async def get_config():
         "map_center": cfg.get("map_center", [40.4168, -3.7038]),
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        "player_profiles": [
-            main.aligerar_avatar(perfil) for perfil in main.get_player_profiles(cfg)
-        ],
+        "mission_pass_required": main.mission_gate_enabled(),
     }
+
+    if mission_open:
+        payload["players"] = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        payload["player_profiles"] = [
+            main.aligerar_avatar(perfil) for perfil in main.get_player_profiles(cfg)
+        ]
+    else:
+        payload["players"] = []
+        payload["player_profiles"] = []
+
+    return payload
 
 
 @router.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])

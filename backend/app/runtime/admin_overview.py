@@ -38,7 +38,10 @@ def admin_stage_summary(stage, index):
         or "signal_hunt"
     ).strip().lower() or "signal_hunt"
 
+    raw_family_type = family_type
+    type_fallback_reason = ""
     if family_type not in SUPPORTED_MINIGAME_TYPES:
+        type_fallback_reason = f"unsupported_minigame_type:{family_type}"
         family_type = "signal_hunt"
 
     raw_config = (
@@ -115,6 +118,8 @@ def admin_stage_summary(stage, index):
         "index": index,
         "title": title,
         "type": family_type,
+        "raw_type": raw_family_type,
+        "type_fallback_reason": type_fallback_reason,
         "label": label,
         "lat": lat,
         "lon": lon,

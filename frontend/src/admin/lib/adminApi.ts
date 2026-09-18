@@ -5,6 +5,8 @@ export type AdminReactOverviewStage = {
   index: number
   title: string
   type: string
+  raw_type?: string
+  type_fallback_reason?: string
   label?: string
   lat?: number | null
   lon?: number | null
@@ -115,6 +117,8 @@ export type AdminReactOverviewResponse = {
     prologue_body?: string
     mapbox_token?: string
     mapbox_style?: string
+    /** Si la puerta de misión está activa. Nunca llega la clave, sólo el estado. */
+    mission_pass_enabled?: boolean
   }
   counts?: {
     players: number
