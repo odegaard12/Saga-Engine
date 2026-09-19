@@ -346,6 +346,93 @@ body.theme-flame-red {
   --theme-radius-shell: 4px;
 }
 
+/* Musgo: verde relajado, no intenso.
+ *
+ * Pedido explícito de Óscar: un tema verde "tipo login carga jugadores
+ * juegos todo" pero relajado, no un verde de neón. La mesa de trabajo
+ * (CraftingPanel.tsx) ya usa un verde vivo (#22c55e) para decir "esto lo
+ * tienes" -es `--theme-ok`/`--theme-done`, universal en los tres temas,
+ * información, no decoración-. Este tema NO reutiliza ese verde como
+ * `--theme-primary`: si el fondo y el "ya lo tienes" fueran el mismo verde
+ * saturado, el aviso de "tienes esto" dejaría de destacar sobre su propio
+ * fondo. `--theme-primary` aquí es un verde salvia apagado -menos
+ * saturación, más gris mezclado-, y el verde vivo se queda solo para
+ * marcar progreso/éxito, igual que en cristal y en fuego.
+ *
+ * Formas: redondas como cristal, no cortadas como fuego. "Relajado" es
+ * curvas suaves, no filos.
+ */
+html.theme-sage-green,
+body.theme-sage-green {
+  --theme-solid: 1;
+  --theme-sheen-a: 94, 116, 100;
+  --theme-sheen-b: 64, 82, 70;
+  --theme-ok: 16, 185, 129;
+  --theme-ok-deep: 5, 150, 105;
+  --theme-ok-soft: 52, 211, 153;
+  --theme-info: 125, 190, 168;
+  --theme-ink: 18, 28, 22;
+  --theme-ink-deep: 9, 15, 11;
+  --theme-ink-soft: 36, 52, 42;
+  --theme-ink-mid: 50, 68, 56;
+  --theme-line: 168, 186, 172;
+  --theme-shell-a: 74, 92, 80;
+  --theme-shell-b: 96, 116, 102;
+  --theme-info-deep: 92, 150, 130;
+  --theme-info-soft: 178, 214, 200;
+  /* Los dos aros de la carga: dos verdes suaves, no el azul cielo de
+     cristal ni el naranja de fuego. */
+  --theme-ring-a: 134, 199, 144;
+  --theme-ring-b: 94, 168, 120;
+  /* El verde de progreso: universal, el mismo en los tres temas. */
+  --theme-done: 34, 197, 94;
+  --theme-done-soft: 134, 239, 172;
+  --theme-line-soft: 210, 224, 212;
+  --theme-info-mid: 110, 176, 152;
+  /* Los alfileres NO siguen al tema: son información (hecho/toca/pendiente),
+     igual que en los otros dos temas. */
+  --theme-pin: 59, 130, 246;
+  --theme-pin-deep: 29, 78, 216;
+  --theme-pin-done: 34, 197, 94;
+  --theme-pin-todo: 239, 68, 68;
+
+  --theme-bg: #16211a;
+  /* Salvia apagado, no el verde vivo de "lo tienes" -ver la nota de arriba-. */
+  --theme-primary: #8fb996;
+  --theme-primary-hover: #79a481;
+  --theme-glass: rgba(22, 33, 26, 0.72);
+  --theme-glass-soft: rgba(34, 48, 38, 0.52);
+  --theme-glass-border: rgba(143, 185, 150, 0.18);
+  --theme-surface: #22332a;
+  --theme-glow: rgba(143, 185, 150, 0.4);
+  --theme-tint: rgba(143, 185, 150, 0.12);
+  --theme-tint-strong: rgba(143, 185, 150, 0.2);
+  --theme-primary-border: rgba(143, 185, 150, 0.26);
+  --theme-wash: rgba(143, 185, 150, 0.06);
+  --theme-backdrop: blur(20px);
+
+  --theme-radius-panel: 24px;
+  --theme-radius-card: 16px;
+  --theme-radius-pill: 999px;
+  --theme-radius-dot: 999px;
+  /* Saturación algo más baja que cristal (1.12): es el "no intenso" pedido,
+     en el propio desenfoque de los paneles. */
+  --theme-blur: blur(22px) saturate(1.05);
+  --theme-border-w: 1px;
+  /* Sin corte de esquina: relajado es curva, no filo. */
+  --theme-panel-cut: 0px;
+  /* Sin uso en ningún componente -ver la nota en --theme-radius-shell de
+     cristal-, declarada solo para que los tres temas sigan con el mismo
+     juego de variables. */
+  --theme-radius-shell: 28px;
+
+  --theme-card: #1f2e25;
+  --theme-card-inset: #2a3d31;
+  --theme-hairline: #35493c;
+  --theme-card-shadow: 0 14px 36px rgba(4, 10, 7, 0.55);
+  --theme-radius-avatar: 999px;
+}
+
 /* --- Y esto es lo que pinta ---------------------------------------------- */
 
 html[class*='theme-'],
