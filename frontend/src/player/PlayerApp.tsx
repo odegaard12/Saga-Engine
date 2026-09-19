@@ -2845,12 +2845,26 @@ export default function PlayerApp() {
             style={{
               position: 'absolute',
               inset: 0,
-              // Rapido y sin curva rara: esto ya no es lo que se VE
-              // desvanecerse -eso lo hace la capa negra de encima-, es solo
-              // quitar de en medio el contenido antes de que el negro se
-              // levante del todo, para que no se noten los dos a la vez.
+              /**
+               * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
+               * luego vuelve el mapa". Este contenido se apagaba en 260ms,
+               * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
+               * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
+               * los 260ms y los 480ms NINGUNA de las dos capas cubre del
+               * todo: el contenido ya se ha ido y el negro todavía no ha
+               * llegado, así que el mapa de debajo -ya montado, porque
+               * `status` es 'ready'- asoma por la rendija.
+               *
+               * El retraso de aqui hace que el contenido se quede opaco
+               * hasta que el negro YA está sólido del todo (480ms); a partir
+               * de ahi puede desaparecer sin que se note, porque el negro ya
+               * lo tapa. 490/200 deja margen de sobra antes de que el negro
+               * empiece a levantarse (930ms, su 62%).
+               */
               opacity: veloSaliendo ? 0 : 1,
-              transition: 'opacity 260ms ease-in',
+              transition: veloSaliendo
+                ? 'opacity 200ms ease-in 490ms'
+                : 'opacity 260ms ease-in',
             }}
           >
           <SplashScreen progress={100} detail={ultimoDetalleRef.current}>

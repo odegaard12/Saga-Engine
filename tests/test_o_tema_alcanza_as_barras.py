@@ -48,26 +48,29 @@ def test_o_tema_usa_eses_ganchos():
         )
 
 
-def test_a_barra_de_arriba_usa_a_tarxeta_do_deseno_b():
-    """Superseded: el radio ya no sale de --theme-radius-shell.
+def test_a_barra_de_arriba_usa_o_cristal_do_tema():
+    """Superseded dos veces: primero «diseño B» (tarjeta sólida) sustituyó al
+    radio clavado en --theme-radius-shell; después, pedido explícito
+    ("demasiado opaco, más glass"), la tarjeta sólida volvió a cristal -con
+    `backdrop-filter`, no el velo plano sin desenfoque que ya falló una vez-.
 
-    La barra de arriba se rediseñó a «diseño B» -tarjeta flotante sólida,
-    igual que las hojas y el prólogo-, con radio fijo de 13px que forma
-    parte de esa identidad, no del tema. Lo que SÍ tiene que seguir saliendo
-    del tema es el color y la sombra: por ahí es por donde fuego/cristal
-    siguen cambiando la barra sin que el color quede clavado en línea.
-
-    `--theme-radius-shell` quedó sin usar en ningún componente -ver grep-,
-    dead CSS pendiente de limpiar (anotado en TODO.md), pero no es lo que
-    esta prueba protege.
+    El radio de 13px sigue sin salir del tema -es la forma de la tarjeta, no
+    su color-. Lo que tiene que seguir saliendo del tema es el color/blur:
+    por ahí es por donde fuego sigue siendo una placa opaca -su
+    `--theme-glass` es casi sólido y su `--theme-blur` vale `none`- sin
+    ninguna regla aparte, mientras cristal y musgo quedan translúcidos.
     """
     codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
         encoding="utf-8"
     )
     codigo = re.sub(r"/\*.*?\*/", "", codigo, flags=re.DOTALL)
 
-    assert "background: 'var(--theme-card)'" in codigo, (
-        "la barra de arriba dejó de leer el color de tarjeta del tema"
+    assert "var(--saga-glass-bg" in codigo, (
+        "la barra de arriba dejó de leer el fondo de cristal del tema"
+    )
+    assert "backdropFilter: 'var(--theme-blur)'" in codigo, (
+        "la barra de arriba dejó de desenfocar el mapa antes de teñirlo -sin "
+        "esto, sobre el mapa se ve barro, no cristal-"
     )
     assert "boxShadow: 'var(--theme-card-shadow)'" in codigo, (
         "la barra de arriba dejó de leer la sombra de tarjeta del tema"
