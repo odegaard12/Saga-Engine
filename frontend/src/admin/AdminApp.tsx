@@ -1425,7 +1425,7 @@ function NodeCard({
       </div>
       {stage.type_fallback_reason ? (
         <div className="admin-node-warning" title={stage.type_fallback_reason}>
-          ⚠️ Tipo de juego "{stage.raw_type}" no soportado — usando {stage.type} como reserva
+          ⚠️ Tipo de juego &quot;{stage.raw_type}&quot; no soportado — usando {stage.type} como reserva
         </div>
       ) : null}
     </button>
