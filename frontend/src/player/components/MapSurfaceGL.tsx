@@ -92,7 +92,7 @@ export function MapSurfaceGL({
   currentLevel = 0,
   playerPosition,
   initialCenter,
-  tresD = false,
+  tresD = true,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
@@ -121,6 +121,10 @@ export function MapSurfaceGL({
       container: contenedorRef.current,
       center: [centro.lon, centro.lat],
       zoom: 16,
+      // Inclinado ya al abrir, no animándose desde plano: con la vista 3D
+      // por defecto, empezar en plano y bascular al montar se ve como un
+      // tirón cada vez que entras.
+      pitch: tresD ? PITCH_3D : 0,
       attributionControl: false,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no

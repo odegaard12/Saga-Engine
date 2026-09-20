@@ -6,6 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.12.0
+
+El relieve se baja en la pantalla de carga, y la vista 3D pasa a ser la de
+por defecto.
+
+- **Relieve en la descarga previa.** Antes la elevación se pedía al entrar
+  al mapa, y eso era la tardanza que se notaba en el móvil. Ahora baja
+  donde ya se está esperando a propósito: la pantalla de carga.
+- **Sin recalcular nada**: el relieve usa el mismo esquema z/x/y que el
+  satélite -las dos son XYZ en Web Mercator de 256 px-, así que cada
+  tesela de relieve cubre justo el mismo trozo que su gemela de satélite.
+  El plan coge las teselas ya planificadas y añade sus gemelas.
+- **Zooms 8 a 13 para el relieve**, no hasta 15. MapLibre estira la
+  elevación de un zoom bajo al acercarte, y la FORMA del monte no gana
+  nada con más detalle. Hasta 13 cuesta unos pocos megas; hasta 15 serían
+  cientos, cargados en la mochila de cada móvil.
+- **Vista 3D por defecto**, e inclinada ya al abrir -no basculando desde
+  plano, que se veía como un tirón en cada entrada-. El botón queda
+  encendido en 3D y apagado en 2D.
+
 ## 5.11.0
 
 Relieve de verdad en el mapa 3D, y el botón donde tiene que estar.

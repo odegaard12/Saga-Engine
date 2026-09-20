@@ -332,7 +332,7 @@ export default function PlayerApp() {
    * jugador busca los mandos del mapa. Flotando suelto sobre el mapa se
    * veía descolgado del diseño.
    */
-  const [mapaTresD, setMapaTresD] = useState(false)
+  const [mapaTresD, setMapaTresD] = useState(true)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
