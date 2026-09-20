@@ -262,24 +262,27 @@ html.saga-route-player .saga-tools-language-row {
 }
 
 /**
- * Costuras blancas entre teselas al hacer zoom -reportado: "líneas blancas
- * durante microsegundos, como si cargara".
+ * ⚠️ AQUÍ HUBO UN ARREGLO QUE TIRÓ LA APP ENTERA (5.7.2, revertido en 5.7.3).
  *
- * No es que falten teselas -la misión offline las baja de zoom 5 a 18,
- * completo-: es el redondeo de subpíxel del navegador al escalar el mosaico
- * de <img> con transform durante la animación de zoom. Entre dos teselas
- * contiguas, cada una se redondea a un píxel de pantalla por separado, y a
- * veces caen un píxel separadas, dejando una línea del fondo (blanco) al
- * descubierto. Es un fallo conocido de Leaflet, no un hueco de datos.
+ * Para tapar las costuras blancas entre teselas al hacer zoom se puso:
  *
- * El arreglo estándar: cada tesela un pixel más ancha/alta de lo que le
- * toca, así que solapa un poco con la de al lado en vez de dejar un hueco
- * si el redondeo no coincide.
+ *     .leaflet-tile { width: calc(100% + 1px) !important; height: ... }
+ *
+ * Y eso no hace lo que parece. Leaflet da a CADA tesela su tamaño en
+ * píxeles en el estilo en línea, y la posiciona en absoluto dentro del
+ * panel. Un `100%` ahí no se mide contra la tesela: se mide contra el
+ * BLOQUE CONTENEDOR, que es el panel del mapa entero. O sea que cada
+ * tesela pasó a medir lo que mide el mapa completo, decenas de ellas
+ * superpuestas, cada una una imagen enorme. Resultado medido en campo:
+ * mapa roto al abrir, navegador a pantalla blanca, y de vuelta al login.
+ *
+ * Si se vuelve a intentar tapar las costuras: el valor tiene que ir en
+ * PÍXELES absolutos sobre el tamaño real de tesela (256 -> 256.5px), o
+ * mejor, no tocarlo: la costura es cosmética y dura un fotograma; esto
+ * costó la aplicación entera.
  */
 .leaflet-tile {
   will-change: transform;
-  width: calc(100% + 1px) !important;
-  height: calc(100% + 1px) !important;
 }
 
 /* Prevent layout shift on the map container when GPS updates arrive */
