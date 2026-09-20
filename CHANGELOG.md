@@ -6,6 +6,61 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.10.2
+
+Dos cosas vistas por fin en una captura del móvil de Óscar, no leyendo
+código.
+
+- **El aviso de HTTP ocupaba un cuarto de la pantalla** y le hablaba a un
+  programador: `ngrok`, `chrome://flags/#unsafely-treat-insecure-origin-as-secure`.
+  Encima del mapa, a un jugador que está en el monte. Ahora es una línea:
+  "esta dirección no es segura, el navegador no deja usar el GPS, avisa a
+  quien monta la misión". El detalle técnico vive donde sirve, en la
+  documentación de despliegue.
+- **La barra de abajo no se leía.** "Activar GPS" parecía desactivado y
+  Mochila/Ferramentas salían lavados. Regresión del paso a cristal
+  (5.6.0): contra el azul noche de antes no se notaba, contra una foto
+  aérea con sol sí. Arreglado con un velo de tinta DEBAJO del tinte de
+  cristal: asegura el contraste sin perder el aspecto, y como ninguna
+  capa es opaca el desenfoque del mapa se sigue viendo.
+
+## 5.10.1
+
+Fuera la línea recta entre nodos del motor WebGL.
+
+Probada en el móvil y descartada: no es "el trazado a medias", es
+información falsa. Cruza el monte por donde no se puede andar, y quien la
+mire caminando se fía de ella. El motor de Leaflet traza por caminos
+reales; hasta que eso esté portado, el motor nuevo no pinta ninguna ruta.
+
+Mejor no pintar nada que pintar una ruta que miente.
+
+## 5.10.0
+
+Segunda capa del motor WebGL: radio del nodo, trazado de la ruta, nodos por
+estado, y botón 2D/3D.
+
+- **Radio del nodo como polígono**, no como círculo de MapLibre: el radio
+  de un círculo va en píxeles, así que al alejarse seguiría midiendo lo
+  mismo en pantalla y dejaría de significar "50 metros a la redonda", que
+  es lo único que ese círculo tiene que decir. Un polígono en coordenadas
+  sí escala, porque está en el terreno y no en la pantalla.
+- **Nodos por estado** (hecho / el que toca / pendiente) con los mismos
+  colores que Leaflet. No siguen al tema, igual que allí: ahí el color es
+  información, y cambiarla por tema obligaría a reaprender el mapa.
+- **Trazado** entre nodos. De momento en línea recta; el trazado por
+  caminos reales queda en la lista de pendientes.
+- **Botón 2D/3D**: inclinar la cámara. Es la misma escena con otra matriz
+  -no pide ni un dato más-, así que funciona igual sin cobertura.
+- Las capas se crean vacías UNA vez y después solo se les cambian los
+  datos. Crear y destruir capas en cada cambio de props es lo que hace
+  parpadear a un mapa de WebGL.
+- Guarda contra el error clásico de MapLibre: tocar fuentes o capas antes
+  de que el estilo termine de cargar lanza, y los datos llegan por props
+  cuando quieren, no cuando el mapa está listo. Todo espera a `load`.
+
+Sigue mandando Leaflet por defecto.
+
 ## 5.9.0
 
 El interruptor entre los dos motores de mapa, para poder compararlos en un
