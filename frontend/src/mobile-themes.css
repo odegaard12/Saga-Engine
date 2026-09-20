@@ -617,8 +617,16 @@ body.theme-flame-red .saga-mesa-ficha {
  * propio (--theme-info-mid), no un blanco translúcido. Aquí el arreglo es el
  * mismo principio: oscurecer en vez de aclarar, que sí separa en cualquier
  * matiz de fondo, y un borde con el color de acento del tema. */
-body.theme-flame-red .saga-shell-count-pill {
-  background: rgba(0, 0, 0, 0.32) !important;
+/**
+ * Asimetría real, cerrada: esto valía SOLO para fuego, y en cristal/musgo la
+ * píldora se quedó sin fondo en absoluto -desde que la barra pasó a cristal
+ * translúcido, "sin fondo" es leerse a medias sobre lo que sea que haya
+ * detrás en el mapa, el mismo problema que ya se arregló aquí para fuego-.
+ * Mismo principio en los tres temas: oscurecer, no aclarar, y un borde con
+ * el color de acento; no una regla de más, la MISMA regla, generalizada.
+ */
+body[class*='theme-'] .saga-shell-count-pill {
+  background: rgba(var(--theme-ink-deep), 0.42) !important;
   border-color: rgba(var(--theme-ok), 0.5) !important;
   color: #fff !important;
 }
