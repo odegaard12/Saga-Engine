@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
-"""La lista de jugadores: dos por fila, en cualquier móvil.
+"""La lista de jugadores: una fila por jugador, no una tarjeta en una rejilla.
 
 Aquí había `repeat(auto-fill, minmax(148px, 1fr))`, que no es «dos»: es «las
 que quepan». En un móvil estrecho la tarjeta no llega a los 148px y `auto-fill`
 se queda en UNA columna, o sea la lista vertical de siempre.
 
-Y lo peor es cómo lo medí: en el banco salían dos por fila y lo di por bueno.
-La ventana del banco era más ancha que un móvil, así que la medida contestaba
-a otra pregunta. `repeat(2, ...)` no depende del ancho y no hay nada que medir.
+Se arregló primero forzando `repeat(2, ...)` -dos columnas fijas-, y después
+se rediseñó a propósito a «fila, no tarjeta»: una foto ya es un rectángulo con
+su forma, meterla en una tarjeta dentro de una rejilla de dos era el recuadro
+dentro del recuadro. `minmax(0, 1fr)` es UNA columna ancha de verdad, no el
+`auto-fill` viejo que se quedaba en una por accidente en móvil estrecho.
 
-El `minmax(0, 1fr)` en vez de `1fr` a secas es para que un nombre largo no
-ensanche su columna y descuadre la pareja.
+El `minmax(0, ...)` en vez de `1fr` a secas es para que un nombre largo no
+ensanche la fila.
 """
 import re
 from pathlib import Path
@@ -25,7 +27,7 @@ def bloque_da_lista() -> str:
     return codigo[inicio : codigo.index("}", inicio)]
 
 
-def test_son_dous_sempre():
+def test_e_unha_soa_fila_de_verdade():
     lista = bloque_da_lista()
     columnas = re.search(r"gridTemplateColumns:\s*'([^']+)'", lista)
 
@@ -33,10 +35,12 @@ def test_son_dous_sempre():
     valor = columnas.group(1)
 
     assert "auto-fill" not in valor and "auto-fit" not in valor, (
-        "«las que quepan» no es «dos por fila»: en un móvil estrecho se queda "
-        "en una sola columna, que es la lista vertical de antes (%s)" % valor
+        "«las que quepan» no es una fila fija: en un móvil estrecho «auto-fill» "
+        "se queda en una columna por accidente, no por diseño (%s)" % valor
     )
-    assert valor.startswith("repeat(2,"), "se esperaban dos columnas fijas: %s" % valor
+    assert valor.startswith("minmax("), (
+        "se esperaba una sola columna ancha (diseño «fila, no tarjeta»): %s" % valor
+    )
 
 
 def test_a_columna_non_se_ensancha_cun_nome_longo():

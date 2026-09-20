@@ -24,6 +24,7 @@ from backend.app.routers import game as game_router  # noqa: E402
 
 def _cliente(monkeypatch):
     monkeypatch.setattr(main, "require_player_session", lambda *a, **k: None)
+    monkeypatch.setattr(main, "exigir_ser_del_grupo", lambda *a, **k: None)
     monkeypatch.setattr(main, "enforce_player_rate_limit", lambda *a, **k: None)
     # El limitador de latidos es por tiempo real y aquí se mandan seguidos.
     main.HEARTBEAT_LAST_SEEN_BY_KEY.clear()

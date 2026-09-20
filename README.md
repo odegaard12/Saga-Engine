@@ -7,7 +7,7 @@
 **Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
 Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-[![Version](https://img.shields.io/badge/version-3.14.2-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.6.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -214,11 +214,14 @@ npm run dev
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| `SECRET_KEY` | Clave secreta para sesiones admin | `cambiar-en-produccion` |
-| `ADMIN_PASSWORD` | Contraseña del panel de admin | `mi-password` |
-| `SAGA_VERSION` | Versión mostrada en el cliente | `3.0.0` |
-| `SAGA_BUILD_TIME` | Timestamp de compilación | `2026-07-07T14:00:00+0200` |
-| `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
+| `SECRET_KEY` | Clave secreta para firmar sesiones (admin y jugador) | `cambiar-en-produccion` |
+| `ADMIN_PASS` | Semilla inicial de la contraseña de admin -solo la primera vez; después manda el panel- | `mi-password` |
+| `ALLOW_DEFAULT_ADMIN` | `1` para permitir el respaldo `CHANGE_ME` sin `ADMIN_PASS` -solo desarrollo local- | `0` |
+| `MISSION_PASS` | Semilla inicial de la contraseña de misión (puerta de entrada compartida por el grupo) -vacía = puerta desactivada | *(vacío)* |
+| `SAGA_DATA_DIR` / `DATA_DIR` | Directorio de datos persistentes | `/app/data` |
+| `TRUST_PROXY_HEADERS` | `1` si SAGA corre detrás de un túnel/proxy -si no, el bloqueo de intentos de login admin es por la IP del proxy, no la real, y cualquiera puede bloquear al admin | `0` |
+| `TRUSTED_PROXY_IPS` | IPs del proxy de confianza, separadas por comas -solo importa con `TRUST_PROXY_HEADERS=1` | `127.0.0.1` |
+| `SAGA_CORS_ALLOW_ORIGINS` | Orígenes permitidos por CORS, separados por comas | `https://tudominio.es` |
 
 ---
 

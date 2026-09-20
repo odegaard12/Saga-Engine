@@ -11,8 +11,11 @@ en el componente. Un número en línea gana a la regla del tema: seguía redonda
 en un tema de esquinas duras. Es el mismo empate que dejó muerta la regla del
 alfiler del mapa —dos verdades, y la del CSS sin pintar—.
 
-Ahora el radio sale de `--theme-radius-shell` con el 22/28 de respaldo, así que
-cristal se ve igual y fuego manda.
+Aquello se arregló con `--theme-radius-shell`, y DESPUÉS la barra se
+rediseñó entera a «diseño B» -tarjeta sólida con radio fijo de 13px, igual
+que las hojas y el prólogo-: `--theme-radius-shell` dejó de usarse, y lo que
+importa ahora es que el COLOR (`--theme-card`/`--theme-card-shadow`) siga
+saliendo del tema, no la forma.
 """
 import re
 from pathlib import Path
@@ -45,56 +48,32 @@ def test_o_tema_usa_eses_ganchos():
         )
 
 
-def test_a_barra_de_arriba_non_leva_o_radio_cravado():
-    """Un número en línea gana a la regla del tema."""
+def test_a_barra_de_arriba_usa_o_cristal_do_tema():
+    """Superseded dos veces: primero «diseño B» (tarjeta sólida) sustituyó al
+    radio clavado en --theme-radius-shell; después, pedido explícito
+    ("demasiado opaco, más glass"), la tarjeta sólida volvió a cristal -con
+    `backdrop-filter`, no el velo plano sin desenfoque que ya falló una vez-.
+
+    El radio de 13px sigue sin salir del tema -es la forma de la tarjeta, no
+    su color-. Lo que tiene que seguir saliendo del tema es el color/blur:
+    por ahí es por donde fuego sigue siendo una placa opaca -su
+    `--theme-glass` es casi sólido y su `--theme-blur` vale `none`- sin
+    ninguna regla aparte, mientras cristal y musgo quedan translúcidos.
+    """
     codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
         encoding="utf-8"
     )
     codigo = re.sub(r"/\*.*?\*/", "", codigo, flags=re.DOTALL)
 
-    assert "borderRadius: compact ? 22 : 28" not in codigo, (
-        "vuelve a estar el radio clavado: la barra se queda redonda dijera lo "
-        "que dijera el tema"
+    assert "var(--saga-glass-bg" in codigo, (
+        "la barra de arriba dejó de leer el fondo de cristal del tema"
     )
-    assert "--theme-radius-shell" in codigo, (
-        "el radio de la barra tiene que salir del tema, con el de siempre de "
-        "respaldo para que cristal no cambie"
+    assert "backdropFilter: 'var(--theme-blur)'" in codigo, (
+        "la barra de arriba dejó de desenfocar el mapa antes de teñirlo -sin "
+        "esto, sobre el mapa se ve barro, no cristal-"
     )
-
-
-def test_o_respaldo_conserva_o_de_cristal():
-    """Cristal sigue con SUS 28 px, los declare o los herede.
-
-    Esta prueba pedía antes que cristal NO declarase `--theme-radius-shell`,
-    para que se quedara con el respaldo del componente. Chocaba de frente con
-    `test_variables_sen_repetir`, que exige que los dos temas declaren el mismo
-    juego: en cuanto fuego declaró la suya (2026-08-21), las dos no podían
-    cumplirse a la vez.
-
-    Se resolvió por el lado que protege lo mismo con menos trampa: cristal la
-    declara con los 28 px que ya usaba. No cambia ni un píxel —es el mismo
-    número que el respaldo— y deja de heredar en silencio un valor que nadie
-    eligió para él, que es justo el fallo que se estaba arreglando.
-
-    Lo que esta prueba protege sigue siendo lo de siempre: que cristal no
-    cambie de forma.
-    """
-    codigo = (FRONT / "player" / "components" / "PlayerShell.tsx").read_text(
-        encoding="utf-8"
-    )
-
-    assert "22 : 28" in codigo, (
-        "el respaldo tiene que seguir siendo el 22/28 exacto de cristal"
-    )
-
-    css = CSS.read_text(encoding="utf-8")
-    inicio = css.index("body.theme-glass {")
-    cuerpo = css[inicio : css.index("}", inicio)]
-
-    hallado = re.search(r"--theme-radius-shell:\s*([^;]+);", cuerpo)
-    assert hallado, "cristal hereda un valor que nadie eligió para él"
-    assert "28" in hallado.group(1), (
-        "cristal ha cambiado de forma: tiene que seguir en sus 28 px"
+    assert "boxShadow: 'var(--theme-card-shadow)'" in codigo, (
+        "la barra de arriba dejó de leer la sombra de tarjeta del tema"
     )
 
 

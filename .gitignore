@@ -10,15 +10,20 @@ _backups/
 *.bak.*
 *.broken_now
 data/admin_auth.json
+data/mission_auth.json
 data/admin_sessions.json
+data/config.json
 data/game_timers.json
 data/*.bak
+graphify-out/
+sim/playwright-bench/out/
 data/gamestate.json
 data/positions.json
 # Route data is private per-deployment — never commit to public repo
 data/stages.json
 data/saga.sqlite3
 data/runtime_store.json
+data/tile_cache/
 .DS_Store
 .env
 .env.*
