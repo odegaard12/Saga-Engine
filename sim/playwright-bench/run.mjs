@@ -14,6 +14,9 @@
 //                               0x0, elementos que se solapan, texto ilegible
 //   animaciones              — graba opacidad y posicion FOTOGRAMA A FOTOGRAMA:
 //                               ¿se mueve de verdad o aparece de golpe?
+//   verificar-deslizamiento-gps — ¿el marcador de jugador desliza entre dos
+//                               fijas de GPS, o salta? Sin navegador ni
+//                               servidor: corre la función real en Node.
 
 const nombre = process.argv[2] || 'team-relay-cobertura'
 
@@ -25,6 +28,7 @@ const escenarios = {
   'album-diseno': () => import('./scenarios/album-diseno.mjs'),
   'auditoria-interfaz': () => import('./scenarios/auditoria-interfaz.mjs'),
   animaciones: () => import('./scenarios/animaciones.mjs'),
+  'verificar-deslizamiento-gps': () => import('./scenarios/verificar-deslizamiento-gps.mjs'),
 }
 
 const cargar = escenarios[nombre]

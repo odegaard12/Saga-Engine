@@ -29,7 +29,7 @@ APP = RAIZ / "frontend" / "src" / "player" / "PlayerApp.tsx"
 def ciclo_de_refresco() -> str:
     """El cuerpo de `refreshMissionFromServer`."""
     texto = APP.read_text(encoding="utf-8")
-    inicio = texto.index("async function refreshMissionFromServer()")
+    inicio = texto.index("async function refreshMissionFromServer(")
     resto = texto[inicio:]
     fin = resto.index("\n    }\n", 1)
     return resto[:fin]

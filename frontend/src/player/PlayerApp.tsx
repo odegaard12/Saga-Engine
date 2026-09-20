@@ -208,6 +208,25 @@ export default function PlayerApp() {
   const payloadRef = useRef<PlayerGamePayload | null>(null)
 
   /**
+   * Coordina el refresco pesado (`pedirPartida`, ~214 KB) con el latido
+   * ligero de cada 30 s.
+   *
+   * Antes los dos vivían en intervalos de 30 s independientes: el refresco
+   * pesado se pedía siempre, tocase lo que tocase, mientras que el latido ya
+   * traía consigo `live_status.level`/`.finished` (ver /api/heartbeat) sin que
+   * nadie lo aprovechara. Con muchos jugadores a la vez eso es la mayor parte
+   * del ancho de banda que satura la Raspberry, no la CPU.
+   *
+   * Ahora el latido, que es barato, avisa aquí si el nivel del servidor
+   * cambió; el refresco pesado solo se dispara cuando hace falta de verdad
+   * (avanzó un nodo, terminó la misión) o como red de seguridad cada
+   * `HEAVY_REFRESH_MIN_INTERVAL_MS` por si algo se edita desde admin sin que
+   * cambie el nivel (mensajes, objetos entregados a mano).
+   */
+  const heavyRefreshDueRef = useRef(false)
+  const lastHeavyRefreshAtRef = useRef(0)
+
+  /**
    * Desde cuándo se espera una posición en el nodo actual.
    *
    * ⚠️ Va AQUÍ, con el resto de hooks y antes de cualquier `return` temprano.
@@ -840,7 +859,7 @@ export default function PlayerApp() {
     let cancelled = false
     let running = false
 
-    async function refreshMissionFromServer() {
+    async function refreshMissionFromServer(options: { force?: boolean } = {}) {
       if (running) return
       // No pisar la carga inicial (descarga de teselas) con un 'ready'.
       if (!initialLoadDoneRef.current) return
@@ -903,6 +922,16 @@ export default function PlayerApp() {
          */
         void repasarFotosPendentes(user)
 
+        const HEAVY_REFRESH_MIN_INTERVAL_MS = 90_000
+        const ahora = Date.now()
+        const tocaRefrescoPesado =
+          options.force ||
+          heavyRefreshDueRef.current ||
+          (ahora - lastHeavyRefreshAtRef.current) >= HEAVY_REFRESH_MIN_INTERVAL_MS
+        if (!tocaRefrescoPesado) return
+        heavyRefreshDueRef.current = false
+        lastHeavyRefreshAtRef.current = ahora
+
         const nextPayload = await pedirPartida(user)
 
         // Un reseteo desde administración es la única vez que el servidor puede
@@ -956,11 +985,11 @@ export default function PlayerApp() {
     }
 
     const refreshAfterReconnect = () => {
-      void refreshMissionFromServer()
+      void refreshMissionFromServer({ force: true })
 
       // Algunos móviles anuncian online antes de que
       // la red esté realmente utilizable.
-      window.setTimeout(refreshMissionFromServer, 1200)
+      window.setTimeout(() => void refreshMissionFromServer({ force: true }), 1200)
     }
 
     window.addEventListener('focus', refresh)
@@ -1104,6 +1133,22 @@ export default function PlayerApp() {
         const profiles = respuesta?.team?.profiles
         if (Array.isArray(profiles)) {
           aplicarEquipoRef.current(profiles)
+        }
+
+        // El latido ya trae el nivel real del servidor (ver /api/heartbeat,
+        // live_status.level): si no coincide con lo que se está pintando, o
+        // si la misión acaba de terminar, el refresco pesado de 214 KB pasa
+        // a ser urgente en vez de esperar a la red de seguridad de 90 s.
+        const liveStatus = respuesta?.live_status
+        const nivelServidor = Number(liveStatus?.level)
+        const remataServidor = Boolean(liveStatus?.finished)
+        const nivelPintado = Number(payloadRef.current?.level || 0)
+        const remataPintado = Boolean(payloadRef.current?.finished)
+        if (
+          Number.isFinite(nivelServidor) &&
+          (nivelServidor !== nivelPintado || remataServidor !== remataPintado)
+        ) {
+          heavyRefreshDueRef.current = true
         }
       } catch {
         // Sin cobertura se pinta el último equipo conocido en vez de vaciar la
@@ -2800,12 +2845,26 @@ export default function PlayerApp() {
             style={{
               position: 'absolute',
               inset: 0,
-              // Rapido y sin curva rara: esto ya no es lo que se VE
-              // desvanecerse -eso lo hace la capa negra de encima-, es solo
-              // quitar de en medio el contenido antes de que el negro se
-              // levante del todo, para que no se noten los dos a la vez.
+              /**
+               * BUG REAL: "se ve el mapa un segundo, luego funde a negro, y
+               * luego vuelve el mapa". Este contenido se apagaba en 260ms,
+               * pero la capa negra de abajo (`sagaVeloNegro`) no llega a
+               * opacidad 1 hasta su 32% -480ms de sus 1500ms totales-. Entre
+               * los 260ms y los 480ms NINGUNA de las dos capas cubre del
+               * todo: el contenido ya se ha ido y el negro todavía no ha
+               * llegado, así que el mapa de debajo -ya montado, porque
+               * `status` es 'ready'- asoma por la rendija.
+               *
+               * El retraso de aqui hace que el contenido se quede opaco
+               * hasta que el negro YA está sólido del todo (480ms); a partir
+               * de ahi puede desaparecer sin que se note, porque el negro ya
+               * lo tapa. 490/200 deja margen de sobra antes de que el negro
+               * empiece a levantarse (930ms, su 62%).
+               */
               opacity: veloSaliendo ? 0 : 1,
-              transition: 'opacity 260ms ease-in',
+              transition: veloSaliendo
+                ? 'opacity 200ms ease-in 490ms'
+                : 'opacity 260ms ease-in',
             }}
           >
           <SplashScreen progress={100} detail={ultimoDetalleRef.current}>

@@ -30,6 +30,7 @@ COMPARTIDAS = {
     "--theme-pin-done": "íd.",
     "--theme-pin-todo": "íd.",
     "--theme-border-w": "el grosor del borde no distingue un tema de otro",
+    "--theme-radius-avatar": "las CARAS no se recortan en ningún tema, a propósito",
     # --theme-radius-pill salió de esta lista el 21/8: en un tema que corta
     # esquinas, una gragea perfecta canta. Fuego la tiene en 3px.
 }

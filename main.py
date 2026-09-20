@@ -75,9 +75,16 @@ app.include_router(assets.router)
 app.include_router(public.router)
 app.include_router(shell.router)
 
+_CORS_ALLOW_ORIGINS = [o for o in _split_csv_env("SAGA_CORS_ALLOW_ORIGINS") if o != "*"]
+if "*" in _split_csv_env("SAGA_CORS_ALLOW_ORIGINS"):
+    print(
+        "[WARN] SAGA_CORS_ALLOW_ORIGINS='*' ignorado: no se puede combinar con "
+        "cookies de sesion (allow_credentials). Lista los origenes explicitos."
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_split_csv_env("SAGA_CORS_ALLOW_ORIGINS"),
+    allow_origins=_CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "HEAD", "OPTIONS"],
     allow_headers=["Accept", "Content-Type", "X-Requested-With"],
@@ -95,7 +102,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 
-VALID_PLAYER_THEMES = {"glass", "flame-red"}
+VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
@@ -257,6 +264,22 @@ ADMIN_LOGIN_WINDOW_SECONDS = 600
 ADMIN_LOGIN_MAX_ATTEMPTS = 5
 ADMIN_LOGIN_LOCK_SECONDS = 600
 ADMIN_LOGIN_ATTEMPTS = {}
+
+# Contraseña de misión: una sola, compartida por todo el grupo. Cierra la
+# entrada de jugadores -sin ella, saber un nombre bastaba para colarse y ver
+# el mapa del grupo y las fotos-. Se guarda cifrada en data/mission_auth.json
+# y se cambia desde el panel de administración. MISSION_PASS (entorno) sólo es
+# la semilla inicial: si no hay clave guardada, la primera vez se toma de ahí.
+# Sin clave guardada ni semilla, la puerta está desactivada y el motor público
+# funciona exactamente igual que antes.
+MISSION_PASS = (os.getenv("MISSION_PASS") or "").strip()
+MISSION_AUTH_DB = os.path.join(DATA_DIR, "mission_auth.json")
+MISSION_COOKIE = "saga_mission"
+MISSION_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 180
+MISSION_UNLOCK_WINDOW_SECONDS = 600
+MISSION_UNLOCK_MAX_ATTEMPTS = 10
+MISSION_UNLOCK_LOCK_SECONDS = 600
+MISSION_UNLOCK_ATTEMPTS = {}
 
 ADMIN_SESSION_COOKIE = "saga_admin_session"
 ADMIN_SESSION_TTL_SECONDS = int(os.getenv("ADMIN_SESSION_TTL_SECONDS", "3600") or "3600")
@@ -443,6 +466,135 @@ def require_player_session(request: Request, user: str):
         raise HTTPException(status_code=403, detail="player session required")
 
 
+def load_mission_auth():
+    data = load_document(MISSION_AUTH_DB, "mission_auth", {})
+    return data if isinstance(data, dict) else {}
+
+
+def save_mission_auth(data):
+    save_document(MISSION_AUTH_DB, "mission_auth", data if isinstance(data, dict) else {})
+
+
+def mission_gate_enabled():
+    auth = load_mission_auth()
+    return bool(auth.get("password_hash") and auth.get("salt"))
+
+
+def set_mission_password(password):
+    """Cambia la clave de misión. Cadena vacía = quita la puerta."""
+    value = str(password or "").strip()
+    if not value:
+        save_mission_auth({})
+        return False
+    hashed = admin_auth_security.hash_password(value)
+    save_mission_auth(
+        {
+            "salt": hashed["salt"],
+            "password_hash": hashed["password_hash"],
+            "iterations": hashed["iterations"],
+        }
+    )
+    return True
+
+
+def ensure_mission_auth():
+    """Semilla desde el entorno la primera vez; después manda el panel."""
+    if MISSION_PASS and not mission_gate_enabled():
+        set_mission_password(MISSION_PASS)
+        print("[INFO] Mission password initialized from MISSION_PASS.")
+
+
+def _mission_cookie_value():
+    """Marcador firmado. No lleva la contraseña; y va atado al hash de la clave
+    actual, así cambiarla en el panel invalida las cookies antiguas."""
+    auth = load_mission_auth()
+    rotacion = str(auth.get("password_hash") or "sin-clave")
+    return hmac.new(
+        get_session_signing_secret().encode("utf-8"),
+        ("mission-ok:" + rotacion).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def mission_unlocked(request: Request) -> bool:
+    if not mission_gate_enabled():
+        return True
+    raw = str(request.cookies.get(MISSION_COOKIE) or "")
+    return bool(raw) and hmac.compare_digest(raw, _mission_cookie_value())
+
+
+def require_mission_unlocked(request: Request):
+    if not mission_unlocked(request):
+        raise HTTPException(status_code=403, detail="mission locked")
+
+
+def check_mission_password(password) -> bool:
+    auth = load_mission_auth()
+    salt = auth.get("salt")
+    expected = auth.get("password_hash")
+    if not salt or not expected:
+        return True  # puerta desactivada
+    candidate = str(password or "")
+    if not candidate.strip():
+        return False
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        candidate.encode("utf-8"),
+        str(salt).encode("utf-8"),
+        int(auth.get("iterations") or 200000),
+    ).hex()
+    return hmac.compare_digest(dk, str(expected))
+
+
+def set_mission_cookie(response: Response, request: Request):
+    response.set_cookie(
+        MISSION_COOKIE,
+        _mission_cookie_value(),
+        max_age=MISSION_COOKIE_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=(request.url.scheme or "").lower() == "https",
+        path="/",
+    )
+
+
+def clear_mission_cookie(response: Response, request: Request):
+    response.delete_cookie(
+        MISSION_COOKIE,
+        path="/",
+        secure=(request.url.scheme or "").lower() == "https",
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def mission_unlock_lock_remaining_seconds(ip, now=None):
+    return admin_auth_security.get_admin_lock_remaining_seconds(
+        MISSION_UNLOCK_ATTEMPTS,
+        ip,
+        window_seconds=MISSION_UNLOCK_WINDOW_SECONDS,
+        now=now,
+    )
+
+
+def register_mission_unlock_failure(ip, now=None):
+    return admin_auth_security.register_admin_login_failure(
+        MISSION_UNLOCK_ATTEMPTS,
+        ip,
+        max_attempts=MISSION_UNLOCK_MAX_ATTEMPTS,
+        window_seconds=MISSION_UNLOCK_WINDOW_SECONDS,
+        lock_seconds=MISSION_UNLOCK_LOCK_SECONDS,
+        now=now,
+    )
+
+
+def clear_mission_unlock_state(ip):
+    return admin_auth_security.clear_admin_login_state(MISSION_UNLOCK_ATTEMPTS, ip)
+
+
+ensure_mission_auth()
+
+
 def hay_sesion_de_algun_jugador(request: Request):
     """¿Quien pregunta es un jugador de esta misión, sea cual sea?
 
@@ -496,14 +648,21 @@ def apply_security_headers(response: Response, request: Request):
     response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=(), interest-cohort=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self' data: blob: https: http:; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https: http:; "
-        "style-src 'self' 'unsafe-inline' https: http:; "
-        "img-src 'self' data: blob: https: http:; "
-        "connect-src 'self' https: http: ws: wss:; "
+        "default-src 'self' data: blob:; "
+        # Sin comodines de host en script-src: un XSS ya no puede cargar JS
+        # externo. 'unsafe-inline'/'unsafe-eval' siguen por el bundle de Vite y
+        # los editores de minijuegos; el objetivo a medio plazo es nonce.
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; "
+        "style-src 'self' 'unsafe-inline'; "
+        # img-src/connect-src mantienen https: porque el mapa habla con varios
+        # servicios de teselas y rutado (OSM, ArcGIS, Mapbox, Overpass, Open-Meteo).
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https: ws: wss:; "
         "worker-src 'self' blob:; "
+        "font-src 'self' data:; "
         "object-src 'none'; "
         "base-uri 'self'; "
+        "form-action 'self'; "
         "frame-ancestors 'none'"
     )
     if (request.url.scheme or "").lower() == "https":
@@ -545,6 +704,17 @@ def clear_player_rate_limits():
 TRUST_PROXY_HEADERS = client_ip_security.TRUST_PROXY_HEADERS
 TRUSTED_PROXY_IPS = client_ip_security.TRUSTED_PROXY_IPS
 TRUSTED_PROXY_CIDRS = client_ip_security.TRUSTED_PROXY_CIDRS
+
+if not TRUST_PROXY_HEADERS:
+    # Detras de un tunel/reverse-proxy (Cloudflare) todas las peticiones llegan
+    # con la IP del proxy. El lockout de login admin es por IP: sin esto, 5
+    # fallos de CUALQUIERA bloquean al admin real, y atacante y admin comparten
+    # contador. Con el tunel hay que poner TRUST_PROXY_HEADERS=1 y
+    # TRUSTED_PROXY_IPS con la IP del proxy (p.ej. 127.0.0.1).
+    print(
+        "[WARN] TRUST_PROXY_HEADERS=0: si SAGA corre tras un tunel/proxy, el "
+        "lockout de login admin es global (DoS trivial). Ver docs/security/client-ip.md"
+    )
 
 _split_env_csv = client_ip_security.split_env_csv
 _request_client_host = client_ip_security.request_client_host

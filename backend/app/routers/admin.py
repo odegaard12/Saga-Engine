@@ -235,6 +235,8 @@ async def admin_react_overview(request: Request):
             "prologue_body": cfg.get("prologue_body"),
             "mapbox_token": cfg.get("mapbox_token"),
             "mapbox_style": cfg.get("mapbox_style"),
+            # Sólo el estado, nunca la clave.
+            "mission_pass_enabled": main.mission_gate_enabled(),
         },
         "counts": {
             "players": len(cfg.get("players", [])) if isinstance(cfg.get("players"), list) else 0,
@@ -397,7 +399,14 @@ async def save_config_endpoint(request: Request):
             updated["players"] = ids
 
     main.save_config(updated)
-    return {"status": "ok"}
+
+    # La clave de misión NO va en config.json: se guarda cifrada aparte. Sólo
+    # se toca si el panel manda la llave `mission_pass` de forma explícita.
+    # Cadena vacía = quitar la puerta; ausente = no tocar nada.
+    if "mission_pass" in incoming:
+        main.set_mission_password(incoming.get("mission_pass"))
+
+    return {"status": "ok", "mission_pass_enabled": main.mission_gate_enabled()}
 
 
 @router.post("/api/reset")
@@ -630,7 +639,12 @@ async def save_stages_endpoint(request: Request):
 @router.post("/api/admin/login")
 async def admin_login(request: Request):
     import main
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid JSON body")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="invalid JSON body")
     now = time.time()
     ip = main.get_client_ip(request)
 

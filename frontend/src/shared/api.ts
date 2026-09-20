@@ -164,6 +164,29 @@ export async function fetchPublicConfig(): Promise<PublicConfig> {
   }
 }
 
+/** Valida la contraseña de misión. Al volver ok, el servidor ha dejado la
+ *  cookie `saga_mission`; basta con volver a pedir `/api/config`. */
+export async function unlockMission(password: string): Promise<void> {
+  const res = await fetch('/api/mission/unlock', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password }),
+  })
+
+  if (res.status === 403) {
+    throw new Error('wrong-mission-password')
+  }
+  if (res.status === 429) {
+    throw new Error('too-many-attempts')
+  }
+  if (!res.ok) {
+    throw new Error(`unlock failed: HTTP ${res.status}`)
+  }
+}
+
 export async function fetchTeamStatus(user: string): Promise<TeamStatusPayload> {
   const timeout = withTimeoutSignal(3000)
 

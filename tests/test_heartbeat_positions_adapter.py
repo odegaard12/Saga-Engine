@@ -6,7 +6,12 @@ import main
 from backend.app.storage.sqlite_store import load_sqlite_positions
 
 
-def make_client():
+def make_client(monkeypatch=None):
+    if monkeypatch is not None:
+        # Estos tests son del adaptador de almacenamiento, no de la puerta de
+        # sesión: se neutraliza el guardián como en el resto de la suite.
+        monkeypatch.setattr(main, "require_player_session", lambda *a, **k: None)
+        monkeypatch.setattr(main, "exigir_ser_del_grupo", lambda *a, **k: None)
     return TestClient(main.app)
 
 
@@ -22,7 +27,7 @@ def test_heartbeat_defaults_to_json_positions_backend(tmp_path: Path, monkeypatc
     monkeypatch.setattr(main, "POSITIONS_DB", str(positions_json))
     reset_heartbeat_rate_state()
 
-    client = make_client()
+    client = make_client(monkeypatch)
     response = client.post(
         "/api/heartbeat",
         json={
@@ -54,7 +59,7 @@ def test_heartbeat_uses_sqlite_positions_adapter_when_enabled(tmp_path: Path, mo
     monkeypatch.setattr(main, "POSITIONS_DB", str(positions_json))
     reset_heartbeat_rate_state()
 
-    client = make_client()
+    client = make_client(monkeypatch)
     response = client.post(
         "/api/heartbeat",
         json={
@@ -97,7 +102,7 @@ def test_heartbeat_preserves_existing_sqlite_coordinates_when_omitted(tmp_path: 
     monkeypatch.setattr(main, "POSITIONS_DB", str(positions_json))
     reset_heartbeat_rate_state()
 
-    client = make_client()
+    client = make_client(monkeypatch)
     first = client.post(
         "/api/heartbeat",
         json={

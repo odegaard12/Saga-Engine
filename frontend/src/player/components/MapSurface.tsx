@@ -177,6 +177,70 @@ function getDistanceMeters(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * earthRadius * Math.asin(Math.sqrt(h))
 }
 
+const DURACION_DESLIZAR_MARCADOR_MS = 450
+// Por encima de esto no se desliza: es un salto de sitio, no un paso más.
+const SALTO_MAXIMO_DESLIZABLE_M = 60
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+/**
+ * Desliza uno o varios elementos con `setLatLng` desde su posición actual
+ * hasta `hasta`, fotograma a fotograma. Ver la nota larga en
+ * `playerMarkerAnimRef`: es RAF a mano, no CSS, para no afectar a cómo se
+ * repinta el resto del mapa al desplazar o hacer zoom.
+ */
+function deslizarMarcadores(
+  animRef: React.MutableRefObject<number | null>,
+  elementos: Array<{ getLatLng: () => L.LatLng; setLatLng: (ll: L.LatLng) => unknown }>,
+  hasta: L.LatLng
+) {
+  if (animRef.current !== null) {
+    window.cancelAnimationFrame(animRef.current)
+    animRef.current = null
+  }
+
+  if (!elementos.length) return
+
+  const desde = elementos.map((el) => el.getLatLng())
+  const distancia = Math.max(
+    ...desde.map((punto) =>
+      getDistanceMeters({ lat: punto.lat, lon: punto.lng }, { lat: hasta.lat, lon: hasta.lng })
+    )
+  )
+
+  if (distancia <= 0.3 || distancia > SALTO_MAXIMO_DESLIZABLE_M) {
+    elementos.forEach((el) => el.setLatLng(hasta))
+    return
+  }
+
+  const inicio = performance.now()
+
+  const paso = (ahora: number) => {
+    const t = Math.min(1, (ahora - inicio) / DURACION_DESLIZAR_MARCADOR_MS)
+    const suavizado = easeOutCubic(t)
+
+    elementos.forEach((el, i) => {
+      const origen = desde[i]
+      el.setLatLng(
+        L.latLng(
+          origen.lat + (hasta.lat - origen.lat) * suavizado,
+          origen.lng + (hasta.lng - origen.lng) * suavizado
+        )
+      )
+    })
+
+    if (t < 1) {
+      animRef.current = window.requestAnimationFrame(paso)
+    } else {
+      animRef.current = null
+    }
+  }
+
+  animRef.current = window.requestAnimationFrame(paso)
+}
+
 function offsetLatLon(
   point: { lat: number; lon: number },
   distanceMeters: number,
@@ -822,6 +886,32 @@ export const MapSurface = React.memo(function MapSurface({
 
   const playerMarkerIconKeyRef = useRef<string | null>(null)
 
+  /**
+   * "Saltos entre avisos de GPS, no va fluido".
+   *
+   * Cada posición nueva se plantaba con `setLatLng` directo: de un punto al
+   * siguiente, sin nada entre medias. Caminando, el GPS no llega cada
+   * fotograma -llega cada varios segundos, y el punto exacto varía un poco
+   * incluso quieto-, así que el punto azul se teletransportaba en microsaltos
+   * en vez de deslizarse. No es la red ni las teselas -eso ya se arregló con
+   * la caché en disco-, es que el marcador nunca interpolaba entre dos fijas.
+   *
+   * `requestAnimationFrame` en vez de una `transition` de CSS a ciegas:
+   * Leaflet mueve TODOS los marcadores -incluidos los nodos y el resto del
+   * grupo- con el mismo mecanismo (`transform` por `setPosition`) al
+   * desplazar o hacer zoom del mapa. Una transición CSS puesta sin distinguir
+   * el motivo haría que CUALQUIER reposicionamiento -tambien panear o hacer
+   * zoom- se viera con retraso de goma, no solo el GPS. Interpolando a mano
+   * con RAF, cada fotograma llama a `setLatLng` con la coordenada de verdad
+   * para ESE instante: el resto del mapa se repinta al momento como siempre,
+   * solo el camino entre dos fijas de GPS se ve continuo.
+   *
+   * Saltos grandes -reabrir la app en otro sitio, primer fix del día- NO se
+   * animan: deslizar despacio medio mapa se ve peor que un salto limpio, y
+   * confunde ("¿por qué se mueve solo?").
+   */
+  const playerMarkerAnimRef = useRef<number | null>(null)
+
   const playerAuraRef = useRef<L.CircleMarker | null>(null)
   const playerAuraModeRef = useRef<'gps' | 'debug' | null>(null)
   const otherPlayerMarkersRef = useRef<Map<string, L.Marker>>(new Map())
@@ -994,6 +1084,10 @@ export const MapSurface = React.memo(function MapSurface({
       clearTimeout(t2)
       resizeObserver?.disconnect()
       map.off('zoomend', updateZoom)
+      if (playerMarkerAnimRef.current !== null) {
+        window.cancelAnimationFrame(playerMarkerAnimRef.current)
+        playerMarkerAnimRef.current = null
+      }
       playerMarkerRef.current?.remove()
       playerAuraRef.current?.remove()
       nodeMarkerRef.current?.remove()
@@ -1700,9 +1794,11 @@ export const MapSurface = React.memo(function MapSurface({
           interactive: false,
         }).addTo(map)
         playerAuraModeRef.current = auraMode
-      } else {
-        playerAuraRef.current.setLatLng(nextLatLng)
       }
+      // Si ya existia, se desliza mas abajo JUNTO con el marcador -mismo
+      // `animRef`, un solo bucle RAF-, no aqui por separado: dos llamadas
+      // independientes se cancelarian la una a la otra al compartir el ref,
+      // y aura y marcador se desincronizarian.
 
       playerAuraRef.current.bringToFront()
     }
@@ -1741,7 +1837,14 @@ export const MapSurface = React.memo(function MapSurface({
         opacity: 0.92,
       })
     } else {
-      playerMarkerRef.current.setLatLng(nextLatLng)
+      // El deslizamiento va JUNTO con el aura -mismo bucle RAF, ver la nota
+      // larga en playerMarkerAnimRef-, no como setLatLng suelto aqui.
+      const aDeslizar: Array<{ getLatLng: () => L.LatLng; setLatLng: (ll: L.LatLng) => unknown }> =
+        [playerMarkerRef.current]
+      if (playerAuraRef.current && playerAuraModeRef.current === auraMode) {
+        aDeslizar.push(playerAuraRef.current)
+      }
+      deslizarMarcadores(playerMarkerAnimRef, aDeslizar, nextLatLng)
 
       if (playerMarkerIconKeyRef.current !== selfMarkerIconKey) {
         playerMarkerRef.current.setIcon(createAvatarIcon(selfMarkerProfile, 'self'))

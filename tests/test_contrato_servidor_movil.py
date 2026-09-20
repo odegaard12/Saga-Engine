@@ -82,6 +82,7 @@ def campos_declarados(fichero: Path, nombre: str) -> set[str]:
 @pytest.fixture
 def cliente(monkeypatch):
     monkeypatch.setattr(main, "require_player_session", lambda *a, **k: None)
+    monkeypatch.setattr(main, "exigir_ser_del_grupo", lambda *a, **k: None)
     monkeypatch.setattr(main, "enforce_player_rate_limit", lambda *a, **k: None)
     main.HEARTBEAT_LAST_SEEN_BY_KEY.clear()
 

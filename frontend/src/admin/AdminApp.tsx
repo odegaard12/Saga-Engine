@@ -267,7 +267,7 @@ export default function AdminApp() {
     const lon = Number(missionDraft.map_center_lon)
     const zoom = Number(missionDraft.map_zoom)
 
-    return {
+    const payload: Record<string, unknown> = {
       ...base,
       players: existingPlayers,
       player_profiles: existingProfiles,
@@ -289,6 +289,46 @@ export default function AdminApp() {
       mapbox_style: missionDraft.mapbox_style || '',
       map_center: [Number.isFinite(lat) ? lat : 40.4168, Number.isFinite(lon) ? lon : -3.7038],
       map_zoom: Number.isFinite(zoom) ? zoom : 13,
+    }
+
+    // La clave de misión sólo viaja si el admin escribió una nueva. Vacío =
+    // no se toca (el servidor la deja como está).
+    const missionPassInput = (missionDraft.mission_pass || '').trim()
+    if (missionPassInput) {
+      payload.mission_pass = missionPassInput
+    }
+
+    return payload
+  }
+
+  async function clearMissionPassword() {
+    if (
+      !window.confirm(
+        'Quitar la contraseña de misión: cualquiera que sepa un nombre podrá entrar. ¿Seguro?'
+      )
+    ) {
+      return
+    }
+
+    setSettingsSaveState('saving')
+    setSettingsSaveError(null)
+    try {
+      const payload = { ...buildMissionConfigPayload(), mission_pass: '' }
+      const saved = await saveAdminConfig(undefined, payload)
+      if (saved.status !== 'ok') {
+        throw new Error(saved.message || 'No se pudo quitar la contraseña.')
+      }
+      const refreshed = await fetchAdminReactOverview()
+      if (refreshed.status === 'ok') {
+        setOverview(refreshed)
+        setMissionDraft(buildMissionDraft((refreshed.config || {}) as Record<string, unknown>))
+      }
+      setSettingsSaveState('saved')
+    } catch (error) {
+      setSettingsSaveState('error')
+      setSettingsSaveError(
+        error instanceof Error ? error.message : 'No se pudo quitar la contraseña.'
+      )
     }
   }
 
@@ -1284,6 +1324,8 @@ export default function AdminApp() {
         onSavePlayers={savePlayerProfiles}
         onUpdateMissionDraft={updateMissionDraft}
         onSaveSettings={saveMissionSettings}
+        missionPassEnabled={overview?.config?.mission_pass_enabled ?? false}
+        onClearMissionPass={clearMissionPassword}
         onApplyMissionTemplate={applyMissionTemplate}
         onCreateNodesWithItems={createLocalNodesWithItems}
       />
@@ -1381,6 +1423,11 @@ function NodeCard({
         <span>{radius}m</span>
         <span>{coords}</span>
       </div>
+      {stage.type_fallback_reason ? (
+        <div className="admin-node-warning" title={stage.type_fallback_reason}>
+          ⚠️ Tipo de juego "{stage.raw_type}" no soportado — usando {stage.type} como reserva
+        </div>
+      ) : null}
     </button>
   )
 }

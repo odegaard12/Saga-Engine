@@ -24,9 +24,17 @@ def test_non_queda_ningun_tirador_debuxado():
     assert "rgba(255,255,255,.25)" not in codigo(), "sigue el color fijo del tirador viejo"
 
 
-def test_a_zona_de_arrastre_segue_activa():
+def test_a_zona_de_arrastre_quitouse_a_propósito():
+    """Superseded: arrastrar para cerrar se quitó del todo, no solo el dibujo.
+
+    Ver el comentario en SwipeableSheet.tsx: "al mover la hoja con el dedo
+    quedaba mal -se despegaba a medias y volvia de golpe- y ya no aportaba
+    nada, porque el boton de cerrar vuelve a verse". Ahora se cierra con la
+    X o tocando fuera; no hay `onTouchStart`/`onTouchMove`/`onTouchEnd` que
+    proteger.
+    """
     codigo_ = codigo()
-    assert "dragHandleWrapper" in codigo_, "la zona de arrastre desapareció entera"
-    assert "onTouchStart={handleTouchStart}" in codigo_
-    assert "onTouchMove={handleTouchMove}" in codigo_
-    assert "onTouchEnd={handleTouchEnd}" in codigo_
+    assert "onTouchStart" not in codigo_, (
+        "ha vuelto el arrastre táctil: si es a propósito, revisar antes por "
+        "qué se quitó"
+    )

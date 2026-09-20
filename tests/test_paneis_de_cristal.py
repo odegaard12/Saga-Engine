@@ -28,9 +28,26 @@ def sin_comentarios(fichero: Path) -> str:
     return re.sub(r"/\*.*?\*/", "", fichero.read_text(encoding="utf-8"), flags=re.DOTALL)
 
 
+def sin_keyframes(texto: str) -> str:
+    """Quita los bloques `@keyframes ... { from {...} to {...} }` enteros.
+
+    `from`/`to` (o los `0%`/`100%`) de UN `@keyframes` no son el mismo
+    selector que los de OTRO: son pasos de animaciones distintas, no dos
+    verdades sobre el mismo sitio. El regex plano de abajo no sabe de
+    anidamiento, así que sin esto cada `@keyframes` nuevo que use `from`/`to`
+    se contaba como un duplicado del anterior.
+    """
+    return re.sub(
+        r"@keyframes\s+[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}",
+        "",
+        texto,
+    )
+
+
 def selectores(fichero: Path) -> dict[str, list[str]]:
     reglas: dict[str, list[str]] = {}
-    for m in re.finditer(r"([^{}@]+)\{([^{}]*)\}", sin_comentarios(fichero)):
+    texto = sin_keyframes(sin_comentarios(fichero))
+    for m in re.finditer(r"([^{}@]+)\{([^{}]*)\}", texto):
         sel = " ".join(m.group(1).split())
         if not sel or sel.startswith("@"):
             continue
