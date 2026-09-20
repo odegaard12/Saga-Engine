@@ -242,6 +242,89 @@ async def map_tile_proxy(z: int, x: int, y: int):
     )
 
 
+# ---------------------------------------------------------------------------
+# Teselas de elevación (relieve del mapa 3D)
+# ---------------------------------------------------------------------------
+#
+# Terrarium, de AWS Open Data: elevación abierta, sin clave ni registro. Es
+# el origen que usa media comunidad de MapLibre para relieve.
+#
+# Va por el mismo camino que las teselas normales -proxy propio con caché en
+# disco- y no directo desde el móvil, por tres motivos que ya costaron caro
+# con el satélite: mismo origen (sin CORS), una sola descarga por zona para
+# TODOS los jugadores en vez de una por móvil, y sobre todo que el service
+# worker pueda guardarlas para el monte. Un origen externo directo no se
+# puede cachear para jugar sin cobertura, que es innegociable aquí.
+_BASE_RELIEVE = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium"
+
+
+def _dem_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
+    import main
+
+    carpeta = Path(main.DATA_DIR) / "dem_cache" / str(z) / str(x)
+    return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
+
+
+@router.get("/dem-tiles/{z}/{x}/{y}.png", include_in_schema=False)
+async def dem_tile_proxy(z: int, x: int, y: int):
+    """Elevación del terreno para el relieve del mapa 3D."""
+    import main
+
+    # Terrarium no pasa de 15: pedir más alto devuelve 404 y MapLibre deja
+    # de dibujar relieve en esa zona. Se recorta aquí.
+    if z < 0 or z > 15:
+        raise HTTPException(status_code=404, detail="Zoom fuera del rango de elevación")
+
+    ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
+
+    if ruta_binario.exists():
+        try:
+            contenido = ruta_binario.read_bytes()
+            tipo = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else "image/png"
+            return Response(
+                content=contenido,
+                media_type=tipo or "image/png",
+                headers={
+                    "Cache-Control": "public, max-age=604800",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+        except OSError:
+            pass
+
+    if not main._HTTPX_AVAILABLE:
+        raise HTTPException(status_code=500, detail="httpx not available for proxying")
+
+    url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
+
+    try:
+        async with main._httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.get(url, headers=_CABECERAS_TESELAS, follow_redirects=True)
+    except main._httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="DEM proxy error: %s" % exc)
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="DEM tile not found upstream")
+
+    tipo_respuesta = resp.headers.get("Content-Type", "image/png")
+
+    try:
+        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
+        ruta_binario.write_bytes(resp.content)
+        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
+    except OSError:
+        pass
+
+    return Response(
+        content=resp.content,
+        media_type=tipo_respuesta,
+        headers={
+            "Cache-Control": "public, max-age=604800",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
 @router.api_route("/sw.js", methods=["GET", "HEAD"])
 def player_service_worker():
     """El service worker, tal cual está en el disco.

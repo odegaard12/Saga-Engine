@@ -6,6 +6,34 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.11.0
+
+Relieve de verdad en el mapa 3D, y el botón donde tiene que estar.
+
+- **Desnivel real.** Hasta ahora "3D" era inclinar la cámara sobre una
+  foto plana: perspectiva, no relieve. Ahora hay origen de elevación
+  (Terrarium de AWS, abierto y sin clave) más sombreado de laderas. El
+  monte se ve Y se lee.
+- **Proxy propio para la elevación** (`/dem-tiles/...`) con caché en
+  disco, igual que el satélite, y no directo desde el móvil: mismo origen
+  (sin CORS), una descarga por zona para todos los jugadores en vez de
+  una por móvil, y sobre todo que el service worker pueda guardarlas para
+  el monte. Un origen externo directo no se puede cachear para jugar sin
+  cobertura, que aquí es innegociable.
+- **Tope de zoom 15 en la elevación**: es hasta donde llega Terrarium. Sin
+  ese tope, al acercarse MapLibre pide teselas que no existen y el relieve
+  desaparece justo cuando más cerca estás.
+- **El botón 2D/3D sube a la fila de iconos**, con la cámara, la
+  clasificación y el resto. Flotando suelto sobre el mapa se veía
+  descolgado del diseño. Solo aparece con el motor WebGL: Leaflet no sabe
+  inclinar la cámara.
+- **Nodos más visibles**: 7 px se perdían sobre la foto aérea, más aún con
+  la cámara inclinada. 10 con borde de 3.
+
+Pendiente y sabido: la primera carga tarda porque la elevación y las
+teselas se piden al entrar. La descarga previa hay que ampliarla para que
+cubra también el relieve.
+
 ## 5.10.2
 
 Dos cosas vistas por fin en una captura del móvil de Óscar, no leyendo
