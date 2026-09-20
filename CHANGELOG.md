@@ -6,6 +6,38 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.6.0
+
+Puerta de contraseña de misión, caché de teselas en disco, tema Musgo, y el
+mapa deja de saltar.
+
+- **Puerta de misión**: contraseña única compartida por el grupo, cierra la
+  entrada hasta desbloquearla; se gestiona desde el panel admin.
+- **Mapa fluido de verdad**: cada tesela era un proxy en vivo a Esri sin
+  caché en el servidor -cada jugador pagaba el viaje Pi→Esri por cada
+  tesela, cada vez-. Ahora se cachea en disco: la primera visita a una zona
+  paga el viaje, las siguientes se sirven local. Y el marcador de jugador
+  ya no salta entre fijas de GPS: desliza con interpolación real
+  (`requestAnimationFrame`), verificado con un banco que ejecuta la función
+  de verdad y mide, no solo lee el código
+  (`sim/playwright-bench/scenarios/verificar-deslizamiento-gps.mjs`).
+- **Tema Musgo**: tercer tema de jugador, verde relajado, junto a Cristal y
+  Fuego.
+- **Barras de cristal**: la barra superior e inferior del jugador vuelven a
+  ser translúcidas (con `backdrop-filter`, no el velo plano que ya falló
+  una vez antes).
+- Arreglado el fundido a negro que dejaba asomar el mapa un instante al
+  salir de la pantalla de permisos.
+- Aviso visible en el panel admin cuando un nodo usa un tipo de minijuego
+  sin runtime propio.
+- Refresco pesado de misión (214 KB) ya no se pide a ciegas cada 30s: el
+  latido, que ya viaja cada 30s, avisa si el nivel cambió de verdad.
+- `js-yaml` (dependencia de desarrollo, vía eslint) actualizada: cerraba
+  una alerta de seguridad de GitHub (DoS por CPU, severidad alta).
+- `TRUST_PROXY_HEADERS`/`TRUSTED_PROXY_IPS` activados en el despliegue de
+  producción: sin ellos, cinco fallos de login admin desde cualquier IP
+  -todas llegan como la del túnel- bloqueaban al admin real.
+
 ## 4.9.30
 
 El hueco de la cabecera de la Mochila era el tirador, no las pestañas.
