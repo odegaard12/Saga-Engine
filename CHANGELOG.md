@@ -6,6 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.7.1
+
+El botón de "ver toda la ruta" (desampliar desde tu posición para ver
+dónde están los nodos) iba a saltos y parpadeaba -reportado por Óscar-.
+Causa documentada en el propio código desde hace tiempo, pero solo
+arreglada para "volver al nodo": `flyToBounds` anima calculando
+posiciones intermedias, y en cada una pide/suelta teselas del mapa. Este
+botón es el peor caso posible -de tu posición junto a un nodo (zoom alto)
+a toda la ruta (zoom bajo)- y nunca tuvo la salida rápida que sí tiene el
+resto de movimientos del mapa. Mismo arreglo que ya funcionaba ahí:
+saltos largos o de zoom grande se PLANTAN sin animar (sin teselas
+intermedias que pedir), solo el ajuste fino se anima.
+
+552/552 tests en verde.
+
 ## 5.7.0
 
 Antitrampas: captura el patrón, sal de la app, resuélvelo con calma. Hueco
