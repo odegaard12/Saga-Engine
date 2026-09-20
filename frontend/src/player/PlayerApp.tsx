@@ -323,6 +323,16 @@ export default function PlayerApp() {
   }
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null)
   const [routeOverviewActive, setRouteOverviewActive] = useState(false)
+
+  /**
+   * Cámara inclinada del mapa WebGL.
+   *
+   * Vive aquí y no dentro del mapa porque el botón está en la fila de
+   * iconos, con la cámara, la clasificación y el resto: ahí es donde el
+   * jugador busca los mandos del mapa. Flotando suelto sobre el mapa se
+   * veía descolgado del diseño.
+   */
+  const [mapaTresD, setMapaTresD] = useState(false)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
@@ -2979,6 +2989,7 @@ export default function PlayerApp() {
             missionStages={payload.stages || []}
             currentLevel={payload.level || 0}
             playerPosition={playerPosition}
+            tresD={mapaTresD}
             initialCenter={
               browserGpsPosition ??
               (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
@@ -3289,6 +3300,28 @@ export default function PlayerApp() {
                 <IconoTrofeo />
               </span>
             </button>
+
+            {/* Solo con el motor WebGL: Leaflet no sabe inclinar la cámara. */}
+            {state.config?.map_engine === 'maplibre' ? (
+              <button
+                type="button"
+                style={mapaTresD ? mapQuickButtonActive : mapRouteToggleInlineButton}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setMapaTresD((valor) => !valor)
+                }}
+                aria-label={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+                title={mapaTresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{ ...mapQuickIcon, fontSize: 12, fontWeight: 900 }}
+                >
+                  {mapaTresD ? '2D' : '3D'}
+                </span>
+              </button>
+            ) : null}
 
             <button
               type="button"

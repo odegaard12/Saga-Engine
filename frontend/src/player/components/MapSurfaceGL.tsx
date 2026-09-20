@@ -26,6 +26,8 @@ import type { MapSurfacePropsGL } from './mapSurfaceContract'
 
 const FUENTE_TESELAS = 'saga-raster'
 const CAPA_TESELAS = 'saga-raster-capa'
+const FUENTE_RELIEVE = 'saga-relieve'
+const CAPA_SOMBRAS = 'saga-sombras'
 const FUENTE_RADIO = 'saga-radio'
 const CAPA_RADIO_RELLENO = 'saga-radio-relleno'
 const CAPA_RADIO_BORDE = 'saga-radio-borde'
@@ -90,6 +92,7 @@ export function MapSurfaceGL({
   currentLevel = 0,
   playerPosition,
   initialCenter,
+  tresD = false,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
@@ -104,8 +107,6 @@ export function MapSurfaceGL({
    * lo que toque capas espera a esto.
    */
   const [estiloListo, setEstiloListo] = useState(false)
-
-  const [tresD, setTresD] = useState(false)
 
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return
@@ -135,8 +136,40 @@ export function MapSurfaceGL({
             maxzoom: 19,
             attribution: '&copy; Esri',
           },
+          /**
+           * Elevación del terreno. Esto es lo que hace que se vea el
+           * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
+           * es la misma foto vista de lado.
+           *
+           * `maxzoom: 15` porque es hasta donde llega Terrarium. Sin ese
+           * tope, al acercarse MapLibre pide teselas que no existen y el
+           * relieve desaparece justo cuando más cerca estás.
+           */
+          [FUENTE_RELIEVE]: {
+            type: 'raster-dem',
+            tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            maxzoom: 15,
+            encoding: 'terrarium',
+          },
         },
-        layers: [{ id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS }],
+        layers: [
+          { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS },
+          // Sombreado de laderas: marca el relieve aunque la foto satélite
+          // sea plana. Sin esto el monte está ahí pero no se lee.
+          {
+            id: CAPA_SOMBRAS,
+            type: 'hillshade',
+            source: FUENTE_RELIEVE,
+            paint: { 'hillshade-exaggeration': 0.5 },
+          },
+        ],
+        /**
+         * Exageración 1.5: el desnivel real de la ruta es suave y a escala
+         * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
+         * el monte en una sierra que no existe.
+         */
+        terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
       },
     })
 
@@ -178,9 +211,11 @@ export function MapSurfaceGL({
           // El alfiler SÍ va en píxeles: es un señalador, tiene que
           // verse igual de lejos que de cerca. Lo que va en metros es el
           // radio del nodo, que es información del terreno.
-          'circle-radius': 7,
+          // 7 px era un punto que se perdía sobre la foto aérea, sobre
+          // todo inclinado. 10 con borde de 3 se ve sin taparlo todo.
+          'circle-radius': 10,
           'circle-color': ['get', 'color'],
-          'circle-stroke-width': 2,
+          'circle-stroke-width': 3,
           'circle-stroke-color': '#0b1220',
         },
       })
@@ -297,35 +332,6 @@ export function MapSurfaceGL({
         style={{ position: 'absolute', inset: 0 }}
       />
 
-      <button
-        type="button"
-        onClick={() => setTresD((valor) => !valor)}
-        aria-label={tresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-        title={tresD ? 'Ver el mapa plano' : 'Inclinar el mapa'}
-        style={{
-          position: 'absolute',
-          right: 12,
-          bottom: 210,
-          zIndex: 500,
-          minWidth: 44,
-          minHeight: 44,
-          borderRadius: 'var(--theme-radius-card)',
-          // Sin colores de respaldo clavados: `--saga-glass-*` las declara
-          // `:root` en mobile-shell.css, así que siempre tienen valor, y un
-          // respaldo en crudo aquí sería un color que no sigue al tema.
-          border: '1px solid var(--saga-glass-border)',
-          background: 'var(--saga-glass-bg)',
-          backdropFilter: 'var(--theme-blur)',
-          WebkitBackdropFilter: 'var(--theme-blur)',
-          color: '#f8fafc',
-          fontSize: 13,
-          fontWeight: 900,
-          letterSpacing: '.04em',
-          cursor: 'pointer',
-        }}
-      >
-        {tresD ? '2D' : '3D'}
-      </button>
     </section>
   )
 }
