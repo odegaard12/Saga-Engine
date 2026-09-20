@@ -36,10 +36,10 @@ def test_o_cristal_xa_non_leva_fondo_en_liña():
 
     Ya no hay `background` en el estilo de `contadorTexto` -solo
     `color: var(--theme-primary)`-, así que en cristal el contador es texto
-    coloreado sin píldora propia. `body.theme-flame-red .saga-shell-count-pill`
-    en mobile-themes.css SÍ sigue forzando un fondo oscuro con `!important`:
-    es una asimetría real entre temas -pendiente en TODO.md-, no algo que
-    esta prueba deba ocultar fingiendo que el fondo en línea sigue ahí.
+    coloreado sin píldora propia. El fondo oscuro con `!important` de
+    mobile-themes.css ya no es solo de fuego -ver
+    `test_a_regra_do_fondo_e_universal`-, es la misma regla generalizada a
+    los tres temas.
     """
     assert "background: 'rgba(255,255,255,.12)'" not in componente(), (
         "ha vuelto el fondo en línea viejo de la píldora"
@@ -48,13 +48,23 @@ def test_o_cristal_xa_non_leva_fondo_en_liña():
 
 def bloque_da_pildora() -> str:
     texto = temas()
-    inicio = texto.index("body.theme-flame-red .saga-shell-count-pill {")
+    inicio = texto.index(".saga-shell-count-pill {")
     return texto[inicio : texto.index("}", inicio)]
 
 
-def test_o_fogo_oscurece_en_vez_de_aclarar():
+def test_a_regra_do_fondo_e_universal():
     """Oscurecer separa en cualquier matiz de fondo; aclarar sobre un fondo ya
-    cálido no separa nada -ese era el fallo original-."""
+    cálido no separa nada -ese era el fallo original en fuego-.
+
+    Antes esto solo valía para `body.theme-flame-red`, y cristal/musgo se
+    quedaban sin ningún fondo propio -asimetría real, cerrada aquí-: la
+    píldora se leía a medias sobre lo que hubiera detrás en el mapa, el
+    mismo síntoma original, en dos temas más.
+    """
+    texto = temas()
+    assert "body.theme-flame-red .saga-shell-count-pill" not in texto, (
+        "la regla del fondo de la píldora volvió a limitarse a un solo tema"
+    )
     b = bloque_da_pildora()
-    assert "rgba(0, 0, 0," in b, "el arreglo tiene que oscurecer el fondo, no aclararlo"
+    assert "rgba(var(--theme-ink-deep)" in b, "el arreglo tiene que oscurecer el fondo, no aclararlo"
     assert "!important" in b, "sin !important no le gana al estilo en línea"

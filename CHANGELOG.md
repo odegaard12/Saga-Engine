@@ -6,6 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.6.2
+
+Asimetría cerrada: la píldora del contador (1/2, 2/2) tenía fondo oscuro
+forzado SOLO en fuego; en cristal y musgo se quedaba sin ningún fondo
+propio, leyéndose a medias sobre lo que hubiera detrás en el mapa -el
+mismo síntoma que ya se había arreglado, pero solo para un tema-. Misma
+regla, generalizada a los tres.
+
 ## 5.6.1
 
 El check de lint fallaba en cada push desde 5.6.0: unas comillas sin escapar
