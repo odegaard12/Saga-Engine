@@ -147,18 +147,31 @@ const wrap: CSSProperties = {
 }
 
 /**
- * Tarjeta flotante SOLIDA -diseno "B", aprobado tras varias rondas.
+ * Tarjeta flotante DE CRISTAL -vuelta a glass, pedido explicito ("demasiado
+ * opaco, hacer tono mas claro y algo glass").
  *
- * Historial de lo que NO funciono, para no repetirlo: primero era una placa
- * de cristal con borde; luego un velo negro con degradado (sobre el mapa
- * verde daba gris y la pantalla perdia el tema); luego un velo en rojo
- * (seguia siendo degradado translucido = barro marron sin bordes limpios).
+ * Historial de lo que NO funciono la primera vez que se probo cristal aqui,
+ * para no repetir el MISMO fallo: era un velo translucido de color PLANO
+ * -sin desenfoque de fondo-, y sobre el mapa (textura muy variada: verde,
+ * marron, caminos) un tinte plano sin blur se ve como barro gris/marron
+ * segun que hay debajo en cada momento, no como cristal.
  *
- * Lo que funciona es lo mismo que hace funcionar el login: color PLANO y
- * sombra real. Se recorta contra el mapa y se lee de un vistazo.
+ * Esta vez es la MISMA receta que ya funciona en los minijuegos y paneles
+ * -`.saga-glass-panel`, `backdrop-filter: var(--theme-blur)`-: el
+ * desenfoque emborrona la textura variada del mapa ANTES de teñirla, así
+ * que el tinte queda uniforme por debajo, no a merced de lo que haya en esa
+ * zona del mapa. Es una receta distinta a la que ya se probó, no la misma
+ * otra vez con otro nombre.
+ *
+ * En fuego esto no cambia nada por fuera: `--theme-glass` ahí es casi opaco
+ * (alpha .97) y `--theme-blur: none`, así que sigue siendo la placa sólida
+ * que ese tema quiere -sin escribir una regla aparte para lograrlo-.
  */
 const card: CSSProperties = {
-  background: 'var(--theme-card)',
+  background: 'var(--saga-glass-bg, var(--theme-card))',
+  border: '1px solid var(--saga-glass-border, var(--theme-hairline))',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   borderRadius: 13,
   boxShadow: 'var(--theme-card-shadow)',
   color: '#ffffff',

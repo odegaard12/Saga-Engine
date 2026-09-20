@@ -3,9 +3,9 @@
 > Este fichero se actualiza al cerrar cada bloque de trabajo. Se lee ANTES de
 > tocar nada, para no volver a descubrir el proyecto desde cero.
 
-**Última actualización:** 2026-09-18 · `.104` en **5.4.0** (`75eaf47`) ·
-`.103` en 5.1.3, **pendiente de igualar** (bloqueado a la espera de que el
-usuario confirme 5.4.0 antes de replicarla)
+**Última actualización:** 2026-09-18 · `.104` y `.103` en **5.5.0**
+(`4b0cfe6`), igualadas. Commits locales, **sin push a GitHub** por petición
+expresa del usuario ("deja de hacer el tema de origin").
 
 ## Qué está funcionando
 
@@ -63,9 +63,12 @@ cada commit lleva la causa raíz explicada):
 
 ## Qué sigue roto / pendiente de medida
 
-- **`.103` desfasada** (5.1.3, debería estar en 5.4.0). Sincronizar en
-  cuanto el usuario confirme que 5.4.0 está bien — no antes, para no tener
-  que revertir en las dos Pis si algo falla.
+- El bench (`sim/playwright-bench/scenarios/animaciones.mjs`) quedó
+  desactualizado tras el restructurado del velo (5.4.0): sigue etiquetando
+  el fundido antiguo (`data-saga-anim="velo"` + opacity) en vez de la capa
+  negra nueva (`velo-negro` + animación `sagaVeloNegro`). Da falso negativo
+  en `relevo.fundido`. Corregir las etiquetas antes de confiar en la
+  próxima pasada.
 - Avisos de área de toque < 44px en la auditoría (iconos de 38px del mapa,
   pestañas de la Mochila de 36px). Decidido no tocar: cambiarlo altera un
   diseño ya aprobado; son avisos, no fallos duros.
@@ -83,8 +86,7 @@ de Ferramentas, botones con marco, zoom del mapa) antes de continuar.
 
 ## Siguiente paso concreto
 
-1. Cuando el usuario confirme 5.4.0: sincronizar `.103` al mismo commit
-   (`75eaf47`) con el flujo de bundle habitual (ver DECISIONS.md).
-2. `node run.mjs auditoria-interfaz` y `node run.mjs animaciones` sobre
-   5.4.0 para tener una medida limpia post-bloque.
+1. Arreglar las etiquetas de `animaciones.mjs` para el velo nuevo
+   (`velo-negro`/`sagaVeloNegro`) antes de la próxima pasada.
+2. `node run.mjs auditoria-interfaz` sobre 5.5.0.
 3. Seguir con lo que quede en TODO.md bajo P2.

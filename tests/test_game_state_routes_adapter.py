@@ -64,6 +64,7 @@ def test_public_state_and_game_routes_read_sqlite_game_state(monkeypatch, tmp_pa
 
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     client = make_client()
+    seed_player_session(client)
 
     state_response = client.get("/api/state/PLAYER%201")
     assert state_response.status_code == 200

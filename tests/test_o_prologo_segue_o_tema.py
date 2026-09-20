@@ -1,65 +1,39 @@
 # -*- coding: utf-8 -*-
-"""`StoryModal.tsx` (el Prólogo y los demás textos de historia) llevaba su
-forma entera en línea -color, radio, borde, sombra-, escrita a mano con las
-variables de brasa de cristal (`--theme-sheen-*`) en vez de apoyarse en
-`.saga-glass-panel`. En cristal daba la casualidad de que coincidía en
-píxeles con el resto de paneles, así que nunca se notó como un fallo; en
-fuego se quedaba completamente plano, sin corte ni brasa -medido con
-`getComputedStyle` en un arnés real: `clip-path: none`, el mismo degradado
-gris de cristal, `border-radius: 28px` clavado-.
+"""`StoryModal.tsx` (el Prólogo y los demás textos de historia) sigue al tema.
 
-Encontrado señalando la barra superior («la estropeas») y mirando la
-pantalla en fuego con capturas reales: el Prólogo era el que de verdad
-estaba sin tocar por el tema, no la barra.
+Superseded a propósito -ver el comentario en mobile-themes.css, «La regla de
+`.saga-story-panel` se fue con el prólogo»-: aquella versión llevaba la forma
+en línea con las variables de brasa DE CRISTAL (`--theme-sheen-*`) copiadas a
+mano, y hacía falta una regla `!important` en el tema de fuego para ganarle.
+Ahora el panel es una tarjeta sólida del diseño «B» -las mismas
+`var(--theme-card)` / `var(--theme-card-shadow)` que la barra superior y las
+hojas-, así que sigue al tema sin ninguna regla aparte ni `!important`: cambiar
+de tema ya cambia estas variables en un solo sitio.
 """
-import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 STORY_MODAL = RAIZ / "frontend" / "src" / "player" / "components" / "StoryModal.tsx"
-THEMES = RAIZ / "frontend" / "src" / "mobile-themes.css"
 
 
 def componente() -> str:
     return STORY_MODAL.read_text(encoding="utf-8")
 
 
-def temas() -> str:
-    return THEMES.read_text(encoding="utf-8")
-
-
-def test_o_panel_leva_a_clase_do_tema():
-    assert 'className="saga-story-panel"' in componente(), (
-        "el panel del prólogo perdió la clase que lo engancha al tema"
-    )
-
-
-def test_o_cristal_non_cambia_ni_un_pixel():
-    """Lo en línea tiene que seguir ahí: es lo que deja a cristal intacto."""
+def test_o_panel_usa_a_tarxeta_do_deseno_b():
     codigo = componente()
-    assert "borderRadius: '28px'" in codigo, "cristal cambiaría de radio si esto se quita"
-    assert "rgba(var(--theme-sheen-a)" in codigo, "cristal perdería su degradado si esto se quita"
-    assert "border: '1px solid rgba(255, 255, 255, 0.22)'" in codigo, (
-        "cristal perdería su borde si esto se quita"
+    assert "var(--theme-card)" in codigo, (
+        "el panel del prólogo dejó de leer el color de la tarjeta del tema"
+    )
+    assert "var(--theme-card-shadow)" in codigo, (
+        "el panel del prólogo dejó de leer la sombra de la tarjeta del tema"
     )
 
 
-def bloque_do_tema_de_fogo() -> str:
-    texto = temas()
-    inicio = texto.index("body.theme-flame-red .saga-story-panel {")
-    return texto[inicio : texto.index("}", inicio)]
-
-
-def test_o_fogo_gana_a_forma_en_liña_con_important():
-    """Lo único que le gana a un estilo en línea es !important. Sin eso, esta
-    regla entera es tan muerta como la que arregla."""
-    b = bloque_do_tema_de_fogo()
-    for propiedad in ("background:", "border-radius:", "border:", "border-top:"):
-        inicio = b.index(propiedad)
-        linea = b[inicio : b.index(";", inicio)]
-        assert "!important" in linea, f"{propiedad} sin !important no le gana a lo en línea"
-
-
-def test_o_fogo_leva_o_mesmo_corte_que_o_resto_de_paneis():
-    b = bloque_do_tema_de_fogo()
-    assert "var(--theme-panel-cut)" in b, "el prólogo no usa la variable de corte del tema"
+def test_non_volveu_a_forma_en_liña_vella():
+    """Si esto reaparece, ha vuelto la copia a mano de cristal que hacía
+    falta parchear con !important en fuego -el fallo que se arregló-."""
+    codigo = componente()
+    assert "rgba(var(--theme-sheen-a)" not in codigo, (
+        "ha vuelto el degradado de cristal copiado a mano en el prólogo"
+    )

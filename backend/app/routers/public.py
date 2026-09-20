@@ -22,8 +22,42 @@ async def get_version():
     return main.get_runtime_version_payload()
 
 
+@router.post("/api/mission/unlock")
+async def mission_unlock(request: Request):
+    """Valida la contraseña de misión y deja la cookie que abre la entrada.
+
+    Apagado mientras MISSION_PASS esté vacía: responde ok sin pedir nada.
+    """
+    import main
+
+    if not main.mission_gate_enabled():
+        return {"status": "ok", "required": False}
+
+    ip = main.get_client_ip(request)
+    remaining = main.mission_unlock_lock_remaining_seconds(ip)
+    if remaining > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="too many attempts; retry in %ds" % remaining,
+        )
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    if not main.check_mission_password((data or {}).get("password")):
+        main.register_mission_unlock_failure(ip)
+        raise HTTPException(status_code=403, detail="wrong mission password")
+
+    main.clear_mission_unlock_state(ip)
+    response = JSONResponse({"status": "ok", "required": True})
+    main.set_mission_cookie(response, request)
+    return response
+
+
 @router.get("/api/config")
-async def get_config():
+async def get_config(request: Request):
     """La configuración pública de la misión.
 
     Sin las fotos de los jugadores dentro. Iban incrustadas en base64 y eran
@@ -31,13 +65,18 @@ async def get_config():
     16 MB por hora y por móvil mandando una y otra vez las mismas caras. Y este
     endpoint es público, así que ahí estaban los retratos de los catorce al
     alcance de cualquiera. Ahora va la URL de /api/player-avatar, que se cachea.
+
+    La lista de jugadores (`players` / `player_profiles`) sólo viaja si la
+    misión está abierta: con MISSION_PASS puesta hay que desbloquear antes con
+    /api/mission/unlock. Sin ella, todo sigue como estaba.
     """
     import main
     import time
 
     cfg = main.load_config()
+    mission_open = main.mission_unlocked(request)
 
-    return {
+    payload = {
         "site_name": cfg.get("site_name", "PUT TITLE HERE"),
         # La hora del SERVIDOR, no la del móvil: para la cuenta atrás de
         # mission_launch_at hace falta un reloj que no se cambie en dos
@@ -56,11 +95,19 @@ async def get_config():
         "map_center": cfg.get("map_center", [40.4168, -3.7038]),
         "map_zoom": cfg.get("map_zoom", 13),
         "mapbox_style": cfg.get("mapbox_style", ""),
-        "players": cfg.get("players", ["PLAYER 1", "PLAYER 2"]),
-        "player_profiles": [
-            main.aligerar_avatar(perfil) for perfil in main.get_player_profiles(cfg)
-        ],
+        "mission_pass_required": main.mission_gate_enabled(),
     }
+
+    if mission_open:
+        payload["players"] = cfg.get("players", ["PLAYER 1", "PLAYER 2"])
+        payload["player_profiles"] = [
+            main.aligerar_avatar(perfil) for perfil in main.get_player_profiles(cfg)
+        ]
+    else:
+        payload["players"] = []
+        payload["player_profiles"] = []
+
+    return payload
 
 
 @router.api_route("/api/player-avatar/{profile_id}", methods=["GET", "HEAD"])
@@ -111,6 +158,13 @@ _BASE_TESELAS = (
 _CABECERAS_TESELAS = {"User-Agent": "SAGA-Engine/2.x tile-proxy"}
 
 
+def _tile_cache_paths(z: int, x: int, y: int) -> tuple[Path, Path]:
+    import main
+
+    carpeta = Path(main.DATA_DIR) / "tile_cache" / str(z) / str(x)
+    return carpeta / f"{y}.bin", carpeta / f"{y}.ct"
+
+
 @router.get("/map-tiles/{z}/{x}/{y}.png", include_in_schema=False)
 async def map_tile_proxy(z: int, x: int, y: int):
     """Sirve las teselas desde el mismo origen que la página.
@@ -118,11 +172,36 @@ async def map_tile_proxy(z: int, x: int, y: int):
     Sin esto, Safari en iOS bloquea la mezcla de contenidos cuando la página va
     por HTTP y la tesela por HTTPS. Además, al ser del mismo origen, el service
     worker puede cachearlas para el monte.
+
+    ⚠️ Antes de la caché en disco, CADA tesela era un viaje Esri de verdad,
+    para CADA jugador, cada vez -aunque otro ya hubiera pisado la misma zona
+    un minuto antes-. Al desampliar el mapa se piden muchas teselas nuevas de
+    golpe, así que ese viaje se notaba como parpadeo/hueco en blanco: no era
+    CSS ni la animación, era la red Pi→Esri. Con la caché en disco, la
+    primera petición de cada tesela paga ese viaje; las siguientes -de ese
+    jugador o de cualquier otro- se sirven del disco de la Pi, que es local.
     """
     import main
 
     if z < 0 or z > 19:
         raise HTTPException(status_code=400, detail="Invalid zoom")
+
+    ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
+
+    if ruta_binario.exists():
+        try:
+            contenido = ruta_binario.read_bytes()
+            tipo = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else "image/jpeg"
+            return Response(
+                content=contenido,
+                media_type=tipo or "image/jpeg",
+                headers={
+                    "Cache-Control": "public, max-age=86400",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+        except OSError:
+            pass  # Caché corrupta o no legible: se pide de nuevo como si no existiera.
 
     if not main._HTTPX_AVAILABLE:
         raise HTTPException(status_code=500, detail="httpx not available for proxying")
@@ -139,9 +218,20 @@ async def map_tile_proxy(z: int, x: int, y: int):
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail="Tile not found upstream")
 
+    tipo_respuesta = resp.headers.get("Content-Type", "image/jpeg")
+
+    # Guardar en disco es un extra: si falla -disco lleno, permisos- la
+    # tesela se sirve igual, solo que no queda cacheada para la próxima vez.
+    try:
+        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
+        ruta_binario.write_bytes(resp.content)
+        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
+    except OSError:
+        pass
+
     return Response(
         content=resp.content,
-        media_type=resp.headers.get("Content-Type", "image/jpeg"),
+        media_type=tipo_respuesta,
         headers={
             "Cache-Control": "public, max-age=86400",
             "Access-Control-Allow-Origin": "*",

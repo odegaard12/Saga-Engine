@@ -58,17 +58,25 @@ def test_ningunha_variable_declarada_dúas_veces():
 
 
 def test_os_temas_declaran_o_mesmo_xogo():
+    """Generalizado a N temas: cada uno declara EXACTAMENTE el mismo juego de
+    variables que la unión de todos. Con solo dos, la diferencia simétrica ya
+    decía "está en uno y no en el otro"; con más de dos hace falta comparar
+    cada tema contra la unión, no tema a tema."""
     temas = {s: c for s, c in bloques().items() if TEMA.match(s)}
 
-    assert len(temas) == 2, "se esperaban dos temas, hay %d" % len(temas)
+    assert len(temas) >= 2, "se esperaban al menos dos temas, hay %d" % len(temas)
 
     juegos = {
         s: set(re.findall(r"(--theme-[a-z0-9-]+):", c)) for s, c in temas.items()
     }
-    nombres = list(juegos)
-    faltan_en_uno = juegos[nombres[0]] ^ juegos[nombres[1]]
+    union = set().union(*juegos.values())
 
-    assert not faltan_en_uno, (
-        "estas variables están en un tema y no en el otro, así que ese hereda "
-        "el valor por defecto —el del tema azul—: %s" % sorted(faltan_en_uno)
+    faltan = {
+        s: sorted(union - variables) for s, variables in juegos.items() if union - variables
+    }
+
+    assert not faltan, (
+        "a estos temas les faltan variables que otro sí declara, así que "
+        "heredan el valor por defecto —el del tema azul—:\n  "
+        + "\n  ".join(f"{s}: {vs}" for s, vs in faltan.items())
     )

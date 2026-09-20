@@ -6,8 +6,9 @@ from backend.app.runtime.core_engine import _as_str, _as_bool
 router = APIRouter()
 
 @router.get("/api/state/{user}")
-async def get_state(user: str):
+async def get_state(user: str, request: Request):
     import main
+    main.require_player_session(request, user)
     stages = main.load_stages(main.STAGES_DB)
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
@@ -18,6 +19,9 @@ async def get_state(user: str):
 @router.get("/api/game/{user}")
 async def get_game_payload(user: str, request: Request, offline_pack: bool = False, fotos_por_url: bool = False):
     import main
+    # Punto de entrada del jugador: aquí es donde se emite la cookie de sesión.
+    # Con la contraseña de misión puesta, sin desbloquear antes no se pasa.
+    main.require_mission_unlocked(request)
     runtime_stages = main.get_runtime_stages()
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or user
@@ -114,7 +118,10 @@ def construir_tabla_de_equipo(user):
 
 
 @router.get("/api/team/{user}")
-async def get_team_payload(user: str):
+async def get_team_payload(user: str, request: Request):
+    import main
+    # La tabla lleva la posición viva de todos: sólo para quien está jugando.
+    main.exigir_ser_del_grupo(request)
     return construir_tabla_de_equipo(user)
 
 
@@ -283,6 +290,11 @@ async def heartbeat(request: Request):
             status_code=400,
             content={"status": "error", "detail": "user required"}
         )
+
+    # Escribir posición exige la sesión firmada de ese jugador, igual que
+    # /api/advance. Sin esto cualquiera con un nombre teletransporta el punto
+    # de un menor en el mapa (o vuelca la tabla entera con ?equipo=1).
+    main.require_player_session(request, user)
 
     cfg = main.load_config()
     profile = main.resolve_known_player_profile(user, cfg)

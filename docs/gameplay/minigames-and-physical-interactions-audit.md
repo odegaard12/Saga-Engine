@@ -17,11 +17,30 @@ Future gameplay work must keep player fullscreen safety separate from minigame, 
 
 ## Current family-native minigames
 
-The active family-native runtime architecture currently includes:
+**Actualizado 2026-09-18** — desactualizado desde hace tiempo respecto al código real, verificado contra `frontend/src/player/minigames/core/resolver.ts` y `backend/app/runtime/core_engine.py`.
+
+El backend define 10 `interaction_type` en `backend/app/runtime/minigames.py` (`SUPPORTED_MINIGAME_TYPES`): `circuit_matrix`, `signal_hunt`, `bearing_hunt`, `motion_challenge`, `audio_challenge`, `sequence_code`, `tilt_maze`, `place_mosaic`, `spark_radar`, `checkpoint`.
+
+De esos 10, el frontend solo tiene **5 runtimes nativos** (`resolver.ts: isNativeMinigameFamily`):
 
 - `signal_hunt`
 - `bearing_hunt`
 - `circuit_matrix`
+- `motion_challenge`
+- `audio_challenge`
+
+**3 más son alias de `circuit_matrix`** — el backend los reetiqueta antes de llegar al jugador (`core_engine.py:157-160`), y el frontend cambia solo la etiqueta visible según `config.game_id` (`resolver.ts:113-121`):
+
+- `sequence_code` → se sirve como `circuit_matrix`, se muestra como "Simón Dice"
+- `place_mosaic` → se sirve como `circuit_matrix`, se muestra como "Mosaico del lugar"
+- `tilt_maze` → se sirve como `circuit_matrix`, se muestra como "Laberinto de equilibrio"
+
+**2 no tienen runtime propio** y caen en fallback silencioso a `signal_hunt` si un nodo los usa (`core_engine.py:161-172`; el fallback ahora se marca con `⚠️` en el panel admin, ver `backend/app/runtime/admin_overview.py: type_fallback_reason`):
+
+- `checkpoint` → se reetiqueta a `signal_hunt` con `game_id: "simple_checkpoint"` (`core_engine.py:161-164`) — es intencional, no un bug, pero no tiene su propia mecánica.
+- `spark_radar` → sin alias, cae directamente en `unsupported_minigame_type:spark_radar` → `signal_hunt` genérico. Existe una carpeta `frontend/src/player/minigames/families/sparkRadar/` sin cablear en el resolver — trabajo a medias, no arrancado desde cero.
+
+También hay una carpeta `families/teamRelay/` sin tipo de backend asociado y sin importar en `resolver.ts` — prototipo huérfano, no forma parte de los 10 tipos soportados.
 
 Relevant family runtime files:
 
@@ -35,6 +54,8 @@ Relevant family runtime files:
 - `frontend/src/player/minigames/families/bearingHunt/RuntimeScreen.tsx`
 - `frontend/src/player/minigames/families/circuitMatrix/definition.ts`
 - `frontend/src/player/minigames/families/circuitMatrix/RuntimeScreen.tsx`
+- `frontend/src/player/minigames/families/motionChallenge/definition.ts`
+- `frontend/src/player/minigames/families/audioChallenge/definition.ts`
 
 ## Legacy/demo game components
 
@@ -45,8 +66,10 @@ The current player path should use family-native runtimes only:
 - `signal_hunt`
 - `bearing_hunt`
 - `circuit_matrix`
+- `motion_challenge`
+- `audio_challenge`
 
-Future gameplay work should add or port games as family-native definitions and runtimes, not as disconnected standalone components.
+Future gameplay work should add or port games as family-native definitions and runtimes, not as disconnected standalone components. `sparkRadar` and `teamRelay` are the two candidates already half-started.
 
 ## Family audit priorities
 

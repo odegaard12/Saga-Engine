@@ -138,6 +138,9 @@ export interface PublicConfig {
   mapbox_style?: string
   players?: string[]
   player_profiles?: PlayerProfile[]
+  /** La misión pide contraseña de grupo. Si es true y no llega `player_profiles`,
+   *  hay que desbloquear con `unlockMission` antes de mostrar la lista. */
+  mission_pass_required?: boolean
   /** Fecha (ISO) desde la que se puede completar un nodo. Vacío = sin bloqueo. */
   mission_launch_at?: string
   /** Reloj del SERVIDOR, en ms — para la cuenta atrás no vale fiarse del móvil. */

@@ -54,6 +54,7 @@ def saga_asset_file_response(filename: str, media_type: str):
 COLOR_DE_BARRA = {
     "theme-glass": "#0f172a",
     "theme-flame-red": "#331613",
+    "theme-sage-green": "#16211a",
 }
 
 

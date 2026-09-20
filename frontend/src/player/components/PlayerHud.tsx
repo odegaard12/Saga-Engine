@@ -755,14 +755,18 @@ function getPrimaryStyle(tone: PrimaryActionTone, disabled: boolean): CSSPropert
  * que se apaga hacia arriba, igual que el `fondoVelo` del login, para que el
  * boton y el dock floten sobre el mapa en vez de vivir dentro de una tarjeta.
  */
-// Tarjeta flotante SOLIDA, como la de arriba. Ver la nota de PlayerShell.tsx:
-// los velos con degradado sobre el mapa daban barro, el color plano no.
+// Tarjeta flotante DE CRISTAL, como la de arriba -misma receta, ver la nota
+// larga en PlayerShell.tsx-: backdrop-filter primero, tinte encima. El velo
+// de degradado SIN desenfoque que dio barro era otra receta, no esta.
 const card: CSSProperties = {
   pointerEvents: 'auto',
   margin: '0 auto',
   display: 'grid',
   gap: 0,
-  background: 'var(--theme-card)',
+  background: 'var(--saga-glass-bg, var(--theme-card))',
+  border: '1px solid var(--saga-glass-border, var(--theme-hairline))',
+  backdropFilter: 'var(--theme-blur)',
+  WebkitBackdropFilter: 'var(--theme-blur)',
   // 20, no 15: "no se redondea bien con la pantalla". La tarjeta flota
   // pegada casi al borde inferior curvo del movil, y una esquina de 15px se
   // ve angulosa al lado de la curva mucho mas cerrada de la pantalla. 20

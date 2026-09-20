@@ -70,6 +70,8 @@ type AdminMissionControlShellProps = {
   onProfileAction: (profileId: string, action: AdminProfileAction) => void
   onUpdateMissionDraft: (key: string, value: string) => void
   onSaveSettings: () => void
+  missionPassEnabled: boolean
+  onClearMissionPass: () => void
   onApplyMissionTemplate: (templateId: MissionTemplateId) => void
   onCreateNodesWithItems?: (items: Array<{ id: string; label: string }>) => void
 }
@@ -135,6 +137,8 @@ export default function AdminMissionControlShell({
   onProfileAction,
   onUpdateMissionDraft,
   onSaveSettings,
+  missionPassEnabled,
+  onClearMissionPass,
   onApplyMissionTemplate,
   onCreateNodesWithItems,
 }: AdminMissionControlShellProps) {
@@ -1077,6 +1081,8 @@ export default function AdminMissionControlShell({
                 settingsSaveError={settingsSaveError}
                 onUpdateMissionDraft={onUpdateMissionDraft}
                 onSaveSettings={onSaveSettings}
+                missionPassEnabled={missionPassEnabled}
+                onClearMissionPass={onClearMissionPass}
               />
             ) : null}
 

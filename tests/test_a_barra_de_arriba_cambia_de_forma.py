@@ -70,17 +70,27 @@ def test_o_cristal_declara_o_seu_28():
     assert "28" in hallado.group(1), "cristal cambiaría de forma, y no es lo que se pedía"
 
 
-def test_o_corte_chega_ao_que_se_ve():
-    """Las tres superficies grandes de la pantalla principal."""
-    texto = css()
-    for selector in ("[data-saga-player-shell='top']", ".saga-hud-quick", ".saga-hud-dock"):
-        assert selector in texto, f"{selector} no aparece en el CSS del tema"
+def test_as_tres_superficies_xa_non_levan_recorte():
+    """Superseded a propósito: ver 'AQUÍ ESTABA EL EMPATE...' en mobile-themes.css.
 
-    inicio = texto.index("--theme-panel-cut")
-    recorte = texto[texto.index("body.theme-flame-red [data-saga-player-shell='top']") :]
-    bloque = recorte[: recorte.index("}")]
-    assert "clip-path" in bloque, (
-        "la barra de arriba y las dos de abajo no reciben el corte: son las tres "
-        "superficies más grandes de la pantalla y sin ellas el tema no cambia"
+    Esta prueba pedía que la barra de arriba y las dos de abajo llevasen
+    `clip-path` con `--theme-panel-cut`. Esa regla se quitó a propósito: las
+    tres pasaron de placas recortadas a velos que se apagan, sin superficie
+    grande que recortar. La forma del tema de fuego en la barra de arriba
+    sigue viva -y probada- en `--theme-radius-shell` (ver el test de arriba).
+    """
+    texto = css()
+    # data-saga-player-shell='top' ya no aparece en absoluto -ni para el
+    # corte ni para nada más-. .saga-hud-quick/.saga-hud-dock sí siguen en el
+    # CSS -llevan la regla del color de los iconos-, así que lo que importa
+    # es que NINGUNA de sus reglas lleve --theme-panel-cut/clip-path, no que
+    # el selector haya desaparecido del todo.
+    assert "[data-saga-player-shell='top']" not in texto, (
+        "data-saga-player-shell='top' ha vuelto a aparecer en el tema: si es "
+        "para recortarlo otra vez, revisar antes por qué se quitó"
     )
-    assert "var(--theme-panel-cut)" in bloque, "el corte no sale del tema"
+    for selector in (".saga-hud-quick", ".saga-hud-dock"):
+        for m in re.finditer(re.escape(selector) + r"[^{]*\{([^}]*)\}", texto):
+            assert "clip-path" not in m.group(1) and "--theme-panel-cut" not in m.group(1), (
+                f"{selector} vuelve a llevar el corte de placa que se quitó a propósito"
+            )
