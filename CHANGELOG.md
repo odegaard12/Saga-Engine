@@ -6,6 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.6.1
+
+El check de lint fallaba en cada push desde 5.6.0: unas comillas sin escapar
+en el aviso nuevo de minijuego sin runtime (`AdminApp.tsx`). Arreglado
+(`&quot;` en vez de `"` dentro del JSX). De paso, 126 releases de GitHub que
+faltaban (v4.1.0 a v5.6.0 — el workflow que las creaba automáticamente,
+`release.yml`, se borró del repo hace meses sin que nadie se diera cuenta)
+creadas a mano con `gh release create` desde `.103`, que tiene sesión de
+GitHub autenticada.
+
 ## 5.6.0
 
 Puerta de contraseña de misión, caché de teselas en disco, tema Musgo, y el
