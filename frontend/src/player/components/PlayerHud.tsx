@@ -763,7 +763,21 @@ const card: CSSProperties = {
   margin: '0 auto',
   display: 'grid',
   gap: 0,
-  background: 'var(--saga-glass-bg, var(--theme-card))',
+  /**
+   * Cristal, pero legible: velo de tinta DEBAJO del tinte.
+   *
+   * Solo con `--saga-glass-bg` el tramo de abajo del degradado va a .52 de
+   * opacidad, y visto en el móvil sobre satélite claro el texto se lavaba:
+   * "Activar GPS" parecía un botón desactivado y Mochila/Ferramentas se
+   * leían a medias. Es regresión del paso a cristal (5.6.0) -contra el
+   * azul noche de antes no se notaba, contra una foto aérea con sol sí-.
+   *
+   * Dos capas apiladas: el velo de tinta asegura el contraste del texto, y
+   * el tinte de cristal encima conserva el aspecto. Ninguna es opaca, así
+   * que el desenfoque del mapa detrás se sigue viendo.
+   */
+  background:
+    'linear-gradient(180deg, rgba(var(--theme-ink-deep), .45), rgba(var(--theme-ink-deep), .72)), var(--saga-glass-bg)',
   border: '1px solid var(--saga-glass-border, var(--theme-hairline))',
   backdropFilter: 'var(--theme-blur)',
   WebkitBackdropFilter: 'var(--theme-blur)',

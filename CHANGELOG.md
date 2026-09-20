@@ -6,6 +6,24 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.10.2
+
+Dos cosas vistas por fin en una captura del móvil de Óscar, no leyendo
+código.
+
+- **El aviso de HTTP ocupaba un cuarto de la pantalla** y le hablaba a un
+  programador: `ngrok`, `chrome://flags/#unsafely-treat-insecure-origin-as-secure`.
+  Encima del mapa, a un jugador que está en el monte. Ahora es una línea:
+  "esta dirección no es segura, el navegador no deja usar el GPS, avisa a
+  quien monta la misión". El detalle técnico vive donde sirve, en la
+  documentación de despliegue.
+- **La barra de abajo no se leía.** "Activar GPS" parecía desactivado y
+  Mochila/Ferramentas salían lavados. Regresión del paso a cristal
+  (5.6.0): contra el azul noche de antes no se notaba, contra una foto
+  aérea con sol sí. Arreglado con un velo de tinta DEBAJO del tinte de
+  cristal: asegura el contraste sin perder el aspecto, y como ninguna
+  capa es opaca el desenfoque del mapa se sigue viendo.
+
 ## 5.10.1
 
 Fuera la línea recta entre nodos del motor WebGL.
