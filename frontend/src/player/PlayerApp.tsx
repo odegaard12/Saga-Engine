@@ -3052,23 +3052,20 @@ export default function PlayerApp() {
               ×
             </button>
           </div>
+          {/**
+           * Una línea, en idioma de jugador.
+           *
+           * Aquí había un bloque con `ngrok` y `chrome://flags/...` dentro.
+           * Visto en el móvil ocupaba un cuarto de la pantalla, encima del
+           * mapa, y le hablaba a quien programa, no a quien juega: nadie en
+           * el monte va a tocar una bandera de Chrome. Lo que el jugador
+           * necesita saber es UNA cosa -aquí no hay GPS- y a quién avisar.
+           * El detalle técnico vive donde sirve: en la documentación de
+           * despliegue.
+           */}
           <div style={insecureNoticeBody}>
-            El navegador bloquea el GPS y el mapa offline en conexiones HTTP. Para probar el modo
-            offline:
-            <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
-              <li>
-                Usa <strong>https://</strong> (con ngrok)
-              </li>
-              <li>
-                O en Chrome del móvil, entra en{' '}
-                <code
-                  style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: 4 }}
-                >
-                  chrome://flags/#unsafely-treat-insecure-origin-as-secure
-                </code>
-                , añade esta URL y actívalo.
-              </li>
-            </ul>
+            Esta dirección no es segura, así que el navegador no deja usar el GPS. Avisa a quien
+            monta la misión.
           </div>
         </div>
       ) : null}
