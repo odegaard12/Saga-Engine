@@ -250,10 +250,6 @@ html.saga-route-player .saga-tools-language-row {
   will-change: transform;
 }
 
-.leaflet-tile {
-  will-change: transform;
-}
-
 .leaflet-pane,
 .leaflet-map-pane,
 .leaflet-tile-pane {
@@ -263,6 +259,27 @@ html.saga-route-player .saga-tools-language-row {
 /* Smooth tile fade-in — avoids the hard white/black blink on load */
 .leaflet-tile-container img {
   transition: opacity 0.2s ease-out;
+}
+
+/**
+ * Costuras blancas entre teselas al hacer zoom -reportado: "líneas blancas
+ * durante microsegundos, como si cargara".
+ *
+ * No es que falten teselas -la misión offline las baja de zoom 5 a 18,
+ * completo-: es el redondeo de subpíxel del navegador al escalar el mosaico
+ * de <img> con transform durante la animación de zoom. Entre dos teselas
+ * contiguas, cada una se redondea a un píxel de pantalla por separado, y a
+ * veces caen un píxel separadas, dejando una línea del fondo (blanco) al
+ * descubierto. Es un fallo conocido de Leaflet, no un hueco de datos.
+ *
+ * El arreglo estándar: cada tesela un pixel más ancha/alta de lo que le
+ * toca, así que solapa un poco con la de al lado en vez de dejar un hueco
+ * si el redondeo no coincide.
+ */
+.leaflet-tile {
+  will-change: transform;
+  width: calc(100% + 1px) !important;
+  height: calc(100% + 1px) !important;
 }
 
 /* Prevent layout shift on the map container when GPS updates arrive */
