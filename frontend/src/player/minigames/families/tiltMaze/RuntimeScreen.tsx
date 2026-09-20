@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
+import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import {
   generateTiltMaze,
   nextTiltMazeCell,
@@ -175,6 +176,22 @@ export function TiltMazeRuntimeScreen({
   const [sensorActive, setSensorActive] = useState(false)
 
   const [sensorText, setSensorText] = useState('Botones táctiles disponibles')
+
+  /**
+   * Antitrampas: salir a media partida para planear la ruta con calma (en
+   * papel, en otra pantalla) fuera del apuro de estar tocando el móvil.
+   *
+   * El laberinto no tiene un `setSessionSeed` -se fija una sola vez al
+   * montar el componente, ver `sessionSeed` arriba-, así que aquí no se
+   * regenera el trazado: se trata como perder todas las vidas de golpe,
+   * igual que caer en el último agujero. Perder el intento entero es el
+   * coste de salir, sea cual sea el motivo -capturar el mapa o cualquier
+   * otro-.
+   */
+  useRegenerarAoOcultar(phase === 'playing', () => {
+    setFailure('Saíches a media partida: perdiches o intento.')
+    setPhase('failed')
+  })
 
   const [continuing, setContinuing] = useState(false)
 

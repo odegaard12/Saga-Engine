@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
+import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -739,6 +740,18 @@ export function PlaceMosaicRuntimeScreen({
     },
     [previewMs, totalPieces]
   )
+
+  /**
+   * Antitrampas: capturar la foto de referencia + el orden mezclado y
+   * resolverlo con calma fuera de la app.
+   *
+   * `reset(true)` ya existe para el intro/peek: reusarlo aquí no es un
+   * mecanismo nuevo, es el mismo camino de siempre -reshuffle de verdad,
+   * vuelve a preview-. Lo que se pierde al salir son los movimientos ya
+   * hechos, no tiempo aparte: el coste es rehacer el rompecabezas, no una
+   * resta en el reloj.
+   */
+  useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', () => reset(true))
 
   useEffect(() => {
     reset(true)
