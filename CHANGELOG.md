@@ -6,6 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.9.0
+
+El interruptor entre los dos motores de mapa, para poder compararlos en un
+móvil de verdad.
+
+- `map_engine` en la configuración de la misión: `leaflet` (por defecto, el
+  motor completo) o `maplibre` (WebGL, en migración). Un valor desconocido
+  cae en Leaflet a propósito: un nombre mal escrito no puede dejar a nadie
+  en el monte con un mapa a medio portar.
+- Viaja en `/api/config`, así que se cambia por misión sin tocar código.
+- El motor WebGL se carga con `lazy`, no con un import normal: `maplibre-gl`
+  son ~800 kB y con un import normal se los tragaría también quien juega con
+  Leaflet, que es todo el mundo mientras dure la migración. Comprobado en el
+  build: queda en su propio chunk (1 MB) y el bundle principal no crece.
+
+Sigue mandando Leaflet por defecto. Esto solo abre la puerta a comparar.
+
 ## 5.8.0
 
 Primera capa del motor de mapa en WebGL (MapLibre GL), en paralelo y
