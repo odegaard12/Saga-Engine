@@ -106,6 +106,16 @@ VALID_PLAYER_THEMES = {"glass", "flame-red", "sage-green"}
 
 SUPPORTED_UI_LANGS = {"gl", "es", "en"}
 
+# Qué motor dibuja el mapa del jugador.
+#
+# `leaflet` es el de siempre y el único completo: lo que juega la gente.
+# `maplibre` es el nuevo, en WebGL, que se está portando por capas -le
+# faltan cosas, la lista está en frontend/.../mapSurfaceContract.ts-. Se
+# elige por misión para poder comparar los dos en un móvil de verdad sin
+# arriesgar una partida. El defecto NO cambia hasta que el nuevo gane en
+# todo.
+VALID_MAP_ENGINES = {"leaflet", "maplibre"}
+
 
 def normalize_ui_lang(value):
     """Idioma de la interfaz. El gallego es el idioma de la misión."""
@@ -120,6 +130,17 @@ def normalize_ui_lang(value):
 def normalize_player_theme(value):
     theme = str(value or "glass").strip().lower()
     return theme if theme in VALID_PLAYER_THEMES else "glass"
+
+
+def normalize_map_engine(value):
+    """Un valor desconocido cae en Leaflet, que es el motor completo.
+
+    Preferir lo conocido no es cobardía aquí: un nombre mal escrito en la
+    configuración no puede dejar a alguien en el monte con un mapa a
+    medio portar.
+    """
+    engine = str(value or "leaflet").strip().lower()
+    return engine if engine in VALID_MAP_ENGINES else "leaflet"
 
 def resolve_config_db_path():
     data_dir = (
@@ -148,6 +169,7 @@ def load_config():
         cfg = {}
     
     cfg["player_theme"] = normalize_player_theme(cfg.get("player_theme", "glass"))
+    cfg["map_engine"] = normalize_map_engine(cfg.get("map_engine", "leaflet"))
     
     # Fallback to env if Mapbox token is missing
     if not cfg.get("mapbox_token"):

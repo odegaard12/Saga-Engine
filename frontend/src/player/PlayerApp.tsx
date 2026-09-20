@@ -1,6 +1,15 @@
 import { getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { ToastNotice, type UiNotice } from './components/ToastNotice'
 import { QuietNotice, type QuietNoticeData } from './components/QuietNotice'
 import { SplashScreen } from './components/SplashScreen'
@@ -27,6 +36,16 @@ import { PlayerHud } from './components/PlayerHud'
 import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
 import { MapSurface } from './components/MapSurface'
+/**
+ * El motor WebGL se carga SOLO si la misión lo pide (`map_engine`).
+ *
+ * `lazy` y no un import normal a propósito: maplibre-gl son ~800 kB, y
+ * con un import normal se los descargaría también quien juega con
+ * Leaflet -que es todo el mundo mientras dure la migración-.
+ */
+const MapSurfaceGL = lazy(() =>
+  import('./components/MapSurfaceGL').then((modulo) => ({ default: modulo.MapSurfaceGL }))
+)
 import { InteractionSheet } from './components/InteractionSheet'
 import { RankingSheet } from './components/RankingSheet'
 import { MissionCompleteScreen } from './components/MissionCompleteScreen'
@@ -2942,6 +2961,30 @@ export default function PlayerApp() {
           ) : null}
         </div>
       ) : null}
+      {/**
+       * Dos motores de mapa conviviendo, elegidos por misión.
+       *
+       * `maplibre` está en migración por capas y le faltan cosas -la lista
+       * exacta está en mapSurfaceContract.ts-, así que NO es el defecto y
+       * no debe serlo hasta que gane en todo. Existe ya para poder
+       * compararlos en un móvil de verdad sin tocar lo que juega la gente.
+       *
+       * Va con `lazy`, no con un import normal: maplibre-gl son ~800 kB y
+       * no puede caerle encima a quien está jugando con Leaflet.
+       */}
+      {state.config?.map_engine === 'maplibre' ? (
+        <Suspense fallback={null}>
+          <MapSurfaceGL
+            currentStage={currentStage}
+            missionStages={payload.stages || []}
+            playerPosition={playerPosition}
+            initialCenter={
+              browserGpsPosition ??
+              (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
+            }
+          />
+        </Suspense>
+      ) : (
       <MapSurface
         currentStage={currentStage}
         missionStages={payload.stages || []}
@@ -2975,6 +3018,7 @@ export default function PlayerApp() {
         onDebugSetPosition={handleDebugSetPosition}
         onNodeTap={handleMapNodeTap}
       />
+      )}
 
       {!isSecure && !hideInsecureNotice ? (
         <div style={insecureNoticeCardStyle}>

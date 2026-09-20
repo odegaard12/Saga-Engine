@@ -127,6 +127,12 @@ export interface PublicConfig {
   admin_subtitle?: string
   ui_lang?: string
   player_theme?: string
+  /**
+   * Qué motor dibuja el mapa: `leaflet` (el completo, por defecto) o
+   * `maplibre` (WebGL, en migración por capas). Ver VALID_MAP_ENGINES en
+   * main.py y la lista de capas pendientes en mapSurfaceContract.ts.
+   */
+  map_engine?: string
   story_title?: string
   story_text?: string
   prologue_title?: string
