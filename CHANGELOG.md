@@ -6,6 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.7.2
+
+Líneas blancas de un instante al hacer zoom en el mapa. No es un hueco de
+datos -la misión offline baja las teselas de zoom 5 a 18 completo-: es la
+costura clásica de Leaflet, redondeo de subpíxel al escalar teselas
+contiguas por separado durante la animación de zoom. Arreglo estándar:
+cada tesela un pixel más ancha/alta, para que solape con la de al lado en
+vez de dejar hueco.
+
+552/552 tests en verde.
+
 ## 5.7.1
 
 El botón de "ver toda la ruta" (desampliar desde tu posición para ver
