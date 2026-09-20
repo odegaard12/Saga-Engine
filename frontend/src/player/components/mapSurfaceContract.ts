@@ -40,6 +40,14 @@ export type MapSurfacePropsGL = {
   className?: string
   playerPosition?: { lat: number; lon: number } | null
   initialCenter?: { lat: number; lon: number }
+  /**
+   * Cámara inclinada (relieve) o plana.
+   *
+   * Lo decide quien dibuja el HUD, no el mapa: el botón vive en la fila de
+   * iconos con los demás. Un botón suelto flotando sobre el mapa por su
+   * cuenta era exactamente lo que se veía descolgado del diseño.
+   */
+  tresD?: boolean
 }
 
 /**
