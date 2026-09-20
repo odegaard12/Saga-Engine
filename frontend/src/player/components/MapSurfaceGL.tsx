@@ -268,26 +268,17 @@ export function MapSurfaceGL({
       })),
     })
 
-    // Una línea suelta necesita dos puntos: con uno solo, MapLibre pinta
-    // una geometría inválida en vez de no pintar nada.
-    pintarFuente(
-      FUENTE_RUTA,
-      nodos.length > 1
-        ? {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature' as const,
-                properties: {},
-                geometry: {
-                  type: 'LineString' as const,
-                  coordinates: nodos.map((nodo) => [nodo.lon as number, nodo.lat as number]),
-                },
-              },
-            ],
-          }
-        : COLECCION_VACIA
-    )
+    /**
+     * El trazado se queda VACÍO a propósito hasta que siga caminos.
+     *
+     * Aquí había una línea recta de nodo a nodo, y probándola en el móvil
+     * quedó claro que no es "el trazado a medias": es información falsa.
+     * Cruza el monte por donde no se puede andar, y quien la mire
+     * caminando se fía de ella. El motor de Leaflet traza por caminos
+     * reales (ver roadRoute* en MapSurface.tsx); hasta que eso esté
+     * portado, mejor no pintar nada que pintar una ruta que miente.
+     */
+    pintarFuente(FUENTE_RUTA, COLECCION_VACIA)
   }, [missionStages, currentLevel, pintarFuente])
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra

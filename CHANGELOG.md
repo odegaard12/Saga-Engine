@@ -6,6 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.10.1
+
+Fuera la línea recta entre nodos del motor WebGL.
+
+Probada en el móvil y descartada: no es "el trazado a medias", es
+información falsa. Cruza el monte por donde no se puede andar, y quien la
+mire caminando se fía de ella. El motor de Leaflet traza por caminos
+reales; hasta que eso esté portado, el motor nuevo no pinta ninguna ruta.
+
+Mejor no pintar nada que pintar una ruta que miente.
+
 ## 5.10.0
 
 Segunda capa del motor WebGL: radio del nodo, trazado de la ruta, nodos por
