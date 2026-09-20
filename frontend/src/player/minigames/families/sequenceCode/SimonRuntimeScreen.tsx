@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import { haptics, sounds } from '../../../utils/haptics'
+import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 
 interface Props {
   resolved: { config?: Record<string, unknown> }
@@ -111,6 +112,23 @@ export function SimonRuntimeScreen({ resolved, stage, submitting, onWin }: Props
   }, [])
 
   useEffect(() => clearTimers, [clearTimers])
+
+  /**
+   * Antitrampas, adaptado a este juego: la secuencia es fija A PROPÓSITO
+   * -"se puede aprender por ensayo y error", ver `buildPattern` arriba-,
+   * así que regenerarla rompería el propio diseño del reto. Lo que sí se
+   * cierra es la pausa gratis: salir a media memorización o a mitad de
+   * repetirla cuenta como un fallo -mismo castigo que fallar tocando mal-,
+   * no como una pausa sin coste para salir a apuntarla con calma.
+   */
+  useRegenerarAoOcultar(phase === 'showing' || phase === 'input', () => {
+    clearTimers()
+    haptics.error()
+    setPhase('failed')
+    setLevel(1)
+    setInputIndex(0)
+    setMessage('Saíches a media proba: volves ao nivel 1.')
+  })
 
   const sequence = useMemo(() => fullPattern.slice(0, level), [fullPattern, level])
 

@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.7.0
+
+Antitrampas: captura el patrón, sal de la app, resuélvelo con calma. Hueco
+real señalado por Óscar en un minijuego de patrón (circuitMatrix y sus
+variantes) — sin nada que lo detecte, hacer una captura de pantalla y
+resolver fuera de la app, sin presión de tiempo, era trivial.
+
+Nuevo hook compartido `useRegenerarAoOcultar`
+(frontend/src/player/minigames/core/): detecta cuándo la pestaña pasa a
+segundo plano mientras hay un patrón activo en pantalla, y dispara una
+reacción -no un descuento de tiempo aparte, el reloj del nodo sigue
+corriendo igual-:
+
+- **circuitMatrix, placeMosaic**: el patrón es aleatorio por partida →
+  vuelve a la pantalla de "Comenzar" con un patrón NUEVO. La captura vieja
+  deja de servir.
+- **tiltMaze**: sin forma de regenerar el trazado en marcha → cuenta como
+  perder todas las vidas de golpe, se pierde el intento entero.
+- **sequenceCode (Simón Dice)**: su secuencia es fija A PROPÓSITO -se
+  aprende por ensayo y error, es el diseño del reto-, así que regenerarla
+  rompería su propia mecánica. Aquí salir cuenta como un fallo normal
+  -vuelta al nivel 1-, cerrando la "pausa gratis para apuntarla" sin tocar
+  el diseño.
+
+Verificado con un test que confirma que las cuatro pantallas llaman al
+hook con las fases correctas, y que sequenceCode específicamente NO
+regenera su patrón (sería un error, no una mejora, para ese juego).
+
+552/552 tests en verde.
+
 ## 5.6.2
 
 Asimetría cerrada: la píldora del contador (1/2, 2/2) tenía fondo oscuro

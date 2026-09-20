@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { normalizeCircuitConfig } from './circuitConfig'
 import { buildCircuitPath, isCircuitPathValid, type CellKey } from './circuitPath'
+import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 
 interface Props {
   resolved: ResolvedCircuitMatrixMinigame
@@ -361,6 +362,20 @@ export function CircuitMatrixRuntimeScreen({
     setWrongKey(null)
     setPreviewIndex(-1)
   }, [])
+
+  /**
+   * Antitrampas: captura el patrón, sale de la app, lo resuelve con calma.
+   *
+   * `preview` es justo el momento en que el patrón está en pantalla para
+   * memorizarlo -el instante que se capturaría-, y `playing` es mientras se
+   * reproduce de memoria. Salir en cualquiera de las dos manda de vuelta a
+   * "Comenzar": el siguiente intento saca un patrón nuevo si
+   * `patternMode` es `random_each_game` -ver `start()`-, así que la
+   * captura vieja deja de servir. No se descuenta nada aparte: el reloj
+   * del nodo sigue corriendo igual, la trampa simplemente deja de
+   * funcionar.
+   */
+  useRegenerarAoOcultar(phase === 'preview' || phase === 'playing', reset)
 
   const start = useCallback(() => {
     continueLockRef.current = false
