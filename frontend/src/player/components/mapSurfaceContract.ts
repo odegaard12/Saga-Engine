@@ -35,6 +35,8 @@ export interface FocusRequestGL {
 export type MapSurfacePropsGL = {
   currentStage: PlayerStage | null
   missionStages?: PlayerStage[]
+  /** Nodos por debajo de este índice están hechos. Decide el color del alfiler. */
+  currentLevel?: number
   className?: string
   playerPosition?: { lat: number; lon: number } | null
   initialCenter?: { lat: number; lon: number }
@@ -48,10 +50,8 @@ export type MapSurfacePropsGL = {
  * defecto -y no antes-.
  */
 export type CapasPendentesGL = {
-  /** Radio del nodo actual, con su halo. */
-  radioDoNodo: true
-  /** Trazado de la ruta entre nodos, y la línea hasta el camino. */
-  trazadoDaRuta: true
+  /** Trazado por CAMINOS reales (el actual va en línea recta entre nodos). */
+  trazadoPorCamiños: true
   /** Avatares del resto del grupo, con agrupación cuando se juntan. */
   grupo: TeamProfileLiveStatus[]
   /** Fotos de campo sobre el mapa. */

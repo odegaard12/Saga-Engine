@@ -2977,6 +2977,7 @@ export default function PlayerApp() {
           <MapSurfaceGL
             currentStage={currentStage}
             missionStages={payload.stages || []}
+            currentLevel={payload.level || 0}
             playerPosition={playerPosition}
             initialCenter={
               browserGpsPosition ??
