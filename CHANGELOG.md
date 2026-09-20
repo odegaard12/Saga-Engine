@@ -6,6 +6,37 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.8.0
+
+Primera capa del motor de mapa en WebGL (MapLibre GL), en paralelo y
+apagada.
+
+Leaflet tiene tres límites que no son fallos sueltos sino su forma de
+dibujar -mosaico de `<img>` reposicionado con `transform`-: el zoom va
+por niveles enteros, las teselas contiguas dejan costuras de subpíxel al
+escalar, y cada nivel nuevo pide un juego de imágenes distinto (blanco
+mientras llegan). Toda la serie 5.7.x fueron parches a síntomas de eso, y
+uno (5.7.2) tiró la aplicación en producción.
+
+- `MapSurfaceGL.tsx`: teselas + posición del jugador + nodos. Usa **las
+  mismas teselas** que Leaflet (`/map-tiles/{z}/{x}/{y}.png`), así que el
+  modo sin cobertura sigue valiendo tal cual, sin migrar datos.
+- El estilo va declarado en crudo, no por URL: una URL de estilo sería
+  una petición más que falla sin cobertura.
+- `mapSurfaceContract.ts`: contrato común de los dos motores y **lista
+  explícita de las capas que al nuevo le faltan** (radio del nodo,
+  trazado, grupo, fotos, encuadres, depuración…). Cuando esa lista quede
+  vacía, y no antes, el motor nuevo pasa a ser el de por defecto.
+
+No lo importa nadie todavía: el bundle solo crece 1,6 kB y lo que juega
+la gente sigue siendo Leaflet, intacto. Al cablearlo habrá que cargar
+`maplibre-gl` con import dinámico (~800 kB).
+
+**Además, dos guardianes nuevos** tras comprobar que la insignia de
+versión del README llevaba meses mintiendo (decía 3.14.2 con el proyecto
+en la 5.5.0) y que volvió a quedarse atrás en 5.7.x: ahora la suite exige
+que README, VERSION y CHANGELOG digan lo mismo.
+
 ## 5.7.2
 
 Líneas blancas de un instante al hacer zoom en el mapa. No es un hueco de
