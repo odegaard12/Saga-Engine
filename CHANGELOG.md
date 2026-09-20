@@ -6,6 +6,62 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.7.2
+
+Líneas blancas de un instante al hacer zoom en el mapa. No es un hueco de
+datos -la misión offline baja las teselas de zoom 5 a 18 completo-: es la
+costura clásica de Leaflet, redondeo de subpíxel al escalar teselas
+contiguas por separado durante la animación de zoom. Arreglo estándar:
+cada tesela un pixel más ancha/alta, para que solape con la de al lado en
+vez de dejar hueco.
+
+552/552 tests en verde.
+
+## 5.7.1
+
+El botón de "ver toda la ruta" (desampliar desde tu posición para ver
+dónde están los nodos) iba a saltos y parpadeaba -reportado por Óscar-.
+Causa documentada en el propio código desde hace tiempo, pero solo
+arreglada para "volver al nodo": `flyToBounds` anima calculando
+posiciones intermedias, y en cada una pide/suelta teselas del mapa. Este
+botón es el peor caso posible -de tu posición junto a un nodo (zoom alto)
+a toda la ruta (zoom bajo)- y nunca tuvo la salida rápida que sí tiene el
+resto de movimientos del mapa. Mismo arreglo que ya funcionaba ahí:
+saltos largos o de zoom grande se PLANTAN sin animar (sin teselas
+intermedias que pedir), solo el ajuste fino se anima.
+
+552/552 tests en verde.
+
+## 5.7.0
+
+Antitrampas: captura el patrón, sal de la app, resuélvelo con calma. Hueco
+real señalado por Óscar en un minijuego de patrón (circuitMatrix y sus
+variantes) — sin nada que lo detecte, hacer una captura de pantalla y
+resolver fuera de la app, sin presión de tiempo, era trivial.
+
+Nuevo hook compartido `useRegenerarAoOcultar`
+(frontend/src/player/minigames/core/): detecta cuándo la pestaña pasa a
+segundo plano mientras hay un patrón activo en pantalla, y dispara una
+reacción -no un descuento de tiempo aparte, el reloj del nodo sigue
+corriendo igual-:
+
+- **circuitMatrix, placeMosaic**: el patrón es aleatorio por partida →
+  vuelve a la pantalla de "Comenzar" con un patrón NUEVO. La captura vieja
+  deja de servir.
+- **tiltMaze**: sin forma de regenerar el trazado en marcha → cuenta como
+  perder todas las vidas de golpe, se pierde el intento entero.
+- **sequenceCode (Simón Dice)**: su secuencia es fija A PROPÓSITO -se
+  aprende por ensayo y error, es el diseño del reto-, así que regenerarla
+  rompería su propia mecánica. Aquí salir cuenta como un fallo normal
+  -vuelta al nivel 1-, cerrando la "pausa gratis para apuntarla" sin tocar
+  el diseño.
+
+Verificado con un test que confirma que las cuatro pantallas llaman al
+hook con las fases correctas, y que sequenceCode específicamente NO
+regenera su patrón (sería un error, no una mejora, para ese juego).
+
+552/552 tests en verde.
+
 ## 5.6.2
 
 Asimetría cerrada: la píldora del contador (1/2, 2/2) tenía fondo oscuro

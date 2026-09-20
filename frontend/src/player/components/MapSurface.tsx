@@ -2227,21 +2227,60 @@ export const MapSurface = React.memo(function MapSurface({
         consumed = true
       } else if (routePoints.length > 1) {
         const bounds = L.latLngBounds(routePoints)
+        const paddedBounds = bounds.pad(0.14)
+        const boundsOptions = {
+          paddingTopLeft: [44, 130] as [number, number],
+          paddingBottomRight: [44, 190] as [number, number],
+          maxZoom: 17,
+        }
 
         map.stop()
         map.invalidateSize({
           pan: false,
         })
 
-        flyToEndTimeRef.current = Date.now() + 1500
-        map.flyToBounds(bounds.pad(0.14), {
-          paddingTopLeft: [44, 130],
-          paddingBottomRight: [44, 190],
-          maxZoom: 17,
-          animate: true,
-          duration: 1.5,
-          easeLinearity: 0.22,
-        })
+        /**
+         * "Desampliar para ver todos los nodos va a saltos, muy lagueado".
+         *
+         * Mismo motivo que ya se documentó arriba para volver al nodo:
+         * `flyToBounds` anima calculando posiciones intermedias, y en cada
+         * una pide/suelta teselas -parpadeo, tirones-. Aquella vez solo se
+         * arregló el camino de "volver al nodo"; este botón -desampliar
+         * para ver toda la ruta desde donde estás- seguía tomando SIEMPRE
+         * el camino animado, y es justo el caso con más distancia/cambio
+         * de zoom de toda la app: de tu posición, muy cerca de un nodo
+         * (zoom 18), a la ruta entera (zoom bajo). El peor caso posible
+         * para `flyToBounds`, sin la salida rápida que sí tiene el resto.
+         *
+         * Mismo umbral que 'player'/'node': salto largo o de zoom grande
+         * se PLANTA (sin teselas intermedias que pedir); solo el ajuste
+         * fino -ya casi en la vista final- se anima.
+         */
+        const targetZoom = map.getBoundsZoom(
+          paddedBounds,
+          false,
+          L.point(
+            boundsOptions.paddingTopLeft[0] + boundsOptions.paddingBottomRight[0],
+            boundsOptions.paddingTopLeft[1] + boundsOptions.paddingBottomRight[1]
+          )
+        )
+        const targetCenter = paddedBounds.getCenter()
+        const currentCenter = map.getCenter()
+        const distance = map.distance(currentCenter, targetCenter)
+        const zoomDiff = Math.abs(map.getZoom() - Math.min(targetZoom, boundsOptions.maxZoom))
+
+        if (distance > 1500 || zoomDiff > 3) {
+          map.fitBounds(paddedBounds, { ...boundsOptions, animate: false })
+          flyToEndTimeRef.current = Date.now() + 200
+        } else {
+          flyToEndTimeRef.current = Date.now() + 1500
+          map.flyToBounds(paddedBounds, {
+            ...boundsOptions,
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.22,
+          })
+        }
         consumed = true
       } else {
         consumed = true
