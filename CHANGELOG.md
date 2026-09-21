@@ -6,7 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.19.0
+## 5.19.1
+
+- **Relieve offline también para región y comarca** (z8-z11), no sólo
+  para la zona de misión y el corredor. Son unos 50 MB más de paquete, y
+  se decide a propósito: el enlace se da días antes de la salida, cada
+  jugador entra en casa con wifi a bajar todo, y la cortina de cuenta
+  atrás (`mission_launch_at`) bloquea jugar hasta la hora. A cambio, el
+  monte es el mismo con o sin cobertura desde la vista de toda Galicia
+  hasta el camino. Continente y país (z3-z7) siguen sin relieve: a ese
+  zoom no se lee y la fuente no lo sirve por debajo de z8.
+
+
 
 - **El paquete offline baja el mapa por niveles de calidad según la
   distancia.** Continente en calidad general (z3-z5, ±1850..3700 km), país
