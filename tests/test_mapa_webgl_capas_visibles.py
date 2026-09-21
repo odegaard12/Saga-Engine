@@ -231,6 +231,19 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
 
 
+def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
+    """
+    Continente en calidad general, país mejor, región mejor, comarca mejor,
+    y la máxima sólo donde se camina. Al desampliar sin cobertura nunca
+    aparece un hueco. El relieve, en cambio, sólo donde se camina: pesa el
+    triple y a zoom bajo apenas se lee.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    for etiqueta in ("nivel-continente-z3", "nivel-pais-z7", "nivel-region-z9", "nivel-comarca-z11"):
+        assert etiqueta in fonte, "falta el nivel %s" % etiqueta
+    assert "if (!/^(mission|corridor)/.test(etiqueta)) continue" in fonte
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.

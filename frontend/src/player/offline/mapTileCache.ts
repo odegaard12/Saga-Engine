@@ -470,18 +470,37 @@ export async function prefetchMissionMapTiles(
     label: 'Calculando mapa',
     done: 0,
     total: 100,
-    detail: 'Regional + zona misión + corredor + nodos',
+    detail: 'Continente · país · región · zona de misión · corredor · nodos',
   })
 
   if (routePoints.length > 0 && center) {
-    // Contexto regional grande (Galicia/España completa para evitar cuadros negros al desampliar)
-    addSquareAroundPointWithBudget(urls, center, 5, 800, 16, 'regional-z5')
-    addSquareAroundPointWithBudget(urls, center, 6, 800, 25, 'regional-z6')
-    addSquareAroundPointWithBudget(urls, center, 7, 600, 36, 'regional-z7')
-    addSquareAroundPointWithBudget(urls, center, 8, 400, 49, 'regional-z8')
-    addSquareAroundPointWithBudget(urls, center, 9, 300, 81, 'regional-z9')
-    addSquareAroundPointWithBudget(urls, center, 10, 200, 121, 'regional-z10')
-    addSquareAroundPointWithBudget(urls, center, 11, 120, 169, 'regional-z11')
+    /**
+     * Calidad por distancia, en cuatro niveles alrededor de la ruta.
+     *
+     * La idea es la de cualquier mapa que se lleva al monte: el continente
+     * en calidad general, el país algo mejor, la región mejor, y la máxima
+     * sólo donde se camina. Al desampliar sin cobertura nunca aparece un
+     * hueco: siempre hay una tesela de algún nivel debajo.
+     *
+     * Alcances medidos para una ruta en Galicia (lat 42), cuadrados
+     * centrados en la ruta:
+     *   continente  z3-z5   ±1850..3700 km   43 teselas
+     *   país        z6-z7   ±700..925 km     74 teselas
+     *   región      z8-z9   ±290..460 km    202 teselas
+     *   comarca     z10-z11 ±115..175 km    458 teselas
+     * Total ~780 teselas, unos 23 MB de imagen. El presupuesto de cada
+     * zoom es lo que fija el lado del cuadrado; el radio en km es el
+     * máximo que se pide, por si algún día la ruta cae en otra latitud.
+     */
+    addSquareAroundPointWithBudget(urls, center, 3, 3000, 9, 'nivel-continente-z3')
+    addSquareAroundPointWithBudget(urls, center, 4, 3000, 9, 'nivel-continente-z4')
+    addSquareAroundPointWithBudget(urls, center, 5, 2000, 25, 'nivel-continente-z5')
+    addSquareAroundPointWithBudget(urls, center, 6, 1000, 25, 'nivel-pais-z6')
+    addSquareAroundPointWithBudget(urls, center, 7, 700, 49, 'nivel-pais-z7')
+    addSquareAroundPointWithBudget(urls, center, 8, 400, 81, 'nivel-region-z8')
+    addSquareAroundPointWithBudget(urls, center, 9, 260, 121, 'nivel-region-z9')
+    addSquareAroundPointWithBudget(urls, center, 10, 180, 169, 'nivel-comarca-z10')
+    addSquareAroundPointWithBudget(urls, center, 11, 110, 289, 'nivel-comarca-z11')
 
     // Zona amplia de misión.
     addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 200, 'mission-z12')
@@ -532,6 +551,16 @@ export async function prefetchMissionMapTiles(
       if (!trozos) continue
       const z = Number(trozos[1])
       if (!ZOOMS_RELIEVE.includes(z)) continue
+      /**
+       * Sólo para la zona de misión y el corredor, no para los niveles
+       * de continente, país, región y comarca. Una tesela de elevación
+       * pesa el triple que una de imagen; darle relieve a media Galicia
+       * eran 30 MB para un desnivel que a ese zoom apenas se lee. Donde se
+       * camina, sí: ahí es donde el monte tiene que ser el mismo con o sin
+       * cobertura.
+       */
+      const etiqueta = urls.get(clave) || ''
+      if (!/^(mission|corridor)/.test(etiqueta)) continue
       const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
