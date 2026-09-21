@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.24.0
+## 5.24.1
+
+- La imagen instala `libexpat1`: `pyosmium` la carga en tiempo de ejecución
+  y la imagen slim no la trae, así que `import osmium` moría y la red de
+  caminos caía a Overpass (bloqueado). Medido en el contenedor.
+
+
 
 - **La red de caminos sale del extracto de OpenStreetMap de Galicia, no de
   Overpass.** Overpass es un servicio público y compartido: con zonas

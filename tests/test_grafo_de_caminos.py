@@ -68,3 +68,9 @@ def test_o_extracto_e_a_via_principal_e_overpass_a_reserva() -> None:
     assert "elementos = await _elementos_desde_overpass(httpx_modulo, bbox)" in fonte
     req = (__import__("pathlib").Path(__file__).resolve().parents[1] / "requirements.txt").read_text(encoding="utf-8")
     assert "osmium" in req
+
+
+def test_a_imaxe_leva_libexpat_para_pyosmium() -> None:
+    """La imagen slim no trae libexpat y `import osmium` moría; el extracto caía a Overpass."""
+    dockerfile = (__import__("pathlib").Path(__file__).resolve().parents[1] / "Dockerfile").read_text(encoding="utf-8")
+    assert "libexpat1" in dockerfile
