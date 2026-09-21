@@ -6,7 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.23.4
+## 5.24.2
+
+- **La barra de carga ya no se queda en 0 % ni en 100 %.** El grafo de
+  caminos (21 MB) había entrado en el paquete como "una tesela más": la
+  barra cuenta teselas, las 4 000 ya estaban (0 → 100 de golpe) y luego se
+  quedaba en 100 % minutos esperando ese único fichero, compitiendo con la
+  carga del mapa. Sale del paquete: el mapa lo pide después de pintar y el
+  service worker lo guarda al pasar, para el modo sin cobertura.
+
+
+
+- La imagen instala `libexpat1`: `pyosmium` la carga en tiempo de ejecución
+  y la imagen slim no la trae, así que `import osmium` moría y la red de
+  caminos caía a Overpass (bloqueado). Medido en el contenedor.
+
+
+
+- **La red de caminos sale del extracto de OpenStreetMap de Galicia, no de
+  Overpass.** Overpass es un servicio público y compartido: con zonas
+  grandes devolvía 504 y, tras varias peticiones pesadas, bloqueó la IP del
+  servidor (406 hasta a su página de estado). Ahora el servidor baja UNA
+  vez el extracto de Geofabrik (~250 MB, se queda en `data/osm/` y se
+  renueva a los 60 días), lo lee en local con `pyosmium`, recorta los
+  caminos del rectángulo de la ruta y construye el grafo. Sin límites, sin
+  bloqueos, reproducible. Overpass queda sólo de reserva si el extracto
+  no se puede bajar. El panel enseña la fase (descargando, leyendo nodos,
+  leyendo caminos, construyendo) y el porcentaje.
+
+
 
 - La baldosa de red de caminos que falla **se parte en cuatro** y se vuelve
   a pedir (hasta 3 km de lado). El 504 de Overpass casi siempre es

@@ -384,7 +384,7 @@ type EstadoRed = {
   tramos?: number
   bytes?: number
   margen_km?: number
-  construccion?: { en_curso: boolean; hechas: number; total: number; error: string; margen_km?: number }
+  construccion?: { en_curso: boolean; hechas: number; total: number; error: string; margen_km?: number; fase?: string }
 }
 
 /**
@@ -469,11 +469,12 @@ function RedDeCaminos() {
       <div className="admin-settings-section-head">
         <strong style={{ color: '#38bdf8' }}>🛣️ Red de caminos (para redirigir fuera del trazado)</strong>
         <span>
-          Descarga de OpenStreetMap las carreteras y caminos alrededor de la ruta y los guarda como
-          grafo. Con esto, si un jugador se sale del trazado, la guía le lleva de vuelta por
-          caminos reales, sin cobertura. Se prepara una vez por ruta; tarda entre medio minuto y
-          dos. El margen debe cubrir desde donde la gente llega a la ruta: 40 km suelen bastar
-          (unos 15-20 MB en el paquete de cada móvil).
+          Baja el extracto de OpenStreetMap de Galicia (Geofabrik, una vez, ~250 MB en el
+          servidor), recorta las carreteras y caminos alrededor de la ruta y los guarda como grafo.
+          Con esto, si un jugador se sale del trazado, la guía le lleva de vuelta por caminos
+          reales, sin cobertura. Se prepara una vez por ruta; la primera vez tarda unos minutos
+          (descarga + lectura). El margen debe cubrir desde donde la gente llega a la ruta: 40 km
+          suelen bastar (unos 15-20 MB en el paquete de cada móvil).
         </span>
       </div>
 
@@ -491,7 +492,11 @@ function RedDeCaminos() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'end' }}>
           <button type="button" className="admin-btn-modern" disabled={ocupado || enCurso} onClick={preparar}>
             {ocupado || enCurso
-              ? `Descargando… ${estado?.construccion?.hechas ?? 0} de ${estado?.construccion?.total || '?'} baldosas`
+              ? `${estado?.construccion?.fase || 'Preparando'}${
+                  estado?.construccion?.total
+                    ? ` · ${Math.round(((estado.construccion.hechas || 0) / estado.construccion.total) * 100)} %`
+                    : ''
+                }…`
               : estado?.hay
                 ? 'Volver a preparar'
                 : 'Preparar red de caminos'}

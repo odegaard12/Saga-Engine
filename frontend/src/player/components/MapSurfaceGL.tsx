@@ -957,6 +957,11 @@ export function MapSurfaceGL({
      */
     mapa.once('idle', () => {
       onListoRef.current?.()
+      // La red de caminos (21 MB) se pide DESPUÉS de pintar, para no
+      // competir con las teselas. El service worker la guarda al pasar.
+      void cargarGrafo().then((grafo) => {
+        grafoRef.current = grafo
+      })
     })
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
@@ -980,11 +985,6 @@ export function MapSurfaceGL({
       gestoRef.current = false
     }
     mapa.on('moveend', alSoltar)
-    // La red de caminos se pide una vez; si no está preparada, no pasa nada.
-    void cargarGrafo().then((grafo) => {
-      grafoRef.current = grafo
-    })
-
     mapa.on('dragstart', alTocar)
     mapa.on('zoomstart', alTocar)
     mapa.on('rotatestart', alTocar)
