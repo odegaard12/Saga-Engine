@@ -29,6 +29,16 @@ HIGHWAYS_A_PIE = (
 )
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Espejos por si el principal devuelve 504 (pasa a menudo con zonas grandes).
+OVERPASS_ESPEJOS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+)
+# Lado máximo de cada baldosa de descarga, en km. Una zona de 80x80 km de
+# una sola vez tumba el servidor público (504); en baldosas de 15 km cada
+# petición es pequeña y se une el resultado.
+LADO_BALDOSA_KM = 15.0
 FICHERO = "road_graph.json"
 TOLERANCIA_M = 3.0  # simplificación de la forma de cada tramo
 
@@ -51,10 +61,27 @@ def bbox_alrededor(puntos, margen_km):
     return (min(lats) - d_lat, min(lons) - d_lon, max(lats) + d_lat, max(lons) + d_lon)
 
 
+def baldosas(bbox, lado_km=LADO_BALDOSA_KM):
+    """Parte el rectángulo en baldosas de como mucho `lado_km` de lado."""
+    sur, oeste, norte, este = bbox
+    lat_c = (sur + norte) / 2
+    paso_lat = lado_km / 111.32
+    paso_lon = lado_km / (111.32 * max(0.2, math.cos(math.radians(lat_c))))
+    filas = max(1, math.ceil((norte - sur) / paso_lat))
+    columnas = max(1, math.ceil((este - oeste) / paso_lon))
+    alto = (norte - sur) / filas
+    ancho = (este - oeste) / columnas
+    salida = []
+    for i in range(filas):
+        for j in range(columnas):
+            salida.append((sur + i * alto, oeste + j * ancho, sur + (i + 1) * alto, oeste + (j + 1) * ancho))
+    return salida
+
+
 def consulta_overpass(bbox):
     sur, oeste, norte, este = bbox
     return (
-        "[out:json][timeout:120];"
+        "[out:json][timeout:90];"
         'way["highway"~"^(%s)$"]["access"!~"^(private|no)$"](%.6f,%.6f,%.6f,%.6f);'
         "(._;>;);out body;" % (HIGHWAYS_A_PIE, sur, oeste, norte, este)
     )
@@ -189,18 +216,43 @@ def estado(data_dir):
     }
 
 
-async def descargar_y_construir(httpx_modulo, puntos, margen_km, data_dir):
-    """Overpass → grafo → fichero. Devuelve el estado. Lanza si Overpass falla."""
-    bbox = bbox_alrededor(puntos, margen_km)
+async def _pedir_baldosa(cliente, bbox):
+    """Una baldosa, probando los espejos en orden. Lanza si fallan todos."""
     consulta = consulta_overpass(bbox)
-    async with httpx_modulo.AsyncClient(timeout=170.0) as cliente:
-        respuesta = await cliente.post(
-            OVERPASS_URL,
-            data={"data": consulta},
-            headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
-        )
-    respuesta.raise_for_status()
-    elementos = respuesta.json().get("elements", [])
+    ultimo = None
+    for url in OVERPASS_ESPEJOS:
+        try:
+            respuesta = await cliente.post(
+                url,
+                data={"data": consulta},
+                headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
+            )
+            respuesta.raise_for_status()
+            return respuesta.json().get("elements", [])
+        except Exception as exc:  # 504, red, JSON roto: al siguiente espejo
+            ultimo = exc
+    raise RuntimeError("Overpass no responde en ningún espejo: %s" % ultimo)
+
+
+async def descargar_y_construir(httpx_modulo, puntos, margen_km, data_dir):
+    """
+    Overpass → grafo → fichero. Devuelve el estado. Lanza si Overpass falla.
+
+    Por baldosas: el servidor público devuelve 504 con zonas grandes de una
+    vez. Se piden trozos de 15 km, se unen y se quitan los elementos
+    repetidos (una vía que cruza dos baldosas viene en las dos).
+    """
+    bbox = bbox_alrededor(puntos, margen_km)
+    vistos = set()
+    elementos = []
+    async with httpx_modulo.AsyncClient(timeout=120.0) as cliente:
+        for trozo in baldosas(bbox):
+            for el in await _pedir_baldosa(cliente, trozo):
+                clave = (el.get("type"), el.get("id"))
+                if clave in vistos:
+                    continue
+                vistos.add(clave)
+                elementos.append(el)
     grafo = construir_grafo(elementos)
     if not grafo["tramos"]:
         raise ValueError("OpenStreetMap no devolvió caminos en esa zona")

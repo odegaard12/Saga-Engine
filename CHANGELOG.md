@@ -6,6 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.23.2
+
+- La red de caminos se descarga **por baldosas de 15 km** y con espejos de
+  reserva. El servidor público de Overpass devolvía 504 con zonas de 30-40
+  km de una vez; en trozos pequeños cada petición es liviana, se unen y se
+  quitan los elementos repetidos. Con test de cobertura de las baldosas.
+
 ## 5.23.1
 
 - La red de caminos admite un margen de hasta 45 km (por defecto 40): tiene
