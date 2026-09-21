@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.1
+## 5.25.2
+
+- **Los nodos 3D seguían sin verse: estaban en el origen del mundo.** Con
+  `matrixAutoUpdate` apagado, three.js no recalcula la matriz de mundo
+  aunque cambie `matrix`; había que marcarla. Los monolitos se quedaban en
+  lat 85° N, lon -180°, sin un solo error.
+- El banco de mapa enseña las estadísticas de la capa 3D (piezas,
+  fotogramas pintados, último error) para poder diagnosticarla desde una
+  captura.
+
+
 
 - **Los nodos 3D no se dibujaban.** MapLibre 6 pasa a la capa un objeto con
   la matriz dentro (`defaultProjectionData.mainMatrix`); se leía "a la
