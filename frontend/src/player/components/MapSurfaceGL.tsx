@@ -215,9 +215,11 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            * malla esté levantada. El contraste de color es lo que hace
            * que una ladera "se vea" desde arriba.
            */
-          'hillshade-shadow-color': '#0f172a',
+          // Sombras del TERRENO, no del tema: una ladera a la sombra es
+          // azul oscura con cualquier piel de la app. (no-tema)
+          'hillshade-shadow-color': '#0f172a', // no-tema
           'hillshade-highlight-color': '#fef3c7',
-          'hillshade-accent-color': '#1e293b',
+          'hillshade-accent-color': '#1e293b', // no-tema
           'hillshade-illumination-direction': 315,
         },
         },
