@@ -6,7 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.16.2
+## 5.17.0
+
+- **Las fotos de campo se quedan en su sitio.** Eran marcadores del DOM, y
+  un marcador del DOM va un fotograma por detrás del terreno: con relieve y
+  zoom "no se quedaban en su posición como los nodos". Ahora son símbolos
+  del mapa, igual que las chinchetas: la miniatura se carga y se enmarca en
+  un canvas bajo demanda (marco blanco, esquinas redondeadas, sombra en el
+  suelo) y el motor la coloca en el mismo fotograma que todo lo demás. El
+  toque sobre una foto lo resuelve el propio mapa y abre todas las de ese
+  punto, como antes.
+- **El mapa ya no da un tirón al terminar de cargar.** La pantalla del
+  jugador abre el mapa sobre el nodo o el GPS, y al llegar los datos se
+  saltaba OTRA VEZ al nodo: el mapa se movía y las teselas recién pintadas
+  se borraban. El salto inicial sólo se hace cuando nadie dio un centro.
+- Fuera el escalado por zoom de los marcadores del DOM: ya no queda ninguno
+  que escalar; los símbolos escalan solos.
+- El banco de mapa enseña cuántas fotos hay en la fuente del mapa.
+
+
 
 - **5.16.1 no bastaba: el worker importa a su vez otro fichero.**
   `maplibre-gl-worker.mjs` hace `import "./maplibre-gl-shared.mjs"`, y con

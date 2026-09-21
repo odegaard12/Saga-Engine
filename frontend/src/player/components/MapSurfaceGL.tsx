@@ -68,6 +68,8 @@ const CAPA_RUTA_BORDE = 'saga-ruta-borde'
 const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
 const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
 const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
+const FUENTE_FOTOS = 'saga-fotos'
+const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
@@ -217,6 +219,72 @@ function dibujarChincheta(numero: string, color: string): ImageData | null {
 }
 
 /**
+ * Enmarca una miniatura como foto de campo: cuadrado con esquinas
+ * redondeadas, marco blanco grueso y sombra en el suelo bajo la base.
+ * Sin imagen (aún cargando, o fallida) deja el marco con un gris neutro:
+ * el sitio se ve igual, la foto llega cuando llega.
+ */
+function dibujarFoto(imagen: HTMLImageElement | null): ImageData | null {
+  const lado = 48
+  const ancho = 60
+  const alto = 64
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * 2
+  lienzo.height = alto * 2
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(2, 2)
+
+  // Sombra en el suelo.
+  ctx.save()
+  ctx.translate(ancho / 2, alto - 5)
+  ctx.scale(1, 0.35)
+  const sombra = ctx.createRadialGradient(0, 0, 3, 0, 0, 20)
+  sombra.addColorStop(0, 'rgba(0,0,0,.5)')
+  sombra.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sombra
+  ctx.beginPath()
+  ctx.arc(0, 0, 20, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  const x = (ancho - lado) / 2
+  const y = 4
+  const radio = 9
+  const trazarMarco = (inset: number) => {
+    const r = Math.max(2, radio - inset)
+    ctx.beginPath()
+    ctx.roundRect(x + inset, y + inset, lado - inset * 2, lado - inset * 2, r)
+  }
+
+  trazarMarco(0)
+  ctx.fillStyle = '#f8fafc'
+  ctx.shadowColor = 'rgba(0,0,0,.45)'
+  ctx.shadowBlur = 6
+  ctx.shadowOffsetY = 2
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+
+  trazarMarco(3)
+  ctx.save()
+  ctx.clip()
+  if (imagen) {
+    // Recorte centrado, como `object-fit: cover`.
+    const escala = Math.max((lado - 6) / imagen.width, (lado - 6) / imagen.height)
+    const w = imagen.width * escala
+    const h = imagen.height * escala
+    ctx.drawImage(imagen, x + 3 + (lado - 6 - w) / 2, y + 3 + (lado - 6 - h) / 2, w, h)
+  } else {
+    // Gris de foto sin cargar: es un hueco, no un color de la piel. (no-tema)
+    ctx.fillStyle = '#94a3b8' // no-tema
+    ctx.fillRect(x, y, lado, lado)
+  }
+  ctx.restore()
+
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/**
  * El estilo del mapa, declarado en crudo y NO por URL.
  *
  * Una URL de estilo sería una petición más que falla sin cobertura, justo
@@ -265,6 +333,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -401,6 +470,29 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * Fotos de campo como símbolos del mapa, por lo mismo que los
+         * nodos: un marcador del DOM va un fotograma por detrás del
+         * terreno y "no se queda en su sitio" con relieve y zoom. La
+         * miniatura se carga y se enmarca en un canvas bajo demanda (ver
+         * `styleimagemissing`), y el motor la coloca en el mismo fotograma
+         * que el resto del mapa.
+         */
+        id: CAPA_FOTOS,
+        type: 'symbol',
+        source: FUENTE_FOTOS,
+        layout: {
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.25],
+          'symbol-sort-key': ['get', 'orden'],
+        },
+      },
+      {
+        /**
          * Los nodos como SÍMBOLOS del mapa, no como marcadores del DOM.
          *
          * Un marcador del DOM se coloca desde JavaScript, un fotograma
@@ -458,7 +550,11 @@ export function MapSurfaceGL({
   const mapaRef = useRef<maplibregl.Map | null>(null)
   const marcadorXogadorRef = useRef<maplibregl.Marker | null>(null)
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
-  const marcadoresFotosRef = useRef<maplibregl.Marker[]>([])
+  /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
+  const fotosPorIconoRef = useRef(new Map<string, string>())
+  /** Lo último recibido, para resolver un toque sobre una foto sin cerrar props viejas. */
+  const fotosRef = useRef<FieldProof[]>([])
+  const abrirFotosRef = useRef<((proofs: FieldProof[]) => void) | undefined>(undefined)
 
   /** Lo último que se mandó pintar a cada fuente, para poder reintentarlo. */
   const ultimoDatoRef = useRef(new Map<string, GeoJSON.FeatureCollection>())
@@ -507,6 +603,26 @@ export function MapSurfaceGL({
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
     mapa.on('styleimagemissing', (evento) => {
+      if (evento.id.startsWith('foto-')) {
+        if (mapa.hasImage(evento.id)) return
+        const url = fotosPorIconoRef.current.get(evento.id)
+        // Se registra YA un marco vacío: MapLibre no vuelve a pedir la
+        // misma imagen, así que si se tardara en cargar la miniatura, sin
+        // esto la foto no aparecería nunca. Cuando llegue, se sustituye.
+        const vacio = dibujarFoto(null)
+        if (vacio) mapa.addImage(evento.id, vacio, { pixelRatio: 2 })
+        if (!url) return
+        const imagen = new Image()
+        imagen.crossOrigin = 'anonymous'
+        imagen.onload = () => {
+          const lista = dibujarFoto(imagen)
+          if (!lista || !mapaRef.current) return
+          if (mapa.hasImage(evento.id)) mapa.updateImage(evento.id, lista)
+          else mapa.addImage(evento.id, lista, { pixelRatio: 2 })
+        }
+        imagen.src = url
+        return
+      }
       const partes = /^nodo-(\d+)-(hecho|actual|pendiente)$/.exec(evento.id)
       if (!partes) return
       if (mapa.hasImage(evento.id)) return
@@ -589,6 +705,21 @@ export function MapSurfaceGL({
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
+    mapa.on('click', CAPA_FOTOS, (evento) => {
+      const props = evento.features?.[0]?.properties as { lat?: number; lon?: number } | undefined
+      if (!props || typeof props.lat !== 'number' || typeof props.lon !== 'number') return
+      // Se abren TODAS las de ese punto: en un nodo suele haber varias y el
+      // visor ya sabe pasarlas.
+      const grupo = fotosRef.current.filter((otra) => otra.lat === props.lat && otra.lon === props.lon)
+      if (grupo.length) abrirFotosRef.current?.(grupo)
+    })
+    mapa.on('mouseenter', CAPA_FOTOS, () => {
+      mapa.getCanvas().style.cursor = 'pointer'
+    })
+    mapa.on('mouseleave', CAPA_FOTOS, () => {
+      mapa.getCanvas().style.cursor = ''
+    })
+
     if (
       new URLSearchParams(window.location.search).has('depurar-mapa') ||
       // El banco de pruebas SIEMPRE necesita el asa: es su razón de ser, y
@@ -626,8 +757,6 @@ export function MapSurfaceGL({
       marcadorXogadorRef.current = null
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
-      marcadoresFotosRef.current.forEach((marcador) => marcador.remove())
-      marcadoresFotosRef.current = []
       mapa.remove()
       mapaRef.current = null
     }
@@ -831,7 +960,13 @@ export function MapSurfaceGL({
      * abre encima del nodo en juego. Solo la primera vez y solo sin GPS:
      * en cuanto hay posición, manda ella.
      */
-    if (!encuadreInicialRef.current && !playerPosition && currentStage?.lat != null) {
+    /**
+     * Y sólo si nadie dio un centro inicial. La pantalla del jugador ya
+     * abre el mapa sobre el nodo o el GPS; saltar otra vez al llegar los
+     * datos era un tirón visible -el mapa se movía y las teselas se
+     * borraban justo después de cargar-.
+     */
+    if (!encuadreInicialRef.current && !initialCenter && !playerPosition && currentStage?.lat != null) {
       encuadreInicialRef.current = true
       mapa.jumpTo({ center: [currentStage.lon as number, currentStage.lat as number], zoom: 17 })
     }
@@ -869,116 +1004,35 @@ export function MapSurfaceGL({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionStages, currentLevel, currentStage?.lat, currentStage?.lon, pintarFuente])
 
-  /**
-   * Fotos de campo. Marcadores del DOM por lo mismo que los nodos: una
-   * capa de MapLibre quedaría enterrada bajo el relieve, y además una foto
-   * ES una miniatura, que es un elemento del DOM de toda la vida.
-   */
+  /** Fotos de campo: puntos en una fuente del mapa; la imagen se pide al dibujar. */
   useEffect(() => {
-    const mapa = mapaRef.current
-    if (!mapa) return
-
-    marcadoresFotosRef.current.forEach((marcador) => marcador.remove())
-    marcadoresFotosRef.current = []
-
     const fotos = (Array.isArray(fieldProofs) ? fieldProofs : []).filter(
       (foto) => typeof foto.lat === 'number' && typeof foto.lon === 'number'
     )
+    fotosRef.current = fotos
+    abrirFotosRef.current = onOpenFieldProofs
 
+    const tabla = new Map<string, string>()
     fotos.forEach((foto) => {
-      /**
-       * La foto va dentro de un envoltorio, no suelta.
-       *
-       * MapLibre escribe el `transform` del elemento que le entregas para
-       * colocarlo en pantalla; si el volcado 3D se pusiera ahí, lo
-       * machacaría en cada fotograma. El envoltorio es de MapLibre y el
-       * volcado va dentro.
-       */
-      const envoltorio = document.createElement('div')
-      Object.assign(envoltorio.style, {
-        transformOrigin: 'bottom center',
-        cursor: 'pointer',
-      } as Partial<CSSStyleDeclaration>)
-
-      const elemento = document.createElement('button')
-      elemento.type = 'button'
-      elemento.setAttribute('aria-label', `Foto de ${foto.display_name || foto.user}`)
-      Object.assign(elemento.style, {
-        width: '46px',
-        height: '46px',
-        padding: '0',
-        borderRadius: '10px',
-        // Marco blanco grueso: la foto queda como una polaroid clavada en
-        // el terreno, que es lo que hace que se lea como objeto y no como
-        // una mancha de la propia imagen satélite.
-        border: '3px solid #f8fafc',
-        /**
-         * SIN volcado falso.
-         *
-         * Aquí hubo un `rotateX` en CSS para que la foto pareciera tumbada
-         * sobre el terreno. Es mentira y se nota: un giro de CSS no sigue
-         * a la cámara del mapa, así que al desplazar o girar la foto se
-         * queda inclinada hacia un lado que no corresponde a nada. Se veía
-         * peor que plana.
-         *
-         * Lo que sí es 3D de verdad va en el mapa, no en el DOM: ver la
-         * capa de postes extruidos de los nodos.
-         */
-        transformOrigin: 'bottom center',
-        boxShadow: '0 2px 4px rgba(0,0,0,.45), 0 12px 16px -6px rgba(0,0,0,.6)',
-        backgroundImage: `url(${foto.thumbnail_url || foto.image_url})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        cursor: 'pointer',
-      } as Partial<CSSStyleDeclaration>)
-      envoltorio.appendChild(elemento)
-
-      elemento.addEventListener('click', (evento) => {
-        evento.stopPropagation()
-        // Se abren TODAS las de ese punto, no solo la tocada: en un nodo
-        // suele haber varias y el visor ya sabe pasarlas.
-        onOpenFieldProofs?.(
-          fotos.filter((otra) => otra.lat === foto.lat && otra.lon === foto.lon)
-        )
-      })
-
-      marcadoresFotosRef.current.push(
-        new maplibregl.Marker({ element: envoltorio, anchor: 'bottom' })
-          .setLngLat([foto.lon, foto.lat])
-          .addTo(mapa)
-      )
+      tabla.set(`foto-${foto.id}`, foto.thumbnail_url || foto.image_url)
     })
-  }, [fieldProofs, onOpenFieldProofs])
+    fotosPorIconoRef.current = tabla
 
-  /**
-   * Los marcadores crecen al acercarse.
-   *
-   * Un tamaño fijo obliga a elegir entre "de lejos tapa media ruta" y "de
-   * cerca no se distingue". Escalando con el zoom, de lejos son
-   * señaladores discretos y de cerca la foto se ve de verdad.
-   *
-   * Se escala el elemento, no se recrean los marcadores: recrearlos en
-   * cada fotograma de zoom haría parpadear el mapa entero.
-   */
-  useEffect(() => {
-    const mapa = mapaRef.current
-    if (!mapa) return
+    pintarFuente(FUENTE_FOTOS, {
+      type: 'FeatureCollection',
+      features: fotos.map((foto, indice) => ({
+        type: 'Feature' as const,
+        properties: {
+          icono: `foto-${foto.id}`,
+          lat: foto.lat,
+          lon: foto.lon,
+          orden: indice,
+        },
+        geometry: { type: 'Point' as const, coordinates: [foto.lon, foto.lat] },
+      })),
+    })
+  }, [fieldProofs, onOpenFieldProofs, pintarFuente])
 
-    const escalar = () => {
-      const zoom = mapa.getZoom()
-      // 15 -> 0.8 ; 19 -> 1.6. Fuera de ese tramo se queda en los topes.
-      const factor = Math.max(0.8, Math.min(1.6, 0.8 + (zoom - 15) * 0.2))
-      for (const marcador of marcadoresFotosRef.current) {
-        marcador.getElement().style.scale = String(factor)
-      }
-    }
-
-    escalar()
-    mapa.on('zoom', escalar)
-    return () => {
-      mapa.off('zoom', escalar)
-    }
-  }, [fieldProofs, missionStages])
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra
   // matriz- y no pide ni un dato más, así que funciona igual sin cobertura.
