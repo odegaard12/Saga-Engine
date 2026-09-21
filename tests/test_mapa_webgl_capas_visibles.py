@@ -45,9 +45,27 @@ def test_as_capas_de_datos_nacen_co_estilo(fonte: str) -> None:
     assert "[FUENTE_RUTA]: { type: 'geojson'" in fonte
     assert "addSource(FUENTE_RADIO" not in fonte, "volvió a añadirse al vuelo"
     assert "addSource(FUENTE_RUTA" not in fonte, "volvió a añadirse al vuelo"
-    assert "addLayer(" not in fonte, "las capas también van en el estilo"
+    assert "mapa.addLayer(" not in fonte, "las capas también van en el estilo"
     assert "mapa.on('load'" not in fonte
     assert "mapa.on('style.load'" not in fonte
+
+
+def test_hai_vixiante_por_se_o_estilo_non_monta(fonte: str) -> None:
+    """
+    Un mapa que nace con la pantalla bloqueada se queda EN BLANCO.
+
+    MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`, y un
+    navegador no ejecuta fotogramas en una pestaña que no se pinta. Si el
+    mapa se crea con la app en segundo plano -normalísimo durante los
+    segundos que tarda la descarga offline- ese fotograma no llega y el
+    estilo no monta. No da error y no siempre se recupera solo; encima los
+    nodos sí se ven, porque son marcadores del DOM, así que parece que el
+    mapa "casi" funciona.
+    """
+    assert "visibilitychange" in fonte
+    assert "isStyleLoaded()" in fonte
+    assert "setStyle(estiloDelMapa())" in fonte
+    assert "rescates >= 5" in fonte, "sin tope, reintentaría en bucle"
 
 
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:

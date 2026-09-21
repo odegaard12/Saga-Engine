@@ -6,7 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.4
+## 5.13.5
+
+- **El mapa podía quedarse EN BLANCO, y esto explica el "está todo mal".**
+  MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`, y un
+  navegador no ejecuta fotogramas en una pestaña que no se está pintando.
+  Si el mapa nace con la pantalla bloqueada o con la app en segundo plano
+  -normalísimo durante los segundos que tarda la descarga offline- ese
+  fotograma no llega nunca: no hay teselas, no hay relieve, no hay radio ni
+  trazado. Y encima los nodos SÍ se ven, porque son marcadores del DOM, así
+  que parece que el mapa casi funciona en vez de estar sin estilo. Sin un
+  solo error en consola. Ahora hay un vigilante que vuelve a aplicar el
+  estilo al recuperar visibilidad, con tope de cinco intentos.
+- **La ruta se encuadra al entrar** cuando todavía no hay GPS. Abriendo
+  siempre a zoom 16 sobre un punto, los diez nodos de una ruta de
+  kilómetros caen fuera de la pantalla o salen alineados contra un borde.
+
+
 
 - **El radio y el trazado, por fin.** 5.13.1 y 5.13.3 no lo arreglaron, y
   las dos veces se dio por bueno sin comprobarlo en la página. El estilo se
