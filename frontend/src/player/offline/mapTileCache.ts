@@ -66,6 +66,30 @@ function tileUrl(zoom: number, x: number, y: number) {
   return `/map-tiles/${zoom}/${wrappedX}/${clampedY}.png`
 }
 
+/**
+ * La misma tesela, pero de ELEVACIÓN.
+ *
+ * El relieve usa exactamente el mismo esquema z/x/y que el satélite -las
+ * dos son XYZ en Web Mercator de 256 px-, así que una tesela de relieve
+ * cubre justo el mismo trozo de terreno que su gemela de satélite. Por eso
+ * el plan de abajo no recalcula nada: coge las teselas ya planificadas y
+ * añade sus gemelas de relieve.
+ */
+function demTileUrl(zoom: number, x: number, y: number) {
+  const n = 2 ** zoom
+  const wrappedX = ((x % n) + n) % n
+  const clampedY = Math.min(Math.max(y, 0), n - 1)
+  return `/dem-tiles/${zoom}/${wrappedX}/${clampedY}.png`
+}
+
+/**
+ * Zooms de relieve que se bajan. Terrarium no pasa de 15, y tampoco hace
+ * falta: MapLibre estira la elevación de un zoom bajo cuando te acercas, y
+ * el RELIEVE -la forma del monte- no gana nada con más detalle. Bajar
+ * hasta 13 cuesta unos pocos megas; hasta 15 serían cientos.
+ */
+const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13]
+
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
 }
@@ -407,6 +431,22 @@ export async function prefetchMissionMapTiles(
       280,
       'mission-z14'
     )
+
+    /**
+     * Relieve: las gemelas de lo que ya se va a bajar.
+     *
+     * Sin esto, el mapa 3D pide la elevación al entrar -y eso es
+     * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
+     * en la pantalla de carga, donde ya se está esperando a propósito.
+     */
+    for (const clave of Array.from(urls.keys())) {
+      const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
+      if (!trozos) continue
+      const z = Number(trozos[1])
+      if (!ZOOMS_RELIEVE.includes(z)) continue
+      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
+      if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
+    }
 
     // Corredor ancho, no línea fina.
     addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
