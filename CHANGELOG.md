@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.23.4
+## 5.24.0
+
+- **La red de caminos sale del extracto de OpenStreetMap de Galicia, no de
+  Overpass.** Overpass es un servicio público y compartido: con zonas
+  grandes devolvía 504 y, tras varias peticiones pesadas, bloqueó la IP del
+  servidor (406 hasta a su página de estado). Ahora el servidor baja UNA
+  vez el extracto de Geofabrik (~250 MB, se queda en `data/osm/` y se
+  renueva a los 60 días), lo lee en local con `pyosmium`, recorta los
+  caminos del rectángulo de la ruta y construye el grafo. Sin límites, sin
+  bloqueos, reproducible. Overpass queda sólo de reserva si el extracto
+  no se puede bajar. El panel enseña la fase (descargando, leyendo nodos,
+  leyendo caminos, construyendo) y el porcentaje.
+
+
 
 - La baldosa de red de caminos que falla **se parte en cuatro** y se vuelve
   a pedir (hasta 3 km de lado). El 504 de Overpass casi siempre es

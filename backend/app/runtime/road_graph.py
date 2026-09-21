@@ -51,7 +51,15 @@ LADO_MINIMO_KM = 3.0
 
 # Lo que está pasando ahora mismo, para que el panel lo enseñe: la
 # construcción corre en segundo plano y el panel la consulta.
-construccion = {"en_curso": False, "hechas": 0, "total": 0, "error": "", "margen_km": None}
+construccion = {"en_curso": False, "hechas": 0, "total": 0, "error": "", "margen_km": None, "fase": ""}
+
+# El extracto de OpenStreetMap de la región, de Geofabrik: UN fichero, sin
+# límites por IP ni servidores compartidos. Se baja una vez a data/osm/ y se
+# reutiliza; se vuelve a bajar si tiene más de 60 días.
+PBF_URL = "https://download.geofabrik.de/europe/spain/galicia-latest.osm.pbf"
+PBF_NOMBRE = "galicia-latest.osm.pbf"
+PBF_CADUCIDAD_DIAS = 60
+VIAS_A_PIE = set(HIGHWAYS_A_PIE.split("|"))
 FICHERO = "road_graph.json"
 TOLERANCIA_M = 3.0  # simplificación de la forma de cada tramo
 
@@ -274,39 +282,128 @@ async def _pedir_baldosa(cliente, bbox):
     raise RuntimeError("Overpass no responde ni con baldosas de %.0f km: %s" % (_lado_km(bbox), ultimo))
 
 
+def ruta_pbf(data_dir):
+    return Path(data_dir) / "osm" / PBF_NOMBRE
+
+
+async def asegurar_pbf(httpx_modulo, data_dir):
+    """Deja el extracto en disco (bajándolo si falta o está viejo). Devuelve su ruta."""
+    import asyncio
+
+    destino = ruta_pbf(data_dir)
+    if destino.exists() and time.time() - destino.stat().st_mtime < PBF_CADUCIDAD_DIAS * 86400:
+        return destino
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporal = destino.with_suffix(".parcial")
+    construccion["fase"] = "descargando el extracto de OpenStreetMap"
+    async with httpx_modulo.AsyncClient(timeout=httpx_modulo.Timeout(60.0, read=600.0), follow_redirects=True) as cliente:
+        async with cliente.stream("GET", PBF_URL, headers={"User-Agent": "SagaEngine/1"}) as respuesta:
+            respuesta.raise_for_status()
+            total = int(respuesta.headers.get("content-length") or 0)
+            construccion["total"] = total
+            bajado = 0
+            with temporal.open("wb") as f:
+                async for trozo in respuesta.aiter_bytes(1 << 20):
+                    f.write(trozo)
+                    bajado += len(trozo)
+                    construccion["hechas"] = bajado
+                    await asyncio.sleep(0)
+    temporal.replace(destino)
+    return destino
+
+
+def elementos_desde_pbf(ruta, bbox):
+    """
+    Del extracto local a elementos con la forma de Overpass, sólo lo que cae
+    en el rectángulo. Dos pasadas: nodos dentro del rectángulo (coordenadas)
+    y vías transitables que toquen alguno de esos nodos.
+    """
+    import osmium
+
+    sur, oeste, norte, este = bbox
+    coords = {}
+    construccion["fase"] = "leyendo nodos del extracto"
+    for nodo in osmium.FileProcessor(str(ruta), osmium.osm.NODE):
+        loc = nodo.location
+        if not loc.valid():
+            continue
+        lat, lon = loc.lat, loc.lon
+        if sur <= lat <= norte and oeste <= lon <= este:
+            coords[nodo.id] = (lat, lon)
+
+    elementos = [{"type": "node", "id": i, "lat": c[0], "lon": c[1]} for i, c in coords.items()]
+    construccion["fase"] = "leyendo caminos del extracto"
+    for via in osmium.FileProcessor(str(ruta), osmium.osm.WAY).with_filter(osmium.filter.KeyFilter("highway")):
+        tipo = via.tags.get("highway", "")
+        if tipo not in VIAS_A_PIE:
+            continue
+        if via.tags.get("access", "") in ("private", "no"):
+            continue
+        ids = [n.ref for n in via.nodes]
+        if not any(i in coords for i in ids):
+            continue
+        elementos.append({"type": "way", "id": via.id, "nodes": ids, "tags": {"highway": tipo}})
+    return elementos
+
+
 async def descargar_y_construir(httpx_modulo, puntos, margen_km, data_dir):
     """
-    Overpass → grafo → fichero. Devuelve el estado. Lanza si Overpass falla.
+    Extracto de Geofabrik → grafo → fichero. Overpass sólo si el extracto
+    falla. Devuelve el estado; deja el error en `construccion`.
 
-    Por baldosas: el servidor público devuelve 504 con zonas grandes de una
-    vez. Se piden trozos de 15 km, se unen y se quitan los elementos
-    repetidos (una vía que cruza dos baldosas viene en las dos).
+    Overpass es un servicio público y compartido: con zonas grandes
+    devolvía 504, y tras varias peticiones pesadas bloqueó la IP (406 hasta
+    a su página de estado). Un fichero de Geofabrik se baja una vez y se
+    lee en local, sin límites.
     """
     import asyncio
 
     bbox = bbox_alrededor(puntos, margen_km)
-    trozos = baldosas(bbox)
-    construccion.update({"en_curso": True, "hechas": 0, "total": len(trozos), "error": "", "margen_km": margen_km})
-    vistos = set()
-    elementos = []
+    construccion.update({"en_curso": True, "hechas": 0, "total": 0, "error": "", "margen_km": margen_km, "fase": "preparando"})
     try:
-        async with httpx_modulo.AsyncClient(timeout=120.0) as cliente:
-            for indice, trozo in enumerate(trozos):
-                for el in await _pedir_baldosa(cliente, trozo):
-                    clave = (el.get("type"), el.get("id"))
-                    if clave in vistos:
-                        continue
-                    vistos.add(clave)
-                    elementos.append(el)
-                construccion["hechas"] = indice + 1
-                if indice + 1 < len(trozos):
-                    await asyncio.sleep(PAUSA_ENTRE_BALDOSAS_S)
-        grafo = construir_grafo(elementos)
+        try:
+            pbf = await asegurar_pbf(httpx_modulo, data_dir)
+            elementos = await asyncio.to_thread(elementos_desde_pbf, pbf, bbox)
+        except Exception as exc:  # sin Geofabrik o sin osmium: Overpass de reserva
+            construccion["fase"] = "extracto no disponible (%s); probando Overpass" % str(exc)[:80]
+            elementos = await _elementos_desde_overpass(httpx_modulo, bbox)
+        construccion["fase"] = "construyendo el grafo"
+        grafo = await asyncio.to_thread(construir_grafo, elementos)
         if not grafo["tramos"]:
-            raise ValueError("OpenStreetMap no devolvió caminos en esa zona")
+            raise ValueError("no hay caminos en esa zona")
+        construccion["fase"] = "guardando"
         return guardar(data_dir, grafo, bbox, margen_km)
     except Exception as exc:
         construccion["error"] = str(exc)[:300]
         raise
     finally:
         construccion["en_curso"] = False
+        construccion["fase"] = ""
+
+
+async def _elementos_desde_overpass(httpx_modulo, bbox):
+    """
+    Overpass por baldosas, de reserva.
+
+    Se piden trozos de 25 km (partidos en cuatro si fallan), se unen y se
+    quitan los elementos repetidos (una vía que cruza dos baldosas viene en
+    las dos).
+    """
+    import asyncio
+
+    trozos = baldosas(bbox)
+    construccion.update({"hechas": 0, "total": len(trozos)})
+    vistos = set()
+    elementos = []
+    async with httpx_modulo.AsyncClient(timeout=120.0) as cliente:
+        for indice, trozo in enumerate(trozos):
+            for el in await _pedir_baldosa(cliente, trozo):
+                clave = (el.get("type"), el.get("id"))
+                if clave in vistos:
+                    continue
+                vistos.add(clave)
+                elementos.append(el)
+            construccion["hechas"] = indice + 1
+            if indice + 1 < len(trozos):
+                await asyncio.sleep(PAUSA_ENTRE_BALDOSAS_S)
+    return elementos

@@ -58,3 +58,13 @@ def test_os_cuartos_parten_a_baldosa_en_catro() -> None:
     assert len(cuartos) == 4
     assert min(c[0] for c in cuartos) == 42.0 and max(c[2] for c in cuartos) == 42.2
     assert abs(_lado_km(cuartos[0]) - _lado_km(bbox) / 2) < 0.5
+
+
+def test_o_extracto_e_a_via_principal_e_overpass_a_reserva() -> None:
+    """Geofabrik (fichero local, sin límites) primero; Overpass sólo si el extracto falla."""
+    fonte = (__import__("pathlib").Path(__file__).resolve().parents[1] / "backend" / "app" / "runtime" / "road_graph.py").read_text(encoding="utf-8")
+    assert 'PBF_URL = "https://download.geofabrik.de/europe/spain/galicia-latest.osm.pbf"' in fonte
+    assert "pbf = await asegurar_pbf(httpx_modulo, data_dir)" in fonte
+    assert "elementos = await _elementos_desde_overpass(httpx_modulo, bbox)" in fonte
+    req = (__import__("pathlib").Path(__file__).resolve().parents[1] / "requirements.txt").read_text(encoding="utf-8")
+    assert "osmium" in req
