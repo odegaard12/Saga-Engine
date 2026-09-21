@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import type { FieldProof, PlayerStage } from '../../types/player'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 
 /**
@@ -81,6 +82,38 @@ function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
   }
 }
 
+/**
+ * Trazado guardado en administración para llegar a un nodo (`route_track`).
+ *
+ * Mismo lector que el motor de Leaflet, y acepta las mismas dos formas en
+ * que se ha ido guardando: pares [lat, lon] y objetos con lat/lon.
+ */
+function leerTrackDelNodo(stage: PlayerStage): Punto[] {
+  const salida: Punto[] = []
+  const crudo = (stage as unknown as Record<string, unknown>).route_track
+  if (!Array.isArray(crudo)) return salida
+
+  for (const punto of crudo) {
+    let lat: number | null = null
+    let lon: number | null = null
+
+    if (Array.isArray(punto) && punto.length >= 2) {
+      lat = Number(punto[0])
+      lon = Number(punto[1])
+    } else if (punto && typeof punto === 'object') {
+      const p = punto as Record<string, unknown>
+      lat = Number(p.lat ?? p.latitude)
+      lon = Number(p.lon ?? p.lng ?? p.longitude)
+    }
+
+    if (lat !== null && lon !== null && Number.isFinite(lat) && Number.isFinite(lon)) {
+      salida.push({ lat, lon })
+    }
+  }
+
+  return salida
+}
+
 const COLECCION_VACIA = { type: 'FeatureCollection' as const, features: [] }
 
 export function MapSurfaceGL({
@@ -91,11 +124,14 @@ export function MapSurfaceGL({
   playerPosition,
   initialCenter,
   tresD = true,
+  fieldProofs,
+  onOpenFieldProofs,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   const marcadorXogadorRef = useRef<maplibregl.Marker | null>(null)
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
+  const marcadoresFotosRef = useRef<maplibregl.Marker[]>([])
 
   /**
    * ¿Está el estilo montado ya?
@@ -187,13 +223,16 @@ export function MapSurfaceGL({
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.12 },
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.2 },
       })
       mapa.addLayer({
         id: CAPA_RADIO_BORDE,
         type: 'line',
         source: FUENTE_RADIO,
-        paint: { 'line-color': COLOR_NODO_ACTUAL, 'line-width': 2, 'line-opacity': 0.75 },
+        // 3 px y blanco al borde: sobre foto aérea con sol, una línea
+        // azul de 2 px se perdía. El radio dice a qué distancia entras
+        // en el nodo; si no se ve, no sirve de nada.
+        paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 0.9 },
       })
 
       mapa.addSource(FUENTE_RUTA, { type: 'geojson', data: COLECCION_VACIA })
@@ -215,6 +254,8 @@ export function MapSurfaceGL({
       marcadorXogadorRef.current = null
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
+      marcadoresFotosRef.current.forEach((marcador) => marcador.remove())
+      marcadoresFotosRef.current = []
       mapa.remove()
       mapaRef.current = null
       setEstiloListo(false)
@@ -300,23 +341,40 @@ export function MapSurfaceGL({
             ? COLOR_NODO_ACTUAL
             : COLOR_NODO_PENDIENTE
 
+      /**
+       * Chincheta, no un punto plano.
+       *
+       * Un círculo suelto sobre la foto aérea no dice DÓNDE toca el suelo:
+       * con la cámara inclinada, un punto plano parece flotar y se lee mal
+       * a qué sitio del terreno pertenece. La forma de gota con la punta
+       * abajo sí lo dice, y anclada por la punta (`anchor: 'bottom'`) se
+       * clava en el sitio exacto aunque el mapa se incline.
+       */
       const elemento = document.createElement('div')
-      elemento.textContent = String(indice + 1)
       elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
       Object.assign(elemento.style, {
-        width: '26px',
-        height: '26px',
-        borderRadius: '50%',
+        width: '30px',
+        height: '30px',
+        borderRadius: '50% 50% 50% 0',
+        transform: 'rotate(-45deg)',
         background: color,
         border: '2px solid #0b1220',
-        color: '#0b1220',
-        font: '900 12px system-ui, sans-serif',
+        boxShadow: '0 3px 10px rgba(0,0,0,.5)',
         display: 'grid',
         placeItems: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,.45)',
       } as Partial<CSSStyleDeclaration>)
 
-      const marcador = new maplibregl.Marker({ element: elemento })
+      // El número va derecho: el giro es de la chincheta, no del texto.
+      const numero = document.createElement('span')
+      numero.textContent = String(indice + 1)
+      Object.assign(numero.style, {
+        transform: 'rotate(45deg)',
+        color: '#0b1220',
+        font: '900 13px system-ui, sans-serif',
+      } as Partial<CSSStyleDeclaration>)
+      elemento.appendChild(numero)
+
+      const marcador = new maplibregl.Marker({ element: elemento, anchor: 'bottom' })
         .setLngLat([nodo.lon as number, nodo.lat as number])
         .addTo(mapa)
 
@@ -324,15 +382,82 @@ export function MapSurfaceGL({
     })
 
     /**
-     * El trazado se queda VACÍO a propósito hasta que siga caminos.
+     * Trazado REAL, el que guarda administración en cada nodo
+     * (`route_track`): sigue caminos de verdad.
      *
-     * Aquí había una línea recta de nodo a nodo, y probándola en el móvil
-     * quedó claro que no es "el trazado a medias": es información falsa.
-     * Cruza el monte por donde no se puede andar, y quien la mire
-     * caminando se fía de ella.
+     * Aquí hubo una línea recta de nodo a nodo y se quitó porque mentía
+     * -cruzaba el monte por donde no se puede andar-. Esto no: es el
+     * mismo trazado que dibuja el motor de Leaflet, leído del mismo sitio.
      */
-    pintarFuente(FUENTE_RUTA, COLECCION_VACIA)
+    const tramos = nodos
+      .map((nodo) => leerTrackDelNodo(nodo))
+      .filter((track) => track.length > 1)
+
+    pintarFuente(
+      FUENTE_RUTA,
+      tramos.length > 0
+        ? {
+            type: 'FeatureCollection',
+            features: tramos.map((track) => ({
+              type: 'Feature' as const,
+              properties: {},
+              geometry: {
+                type: 'LineString' as const,
+                coordinates: track.map((punto) => [punto.lon, punto.lat]),
+              },
+            })),
+          }
+        : COLECCION_VACIA
+    )
   }, [missionStages, currentLevel, pintarFuente])
+
+  /**
+   * Fotos de campo. Marcadores del DOM por lo mismo que los nodos: una
+   * capa de MapLibre quedaría enterrada bajo el relieve, y además una foto
+   * ES una miniatura, que es un elemento del DOM de toda la vida.
+   */
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+
+    marcadoresFotosRef.current.forEach((marcador) => marcador.remove())
+    marcadoresFotosRef.current = []
+
+    const fotos = (Array.isArray(fieldProofs) ? fieldProofs : []).filter(
+      (foto) => typeof foto.lat === 'number' && typeof foto.lon === 'number'
+    )
+
+    fotos.forEach((foto) => {
+      const elemento = document.createElement('button')
+      elemento.type = 'button'
+      elemento.setAttribute('aria-label', `Foto de ${foto.display_name || foto.user}`)
+      Object.assign(elemento.style, {
+        width: '42px',
+        height: '42px',
+        padding: '0',
+        borderRadius: '10px',
+        border: '2px solid #f8fafc',
+        boxShadow: '0 3px 10px rgba(0,0,0,.5)',
+        backgroundImage: `url(${foto.thumbnail_url || foto.image_url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        cursor: 'pointer',
+      } as Partial<CSSStyleDeclaration>)
+
+      elemento.addEventListener('click', (evento) => {
+        evento.stopPropagation()
+        // Se abren TODAS las de ese punto, no solo la tocada: en un nodo
+        // suele haber varias y el visor ya sabe pasarlas.
+        onOpenFieldProofs?.(
+          fotos.filter((otra) => otra.lat === foto.lat && otra.lon === foto.lon)
+        )
+      })
+
+      marcadoresFotosRef.current.push(
+        new maplibregl.Marker({ element: elemento }).setLngLat([foto.lon, foto.lat]).addTo(mapa)
+      )
+    })
+  }, [fieldProofs, onOpenFieldProofs])
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra
   // matriz- y no pide ni un dato más, así que funciona igual sin cobertura.
