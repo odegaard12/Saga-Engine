@@ -6,7 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.2
+## 5.14.3
+
+- **El banco de pruebas mentía, que es peor que no tenerlo.** Comprobaba la
+  fuente de teselas por un nombre que no existe -siempre decía que no había
+  teselas aunque el mapa las estuviera pintando- y tenía un candado que
+  impedía repetir la petición de la partida: si el componente se montaba
+  dos veces, la segunda se quedaba sin nodos para siempre y el panel decía
+  "nodos 0" mientras el mapa tenía diez marcadores puestos.
+- El banco muestra también cuántas fotos cargó y lleva un botón para volver
+  a pedir los datos sin recargar la página.
+
+
 
 - **Encontrado el fallo que se llevó media docena de versiones: el trazado,
   el radio y los volúmenes 3D nunca recibían sus datos.** La línea que los

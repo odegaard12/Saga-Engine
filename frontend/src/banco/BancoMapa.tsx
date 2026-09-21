@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import { MapSurfaceGL } from '../player/components/MapSurfaceGL'
 import type { FieldProof, PlayerStage } from '../types/player'
@@ -92,7 +92,7 @@ function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
 
   return {
     estiloCargado: mapa.isStyleLoaded() === true,
-    teselas: Boolean(mapa.getSource('saga-teselas')),
+    teselas: Boolean(mapa.getSource('saga-raster')),
     relieve: Boolean(mapa.getSource('saga-relieve')),
     terreno,
     zoom: Number(mapa.getZoom().toFixed(2)),
@@ -124,17 +124,23 @@ export default function BancoMapa() {
   const [tresD, setTresD] = useState(true)
   const [lectura, setLectura] = useState<Lectura | null>(null)
   const [posicion, setPosicion] = useState<{ lat: number; lon: number } | null>(null)
-  const pedidoRef = useRef(false)
+  const [intento, setIntento] = useState(0)
 
   const usuario = useMemo(
     () => new URLSearchParams(window.location.search).get('user') || '',
     []
   )
 
+  /**
+   * Pedir la partida. Sin candados.
+   *
+   * Había un `useRef` que impedía repetir la petición, y si el componente
+   * se montaba dos veces -cosa que pasa- la segunda se quedaba sin nodos
+   * para siempre: el panel decía "nodos 0" mientras el mapa tenía diez
+   * marcadores puestos. Un banco de pruebas que miente es peor que no
+   * tenerlo.
+   */
   useEffect(() => {
-    if (pedidoRef.current) return
-    pedidoRef.current = true
-
     if (!usuario) {
       setError('Falta ?user= en la dirección. Ejemplo: /banco-mapa?user=NOMBRE')
       return
@@ -164,7 +170,7 @@ export default function BancoMapa() {
         // Las fotos son un extra; sin ellas el banco sigue valiendo.
       }
     })()
-  }, [usuario])
+  }, [usuario, intento])
 
   // Las lecturas se refrescan solas: casi todo lo interesante del mapa
   // cambia sin que React se entere.
@@ -199,6 +205,7 @@ export default function BancoMapa() {
 
         <Fila etiqueta="nodos" valor={String(stages.length)} mal={stages.length === 0} />
         <Fila etiqueta="nivel" valor={String(nivel)} />
+        <Fila etiqueta="fotos" valor={String(fotos.length)} />
 
         {lectura ? (
           <>
@@ -239,12 +246,18 @@ export default function BancoMapa() {
           <button type="button" style={ESTILO_BOTON} onClick={() => setTresD((v) => !v)}>
             {tresD ? 'ver 2D' : 'ver 3D'}
           </button>
+          <button type="button" style={ESTILO_BOTON} onClick={() => setIntento((v) => v + 1)}>
+            recargar datos
+          </button>
           <button
             type="button"
             style={ESTILO_BOTON}
             onClick={() => setNivel((v) => (v + 1) % Math.max(1, stages.length))}
           >
             nodo siguiente
+          </button>
+          <button type="button" style={ESTILO_BOTON} onClick={() => setIntento((v) => v + 1)}>
+            recargar datos
           </button>
           <button
             type="button"
