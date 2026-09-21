@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.16.1
+## 5.16.2
+
+- **5.16.1 no bastaba: el worker importa a su vez otro fichero.**
+  `maplibre-gl-worker.mjs` hace `import "./maplibre-gl-shared.mjs"`, y con
+  `?url` Vite sólo copiaba el primero; el segundo daba 404 y el módulo
+  moría igual de callado. Medido: fichero servido con 200 y `text/javascript`,
+  y aun así cero respuestas del worker. Ahora se importa con `?worker&url`,
+  que empaqueta el worker CON sus dependencias en un único fichero con hash.
+
+
 
 - **EL fallo de toda la migración al mapa 3D, y el más silencioso.**
   MapLibre v6 hace su trabajo pesado en un web worker que carga como módulo

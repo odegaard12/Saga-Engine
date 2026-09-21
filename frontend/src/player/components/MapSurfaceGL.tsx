@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 
 /**
  * EL fallo de toda la migración, y el más silencioso.
@@ -19,9 +19,11 @@ import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
  * por eso eran lo único que se veía. Tuvo pinta de bug de datos, de bug
  * de eventos, de bug de posición y de bug del móvil, y no era ninguno.
  *
- * Con `?url` Vite emite el fichero con su hash en `/assets/` y aquí se
- * le da a MapLibre la dirección de verdad. Mismo origen, mismo caché
- * offline que el resto de la aplicación.
+ * Y no vale con `?url`: ese worker hace a su vez
+ * `import "./maplibre-gl-shared.mjs"`, que tampoco estaría. Con
+ * `?worker&url` Vite empaqueta el worker CON lo que importa en un único
+ * fichero con hash en `/assets/`, y aquí se le da a MapLibre esa
+ * dirección. Mismo origen, mismo caché offline que el resto.
  */
 maplibregl.setWorkerUrl(urlDelWorker)
 import type { FieldProof, PlayerStage } from '../../types/player'

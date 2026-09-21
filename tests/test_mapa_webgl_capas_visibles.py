@@ -36,7 +36,10 @@ def test_o_worker_de_maplibre_ten_url_propia(fonte: str) -> None:
     pareció bug de datos, de eventos, de posición y del móvil, y no era
     ninguno. Con `?url` Vite emite el fichero y aquí se le da la dirección.
     """
-    assert "from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'" in fonte
+    # `?worker&url`, no `?url`: el worker importa a su vez
+    # `./maplibre-gl-shared.mjs`, y con `?url` ese segundo fichero tampoco
+    # se copia. Vite tiene que empaquetar el worker CON sus imports.
+    assert "from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'" in fonte
     assert "maplibregl.setWorkerUrl(urlDelWorker)" in fonte
 
 
