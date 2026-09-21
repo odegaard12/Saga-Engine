@@ -6,6 +6,30 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.13.0
+
+Cuatro cosas que faltaban en el mapa 3D, dichas mirándolo en el móvil.
+
+- **Chinchetas, no puntos planos.** Un círculo suelto sobre la foto aérea
+  no dice DÓNDE toca el suelo: con la cámara inclinada parece flotar. La
+  forma de gota con la punta abajo, anclada por la punta, se clava en el
+  sitio exacto aunque el mapa se incline. Con el número dentro, derecho
+  (el giro es de la chincheta, no del texto).
+- **El radio del nodo ahora se ve**: el borde era azul de 2 px y se perdía
+  sobre foto aérea con sol. Blanco de 3 px. Ese círculo dice a qué
+  distancia entras en el nodo; si no se ve, no sirve de nada.
+- **Trazado real de vuelta.** No la línea recta que se quitó por mentir,
+  sino el `route_track` que guarda administración en cada nodo — el mismo
+  que dibuja el motor de Leaflet, leído del mismo sitio y con el mismo
+  lector.
+- **Fotos de campo** sobre el mapa, y al tocarlas se abre el visor con
+  todas las de ese punto. Marcadores del DOM por lo mismo que los nodos:
+  una capa de MapLibre quedaría enterrada bajo el relieve, y una foto ES
+  una miniatura.
+
+Quedan: avatares del grupo, los tres encuadres, el aura de GPS, el cono de
+orientación y el modo depuración.
+
 ## 5.12.1
 
 Los nodos no se veían en el mapa 3D. Y no daba ningún error, que es lo que

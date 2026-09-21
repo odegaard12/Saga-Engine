@@ -48,6 +48,10 @@ export type MapSurfacePropsGL = {
    * cuenta era exactamente lo que se veía descolgado del diseño.
    */
   tresD?: boolean
+  /** Fotos de campo sobre el mapa. */
+  fieldProofs?: FieldProof[]
+  /** Se abre el visor al tocar una foto. */
+  onOpenFieldProofs?: (proofs: FieldProof[]) => void
 }
 
 /**
@@ -58,19 +62,8 @@ export type MapSurfacePropsGL = {
  * defecto -y no antes-.
  */
 export type CapasPendentesGL = {
-  /**
-   * Trazado por CAMINOS reales.
-   *
-   * Probado en el móvil con línea recta de nodo a nodo y descartado: no
-   * es "el trazado a medias", es información falsa -cruza el monte por
-   * donde no se puede andar, y quien la mire caminando se fía-. Hasta que
-   * siga caminos, el motor nuevo no pinta ninguna ruta.
-   */
-  trazadoPorCamiños: true
   /** Avatares del resto del grupo, con agrupación cuando se juntan. */
   grupo: TeamProfileLiveStatus[]
-  /** Fotos de campo sobre el mapa. */
-  fotos: FieldProof[]
   /** Estado del GPS y el aura de precisión. */
   gps: PlayerGpsStatus
   /** Cono de orientación (brújula). */

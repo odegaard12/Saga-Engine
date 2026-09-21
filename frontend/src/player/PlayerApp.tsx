@@ -2990,6 +2990,8 @@ export default function PlayerApp() {
             currentLevel={payload.level || 0}
             playerPosition={playerPosition}
             tresD={mapaTresD}
+            fieldProofs={todasAsFotos}
+            onOpenFieldProofs={setSelectedFieldProofs}
             initialCenter={
               browserGpsPosition ??
               (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
