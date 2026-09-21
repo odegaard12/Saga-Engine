@@ -418,7 +418,15 @@ export function MapSurfaceGL({
        *
        * No se expone nunca por defecto: es una puerta abierta al mapa.
        */
-      ;(window as unknown as { __sagaMapa?: maplibregl.Map }).__sagaMapa = mapa
+      const ventana = window as unknown as {
+        __sagaMapa?: maplibregl.Map
+        __sagaEstilo?: () => maplibregl.StyleSpecification
+      }
+      ventana.__sagaMapa = mapa
+      // El estilo también: en una pestaña que no pinta, MapLibre nunca
+      // monta el estilo (espera un fotograma). Con esto se puede forzar
+      // desde fuera y medir las capas de datos aunque nadie mire.
+      ventana.__sagaEstilo = estiloDelMapa
     }
 
     return () => {

@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.5
+## 5.14.6
+
+- El asa de depuración expone también el estilo del mapa. En una pestaña
+  que no pinta MapLibre nunca monta el estilo -espera un fotograma-, y sin
+  eso no había forma de medir las capas de datos. Ahora se puede forzar el
+  montaje desde fuera y comprobar trazado, radio y volumen sin que nadie
+  tenga que estar mirando.
+
+
 
 - **Los nodos por fin se quedan en su sitio.** Salían apilados en columna
   y sólo "iban a su ubicación" al ampliar, y a escala de toda Galicia los
