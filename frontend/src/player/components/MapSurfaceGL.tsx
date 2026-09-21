@@ -600,10 +600,22 @@ export function MapSurfaceGL({
        */
       const elemento = document.createElement('div')
       elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
+      /**
+       * NUNCA `position` en el elemento del marcador.
+       *
+       * MapLibre lo coloca con su clase (`position: absolute`) más un
+       * `transform` que va SUMANDO al sitio donde el elemento esté. Aquí
+       * hubo un `position: 'relative'` en línea -para que la sombra y la
+       * gota, absolutas, tuvieran a quién referirse- y el estilo en línea
+       * gana a la clase: los diez nodos quedaron en flujo de documento,
+       * apilados en columna desde la esquina del mapa, y MapLibre sólo
+       * les sumaba el desplazamiento. De ahí la "fila de nodos" que
+       * costó cinco versiones. El `absolute` de MapLibre ya sirve de
+       * referencia a los hijos; no hace falta nada más.
+       */
       Object.assign(elemento.style, {
         width: '28px',
         height: '34px',
-        position: 'relative',
       } as Partial<CSSStyleDeclaration>)
 
       /**
