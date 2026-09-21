@@ -6,7 +6,7 @@ cruce) y cuatro tramos; y la forma de un tramo con un vértice inútil se
 simplifica.
 """
 
-from backend.app.runtime.road_graph import baldosas, bbox_alrededor, construir_grafo, simplificar
+from backend.app.runtime.road_graph import _cuartos, _lado_km, baldosas, bbox_alrededor, construir_grafo, simplificar
 
 
 def _nodo(i, lat, lon):
@@ -49,3 +49,12 @@ def test_as_baldosas_cobren_todo_o_rectangulo() -> None:
     assert min(t[1] for t in trozos) == bbox[1] and max(t[3] for t in trozos) == bbox[3]
     for sur, oeste, norte, este in trozos:
         assert (norte - sur) * 111.32 <= 15.01
+
+
+def test_os_cuartos_parten_a_baldosa_en_catro() -> None:
+    """Una baldosa que falla se parte en cuatro cuartos que la cubren y miden la mitad de lado."""
+    bbox = (42.0, -9.0, 42.2, -8.7)
+    cuartos = _cuartos(bbox)
+    assert len(cuartos) == 4
+    assert min(c[0] for c in cuartos) == 42.0 and max(c[2] for c in cuartos) == 42.2
+    assert abs(_lado_km(cuartos[0]) - _lado_km(bbox) / 2) < 0.5

@@ -42,8 +42,12 @@ LADO_BALDOSA_KM = 25.0
 # Overpass concede pocas ranuras por IP: peticiones encadenadas sin pausa
 # acaban en 504 en todos los espejos. Entre baldosas se espera un poco, y
 # ante un fallo se espera más antes de probar el siguiente espejo.
-PAUSA_ENTRE_BALDOSAS_S = 4.0
-PAUSA_TRAS_FALLO_S = 15.0
+PAUSA_ENTRE_BALDOSAS_S = 2.0
+PAUSA_TRAS_FALLO_S = 6.0
+# Si una baldosa falla (zona densa: una ciudad entera en 25 km es demasiado
+# para Overpass), se parte en cuatro y se vuelve a pedir. Hasta este lado
+# mínimo; por debajo, el fallo ya no es de tamaño.
+LADO_MINIMO_KM = 3.0
 
 # Lo que está pasando ahora mismo, para que el panel lo enseñe: la
 # construcción corre en segundo plano y el panel la consulta.
@@ -226,26 +230,48 @@ def estado(data_dir):
     }
 
 
+def _lado_km(bbox):
+    sur, oeste, norte, este = bbox
+    return max((norte - sur) * 111.32, (este - oeste) * 111.32 * math.cos(math.radians((sur + norte) / 2)))
+
+
+def _cuartos(bbox):
+    sur, oeste, norte, este = bbox
+    lat_m, lon_m = (sur + norte) / 2, (oeste + este) / 2
+    return [(sur, oeste, lat_m, lon_m), (sur, lon_m, lat_m, este), (lat_m, oeste, norte, lon_m), (lat_m, lon_m, norte, este)]
+
+
 async def _pedir_baldosa(cliente, bbox):
-    """Una baldosa, probando los espejos en orden con pausa tras cada fallo. Lanza si fallan todos."""
+    """
+    Una baldosa, probando los espejos en orden. Si todos fallan y la baldosa
+    aún es grande, se parte en cuatro y se piden los cuartos: el 504 de
+    Overpass casi siempre es "demasiado para una petición" (una ciudad
+    entera dentro), no "no funciona". Lanza sólo si falla por debajo del
+    lado mínimo.
+    """
     import asyncio
 
     consulta = consulta_overpass(bbox)
     ultimo = None
-    for vuelta in range(2):
-        for url in OVERPASS_ESPEJOS:
-            try:
-                respuesta = await cliente.post(
-                    url,
-                    data={"data": consulta},
-                    headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
-                )
-                respuesta.raise_for_status()
-                return respuesta.json().get("elements", [])
-            except Exception as exc:  # 504, red, JSON roto: esperar y al siguiente
-                ultimo = exc
-                await asyncio.sleep(PAUSA_TRAS_FALLO_S * (vuelta + 1))
-    raise RuntimeError("Overpass no responde en ningún espejo: %s" % ultimo)
+    for url in OVERPASS_ESPEJOS:
+        try:
+            respuesta = await cliente.post(
+                url,
+                data={"data": consulta},
+                headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
+            )
+            respuesta.raise_for_status()
+            return respuesta.json().get("elements", [])
+        except Exception as exc:  # 504, red, JSON roto: al siguiente espejo
+            ultimo = exc
+            await asyncio.sleep(PAUSA_TRAS_FALLO_S)
+    if _lado_km(bbox) > LADO_MINIMO_KM:
+        elementos = []
+        for cuarto in _cuartos(bbox):
+            elementos.extend(await _pedir_baldosa(cliente, cuarto))
+            await asyncio.sleep(PAUSA_ENTRE_BALDOSAS_S)
+        return elementos
+    raise RuntimeError("Overpass no responde ni con baldosas de %.0f km: %s" % (_lado_km(bbox), ultimo))
 
 
 async def descargar_y_construir(httpx_modulo, puntos, margen_km, data_dir):
