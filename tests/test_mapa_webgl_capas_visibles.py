@@ -164,6 +164,9 @@ def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None
     assert "marcadoresNodosRef.current.push" not in fonte, (
         "volvieron los nodos como marcadores del DOM"
     )
+    # Las fotos, lo mismo: un marcador del DOM "no se queda en su sitio".
+    assert "marcadoresFotosRef" not in fonte, "volvieron las fotos como marcadores del DOM"
+    assert "id: CAPA_FOTOS" in fonte and "function dibujarFoto(" in fonte
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
