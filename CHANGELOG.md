@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.3
+## 5.14.4
+
+- El banco de mapa cuenta sus propios montajes y enseña qué respondió la
+  API (código, nodos, nivel). Se vio "nodos 0" con nueve chinchetas en el
+  mapa, y en vez de deducir por qué, que lo diga él.
+- Botón **nodos de prueba**: tres nodos inventados cerca de Catoira, con
+  trazado y radio. Prueban el trazado, el radio y el volumen 3D sin depender
+  de la API ni de la sesión: si con ellos se ve, el motor está bien y lo que
+  falla es de dónde salen los datos; y al revés.
+
+
 
 - **El banco de pruebas mentía, que es peor que no tenerlo.** Comprobaba la
   fuente de teselas por un nombre que no existe -siempre decía que no había
