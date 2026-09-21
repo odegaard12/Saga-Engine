@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.24.1
+## 5.24.2
+
+- **La barra de carga ya no se queda en 0 % ni en 100 %.** El grafo de
+  caminos (21 MB) había entrado en el paquete como "una tesela más": la
+  barra cuenta teselas, las 4 000 ya estaban (0 → 100 de golpe) y luego se
+  quedaba en 100 % minutos esperando ese único fichero, compitiendo con la
+  carga del mapa. Sale del paquete: el mapa lo pide después de pintar y el
+  service worker lo guarda al pasar, para el modo sin cobertura.
+
+
 
 - La imagen instala `libexpat1`: `pyosmium` la carga en tiempo de ejecución
   y la imagen slim no la trae, así que `import osmium` moría y la red de

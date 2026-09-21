@@ -157,7 +157,7 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   relieve: ZOOMS_RELIEVE,
   niveles: NIVELES,
   mision: [MISSION_AREA_RADIUS_KM, ROUTE_CORRIDOR_KM, NODE_DETAIL_RADIUS_KM],
-  grafo: 1,
+  grafo: 2,
 })
 
 function metersPerTile(lat: number, zoom: number) {
@@ -547,7 +547,7 @@ export async function prefetchMissionMapTiles(
   const center = routeCenter(routePoints)
 
   onProgress?.({
-    label: 'Calculando mapa',
+    label: 'Abriendo el mapa guardado',
     done: 0,
     total: 100,
     detail: 'Continente · país · región · zona de misión · corredor · nodos',
@@ -651,12 +651,12 @@ export async function prefetchMissionMapTiles(
   }
 
   /**
-   * La red de caminos, si el panel la preparó. Es un fichero, no una tesela,
-   * pero va en el mismo paquete y por la misma caché: sin ella, fuera del
-   * trazado la guía sólo puede ir en línea recta. Si no existe (404) el
-   * fetch falla y se cuenta como no guardada, sin romper nada.
+   * La red de caminos NO va en este paquete. Son 21 MB en un solo fichero
+   * y la barra cuenta teselas: se quedaba en 100 % "esperando una tesela"
+   * durante minutos, compitiendo con la carga del mapa. La guarda el
+   * service worker (primero lo guardado) la primera vez que el mapa la
+   * pide, y el mapa la pide DESPUÉS de haber pintado.
    */
-  if (!urls.has('/api/road-graph')) urls.set('/api/road-graph', 'road-graph')
 
   const orderedUrls = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
   await fetchAndCacheUrls(orderedUrls, onProgress)

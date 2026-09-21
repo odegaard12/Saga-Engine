@@ -347,6 +347,10 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     assert "export function rutaPorCaminos(" in ruta and "class Monticulo" in ruta
     sw = (COMPONENTE.parents[3] / "public" / "sw.js").read_text(encoding="utf-8")
     assert "url.pathname === '/api/road-graph'" in sw
+    # 21 MB en un fichero: fuera del paquete de teselas, pedido tras pintar.
+    pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "urls.set('/api/road-graph'" not in pack
+    assert "void cargarGrafo().then" in fonte.split("mapa.once('idle'")[1]
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
