@@ -235,13 +235,15 @@ def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
     """
     Continente en calidad general, país mejor, región mejor, comarca mejor,
     y la máxima sólo donde se camina. Al desampliar sin cobertura nunca
-    aparece un hueco. El relieve, en cambio, sólo donde se camina: pesa el
-    triple y a zoom bajo apenas se lee.
+    aparece un hueco. El relieve va de región hacia arriba: continente y
+    país (z3-z7) no lo tienen, que a ese zoom no se lee.
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     for etiqueta in ("nivel-continente-z3", "nivel-pais-z7", "nivel-region-z9", "nivel-comarca-z11"):
         assert etiqueta in fonte, "falta el nivel %s" % etiqueta
-    assert "if (!/^(mission|corridor)/.test(etiqueta)) continue" in fonte
+    # Relieve de z8 arriba (región, comarca, misión, corredor). Se decidió
+    # con el enlace dado días antes para bajar en casa: pesa ~50 MB más.
+    assert "if (!/^(mission|corridor|nivel-region|nivel-comarca)/.test(etiqueta)) continue" in fonte
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:

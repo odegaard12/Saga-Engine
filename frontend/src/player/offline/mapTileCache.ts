@@ -552,15 +552,19 @@ export async function prefetchMissionMapTiles(
       const z = Number(trozos[1])
       if (!ZOOMS_RELIEVE.includes(z)) continue
       /**
-       * Sólo para la zona de misión y el corredor, no para los niveles
-       * de continente, país, región y comarca. Una tesela de elevación
-       * pesa el triple que una de imagen; darle relieve a media Galicia
-       * eran 30 MB para un desnivel que a ese zoom apenas se lee. Donde se
-       * camina, sí: ahí es donde el monte tiene que ser el mismo con o sin
-       * cobertura.
+       * Relieve para región, comarca, zona de misión y corredor: todo lo
+       * que va de z8 hacia arriba. Continente y país (z3-z7) quedan sin
+       * relieve, que a ese zoom no se lee y la fuente tampoco lo sirve
+       * por debajo de z8.
+       *
+       * Son unos 50 MB más de paquete. Se decidió a propósito: el enlace
+       * se da días antes de la salida y cada jugador entra en casa, con
+       * wifi, a bajar todo; la cortina de cuenta atrás bloquea jugar hasta
+       * la hora. A cambio, el monte es el mismo con o sin cobertura desde
+       * la vista de toda Galicia hasta el camino.
        */
       const etiqueta = urls.get(clave) || ''
-      if (!/^(mission|corridor)/.test(etiqueta)) continue
+      if (!/^(mission|corridor|nivel-region|nivel-comarca)/.test(etiqueta)) continue
       const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
