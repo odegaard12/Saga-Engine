@@ -1208,6 +1208,14 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
     if (!mapa || !focusRequest) return
     if (ultimoEncuadreRef.current === focusRequest.token) return
+    /**
+     * "Centrar en mí" sin posición todavía: se pulsa, el navegador pide el
+     * permiso de ubicación, el jugador acepta… y la posición llega DESPUÉS
+     * de que este efecto haya corrido. Consumir el token aquí era perderlo:
+     * el mapa no se centraba nunca. Se deja pendiente y se vuelve a pasar
+     * por aquí cuando la posición aparece.
+     */
+    if (focusRequest.target === 'player' && !playerPosition) return
     ultimoEncuadreRef.current = focusRequest.token
 
     if (focusRequest.target === 'route') {
@@ -1232,7 +1240,7 @@ export function MapSurfaceGL({
     // `missionStages`/posición se leen en el momento del encuadre; no hay
     // que reencuadrar cuando cambian.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusRequest?.token, focusRequest?.target])
+  }, [focusRequest?.token, focusRequest?.target, playerPosition?.lat, playerPosition?.lon])
 
   // Radio del nodo actual.
   useEffect(() => {
@@ -1437,10 +1445,15 @@ export function MapSurfaceGL({
         <div
           role="status"
           style={{
+            // Centrado por márgenes, no por transform: el contenedor del
+            // mapa lleva sus propias transformaciones y el `translateX`
+            // se veía descentrado en el móvil.
             position: 'absolute',
-            left: '50%',
+            left: 0,
+            right: 0,
             top: '38%',
-            transform: 'translateX(-50%)',
+            width: 'fit-content',
+            margin: '0 auto',
             padding: '8px 14px',
             borderRadius: 999,
             background: 'rgba(var(--theme-ink), .78)',
