@@ -35,6 +35,13 @@ FROM python:3.13-slim
 ENV TZ=Europe/Madrid
 WORKDIR /app
 
+# pyosmium (red de caminos desde el extracto de OpenStreetMap) carga
+# libexpat en tiempo de ejecución y la imagen slim no la trae: sin esto,
+# `import osmium` muere con "libexpat.so.1: cannot open shared object file".
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
