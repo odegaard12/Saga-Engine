@@ -41,6 +41,7 @@ const FUENTE_RUTA = 'saga-ruta'
 const CAPA_RUTA = 'saga-ruta-linea'
 const CAPA_RUTA_BORDE = 'saga-ruta-borde'
 const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
+const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -179,6 +180,13 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           maxzoom: 15,
           encoding: 'terrarium',
         },
+        [FUENTE_RELIEVE_SOMBRAS]: {
+          type: 'raster-dem',
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
+          tileSize: 256,
+          maxzoom: 15,
+          encoding: 'terrarium',
+        },
       },
       layers: [
         { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS },
@@ -187,7 +195,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         {
           id: CAPA_SOMBRAS,
           type: 'hillshade',
-          source: FUENTE_RELIEVE,
+          source: FUENTE_RELIEVE_SOMBRAS,
           /**
          * Sombreado fuerte a propósito.
          *
@@ -197,7 +205,21 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * laderas es lo que hace legible la forma del terreno a esa
          * escala, más que la propia malla.
          */
-        paint: { 'hillshade-exaggeration': 0.85 },
+        paint: {
+          'hillshade-exaggeration': 0.85,
+          /**
+           * Sombra azulada y luz cálida, como en los mapas de montaña.
+           *
+           * Con los colores por defecto (gris sobre gris) el sombreado se
+           * funde con la foto satélite y el monte se lee plano aunque la
+           * malla esté levantada. El contraste de color es lo que hace
+           * que una ladera "se vea" desde arriba.
+           */
+          'hillshade-shadow-color': '#0f172a',
+          'hillshade-highlight-color': '#fef3c7',
+          'hillshade-accent-color': '#1e293b',
+          'hillshade-illumination-direction': 315,
+        },
         },
         {
         id: CAPA_RADIO_RELLENO,
@@ -256,8 +278,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: {
           'fill-extrusion-color': ['get', 'color'],
           'fill-extrusion-height': ['get', 'altura'],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.9,
+          'fill-extrusion-base': ['get', 'base'],
+          'fill-extrusion-opacity': 0.92,
         },
       },
       {
@@ -694,31 +716,41 @@ export function MapSurfaceGL({
      * lo trata como lo que dice ser -algo plantado en el terreno- y crece,
      * se inclina y se tapa solo, sin una línea de código que lo simule.
      */
-    pintarFuente(FUENTE_NODOS_VOLUMEN, {
-      type: 'FeatureCollection',
-      features: nodos.map((nodo, indice) => ({
-        type: 'Feature' as const,
-        properties: {
-          color:
-            indice < currentLevel
-              ? COLOR_NODO_HECHO
-              : indice === currentLevel
-                ? COLOR_NODO_ACTUAL
-                : COLOR_NODO_PENDIENTE,
-          /**
-           * Altura en METROS, y generosa a propósito.
-           *
-           * A zoom 16-17 un poste de diez metros es un punto: la
-           * perspectiva lo aplasta contra el suelo y no se lee como
-           * volumen. Lo que hace que un nodo parezca PLANTADO en el monte
-           * es que se vea su costado, y para eso tiene que ser alto.
-           */
-          altura: indice === currentLevel ? 45 : 28,
+    /**
+     * Cada nodo son DOS volúmenes: un poste fino y una cabeza ancha.
+     *
+     * Un cilindro solo se lee como "depósito de agua". Poste estrecho más
+     * cabeza gorda encima es la silueta de una chincheta clavada, y esa
+     * silueta la reconoce cualquiera desde cualquier ángulo. Todo en
+     * metros: crece, se inclina y se tapa con la perspectiva, sin
+     * simulaciones.
+     */
+    const volumenes: GeoJSON.Feature[] = []
+    nodos.forEach((nodo, indice) => {
+      const color =
+        indice < currentLevel
+          ? COLOR_NODO_HECHO
+          : indice === currentLevel
+            ? COLOR_NODO_ACTUAL
+            : COLOR_NODO_PENDIENTE
+      // El nodo en juego es más alto: se localiza de lejos aunque haya
+      // otros por delante.
+      const alturaPoste = indice === currentLevel ? 40 : 26
+      const centro = { lat: nodo.lat as number, lon: nodo.lon as number }
+      volumenes.push(
+        {
+          type: 'Feature',
+          properties: { color, base: 0, altura: alturaPoste },
+          geometry: circuloGeoJSON(centro, 2.5, 16).features[0].geometry,
         },
-        geometry: circuloGeoJSON({ lat: nodo.lat as number, lon: nodo.lon as number }, 6, 20)
-          .features[0].geometry,
-      })),
+        {
+          type: 'Feature',
+          properties: { color, base: alturaPoste, altura: alturaPoste + 14 },
+          geometry: circuloGeoJSON(centro, 7, 24).features[0].geometry,
+        }
+      )
     })
+    pintarFuente(FUENTE_NODOS_VOLUMEN, { type: 'FeatureCollection', features: volumenes })
 
     /**
      * Abrir sobre el NODO ACTUAL, no sobre la ruta entera.

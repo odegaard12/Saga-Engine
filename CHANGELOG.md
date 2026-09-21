@@ -6,7 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.6
+## 5.15.0
+
+- **Chinchetas 3D de verdad: poste fino y cabeza ancha, en metros.** Un
+  cilindro solo se leía como un depósito de agua. Poste estrecho más cabeza
+  gorda encima es la silueta de una chincheta clavada, y esa silueta la
+  reconoce cualquiera desde cualquier ángulo. Son dos volúmenes extruidos
+  por nodo: crecen, se inclinan y se tapan con la perspectiva, sin
+  simulaciones. El nodo en juego es más alto.
+- **Relieve que se lee, como en los mapas de montaña.** Sombra azulada y luz
+  cálida en el sombreado de laderas: con los grises por defecto se fundía
+  con la foto satélite y el monte parecía plano aunque la malla estuviera
+  levantada. Y el sombreado pasa a una fuente de elevación propia, porque
+  MapLibre avisa de que compartirla con el terreno baja la calidad del
+  dibujo (mismas teselas, misma caché; sólo cambia el nombre).
+- El banco de mapa lee las fuentes por `serialize()`, que es API pública.
+  Leía un campo interno que ya no existe y decía 0 con los datos puestos.
+  Medido: radio 1, trazado 9, volumen 10 -el volcado de 5.14.2 funciona-.
+
+
 
 - El asa de depuración expone también el estilo del mapa. En una pestaña
   que no pinta MapLibre nunca monta el estilo -espera un fotograma-, y sin
