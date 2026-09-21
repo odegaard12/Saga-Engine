@@ -131,19 +131,6 @@ export default function BancoMapa() {
     []
   )
 
-  // El componente del mapa sólo publica el asa con este parámetro. Sin ella
-  // este banco no puede leer nada, así que se pone sola.
-  useEffect(() => {
-    const parametros = new URLSearchParams(window.location.search)
-    if (parametros.has('depurar-mapa')) return
-    parametros.set('depurar-mapa', '1')
-    window.history.replaceState(
-      window.history.state,
-      '',
-      `${window.location.pathname}?${parametros.toString()}`
-    )
-  }, [])
-
   useEffect(() => {
     if (pedidoRef.current) return
     pedidoRef.current = true

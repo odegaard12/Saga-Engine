@@ -380,7 +380,14 @@ export function MapSurfaceGL({
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
-    if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
+    if (
+      new URLSearchParams(window.location.search).has('depurar-mapa') ||
+      // El banco de pruebas SIEMPRE necesita el asa: es su razón de ser, y
+      // pedírsela por parámetro llegaba tarde -los efectos del hijo corren
+      // antes que los del padre, así que el mapa miraba la dirección antes
+      // de que el banco hubiera podido escribir el parámetro-.
+      window.location.pathname === '/banco-mapa'
+    ) {
       /**
        * Asa de depuración, solo con `?depurar-mapa=1` en la dirección.
        *

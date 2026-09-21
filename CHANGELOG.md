@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.0
+## 5.14.1
+
+- El banco de mapa ya no necesitaba recargarse para mostrar los números. Se
+  pedía el asa del mapa por parámetro en la dirección, y llegaba tarde: los
+  efectos del hijo corren antes que los del padre, así que el mapa miraba la
+  dirección antes de que el banco hubiera podido escribir el parámetro.
+
+
 
 - **Banco de pruebas del mapa en `/banco-mapa?user=NOMBRE`.** El mapa no se
   podía mirar, y ese era el problema de fondo: la pantalla del jugador sólo
