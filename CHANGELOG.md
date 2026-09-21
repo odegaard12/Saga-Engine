@@ -6,7 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.20.0
+## 5.21.0
+
+- **La pantalla de carga vuelve a bajar lo que falta, y esta vez para
+  siempre.** El resumen guardado en el móvil lleva ahora la FIRMA del plan
+  (tope, niveles, relieve, radios): cuando cambia lo que lleva el paquete,
+  el resumen viejo deja de valer solo. Tres versiones seguidas dejaron la
+  barra al 100 % de golpe y el mapa cargando de la red al moverse porque
+  el resumen seguía diciendo "completo"; ya no puede pasar.
+- **Un solo botón para encuadrar y enderezar.** Fuera el botón flotante de
+  norte: el botón de la barra de "ver la ruta / volver a mí" -que en el
+  motor nuevo no hacía nada porque los encuadres estaban pendientes- ahora
+  encuadra de verdad, siempre con el norte arriba, y su aguja gira con el
+  mapa para avisar de que está girado.
+- **Los tres encuadres y "seguirme" en el mapa 3D.** Ver la ruta entera,
+  ver el nodo, volver a mí; y la cámara sigue al jugador, suave, hasta que
+  toca el mapa con la mano.
+- **Vuelve la animación entre el jugador y el nodo**: una línea a trazos de
+  ti al nodo que toca, con los trazos avanzando hacia él. Recta a
+  propósito: no dice por dónde ir -eso lo dice el trazado-, dice hacia
+  dónde.
+- El botón 2D/3D: el color va con la etiqueta. "3D" claro, "2D" oscuro.
+
+
 
 - **La cuenta atrás de salida habría fallado dos horas, y ya no.** El
   contenedor corre en UTC y el móvil en hora local; la fecha del panel se
