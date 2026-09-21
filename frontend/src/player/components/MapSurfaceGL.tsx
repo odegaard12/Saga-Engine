@@ -397,9 +397,11 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
          * es la misma foto vista de lado.
          *
-         * `maxzoom: 15` porque es hasta donde llega Terrarium. Sin ese
-         * tope, al acercarse MapLibre pide teselas que no existen y el
-         * relieve desaparece justo cuando más cerca estás.
+         * `maxzoom: 14`: Terrarium llega a 15, pero z15 sólo aporta detalle
+         * que a pie no se aprecia y duplica el relieve del paquete offline
+         * (90 KB por tesela). Con 14, al acercarse MapLibre amplía la de
+         * z14, y el paquete cabe. Sin tope, pediría teselas que no existen
+         * y el relieve desaparecería justo cuando más cerca estás.
          */
         /**
          * El radio y el trazado nacen aquí, vacíos.
@@ -426,14 +428,14 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
-          maxzoom: 15,
+          maxzoom: 14,
           encoding: 'terrarium',
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
-          maxzoom: 15,
+          maxzoom: 14,
           encoding: 'terrarium',
         },
       },

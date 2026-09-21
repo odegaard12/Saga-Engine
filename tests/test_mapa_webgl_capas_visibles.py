@@ -190,7 +190,7 @@ def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
     real, no rectas entre nodos.
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]" in fonte
+    assert "const ZOOMS_RELIEVE = [11, 12, 13, 14]" in fonte
     assert "function puntosDelTrack(" in fonte
     assert "const track = puntosDelTrack(stage)" in fonte
 
@@ -243,7 +243,25 @@ def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
         assert etiqueta in fonte, "falta el nivel %s" % etiqueta
     # Relieve de z8 arriba (región, comarca, misión, corredor). Se decidió
     # con el enlace dado días antes para bajar en casa: pesa ~50 MB más.
-    assert "if (!/^(mission|corridor|nivel-region|nivel-comarca)/.test(etiqueta)) continue" in fonte
+    assert "if (!/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue" in fonte
+    assert "const MAX_TILE_URLS = 8000" in fonte, (
+        "con 1500 el corredor y el detalle de nodos se quedaban fuera por orden de llegada"
+    )
+
+
+def test_a_hora_de_saida_ten_zona() -> None:
+    """
+    El contenedor corre en UTC y el móvil en hora local: una fecha sin zona
+    abría la cortina a la hora y el servidor seguía rechazando avanzar dos
+    horas más. Se guarda con zona desde el panel, el servidor asume España
+    si aun así llega sin ella, y el contenedor vive en Europe/Madrid.
+    """
+    raiz = COMPONENTE.parents[4]
+    assert "ENV TZ=Europe/Madrid" in (raiz / "Dockerfile").read_text(encoding="utf-8")
+    horario = (raiz / "backend" / "app" / "runtime" / "mission_schedule.py").read_text(encoding="utf-8")
+    assert 'ZoneInfo("Europe/Madrid")' in horario
+    admin = (raiz / "frontend" / "src" / "admin" / "AdminApp.tsx").read_text(encoding="utf-8")
+    assert "fechaConZona(missionDraft.mission_launch_at" in admin
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
