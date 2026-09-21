@@ -68,6 +68,21 @@ def test_hai_vixiante_por_se_o_estilo_non_monta(fonte: str) -> None:
     assert "rescates >= 5" in fonte, "sin tope, reintentaría en bucle"
 
 
+def test_o_3d_dos_nodos_e_xeometria_non_debuxo(fonte: str) -> None:
+    """
+    Los nodos tienen volumen DENTRO del mapa, no sombras en CSS.
+
+    Un marcador del DOM es una calcomanía pegada a la pantalla: no se
+    inclina con la cámara, no lo tapa una loma y al girar el mapa sigue
+    mirando de frente. Por mucha sombra que se le pinte nunca parece parte
+    del terreno. Lo mismo valía para el `rotateX` de las fotos, que además
+    se veía torcido al desplazar porque un giro de CSS no sigue al mapa.
+    """
+    assert "'fill-extrusion'" in fonte, "el volumen de los nodos es geometría"
+    assert "'fill-extrusion-height'" in fonte
+    assert "transform: 'rotateX(" not in fonte, "volvió el volcado falso de CSS"
+
+
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:
     """
     MapLibre REESCRIBE el `transform` del elemento que le entregas.

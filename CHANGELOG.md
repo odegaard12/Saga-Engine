@@ -6,7 +6,24 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.5
+## 5.13.6
+
+- **Los nodos pasan a ser 3D de verdad, no un dibujo que lo imita.** Cada
+  nodo levanta un volumen extruido desde el suelo, con altura en METROS: se
+  inclina con la cámara, lo tapa el monte que tiene delante y crece en
+  perspectiva al acercarse. Un marcador del DOM nunca podía hacer eso -es
+  una calcomanía pegada a la pantalla- por mucha sombra que se le pintara.
+  El nodo en juego se levanta más que los demás, para localizarlo de lejos.
+- **Fuera el volcado falso de las fotos.** Se les había puesto un `rotateX`
+  en CSS para que parecieran tumbadas sobre el terreno. Es mentira y se
+  nota: un giro de CSS no sigue a la cámara, así que al desplazar o girar
+  el mapa quedaban inclinadas hacia un lado que no correspondía a nada.
+- **Al abrir, el mapa va al nodo actual, no a la ruta entera.** Encuadrar
+  los diez nodos de golpe sonaba bien y quedó peor: a zoom 13 los
+  alfileres, que miden lo mismo en píxeles a cualquier escala, se amontonan
+  en una fila de chinchetas sobre medio mapa de Galicia.
+
+
 
 - **El mapa podía quedarse EN BLANCO, y esto explica el "está todo mal".**
   MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`, y un

@@ -40,6 +40,8 @@ const CAPA_RADIO_BORDE = 'saga-radio-borde'
 const FUENTE_RUTA = 'saga-ruta'
 const CAPA_RUTA = 'saga-ruta-linea'
 const CAPA_RUTA_BORDE = 'saga-ruta-borde'
+const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
+const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
  * Los colores de los alfileres NO siguen al tema, igual que en Leaflet.
@@ -169,6 +171,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          */
         [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -233,6 +236,31 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
         },
         {
+        /**
+         * ESTO es 3D de verdad, y no un dibujo que lo imita.
+         *
+         * Los alfileres del DOM son calcomanías pegadas a la pantalla: no
+         * se inclinan con la cámara, no los tapa una loma y al girar el
+         * mapa siguen mirando de frente. Da igual cuánta sombra se les
+         * pinte, nunca van a parecer parte del terreno.
+         *
+         * Un volumen extruido sí es geometría dentro del mapa: se levanta
+         * del suelo, se inclina con la vista, lo esconde el monte que
+         * tiene delante y crece en perspectiva al acercarse. El alfiler
+         * con el número se queda encima, legible, que para leer un número
+         * una calcomanía es justo lo que hace falta.
+         */
+        id: CAPA_NODOS_VOLUMEN,
+        type: 'fill-extrusion',
+        source: FUENTE_NODOS_VOLUMEN,
+        paint: {
+          'fill-extrusion-color': ['get', 'color'],
+          'fill-extrusion-height': ['get', 'altura'],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.75,
+        },
+      },
+      {
         id: CAPA_RUTA,
         type: 'line',
         source: FUENTE_RUTA,
@@ -593,22 +621,47 @@ export function MapSurfaceGL({
     })
 
     /**
-     * Encuadrar la ruta la primera vez, si todavía no hay GPS.
+     * El volumen de cada nodo: un poste corto que sale del suelo.
      *
-     * Abriendo siempre a zoom 16 sobre un punto, los diez nodos de una ruta
-     * de kilómetros caen fuera de la pantalla o salen alineados contra un
-     * borde, que es justo lo que se veía. Encuadrar la ruta entera da el
-     * "dónde estoy y a dónde voy" de un vistazo.
-     *
-     * Solo la primera vez y solo sin GPS: en cuanto hay posición, mandas
-     * tú, y mover la cámara bajo los pies del jugador es peor que no
-     * encuadrar nada.
+     * Radio pequeño y altura en METROS, no en píxeles: así la perspectiva
+     * lo trata como lo que dice ser -algo plantado en el terreno- y crece,
+     * se inclina y se tapa solo, sin una línea de código que lo simule.
      */
-    if (!encuadreInicialRef.current && nodos.length > 1 && !playerPosition) {
+    pintarFuente(FUENTE_NODOS_VOLUMEN, {
+      type: 'FeatureCollection',
+      features: nodos.map((nodo, indice) => ({
+        type: 'Feature' as const,
+        properties: {
+          color:
+            indice < currentLevel
+              ? COLOR_NODO_HECHO
+              : indice === currentLevel
+                ? COLOR_NODO_ACTUAL
+                : COLOR_NODO_PENDIENTE,
+          // El nodo en juego se levanta más: se localiza de un vistazo
+          // desde lejos, incluso con otros nodos por delante.
+          altura: indice === currentLevel ? 22 : 12,
+        },
+        geometry: circuloGeoJSON({ lat: nodo.lat as number, lon: nodo.lon as number }, 3.5, 20)
+          .features[0].geometry,
+      })),
+    })
+
+    /**
+     * Abrir sobre el NODO ACTUAL, no sobre la ruta entera.
+     *
+     * Encuadrar los diez nodos de golpe sonaba bien y quedó fatal: a zoom
+     * 13 la ruta entra en pantalla pero los alfileres, que tienen tamaño
+     * fijo en píxeles, se amontonan en una fila de chinchetas sobre un
+     * mapa de media Galicia. No informa de nada y parece roto.
+     *
+     * Lo que hace falta al abrir es "dónde tengo que ir ahora", así que se
+     * abre encima del nodo en juego. Solo la primera vez y solo sin GPS:
+     * en cuanto hay posición, manda ella.
+     */
+    if (!encuadreInicialRef.current && !playerPosition && currentStage?.lat != null) {
       encuadreInicialRef.current = true
-      const limites = new maplibregl.LngLatBounds()
-      nodos.forEach((nodo) => limites.extend([nodo.lon as number, nodo.lat as number]))
-      mapa.fitBounds(limites, { padding: 60, animate: false, maxZoom: 16 })
+      mapa.jumpTo({ center: [currentStage.lon as number, currentStage.lat as number], zoom: 17 })
     }
 
     /**
@@ -642,7 +695,7 @@ export function MapSurfaceGL({
     // `playerPosition` solo decide si procede encuadrar al entrar; no debe
     // rehacer los marcadores en cada paso que das.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionStages, currentLevel, pintarFuente])
+  }, [missionStages, currentLevel, currentStage?.lat, currentStage?.lon, pintarFuente])
 
   /**
    * Fotos de campo. Marcadores del DOM por lo mismo que los nodos: una
@@ -671,9 +724,6 @@ export function MapSurfaceGL({
        */
       const envoltorio = document.createElement('div')
       Object.assign(envoltorio.style, {
-        // La perspectiva tiene que vivir en el PADRE para que el volcado
-        // del hijo tenga profundidad real y no sea un simple aplastado.
-        perspective: '140px',
         transformOrigin: 'bottom center',
         cursor: 'pointer',
       } as Partial<CSSStyleDeclaration>)
@@ -691,13 +741,17 @@ export function MapSurfaceGL({
         // una mancha de la propia imagen satélite.
         border: '3px solid #f8fafc',
         /**
-         * Inclinada hacia atrás y levantada del suelo.
+         * SIN volcado falso.
          *
-         * Con la cámara en 3D el suelo se ve en picado; una foto
-         * perfectamente plana parecía pegada al cristal de la pantalla en
-         * vez de estar EN el sitio. Volcarla la planta sobre el terreno.
+         * Aquí hubo un `rotateX` en CSS para que la foto pareciera tumbada
+         * sobre el terreno. Es mentira y se nota: un giro de CSS no sigue
+         * a la cámara del mapa, así que al desplazar o girar la foto se
+         * queda inclinada hacia un lado que no corresponde a nada. Se veía
+         * peor que plana.
+         *
+         * Lo que sí es 3D de verdad va en el mapa, no en el DOM: ver la
+         * capa de postes extruidos de los nodos.
          */
-        transform: 'rotateX(22deg)',
         transformOrigin: 'bottom center',
         boxShadow: '0 2px 4px rgba(0,0,0,.45), 0 12px 16px -6px rgba(0,0,0,.6)',
         backgroundImage: `url(${foto.thumbnail_url || foto.image_url})`,
