@@ -38,7 +38,16 @@ OVERPASS_ESPEJOS = (
 # Lado máximo de cada baldosa de descarga, en km. Una zona de 80x80 km de
 # una sola vez tumba el servidor público (504); en baldosas de 15 km cada
 # petición es pequeña y se une el resultado.
-LADO_BALDOSA_KM = 15.0
+LADO_BALDOSA_KM = 25.0
+# Overpass concede pocas ranuras por IP: peticiones encadenadas sin pausa
+# acaban en 504 en todos los espejos. Entre baldosas se espera un poco, y
+# ante un fallo se espera más antes de probar el siguiente espejo.
+PAUSA_ENTRE_BALDOSAS_S = 4.0
+PAUSA_TRAS_FALLO_S = 15.0
+
+# Lo que está pasando ahora mismo, para que el panel lo enseñe: la
+# construcción corre en segundo plano y el panel la consulta.
+construccion = {"en_curso": False, "hechas": 0, "total": 0, "error": "", "margen_km": None}
 FICHERO = "road_graph.json"
 TOLERANCIA_M = 3.0  # simplificación de la forma de cada tramo
 
@@ -200,13 +209,14 @@ def estado(data_dir):
     """Lo que el panel enseña: si hay grafo, de cuándo, cuánto pesa, cuántos tramos."""
     fichero = ruta_fichero(data_dir)
     if not fichero.exists():
-        return {"hay": False}
+        return {"hay": False, "construccion": dict(construccion)}
     try:
         cuerpo = json.loads(fichero.read_text(encoding="utf-8"))
     except Exception:
-        return {"hay": False, "error": "fichero ilegible"}
+        return {"hay": False, "error": "fichero ilegible", "construccion": dict(construccion)}
     return {
         "hay": True,
+        "construccion": dict(construccion),
         "built_at": cuerpo.get("built_at", ""),
         "bbox": cuerpo.get("bbox"),
         "margen_km": cuerpo.get("margen_km"),
@@ -217,20 +227,24 @@ def estado(data_dir):
 
 
 async def _pedir_baldosa(cliente, bbox):
-    """Una baldosa, probando los espejos en orden. Lanza si fallan todos."""
+    """Una baldosa, probando los espejos en orden con pausa tras cada fallo. Lanza si fallan todos."""
+    import asyncio
+
     consulta = consulta_overpass(bbox)
     ultimo = None
-    for url in OVERPASS_ESPEJOS:
-        try:
-            respuesta = await cliente.post(
-                url,
-                data={"data": consulta},
-                headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
-            )
-            respuesta.raise_for_status()
-            return respuesta.json().get("elements", [])
-        except Exception as exc:  # 504, red, JSON roto: al siguiente espejo
-            ultimo = exc
+    for vuelta in range(2):
+        for url in OVERPASS_ESPEJOS:
+            try:
+                respuesta = await cliente.post(
+                    url,
+                    data={"data": consulta},
+                    headers={"User-Agent": "SagaEngine/1 (grafo de caminos para la ruta)"},
+                )
+                respuesta.raise_for_status()
+                return respuesta.json().get("elements", [])
+            except Exception as exc:  # 504, red, JSON roto: esperar y al siguiente
+                ultimo = exc
+                await asyncio.sleep(PAUSA_TRAS_FALLO_S * (vuelta + 1))
     raise RuntimeError("Overpass no responde en ningún espejo: %s" % ultimo)
 
 
@@ -242,18 +256,31 @@ async def descargar_y_construir(httpx_modulo, puntos, margen_km, data_dir):
     vez. Se piden trozos de 15 km, se unen y se quitan los elementos
     repetidos (una vía que cruza dos baldosas viene en las dos).
     """
+    import asyncio
+
     bbox = bbox_alrededor(puntos, margen_km)
+    trozos = baldosas(bbox)
+    construccion.update({"en_curso": True, "hechas": 0, "total": len(trozos), "error": "", "margen_km": margen_km})
     vistos = set()
     elementos = []
-    async with httpx_modulo.AsyncClient(timeout=120.0) as cliente:
-        for trozo in baldosas(bbox):
-            for el in await _pedir_baldosa(cliente, trozo):
-                clave = (el.get("type"), el.get("id"))
-                if clave in vistos:
-                    continue
-                vistos.add(clave)
-                elementos.append(el)
-    grafo = construir_grafo(elementos)
-    if not grafo["tramos"]:
-        raise ValueError("OpenStreetMap no devolvió caminos en esa zona")
-    return guardar(data_dir, grafo, bbox, margen_km)
+    try:
+        async with httpx_modulo.AsyncClient(timeout=120.0) as cliente:
+            for indice, trozo in enumerate(trozos):
+                for el in await _pedir_baldosa(cliente, trozo):
+                    clave = (el.get("type"), el.get("id"))
+                    if clave in vistos:
+                        continue
+                    vistos.add(clave)
+                    elementos.append(el)
+                construccion["hechas"] = indice + 1
+                if indice + 1 < len(trozos):
+                    await asyncio.sleep(PAUSA_ENTRE_BALDOSAS_S)
+        grafo = construir_grafo(elementos)
+        if not grafo["tramos"]:
+            raise ValueError("OpenStreetMap no devolvió caminos en esa zona")
+        return guardar(data_dir, grafo, bbox, margen_km)
+    except Exception as exc:
+        construccion["error"] = str(exc)[:300]
+        raise
+    finally:
+        construccion["en_curso"] = False

@@ -384,6 +384,7 @@ type EstadoRed = {
   tramos?: number
   bytes?: number
   margen_km?: number
+  construccion?: { en_curso: boolean; hechas: number; total: number; error: string; margen_km?: number }
 }
 
 /**
@@ -426,17 +427,38 @@ function RedDeCaminos() {
     }
   }, [])
 
+  // Mientras construye en el servidor, se pregunta cada 5 s por el progreso.
+  const enCurso = Boolean(estado?.construccion?.en_curso)
+  useEffectRed(() => {
+    if (!enCurso) return
+    const reloj = window.setInterval(() => {
+      pedir('/api/admin/road-graph/status')
+        .then((datos) => {
+          setEstado(datos)
+          if (!datos.construccion?.en_curso) {
+            setOcupado(false)
+            setAviso(
+              datos.construccion?.error
+                ? `No se pudo preparar: ${datos.construccion.error}`
+                : 'Red de caminos preparada. Los móviles la bajarán con el paquete offline en la próxima entrada.'
+            )
+          }
+        })
+        .catch(() => {})
+    }, 5000)
+    return () => window.clearInterval(reloj)
+  }, [enCurso])
+
   async function preparar() {
     setOcupado(true)
     setAviso(null)
     try {
       const datos = await pedir('/api/admin/road-graph/build', { margen_km: margen })
       setEstado(datos)
-      setAviso('Red de caminos preparada. Los móviles la bajarán con el paquete offline en la próxima entrada.')
+      setAviso('Descargando de OpenStreetMap en el servidor, por baldosas. Puedes salir de aquí; sigue sola.')
     } catch (fallo) {
-      setAviso(`No se pudo preparar: ${String((fallo as Error).message || fallo)}`)
-    } finally {
       setOcupado(false)
+      setAviso(`No se pudo arrancar: ${String((fallo as Error).message || fallo)}`)
     }
   }
 
@@ -467,8 +489,12 @@ function RedDeCaminos() {
           />
         </label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'end' }}>
-          <button type="button" className="admin-btn-modern" disabled={ocupado} onClick={preparar}>
-            {ocupado ? 'Descargando de OpenStreetMap…' : estado?.hay ? 'Volver a preparar' : 'Preparar red de caminos'}
+          <button type="button" className="admin-btn-modern" disabled={ocupado || enCurso} onClick={preparar}>
+            {ocupado || enCurso
+              ? `Descargando… ${estado?.construccion?.hechas ?? 0} de ${estado?.construccion?.total || '?'} baldosas`
+              : estado?.hay
+                ? 'Volver a preparar'
+                : 'Preparar red de caminos'}
           </button>
           <span style={{ fontSize: 12, opacity: 0.8 }}>
             {estado === null
