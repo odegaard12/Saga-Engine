@@ -398,7 +398,7 @@ function RedDeCaminos() {
   const [estado, setEstado] = useStateRed<EstadoRed | null>(null)
   const [ocupado, setOcupado] = useStateRed(false)
   const [aviso, setAviso] = useStateRed<string | null>(null)
-  const [margen, setMargen] = useStateRed(12)
+  const [margen, setMargen] = useStateRed(40)
 
   async function pedir(ruta: string, cuerpo: Record<string, unknown> = {}) {
     const res = await fetch(ruta, {
@@ -450,7 +450,8 @@ function RedDeCaminos() {
           Descarga de OpenStreetMap las carreteras y caminos alrededor de la ruta y los guarda como
           grafo. Con esto, si un jugador se sale del trazado, la guía le lleva de vuelta por
           caminos reales, sin cobertura. Se prepara una vez por ruta; tarda entre medio minuto y
-          dos.
+          dos. El margen debe cubrir desde donde la gente llega a la ruta: 40 km suelen bastar
+          (unos 15-20 MB en el paquete de cada móvil).
         </span>
       </div>
 
@@ -460,7 +461,7 @@ function RedDeCaminos() {
           <input
             type="number"
             min={3}
-            max={30}
+            max={45}
             value={margen}
             onChange={(event) => setMargen(Number(event.target.value) || 12)}
           />
