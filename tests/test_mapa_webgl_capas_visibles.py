@@ -26,17 +26,34 @@ def fonte() -> str:
     return COMPONENTE.read_text(encoding="utf-8")
 
 
-def test_as_capas_esperan_a_style_load_e_non_a_load(fonte: str) -> None:
+def test_o_estilo_comprobase_antes_de_escoitalo(fonte: str) -> None:
     """
-    El radio y el trazado se pintan cuando el ESTILO está montado.
+    Preguntar por el estilo ANTES de esperar su evento.
 
-    Con `load` esperaban además al terreno, y si la elevación tardaba o
-    fallaba no se pintaban nunca. El síntoma era desconcertante: se veían los
-    nodos y las fotos (marcadores del DOM, que no esperan a nada) y faltaban
-    justo las dos capas de datos.
+    Dos intentos fallaron aquí, los dos en silencio. `load` esperaba también
+    al terreno y no disparaba si la elevación tardaba. `style.load` parecía
+    la respuesta, pero el estilo se declara EN LÍNEA y MapLibre lo monta de
+    forma síncrona dentro del constructor: el evento ya había pasado cuando
+    se enganchaba el escuchador, y no vuelve a ocurrir.
+
+    El síntoma fue idéntico las dos veces -nodos y fotos sí, capas de datos
+    no- porque los marcadores del DOM no esperan a nada.
     """
-    assert "mapa.on('style.load'" in fonte
-    assert "mapa.on('load'" not in fonte
+    assert "mapa.isStyleLoaded()" in fonte, (
+        "sin comprobar el estilo antes, el evento puede haber pasado ya"
+    )
+    assert "mapa.on('style.load'" in fonte, "hace falta el camino asíncrono"
+    assert "mapa.on('load'" not in fonte, "`load` espera también al terreno"
+
+
+def test_engadir_a_fonte_dúas_veces_non_revienta_o_mapa(fonte: str) -> None:
+    """
+    El montaje puede llegar por el atajo síncrono Y por el evento.
+
+    Añadir dos veces la misma fuente tira el mapa entero, así que el camino
+    tiene que ser idempotente.
+    """
+    assert "if (mapa.getSource(FUENTE_RADIO))" in fonte
 
 
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:

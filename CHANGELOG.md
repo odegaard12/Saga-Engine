@@ -6,7 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.2
+## 5.13.3
+
+- **El radio y el trazado seguían sin pintarse, y ahora se sabe por qué.**
+  En 5.13.1 se cambió `load` por `style.load` dando por hecho que era el
+  evento correcto. Lo es, pero llega tarde: el estilo se declara EN LÍNEA
+  -no por URL- y MapLibre lo monta de forma síncrona dentro del
+  constructor, así que para cuando se engancha el escuchador el evento ya
+  ocurrió y no vuelve a ocurrir. Ahora se pregunta con `isStyleLoaded()`
+  antes de escuchar. Se cazó porque el asa de depuración de 5.13.2 no
+  aparecía en la página, que es exactamente para lo que se puso.
+
+
 
 - **Tu posición vuelve a ser tu avatar, no una chincheta.** En el motor
   nuevo había quedado el marcador por defecto de MapLibre, y eso no es un
