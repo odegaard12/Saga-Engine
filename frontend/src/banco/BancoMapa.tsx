@@ -21,6 +21,38 @@ import type { FieldProof, PlayerStage } from '../types/player'
  * No es una pantalla de juego y no pretende parecerlo.
  */
 
+/** Cuántas veces se ha montado el banco en esta página. Debería ser 1. */
+let montajes = 0
+
+/**
+ * Tres nodos inventados, cerca de Catoira, con trazado y radio.
+ *
+ * Sirven para probar el mapa SIN depender de la API ni de la sesión: si
+ * con estos se ven el trazado, el radio y el volumen, el motor está bien y
+ * lo que falla es de dónde salen los datos. Y al revés.
+ */
+function nodosDePrueba(): PlayerStage[] {
+  const base = { lat: 42.6205, lon: -8.7175 }
+  const paso = (i: number) => ({ lat: base.lat + i * 0.0025, lon: base.lon + i * 0.0018 })
+  const tramo = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => [
+    [a.lat, a.lon],
+    [(a.lat * 2 + b.lat) / 3, (a.lon * 2 + b.lon) / 3 + 0.0006],
+    [(a.lat + b.lat * 2) / 3, (a.lon + b.lon * 2) / 3 - 0.0004],
+    [b.lat, b.lon],
+  ]
+  return [0, 1, 2].map((i) => {
+    const aqui = paso(i)
+    return {
+      id: `prueba-${i + 1}`,
+      title: `Prueba ${i + 1}`,
+      lat: aqui.lat,
+      lon: aqui.lon,
+      radius: 50,
+      route_track: i === 0 ? [] : tramo(paso(i - 1), aqui),
+    } as unknown as PlayerStage
+  })
+}
+
 const ESTILO_PANEL: React.CSSProperties = {
   position: 'absolute',
   top: 12,
@@ -125,6 +157,11 @@ export default function BancoMapa() {
   const [lectura, setLectura] = useState<Lectura | null>(null)
   const [posicion, setPosicion] = useState<{ lat: number; lon: number } | null>(null)
   const [intento, setIntento] = useState(0)
+  const [api, setApi] = useState('pidiendo…')
+  const [instancia] = useState(() => {
+    montajes += 1
+    return `${montajes}·${Math.random().toString(36).slice(2, 6)}`
+  })
 
   const usuario = useMemo(
     () => new URLSearchParams(window.location.search).get('user') || '',
@@ -150,13 +187,17 @@ export default function BancoMapa() {
       try {
         const respuesta = await fetch(`/api/game/${encodeURIComponent(usuario)}?fresh=${Date.now()}`)
         if (!respuesta.ok) {
+          setApi(`HTTP ${respuesta.status}`)
           setError(`El servidor respondió ${respuesta.status} para ese jugador.`)
           return
         }
         const datos = await respuesta.json()
-        setStages(Array.isArray(datos.stages) ? datos.stages : [])
+        const lista = Array.isArray(datos.stages) ? datos.stages : []
+        setApi(`HTTP ${respuesta.status} · ${lista.length} nodos · nivel ${datos.level ?? '?'}`)
+        setStages(lista)
         setNivel(typeof datos.level === 'number' ? datos.level : 0)
       } catch (fallo) {
+        setApi(`falló: ${String(fallo).slice(0, 60)}`)
         setError(`No se pudo pedir la partida: ${String(fallo)}`)
       }
 
@@ -203,6 +244,8 @@ export default function BancoMapa() {
 
         {error ? <div style={{ color: '#f87171' }}>{error}</div> : null}
 
+        <Fila etiqueta="instancia" valor={instancia} mal={montajes > 1} />
+        <Fila etiqueta="api" valor={api} mal={!api.startsWith('HTTP 200')} />
         <Fila etiqueta="nodos" valor={String(stages.length)} mal={stages.length === 0} />
         <Fila etiqueta="nivel" valor={String(nivel)} />
         <Fila etiqueta="fotos" valor={String(fotos.length)} />
@@ -252,12 +295,20 @@ export default function BancoMapa() {
           <button
             type="button"
             style={ESTILO_BOTON}
+            onClick={() => {
+              setStages(nodosDePrueba())
+              setNivel(1)
+              setApi('nodos de prueba')
+            }}
+          >
+            nodos de prueba
+          </button>
+          <button
+            type="button"
+            style={ESTILO_BOTON}
             onClick={() => setNivel((v) => (v + 1) % Math.max(1, stages.length))}
           >
             nodo siguiente
-          </button>
-          <button type="button" style={ESTILO_BOTON} onClick={() => setIntento((v) => v + 1)}>
-            recargar datos
           </button>
           <button
             type="button"
