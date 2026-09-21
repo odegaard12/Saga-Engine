@@ -74,6 +74,14 @@ export type MapSurfacePropsGL = {
    * movía.
    */
   onListo?: () => void
+  /** Los tres encuadres: seguirme, ver el nodo, ver toda la ruta. Siempre con el norte arriba. */
+  focusRequest?: FocusRequestGL | null
+  /** La cámara sigue al jugador mientras nadie toque el mapa. */
+  followPlayer?: boolean
+  /** El jugador ha movido el mapa con la mano: quien siga, que deje de seguir. */
+  onUserMapMove?: () => void
+  /** Rumbo del mapa en grados (0 = norte arriba). Para girar la aguja de la barra. */
+  onRumbo?: (rumbo: number) => void
 }
 
 /**
@@ -90,8 +98,6 @@ export type CapasPendentesGL = {
   gps: PlayerGpsStatus
   /** Cono de orientación (brújula). */
   conoDeOrientacion: true
-  /** Los tres encuadres: seguirme, ver el nodo, ver toda la ruta. */
-  encuadres: FocusRequestGL
   /** Modo depuración: tocar el mapa para moverse. */
   depuracion: true
   /** Aviso de teselas servidas desde la caché sin cobertura. */

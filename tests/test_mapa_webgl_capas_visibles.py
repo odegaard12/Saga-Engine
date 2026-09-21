@@ -264,6 +264,38 @@ def test_a_hora_de_saida_ten_zona() -> None:
     assert "fechaConZona(missionDraft.mission_launch_at" in admin
 
 
+def test_un_so_boton_para_encadrar_e_enderezar(fonte: str) -> None:
+    """
+    No hay botón flotante de norte: el de encuadre de la barra encuadra con
+    el norte arriba y su aguja gira con el mapa. Y los tres encuadres y el
+    "seguirme" existen en el motor nuevo.
+    """
+    assert "Volver a poner el norte arriba" not in fonte, "volvió el botón flotante"
+    assert "bearing: 0, duration: 800" in fonte and "focusRequest.target === 'route'" in fonte
+    assert "followPlayerRef.current && mapa" in fonte
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "onRumbo={setRumboMapa}" in app and "focusRequest={focusRequest}" in app
+
+
+def test_a_guia_do_xogador_ao_nodo_existe(fonte: str) -> None:
+    """La animación entre el jugador y el nodo: línea a trazos que avanza hacia él."""
+    assert "id: CAPA_GUIA" in fonte
+    assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" in fonte
+
+
+def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
+    """
+    Cada cambio de lo que lleva el paquete dejaba un resumen viejo diciendo
+    "completo": barra al 100 % de golpe y el mapa cargando de la red al
+    moverse. Tres veces. La firma lo invalida sola.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "const FIRMA_DEL_PLAN = JSON.stringify({" in fonte
+    assert "if (resumen.firma !== FIRMA_DEL_PLAN) return null" in fonte
+    assert "firma: FIRMA_DEL_PLAN," in fonte
+    assert "for (const [zoom, radioKm, presupuesto, etiqueta] of NIVELES)" in fonte
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.
