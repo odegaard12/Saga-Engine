@@ -424,8 +424,17 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
 
-  // Map tiles are now served via a same-origin proxy (/map-tiles/...)
-  if (url.pathname.startsWith('/map-tiles/')) {
+  /**
+   * Teselas de imagen Y de elevación, las dos desde la caché primero.
+   *
+   * Aquí sólo estaban las de imagen. Sin red, el mapa 3D pedía la
+   * elevación (/dem-tiles/), el service worker la dejaba pasar a la red,
+   * la red no estaba, y el monte salía PLANO: "sin cobertura era otro
+   * mapa, no tenía el mismo desnivel". Las teselas de imagen sí llegaban,
+   * lo que lo hacía aún más raro. Es la misma caché en la que la pantalla
+   * de carga las guarda.
+   */
+  if (url.pathname.startsWith('/map-tiles/') || url.pathname.startsWith('/dem-tiles/')) {
     event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return
   }

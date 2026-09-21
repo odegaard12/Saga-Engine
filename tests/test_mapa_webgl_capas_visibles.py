@@ -166,7 +166,69 @@ def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None
     )
     # Las fotos, lo mismo: un marcador del DOM "no se queda en su sitio".
     assert "marcadoresFotosRef" not in fonte, "volvieron las fotos como marcadores del DOM"
+    # Y el avatar, que era el último marcador del DOM y el único que saltaba.
+    assert "marcadorXogadorRef" not in fonte, "volvió el avatar como marcador del DOM"
+    assert "id: CAPA_JUGADOR" in fonte and "function dibujarAvatar(" in fonte
     assert "id: CAPA_FOTOS" in fonte and "function dibujarFoto(" in fonte
+
+
+def test_o_trazado_leva_estado_e_pulso(fonte: str) -> None:
+    """
+    Verde lo andado, azul el tramo en juego, claro lo pendiente; y un
+    pulso sobre el tramo en juego. El color cuenta la partida sin leer.
+    """
+    assert "properties: { estado: tramo.estado }" in fonte
+    assert "id: CAPA_RUTA_PULSO" in fonte
+    assert "filter: ['==', ['get', 'estado'], 'actual']" in fonte
+    assert "setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity'" in fonte
+
+
+def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
+    """
+    El terreno pide elevación a z14-15 al caminar; bajar sólo hasta z13
+    dejaba el monte plano sin cobertura. Y el corredor sigue el trazado
+    real, no rectas entre nodos.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]" in fonte
+    assert "function puntosDelTrack(" in fonte
+    assert "const track = puntosDelTrack(stage)" in fonte
+
+
+def test_o_service_worker_serve_a_elevacion_sen_rede() -> None:
+    """
+    Sin red, el mapa 3D pedía la elevación y el service worker la dejaba
+    pasar a una red que no estaba: el monte salía PLANO aunque las teselas
+    de imagen sí llegaran. "Sin cobertura era otro mapa."
+    """
+    sw = (COMPONENTE.parents[3] / "public" / "sw.js").read_text(encoding="utf-8")
+    assert "url.pathname.startsWith('/dem-tiles/')" in sw
+    assert "'saga:offline-map-tiles:v3'" in (
+        COMPONENTE.parents[1] / "offline" / "mapTileCache.ts"
+    ).read_text(encoding="utf-8"), "el resumen viejo daría el paquete por completo sin bajar lo nuevo"
+
+
+def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
+    """
+    El mapa avisa una vez en `idle` y el velo de carga espera a ese aviso
+    (con tope). Así decodificar teselas y levantar el relieve pasa DEBAJO
+    del velo, no encima del jugador mientras se mueve.
+    """
+    assert "mapa.once('idle'" in fonte and "onListoRef.current?.()" in fonte
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "onListo={() => setMapaListo(true)}" in app
+    assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
+    assert "setTimeout(() => setMapaListo(true), 7000)" in app, "sin tope, la carga podría ser eterna"
+
+
+def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
+    """
+    El bucle de gemelas de relieve recorre lo que ya está en la lista; antes
+    del corredor no veía las teselas de z15 y el terreno se quedaba sin
+    elevación fina para el paquete offline.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:

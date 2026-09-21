@@ -6,7 +6,18 @@ import type { PlayerStage } from '../../types/player'
 // se pierde en el siguiente arranque y el jugador se queda sin mapa offline
 // creyendo que lo tiene.
 const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
-const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v2'
+/**
+ * v3 desde 5.18.1. Cambiar la clave es lo que obliga a rehacer el paquete.
+ *
+ * La pantalla de carga se salta la descarga si el resumen guardado dice
+ * que ya está al 98 %. Al cambiar QUÉ lleva el paquete -en 5.18.0 entraron
+ * el relieve a z14-15 y el corredor por el trazado real- el resumen viejo
+ * seguía diciendo "completo", la barra pasaba al 100 % al instante y lo
+ * nuevo no se bajaba nunca: "descarga súper rápido y en modo avión no hay
+ * nada". Con otra clave el resumen viejo no cuenta; lo que ya está en el
+ * móvil no se vuelve a pedir, sólo lo que falta.
+ */
+const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v3'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
 const MAX_TILE_URLS = 1500
@@ -88,7 +99,16 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * el RELIEVE -la forma del monte- no gana nada con más detalle. Bajar
  * hasta 13 cuesta unos pocos megas; hasta 15 serían cientos.
  */
-const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13]
+/**
+ * Hasta 15, que es el máximo que sirve la fuente de elevación.
+ *
+ * Con relieve, el mapa pide la elevación a z14-15 en cuanto se camina
+ * (zoom 16-17 sobre el terreno). Bajar sólo hasta z13 dejaba justo esas
+ * teselas fuera del paquete: al entrar sin cobertura, el monte se
+ * quedaba plano y el mapa "cargaba mal". Las de z14-15 son las gemelas
+ * del corredor, que ya se baja: es el mismo recorrido, no más zona.
+ */
+const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]
 
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
@@ -106,18 +126,61 @@ function getDistanceMeters(a: Point, b: Point) {
   return 2 * radius * Math.asin(Math.sqrt(h))
 }
 
+/**
+ * Los puntos del trazado real de un nodo (`route_track`), si los tiene.
+ *
+ * Admite los dos formatos que guarda administración: pares `[lat, lon]`
+ * y objetos `{lat, lon|lng}`. Devuelve vacío si no hay trazado.
+ */
+function puntosDelTrack(stage: PlayerStage): Point[] {
+  const bruto = (stage as { route_track?: unknown }).route_track
+  if (!Array.isArray(bruto)) return []
+  const puntos: Point[] = []
+  for (const entrada of bruto) {
+    if (Array.isArray(entrada) && entrada.length >= 2) {
+      const lat = Number(entrada[0])
+      const lon = Number(entrada[1])
+      if (Number.isFinite(lat) && Number.isFinite(lon)) puntos.push({ lat, lon })
+      continue
+    }
+    if (entrada && typeof entrada === 'object') {
+      const o = entrada as { lat?: unknown; lon?: unknown; lng?: unknown }
+      const lat = Number(o.lat)
+      const lon = Number(o.lon ?? o.lng)
+      if (Number.isFinite(lat) && Number.isFinite(lon)) puntos.push({ lat, lon })
+    }
+  }
+  return puntos
+}
+
+/**
+ * Nodos MÁS el trazado real entre ellos.
+ *
+ * El corredor de teselas se traza alrededor de estos puntos. Con sólo
+ * los nodos, el corredor iba en línea recta de uno a otro, y la ruta de
+ * verdad -que da rodeos por caminos- se salía de él: al llegar a esos
+ * tramos sin cobertura, el mapa se quedaba en blanco. Con los puntos del
+ * trazado, el corredor sigue por donde se camina.
+ *
+ * Se muestrea cada pocos metros para no disparar el cálculo: el corredor
+ * ya tiene dos kilómetros de ancho, no hace falta cada paso.
+ */
 function uniqueStagePoints(stages: PlayerStage[]) {
   const seen = new Set<string>()
   const points: Point[] = []
+  const anadir = (lat: number, lon: number) => {
+    const key = `${lat.toFixed(4)}:${lon.toFixed(4)}`
+    if (seen.has(key)) return
+    seen.add(key)
+    points.push({ lat, lon })
+  }
 
   for (const stage of stages || []) {
     if (typeof stage.lat !== 'number' || typeof stage.lon !== 'number') continue
-
-    const key = `${stage.lat.toFixed(5)}:${stage.lon.toFixed(5)}`
-    if (seen.has(key)) continue
-
-    seen.add(key)
-    points.push({ lat: stage.lat, lon: stage.lon })
+    anadir(stage.lat, stage.lon)
+    const track = puntosDelTrack(stage)
+    const paso = Math.max(1, Math.floor(track.length / 40))
+    for (let i = 0; i < track.length; i += paso) anadir(track[i].lat, track[i].lon)
   }
 
   return points
@@ -432,22 +495,6 @@ export async function prefetchMissionMapTiles(
       'mission-z14'
     )
 
-    /**
-     * Relieve: las gemelas de lo que ya se va a bajar.
-     *
-     * Sin esto, el mapa 3D pide la elevación al entrar -y eso es
-     * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
-     * en la pantalla de carga, donde ya se está esperando a propósito.
-     */
-    for (const clave of Array.from(urls.keys())) {
-      const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
-      if (!trozos) continue
-      const z = Number(trozos[1])
-      if (!ZOOMS_RELIEVE.includes(z)) continue
-      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
-      if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
-    }
-
     // Corredor ancho, no línea fina.
     addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
     addRouteCorridor(
@@ -468,6 +515,27 @@ export async function prefetchMissionMapTiles(
       340,
       'corridor-z17'
     )
+
+    /**
+     * Relieve: las gemelas de lo que ya se va a bajar.
+     *
+     * DESPUÉS del corredor, no antes: este bucle recorre lo que ya está
+     * en la lista, y puesto antes del corredor no veía las teselas de
+     * z15 -las que el terreno pide al caminar- y se quedaban sin gemela.
+     *
+     * Sin esto, el mapa 3D pide la elevación al entrar -y eso es
+     * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
+     * en la pantalla de carga, donde ya se está esperando a propósito.
+     */
+    for (const clave of Array.from(urls.keys())) {
+      const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
+      if (!trozos) continue
+      const z = Number(trozos[1])
+      if (!ZOOMS_RELIEVE.includes(z)) continue
+      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
+      if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
+    }
+
 
     // Detalle alto solo cerca de nodos.
     for (const point of routePoints) {

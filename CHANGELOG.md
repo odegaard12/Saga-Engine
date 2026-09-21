@@ -6,7 +6,57 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.17.0
+## 5.18.2
+
+- **El mapa se pinta debajo de la pantalla de carga.** El velo ya no se
+  retira hasta que el mapa 3D avisa de que ha pintado su primera vista
+  -estilo montado, teselas e imágenes cargadas, relieve construido-, con un
+  tope de siete segundos por si el aviso no llega (sin paquete y sin
+  cobertura, o con la app en segundo plano). Antes el velo se iba en cuanto
+  había permisos y todo ese trabajo caía encima del jugador: "tuvo que
+  renderizar todo mientras me movía".
+- Las gemelas de relieve del paquete offline se calculan DESPUÉS del
+  corredor: el bucle recorre lo que ya está en la lista, y puesto antes no
+  veía las teselas de z15, las que el terreno pide al caminar.
+
+
+
+- **Sin cobertura, el relieve.** El service worker servía desde la caché
+  las teselas de imagen pero no las de elevación (`/dem-tiles/`): sin red
+  el monte salía plano -"era otro mapa, no tenía el mismo desnivel"-. Ahora
+  la elevación va por la misma caché que la imagen.
+- **La pantalla de carga vuelve a bajar lo que falta.** Se saltaba la
+  descarga porque el resumen guardado decía "completo" -de un paquete de
+  antes de que entraran el relieve a z14-15 y el corredor por el trazado
+  real-: la barra pasaba al 100 % al instante y lo nuevo no se bajaba
+  nunca. Cambia la clave del resumen; lo que ya está en el móvil no se
+  vuelve a pedir, sólo lo que falta.
+- El botón 2D/3D tiene el mismo aspecto en los dos estados; cambia la
+  etiqueta, que dice a qué modo vas. Cambiar de color al pasar a 2D se leía
+  como avería.
+- Botón de norte: aparece sólo cuando el mapa está girado, con la aguja
+  girando con él; un toque lo devuelve al norte.
+
+
+
+- **El trazado cuenta la partida.** Verde lo andado, azul el tramo en
+  juego, claro y apagado lo que queda: cada tramo hereda el estado del
+  nodo al que llega. Y sobre el tramo en juego, un pulso blanco que
+  respira (opacidad animada diez veces por segundo, sólo con la pestaña
+  visible): "por aquí, ahora", sin leer nada.
+- **Tu avatar deja de saltar.** Era el último marcador del DOM que quedaba
+  en el mapa 3D, y por eso el único que seguía descolocándose con el
+  relieve al hacer zoom. Ahora es un símbolo del mapa como los nodos y las
+  fotos: círculo con tu foto (o iniciales sobre tu color), anillo blanco y
+  halo de tu color, dibujado en canvas y colocado por el motor en el mismo
+  fotograma que el terreno.
+- **El paquete offline baja lo que el mapa 3D pide de verdad.** El
+  corredor de teselas seguía rectas entre nodos, y la ruta real da rodeos
+  por caminos que se salían de él: ahora sigue el `route_track`. Y el
+  relieve baja hasta z15 (antes z13): el terreno pide z14-15 en cuanto se
+  camina, y sin ellas el monte se quedaba plano sin cobertura.
+
+
 
 - **Las fotos de campo se quedan en su sitio.** Eran marcadores del DOM, y
   un marcador del DOM va un fotograma por detrás del terreno: con relieve y
