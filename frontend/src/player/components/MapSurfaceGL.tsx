@@ -122,6 +122,148 @@ function leerTrackDelNodo(stage: PlayerStage): Punto[] {
 
 const COLECCION_VACIA = { type: 'FeatureCollection' as const, features: [] }
 
+/**
+ * El estilo del mapa, declarado en crudo y NO por URL.
+ *
+ * Una URL de estilo sería una petición más que falla sin cobertura, justo
+ * lo que no puede pasar en el monte. Sin tipografías ni iconos externos por
+ * el mismo motivo: cada recurso de fuera es otra cosa que puede faltar.
+ *
+ * Es una función y no una constante porque hace falta poder volver a
+ * aplicarlo si el montaje se queda a medias (ver el vigilante de abajo).
+ */
+function estiloDelMapa(): maplibregl.StyleSpecification {
+  return {
+    version: 8,
+      sources: {
+        [FUENTE_TESELAS]: {
+          type: 'raster',
+          tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
+          tileSize: 256,
+          maxzoom: 19,
+          attribution: '&copy; Esri',
+        },
+        /**
+         * Elevación del terreno. Esto es lo que hace que se vea el
+         * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
+         * es la misma foto vista de lado.
+         *
+         * `maxzoom: 15` porque es hasta donde llega Terrarium. Sin ese
+         * tope, al acercarse MapLibre pide teselas que no existen y el
+         * relieve desaparece justo cuando más cerca estás.
+         */
+        /**
+         * El radio y el trazado nacen aquí, vacíos.
+         *
+         * Declararlos en el estilo -y no añadirlos después- es lo que
+         * mata de raíz el fallo que costó tres versiones: al añadirlos
+         * al vuelo hay que esperar a que el estilo esté montado, y
+         * ninguna de las dos señales de MapLibre sirve a ciegas. El
+         * evento `style.load` YA ha ocurrido cuando enganchas el
+         * escuchador, porque el estilo va en línea y se monta dentro del
+         * constructor; e `isStyleLoaded()` es más estricto que el
+         * evento, porque exige además que carguen todas las fuentes.
+         * Entre las dos, el código se quedaba en tierra de nadie.
+         *
+         * Naciendo con el estilo, existen desde el primer fotograma.
+         */
+        [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_RELIEVE]: {
+          type: 'raster-dem',
+          tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
+          tileSize: 256,
+          maxzoom: 15,
+          encoding: 'terrarium',
+        },
+      },
+      layers: [
+        { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS },
+        // Sombreado de laderas: marca el relieve aunque la foto satélite
+        // sea plana. Sin esto el monte está ahí pero no se lee.
+        {
+          id: CAPA_SOMBRAS,
+          type: 'hillshade',
+          source: FUENTE_RELIEVE,
+          /**
+         * Sombreado fuerte a propósito.
+         *
+         * A la altura a la que se juega -zoom 17-18, unos cientos de
+         * metros de ancho- el desnivel REAL de un valle son unos pocos
+         * metros: geométricamente correcto e invisible. El sombreado de
+         * laderas es lo que hace legible la forma del terreno a esa
+         * escala, más que la propia malla.
+         */
+        paint: { 'hillshade-exaggeration': 0.85 },
+        },
+        {
+        id: CAPA_RADIO_RELLENO,
+        type: 'fill',
+        source: FUENTE_RADIO,
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
+        },
+        {
+        id: CAPA_RADIO_BORDE,
+        type: 'line',
+        source: FUENTE_RADIO,
+        // 3 px y blanco al borde: sobre foto aérea con sol, una línea
+        // azul de 2 px se perdía. El radio dice a qué distancia entras
+        // en el nodo; si no se ve, no sirve de nada.
+        /**
+         * Borde a trazos: un círculo continuo se confunde con una rotonda
+         * o un depósito de la propia foto satélite. A trazos se lee como
+         * lo que es -una marca del juego, no algo del terreno-.
+         */
+        paint: {
+          'line-color': '#ffffff',
+          'line-opacity': 0.95,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
+          'line-dasharray': [2, 1.5],
+        },
+        },
+        {
+        id: CAPA_RUTA_BORDE,
+        type: 'line',
+        source: FUENTE_RUTA,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#0b1220',
+          'line-opacity': 0.55,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
+        },
+        },
+        {
+        id: CAPA_RUTA,
+        type: 'line',
+        source: FUENTE_RUTA,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        /**
+         * Grosor por zoom y no fijo.
+         *
+         * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
+         * sobre arena, un hilo blanco translúcido desaparece. De ahí que
+         * antes "no se viera el trazado" aunque estuviera pintado.
+         *
+         * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
+         * que hace de contorno; es el mismo truco que usan las apps de
+         * senderismo para que la traza se lea sobre cualquier fondo.
+         */
+        paint: {
+          'line-color': '#f8fafc',
+          'line-opacity': 0.95,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
+        },
+        },
+      ],
+      /**
+       * Exageración 1.5: el desnivel real de la ruta es suave y a escala
+       * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
+       * el monte en una sierra que no existe.
+       */
+      terrain: { source: FUENTE_RELIEVE, exaggeration: 2.2 },
+  }
+}
+
 export function MapSurfaceGL({
   className,
   currentStage,
@@ -140,6 +282,10 @@ export function MapSurfaceGL({
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   const marcadoresFotosRef = useRef<maplibregl.Marker[]>([])
 
+  /** La ruta se encuadra una vez al entrar, no cada vez que llegan datos. */
+  const encuadreInicialRef = useRef(false)
+  /** Sube cuando hay que repintar todo: el estilo se rehizo por debajo. */
+  const [versionEstilo, setVersionEstilo] = useState(0)
   /** Qué foto y color tiene ya pintados el avatar, para no rehacerlo en balde. */
   const fichaAvatarRef = useRef('')
 
@@ -165,138 +311,46 @@ export function MapSurfaceGL({
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
       // motivo: cada recurso externo es otra cosa que puede faltar.
-      style: {
-        version: 8,
-        sources: {
-          [FUENTE_TESELAS]: {
-            type: 'raster',
-            tiles: [`${window.location.origin}/map-tiles/{z}/{x}/{y}.png`],
-            tileSize: 256,
-            maxzoom: 19,
-            attribution: '&copy; Esri',
-          },
-          /**
-           * Elevación del terreno. Esto es lo que hace que se vea el
-           * DESNIVEL: inclinar la cámara sobre una foto plana no es 3D,
-           * es la misma foto vista de lado.
-           *
-           * `maxzoom: 15` porque es hasta donde llega Terrarium. Sin ese
-           * tope, al acercarse MapLibre pide teselas que no existen y el
-           * relieve desaparece justo cuando más cerca estás.
-           */
-          /**
-           * El radio y el trazado nacen aquí, vacíos.
-           *
-           * Declararlos en el estilo -y no añadirlos después- es lo que
-           * mata de raíz el fallo que costó tres versiones: al añadirlos
-           * al vuelo hay que esperar a que el estilo esté montado, y
-           * ninguna de las dos señales de MapLibre sirve a ciegas. El
-           * evento `style.load` YA ha ocurrido cuando enganchas el
-           * escuchador, porque el estilo va en línea y se monta dentro del
-           * constructor; e `isStyleLoaded()` es más estricto que el
-           * evento, porque exige además que carguen todas las fuentes.
-           * Entre las dos, el código se quedaba en tierra de nadie.
-           *
-           * Naciendo con el estilo, existen desde el primer fotograma.
-           */
-          [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
-          [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
-          [FUENTE_RELIEVE]: {
-            type: 'raster-dem',
-            tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
-            tileSize: 256,
-            maxzoom: 15,
-            encoding: 'terrarium',
-          },
-        },
-        layers: [
-          { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS },
-          // Sombreado de laderas: marca el relieve aunque la foto satélite
-          // sea plana. Sin esto el monte está ahí pero no se lee.
-          {
-            id: CAPA_SOMBRAS,
-            type: 'hillshade',
-            source: FUENTE_RELIEVE,
-            /**
-           * Sombreado fuerte a propósito.
-           *
-           * A la altura a la que se juega -zoom 17-18, unos cientos de
-           * metros de ancho- el desnivel REAL de un valle son unos pocos
-           * metros: geométricamente correcto e invisible. El sombreado de
-           * laderas es lo que hace legible la forma del terreno a esa
-           * escala, más que la propia malla.
-           */
-          paint: { 'hillshade-exaggeration': 0.85 },
-          },
-          {
-          id: CAPA_RADIO_RELLENO,
-          type: 'fill',
-          source: FUENTE_RADIO,
-          paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
-          },
-          {
-          id: CAPA_RADIO_BORDE,
-          type: 'line',
-          source: FUENTE_RADIO,
-          // 3 px y blanco al borde: sobre foto aérea con sol, una línea
-          // azul de 2 px se perdía. El radio dice a qué distancia entras
-          // en el nodo; si no se ve, no sirve de nada.
-          /**
-           * Borde a trazos: un círculo continuo se confunde con una rotonda
-           * o un depósito de la propia foto satélite. A trazos se lee como
-           * lo que es -una marca del juego, no algo del terreno-.
-           */
-          paint: {
-            'line-color': '#ffffff',
-            'line-opacity': 0.95,
-            'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
-            'line-dasharray': [2, 1.5],
-          },
-          },
-          {
-          id: CAPA_RUTA_BORDE,
-          type: 'line',
-          source: FUENTE_RUTA,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: {
-            'line-color': '#0b1220',
-            'line-opacity': 0.55,
-            'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
-          },
-          },
-          {
-          id: CAPA_RUTA,
-          type: 'line',
-          source: FUENTE_RUTA,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          /**
-           * Grosor por zoom y no fijo.
-           *
-           * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
-           * sobre arena, un hilo blanco translúcido desaparece. De ahí que
-           * antes "no se viera el trazado" aunque estuviera pintado.
-           *
-           * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
-           * que hace de contorno; es el mismo truco que usan las apps de
-           * senderismo para que la traza se lea sobre cualquier fondo.
-           */
-          paint: {
-            'line-color': '#f8fafc',
-            'line-opacity': 0.95,
-            'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
-          },
-          },
-        ],
-        /**
-         * Exageración 1.5: el desnivel real de la ruta es suave y a escala
-         * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
-         * el monte en una sierra que no existe.
-         */
-        terrain: { source: FUENTE_RELIEVE, exaggeration: 2.2 },
-      },
+      style: estiloDelMapa(),
     })
 
     mapaRef.current = mapa
+
+    /**
+     * Vigilante: si el estilo no montó, volver a aplicarlo.
+     *
+     * MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`. Un
+     * navegador NO ejecuta fotogramas en una pestaña que no se está
+     * pintando, así que si el mapa se crea con la pantalla bloqueada o con
+     * la app en segundo plano -algo normalísimo durante los segundos que
+     * tarda la descarga offline- ese fotograma no llega, el estilo se
+     * queda sin montar y el mapa se ve EN BLANCO, con los nodos flotando
+     * encima porque son marcadores del DOM y esos sí aparecen.
+     *
+     * No da ningún error ni se recupera solo si el fotograma pendiente se
+     * perdió. Volver a aplicar el estilo al recuperar visibilidad cuesta
+     * nada y evita quedarse mirando un mapa vacío en mitad del monte.
+     */
+    let rescates = 0
+    const vigilarEstilo = () => {
+      const vivo = mapaRef.current
+      if (!vivo || document.visibilityState !== 'visible') return
+      if (vivo.isStyleLoaded()) return
+      // Cinco intentos y basta: si a estas alturas no monta, el problema no
+      // es el fotograma perdido y reintentar en bucle solo gasta batería.
+      if (rescates >= 5) return
+      rescates += 1
+      try {
+        vivo.setStyle(estiloDelMapa())
+        // El estilo nuevo nace con las fuentes vacías, así que hay que
+        // volver a meterles los datos que ya se habían calculado.
+        vivo.once('styledata', () => setVersionEstilo((v) => v + 1))
+      } catch {
+        // Si el mapa ya no existe, no hay nada que rescatar.
+      }
+    }
+    document.addEventListener('visibilitychange', vigilarEstilo)
+    const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
     if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
       /**
@@ -313,6 +367,8 @@ export function MapSurfaceGL({
     }
 
     return () => {
+      document.removeEventListener('visibilitychange', vigilarEstilo)
+      window.clearInterval(relojVigilante)
       marcadorXogadorRef.current?.remove()
       marcadorXogadorRef.current = null
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
@@ -334,7 +390,10 @@ export function MapSurfaceGL({
       const fuente = mapa.getSource(id) as maplibregl.GeoJSONSource | undefined
       fuente?.setData(datos as GeoJSON.FeatureCollection)
     },
-    []
+    // `versionEstilo` no se usa dentro, pero al cambiar obliga a repintar
+    // tras un rescate del estilo, que es justo lo que hace falta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [versionEstilo]
   )
 
   // Tu posición.
@@ -534,6 +593,25 @@ export function MapSurfaceGL({
     })
 
     /**
+     * Encuadrar la ruta la primera vez, si todavía no hay GPS.
+     *
+     * Abriendo siempre a zoom 16 sobre un punto, los diez nodos de una ruta
+     * de kilómetros caen fuera de la pantalla o salen alineados contra un
+     * borde, que es justo lo que se veía. Encuadrar la ruta entera da el
+     * "dónde estoy y a dónde voy" de un vistazo.
+     *
+     * Solo la primera vez y solo sin GPS: en cuanto hay posición, mandas
+     * tú, y mover la cámara bajo los pies del jugador es peor que no
+     * encuadrar nada.
+     */
+    if (!encuadreInicialRef.current && nodos.length > 1 && !playerPosition) {
+      encuadreInicialRef.current = true
+      const limites = new maplibregl.LngLatBounds()
+      nodos.forEach((nodo) => limites.extend([nodo.lon as number, nodo.lat as number]))
+      mapa.fitBounds(limites, { padding: 60, animate: false, maxZoom: 16 })
+    }
+
+    /**
      * Trazado REAL, el que guarda administración en cada nodo
      * (`route_track`): sigue caminos de verdad.
      *
@@ -561,6 +639,9 @@ export function MapSurfaceGL({
           }
         : COLECCION_VACIA
     )
+    // `playerPosition` solo decide si procede encuadrar al entrar; no debe
+    // rehacer los marcadores en cada paso que das.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionStages, currentLevel, pintarFuente])
 
   /**
