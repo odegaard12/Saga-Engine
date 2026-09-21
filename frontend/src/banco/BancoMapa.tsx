@@ -81,6 +81,8 @@ const ESTILO_BOTON: React.CSSProperties = {
 }
 
 type Lectura = {
+  /** El worker responde: la fuente GeoJSON del trazado llegó a cargarse. */
+  workerVivo: boolean
   estiloCargado: boolean
   teselas: boolean
   relieve: boolean
@@ -131,6 +133,13 @@ function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
   })()
 
   return {
+    workerVivo: (() => {
+      try {
+        return Boolean((mapa.getSource('saga-ruta') as { loaded?: () => boolean } | undefined)?.loaded?.())
+      } catch {
+        return false
+      }
+    })(),
     estiloCargado: mapa.isStyleLoaded() === true,
     teselas: Boolean(mapa.getSource('saga-raster')),
     relieve: Boolean(mapa.getSource('saga-relieve')),
@@ -266,6 +275,11 @@ export default function BancoMapa() {
               mal={!lectura.estiloCargado}
             />
             <Fila etiqueta="teselas" valor={lectura.teselas ? 'sí' : 'NO'} mal={!lectura.teselas} />
+            <Fila
+              etiqueta="worker (GeoJSON)"
+              valor={lectura.workerVivo ? 'responde' : 'MUDO'}
+              mal={!lectura.workerVivo}
+            />
             <Fila
               etiqueta="relieve"
               valor={lectura.terreno != null ? `x${lectura.terreno}` : 'NO'}

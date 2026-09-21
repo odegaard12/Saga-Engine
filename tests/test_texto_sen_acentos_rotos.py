@@ -36,6 +36,10 @@ SALTAR = ("node_modules", ".git", "dist", "__pycache__", ".pytest_cache")
 # una palabra.
 ROTO = re.compile(r"[A-Za-zÀ-ÿ]\?([A-Za-z_À-ÿ]+)")
 
+# Sufijos de importación de Vite (`fichero.mjs?url`, `?raw`, `?inline`,
+# `?worker`): son un interrogante legítimo, no un acento perdido.
+SUFIXOS_VITE = {"url", "raw", "inline", "worker", "sharedworker"}
+
 
 def acentos_rotos(texto: str) -> list[tuple[int, str]]:
     """Los `?` en medio de palabra, sin contar los de las URLs.
@@ -46,6 +50,10 @@ def acentos_rotos(texto: str) -> list[tuple[int, str]]:
     salida = []
     for n, linea in enumerate(texto.split("\n"), 1):
         for m in ROTO.finditer(linea):
+
+            if m.group(1) in SUFIXOS_VITE:
+
+                continue
             resto = linea[m.end() : m.end() + 1]
             if resto == "=":
                 continue  # parámetro de una URL

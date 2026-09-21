@@ -6,7 +6,56 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.15.1
+## 5.16.2
+
+- **5.16.1 no bastaba: el worker importa a su vez otro fichero.**
+  `maplibre-gl-worker.mjs` hace `import "./maplibre-gl-shared.mjs"`, y con
+  `?url` Vite sólo copiaba el primero; el segundo daba 404 y el módulo
+  moría igual de callado. Medido: fichero servido con 200 y `text/javascript`,
+  y aun así cero respuestas del worker. Ahora se importa con `?worker&url`,
+  que empaqueta el worker CON sus dependencias en un único fichero con hash.
+
+
+
+- **EL fallo de toda la migración al mapa 3D, y el más silencioso.**
+  MapLibre v6 hace su trabajo pesado en un web worker que carga como módulo
+  desde una URL calculada al lado de su propio chunk
+  (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`). Vite no copia
+  ese fichero porque nadie lo importa, así que devolvía 404 -los dos 404
+  sin explicar de cada carga- y el worker moría sin decir una palabra.
+  Todo lo que pasa por el worker estuvo muerto desde 5.10: las fuentes
+  GeoJSON (trazado, radio, extrusión, símbolos) y la decodificación del
+  relieve. Las teselas satélite y los marcadores del DOM no lo usan, y por
+  eso eran lo único que se veía. Tuvo pinta de bug de datos, de eventos,
+  de posición y del móvil, y no era ninguno. Medido: worker vivo, cero
+  respuestas a una carga GeoJSON.
+  Ahora el worker se importa con `?url`, Vite lo emite con hash en
+  `/assets/` y se le da a MapLibre la dirección real.
+- El banco de mapa lleva una fila **worker (GeoJSON)** que mide justo este
+  síntoma: si dice MUDO, nada de lo que pase por el worker se va a ver.
+
+
+
+- **Los nodos pasan a ser símbolos del mapa, no marcadores del DOM.** Un
+  marcador del DOM se coloca desde JavaScript un fotograma después de que
+  el mapa se haya dibujado: con relieve y zoom va siempre por detrás del
+  terreno -"al ampliar quedan mal y al soltar se recolocan"-. Un símbolo lo
+  pinta el propio motor, en el mismo fotograma y a la altura correcta del
+  terreno. La chincheta se dibuja en un canvas al vuelo, con el número
+  horneado dentro: cabeza con luz, borde oscuro, punta y sombra en el
+  suelo. Sin fuentes de letras externas, que serían una petición más que
+  falla sin cobertura. Bajo cada una, un disco de metro y medio pegado al
+  relieve que la ancla al terreno sin taparla.
+- **El vigilante del estilo rehacía mapas sanos.** Comprobaba
+  `isStyleLoaded()`, que es `false` cada vez que hay una tesela cargando
+  -o sea, en cada zoom-, y rehacía el estilo entero hasta cinco veces:
+  vaciaba fuentes, recargaba teselas y descolocaba marcadores. Eso era el
+  "carga raro". Ahora sólo actúa si el estilo no tiene capas.
+- Trazado un poco más grueso y radio de entrada con borde continuo y
+  relleno más presente: las líneas a trazos tienen historial de pintarse
+  mal sobre relieve en MapLibre, y lo primero es que se vea.
+
+
 
 - La guarda de colores del tema cazaba las sombras del terreno de 5.15.0.
   Son colores del monte, no de la piel de la app: una ladera a la sombra es
