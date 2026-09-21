@@ -140,15 +140,6 @@ export function MapSurfaceGL({
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   const marcadoresFotosRef = useRef<maplibregl.Marker[]>([])
 
-  /**
-   * ¿Está el estilo montado ya?
-   *
-   * Es LA fuente de errores de MapLibre: `addSource`/`getSource` antes de
-   * que el estilo termine de cargar lanza, y los datos (posición, nodos)
-   * llegan por props cuando quieren, no cuando el mapa está listo. Todo
-   * lo que toque capas espera a esto.
-   */
-  const [estiloListo, setEstiloListo] = useState(false)
   /** Qué foto y color tiene ya pintados el avatar, para no rehacerlo en balde. */
   const fichaAvatarRef = useRef('')
 
@@ -193,6 +184,23 @@ export function MapSurfaceGL({
            * tope, al acercarse MapLibre pide teselas que no existen y el
            * relieve desaparece justo cuando más cerca estás.
            */
+          /**
+           * El radio y el trazado nacen aquí, vacíos.
+           *
+           * Declararlos en el estilo -y no añadirlos después- es lo que
+           * mata de raíz el fallo que costó tres versiones: al añadirlos
+           * al vuelo hay que esperar a que el estilo esté montado, y
+           * ninguna de las dos señales de MapLibre sirve a ciegas. El
+           * evento `style.load` YA ha ocurrido cuando enganchas el
+           * escuchador, porque el estilo va en línea y se monta dentro del
+           * constructor; e `isStyleLoaded()` es más estricto que el
+           * evento, porque exige además que carguen todas las fuentes.
+           * Entre las dos, el código se quedaba en tierra de nadie.
+           *
+           * Naciendo con el estilo, existen desde el primer fotograma.
+           */
+          [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
+          [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
           [FUENTE_RELIEVE]: {
             type: 'raster-dem',
             tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -220,6 +228,64 @@ export function MapSurfaceGL({
            */
           paint: { 'hillshade-exaggeration': 0.85 },
           },
+          {
+          id: CAPA_RADIO_RELLENO,
+          type: 'fill',
+          source: FUENTE_RADIO,
+          paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
+          },
+          {
+          id: CAPA_RADIO_BORDE,
+          type: 'line',
+          source: FUENTE_RADIO,
+          // 3 px y blanco al borde: sobre foto aérea con sol, una línea
+          // azul de 2 px se perdía. El radio dice a qué distancia entras
+          // en el nodo; si no se ve, no sirve de nada.
+          /**
+           * Borde a trazos: un círculo continuo se confunde con una rotonda
+           * o un depósito de la propia foto satélite. A trazos se lee como
+           * lo que es -una marca del juego, no algo del terreno-.
+           */
+          paint: {
+            'line-color': '#ffffff',
+            'line-opacity': 0.95,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
+            'line-dasharray': [2, 1.5],
+          },
+          },
+          {
+          id: CAPA_RUTA_BORDE,
+          type: 'line',
+          source: FUENTE_RUTA,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#0b1220',
+            'line-opacity': 0.55,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
+          },
+          },
+          {
+          id: CAPA_RUTA,
+          type: 'line',
+          source: FUENTE_RUTA,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          /**
+           * Grosor por zoom y no fijo.
+           *
+           * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
+           * sobre arena, un hilo blanco translúcido desaparece. De ahí que
+           * antes "no se viera el trazado" aunque estuviera pintado.
+           *
+           * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
+           * que hace de contorno; es el mismo truco que usan las apps de
+           * senderismo para que la traza se lea sobre cualquier fondo.
+           */
+          paint: {
+            'line-color': '#f8fafc',
+            'line-opacity': 0.95,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
+          },
+          },
         ],
         /**
          * Exageración 1.5: el desnivel real de la ruta es suave y a escala
@@ -232,117 +298,18 @@ export function MapSurfaceGL({
 
     mapaRef.current = mapa
 
-    const alCargar = () => {
-      // Las capas se crean vacías una sola vez; los efectos de abajo solo
-      // les cambian los datos. Crear y destruir capas en cada cambio de
-      // props es lo que hace parpadear a un mapa de WebGL.
-      // Puede llegar por el atajo síncrono Y por el evento: añadir una
-      // fuente dos veces revienta el mapa entero.
-      if (mapa.getSource(FUENTE_RADIO)) {
-        setEstiloListo(true)
-        return
-      }
-
-      mapa.addSource(FUENTE_RADIO, { type: 'geojson', data: COLECCION_VACIA })
-      mapa.addLayer({
-        id: CAPA_RADIO_RELLENO,
-        type: 'fill',
-        source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
-      })
-      mapa.addLayer({
-        id: CAPA_RADIO_BORDE,
-        type: 'line',
-        source: FUENTE_RADIO,
-        // 3 px y blanco al borde: sobre foto aérea con sol, una línea
-        // azul de 2 px se perdía. El radio dice a qué distancia entras
-        // en el nodo; si no se ve, no sirve de nada.
-        /**
-         * Borde a trazos: un círculo continuo se confunde con una rotonda
-         * o un depósito de la propia foto satélite. A trazos se lee como
-         * lo que es -una marca del juego, no algo del terreno-.
-         */
-        paint: {
-          'line-color': '#ffffff',
-          'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
-          'line-dasharray': [2, 1.5],
-        },
-      })
-
-      mapa.addSource(FUENTE_RUTA, { type: 'geojson', data: COLECCION_VACIA })
-      mapa.addLayer({
-        id: CAPA_RUTA_BORDE,
-        type: 'line',
-        source: FUENTE_RUTA,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#0b1220',
-          'line-opacity': 0.55,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
-        },
-      })
-
-      mapa.addLayer({
-        id: CAPA_RUTA,
-        type: 'line',
-        source: FUENTE_RUTA,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        /**
-         * Grosor por zoom y no fijo.
-         *
-         * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
-         * sobre arena, un hilo blanco translúcido desaparece. De ahí que
-         * antes "no se viera el trazado" aunque estuviera pintado.
-         *
-         * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
-         * que hace de contorno; es el mismo truco que usan las apps de
-         * senderismo para que la traza se lea sobre cualquier fondo.
-         */
-        paint: {
-          'line-color': '#f8fafc',
-          'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
-        },
-      })
-
+    if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
       /**
        * Asa de depuración, solo con `?depurar-mapa=1` en la dirección.
        *
-       * Comprobar desde fuera si el terreno está puesto, con qué
-       * exageración o qué capas hay era imposible: MapLibre no deja
-       * ninguna referencia accesible desde el DOM. Se estaba verificando a
-       * ojo, que es como se colaron los fallos de esta misma pantalla.
+       * MapLibre no deja ninguna referencia al mapa accesible desde el
+       * DOM, así que comprobar desde fuera si el terreno está puesto o qué
+       * capas hay era imposible y se estaba verificando a ojo. Que es
+       * exactamente como se colaron los fallos de esta pantalla.
        *
        * No se expone nunca por defecto: es una puerta abierta al mapa.
        */
-      if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
-        ;(window as unknown as { __sagaMapa?: maplibregl.Map }).__sagaMapa = mapa
-      }
-
-      setEstiloListo(true)
-    }
-
-    /**
-     * Preguntar ANTES de escuchar, porque el evento puede haber pasado ya.
-     *
-     * Aquí hubo dos intentos fallidos y los dos fallaban en silencio:
-     *
-     * 1. `load` espera a que TODO esté cargado, y con el relieve activado
-     *    eso incluye el terreno; si la elevación tardaba, no disparaba.
-     * 2. `style.load` parecía la respuesta, pero el estilo se declara EN
-     *    LÍNEA (no por URL), y MapLibre lo monta de forma síncrona dentro
-     *    del constructor: para cuando esta línea se ejecuta, el evento ya
-     *    ocurrió y no vuelve a ocurrir nunca.
-     *
-     * El síntoma fue el mismo las dos veces y por eso costó tanto: los
-     * nodos y las fotos se veían -son marcadores del DOM, no esperan a
-     * nada- y faltaban justo las capas de datos, sin un solo error.
-     */
-    if (mapa.isStyleLoaded()) {
-      alCargar()
-    } else {
-      mapa.on('style.load', alCargar)
+      ;(window as unknown as { __sagaMapa?: maplibregl.Map }).__sagaMapa = mapa
     }
 
     return () => {
@@ -354,7 +321,6 @@ export function MapSurfaceGL({
       marcadoresFotosRef.current = []
       mapa.remove()
       mapaRef.current = null
-      setEstiloListo(false)
     }
     // Solo al montar, a propósito.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -364,11 +330,11 @@ export function MapSurfaceGL({
   const pintarFuente = useCallback(
     (id: string, datos: GeoJSON.FeatureCollection | typeof COLECCION_VACIA) => {
       const mapa = mapaRef.current
-      if (!mapa || !estiloListo) return
+      if (!mapa) return
       const fuente = mapa.getSource(id) as maplibregl.GeoJSONSource | undefined
       fuente?.setData(datos as GeoJSON.FeatureCollection)
     },
-    [estiloListo]
+    []
   )
 
   // Tu posición.

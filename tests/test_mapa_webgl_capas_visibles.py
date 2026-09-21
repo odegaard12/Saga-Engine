@@ -26,34 +26,28 @@ def fonte() -> str:
     return COMPONENTE.read_text(encoding="utf-8")
 
 
-def test_o_estilo_comprobase_antes_de_escoitalo(fonte: str) -> None:
+def test_as_capas_de_datos_nacen_co_estilo(fonte: str) -> None:
     """
-    Preguntar por el estilo ANTES de esperar su evento.
+    El radio y el trazado se declaran EN el estilo, no se añaden después.
 
-    Dos intentos fallaron aquí, los dos en silencio. `load` esperaba también
-    al terreno y no disparaba si la elevación tardaba. `style.load` parecía
-    la respuesta, pero el estilo se declara EN LÍNEA y MapLibre lo monta de
-    forma síncrona dentro del constructor: el evento ya había pasado cuando
-    se enganchaba el escuchador, y no vuelve a ocurrir.
+    Añadirlos al vuelo obliga a esperar a que el estilo esté montado, y
+    ninguna de las dos señales de MapLibre sirve a ciegas: `style.load` ya
+    ha ocurrido cuando enganchas el escuchador -porque el estilo va en
+    línea y se monta dentro del constructor- e `isStyleLoaded()` es más
+    estricto que el evento y exige además que carguen todas las fuentes.
+    Entre las dos, el código se quedaba en tierra de nadie.
 
-    El síntoma fue idéntico las dos veces -nodos y fotos sí, capas de datos
-    no- porque los marcadores del DOM no esperan a nada.
+    Costó tres versiones porque el síntoma no daba ni un error: los nodos y
+    las fotos se veían -son marcadores del DOM, no esperan a nada- y
+    faltaban justo las capas de datos.
     """
-    assert "mapa.isStyleLoaded()" in fonte, (
-        "sin comprobar el estilo antes, el evento puede haber pasado ya"
-    )
-    assert "mapa.on('style.load'" in fonte, "hace falta el camino asíncrono"
-    assert "mapa.on('load'" not in fonte, "`load` espera también al terreno"
-
-
-def test_engadir_a_fonte_dúas_veces_non_revienta_o_mapa(fonte: str) -> None:
-    """
-    El montaje puede llegar por el atajo síncrono Y por el evento.
-
-    Añadir dos veces la misma fuente tira el mapa entero, así que el camino
-    tiene que ser idempotente.
-    """
-    assert "if (mapa.getSource(FUENTE_RADIO))" in fonte
+    assert "[FUENTE_RADIO]: { type: 'geojson'" in fonte
+    assert "[FUENTE_RUTA]: { type: 'geojson'" in fonte
+    assert "addSource(FUENTE_RADIO" not in fonte, "volvió a añadirse al vuelo"
+    assert "addSource(FUENTE_RUTA" not in fonte, "volvió a añadirse al vuelo"
+    assert "addLayer(" not in fonte, "las capas también van en el estilo"
+    assert "mapa.on('load'" not in fonte
+    assert "mapa.on('style.load'" not in fonte
 
 
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:
