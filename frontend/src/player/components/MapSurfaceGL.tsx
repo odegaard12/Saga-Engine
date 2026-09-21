@@ -257,7 +257,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'fill-extrusion-color': ['get', 'color'],
           'fill-extrusion-height': ['get', 'altura'],
           'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.75,
+          'fill-extrusion-opacity': 0.9,
         },
       },
       {
@@ -310,6 +310,8 @@ export function MapSurfaceGL({
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   const marcadoresFotosRef = useRef<maplibregl.Marker[]>([])
 
+  /** Lo último que se mandó pintar a cada fuente, para poder reintentarlo. */
+  const ultimoDatoRef = useRef(new Map<string, GeoJSON.FeatureCollection>())
   /** La ruta se encuadra una vez al entrar, no cada vez que llegan datos. */
   const encuadreInicialRef = useRef(false)
   /** Sube cuando hay que repintar todo: el estilo se rehizo por debajo. */
@@ -359,6 +361,24 @@ export function MapSurfaceGL({
      * perdió. Volver a aplicar el estilo al recuperar visibilidad cuesta
      * nada y evita quedarse mirando un mapa vacío en mitad del monte.
      */
+    /**
+     * Volcar en el mapa lo que no cupo antes.
+     *
+     * `styledata` salta cada vez que el estilo cambia de estado, incluida
+     * la primera vez que termina de montarse. Es el momento exacto en que
+     * las fuentes pasan a existir y hay que rellenarlas con lo que ya se
+     * había calculado mientras tanto.
+     */
+    const volcarPendientes = () => {
+      const vivo = mapaRef.current
+      if (!vivo) return
+      for (const [id, datos] of ultimoDatoRef.current) {
+        const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
+        fuente?.setData(datos)
+      }
+    }
+    mapa.on('styledata', volcarPendientes)
+
     let rescates = 0
     const vigilarEstilo = () => {
       const vivo = mapaRef.current
@@ -402,6 +422,7 @@ export function MapSurfaceGL({
     }
 
     return () => {
+      mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
       window.clearInterval(relojVigilante)
       marcadorXogadorRef.current?.remove()
@@ -418,8 +439,27 @@ export function MapSurfaceGL({
   }, [])
 
   /** Cambia los datos de una fuente, si el mapa está en condiciones. */
+  /**
+   * Cambia los datos de una fuente, y si no puede, se acuerda.
+   *
+   * ESTE era el fallo que se llevó media docena de versiones. La línea
+   * anterior era `fuente?.setData(datos)`: si el estilo todavía no había
+   * terminado de montarse, `getSource` devolvía nada, la interrogación se
+   * tragaba la llamada y NO SE REINTENTABA JAMÁS. Los nodos llegan de la
+   * API en menos de lo que tarda el estilo en montar, así que el trazado,
+   * el radio y los volúmenes se perdían casi siempre.
+   *
+   * Y el síntoma engañaba: las teselas y el relieve se veían -van
+   * declarados en el estilo, no necesitan que nadie les meta datos- y los
+   * nodos y las fotos también -son marcadores del DOM-. Lo único que
+   * faltaba era lo que hay que rellenar después. Sin un solo error.
+   *
+   * Ahora lo último de cada fuente se guarda siempre, y se vuelca en
+   * cuanto el estilo está en condiciones.
+   */
   const pintarFuente = useCallback(
     (id: string, datos: GeoJSON.FeatureCollection | typeof COLECCION_VACIA) => {
+      ultimoDatoRef.current.set(id, datos as GeoJSON.FeatureCollection)
       const mapa = mapaRef.current
       if (!mapa) return
       const fuente = mapa.getSource(id) as maplibregl.GeoJSONSource | undefined
@@ -561,8 +601,8 @@ export function MapSurfaceGL({
       const elemento = document.createElement('div')
       elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
       Object.assign(elemento.style, {
-        width: '34px',
-        height: '42px',
+        width: '28px',
+        height: '34px',
         position: 'relative',
       } as Partial<CSSStyleDeclaration>)
 
@@ -591,9 +631,9 @@ export function MapSurfaceGL({
         position: 'absolute',
         left: '50%',
         top: '0',
-        width: '30px',
-        height: '30px',
-        marginLeft: '-15px',
+        width: '24px',
+        height: '24px',
+        marginLeft: '-12px',
         borderRadius: '50% 50% 50% 0',
         transform: 'rotate(-45deg)',
         /**
@@ -615,7 +655,7 @@ export function MapSurfaceGL({
       Object.assign(numero.style, {
         transform: 'rotate(45deg)',
         color: '#0b1220',
-        font: '900 13px system-ui, sans-serif',
+        font: '900 11px system-ui, sans-serif',
         textShadow: '0 1px 0 rgba(255,255,255,.35)',
       } as Partial<CSSStyleDeclaration>)
       gota.appendChild(numero)
@@ -645,11 +685,17 @@ export function MapSurfaceGL({
               : indice === currentLevel
                 ? COLOR_NODO_ACTUAL
                 : COLOR_NODO_PENDIENTE,
-          // El nodo en juego se levanta más: se localiza de un vistazo
-          // desde lejos, incluso con otros nodos por delante.
-          altura: indice === currentLevel ? 22 : 12,
+          /**
+           * Altura en METROS, y generosa a propósito.
+           *
+           * A zoom 16-17 un poste de diez metros es un punto: la
+           * perspectiva lo aplasta contra el suelo y no se lee como
+           * volumen. Lo que hace que un nodo parezca PLANTADO en el monte
+           * es que se vea su costado, y para eso tiene que ser alto.
+           */
+          altura: indice === currentLevel ? 45 : 28,
         },
-        geometry: circuloGeoJSON({ lat: nodo.lat as number, lon: nodo.lon as number }, 3.5, 20)
+        geometry: circuloGeoJSON({ lat: nodo.lat as number, lon: nodo.lon as number }, 6, 20)
           .features[0].geometry,
       })),
     })

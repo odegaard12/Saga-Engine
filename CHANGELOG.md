@@ -6,7 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.1
+## 5.14.2
+
+- **Encontrado el fallo que se llevó media docena de versiones: el trazado,
+  el radio y los volúmenes 3D nunca recibían sus datos.** La línea que los
+  pintaba era `fuente?.setData(datos)`. Si el estilo del mapa todavía no
+  había terminado de montarse, `getSource` no devolvía nada, la
+  interrogación se tragaba la llamada en silencio y no se reintentaba
+  jamás. Los nodos llegan de la API en bastante menos de lo que tarda el
+  estilo, así que se perdían casi siempre.
+  El síntoma engañaba y por eso costó tanto: se veían las teselas y el
+  relieve -van declarados en el estilo, nadie tiene que rellenarlos- y se
+  veían los nodos y las fotos -son marcadores del DOM-. Faltaba
+  exactamente lo que hay que rellenar después. Sin un solo error.
+  Ahora lo último de cada fuente se guarda siempre y se vuelca en cuanto el
+  estilo está en condiciones.
+- Los volúmenes de los nodos suben a 28 m, y 45 m el nodo en juego, con
+  seis metros de radio. A zoom 16-17 un poste bajo lo aplasta la
+  perspectiva contra el suelo y no se lee como volumen: lo que hace que un
+  nodo parezca plantado en el monte es verle el costado.
+- La chincheta del número se hace más pequeña, porque ya no es ella la que
+  marca el sitio.
+
+
 
 - El banco de mapa ya no necesitaba recargarse para mostrar los números. Se
   pedía el asa del mapa por parámetro en la dirección, y llegaba tarde: los
