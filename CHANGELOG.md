@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.23.0
+## 5.23.1
+
+- La red de caminos admite un margen de hasta 45 km (por defecto 40): tiene
+  que cubrir desde donde la gente LLEGA a la ruta, no sólo la ruta. Con
+  12 km, quien probaba desde casa a 35 km veía la guía recta y creía que
+  no funcionaba.
+- El banco de mapa tiene un botón "ponerme lejos" (2,5 km del nodo) para
+  ver la guía redirigir por caminos.
+
+
 
 - **Red de caminos: fuera del trazado, la guía redirige por carreteras.**
   El mapa del panel dibuja las carreteras pero no las tiene como datos.

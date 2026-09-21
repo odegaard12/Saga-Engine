@@ -1186,7 +1186,11 @@ async def road_graph_build(request: Request):
         margen = float((data or {}).get("margen_km") or 12)
     except (TypeError, ValueError):
         margen = 12.0
-    margen = max(3.0, min(30.0, margen))
+    # Hasta 45 km: la red tiene que cubrir desde donde la gente LLEGA a la
+    # ruta (el pueblo de al lado, el aparcamiento), no sólo la ruta. Con 12
+    # km, quien probaba desde casa a 35 km veía la guía recta y creía que
+    # no funcionaba. A 40 km el grafo ronda los 15-20 MB en el paquete.
+    margen = max(3.0, min(45.0, margen))
 
     try:
         resultado = await road_graph.descargar_y_construir(main._httpx, puntos, margen, main.DATA_DIR)
