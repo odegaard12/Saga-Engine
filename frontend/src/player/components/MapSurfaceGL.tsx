@@ -236,6 +236,13 @@ export function MapSurfaceGL({
       // Las capas se crean vacías una sola vez; los efectos de abajo solo
       // les cambian los datos. Crear y destruir capas en cada cambio de
       // props es lo que hace parpadear a un mapa de WebGL.
+      // Puede llegar por el atajo síncrono Y por el evento: añadir una
+      // fuente dos veces revienta el mapa entero.
+      if (mapa.getSource(FUENTE_RADIO)) {
+        setEstiloListo(true)
+        return
+      }
+
       mapa.addSource(FUENTE_RADIO, { type: 'geojson', data: COLECCION_VACIA })
       mapa.addLayer({
         id: CAPA_RADIO_RELLENO,
@@ -317,18 +324,26 @@ export function MapSurfaceGL({
     }
 
     /**
-     * `style.load`, no `load`.
+     * Preguntar ANTES de escuchar, porque el evento puede haber pasado ya.
      *
-     * `load` espera a que TODO esté cargado, y con relieve activado eso
-     * incluye el terreno. Si la elevación tarda o falla, `load` no dispara
-     * -y entonces el radio y el trazado no se pintaban nunca, mientras que
-     * los nodos y las fotos sí se veían porque son marcadores del DOM y no
-     * esperan a nada-. Justo el síntoma que se vio en el móvil.
+     * Aquí hubo dos intentos fallidos y los dos fallaban en silencio:
      *
-     * `style.load` dispara cuando el estilo está montado, que es lo único
-     * que hace falta para añadir fuentes y capas.
+     * 1. `load` espera a que TODO esté cargado, y con el relieve activado
+     *    eso incluye el terreno; si la elevación tardaba, no disparaba.
+     * 2. `style.load` parecía la respuesta, pero el estilo se declara EN
+     *    LÍNEA (no por URL), y MapLibre lo monta de forma síncrona dentro
+     *    del constructor: para cuando esta línea se ejecuta, el evento ya
+     *    ocurrió y no vuelve a ocurrir nunca.
+     *
+     * El síntoma fue el mismo las dos veces y por eso costó tanto: los
+     * nodos y las fotos se veían -son marcadores del DOM, no esperan a
+     * nada- y faltaban justo las capas de datos, sin un solo error.
      */
-    mapa.on('style.load', alCargar)
+    if (mapa.isStyleLoaded()) {
+      alCargar()
+    } else {
+      mapa.on('style.load', alCargar)
+    }
 
     return () => {
       marcadorXogadorRef.current?.remove()
