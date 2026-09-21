@@ -195,6 +195,19 @@ def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
     assert "const track = puntosDelTrack(stage)" in fonte
 
 
+def test_o_service_worker_serve_a_elevacion_sen_rede() -> None:
+    """
+    Sin red, el mapa 3D pedía la elevación y el service worker la dejaba
+    pasar a una red que no estaba: el monte salía PLANO aunque las teselas
+    de imagen sí llegaran. "Sin cobertura era otro mapa."
+    """
+    sw = (COMPONENTE.parents[3] / "public" / "sw.js").read_text(encoding="utf-8")
+    assert "url.pathname.startsWith('/dem-tiles/')" in sw
+    assert "'saga:offline-map-tiles:v3'" in (
+        COMPONENTE.parents[1] / "offline" / "mapTileCache.ts"
+    ).read_text(encoding="utf-8"), "el resumen viejo daría el paquete por completo sin bajar lo nuevo"
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.

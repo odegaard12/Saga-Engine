@@ -6,7 +6,18 @@ import type { PlayerStage } from '../../types/player'
 // se pierde en el siguiente arranque y el jugador se queda sin mapa offline
 // creyendo que lo tiene.
 const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
-const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v2'
+/**
+ * v3 desde 5.18.1. Cambiar la clave es lo que obliga a rehacer el paquete.
+ *
+ * La pantalla de carga se salta la descarga si el resumen guardado dice
+ * que ya está al 98 %. Al cambiar QUÉ lleva el paquete -en 5.18.0 entraron
+ * el relieve a z14-15 y el corredor por el trazado real- el resumen viejo
+ * seguía diciendo "completo", la barra pasaba al 100 % al instante y lo
+ * nuevo no se bajaba nunca: "descarga súper rápido y en modo avión no hay
+ * nada". Con otra clave el resumen viejo no cuenta; lo que ya está en el
+ * móvil no se vuelve a pedir, sólo lo que falta.
+ */
+const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v3'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
 const MAX_TILE_URLS = 1500

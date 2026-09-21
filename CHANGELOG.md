@@ -6,7 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.18.0
+## 5.18.1
+
+- **Sin cobertura, el relieve.** El service worker servía desde la caché
+  las teselas de imagen pero no las de elevación (`/dem-tiles/`): sin red
+  el monte salía plano -"era otro mapa, no tenía el mismo desnivel"-. Ahora
+  la elevación va por la misma caché que la imagen.
+- **La pantalla de carga vuelve a bajar lo que falta.** Se saltaba la
+  descarga porque el resumen guardado decía "completo" -de un paquete de
+  antes de que entraran el relieve a z14-15 y el corredor por el trazado
+  real-: la barra pasaba al 100 % al instante y lo nuevo no se bajaba
+  nunca. Cambia la clave del resumen; lo que ya está en el móvil no se
+  vuelve a pedir, sólo lo que falta.
+- El botón 2D/3D tiene el mismo aspecto en los dos estados; cambia la
+  etiqueta, que dice a qué modo vas. Cambiar de color al pasar a 2D se leía
+  como avería.
+- Botón de norte: aparece sólo cuando el mapa está girado, con la aguja
+  girando con él; un toque lo devuelve al norte.
+
+
 
 - **El trazado cuenta la partida.** Verde lo andado, azul el tramo en
   juego, claro y apagado lo que queda: cada tramo hereda el estado del
