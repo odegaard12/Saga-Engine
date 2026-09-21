@@ -6,7 +6,28 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.15.1
+## 5.16.0
+
+- **Los nodos pasan a ser símbolos del mapa, no marcadores del DOM.** Un
+  marcador del DOM se coloca desde JavaScript un fotograma después de que
+  el mapa se haya dibujado: con relieve y zoom va siempre por detrás del
+  terreno -"al ampliar quedan mal y al soltar se recolocan"-. Un símbolo lo
+  pinta el propio motor, en el mismo fotograma y a la altura correcta del
+  terreno. La chincheta se dibuja en un canvas al vuelo, con el número
+  horneado dentro: cabeza con luz, borde oscuro, punta y sombra en el
+  suelo. Sin fuentes de letras externas, que serían una petición más que
+  falla sin cobertura. Bajo cada una, un disco de metro y medio pegado al
+  relieve que la ancla al terreno sin taparla.
+- **El vigilante del estilo rehacía mapas sanos.** Comprobaba
+  `isStyleLoaded()`, que es `false` cada vez que hay una tesela cargando
+  -o sea, en cada zoom-, y rehacía el estilo entero hasta cinco veces:
+  vaciaba fuentes, recargaba teselas y descolocaba marcadores. Eso era el
+  "carga raro". Ahora sólo actúa si el estilo no tiene capas.
+- Trazado un poco más grueso y radio de entrada con borde continuo y
+  relleno más presente: las líneas a trazos tienen historial de pintarse
+  mal sobre relieve en MapLibre, y lo primero es que se vea.
+
+
 
 - La guarda de colores del tema cazaba las sombras del terreno de 5.15.0.
   Son colores del monte, no de la piel de la app: una ladera a la sombra es

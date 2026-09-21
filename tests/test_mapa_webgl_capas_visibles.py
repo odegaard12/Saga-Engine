@@ -130,22 +130,34 @@ def test_ningun_marcador_leva_position_en_lina(fonte: str) -> None:
         )
 
 
-def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:
+def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None:
     """
-    MapLibre REESCRIBE el `transform` del elemento que le entregas.
+    Los nodos los pinta el motor, no el DOM.
 
-    La forma de gota se conseguía girando el elemento 45 grados; al estar en
-    el elemento del marcador, MapLibre lo machacaba en cada fotograma para
-    colocarlo en pantalla y lo que se veían eran bolas. El giro tiene que
-    vivir en un hijo.
+    Un marcador del DOM se coloca desde JavaScript un fotograma después de
+    que el mapa se haya dibujado: con relieve y zoom va siempre por detrás
+    del terreno ("se quedan mal y al soltar se recolocan"). Un símbolo lo
+    pinta MapLibre en el mismo fotograma y a la altura correcta del
+    terreno. La imagen se dibuja en canvas con el número horneado: sin
+    fuentes de letras externas, que fallarían sin cobertura.
     """
-    marcadores = fonte.count("new maplibregl.Marker({ element:")
-    assert marcadores >= 2, "cambiaron los marcadores; revisar esta guarda"
-    assert "rotate(-45deg)" in fonte, "se perdió la forma de chincheta"
-    # El giro y la creación del elemento del marcador no pueden ser la misma
-    # asignación de estilo.
-    bloque_marcador = fonte.split("const elemento = document.createElement('div')")[1]
-    cabecera = bloque_marcador.split("} as Partial<CSSStyleDeclaration>)")[0]
-    assert "rotate(" not in cabecera, (
-        "el giro volvió al elemento del marcador: MapLibre lo va a machacar"
+    assert "type: 'symbol'" in fonte
+    assert "mapa.on('styleimagemissing'" in fonte
+    assert "function dibujarChincheta(" in fonte
+    assert "marcadoresNodosRef.current.push" not in fonte, (
+        "volvieron los nodos como marcadores del DOM"
     )
+
+
+def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
+    """
+    El vigilante sólo actúa si el estilo NO tiene capas.
+
+    `isStyleLoaded()` es `false` cada vez que hay una tesela cargando -o
+    sea, en cada zoom-. Con esa comprobación rehacía el estilo entero
+    hasta cinco veces sobre un mapa sano: vaciaba fuentes, recargaba
+    teselas y descolocaba marcadores.
+    """
+    bloque = fonte[fonte.index("const vigilarEstilo"):fonte.index("document.addEventListener('visibilitychange'")]
+    assert "vivo.isStyleLoaded()" not in bloque, "el vigilante volvió a mirar isStyleLoaded()"
+    assert "getStyle().layers.length" in bloque
