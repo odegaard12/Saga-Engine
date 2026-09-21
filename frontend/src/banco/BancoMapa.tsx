@@ -94,6 +94,7 @@ type Lectura = {
   radioVertices: number
   rutaTramos: number
   nodosVolumen: number
+  fotosEnMapa: number
 }
 
 /** Lee el estado real del mapa. Nada de esto se puede deducir mirando. */
@@ -118,6 +119,7 @@ function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
   const radio = datos('saga-radio')
   const ruta = datos('saga-ruta')
   const volumen = datos('saga-nodos-volumen')
+  const fotosMapa = datos('saga-fotos')
   let capas: string[] = []
   try {
     capas = mapa.getStyle().layers.map((capa) => capa.id)
@@ -153,6 +155,7 @@ function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
       : 0,
     rutaTramos: ruta?.features?.length ?? 0,
     nodosVolumen: volumen?.features?.length ?? 0,
+    fotosEnMapa: fotosMapa?.features?.length ?? 0,
   }
 }
 
@@ -301,6 +304,7 @@ export default function BancoMapa() {
               valor={String(lectura.nodosVolumen)}
               mal={lectura.nodosVolumen === 0}
             />
+            <Fila etiqueta="fotos en mapa" valor={String(lectura.fotosEnMapa)} />
             <Fila etiqueta="capas" valor={String(lectura.capas.length)} />
           </>
         ) : (
