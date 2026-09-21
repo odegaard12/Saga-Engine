@@ -6,7 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.17.0
+## 5.18.0
+
+- **El trazado cuenta la partida.** Verde lo andado, azul el tramo en
+  juego, claro y apagado lo que queda: cada tramo hereda el estado del
+  nodo al que llega. Y sobre el tramo en juego, un pulso blanco que
+  respira (opacidad animada diez veces por segundo, sólo con la pestaña
+  visible): "por aquí, ahora", sin leer nada.
+- **Tu avatar deja de saltar.** Era el último marcador del DOM que quedaba
+  en el mapa 3D, y por eso el único que seguía descolocándose con el
+  relieve al hacer zoom. Ahora es un símbolo del mapa como los nodos y las
+  fotos: círculo con tu foto (o iniciales sobre tu color), anillo blanco y
+  halo de tu color, dibujado en canvas y colocado por el motor en el mismo
+  fotograma que el terreno.
+- **El paquete offline baja lo que el mapa 3D pide de verdad.** El
+  corredor de teselas seguía rectas entre nodos, y la ruta real da rodeos
+  por caminos que se salían de él: ahora sigue el `route_track`. Y el
+  relieve baja hasta z15 (antes z13): el terreno pide z14-15 en cuanto se
+  camina, y sin ellas el monte se quedaba plano sin cobertura.
+
+
 
 - **Las fotos de campo se quedan en su sitio.** Eran marcadores del DOM, y
   un marcador del DOM va un fotograma por detrás del terreno: con relieve y
