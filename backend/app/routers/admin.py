@@ -1192,8 +1192,21 @@ async def road_graph_build(request: Request):
     # no funcionaba. A 40 km el grafo ronda los 15-20 MB en el paquete.
     margen = max(3.0, min(45.0, margen))
 
-    try:
-        resultado = await road_graph.descargar_y_construir(main._httpx, puntos, margen, main.DATA_DIR)
-    except Exception as exc:  # Overpass caído, sin red, zona sin caminos…
-        return JSONResponse(status_code=502, content={"status": "error", "detail": str(exc)[:300]})
-    return {"status": "ok", **resultado}
+    # En segundo plano. Con 40 km son unas 25 baldosas con pausas entre
+    # ellas: cinco o seis minutos. Una petición HTTP tan larga caduca por el
+    # camino (túnel, navegador); el panel arranca la construcción y va
+    # preguntando por ella con /road-graph/status.
+    if road_graph.construccion.get("en_curso"):
+        return {"status": "ok", "arrancada": False, **road_graph.estado(main.DATA_DIR)}
+
+    import asyncio
+
+    async def _construir():
+        try:
+            await road_graph.descargar_y_construir(main._httpx, puntos, margen, main.DATA_DIR)
+        except Exception:
+            pass  # el error queda en road_graph.construccion["error"]
+
+    asyncio.create_task(_construir())
+    road_graph.construccion.update({"en_curso": True, "hechas": 0, "total": 0, "error": "", "margen_km": margen})
+    return {"status": "ok", "arrancada": True, **road_graph.estado(main.DATA_DIR)}

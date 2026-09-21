@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.23.2
+## 5.23.3
+
+- La red de caminos se construye **en segundo plano** en el servidor, y el
+  panel enseña el progreso ("7 de 25 baldosas"). Con 40 km son cinco o seis
+  minutos y una petición HTTP tan larga caducaba por el camino.
+- Baldosas de 25 km con pausa entre ellas y espera antes de reintentar:
+  Overpass concede pocas ranuras por IP y las peticiones encadenadas sin
+  pausa acababan en 504 en todos los espejos.
+
+
 
 - La red de caminos se descarga **por baldosas de 15 km** y con espejos de
   reserva. El servidor público de Overpass devolvía 504 con zonas de 30-40
