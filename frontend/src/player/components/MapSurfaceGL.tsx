@@ -106,6 +106,20 @@ type Punto = { lat: number; lon: number }
  * círculo tiene que decir. Un polígono en coordenadas sí escala con el
  * mapa porque está en el terreno, no en la pantalla.
  */
+/** Distancia en metros entre dos puntos (suficiente para unos pocos km). */
+function metrosEntre(a: Punto, b: Punto): number {
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180
+  const lat1 = (a.lat * Math.PI) / 180
+  const lat2 = (b.lat * Math.PI) / 180
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(h))
+}
+
+/** A partir de cuántos metros del camino se avisa; se apaga algo más cerca, para no parpadear. */
+const FUERA_DE_TRAZADO_M = 500
+const DE_VUELTA_AL_TRAZADO_M = 400
+
 function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
   const coords: [number, number][] = []
   const radioLat = radioMetros / 111320
@@ -724,6 +738,12 @@ export function MapSurfaceGL({
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
   const onListoRef = useRef(onListo)
   onListoRef.current = onListo
+  /** Metros al camino cuando estás fuera de él; null cuando vas por él. */
+  const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
+  /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
+  const gestoRef = useRef(false)
+  /** Última posición a la que se siguió, para no encadenar animaciones por 2 metros. */
+  const ultimoSeguimientoRef = useRef<Punto | null>(null)
   /** Callbacks por ref: los escuchadores del mapa se registran una vez. */
   const onUserMapMoveRef = useRef(onUserMapMove)
   onUserMapMoveRef.current = onUserMapMove
@@ -946,8 +966,15 @@ export function MapSurfaceGL({
      * código (seguir, encuadrar) no cuentan, o se apagaría solo.
      */
     const alTocar = (evento: { originalEvent?: unknown }) => {
-      if (evento.originalEvent) onUserMapMoveRef.current?.()
+      if (evento.originalEvent) {
+        gestoRef.current = true
+        onUserMapMoveRef.current?.()
+      }
     }
+    const alSoltar = () => {
+      gestoRef.current = false
+    }
+    mapa.on('moveend', alSoltar)
     mapa.on('dragstart', alTocar)
     mapa.on('zoomstart', alTocar)
     mapa.on('rotatestart', alTocar)
@@ -1003,6 +1030,7 @@ export function MapSurfaceGL({
     return () => {
       pulsoVivo = false
       mapa.off('rotate', alGirar)
+      mapa.off('moveend', alSoltar)
       mapa.off('dragstart', alTocar)
       mapa.off('zoomstart', alTocar)
       mapa.off('rotatestart', alTocar)
@@ -1089,9 +1117,27 @@ export function MapSurfaceGL({
       ],
     })
 
-    // Seguirme: la cámara va contigo, suave, mientras nadie toque el mapa.
-    if (followPlayerRef.current && mapa) {
-      mapa.easeTo({ center: [playerPosition.lon, playerPosition.lat], duration: 600, essential: true })
+    /**
+     * Seguirme, sin tirones.
+     *
+     * Cada aviso del GPS lanzaba una animación de 600 ms, y como los avisos
+     * llegan cada pocos segundos -a veces con el anterior sin terminar-, el
+     * mapa iba a sacudidas. Ahora: no se sigue mientras el jugador tiene
+     * el mapa en la mano, no se sigue por menos de tres metros, y la
+     * animación es más larga que el intervalo entre avisos, así que una
+     * enlaza con la siguiente en vez de cortarla.
+     */
+    if (followPlayerRef.current && mapa && !gestoRef.current) {
+      const anterior = ultimoSeguimientoRef.current
+      if (!anterior || metrosEntre(anterior, playerPosition) >= 3) {
+        ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
+        mapa.easeTo({
+          center: [playerPosition.lon, playerPosition.lat],
+          duration: 1400,
+          easing: (x) => x,
+          essential: true,
+        })
+      }
     }
   }, [
     playerPosition?.lat,
@@ -1102,29 +1148,53 @@ export function MapSurfaceGL({
     pintarFuente,
   ])
 
-  // La guía de ti al nodo que toca.
+  /**
+   * La guía de ti al nodo que toca, POR EL CAMINO.
+   *
+   * Recta era mentira: cruzaba el monte por donde no se puede andar. Ahora
+   * se busca el punto del trazado del nodo más cercano a ti y la guía es
+   * un tramito recto hasta ese punto más el trazado que queda desde ahí
+   * hasta el nodo. Y de paso se sabe a cuántos metros del camino estás:
+   * si son más de 500, "fuera del trazado".
+   */
   useEffect(() => {
     if (!playerPosition || currentStage?.lat == null || currentStage?.lon == null) {
       pintarFuente(FUENTE_GUIA, COLECCION_VACIA)
+      setFueraDeTrazado(null)
       return
     }
+    const nodo = { lat: currentStage.lat as number, lon: currentStage.lon as number }
+    const track = leerTrackDelNodo(currentStage)
+    const camino = track.length > 1 ? track : [nodo]
+
+    let mejor = 0
+    let mejorMetros = Infinity
+    camino.forEach((punto, indice) => {
+      const metros = metrosEntre(playerPosition, punto)
+      if (metros < mejorMetros) {
+        mejorMetros = metros
+        mejor = indice
+      }
+    })
+
+    const coordenadas: [number, number][] = [
+      [playerPosition.lon, playerPosition.lat],
+      ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
+    ]
     pintarFuente(FUENTE_GUIA, {
       type: 'FeatureCollection',
       features: [
-        {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [playerPosition.lon, playerPosition.lat],
-              [currentStage.lon as number, currentStage.lat as number],
-            ],
-          },
-        },
+        { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordenadas } },
       ],
     })
-  }, [playerPosition?.lat, playerPosition?.lon, currentStage?.lat, currentStage?.lon, pintarFuente])
+
+    // Con histéresis: se enciende a 500 m y se apaga por debajo de 400,
+    // para que en el borde no parpadee a cada aviso del GPS.
+    setFueraDeTrazado((antes) => {
+      if (antes === null) return mejorMetros > FUERA_DE_TRAZADO_M ? Math.round(mejorMetros) : null
+      return mejorMetros > DE_VUELTA_AL_TRAZADO_M ? Math.round(mejorMetros) : null
+    })
+  }, [playerPosition?.lat, playerPosition?.lon, currentStage, pintarFuente])
 
   /**
    * Los tres encuadres, siempre con el norte arriba.
@@ -1358,6 +1428,35 @@ export function MapSurfaceGL({
         aria-label="Mapa de la misión (WebGL)"
         style={{ position: 'absolute', inset: 0 }}
       />
+      {fueraDeTrazado !== null ? (
+        /**
+         * Aviso de fuera del trazado. Pequeño, en el centro, sin tapar la
+         * barra de arriba ni la de abajo. Dice cuánto, porque no es lo
+         * mismo 520 m que 3 km.
+         */
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '38%',
+            transform: 'translateX(-50%)',
+            padding: '8px 14px',
+            borderRadius: 999,
+            background: 'rgba(var(--theme-ink), .78)',
+            color: '#ffffff',
+            border: '1px solid rgba(255,255,255,.35)',
+            font: '800 13px system-ui, sans-serif',
+            letterSpacing: '.02em',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 5,
+          }}
+        >
+          Fuera del trazado ·{' '}
+          {fueraDeTrazado >= 1000 ? `${(fueraDeTrazado / 1000).toFixed(1)} km` : `${fueraDeTrazado} m`}
+        </div>
+      ) : null}
 
     </section>
   )
