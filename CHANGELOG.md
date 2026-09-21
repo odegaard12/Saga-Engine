@@ -6,7 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.6
+## 5.14.0
+
+- **Banco de pruebas del mapa en `/banco-mapa?user=NOMBRE`.** El mapa no se
+  podía mirar, y ese era el problema de fondo: la pantalla del jugador sólo
+  se abre en vertical -en un escritorio enseña el aviso de girar el móvil y
+  el mapa ni llega a montarse-, exige elegir jugador, pide permisos y se
+  pasa cuarenta y cinco segundos descargando la misión antes de pintar
+  nada. Con todo eso delante, cada cambio del mapa se corregía a ciegas y
+  se daba por bueno sin verlo, que es exactamente como se colaron los
+  últimos fallos.
+  El banco abre el mapa solo, a pantalla completa, con los datos de verdad
+  y con los números a la vista: si el estilo montó, si hay teselas, con
+  cuánto relieve, cuántos vértices tiene el radio, cuántos tramos el
+  trazado y cuántos nodos tienen volumen. Nada de eso se puede deducir
+  mirando una captura.
+
+
 
 - **Los nodos pasan a ser 3D de verdad, no un dibujo que lo imita.** Cada
   nodo levanta un volumen extruido desde el suelo, con altura en METROS: se

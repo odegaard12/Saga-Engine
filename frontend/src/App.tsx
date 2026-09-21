@@ -16,6 +16,14 @@ import { BuildInfoBadge } from './shared/BuildInfoBadge'
  */
 const AdminApp = lazy(() => import('./admin/AdminApp'))
 
+/**
+ * Banco de pruebas del mapa, aparte del juego.
+ *
+ * Va suelto y cargado sólo al entrar: no es una pantalla de jugador y no
+ * tiene por qué viajar en el paquete que se descarga en el punto de salida.
+ */
+const BancoMapa = lazy(() => import('./banco/BancoMapa'))
+
 function ensurePlayerQueryParam(user: string): void {
   if (typeof window === 'undefined') return
   if (!window.location.pathname.startsWith('/player/')) return
@@ -66,10 +74,26 @@ export default function App() {
   }, [])
 
   const isAdmin = currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
+  const esBancoDeMapa = currentPath === '/banco-mapa'
   let content: ReactNode
   let showFloatingBuildInfo = true
 
-  if (isAdmin) {
+  if (esBancoDeMapa) {
+    /**
+     * El banco NO pasa por la pantalla del jugador a propósito.
+     *
+     * Esa pantalla sólo se abre en vertical, pide elegir jugador y se pasa
+     * cuarenta y cinco segundos descargando la misión. En un escritorio ni
+     * siquiera llega a montar el mapa: enseña el aviso de girar el móvil.
+     * Con todo eso delante, revisar un cambio de mapa era imposible.
+     */
+    content = (
+      <Suspense fallback={<PantallaCargandoAdmin />}>
+        <BancoMapa />
+      </Suspense>
+    )
+    showFloatingBuildInfo = false
+  } else if (isAdmin) {
     content = (
       <Suspense fallback={<PantallaCargandoAdmin />}>
         <AdminApp />
