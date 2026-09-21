@@ -361,3 +361,25 @@ def player_service_worker():
 @router.get("/service-worker.js")
 def player_service_worker_alias():
     return player_service_worker()
+
+
+@router.get("/api/road-graph")
+async def road_graph_publico():
+    """
+    La red de caminos de la zona, para el móvil.
+
+    Público como las teselas: no lleva nada personal, es OpenStreetMap
+    recortado. Un día de caché en el navegador; el service worker la sirve
+    sin cobertura desde el paquete offline.
+    """
+    import main
+    from backend.app.runtime import road_graph
+
+    fichero = road_graph.ruta_fichero(main.DATA_DIR)
+    if not fichero.exists():
+        raise HTTPException(status_code=404, detail="no road graph")
+    return Response(
+        content=fichero.read_bytes(),
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )

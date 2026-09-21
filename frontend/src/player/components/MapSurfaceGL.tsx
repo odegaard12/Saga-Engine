@@ -33,6 +33,7 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
+import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
 
 /**
  * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
@@ -742,6 +743,10 @@ export function MapSurfaceGL({
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
   const gestoRef = useRef(false)
+  /** La red de caminos, si el panel la preparó; null mientras no está o si no hay. */
+  const grafoRef = useRef<GrafoDeCaminos | null>(null)
+  /** Última ruta por caminos calculada, para no recalcular a cada aviso del GPS. */
+  const rutaCaminosRef = useRef<{ desde: Punto; hastaClave: string; coords: [number, number][] } | null>(null)
   /** Última posición a la que se siguió, para no encadenar animaciones por 2 metros. */
   const ultimoSeguimientoRef = useRef<Punto | null>(null)
   /** Callbacks por ref: los escuchadores del mapa se registran una vez. */
@@ -975,6 +980,11 @@ export function MapSurfaceGL({
       gestoRef.current = false
     }
     mapa.on('moveend', alSoltar)
+    // La red de caminos se pide una vez; si no está preparada, no pasa nada.
+    void cargarGrafo().then((grafo) => {
+      grafoRef.current = grafo
+    })
+
     mapa.on('dragstart', alTocar)
     mapa.on('zoomstart', alTocar)
     mapa.on('rotatestart', alTocar)
@@ -1177,8 +1187,38 @@ export function MapSurfaceGL({
       }
     })
 
+    /**
+     * Lejos del trazado: por carreteras y caminos hasta el punto más
+     * cercano de la ruta, si el panel preparó la red de caminos. La ruta
+     * se recalcula sólo cuando te has movido más de quince metros o ha
+     * cambiado el destino: A* sobre decenas de miles de nodos cada aviso
+     * del GPS gastaría batería para nada.
+     */
+    let porCaminos: [number, number][] = []
+    const objetivo = camino[mejor]
+    const claveObjetivo = `${objetivo.lat.toFixed(5)},${objetivo.lon.toFixed(5)}`
+    if (mejorMetros > 120 && grafoRef.current) {
+      const previa = rutaCaminosRef.current
+      if (
+        previa &&
+        previa.hastaClave === claveObjetivo &&
+        metrosEntre(previa.desde, playerPosition) < 15
+      ) {
+        porCaminos = previa.coords
+      } else {
+        const calculada = rutaPorCaminos(grafoRef.current, playerPosition, objetivo, 400)
+        porCaminos = calculada ?? []
+        rutaCaminosRef.current = {
+          desde: { lat: playerPosition.lat, lon: playerPosition.lon },
+          hastaClave: claveObjetivo,
+          coords: porCaminos,
+        }
+      }
+    }
+
     const coordenadas: [number, number][] = [
       [playerPosition.lon, playerPosition.lat],
+      ...porCaminos,
       ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
     ]
     pintarFuente(FUENTE_GUIA, {

@@ -6,7 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.22.1
+## 5.23.0
+
+- **Red de caminos: fuera del trazado, la guía redirige por carreteras.**
+  El mapa del panel dibuja las carreteras pero no las tiene como datos.
+  Ahora el panel (Ajustes → "Red de caminos") descarga de OpenStreetMap las
+  carreteras y caminos alrededor de la ruta (margen configurable, 12 km por
+  defecto), los reduce a un grafo de cruces y tramos con su forma
+  simplificada, y lo guarda. El grafo viaja en el paquete offline de cada
+  móvil (`/api/road-graph`, misma caché que las teselas) y el móvil calcula
+  el camino más corto con A*, sin cobertura. La guía, cuando estás a más de
+  120 m del trazado, va por caminos reales hasta el punto más cercano de la
+  ruta y desde ahí sigue el trazado. Sin red preparada, recta como antes.
+  Se recalcula sólo cuando te mueves más de quince metros, por la batería.
+
+
 
 - **La barra de carga cuenta lo que hace.** Con el paquete ya completo
   pasaba unos segundos "calculando" y saltaba de 0 a 100: parecía que no

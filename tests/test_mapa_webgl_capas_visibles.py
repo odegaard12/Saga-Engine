@@ -335,6 +335,20 @@ def test_a_comprobacion_do_paquete_ensenase() -> None:
     assert "teselas en el móvil" in fonte
 
 
+def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
+    """
+    Fuera del trazado, la guía va por carreteras y caminos (A* sobre la red
+    de OpenStreetMap que prepara el panel) hasta el punto más cercano de la
+    ruta. Sin red preparada, recta como antes.
+    """
+    assert "rutaPorCaminos(grafoRef.current, playerPosition, objetivo, 400)" in fonte
+    assert "mejorMetros > 120 && grafoRef.current" in fonte
+    ruta = (COMPONENTE.parents[1] / "routing" / "roadGraph.ts").read_text(encoding="utf-8")
+    assert "export function rutaPorCaminos(" in ruta and "class Monticulo" in ruta
+    sw = (COMPONENTE.parents[3] / "public" / "sw.js").read_text(encoding="utf-8")
+    assert "url.pathname === '/api/road-graph'" in sw
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.
