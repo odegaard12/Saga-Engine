@@ -6,6 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.12.1
+
+Los nodos no se veían en el mapa 3D. Y no daba ningún error, que es lo que
+lo hizo difícil de encontrar: **se dibujaban por debajo del monte**.
+
+Con el relieve activado, una capa de círculos de MapLibre queda enterrada
+bajo la malla del terreno. El mapa se veía perfecto y los nodos no
+aparecían por ningún lado.
+
+Ahora van como marcadores del DOM: van por encima del lienzo siempre, lo
+tape lo que lo tape, y además llevan el número dentro, como en el motor de
+Leaflet. Son diez, no diez mil, así que tenerlos en el DOM no cuesta nada
+aquí.
+
 ## 5.12.0
 
 El relieve se baja en la pantalla de carga, y la vista 3D pasa a ser la de

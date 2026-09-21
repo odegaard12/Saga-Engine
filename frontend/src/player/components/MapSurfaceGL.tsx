@@ -33,8 +33,6 @@ const CAPA_RADIO_RELLENO = 'saga-radio-relleno'
 const CAPA_RADIO_BORDE = 'saga-radio-borde'
 const FUENTE_RUTA = 'saga-ruta'
 const CAPA_RUTA = 'saga-ruta-linea'
-const FUENTE_NODOS = 'saga-nodos'
-const CAPA_NODOS = 'saga-nodos-punto'
 
 /**
  * Los colores de los alfileres NO siguen al tema, igual que en Leaflet.
@@ -97,6 +95,7 @@ export function MapSurfaceGL({
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   const marcadorXogadorRef = useRef<maplibregl.Marker | null>(null)
+  const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
 
   /**
    * ¿Está el estilo montado ya?
@@ -206,24 +205,6 @@ export function MapSurfaceGL({
         paint: { 'line-color': '#f8fafc', 'line-width': 3, 'line-opacity': 0.55 },
       })
 
-      mapa.addSource(FUENTE_NODOS, { type: 'geojson', data: COLECCION_VACIA })
-      mapa.addLayer({
-        id: CAPA_NODOS,
-        type: 'circle',
-        source: FUENTE_NODOS,
-        paint: {
-          // El alfiler SÍ va en píxeles: es un señalador, tiene que
-          // verse igual de lejos que de cerca. Lo que va en metros es el
-          // radio del nodo, que es información del terreno.
-          // 7 px era un punto que se perdía sobre la foto aérea, sobre
-          // todo inclinado. 10 con borde de 3 se ve sin taparlo todo.
-          'circle-radius': 10,
-          'circle-color': ['get', 'color'],
-          'circle-stroke-width': 3,
-          'circle-stroke-color': '#0b1220',
-        },
-      })
-
       setEstiloListo(true)
     }
 
@@ -232,6 +213,8 @@ export function MapSurfaceGL({
     return () => {
       marcadorXogadorRef.current?.remove()
       marcadorXogadorRef.current = null
+      marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
+      marcadoresNodosRef.current = []
       mapa.remove()
       mapaRef.current = null
       setEstiloListo(false)
@@ -285,26 +268,59 @@ export function MapSurfaceGL({
     )
   }, [currentStage?.lat, currentStage?.lon, currentStage?.radius, pintarFuente])
 
-  // Nodos y trazado entre ellos.
+  /**
+   * Los nodos van como marcadores del DOM, NO como capa de círculos.
+   *
+   * Con el relieve activado, una capa de círculos queda ENTERRADA bajo la
+   * malla del terreno: el mapa se veía bien y los nodos no aparecían por
+   * ningún lado -reportado en el móvil, y costó encontrarlo porque no da
+   * ningún error: se dibujan, pero por debajo del monte-.
+   *
+   * Un marcador del DOM va por encima del lienzo siempre, lo tape lo que
+   * lo tape, y además permite ponerle el número dentro, como en el motor
+   * de Leaflet. Son diez, no diez mil: el coste de tenerlos en el DOM es
+   * irrelevante aquí.
+   */
   useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+
+    marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
+    marcadoresNodosRef.current = []
+
     const nodos = (Array.isArray(missionStages) ? missionStages : []).filter(
       (nodo) => typeof nodo.lat === 'number' && typeof nodo.lon === 'number'
     )
 
-    pintarFuente(FUENTE_NODOS, {
-      type: 'FeatureCollection',
-      features: nodos.map((nodo, indice) => ({
-        type: 'Feature' as const,
-        properties: {
-          color:
-            indice < currentLevel
-              ? COLOR_NODO_HECHO
-              : indice === currentLevel
-                ? COLOR_NODO_ACTUAL
-                : COLOR_NODO_PENDIENTE,
-        },
-        geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
-      })),
+    nodos.forEach((nodo, indice) => {
+      const color =
+        indice < currentLevel
+          ? COLOR_NODO_HECHO
+          : indice === currentLevel
+            ? COLOR_NODO_ACTUAL
+            : COLOR_NODO_PENDIENTE
+
+      const elemento = document.createElement('div')
+      elemento.textContent = String(indice + 1)
+      elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
+      Object.assign(elemento.style, {
+        width: '26px',
+        height: '26px',
+        borderRadius: '50%',
+        background: color,
+        border: '2px solid #0b1220',
+        color: '#0b1220',
+        font: '900 12px system-ui, sans-serif',
+        display: 'grid',
+        placeItems: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,.45)',
+      } as Partial<CSSStyleDeclaration>)
+
+      const marcador = new maplibregl.Marker({ element: elemento })
+        .setLngLat([nodo.lon as number, nodo.lat as number])
+        .addTo(mapa)
+
+      marcadoresNodosRef.current.push(marcador)
     })
 
     /**
@@ -313,9 +329,7 @@ export function MapSurfaceGL({
      * Aquí había una línea recta de nodo a nodo, y probándola en el móvil
      * quedó claro que no es "el trazado a medias": es información falsa.
      * Cruza el monte por donde no se puede andar, y quien la mire
-     * caminando se fía de ella. El motor de Leaflet traza por caminos
-     * reales (ver roadRoute* en MapSurface.tsx); hasta que eso esté
-     * portado, mejor no pintar nada que pintar una ruta que miente.
+     * caminando se fía de ella.
      */
     pintarFuente(FUENTE_RUTA, COLECCION_VACIA)
   }, [missionStages, currentLevel, pintarFuente])
