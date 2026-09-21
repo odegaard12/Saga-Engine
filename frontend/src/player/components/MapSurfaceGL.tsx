@@ -687,9 +687,13 @@ export function MapSurfaceGL({
   fieldProofs,
   onOpenFieldProofs,
   selfProfile,
+  onListo,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
+  /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
+  const onListoRef = useRef(onListo)
+  onListoRef.current = onListo
   /** Rumbo actual del mapa, para enseñar el botón de norte sólo cuando hace falta. */
   const [rumbo, setRumbo] = useState(0)
   /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
@@ -878,6 +882,16 @@ export function MapSurfaceGL({
       window.setTimeout(latir, 100)
     }
     latir()
+
+    /**
+     * `idle` salta cuando no queda nada por cargar ni por dibujar: teselas,
+     * elevación, imágenes de símbolos. La primera vez es "el mapa está".
+     * Sólo se avisa una vez: después, cada zoom vuelve a pasar por `idle`
+     * y eso ya no le importa a nadie.
+     */
+    mapa.once('idle', () => {
+      onListoRef.current?.()
+    })
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.

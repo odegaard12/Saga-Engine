@@ -1503,6 +1503,17 @@ export default function PlayerApp() {
    */
   const [velo, setVelo] = useState(false)
   const [veloSaliendo, setVeloSaliendo] = useState(false)
+  /**
+   * El mapa 3D ha pintado su primera vista.
+   *
+   * El velo de carga no se retira hasta que esto sea cierto (o hasta un
+   * tope de tiempo): así el trabajo de decodificar teselas y levantar el
+   * relieve se hace DEBAJO del velo, y al entrar el mapa ya está. Antes el
+   * velo se iba en cuanto había permisos y todo ese trabajo caía encima del
+   * jugador mientras se movía: "tuvo que renderizar todo mientras me
+   * movía". Con el motor de Leaflet no hay aviso, así que no se espera.
+   */
+  const [mapaListo, setMapaListo] = useState(false)
   const ultimoDetalleRef = useRef('Preparando la misión…')
 
   /**
@@ -1542,6 +1553,11 @@ export default function PlayerApp() {
     // La carga se queda puesta mientras falte un permiso: ahora se piden
     // DENTRO de ella. Una partida ya terminada no pide nada.
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
+    // Y mientras el mapa 3D no haya pintado su primera vista (con tope).
+    if (state.status === 'ready' && state.config?.map_engine === 'maplibre' && !mapaListo) {
+      ultimoDetalleRef.current = 'Pintando el mapa…'
+      return undefined
+    }
     // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
     // MISMO render que lo monta, el navegador funde el `mount` y el cambio en
     // un solo fotograma y no se ve transicion ninguna.
@@ -1557,7 +1573,18 @@ export default function PlayerApp() {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
     }
-  }, [velo, permisosPendientes])
+  }, [velo, permisosPendientes, mapaListo, state.status, state.status === 'ready' ? state.config?.map_engine : undefined])
+
+  /**
+   * Tope para la espera del mapa: siete segundos. Si `idle` no llega -sin
+   * cobertura y sin paquete, o con la pestaña en segundo plano-, el velo se
+   * retira igual. Mejor un mapa a medias que una pantalla de carga eterna.
+   */
+  useEffect(() => {
+    if (!velo || mapaListo) return undefined
+    const tope = window.setTimeout(() => setMapaListo(true), 7000)
+    return () => window.clearTimeout(tope)
+  }, [velo, mapaListo])
 
   if (state.status === 'idle' || state.status === 'loading') {
     const mapProgress = state.status === 'loading' ? state.mapProgress : undefined
@@ -3002,6 +3029,7 @@ export default function PlayerApp() {
               display_name: payload.display_name || payload.user,
               gps_status: gpsState,
             }}
+            onListo={() => setMapaListo(true)}
           />
         </Suspense>
       ) : (

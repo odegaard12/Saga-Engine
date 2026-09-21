@@ -208,6 +208,29 @@ def test_o_service_worker_serve_a_elevacion_sen_rede() -> None:
     ).read_text(encoding="utf-8"), "el resumen viejo daría el paquete por completo sin bajar lo nuevo"
 
 
+def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
+    """
+    El mapa avisa una vez en `idle` y el velo de carga espera a ese aviso
+    (con tope). Así decodificar teselas y levantar el relieve pasa DEBAJO
+    del velo, no encima del jugador mientras se mueve.
+    """
+    assert "mapa.once('idle'" in fonte and "onListoRef.current?.()" in fonte
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "onListo={() => setMapaListo(true)}" in app
+    assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
+    assert "setTimeout(() => setMapaListo(true), 7000)" in app, "sin tope, la carga podría ser eterna"
+
+
+def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
+    """
+    El bucle de gemelas de relieve recorre lo que ya está en la lista; antes
+    del corredor no veía las teselas de z15 y el terreno se quedaba sin
+    elevación fina para el paquete offline.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.

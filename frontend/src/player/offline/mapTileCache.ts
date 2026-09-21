@@ -495,22 +495,6 @@ export async function prefetchMissionMapTiles(
       'mission-z14'
     )
 
-    /**
-     * Relieve: las gemelas de lo que ya se va a bajar.
-     *
-     * Sin esto, el mapa 3D pide la elevación al entrar -y eso es
-     * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
-     * en la pantalla de carga, donde ya se está esperando a propósito.
-     */
-    for (const clave of Array.from(urls.keys())) {
-      const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
-      if (!trozos) continue
-      const z = Number(trozos[1])
-      if (!ZOOMS_RELIEVE.includes(z)) continue
-      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
-      if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
-    }
-
     // Corredor ancho, no línea fina.
     addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
     addRouteCorridor(
@@ -531,6 +515,27 @@ export async function prefetchMissionMapTiles(
       340,
       'corridor-z17'
     )
+
+    /**
+     * Relieve: las gemelas de lo que ya se va a bajar.
+     *
+     * DESPUÉS del corredor, no antes: este bucle recorre lo que ya está
+     * en la lista, y puesto antes del corredor no veía las teselas de
+     * z15 -las que el terreno pide al caminar- y se quedaban sin gemela.
+     *
+     * Sin esto, el mapa 3D pide la elevación al entrar -y eso es
+     * exactamente la tardanza que se notaba en el móvil-. Se hace aquí,
+     * en la pantalla de carga, donde ya se está esperando a propósito.
+     */
+    for (const clave of Array.from(urls.keys())) {
+      const trozos = /^\/map-tiles\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(clave)
+      if (!trozos) continue
+      const z = Number(trozos[1])
+      if (!ZOOMS_RELIEVE.includes(z)) continue
+      const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
+      if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
+    }
+
 
     // Detalle alto solo cerca de nodos.
     for (const point of routePoints) {
