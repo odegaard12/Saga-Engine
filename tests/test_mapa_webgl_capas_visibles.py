@@ -50,6 +50,29 @@ def test_as_capas_de_datos_nacen_co_estilo(fonte: str) -> None:
     assert "mapa.on('style.load'" not in fonte
 
 
+def test_os_datos_das_fontes_non_se_perden(fonte: str) -> None:
+    """
+    Si el estilo aún no montó, los datos se guardan y se vuelcan después.
+
+    Aquí estuvo el fallo que se llevó media docena de versiones: la línea
+    era `fuente?.setData(datos)`, y si el estilo no había terminado de
+    montarse `getSource` devolvía nada, la interrogación se tragaba la
+    llamada y NO se reintentaba jamás. Los nodos llegan de la API en menos
+    de lo que tarda el estilo, así que el trazado, el radio y los volúmenes
+    se perdían casi siempre.
+
+    El síntoma engañaba: se veían las teselas y el relieve -van declarados
+    en el estilo y no hay que rellenarlos- y los nodos y las fotos -son
+    marcadores del DOM-. Faltaba justo lo que hay que rellenar después.
+    """
+    assert "ultimoDatoRef.current.set(id" in fonte, (
+        "sin guardar el último dato, una fuente que aún no existe lo pierde"
+    )
+    assert "mapa.on('styledata', volcarPendientes)" in fonte, (
+        "hace falta volcar lo pendiente cuando las fuentes ya existen"
+    )
+
+
 def test_hai_vixiante_por_se_o_estilo_non_monta(fonte: str) -> None:
     """
     Un mapa que nace con la pantalla bloqueada se queda EN BLANCO.
