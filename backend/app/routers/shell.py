@@ -23,6 +23,23 @@ async def entrada():
     return main.react_index_or_missing()
 
 
+@router.head("/banco-mapa", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/banco-mapa", response_class=HTMLResponse)
+async def banco_de_mapa():
+    """
+    Banco de pruebas del mapa.
+
+    La pantalla del jugador sólo se abre en vertical y en un escritorio
+    enseña el aviso de girar el móvil, así que el mapa no llega a montarse y
+    no había forma de revisarlo. Esto sirve la misma página de React, que al
+    ver esta ruta monta el mapa solo, a pantalla completa y con los números
+    a la vista.
+    """
+    import main
+
+    return main.react_index_or_missing()
+
+
 @router.head("/admin-react", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/admin-react", response_class=HTMLResponse)
 async def panel():

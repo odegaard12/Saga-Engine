@@ -50,6 +50,29 @@ def test_as_capas_de_datos_nacen_co_estilo(fonte: str) -> None:
     assert "mapa.on('style.load'" not in fonte
 
 
+def test_os_datos_das_fontes_non_se_perden(fonte: str) -> None:
+    """
+    Si el estilo aún no montó, los datos se guardan y se vuelcan después.
+
+    Aquí estuvo el fallo que se llevó media docena de versiones: la línea
+    era `fuente?.setData(datos)`, y si el estilo no había terminado de
+    montarse `getSource` devolvía nada, la interrogación se tragaba la
+    llamada y NO se reintentaba jamás. Los nodos llegan de la API en menos
+    de lo que tarda el estilo, así que el trazado, el radio y los volúmenes
+    se perdían casi siempre.
+
+    El síntoma engañaba: se veían las teselas y el relieve -van declarados
+    en el estilo y no hay que rellenarlos- y los nodos y las fotos -son
+    marcadores del DOM-. Faltaba justo lo que hay que rellenar después.
+    """
+    assert "ultimoDatoRef.current.set(id" in fonte, (
+        "sin guardar el último dato, una fuente que aún no existe lo pierde"
+    )
+    assert "mapa.on('styledata', volcarPendientes)" in fonte, (
+        "hace falta volcar lo pendiente cuando las fuentes ya existen"
+    )
+
+
 def test_hai_vixiante_por_se_o_estilo_non_monta(fonte: str) -> None:
     """
     Un mapa que nace con la pantalla bloqueada se queda EN BLANCO.
@@ -81,6 +104,30 @@ def test_o_3d_dos_nodos_e_xeometria_non_debuxo(fonte: str) -> None:
     assert "'fill-extrusion'" in fonte, "el volumen de los nodos es geometría"
     assert "'fill-extrusion-height'" in fonte
     assert "transform: 'rotateX(" not in fonte, "volvió el volcado falso de CSS"
+
+
+def test_ningun_marcador_leva_position_en_lina(fonte: str) -> None:
+    """
+    El elemento que se entrega a MapLibre no lleva `position` propio.
+
+    MapLibre lo coloca con su clase (`position: absolute`) más un
+    `transform` que SUMA al sitio donde el elemento esté. Un `position`
+    en línea gana a la clase y deja el marcador en flujo de documento:
+    los nodos salían apilados en columna desde la esquina del mapa y sólo
+    "iban a su sitio" al ampliar. Cinco versiones persiguiendo eso.
+    """
+    import re
+
+    # Cada bloque de estilo del elemento que acaba en `new maplibregl.Marker({ element: X`
+    for nombre in re.findall(r"new maplibregl\.Marker\(\{ element: (\w+)", fonte):
+        bloque = re.search(
+            r"Object\.assign\(%s\.style, \{(.*?)\} as Partial" % nombre, fonte, re.S
+        )
+        if not bloque:
+            continue
+        assert "position:" not in bloque.group(1), (
+            "el elemento `%s` lleva `position` en línea: MapLibre lo apilará en flujo" % nombre
+        )
 
 
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:

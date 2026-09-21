@@ -6,7 +6,94 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.6
+## 5.14.6
+
+- El asa de depuración expone también el estilo del mapa. En una pestaña
+  que no pinta MapLibre nunca monta el estilo -espera un fotograma-, y sin
+  eso no había forma de medir las capas de datos. Ahora se puede forzar el
+  montaje desde fuera y comprobar trazado, radio y volumen sin que nadie
+  tenga que estar mirando.
+
+
+
+- **Los nodos por fin se quedan en su sitio.** Salían apilados en columna
+  y sólo "iban a su ubicación" al ampliar, y a escala de toda Galicia los
+  diez formaban una fila perfecta y equiespaciada -cosa que ninguna
+  geografía produce-. La causa: el elemento de la chincheta llevaba
+  `position: relative` en línea, y el estilo en línea gana a la clase de
+  MapLibre (`position: absolute`). Los diez nodos estaban en flujo de
+  documento desde la esquina del mapa, y MapLibre sólo les sumaba el
+  desplazamiento. Medido en el navegador: regla `absolute`, cálculo
+  `relative`. Cinco versiones persiguiendo esto. Hay test que lo blinda
+  para todos los marcadores.
+
+
+
+- El banco de mapa cuenta sus propios montajes y enseña qué respondió la
+  API (código, nodos, nivel). Se vio "nodos 0" con nueve chinchetas en el
+  mapa, y en vez de deducir por qué, que lo diga él.
+- Botón **nodos de prueba**: tres nodos inventados cerca de Catoira, con
+  trazado y radio. Prueban el trazado, el radio y el volumen 3D sin depender
+  de la API ni de la sesión: si con ellos se ve, el motor está bien y lo que
+  falla es de dónde salen los datos; y al revés.
+
+
+
+- **El banco de pruebas mentía, que es peor que no tenerlo.** Comprobaba la
+  fuente de teselas por un nombre que no existe -siempre decía que no había
+  teselas aunque el mapa las estuviera pintando- y tenía un candado que
+  impedía repetir la petición de la partida: si el componente se montaba
+  dos veces, la segunda se quedaba sin nodos para siempre y el panel decía
+  "nodos 0" mientras el mapa tenía diez marcadores puestos.
+- El banco muestra también cuántas fotos cargó y lleva un botón para volver
+  a pedir los datos sin recargar la página.
+
+
+
+- **Encontrado el fallo que se llevó media docena de versiones: el trazado,
+  el radio y los volúmenes 3D nunca recibían sus datos.** La línea que los
+  pintaba era `fuente?.setData(datos)`. Si el estilo del mapa todavía no
+  había terminado de montarse, `getSource` no devolvía nada, la
+  interrogación se tragaba la llamada en silencio y no se reintentaba
+  jamás. Los nodos llegan de la API en bastante menos de lo que tarda el
+  estilo, así que se perdían casi siempre.
+  El síntoma engañaba y por eso costó tanto: se veían las teselas y el
+  relieve -van declarados en el estilo, nadie tiene que rellenarlos- y se
+  veían los nodos y las fotos -son marcadores del DOM-. Faltaba
+  exactamente lo que hay que rellenar después. Sin un solo error.
+  Ahora lo último de cada fuente se guarda siempre y se vuelca en cuanto el
+  estilo está en condiciones.
+- Los volúmenes de los nodos suben a 28 m, y 45 m el nodo en juego, con
+  seis metros de radio. A zoom 16-17 un poste bajo lo aplasta la
+  perspectiva contra el suelo y no se lee como volumen: lo que hace que un
+  nodo parezca plantado en el monte es verle el costado.
+- La chincheta del número se hace más pequeña, porque ya no es ella la que
+  marca el sitio.
+
+
+
+- El banco de mapa ya no necesitaba recargarse para mostrar los números. Se
+  pedía el asa del mapa por parámetro en la dirección, y llegaba tarde: los
+  efectos del hijo corren antes que los del padre, así que el mapa miraba la
+  dirección antes de que el banco hubiera podido escribir el parámetro.
+
+
+
+- **Banco de pruebas del mapa en `/banco-mapa?user=NOMBRE`.** El mapa no se
+  podía mirar, y ese era el problema de fondo: la pantalla del jugador sólo
+  se abre en vertical -en un escritorio enseña el aviso de girar el móvil y
+  el mapa ni llega a montarse-, exige elegir jugador, pide permisos y se
+  pasa cuarenta y cinco segundos descargando la misión antes de pintar
+  nada. Con todo eso delante, cada cambio del mapa se corregía a ciegas y
+  se daba por bueno sin verlo, que es exactamente como se colaron los
+  últimos fallos.
+  El banco abre el mapa solo, a pantalla completa, con los datos de verdad
+  y con los números a la vista: si el estilo montó, si hay teselas, con
+  cuánto relieve, cuántos vértices tiene el radio, cuántos tramos el
+  trazado y cuántos nodos tienen volumen. Nada de eso se puede deducir
+  mirando una captura.
+
+
 
 - **Los nodos pasan a ser 3D de verdad, no un dibujo que lo imita.** Cada
   nodo levanta un volumen extruido desde el suelo, con altura en METROS: se
