@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.15.0
+## 5.15.1
+
+- La guarda de colores del tema cazaba las sombras del terreno de 5.15.0.
+  Son colores del monte, no de la piel de la app: una ladera a la sombra es
+  azul oscura con cualquier tema. Quedan marcados como tales.
+
+
 
 - **Chinchetas 3D de verdad: poste fino y cabeza ancha, en metros.** Un
   cilindro solo se leía como un depósito de agua. Poste estrecho más cabeza
