@@ -42,6 +42,8 @@ const CAPA_RUTA = 'saga-ruta-linea'
 const CAPA_RUTA_BORDE = 'saga-ruta-borde'
 const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
 const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
+const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
+const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -126,6 +128,70 @@ function leerTrackDelNodo(stage: PlayerStage): Punto[] {
 const COLECCION_VACIA = { type: 'FeatureCollection' as const, features: [] }
 
 /**
+ * Dibuja una chincheta con el número dentro, en un canvas.
+ *
+ * A doble resolución (`pixelRatio: 2` al registrarla) para que no salga
+ * borrosa en un móvil. Forma: cabeza redonda con luz arriba y borde
+ * oscuro, punta hacia abajo, y una sombra elíptica en el suelo que es lo
+ * que la hace parecer CLAVADA y no pegada a la pantalla.
+ */
+function dibujarChincheta(numero: string, color: string): ImageData | null {
+  const ancho = 56
+  const alto = 72
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * 2
+  lienzo.height = alto * 2
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(2, 2)
+
+  // Sombra en el suelo, bajo la punta.
+  ctx.save()
+  ctx.translate(ancho / 2, alto - 4)
+  ctx.scale(1, 0.38)
+  const sombra = ctx.createRadialGradient(0, 0, 2, 0, 0, 16)
+  sombra.addColorStop(0, 'rgba(0,0,0,.55)')
+  sombra.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sombra
+  ctx.beginPath()
+  ctx.arc(0, 0, 16, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  // Cuerpo: círculo arriba + punta abajo, en un solo trazo.
+  const cx = ancho / 2
+  const cy = 24
+  const r = 19
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, Math.PI * 0.8, Math.PI * 0.2, false)
+  ctx.lineTo(cx, alto - 6)
+  ctx.closePath()
+  const luz = ctx.createRadialGradient(cx - 6, cy - 7, 2, cx, cy, r + 6)
+  luz.addColorStop(0, 'rgba(255,255,255,.55)')
+  luz.addColorStop(0.35, color)
+  luz.addColorStop(1, 'rgba(0,0,0,.45)')
+  ctx.fillStyle = luz
+  ctx.fill()
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = '#0b1220'
+  ctx.stroke()
+
+  // Disco claro para que el número se lea sobre cualquier color.
+  ctx.beginPath()
+  ctx.arc(cx, cy, 12.5, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,.92)'
+  ctx.fill()
+
+  ctx.fillStyle = '#0b1220'
+  ctx.font = `900 ${numero.length > 1 ? 14 : 16}px system-ui, -apple-system, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(numero, cx, cy + 0.5)
+
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/**
  * El estilo del mapa, declarado en crudo y NO por URL.
  *
  * Una URL de estilo sería una petición más que falla sin cobertura, justo
@@ -173,6 +239,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_RADIO]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RUTA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -227,7 +294,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.32 },
         },
         {
         id: CAPA_RADIO_BORDE,
@@ -244,8 +311,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: {
           'line-color': '#ffffff',
           'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
-          'line-dasharray': [2, 1.5],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2.5, 17, 4.5, 19, 7],
+          // Sin trazos: las líneas a trazos tienen historial de no pintarse
+          // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
         },
         },
         {
@@ -303,10 +371,43 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         paint: {
           'line-color': '#f8fafc',
           'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 3, 16, 5.5, 19, 9],
         },
+      },
+      {
+        /**
+         * Los nodos como SÍMBOLOS del mapa, no como marcadores del DOM.
+         *
+         * Un marcador del DOM se coloca desde JavaScript, un fotograma
+         * después de que el mapa se haya dibujado: con relieve y zoom, va
+         * siempre por detrás del terreno -"se quedan mal y al soltar se
+         * recolocan"-. Un símbolo lo pinta el propio motor, en el mismo
+         * fotograma y sobre la altura correcta del terreno.
+         *
+         * La imagen de cada chincheta se dibuja en un canvas al vuelo, con
+         * el número horneado dentro (ver `styleimagemissing`): así no hace
+         * falta ninguna fuente de letras externa, que sería una petición
+         * más que falla sin cobertura.
+         */
+        id: CAPA_NODOS_ICONOS,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        layout: {
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          // Billboard: siempre de frente, como una chincheta clavada que
+          // miras desde cualquier lado. Pegarla al plano del mapa la
+          // aplastaría con la inclinación.
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.45, 15, 0.7, 17, 0.95, 19, 1.2],
+          // El nodo en juego se pinta el último: queda encima si se solapan.
+          'symbol-sort-key': ['get', 'orden'],
         },
-      ],
+      },
+    ],
       /**
        * Exageración 1.5: el desnivel real de la ruta es suave y a escala
        * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
@@ -371,6 +472,30 @@ export function MapSurfaceGL({
     mapaRef.current = mapa
 
     /**
+     * Imagen de chincheta dibujada al vuelo.
+     *
+     * MapLibre pide la imagen la primera vez que una capa la nombra y no
+     * la tiene. Se dibuja aquí en un canvas, con el número horneado, y se
+     * registra. Funciona igual tras un rehecho del estilo -que borra las
+     * imágenes-: las pide otra vez y se vuelven a dibujar.
+     *
+     * Formato del nombre: `nodo-<número>-<estado>`.
+     */
+    mapa.on('styleimagemissing', (evento) => {
+      const partes = /^nodo-(\d+)-(hecho|actual|pendiente)$/.exec(evento.id)
+      if (!partes) return
+      if (mapa.hasImage(evento.id)) return
+      const color =
+        partes[2] === 'hecho'
+          ? COLOR_NODO_HECHO
+          : partes[2] === 'actual'
+            ? COLOR_NODO_ACTUAL
+            : COLOR_NODO_PENDIENTE
+      const imagen = dibujarChincheta(partes[1], color)
+      if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
+    })
+
+    /**
      * Vigilante: si el estilo no montó, volver a aplicarlo.
      *
      * MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`. Un
@@ -407,7 +532,22 @@ export function MapSurfaceGL({
     const vigilarEstilo = () => {
       const vivo = mapaRef.current
       if (!vivo || document.visibilityState !== 'visible') return
-      if (vivo.isStyleLoaded()) return
+      /**
+       * `isStyleLoaded()` NO vale aquí: es `false` cada vez que hay una
+       * tesela cargando, o sea, en cada zoom. Con esa comprobación el
+       * vigilante rehacía el estilo entero hasta cinco veces sobre un
+       * mapa sano: vaciaba las fuentes, recargaba teselas y descolocaba
+       * los marcadores -"carga raro y al soltar se recoloca"-. Lo que
+       * importa es si el estilo llegó a montarse, y eso se ve en si tiene
+       * capas.
+       */
+      let capas = 0
+      try {
+        capas = vivo.getStyle().layers.length
+      } catch {
+        capas = 0
+      }
+      if (capas > 0) return
       // Cinco intentos y basta: si a estas alturas no monta, el problema no
       // es el fotograma perdido y reintentar en bucle solo gasta batería.
       if (rescates >= 5) return
@@ -604,111 +744,19 @@ export function MapSurfaceGL({
       (nodo) => typeof nodo.lat === 'number' && typeof nodo.lon === 'number'
     )
 
-    nodos.forEach((nodo, indice) => {
-      const color =
-        indice < currentLevel
-          ? COLOR_NODO_HECHO
-          : indice === currentLevel
-            ? COLOR_NODO_ACTUAL
-            : COLOR_NODO_PENDIENTE
+    const estado = (indice: number) =>
+      indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
 
-      /**
-       * Chincheta, no un punto plano.
-       *
-       * Un círculo suelto sobre la foto aérea no dice DÓNDE toca el suelo:
-       * con la cámara inclinada, un punto plano parece flotar y se lee mal
-       * a qué sitio del terreno pertenece. La forma de gota con la punta
-       * abajo sí lo dice, y anclada por la punta (`anchor: 'bottom'`) se
-       * clava en el sitio exacto aunque el mapa se incline.
-       */
-      /**
-       * El envoltorio es de MapLibre; la chincheta va dentro.
-       *
-       * Esto NO es decoración: MapLibre reescribe el `transform` del
-       * elemento que le entregas para colocarlo en pantalla. El giro de
-       * la gota estaba puesto ahí y se machacaba en cada fotograma, así
-       * que lo que se veía eran bolas, no chinchetas. Dentro del
-       * envoltorio el giro sobrevive.
-       */
-      const elemento = document.createElement('div')
-      elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
-      /**
-       * NUNCA `position` en el elemento del marcador.
-       *
-       * MapLibre lo coloca con su clase (`position: absolute`) más un
-       * `transform` que va SUMANDO al sitio donde el elemento esté. Aquí
-       * hubo un `position: 'relative'` en línea -para que la sombra y la
-       * gota, absolutas, tuvieran a quién referirse- y el estilo en línea
-       * gana a la clase: los diez nodos quedaron en flujo de documento,
-       * apilados en columna desde la esquina del mapa, y MapLibre sólo
-       * les sumaba el desplazamiento. De ahí la "fila de nodos" que
-       * costó cinco versiones. El `absolute` de MapLibre ya sirve de
-       * referencia a los hijos; no hace falta nada más.
-       */
-      Object.assign(elemento.style, {
-        width: '28px',
-        height: '34px',
-      } as Partial<CSSStyleDeclaration>)
-
-      /**
-       * Sombra en el SUELO, separada de la chincheta.
-       *
-       * Una sombra pegada al alfiler lo hace parecer un adhesivo sobre el
-       * cristal. Una elipse aplastada a sus pies es lo que da la lectura
-       * de "está clavado ahí abajo, en el terreno".
-       */
-      const sombra = document.createElement('div')
-      Object.assign(sombra.style, {
-        position: 'absolute',
-        left: '50%',
-        bottom: '-2px',
-        width: '20px',
-        height: '7px',
-        transform: 'translateX(-50%)',
-        borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(0,0,0,.55), rgba(0,0,0,0) 70%)',
-      } as Partial<CSSStyleDeclaration>)
-      elemento.appendChild(sombra)
-
-      const gota = document.createElement('div')
-      Object.assign(gota.style, {
-        position: 'absolute',
-        left: '50%',
-        top: '0',
-        width: '24px',
-        height: '24px',
-        marginLeft: '-12px',
-        borderRadius: '50% 50% 50% 0',
-        transform: 'rotate(-45deg)',
-        /**
-         * Degradado, no color plano: la luz arriba y la sombra abajo es
-         * lo que convierte un disco en un cuerpo con volumen. Es el mismo
-         * color del estado del nodo, solo que con relieve.
-         */
-        background: `radial-gradient(circle at 32% 28%, #ffffff55, ${color} 55%, #00000055)`,
-        border: '2px solid #0b1220',
-        boxShadow: '0 2px 5px rgba(0,0,0,.45)',
-        display: 'grid',
-        placeItems: 'center',
-      } as Partial<CSSStyleDeclaration>)
-      elemento.appendChild(gota)
-
-      // El número va derecho: el giro es de la chincheta, no del texto.
-      const numero = document.createElement('span')
-      numero.textContent = String(indice + 1)
-      Object.assign(numero.style, {
-        transform: 'rotate(45deg)',
-        color: '#0b1220',
-        font: '900 11px system-ui, sans-serif',
-        textShadow: '0 1px 0 rgba(255,255,255,.35)',
-      } as Partial<CSSStyleDeclaration>)
-      gota.appendChild(numero)
-
-      const marcador = new maplibregl.Marker({ element: elemento, anchor: 'bottom' })
-        .setLngLat([nodo.lon as number, nodo.lat as number])
-        .addTo(mapa)
-
-      marcadoresNodosRef.current.push(marcador)
+    pintarFuente(FUENTE_NODOS_ICONOS, {
+      type: 'FeatureCollection',
+      features: nodos.map((nodo, indice) => ({
+        type: 'Feature' as const,
+        properties: {
+          icono: `nodo-${indice + 1}-${estado(indice)}`,
+          orden: indice === currentLevel ? 1000 : indice,
+        },
+        geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
+      })),
     })
 
     /**
@@ -719,40 +767,32 @@ export function MapSurfaceGL({
      * se inclina y se tapa solo, sin una línea de código que lo simule.
      */
     /**
-     * Cada nodo son DOS volúmenes: un poste fino y una cabeza ancha.
-     *
-     * Un cilindro solo se lee como "depósito de agua". Poste estrecho más
-     * cabeza gorda encima es la silueta de una chincheta clavada, y esa
-     * silueta la reconoce cualquiera desde cualquier ángulo. Todo en
-     * metros: crece, se inclina y se tapa con la perspectiva, sin
-     * simulaciones.
+     * Bajo cada chincheta, un disco de metro y medio de alto pegado al
+     * terreno: es geometría del mapa, así que se inclina, se tapa y se
+     * escala con el relieve. Da la lectura de "clavada AHÍ" sin levantar
+     * un poste que tape el icono. El del nodo en juego es más ancho.
      */
-    const volumenes: GeoJSON.Feature[] = []
-    nodos.forEach((nodo, indice) => {
-      const color =
-        indice < currentLevel
-          ? COLOR_NODO_HECHO
-          : indice === currentLevel
-            ? COLOR_NODO_ACTUAL
-            : COLOR_NODO_PENDIENTE
-      // El nodo en juego es más alto: se localiza de lejos aunque haya
-      // otros por delante.
-      const alturaPoste = indice === currentLevel ? 40 : 26
-      const centro = { lat: nodo.lat as number, lon: nodo.lon as number }
-      volumenes.push(
-        {
-          type: 'Feature',
-          properties: { color, base: 0, altura: alturaPoste },
-          geometry: circuloGeoJSON(centro, 2.5, 16).features[0].geometry,
+    pintarFuente(FUENTE_NODOS_VOLUMEN, {
+      type: 'FeatureCollection',
+      features: nodos.map((nodo, indice) => ({
+        type: 'Feature' as const,
+        properties: {
+          color:
+            indice < currentLevel
+              ? COLOR_NODO_HECHO
+              : indice === currentLevel
+                ? COLOR_NODO_ACTUAL
+                : COLOR_NODO_PENDIENTE,
+          base: 0,
+          altura: 1.5,
         },
-        {
-          type: 'Feature',
-          properties: { color, base: alturaPoste, altura: alturaPoste + 14 },
-          geometry: circuloGeoJSON(centro, 7, 24).features[0].geometry,
-        }
-      )
+        geometry: circuloGeoJSON(
+          { lat: nodo.lat as number, lon: nodo.lon as number },
+          indice === currentLevel ? 7 : 4.5,
+          24
+        ).features[0].geometry,
+      })),
     })
-    pintarFuente(FUENTE_NODOS_VOLUMEN, { type: 'FeatureCollection', features: volumenes })
 
     /**
      * Abrir sobre el NODO ACTUAL, no sobre la ruta entera.
@@ -903,9 +943,6 @@ export function MapSurfaceGL({
       const zoom = mapa.getZoom()
       // 15 -> 0.8 ; 19 -> 1.6. Fuera de ese tramo se queda en los topes.
       const factor = Math.max(0.8, Math.min(1.6, 0.8 + (zoom - 15) * 0.2))
-      for (const marcador of marcadoresNodosRef.current) {
-        marcador.getElement().style.scale = String(factor)
-      }
       for (const marcador of marcadoresFotosRef.current) {
         marcador.getElement().style.scale = String(factor)
       }
