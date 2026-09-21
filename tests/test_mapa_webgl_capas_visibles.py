@@ -106,6 +106,30 @@ def test_o_3d_dos_nodos_e_xeometria_non_debuxo(fonte: str) -> None:
     assert "transform: 'rotateX(" not in fonte, "volvió el volcado falso de CSS"
 
 
+def test_ningun_marcador_leva_position_en_lina(fonte: str) -> None:
+    """
+    El elemento que se entrega a MapLibre no lleva `position` propio.
+
+    MapLibre lo coloca con su clase (`position: absolute`) más un
+    `transform` que SUMA al sitio donde el elemento esté. Un `position`
+    en línea gana a la clase y deja el marcador en flujo de documento:
+    los nodos salían apilados en columna desde la esquina del mapa y sólo
+    "iban a su sitio" al ampliar. Cinco versiones persiguiendo eso.
+    """
+    import re
+
+    # Cada bloque de estilo del elemento que acaba en `new maplibregl.Marker({ element: X`
+    for nombre in re.findall(r"new maplibregl\.Marker\(\{ element: (\w+)", fonte):
+        bloque = re.search(
+            r"Object\.assign\(%s\.style, \{(.*?)\} as Partial" % nombre, fonte, re.S
+        )
+        if not bloque:
+            continue
+        assert "position:" not in bloque.group(1), (
+            "el elemento `%s` lleva `position` en línea: MapLibre lo apilará en flujo" % nombre
+        )
+
+
 def test_o_xiro_da_chincheta_non_vai_no_elemento_do_marcador(fonte: str) -> None:
     """
     MapLibre REESCRIBE el `transform` del elemento que le entregas.

@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.14.4
+## 5.14.5
+
+- **Los nodos por fin se quedan en su sitio.** Salían apilados en columna
+  y sólo "iban a su ubicación" al ampliar, y a escala de toda Galicia los
+  diez formaban una fila perfecta y equiespaciada -cosa que ninguna
+  geografía produce-. La causa: el elemento de la chincheta llevaba
+  `position: relative` en línea, y el estilo en línea gana a la clase de
+  MapLibre (`position: absolute`). Los diez nodos estaban en flujo de
+  documento desde la esquina del mapa, y MapLibre sólo les sumaba el
+  desplazamiento. Medido en el navegador: regla `absolute`, cálculo
+  `relative`. Cinco versiones persiguiendo esto. Hay test que lo blinda
+  para todos los marcadores.
+
+
 
 - El banco de mapa cuenta sus propios montajes y enseña qué respondió la
   API (código, nodos, nivel). Se vio "nodos 0" con nueve chinchetas en el
