@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.13.3
+## 5.13.4
+
+- **El radio y el trazado, por fin.** 5.13.1 y 5.13.3 no lo arreglaron, y
+  las dos veces se dio por bueno sin comprobarlo en la página. El estilo se
+  declara en línea, así que MapLibre lo monta dentro del constructor: el
+  evento `style.load` ya ha ocurrido cuando se engancha el escuchador, y
+  `isStyleLoaded()` no vale de red porque es más estricto que el evento
+  -exige además que carguen todas las fuentes-. Entre las dos señales, el
+  código se quedaba en tierra de nadie y no pintaba nunca.
+  Ahora las dos fuentes y sus cuatro capas **nacen declaradas en el
+  estilo**, así que existen desde el primer fotograma y no hay nada que
+  esperar. El estado de "estilo listo" desaparece.
+
+
 
 - **El radio y el trazado seguían sin pintarse, y ahora se sabe por qué.**
   En 5.13.1 se cambió `load` por `style.load` dando por hecho que era el
