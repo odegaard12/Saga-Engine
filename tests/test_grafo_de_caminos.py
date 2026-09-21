@@ -6,7 +6,7 @@ cruce) y cuatro tramos; y la forma de un tramo con un vértice inútil se
 simplifica.
 """
 
-from backend.app.runtime.road_graph import bbox_alrededor, construir_grafo, simplificar
+from backend.app.runtime.road_graph import baldosas, bbox_alrededor, construir_grafo, simplificar
 
 
 def _nodo(i, lat, lon):
@@ -38,3 +38,14 @@ def test_un_vertice_inutil_desaparece() -> None:
 def test_bbox_con_marxe() -> None:
     sur, oeste, norte, este = bbox_alrededor([(42.3, -8.7), (42.4, -8.6)], 10)
     assert sur < 42.3 and norte > 42.4 and oeste < -8.7 and este > -8.6
+
+
+def test_as_baldosas_cobren_todo_o_rectangulo() -> None:
+    """Zonas grandes se piden en trozos de 15 km; unidos, cubren el rectángulo entero."""
+    bbox = (42.0, -9.0, 42.6, -8.2)  # ~67 x 66 km
+    trozos = baldosas(bbox, 15.0)
+    assert len(trozos) >= 16
+    assert min(t[0] for t in trozos) == bbox[0] and max(t[2] for t in trozos) == bbox[2]
+    assert min(t[1] for t in trozos) == bbox[1] and max(t[3] for t in trozos) == bbox[3]
+    for sur, oeste, norte, este in trozos:
+        assert (norte - sur) * 111.32 <= 15.01
