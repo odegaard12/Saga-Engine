@@ -225,7 +225,7 @@ export default function AdminApp() {
       prologue_subtitle: getConfigTextValue(source, 'prologue_subtitle', ''),
       prologue_image_url: getConfigTextValue(source, 'prologue_image_url', ''),
       prologue_body: getConfigTextValue(source, 'prologue_body', ''),
-      mission_launch_at: getConfigTextValue(source, 'mission_launch_at', ''),
+      mission_launch_at: fechaParaElInput(getConfigTextValue(source, 'mission_launch_at', '')),
       player_theme: getConfigTextValue(source, 'player_theme', config?.player_theme || TEMA_POR_DEFECTO),
       mapbox_token: getConfigTextValue(source, 'mapbox_token', config?.mapbox_token || ''),
       mapbox_style: getConfigTextValue(source, 'mapbox_style', config?.mapbox_style || ''),
@@ -283,7 +283,7 @@ export default function AdminApp() {
       prologue_subtitle: missionDraft.prologue_subtitle || '',
       prologue_image_url: missionDraft.prologue_image_url || '',
       prologue_body: missionDraft.prologue_body || '',
-      mission_launch_at: missionDraft.mission_launch_at || '',
+      mission_launch_at: fechaConZona(missionDraft.mission_launch_at || ''),
       player_theme: missionDraft.player_theme || TEMA_POR_DEFECTO,
       mapbox_token: missionDraft.mapbox_token || '',
       mapbox_style: missionDraft.mapbox_style || '',
@@ -3704,3 +3704,44 @@ const styles = `
 
 
 `
+
+/**
+ * La fecha de salida se guarda CON zona horaria.
+ *
+ * El <input type="datetime-local"> da "2026-02-14T09:00", sin zona. Guardado
+ * tal cual, el servidor (un contenedor en UTC) y el móvil (hora local) lo
+ * leían en husos distintos: la cortina se levantaba a la hora y el servidor
+ * seguía rechazando avanzar durante dos horas. Con la zona del navegador del
+ * organizador dentro -"2026-02-14T09:00:00+01:00"- no hay nada que asumir.
+ */
+function fechaConZona(valor: string): string {
+  const texto = String(valor || '').trim()
+  if (!texto) return ''
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(texto)) return texto
+  const ms = Date.parse(texto)
+  if (!Number.isFinite(ms)) return texto
+  const fecha = new Date(ms)
+  const dos = (n: number) => String(n).padStart(2, '0')
+  const desfase = -fecha.getTimezoneOffset()
+  const signo = desfase >= 0 ? '+' : '-'
+  const abs = Math.abs(desfase)
+  return (
+    `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
+    `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}:00` +
+    `${signo}${dos(Math.floor(abs / 60))}:${dos(abs % 60)}`
+  )
+}
+
+/** Lo contrario: de la fecha guardada (con zona) a lo que entiende el input, en hora local. */
+function fechaParaElInput(valor: string): string {
+  const texto = String(valor || '').trim()
+  if (!texto) return ''
+  const ms = Date.parse(texto)
+  if (!Number.isFinite(ms)) return texto
+  const fecha = new Date(ms)
+  const dos = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
+    `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`
+  )
+}

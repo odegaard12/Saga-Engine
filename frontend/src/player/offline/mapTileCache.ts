@@ -20,7 +20,16 @@ const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
 const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v3'
 
 // Control sano: bastante mapa, pero sin intentar descargar media provincia en zoom 18.
-const MAX_TILE_URLS = 1500
+/**
+ * 8000, no 1500. El tope se aplica por ORDEN DE LLEGADA a la lista, y con
+ * los niveles de continente, país y región delante, 1500 dejaba fuera
+ * justo lo último: el corredor por donde se camina y el detalle de los
+ * nodos. La barra llegaba al 100 % "de golpe" -sólo había bajado lo de
+ * lejos- y al acercarse al nodo el mapa tenía que cargar de la red.
+ * El paquete completo ronda las 4300 teselas; 8000 deja margen para
+ * rutas más largas sin volver a recortar en silencio.
+ */
+const MAX_TILE_URLS = 8000
 
 const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
 const MISSION_AREA_RADIUS_KM = 10 // zona jugable amplia, zoom medio
@@ -100,15 +109,16 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * hasta 13 cuesta unos pocos megas; hasta 15 serían cientos.
  */
 /**
- * Hasta 15, que es el máximo que sirve la fuente de elevación.
+ * Relieve de z11 a z14.
  *
- * Con relieve, el mapa pide la elevación a z14-15 en cuanto se camina
- * (zoom 16-17 sobre el terreno). Bajar sólo hasta z13 dejaba justo esas
- * teselas fuera del paquete: al entrar sin cobertura, el monte se
- * quedaba plano y el mapa "cargaba mal". Las de z14-15 son las gemelas
- * del corredor, que ya se baja: es el mismo recorrido, no más zona.
+ * Una tesela de elevación pesa 90 KB, tres o cuatro veces una de imagen:
+ * es lo que decide el tamaño del paquete. De z11 a z14 cubre la comarca
+ * y la zona de misión, que es donde el monte tiene que ser el mismo con
+ * o sin cobertura; el mapa 3D no pide más de z14 (ver la fuente de
+ * elevación en MapSurfaceGL), así que z15 sobraba. Y por debajo de z11 el
+ * desnivel no se lee a ese zoom. Unas 1000 teselas, ~90 MB.
  */
-const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]
+const ZOOMS_RELIEVE = [11, 12, 13, 14]
 
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
@@ -501,6 +511,9 @@ export async function prefetchMissionMapTiles(
     addSquareAroundPointWithBudget(urls, center, 9, 260, 121, 'nivel-region-z9')
     addSquareAroundPointWithBudget(urls, center, 10, 180, 169, 'nivel-comarca-z10')
     addSquareAroundPointWithBudget(urls, center, 11, 110, 289, 'nivel-comarca-z11')
+    // Entorno a z12 (±58 km): es lo que se ve al desampliar desde casa
+    // hacia la ruta. Sólo imagen; el relieve a esta distancia no hace falta.
+    addSquareAroundPointWithBudget(urls, center, 12, 60, 289, 'nivel-entorno-z12')
 
     // Zona amplia de misión.
     addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 200, 'mission-z12')
@@ -564,7 +577,7 @@ export async function prefetchMissionMapTiles(
        * la vista de toda Galicia hasta el camino.
        */
       const etiqueta = urls.get(clave) || ''
-      if (!/^(mission|corridor|nivel-region|nivel-comarca)/.test(etiqueta)) continue
+      if (!/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
       const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }

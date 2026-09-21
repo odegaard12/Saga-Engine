@@ -6,7 +6,30 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.19.1
+## 5.20.0
+
+- **La cuenta atrás de salida habría fallado dos horas, y ya no.** El
+  contenedor corre en UTC y el móvil en hora local; la fecha del panel se
+  guardaba sin zona, así que el servidor la leía como UTC (una salida a las
+  09:00 era 11:00 en Galicia) mientras la cortina del móvil se levantaba a
+  las 09:00: dos horas con la cortina fuera y `/api/advance` diciendo que
+  no. Tres capas de arreglo: el panel guarda la fecha con la zona del
+  organizador, el servidor asume Europe/Madrid si aun así llega sin ella,
+  y el contenedor vive en Europe/Madrid. Con test.
+- **El paquete offline ya no recorta el corredor.** El tope de 1500
+  teselas se aplica por orden de llegada, y con los niveles de continente,
+  país y región delante dejaba fuera justo lo último: el corredor por donde
+  se camina y el detalle de los nodos. La barra llegaba al 100 % de golpe y
+  cerca del nodo el mapa cargaba de la red. Tope a 8000.
+- Relieve de z11 a z14 (comarca y zona de misión), ~1000 teselas, ~90 MB:
+  la elevación pesa 90 KB por tesela y es lo que decide el tamaño del
+  paquete. La fuente de elevación del mapa se queda en z14 -z15 sólo
+  aportaba detalle que a pie no se aprecia y duplicaba el relieve del
+  paquete-. Y un nivel de entorno a z12 (±58 km, sólo imagen) para lo que
+  se ve al desampliar desde casa hacia la ruta.
+- El botón 2D/3D: verde en 3D, apagado en 2D.
+
+
 
 - **Relieve offline también para región y comarca** (z8-z11), no sólo
   para la zona de misión y el corredor. Son unos 50 MB más de paquete, y
