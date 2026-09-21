@@ -166,7 +166,33 @@ def test_os_nodos_son_simbolos_do_mapa_non_marcadores_do_dom(fonte: str) -> None
     )
     # Las fotos, lo mismo: un marcador del DOM "no se queda en su sitio".
     assert "marcadoresFotosRef" not in fonte, "volvieron las fotos como marcadores del DOM"
+    # Y el avatar, que era el último marcador del DOM y el único que saltaba.
+    assert "marcadorXogadorRef" not in fonte, "volvió el avatar como marcador del DOM"
+    assert "id: CAPA_JUGADOR" in fonte and "function dibujarAvatar(" in fonte
     assert "id: CAPA_FOTOS" in fonte and "function dibujarFoto(" in fonte
+
+
+def test_o_trazado_leva_estado_e_pulso(fonte: str) -> None:
+    """
+    Verde lo andado, azul el tramo en juego, claro lo pendiente; y un
+    pulso sobre el tramo en juego. El color cuenta la partida sin leer.
+    """
+    assert "properties: { estado: tramo.estado }" in fonte
+    assert "id: CAPA_RUTA_PULSO" in fonte
+    assert "filter: ['==', ['get', 'estado'], 'actual']" in fonte
+    assert "setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity'" in fonte
+
+
+def test_o_paquete_offline_cobre_o_relevo_ata_z15() -> None:
+    """
+    El terreno pide elevación a z14-15 al caminar; bajar sólo hasta z13
+    dejaba el monte plano sin cobertura. Y el corredor sigue el trazado
+    real, no rectas entre nodos.
+    """
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]" in fonte
+    assert "function puntosDelTrack(" in fonte
+    assert "const track = puntosDelTrack(stage)" in fonte
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:

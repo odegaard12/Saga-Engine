@@ -69,6 +69,10 @@ const FUENTE_NODOS_VOLUMEN = 'saga-nodos-volumen'
 const FUENTE_RELIEVE_SOMBRAS = 'saga-relieve-sombras'
 const FUENTE_NODOS_ICONOS = 'saga-nodos-iconos'
 const FUENTE_FOTOS = 'saga-fotos'
+const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
+const FUENTE_JUGADOR = 'saga-jugador'
+const CAPA_JUGADOR = 'saga-jugador-capa'
+const ICONO_AVATAR = 'avatar-propio'
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
@@ -285,6 +289,89 @@ function dibujarFoto(imagen: HTMLImageElement | null): ImageData | null {
 }
 
 /**
+ * Tu avatar: círculo con tu foto (o tus iniciales sobre tu color), anillo
+ * blanco y halo de tu color. Es lo que hace que "este soy yo" se lea de
+ * un vistazo entre chinchetas numeradas.
+ */
+function dibujarAvatar(
+  ficha: { color: string; iniciales: string },
+  imagen: HTMLImageElement | null
+): ImageData | null {
+  const lado = 64
+  const lienzo = document.createElement('canvas')
+  lienzo.width = lado * 2
+  lienzo.height = lado * 2
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(2, 2)
+  const c = lado / 2
+
+  // Halo del color del jugador: lo separa del terreno, claro u oscuro.
+  const halo = ctx.createRadialGradient(c, c, 18, c, c, 31)
+  halo.addColorStop(0, ficha.color + 'aa')
+  halo.addColorStop(1, ficha.color + '00')
+  ctx.fillStyle = halo
+  ctx.beginPath()
+  ctx.arc(c, c, 31, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Anillo blanco.
+  ctx.beginPath()
+  ctx.arc(c, c, 22, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.shadowColor = 'rgba(0,0,0,.45)'
+  ctx.shadowBlur = 5
+  ctx.shadowOffsetY = 2
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+
+  // Foto recortada en círculo, o disco de color con iniciales.
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(c, c, 19, 0, Math.PI * 2)
+  ctx.clip()
+  if (imagen) {
+    const escala = Math.max(38 / imagen.width, 38 / imagen.height)
+    const w = imagen.width * escala
+    const h = imagen.height * escala
+    ctx.drawImage(imagen, c - w / 2, c - h / 2, w, h)
+  } else {
+    ctx.fillStyle = ficha.color
+    ctx.fillRect(0, 0, lado, lado)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '900 15px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(ficha.iniciales.slice(0, 2) || '·', c, c + 0.5)
+  }
+  ctx.restore()
+
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/**
+ * Registra (o sustituye) el avatar en el mapa. Primero con iniciales, que
+ * es inmediato; si hay foto, se carga y se sustituye al llegar.
+ */
+function pintarAvatar(mapa: maplibregl.Map, ficha: { color: string; foto: string; iniciales: string }) {
+  const poner = (datos: ImageData | null) => {
+    if (!datos) return
+    try {
+      if (mapa.hasImage(ICONO_AVATAR)) mapa.updateImage(ICONO_AVATAR, datos)
+      else mapa.addImage(ICONO_AVATAR, datos, { pixelRatio: 2 })
+    } catch {
+      // El mapa pudo cerrarse mientras cargaba la foto.
+    }
+  }
+  poner(dibujarAvatar(ficha, null))
+  if (!ficha.foto) return
+  const imagen = new Image()
+  imagen.crossOrigin = 'anonymous'
+  imagen.onload = () => poner(dibujarAvatar(ficha, imagen))
+  imagen.src = ficha.foto
+}
+
+/**
  * El estilo del mapa, declarado en crudo y NO por URL.
  *
  * Una URL de estilo sería una petición más que falla sin cobertura, justo
@@ -334,6 +421,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_NODOS_VOLUMEN]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -463,9 +551,40 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * senderismo para que la traza se lea sobre cualquier fondo.
          */
         paint: {
-          'line-color': '#f8fafc',
-          'line-opacity': 0.95,
+          /**
+           * El color cuenta la partida: verde lo andado, azul el tramo
+           * en juego, claro y apagado lo que queda. Cada tramo lleva el
+           * estado del nodo al que llega.
+           */
+          'line-color': [
+            'match',
+            ['get', 'estado'],
+            'hecho',
+            COLOR_NODO_HECHO,
+            'actual',
+            COLOR_NODO_ACTUAL,
+            '#f8fafc',
+          ],
+          'line-opacity': ['match', ['get', 'estado'], 'pendiente', 0.55, 0.95],
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 3, 16, 5.5, 19, 9],
+        },
+      },
+      {
+        /**
+         * Pulso sobre el tramo en juego: una línea blanca más ancha cuya
+         * opacidad respira (ver el bucle en el montaje). Es lo que dice
+         * "por aquí, ahora" sin leer nada.
+         */
+        id: CAPA_RUTA_PULSO,
+        type: 'line',
+        source: FUENTE_RUTA,
+        filter: ['==', ['get', 'estado'], 'actual'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-opacity': 0.4,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 11, 19, 18],
+          'line-blur': 3,
         },
       },
       {
@@ -524,6 +643,29 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'symbol-sort-key': ['get', 'orden'],
         },
       },
+      {
+        /**
+         * TÚ, como símbolo del mapa y no como marcador del DOM.
+         *
+         * El avatar era el último marcador del DOM que quedaba, y por eso
+         * era el único que seguía saltando con el relieve al hacer zoom.
+         * La foto se enmarca en un canvas con tu color (ver
+         * `styleimagemissing`) y el motor la coloca en el mismo fotograma
+         * que el terreno, igual que los nodos y las fotos.
+         */
+        id: CAPA_JUGADOR,
+        type: 'symbol',
+        source: FUENTE_JUGADOR,
+        layout: {
+          'icon-image': ICONO_AVATAR,
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 0.9, 19, 1.1],
+        },
+      },
     ],
       /**
        * Exageración 1.5: el desnivel real de la ruta es suave y a escala
@@ -548,7 +690,12 @@ export function MapSurfaceGL({
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
-  const marcadorXogadorRef = useRef<maplibregl.Marker | null>(null)
+  /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
+  const fichaRef = useRef<{ color: string; foto: string; iniciales: string }>({
+    color: COLOR_NODO_HECHO,
+    foto: '',
+    iniciales: '',
+  })
   const marcadoresNodosRef = useRef<maplibregl.Marker[]>([])
   /** Miniatura de cada foto por nombre de icono, para dibujarla cuando el mapa la pida. */
   const fotosPorIconoRef = useRef(new Map<string, string>())
@@ -562,8 +709,6 @@ export function MapSurfaceGL({
   const encuadreInicialRef = useRef(false)
   /** Sube cuando hay que repintar todo: el estilo se rehizo por debajo. */
   const [versionEstilo, setVersionEstilo] = useState(0)
-  /** Qué foto y color tiene ya pintados el avatar, para no rehacerlo en balde. */
-  const fichaAvatarRef = useRef('')
 
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return
@@ -603,6 +748,11 @@ export function MapSurfaceGL({
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
     mapa.on('styleimagemissing', (evento) => {
+      if (evento.id === ICONO_AVATAR) {
+        if (mapa.hasImage(ICONO_AVATAR)) return
+        pintarAvatar(mapa, fichaRef.current)
+        return
+      }
       if (evento.id.startsWith('foto-')) {
         if (mapa.hasImage(evento.id)) return
         const url = fotosPorIconoRef.current.get(evento.id)
@@ -702,6 +852,31 @@ export function MapSurfaceGL({
         // Si el mapa ya no existe, no hay nada que rescatar.
       }
     }
+    /**
+     * El pulso del tramo en juego.
+     *
+     * MapLibre no anima propiedades solo; se cambia la opacidad de la capa
+     * unas diez veces por segundo con una senoide. Sólo con la pestaña
+     * visible: en segundo plano no hay nadie mirando y sí batería.
+     */
+    let pulsoVivo = true
+    const latir = () => {
+      if (!pulsoVivo) return
+      const vivo = mapaRef.current
+      if (vivo && document.visibilityState === 'visible') {
+        try {
+          if (vivo.getLayer(CAPA_RUTA_PULSO)) {
+            const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
+            vivo.setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity', 0.12 + 0.5 * (0.5 + 0.5 * Math.sin(fase)))
+          }
+        } catch {
+          // Entre un rehecho del estilo y el siguiente la capa puede no estar.
+        }
+      }
+      window.setTimeout(latir, 100)
+    }
+    latir()
+
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
@@ -750,11 +925,10 @@ export function MapSurfaceGL({
     }
 
     return () => {
+      pulsoVivo = false
       mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
       window.clearInterval(relojVigilante)
-      marcadorXogadorRef.current?.remove()
-      marcadorXogadorRef.current = null
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
       mapa.remove()
@@ -797,65 +971,50 @@ export function MapSurfaceGL({
     [versionEstilo]
   )
 
-  // Tu posición.
+  // Tu posición: un punto en una fuente del mapa; el avatar se dibuja al pedirlo.
   useEffect(() => {
+    const ficha = {
+      color: getPlayerColor(selfProfile || {}),
+      foto: getPlayerAvatarUrl(selfProfile || {}) || '',
+      iniciales: getPlayerAvatarInitials(selfProfile || {}) || '',
+    }
+    const cambio =
+      ficha.color !== fichaRef.current.color ||
+      ficha.foto !== fichaRef.current.foto ||
+      ficha.iniciales !== fichaRef.current.iniciales
+    fichaRef.current = ficha
     const mapa = mapaRef.current
-    if (!mapa || !playerPosition) return
-
-    const lngLat: [number, number] = [playerPosition.lon, playerPosition.lat]
-
-    const fichaActual = `${selfProfile?.avatar_url || ''}|${selfProfile?.color || ''}`
-    if (marcadorXogadorRef.current && fichaAvatarRef.current !== fichaActual) {
-      // Cambió la foto o el color: el elemento se construye una vez, así
-      // que hay que tirarlo y rehacerlo.
-      marcadorXogadorRef.current.remove()
-      marcadorXogadorRef.current = null
+    // Si cambió la ficha y el avatar ya estaba dibujado, se redibuja.
+    if (cambio && mapa) {
+      try {
+        if (mapa.hasImage(ICONO_AVATAR)) pintarAvatar(mapa, ficha)
+      } catch {
+        // Sin estilo todavía: se pintará cuando el mapa lo pida.
+      }
     }
 
-    if (!marcadorXogadorRef.current) {
-      /**
-       * TÚ eres un avatar con tu foto, no una chincheta.
-       *
-       * Aquí estuvo el marcador por defecto de MapLibre y era un error de
-       * lectura, no de estética: en un mapa lleno de chinchetas numeradas,
-       * una chincheta más no dice "este eres tú". La foto sí, y de un
-       * vistazo -que es justo lo que haces mientras caminas-.
-       */
-      const color = getPlayerColor(selfProfile || {})
-      const foto = getPlayerAvatarUrl(selfProfile || {})
-      const iniciales = getPlayerAvatarInitials(selfProfile || {})
-
-      const avatar = document.createElement('div')
-      avatar.setAttribute('aria-label', 'Tu posición')
-      Object.assign(avatar.style, {
-        width: '46px',
-        height: '46px',
-        borderRadius: '999px',
-        border: `3px solid ${color}`,
-        background: foto ? `#0b1220 center/cover url(${foto})` : color,
-        // Halo del color del jugador: lo separa del terreno sea cual sea
-        // la foto satélite de debajo, clara u oscura.
-        boxShadow: `0 0 0 4px ${color}55, 0 6px 16px rgba(0,0,0,.55)`,
-        display: 'grid',
-        placeItems: 'center',
-        color: '#ffffff',
-        font: '950 15px system-ui, sans-serif',
-        overflow: 'hidden',
-      } as Partial<CSSStyleDeclaration>)
-      if (!foto) avatar.textContent = iniciales
-
-      fichaAvatarRef.current = fichaActual
-      marcadorXogadorRef.current = new maplibregl.Marker({ element: avatar })
-        .setLngLat(lngLat)
-        .addTo(mapa)
+    if (!playerPosition) {
+      pintarFuente(FUENTE_JUGADOR, COLECCION_VACIA)
       return
     }
-
-    marcadorXogadorRef.current.setLngLat(lngLat)
-    // Si cambia la ficha (foto nueva, otro color) hay que rehacer el
-    // avatar: el elemento del marcador se construye una sola vez.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerPosition?.lat, playerPosition?.lon, selfProfile?.avatar_url, selfProfile?.color])
+    pintarFuente(FUENTE_JUGADOR, {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Point', coordinates: [playerPosition.lon, playerPosition.lat] },
+        },
+      ],
+    })
+  }, [
+    playerPosition?.lat,
+    playerPosition?.lon,
+    selfProfile?.avatar_url,
+    selfProfile?.color,
+    selfProfile?.display_name,
+    pintarFuente,
+  ])
 
   // Radio del nodo actual.
   useEffect(() => {
@@ -979,21 +1138,23 @@ export function MapSurfaceGL({
      * -cruzaba el monte por donde no se puede andar-. Esto no: es el
      * mismo trazado que dibuja el motor de Leaflet, leído del mismo sitio.
      */
+    // Cada tramo es el trazado que LLEGA a su nodo, así que hereda el
+    // estado de ese nodo: andado, en juego o pendiente.
     const tramos = nodos
-      .map((nodo) => leerTrackDelNodo(nodo))
-      .filter((track) => track.length > 1)
+      .map((nodo, indice) => ({ track: leerTrackDelNodo(nodo), estado: estado(indice) }))
+      .filter((tramo) => tramo.track.length > 1)
 
     pintarFuente(
       FUENTE_RUTA,
       tramos.length > 0
         ? {
             type: 'FeatureCollection',
-            features: tramos.map((track) => ({
+            features: tramos.map((tramo) => ({
               type: 'Feature' as const,
-              properties: {},
+              properties: { estado: tramo.estado },
               geometry: {
                 type: 'LineString' as const,
-                coordinates: track.map((punto) => [punto.lon, punto.lat]),
+                coordinates: tramo.track.map((punto) => [punto.lon, punto.lat]),
               },
             })),
           }

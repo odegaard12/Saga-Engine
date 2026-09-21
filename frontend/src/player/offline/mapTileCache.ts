@@ -88,7 +88,16 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * el RELIEVE -la forma del monte- no gana nada con más detalle. Bajar
  * hasta 13 cuesta unos pocos megas; hasta 15 serían cientos.
  */
-const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13]
+/**
+ * Hasta 15, que es el máximo que sirve la fuente de elevación.
+ *
+ * Con relieve, el mapa pide la elevación a z14-15 en cuanto se camina
+ * (zoom 16-17 sobre el terreno). Bajar sólo hasta z13 dejaba justo esas
+ * teselas fuera del paquete: al entrar sin cobertura, el monte se
+ * quedaba plano y el mapa "cargaba mal". Las de z14-15 son las gemelas
+ * del corredor, que ya se baja: es el mismo recorrido, no más zona.
+ */
+const ZOOMS_RELIEVE = [8, 9, 10, 11, 12, 13, 14, 15]
 
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
@@ -106,18 +115,61 @@ function getDistanceMeters(a: Point, b: Point) {
   return 2 * radius * Math.asin(Math.sqrt(h))
 }
 
+/**
+ * Los puntos del trazado real de un nodo (`route_track`), si los tiene.
+ *
+ * Admite los dos formatos que guarda administración: pares `[lat, lon]`
+ * y objetos `{lat, lon|lng}`. Devuelve vacío si no hay trazado.
+ */
+function puntosDelTrack(stage: PlayerStage): Point[] {
+  const bruto = (stage as { route_track?: unknown }).route_track
+  if (!Array.isArray(bruto)) return []
+  const puntos: Point[] = []
+  for (const entrada of bruto) {
+    if (Array.isArray(entrada) && entrada.length >= 2) {
+      const lat = Number(entrada[0])
+      const lon = Number(entrada[1])
+      if (Number.isFinite(lat) && Number.isFinite(lon)) puntos.push({ lat, lon })
+      continue
+    }
+    if (entrada && typeof entrada === 'object') {
+      const o = entrada as { lat?: unknown; lon?: unknown; lng?: unknown }
+      const lat = Number(o.lat)
+      const lon = Number(o.lon ?? o.lng)
+      if (Number.isFinite(lat) && Number.isFinite(lon)) puntos.push({ lat, lon })
+    }
+  }
+  return puntos
+}
+
+/**
+ * Nodos MÁS el trazado real entre ellos.
+ *
+ * El corredor de teselas se traza alrededor de estos puntos. Con sólo
+ * los nodos, el corredor iba en línea recta de uno a otro, y la ruta de
+ * verdad -que da rodeos por caminos- se salía de él: al llegar a esos
+ * tramos sin cobertura, el mapa se quedaba en blanco. Con los puntos del
+ * trazado, el corredor sigue por donde se camina.
+ *
+ * Se muestrea cada pocos metros para no disparar el cálculo: el corredor
+ * ya tiene dos kilómetros de ancho, no hace falta cada paso.
+ */
 function uniqueStagePoints(stages: PlayerStage[]) {
   const seen = new Set<string>()
   const points: Point[] = []
+  const anadir = (lat: number, lon: number) => {
+    const key = `${lat.toFixed(4)}:${lon.toFixed(4)}`
+    if (seen.has(key)) return
+    seen.add(key)
+    points.push({ lat, lon })
+  }
 
   for (const stage of stages || []) {
     if (typeof stage.lat !== 'number' || typeof stage.lon !== 'number') continue
-
-    const key = `${stage.lat.toFixed(5)}:${stage.lon.toFixed(5)}`
-    if (seen.has(key)) continue
-
-    seen.add(key)
-    points.push({ lat: stage.lat, lon: stage.lon })
+    anadir(stage.lat, stage.lon)
+    const track = puntosDelTrack(stage)
+    const paso = Math.max(1, Math.floor(track.length / 40))
+    for (let i = 0; i < track.length; i += paso) anadir(track[i].lat, track[i].lon)
   }
 
   return points
