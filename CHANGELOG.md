@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.0
+## 5.25.1
+
+- **Los nodos 3D no se dibujaban.** MapLibre 6 pasa a la capa un objeto con
+  la matriz dentro (`defaultProjectionData.mainMatrix`); se leía "a la
+  antigua" y la proyección salía inválida, sin un solo error. Ahora se lee
+  de donde está, y el asa de depuración enseña cuántos fotogramas pintó la
+  capa y su último error.
+- **La guía fuera del trazado volvía a salir recta.** La capa 3D pedía
+  repintados sin parar desde el primer fotograma, así que el mapa nunca
+  llegaba a "idle", y de idle dependían el aviso de "mapa pintado" y la
+  carga de la red de caminos. La animación arranca ahora DESPUÉS del
+  primer idle.
+
+
 
 - **Nodos 3D de verdad dentro del mapa.** Una capa personalizada de MapLibre
   dibuja con three.js sobre el mismo lienzo, con la matriz de proyección

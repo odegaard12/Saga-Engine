@@ -361,6 +361,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     """
     capa = (COMPONENTE.parent / "nodosTresD.ts").read_text(encoding="utf-8")
     assert "renderingMode: '3d'" in capa and "queryTerrainElevation" in capa
+    # MapLibre 6: la matriz viene en defaultProjectionData.mainMatrix; y la
+    # animación no puede arrancar antes del primer idle (mataba el idle).
+    assert "defaultProjectionData?.mainMatrix" in capa
+    assert "m.once('idle', () => {" in capa and "animar = true" in capa
     assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
     assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
     assert "capaNodosRef.current?.setNodos(" in fonte
