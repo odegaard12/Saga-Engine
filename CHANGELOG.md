@@ -6,7 +6,29 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.21.0
+## 5.22.0
+
+- **La guía de ti al nodo va por el camino.** Recta era mentira: cruzaba el
+  monte por donde no se puede andar. Ahora es un tramito hasta el punto del
+  trazado más cercano y, desde ahí, el trazado que queda hasta el nodo.
+- **Aviso de "fuera del trazado"** a más de 500 m del camino, con los metros
+  (o kilómetros) que faltan; se apaga por debajo de 400 m para no parpadear
+  en el borde a cada aviso del GPS.
+- **Seguirme sin tirones.** Cada aviso del GPS lanzaba una animación corta
+  que cortaba la anterior: sacudidas. Ahora no se sigue con el mapa en la
+  mano ni por menos de tres metros, y la animación es más larga que el
+  intervalo entre avisos, así que una enlaza con la siguiente.
+- **La tarjeta de permisos deja de salir con todo concedido.** En iPhone no
+  se puede consultar si la cámara está concedida sin pedirla, y el
+  movimiento exige un toque por sesión: la tarjeta salía SIEMPRE. Lo
+  concedido una vez se recuerda en el móvil; la petición de movimiento que
+  iOS exige desde un toque se cuela en el primer toque del jugador, ya
+  concedida, sin preguntar nada.
+- El botón de "ver la ruta" mantiene siempre el icono de brújula: cambiar
+  de icono al activarse hacía creer que había un botón más. El estado lo
+  dice el color.
+
+
 
 - **La pantalla de carga vuelve a bajar lo que falta, y esta vez para
   siempre.** El resumen guardado en el móvil lleva ahora la FIRMA del plan

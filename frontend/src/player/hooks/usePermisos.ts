@@ -31,6 +31,35 @@ function iosPideMovimiento(): boolean {
   return typeof Orientacion?.requestPermission === 'function'
 }
 
+/**
+ * Lo que el jugador ya concedió se recuerda en el móvil.
+ *
+ * En iPhone no hay forma de preguntar si la cámara está concedida sin
+ * pedirla, y el permiso de movimiento exige un toque en cada sesión: la
+ * tarjeta de "antes de salir" salía SIEMPRE, con todo concedido, y el
+ * jugador tenía que volver a pulsar "Permitir" cada vez que abría la app.
+ * Con la memoria, lo concedido una vez se da por concedido; si el sistema
+ * lo retiró, el uso real (hacer la foto, la brújula) lo volverá a pedir.
+ */
+const CLAVE_CAMARA = 'saga:permiso:camara'
+const CLAVE_MOVIMIENTO = 'saga:permiso:movimiento'
+
+function recordado(clave: string): boolean {
+  try {
+    return window.localStorage.getItem(clave) === 'ok'
+  } catch {
+    return false
+  }
+}
+
+function recordar(clave: string) {
+  try {
+    window.localStorage.setItem(clave, 'ok')
+  } catch {
+    // Sin almacenamiento (modo privado): se pedirá otra vez, sin más.
+  }
+}
+
 export function usePermisos() {
   const [camara, setCamara] = useState<EstadoPermiso>('idle')
   const [movimiento, setMovimiento] = useState<EstadoPermiso>('idle')
@@ -68,6 +97,7 @@ export function usePermisos() {
       // abierta gasta batería y deja el piloto encendido, que asusta.
       stream.getTracks().forEach((track) => track.stop())
       setCamara('ok')
+      recordar(CLAVE_CAMARA)
     } catch {
       setCamara('error')
     }
@@ -90,7 +120,10 @@ export function usePermisos() {
     try {
       const concedido = (await Orientacion.requestPermission()) === 'granted'
       setMovimiento(concedido ? 'ok' : 'error')
-      if (concedido) window.dispatchEvent(new CustomEvent(AVISO_MOVIMIENTO))
+      if (concedido) {
+        recordar(CLAVE_MOVIMIENTO)
+        window.dispatchEvent(new CustomEvent(AVISO_MOVIMIENTO))
+      }
     } catch {
       setMovimiento('error')
     }
@@ -105,7 +138,33 @@ export function usePermisos() {
       if (!iosPideMovimiento() && !cancelado) {
         setMovimiento('ok')
         window.dispatchEvent(new CustomEvent(AVISO_MOVIMIENTO))
+      } else if (recordado(CLAVE_MOVIMIENTO) && !cancelado) {
+        /**
+         * iPhone con el movimiento ya concedido otra vez: se da por bueno
+         * sin tarjeta, y la petición real -que iOS exige hacer desde un
+         * toque- se cuela en el PRIMER toque del jugador en cualquier
+         * sitio. Ya concedido, iOS la resuelve sin preguntar nada.
+         */
+        setMovimiento('ok')
+        const alPrimerToque = () => {
+          window.removeEventListener('pointerdown', alPrimerToque)
+          const Orientacion = window.DeviceOrientationEvent as
+            | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> })
+            | undefined
+          Orientacion?.requestPermission?.()
+            .then((estado) => {
+              if (estado === 'granted') window.dispatchEvent(new CustomEvent(AVISO_MOVIMIENTO))
+            })
+            .catch(() => {
+              // Si lo retiraron, la brújula lo pedirá cuando se use.
+            })
+        }
+        window.addEventListener('pointerdown', alPrimerToque, { once: true })
       }
+
+      // Cámara recordada: no se molesta. Si el sistema la retiró, la foto
+      // la volverá a pedir en su momento.
+      if (recordado(CLAVE_CAMARA) && !cancelado) setCamara('ok')
 
       if (typeof navigator === 'undefined' || !navigator.permissions?.query) return
 

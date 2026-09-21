@@ -52,7 +52,7 @@ import { MissionCompleteScreen } from './components/MissionCompleteScreen'
 import { UseItemOverlay } from './components/UseItemOverlay'
 
 import { FieldPrepPanel } from './components/FieldPrepPanel'
-import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoUbicacion, IconoDiana } from './components/PlayerIcons'
+import { IconoCamara, IconoLibro, IconoTrofeo, IconoBrujula, IconoDiana } from './components/PlayerIcons'
 import { MissionLockScreen } from './components/MissionLockScreen'
 import { FieldPhotoViewer } from './components/FieldPhotoViewer'
 import { FieldCameraCapture } from './components/FieldCameraCapture'
@@ -3396,7 +3396,10 @@ export default function PlayerApp() {
                     transition: 'transform 140ms linear',
                   }}
                 >
-                  {routeOverviewActive ? <IconoUbicacion /> : <IconoBrujula />}
+                  {/* Siempre la brújula: cambiar de icono al activarse hacía
+                      creer que había un botón más. El estado lo dice el
+                      color (encendido = viendo la ruta). */}
+                  <IconoBrujula />
                 </span>
               </span>
             </button>
