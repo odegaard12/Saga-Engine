@@ -6,7 +6,24 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.24.2
+## 5.25.0
+
+- **Nodos 3D de verdad dentro del mapa.** Una capa personalizada de MapLibre
+  dibuja con three.js sobre el mismo lienzo, con la matriz de proyección
+  del mapa: los modelos viven en metros sobre el relieve y se inclinan, se
+  tapan y se escalan con él. Diseño acordado: monolito blanco sobrio; la
+  base y la tapa con la forma del tipo (redonda checkpoint, cuadrada QR,
+  triangular minijuego); el color es el estado (verde hecho, azul en juego,
+  rojo pendiente) en una franja de luz, la tapa y un disco en el suelo; el
+  número grande siempre de frente e icono pequeño del tipo. Animación
+  mínima: la luz respira; el nodo en juego, un anillo fino girando y un
+  pulso en el suelo. En cuesta, el zócalo se hunde 30 cm y muerde la
+  ladera en vez de flotar. A ~20 fotogramas por segundo y sólo con la
+  pestaña visible, por la batería. En 2D siguen las chinchetas planas.
+- El servidor manda siempre `kind` (checkpoint / qr / minijuego) en cada
+  nodo: sólo dice qué clase de sitio es, nada del contenido.
+
+
 
 - **La barra de carga ya no se queda en 0 % ni en 100 %.** El grafo de
   caminos (21 MB) había entrado en el paquete como "una tesela más": la

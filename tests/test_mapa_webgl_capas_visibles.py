@@ -353,6 +353,21 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     assert "void cargarGrafo().then" in fonte.split("mapa.once('idle'")[1]
 
 
+def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
+    """
+    Los nodos son objetos three.js dentro del mapa (capa personalizada con
+    la matriz de proyección de MapLibre), en metros sobre el relieve. Base y
+    tapa con la forma del tipo; color = estado; número siempre de frente.
+    """
+    capa = (COMPONENTE.parent / "nodosTresD.ts").read_text(encoding="utf-8")
+    assert "renderingMode: '3d'" in capa and "queryTerrainElevation" in capa
+    assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
+    assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
+    assert "capaNodosRef.current?.setNodos(" in fonte
+    mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
+    assert '"kind": kind_del_nodo(node)' in mision
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.

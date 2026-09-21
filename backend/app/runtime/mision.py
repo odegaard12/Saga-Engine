@@ -203,6 +203,22 @@ def _minigame_con_url_de_foto(node, fotos_por_url=False):
     return salida
 
 
+def kind_del_nodo(node):
+    """
+    checkpoint / qr / minijuego, a partir del tipo de interacción.
+
+    Es lo que decide la FORMA del nodo en el mapa 3D (base redonda, cuadrada
+    o triangular). Va siempre en la proyección pública: no dice nada del
+    contenido, sólo de qué clase de sitio es.
+    """
+    tipo = str((node.get("interaction") or {}).get("type") or "").lower()
+    if tipo == "checkpoint":
+        return "checkpoint"
+    if "qr" in tipo:
+        return "qr"
+    return "minijuego"
+
+
 def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False):
     """Un nodo, tal y como lo recibe el móvil.
 
@@ -220,6 +236,8 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         "lat": node["location"]["lat"],
         "lon": node["location"]["lon"],
         "radius": node["location"]["radius_m"],
+        # Qué clase de nodo es, para dibujarlo: no revela contenido jugable.
+        "kind": kind_del_nodo(node),
     }
 
     if include_runtime:

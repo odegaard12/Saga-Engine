@@ -34,6 +34,7 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
+import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
  * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
@@ -75,6 +76,7 @@ const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
 const ICONO_AVATAR = 'avatar-propio'
 const FUENTE_GUIA = 'saga-guia'
+const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
 const CAPA_GUIA = 'saga-guia-capa'
 /** Fases de la "hormiga" de la guía: el trazo avanza hacia el nodo. */
 const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001]]
@@ -120,6 +122,14 @@ function metrosEntre(a: Punto, b: Punto): number {
 /** A partir de cuántos metros del camino se avisa; se apaga algo más cerca, para no parpadear. */
 const FUERA_DE_TRAZADO_M = 500
 const DE_VUELTA_AL_TRAZADO_M = 400
+
+/** checkpoint / qr / minijuego, del campo `kind` del servidor (o del tipo, si viene). */
+function tipoDelNodo(nodo: { kind?: string; type?: string }): TipoDeNodo {
+  const texto = String(nodo.kind || nodo.type || '').toLowerCase()
+  if (texto === 'checkpoint') return 'checkpoint'
+  if (texto.includes('qr')) return 'qr'
+  return 'minijuego'
+}
 
 function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
   const coords: [number, number][] = []
@@ -743,6 +753,13 @@ export function MapSurfaceGL({
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
   const gestoRef = useRef(false)
+  /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
+  const aplicarModoRef = useRef<(() => void) | null>(null)
+  /** Los nodos en 3D (three.js dentro del mapa). Se crea una vez. */
+  const capaNodosRef = useRef<CapaNodosTresD | null>(null)
+  if (!capaNodosRef.current) capaNodosRef.current = crearCapaNodosTresD(CAPA_NODOS_TRES_D)
+  const tresDRef = useRef(tresD)
+  tresDRef.current = tresD
   /** La red de caminos, si el panel la preparó; null mientras no está o si no hay. */
   const grafoRef = useRef<GrafoDeCaminos | null>(null)
   /** Última ruta por caminos calculada, para no recalcular a cada aviso del GPS. */
@@ -884,7 +901,26 @@ export function MapSurfaceGL({
         const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
         fuente?.setData(datos)
       }
+      /**
+       * La capa 3D (three.js) se añade cuando el estilo tiene capas, y se
+       * vuelve a añadir tras un rehecho del estilo, que la borra. En 3D
+       * los nodos son los modelos; las chinchetas planas y los discos
+       * extruidos se ocultan. En 2D, al revés.
+       */
+      try {
+        if (vivo.getStyle().layers.length > 0 && !vivo.getLayer(CAPA_NODOS_TRES_D) && capaNodosRef.current) {
+          vivo.addLayer(capaNodosRef.current.capa)
+        }
+        const enTresD = tresDRef.current
+        capaNodosRef.current?.setVisible(enTresD)
+        for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_VOLUMEN]) {
+          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', enTresD ? 'none' : 'visible')
+        }
+      } catch {
+        // Estilo a medio montar: se repite en el siguiente `styledata`.
+      }
     }
+    aplicarModoRef.current = volcarPendientes
     mapa.on('styledata', volcarPendientes)
 
     let rescates = 0
@@ -1158,6 +1194,11 @@ export function MapSurfaceGL({
     pintarFuente,
   ])
 
+  // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
+  useEffect(() => {
+    aplicarModoRef.current?.()
+  }, [tresD])
+
   /**
    * La guía de ti al nodo que toca, POR EL CAMINO.
    *
@@ -1325,6 +1366,17 @@ export function MapSurfaceGL({
 
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
+
+    capaNodosRef.current?.setNodos(
+      nodos.map((nodo, indice) => ({
+        id: String((nodo as { id?: unknown }).id ?? indice),
+        lat: nodo.lat as number,
+        lon: nodo.lon as number,
+        numero: indice + 1,
+        tipo: tipoDelNodo(nodo),
+        estado: estado(indice),
+      }))
+    )
 
     pintarFuente(FUENTE_NODOS_ICONOS, {
       type: 'FeatureCollection',
