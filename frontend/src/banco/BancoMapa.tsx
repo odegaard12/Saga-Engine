@@ -95,6 +95,7 @@ type Lectura = {
   rutaTramos: number
   nodosVolumen: number
   fotosEnMapa: number
+  nodos3d: string
 }
 
 /** Lee el estado real del mapa. Nada de esto se puede deducir mirando. */
@@ -156,6 +157,16 @@ function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
     rutaTramos: ruta?.features?.length ?? 0,
     nodosVolumen: volumen?.features?.length ?? 0,
     fotosEnMapa: fotosMapa?.features?.length ?? 0,
+    nodos3d: (() => {
+      try {
+        const leer = (window as unknown as { __sagaNodos3D?: () => { piezas: number; renders: number; rendersConPiezas: number; animar: boolean; ultimoError: string } }).__sagaNodos3D
+        const e = leer?.()
+        if (!e) return 'sin capa'
+        return `${e.piezas} piezas · ${e.rendersConPiezas}/${e.renders} fotogramas · anim ${e.animar ? 'sí' : 'no'}${e.ultimoError ? ' · ERROR ' + e.ultimoError : ''}`
+      } catch {
+        return 'err'
+      }
+    })(),
   }
 }
 
@@ -305,6 +316,7 @@ export default function BancoMapa() {
               mal={lectura.nodosVolumen === 0}
             />
             <Fila etiqueta="fotos en mapa" valor={String(lectura.fotosEnMapa)} />
+            <Fila etiqueta="nodos 3D" valor={lectura.nodos3d} mal={/ERROR|sin capa/.test(lectura.nodos3d)} />
             <Fila etiqueta="capas" valor={String(lectura.capas.length)} />
           </>
         ) : (

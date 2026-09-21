@@ -326,6 +326,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           .makeTranslation(mc.x, mc.y, mc.z)
           .multiply(new THREE.Matrix4().makeScale(s, -s, s))
           .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2))
+        /**
+         * Con `matrixAutoUpdate` apagado, three.js NO recalcula la matriz
+         * de mundo aunque `matrix` cambie: hay que marcarlo. Sin esto los
+         * monolitos se quedaban en el origen del espacio Mercator (lat
+         * 85° N, lon -180°), invisibles, sin un solo error.
+         */
+        p.grupo.matrixWorldNeedsUpdate = true
 
         // Carteles siempre de frente: giran con el rumbo y se tumban con la inclinación.
         for (const c of p.carteles) c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')
