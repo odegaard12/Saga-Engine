@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FieldProof, PlayerStage } from '../../types/player'
+import {
+  getPlayerAvatarInitials,
+  getPlayerAvatarUrl,
+  getPlayerColor,
+} from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 
 /**
@@ -127,6 +132,7 @@ export function MapSurfaceGL({
   tresD = true,
   fieldProofs,
   onOpenFieldProofs,
+  selfProfile,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
@@ -143,6 +149,8 @@ export function MapSurfaceGL({
    * lo que toque capas espera a esto.
    */
   const [estiloListo, setEstiloListo] = useState(false)
+  /** Qué foto y color tiene ya pintados el avatar, para no rehacerlo en balde. */
+  const fichaAvatarRef = useRef('')
 
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return
@@ -201,7 +209,16 @@ export function MapSurfaceGL({
             id: CAPA_SOMBRAS,
             type: 'hillshade',
             source: FUENTE_RELIEVE,
-            paint: { 'hillshade-exaggeration': 0.5 },
+            /**
+           * Sombreado fuerte a propósito.
+           *
+           * A la altura a la que se juega -zoom 17-18, unos cientos de
+           * metros de ancho- el desnivel REAL de un valle son unos pocos
+           * metros: geométricamente correcto e invisible. El sombreado de
+           * laderas es lo que hace legible la forma del terreno a esa
+           * escala, más que la propia malla.
+           */
+          paint: { 'hillshade-exaggeration': 0.85 },
           },
         ],
         /**
@@ -209,7 +226,7 @@ export function MapSurfaceGL({
          * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
          * el monte en una sierra que no existe.
          */
-        terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
+        terrain: { source: FUENTE_RELIEVE, exaggeration: 2.2 },
       },
     })
 
@@ -282,6 +299,20 @@ export function MapSurfaceGL({
         },
       })
 
+      /**
+       * Asa de depuración, solo con `?depurar-mapa=1` en la dirección.
+       *
+       * Comprobar desde fuera si el terreno está puesto, con qué
+       * exageración o qué capas hay era imposible: MapLibre no deja
+       * ninguna referencia accesible desde el DOM. Se estaba verificando a
+       * ojo, que es como se colaron los fallos de esta misma pantalla.
+       *
+       * No se expone nunca por defecto: es una puerta abierta al mapa.
+       */
+      if (new URLSearchParams(window.location.search).has('depurar-mapa')) {
+        ;(window as unknown as { __sagaMapa?: maplibregl.Map }).__sagaMapa = mapa
+      }
+
       setEstiloListo(true)
     }
 
@@ -332,15 +363,58 @@ export function MapSurfaceGL({
 
     const lngLat: [number, number] = [playerPosition.lon, playerPosition.lat]
 
+    const fichaActual = `${selfProfile?.avatar_url || ''}|${selfProfile?.color || ''}`
+    if (marcadorXogadorRef.current && fichaAvatarRef.current !== fichaActual) {
+      // Cambió la foto o el color: el elemento se construye una vez, así
+      // que hay que tirarlo y rehacerlo.
+      marcadorXogadorRef.current.remove()
+      marcadorXogadorRef.current = null
+    }
+
     if (!marcadorXogadorRef.current) {
-      marcadorXogadorRef.current = new maplibregl.Marker({ color: COLOR_NODO_HECHO })
+      /**
+       * TÚ eres un avatar con tu foto, no una chincheta.
+       *
+       * Aquí estuvo el marcador por defecto de MapLibre y era un error de
+       * lectura, no de estética: en un mapa lleno de chinchetas numeradas,
+       * una chincheta más no dice "este eres tú". La foto sí, y de un
+       * vistazo -que es justo lo que haces mientras caminas-.
+       */
+      const color = getPlayerColor(selfProfile || {})
+      const foto = getPlayerAvatarUrl(selfProfile || {})
+      const iniciales = getPlayerAvatarInitials(selfProfile || {})
+
+      const avatar = document.createElement('div')
+      avatar.setAttribute('aria-label', 'Tu posición')
+      Object.assign(avatar.style, {
+        width: '46px',
+        height: '46px',
+        borderRadius: '999px',
+        border: `3px solid ${color}`,
+        background: foto ? `#0b1220 center/cover url(${foto})` : color,
+        // Halo del color del jugador: lo separa del terreno sea cual sea
+        // la foto satélite de debajo, clara u oscura.
+        boxShadow: `0 0 0 4px ${color}55, 0 6px 16px rgba(0,0,0,.55)`,
+        display: 'grid',
+        placeItems: 'center',
+        color: '#ffffff',
+        font: '950 15px system-ui, sans-serif',
+        overflow: 'hidden',
+      } as Partial<CSSStyleDeclaration>)
+      if (!foto) avatar.textContent = iniciales
+
+      fichaAvatarRef.current = fichaActual
+      marcadorXogadorRef.current = new maplibregl.Marker({ element: avatar })
         .setLngLat(lngLat)
         .addTo(mapa)
       return
     }
 
     marcadorXogadorRef.current.setLngLat(lngLat)
-  }, [playerPosition?.lat, playerPosition?.lon])
+    // Si cambia la ficha (foto nueva, otro color) hay que rehacer el
+    // avatar: el elemento del marcador se construye una sola vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerPosition?.lat, playerPosition?.lon, selfProfile?.avatar_url, selfProfile?.color])
 
   // Radio del nodo actual.
   useEffect(() => {

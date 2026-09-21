@@ -2996,6 +2996,12 @@ export default function PlayerApp() {
               browserGpsPosition ??
               (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
             }
+            selfProfile={{
+              ...(payload.profile || {}),
+              user: payload.user,
+              display_name: payload.display_name || payload.user,
+              gps_status: gpsState,
+            }}
           />
         </Suspense>
       ) : (

@@ -6,6 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.13.2
+
+- **Tu posición vuelve a ser tu avatar, no una chincheta.** En el motor
+  nuevo había quedado el marcador por defecto de MapLibre, y eso no es un
+  detalle estético: en un mapa lleno de chinchetas numeradas, una chincheta
+  más no dice "este eres tú". Ahora va tu foto, con tu color de halo, como
+  en el motor de siempre.
+- **Relieve más marcado.** A la altura a la que se juega -zoom 17-18, unos
+  cientos de metros de ancho- el desnivel real de un valle son unos pocos
+  metros: geométricamente correcto e invisible. El sombreado de laderas
+  pasa de 0,5 a 0,85 y la exageración del terreno de 1,5 a 2,2, que es lo
+  que hace legible la FORMA del terreno a esa escala.
+- Asa de depuración del mapa con `?depurar-mapa=1`. Sin ella no había modo
+  de comprobar desde fuera si el terreno estaba puesto o qué capas había, y
+  se estaba verificando a ojo -que es justo como se colaron los fallos de
+  esta pantalla-. No se expone nunca por defecto.
+
 ## 5.13.1
 
 Tres cosas del mapa 3D que no se veían, y ninguna daba error: el mapa se
