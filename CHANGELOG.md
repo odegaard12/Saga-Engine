@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.18.2
+## 5.19.0
+
+- **El paquete offline baja el mapa por niveles de calidad según la
+  distancia.** Continente en calidad general (z3-z5, ±1850..3700 km), país
+  algo mejor (z6-z7, ±700..925 km), región mejor (z8-z9, ±290..460 km),
+  comarca mejor (z10-z11, ±115..175 km), y la máxima sólo donde se camina
+  (zona de misión y corredor, como hasta ahora). Unos 780 teselas de
+  contexto, 23 MB: al desampliar sin cobertura nunca aparece un hueco. Los
+  niveles bajos existían, pero con presupuestos que a z3-z4 no llegaban y a
+  z10-z11 se quedaban cortos.
+- El relieve del paquete se limita a la zona de misión y al corredor. Una
+  tesela de elevación pesa el triple que una de imagen; darle relieve a
+  media Galicia eran 30 MB para un desnivel que a ese zoom apenas se lee.
+  Donde se camina, el monte es el mismo con o sin cobertura.
+
+
 
 - **El mapa se pinta debajo de la pantalla de carga.** El velo ya no se
   retira hasta que el mapa 3D avisa de que ha pintado su primera vista
