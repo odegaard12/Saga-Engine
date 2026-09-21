@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.23.3
+## 5.23.4
+
+- La baldosa de red de caminos que falla **se parte en cuatro** y se vuelve
+  a pedir (hasta 3 km de lado). El 504 de Overpass casi siempre es
+  "demasiado para una petición" -una ciudad entera dentro de una baldosa de
+  25 km-, no "no funciona"; reintentar la misma baldosa en tres espejos
+  sólo la atascaba. Pausas más cortas.
+
+
 
 - La red de caminos se construye **en segundo plano** en el servidor, y el
   panel enseña el progreso ("7 de 25 baldosas"). Con 40 km son cinco o seis
