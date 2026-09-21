@@ -3313,7 +3313,10 @@ export default function PlayerApp() {
             {state.config?.map_engine === 'maplibre' ? (
               <button
                 type="button"
-                style={mapaTresD ? mapQuickButtonActive : mapRouteToggleInlineButton}
+                // Mismo aspecto en los dos estados: cambiar de color al pasar a 2D
+                // se leía como "algo se ha estropeado", no como un modo distinto.
+                // Lo que cambia es la etiqueta: dice a qué modo vas.
+                style={mapQuickButtonActive}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()

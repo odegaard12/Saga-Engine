@@ -690,6 +690,8 @@ export function MapSurfaceGL({
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
+  /** Rumbo actual del mapa, para enseñar el botón de norte sólo cuando hace falta. */
+  const [rumbo, setRumbo] = useState(0)
   /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
   const fichaRef = useRef<{ color: string; foto: string; iniciales: string }>({
     color: COLOR_NODO_HECHO,
@@ -877,6 +879,11 @@ export function MapSurfaceGL({
     }
     latir()
 
+    // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
+    // cuando el mapa está girado.
+    const alGirar = () => setRumbo(Math.round(mapa.getBearing()))
+    mapa.on('rotate', alGirar)
+
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
@@ -926,6 +933,7 @@ export function MapSurfaceGL({
 
     return () => {
       pulsoVivo = false
+      mapa.off('rotate', alGirar)
       mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
       window.clearInterval(relojVigilante)
@@ -1210,6 +1218,52 @@ export function MapSurfaceGL({
         aria-label="Mapa de la misión (WebGL)"
         style={{ position: 'absolute', inset: 0 }}
       />
+      {rumbo !== 0 ? (
+        /**
+         * Volver al norte. Sólo aparece cuando el mapa está girado.
+         *
+         * En 3D el mapa se gira con dos dedos sin querer, y con el norte
+         * fuera de sitio cuesta relacionar lo que ves con lo que tienes
+         * delante. La aguja gira con el mapa, así que además dice hacia
+         * dónde queda el norte antes de pulsar.
+         */
+        <button
+          type="button"
+          aria-label="Volver a poner el norte arriba"
+          title="Norte arriba"
+          onClick={() => mapaRef.current?.easeTo({ bearing: 0, duration: 450 })}
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: '50%',
+            width: 42,
+            height: 42,
+            borderRadius: 999,
+            border: '1px solid rgba(255,255,255,.35)',
+            background: 'rgba(var(--theme-ink), .72)',
+            color: '#ffffff',
+            display: 'grid',
+            placeItems: 'center',
+            font: '900 12px system-ui, sans-serif',
+            cursor: 'pointer',
+            zIndex: 5,
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              transform: `rotate(${-rumbo}deg)`,
+              transition: 'transform 120ms linear',
+              lineHeight: 1,
+            }}
+          >
+            ▲
+            <br />
+            N
+          </span>
+        </button>
+      ) : null}
 
     </section>
   )
