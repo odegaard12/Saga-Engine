@@ -34,6 +34,7 @@ const CAPA_RADIO_RELLENO = 'saga-radio-relleno'
 const CAPA_RADIO_BORDE = 'saga-radio-borde'
 const FUENTE_RUTA = 'saga-ruta'
 const CAPA_RUTA = 'saga-ruta-linea'
+const CAPA_RUTA_BORDE = 'saga-ruta-borde'
 
 /**
  * Los colores de los alfileres NO siguen al tema, igual que en Leaflet.
@@ -223,7 +224,7 @@ export function MapSurfaceGL({
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.2 },
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.28 },
       })
       mapa.addLayer({
         id: CAPA_RADIO_BORDE,
@@ -232,22 +233,71 @@ export function MapSurfaceGL({
         // 3 px y blanco al borde: sobre foto aérea con sol, una línea
         // azul de 2 px se perdía. El radio dice a qué distancia entras
         // en el nodo; si no se ve, no sirve de nada.
-        paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 0.9 },
+        /**
+         * Borde a trazos: un círculo continuo se confunde con una rotonda
+         * o un depósito de la propia foto satélite. A trazos se lee como
+         * lo que es -una marca del juego, no algo del terreno-.
+         */
+        paint: {
+          'line-color': '#ffffff',
+          'line-opacity': 0.95,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 19, 6],
+          'line-dasharray': [2, 1.5],
+        },
       })
 
       mapa.addSource(FUENTE_RUTA, { type: 'geojson', data: COLECCION_VACIA })
+      mapa.addLayer({
+        id: CAPA_RUTA_BORDE,
+        type: 'line',
+        source: FUENTE_RUTA,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#0b1220',
+          'line-opacity': 0.55,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 9, 19, 15],
+        },
+      })
+
       mapa.addLayer({
         id: CAPA_RUTA,
         type: 'line',
         source: FUENTE_RUTA,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#f8fafc', 'line-width': 3, 'line-opacity': 0.55 },
+        /**
+         * Grosor por zoom y no fijo.
+         *
+         * La ruta se dibuja sobre FOTO SATÉLITE: sobre asfalto claro o
+         * sobre arena, un hilo blanco translúcido desaparece. De ahí que
+         * antes "no se viera el trazado" aunque estuviera pintado.
+         *
+         * Va acompañada de una línea oscura por debajo (CAPA_RUTA_BORDE)
+         * que hace de contorno; es el mismo truco que usan las apps de
+         * senderismo para que la traza se lea sobre cualquier fondo.
+         */
+        paint: {
+          'line-color': '#f8fafc',
+          'line-opacity': 0.95,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5, 19, 9],
+        },
       })
 
       setEstiloListo(true)
     }
 
-    mapa.on('load', alCargar)
+    /**
+     * `style.load`, no `load`.
+     *
+     * `load` espera a que TODO esté cargado, y con relieve activado eso
+     * incluye el terreno. Si la elevación tarda o falla, `load` no dispara
+     * -y entonces el radio y el trazado no se pintaban nunca, mientras que
+     * los nodos y las fotos sí se veían porque son marcadores del DOM y no
+     * esperan a nada-. Justo el síntoma que se vio en el móvil.
+     *
+     * `style.load` dispara cuando el estilo está montado, que es lo único
+     * que hace falta para añadir fuentes y capas.
+     */
+    mapa.on('style.load', alCargar)
 
     return () => {
       marcadorXogadorRef.current?.remove()
@@ -350,19 +400,65 @@ export function MapSurfaceGL({
        * abajo sí lo dice, y anclada por la punta (`anchor: 'bottom'`) se
        * clava en el sitio exacto aunque el mapa se incline.
        */
+      /**
+       * El envoltorio es de MapLibre; la chincheta va dentro.
+       *
+       * Esto NO es decoración: MapLibre reescribe el `transform` del
+       * elemento que le entregas para colocarlo en pantalla. El giro de
+       * la gota estaba puesto ahí y se machacaba en cada fotograma, así
+       * que lo que se veía eran bolas, no chinchetas. Dentro del
+       * envoltorio el giro sobrevive.
+       */
       const elemento = document.createElement('div')
       elemento.setAttribute('aria-label', `Nodo ${indice + 1}`)
       Object.assign(elemento.style, {
+        width: '34px',
+        height: '42px',
+        position: 'relative',
+      } as Partial<CSSStyleDeclaration>)
+
+      /**
+       * Sombra en el SUELO, separada de la chincheta.
+       *
+       * Una sombra pegada al alfiler lo hace parecer un adhesivo sobre el
+       * cristal. Una elipse aplastada a sus pies es lo que da la lectura
+       * de "está clavado ahí abajo, en el terreno".
+       */
+      const sombra = document.createElement('div')
+      Object.assign(sombra.style, {
+        position: 'absolute',
+        left: '50%',
+        bottom: '-2px',
+        width: '20px',
+        height: '7px',
+        transform: 'translateX(-50%)',
+        borderRadius: '50%',
+        background: 'radial-gradient(ellipse, rgba(0,0,0,.55), rgba(0,0,0,0) 70%)',
+      } as Partial<CSSStyleDeclaration>)
+      elemento.appendChild(sombra)
+
+      const gota = document.createElement('div')
+      Object.assign(gota.style, {
+        position: 'absolute',
+        left: '50%',
+        top: '0',
         width: '30px',
         height: '30px',
+        marginLeft: '-15px',
         borderRadius: '50% 50% 50% 0',
         transform: 'rotate(-45deg)',
-        background: color,
+        /**
+         * Degradado, no color plano: la luz arriba y la sombra abajo es
+         * lo que convierte un disco en un cuerpo con volumen. Es el mismo
+         * color del estado del nodo, solo que con relieve.
+         */
+        background: `radial-gradient(circle at 32% 28%, #ffffff55, ${color} 55%, #00000055)`,
         border: '2px solid #0b1220',
-        boxShadow: '0 3px 10px rgba(0,0,0,.5)',
+        boxShadow: '0 2px 5px rgba(0,0,0,.45)',
         display: 'grid',
         placeItems: 'center',
       } as Partial<CSSStyleDeclaration>)
+      elemento.appendChild(gota)
 
       // El número va derecho: el giro es de la chincheta, no del texto.
       const numero = document.createElement('span')
@@ -371,8 +467,9 @@ export function MapSurfaceGL({
         transform: 'rotate(45deg)',
         color: '#0b1220',
         font: '900 13px system-ui, sans-serif',
+        textShadow: '0 1px 0 rgba(255,255,255,.35)',
       } as Partial<CSSStyleDeclaration>)
-      elemento.appendChild(numero)
+      gota.appendChild(numero)
 
       const marcador = new maplibregl.Marker({ element: elemento, anchor: 'bottom' })
         .setLngLat([nodo.lon as number, nodo.lat as number])
@@ -428,21 +525,51 @@ export function MapSurfaceGL({
     )
 
     fotos.forEach((foto) => {
+      /**
+       * La foto va dentro de un envoltorio, no suelta.
+       *
+       * MapLibre escribe el `transform` del elemento que le entregas para
+       * colocarlo en pantalla; si el volcado 3D se pusiera ahí, lo
+       * machacaría en cada fotograma. El envoltorio es de MapLibre y el
+       * volcado va dentro.
+       */
+      const envoltorio = document.createElement('div')
+      Object.assign(envoltorio.style, {
+        // La perspectiva tiene que vivir en el PADRE para que el volcado
+        // del hijo tenga profundidad real y no sea un simple aplastado.
+        perspective: '140px',
+        transformOrigin: 'bottom center',
+        cursor: 'pointer',
+      } as Partial<CSSStyleDeclaration>)
+
       const elemento = document.createElement('button')
       elemento.type = 'button'
       elemento.setAttribute('aria-label', `Foto de ${foto.display_name || foto.user}`)
       Object.assign(elemento.style, {
-        width: '42px',
-        height: '42px',
+        width: '46px',
+        height: '46px',
         padding: '0',
         borderRadius: '10px',
-        border: '2px solid #f8fafc',
-        boxShadow: '0 3px 10px rgba(0,0,0,.5)',
+        // Marco blanco grueso: la foto queda como una polaroid clavada en
+        // el terreno, que es lo que hace que se lea como objeto y no como
+        // una mancha de la propia imagen satélite.
+        border: '3px solid #f8fafc',
+        /**
+         * Inclinada hacia atrás y levantada del suelo.
+         *
+         * Con la cámara en 3D el suelo se ve en picado; una foto
+         * perfectamente plana parecía pegada al cristal de la pantalla en
+         * vez de estar EN el sitio. Volcarla la planta sobre el terreno.
+         */
+        transform: 'rotateX(22deg)',
+        transformOrigin: 'bottom center',
+        boxShadow: '0 2px 4px rgba(0,0,0,.45), 0 12px 16px -6px rgba(0,0,0,.6)',
         backgroundImage: `url(${foto.thumbnail_url || foto.image_url})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         cursor: 'pointer',
       } as Partial<CSSStyleDeclaration>)
+      envoltorio.appendChild(elemento)
 
       elemento.addEventListener('click', (evento) => {
         evento.stopPropagation()
@@ -454,10 +581,45 @@ export function MapSurfaceGL({
       })
 
       marcadoresFotosRef.current.push(
-        new maplibregl.Marker({ element: elemento }).setLngLat([foto.lon, foto.lat]).addTo(mapa)
+        new maplibregl.Marker({ element: envoltorio, anchor: 'bottom' })
+          .setLngLat([foto.lon, foto.lat])
+          .addTo(mapa)
       )
     })
   }, [fieldProofs, onOpenFieldProofs])
+
+  /**
+   * Los marcadores crecen al acercarse.
+   *
+   * Un tamaño fijo obliga a elegir entre "de lejos tapa media ruta" y "de
+   * cerca no se distingue". Escalando con el zoom, de lejos son
+   * señaladores discretos y de cerca la foto se ve de verdad.
+   *
+   * Se escala el elemento, no se recrean los marcadores: recrearlos en
+   * cada fotograma de zoom haría parpadear el mapa entero.
+   */
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+
+    const escalar = () => {
+      const zoom = mapa.getZoom()
+      // 15 -> 0.8 ; 19 -> 1.6. Fuera de ese tramo se queda en los topes.
+      const factor = Math.max(0.8, Math.min(1.6, 0.8 + (zoom - 15) * 0.2))
+      for (const marcador of marcadoresNodosRef.current) {
+        marcador.getElement().style.scale = String(factor)
+      }
+      for (const marcador of marcadoresFotosRef.current) {
+        marcador.getElement().style.scale = String(factor)
+      }
+    }
+
+    escalar()
+    mapa.on('zoom', escalar)
+    return () => {
+      mapa.off('zoom', escalar)
+    }
+  }, [fieldProofs, missionStages])
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra
   // matriz- y no pide ni un dato más, así que funciona igual sin cobertura.
