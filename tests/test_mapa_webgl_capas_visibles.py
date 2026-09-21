@@ -26,6 +26,20 @@ def fonte() -> str:
     return COMPONENTE.read_text(encoding="utf-8")
 
 
+def test_o_worker_de_maplibre_ten_url_propia(fonte: str) -> None:
+    """
+    MapLibre v6 carga su worker desde una URL AL LADO de su chunk.
+
+    Vite no copia ese fichero si nadie lo importa: 404 silencioso, worker
+    muerto, y con él todo lo GeoJSON (trazado, radio, extrusión, símbolos)
+    y la decodificación del relieve. Fue EL fallo de toda la migración:
+    pareció bug de datos, de eventos, de posición y del móvil, y no era
+    ninguno. Con `?url` Vite emite el fichero y aquí se le da la dirección.
+    """
+    assert "from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'" in fonte
+    assert "maplibregl.setWorkerUrl(urlDelWorker)" in fonte
+
+
 def test_as_capas_de_datos_nacen_co_estilo(fonte: str) -> None:
     """
     El radio y el trazado se declaran EN el estilo, no se añaden después.

@@ -1,6 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+
+/**
+ * EL fallo de toda la migración, y el más silencioso.
+ *
+ * MapLibre v6 hace su trabajo pesado en un web worker que carga como
+ * módulo desde una URL calculada AL LADO de su propio chunk:
+ * `new URL('./maplibre-gl-worker.mjs', import.meta.url)`. Vite no copia
+ * ese fichero porque nadie lo importa, así que la petición devolvía 404
+ * -los dos 404 sin explicar de cada carga- y el worker moría sin decir
+ * una palabra.
+ *
+ * Todo lo que pasa por el worker estuvo muerto desde 5.10: las fuentes
+ * GeoJSON (trazado, radio, extrusión, símbolos) y la decodificación del
+ * relieve. Las teselas satélite y los marcadores del DOM no lo usan, y
+ * por eso eran lo único que se veía. Tuvo pinta de bug de datos, de bug
+ * de eventos, de bug de posición y de bug del móvil, y no era ninguno.
+ *
+ * Con `?url` Vite emite el fichero con su hash en `/assets/` y aquí se
+ * le da a MapLibre la dirección de verdad. Mismo origen, mismo caché
+ * offline que el resto de la aplicación.
+ */
+maplibregl.setWorkerUrl(urlDelWorker)
 import type { FieldProof, PlayerStage } from '../../types/player'
 import {
   getPlayerAvatarInitials,

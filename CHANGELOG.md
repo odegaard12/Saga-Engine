@@ -6,7 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.16.0
+## 5.16.1
+
+- **EL fallo de toda la migración al mapa 3D, y el más silencioso.**
+  MapLibre v6 hace su trabajo pesado en un web worker que carga como módulo
+  desde una URL calculada al lado de su propio chunk
+  (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`). Vite no copia
+  ese fichero porque nadie lo importa, así que devolvía 404 -los dos 404
+  sin explicar de cada carga- y el worker moría sin decir una palabra.
+  Todo lo que pasa por el worker estuvo muerto desde 5.10: las fuentes
+  GeoJSON (trazado, radio, extrusión, símbolos) y la decodificación del
+  relieve. Las teselas satélite y los marcadores del DOM no lo usan, y por
+  eso eran lo único que se veía. Tuvo pinta de bug de datos, de eventos,
+  de posición y del móvil, y no era ninguno. Medido: worker vivo, cero
+  respuestas a una carga GeoJSON.
+  Ahora el worker se importa con `?url`, Vite lo emite con hash en
+  `/assets/` y se le da a MapLibre la dirección real.
+- El banco de mapa lleva una fila **worker (GeoJSON)** que mide justo este
+  síntoma: si dice MUDO, nada de lo que pase por el worker se va a ver.
+
+
 
 - **Los nodos pasan a ser símbolos del mapa, no marcadores del DOM.** Un
   marcador del DOM se coloca desde JavaScript un fotograma después de que
