@@ -434,7 +434,13 @@ self.addEventListener('fetch', (event) => {
    * lo que lo hacía aún más raro. Es la misma caché en la que la pantalla
    * de carga las guarda.
    */
-  if (url.pathname.startsWith('/map-tiles/') || url.pathname.startsWith('/dem-tiles/')) {
+  // La red de caminos va con las teselas: misma caché, mismo "primero lo
+  // guardado", para que la guía redirija por carreteras sin cobertura.
+  if (
+    url.pathname.startsWith('/map-tiles/') ||
+    url.pathname.startsWith('/dem-tiles/') ||
+    url.pathname === '/api/road-graph'
+  ) {
     event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return
   }

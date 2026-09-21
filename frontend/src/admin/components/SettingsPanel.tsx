@@ -1,3 +1,4 @@
+import { useEffect as useEffectRed, useState as useStateRed } from 'react'
 type SettingsPanelProps = {
   missionDraft: Record<string, string>
   settingsSaveState: 'idle' | 'saving' | 'saved' | 'error'
@@ -311,6 +312,8 @@ export default function SettingsPanel({
         </div>
       </section>
 
+      <RedDeCaminos />
+
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
           <strong style={{ color: '#22c55e' }}>🔐 Pantalla de Inicio de Sesión (Login de Jugador)</strong>
@@ -371,5 +374,111 @@ export default function SettingsPanel({
         </button>
       </div>
     </div>
+  )
+}
+
+type EstadoRed = {
+  hay: boolean
+  built_at?: string
+  nodos?: number
+  tramos?: number
+  bytes?: number
+  margen_km?: number
+}
+
+/**
+ * La red de caminos de la zona, descargada de OpenStreetMap.
+ *
+ * El mapa de este panel DIBUJA las carreteras, pero no las tiene como datos.
+ * Para que la guía del jugador redirija por carreteras y caminos cuando se
+ * sale del trazado, hace falta la red como grafo. Se descarga aquí, una
+ * vez por ruta, y viaja en el paquete offline de cada móvil.
+ */
+function RedDeCaminos() {
+  const [estado, setEstado] = useStateRed<EstadoRed | null>(null)
+  const [ocupado, setOcupado] = useStateRed(false)
+  const [aviso, setAviso] = useStateRed<string | null>(null)
+  const [margen, setMargen] = useStateRed(12)
+
+  async function pedir(ruta: string, cuerpo: Record<string, unknown> = {}) {
+    const res = await fetch(ruta, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    })
+    const datos = (await res.json().catch(() => ({}))) as EstadoRed & { status?: string; detail?: string }
+    if (!res.ok || datos.status === 'error') throw new Error(datos.detail || `HTTP ${res.status}`)
+    return datos
+  }
+
+  useEffectRed(() => {
+    let vivo = true
+    pedir('/api/admin/road-graph/status')
+      .then((datos) => {
+        if (vivo) setEstado(datos)
+      })
+      .catch(() => {
+        if (vivo) setEstado({ hay: false })
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  async function preparar() {
+    setOcupado(true)
+    setAviso(null)
+    try {
+      const datos = await pedir('/api/admin/road-graph/build', { margen_km: margen })
+      setEstado(datos)
+      setAviso('Red de caminos preparada. Los móviles la bajarán con el paquete offline en la próxima entrada.')
+    } catch (fallo) {
+      setAviso(`No se pudo preparar: ${String((fallo as Error).message || fallo)}`)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  const mb = estado?.bytes ? (estado.bytes / 1024 / 1024).toFixed(1) : null
+
+  return (
+    <section className="admin-settings-section-modern">
+      <div className="admin-settings-section-head">
+        <strong style={{ color: '#38bdf8' }}>🛣️ Red de caminos (para redirigir fuera del trazado)</strong>
+        <span>
+          Descarga de OpenStreetMap las carreteras y caminos alrededor de la ruta y los guarda como
+          grafo. Con esto, si un jugador se sale del trazado, la guía le lleva de vuelta por
+          caminos reales, sin cobertura. Se prepara una vez por ruta; tarda entre medio minuto y
+          dos.
+        </span>
+      </div>
+
+      <div className="admin-settings-grid-modern">
+        <label>
+          Margen alrededor de la ruta (km)
+          <input
+            type="number"
+            min={3}
+            max={30}
+            value={margen}
+            onChange={(event) => setMargen(Number(event.target.value) || 12)}
+          />
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'end' }}>
+          <button type="button" className="admin-btn-modern" disabled={ocupado} onClick={preparar}>
+            {ocupado ? 'Descargando de OpenStreetMap…' : estado?.hay ? 'Volver a preparar' : 'Preparar red de caminos'}
+          </button>
+          <span style={{ fontSize: 12, opacity: 0.8 }}>
+            {estado === null
+              ? 'Comprobando…'
+              : estado.hay
+                ? `Preparada el ${estado.built_at || '?'} · ${estado.tramos ?? '?'} tramos · ${estado.nodos ?? '?'} cruces · ${mb ?? '?'} MB · margen ${estado.margen_km ?? '?'} km`
+                : 'Sin preparar: fuera del trazado la guía irá en línea recta.'}
+          </span>
+          {aviso ? <span style={{ fontSize: 12 }}>{aviso}</span> : null}
+        </div>
+      </div>
+    </section>
   )
 }
