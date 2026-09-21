@@ -277,10 +277,33 @@ def test_un_so_boton_para_encadrar_e_enderezar(fonte: str) -> None:
     assert "onRumbo={setRumboMapa}" in app and "focusRequest={focusRequest}" in app
 
 
-def test_a_guia_do_xogador_ao_nodo_existe(fonte: str) -> None:
-    """La animación entre el jugador y el nodo: línea a trazos que avanza hacia él."""
+def test_a_guia_do_xogador_ao_nodo_vai_polo_camino(fonte: str) -> None:
+    """
+    La animación entre el jugador y el nodo, por el camino: un tramito hasta
+    el punto del trazado más cercano y el trazado que queda hasta el nodo.
+    Recta era mentira. Y a más de 500 m del camino, aviso con histéresis.
+    """
     assert "id: CAPA_GUIA" in fonte
     assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" in fonte
+    assert "...camino.slice(mejor).map(" in fonte, "la guía volvió a ser una recta"
+    assert "const FUERA_DE_TRAZADO_M = 500" in fonte and "const DE_VUELTA_AL_TRAZADO_M = 400" in fonte
+    assert "Fuera del trazado" in fonte
+
+
+def test_seguirme_sen_tirons(fonte: str) -> None:
+    """No se sigue con el mapa en la mano ni por menos de tres metros, y la animación enlaza."""
+    assert "followPlayerRef.current && mapa && !gestoRef.current" in fonte
+    assert "metrosEntre(anterior, playerPosition) >= 3" in fonte
+
+
+def test_os_permisos_concedidos_lembranse() -> None:
+    """
+    En iPhone la cámara no se puede consultar sin pedirla y el movimiento
+    exige un toque por sesión: la tarjeta salía siempre con todo concedido.
+    """
+    hook = (COMPONENTE.parents[1] / "hooks" / "usePermisos.ts").read_text(encoding="utf-8")
+    assert "recordar(CLAVE_CAMARA)" in hook and "recordar(CLAVE_MOVIMIENTO)" in hook
+    assert "recordado(CLAVE_MOVIMIENTO)" in hook and "addEventListener('pointerdown', alPrimerToque" in hook
 
 
 def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
@@ -294,6 +317,22 @@ def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
     assert "if (resumen.firma !== FIRMA_DEL_PLAN) return null" in fonte
     assert "firma: FIRMA_DEL_PLAN," in fonte
     assert "for (const [zoom, radioKm, presupuesto, etiqueta] of NIVELES)" in fonte
+
+
+def test_centrar_en_min_espera_a_posicion(fonte: str) -> None:
+    """
+    Pulsar "centrar en mí" antes de tener posición consumía el encuadre y el
+    mapa no se centraba nunca al llegar el GPS. El token queda pendiente.
+    """
+    assert "if (focusRequest.target === 'player' && !playerPosition) return" in fonte
+    assert "playerPosition?.lat, playerPosition?.lon])" in fonte
+
+
+def test_a_comprobacion_do_paquete_ensenase() -> None:
+    """Con el paquete completo la barra avanza con la cuenta real de teselas, no salta a 100."""
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "label: 'Comprobando el mapa guardado'" in fonte
+    assert "teselas en el móvil" in fonte
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
