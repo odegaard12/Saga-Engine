@@ -340,6 +340,21 @@ export default function BancoMapa() {
             type="button"
             style={ESTILO_BOTON}
             onClick={() =>
+              // A unos 2,5 km del nodo: fuera del trazado, la guía debe ir
+              // por caminos hasta la ruta, no en línea recta.
+              setPosicion(
+                nodoActual?.lat != null
+                  ? { lat: (nodoActual.lat as number) + 0.02, lon: (nodoActual.lon as number) + 0.012 }
+                  : null
+              )
+            }
+          >
+            ponerme lejos
+          </button>
+          <button
+            type="button"
+            style={ESTILO_BOTON}
+            onClick={() =>
               setPosicion(
                 nodoActual?.lat != null
                   ? { lat: (nodoActual.lat as number) + 0.0004, lon: nodoActual.lon as number }

@@ -6,7 +6,54 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.22.1
+## 5.23.4
+
+- La baldosa de red de caminos que falla **se parte en cuatro** y se vuelve
+  a pedir (hasta 3 km de lado). El 504 de Overpass casi siempre es
+  "demasiado para una petición" -una ciudad entera dentro de una baldosa de
+  25 km-, no "no funciona"; reintentar la misma baldosa en tres espejos
+  sólo la atascaba. Pausas más cortas.
+
+
+
+- La red de caminos se construye **en segundo plano** en el servidor, y el
+  panel enseña el progreso ("7 de 25 baldosas"). Con 40 km son cinco o seis
+  minutos y una petición HTTP tan larga caducaba por el camino.
+- Baldosas de 25 km con pausa entre ellas y espera antes de reintentar:
+  Overpass concede pocas ranuras por IP y las peticiones encadenadas sin
+  pausa acababan en 504 en todos los espejos.
+
+
+
+- La red de caminos se descarga **por baldosas de 15 km** y con espejos de
+  reserva. El servidor público de Overpass devolvía 504 con zonas de 30-40
+  km de una vez; en trozos pequeños cada petición es liviana, se unen y se
+  quitan los elementos repetidos. Con test de cobertura de las baldosas.
+
+## 5.23.1
+
+- La red de caminos admite un margen de hasta 45 km (por defecto 40): tiene
+  que cubrir desde donde la gente LLEGA a la ruta, no sólo la ruta. Con
+  12 km, quien probaba a decenas de km veía la guía recta y creía que
+  no funcionaba.
+- El banco de mapa tiene un botón "ponerme lejos" (2,5 km del nodo) para
+  ver la guía redirigir por caminos.
+
+
+
+- **Red de caminos: fuera del trazado, la guía redirige por carreteras.**
+  El mapa del panel dibuja las carreteras pero no las tiene como datos.
+  Ahora el panel (Ajustes → "Red de caminos") descarga de OpenStreetMap las
+  carreteras y caminos alrededor de la ruta (margen configurable, 12 km por
+  defecto), los reduce a un grafo de cruces y tramos con su forma
+  simplificada, y lo guarda. El grafo viaja en el paquete offline de cada
+  móvil (`/api/road-graph`, misma caché que las teselas) y el móvil calcula
+  el camino más corto con A*, sin cobertura. La guía, cuando estás a más de
+  120 m del trazado, va por caminos reales hasta el punto más cercano de la
+  ruta y desde ahí sigue el trazado. Sin red preparada, recta como antes.
+  Se recalcula sólo cuando te mueves más de quince metros, por la batería.
+
+
 
 - **La barra de carga cuenta lo que hace.** Con el paquete ya completo
   pasaba unos segundos "calculando" y saltaba de 0 a 100: parecía que no

@@ -1124,3 +1124,89 @@ async def stop_browser_simulation_session_endpoint(request: Request):
 
     main.quitar_jugadores_de_simulacion()
     return {"status": "ok"}
+
+
+@router.post("/api/admin/road-graph/status")
+async def road_graph_status(request: Request):
+    """¿Hay red de caminos preparada? De cuándo, cuánto pesa, cuántos tramos."""
+    import main
+    from backend.app.runtime import road_graph
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+    return {"status": "ok", **road_graph.estado(main.DATA_DIR)}
+
+
+@router.post("/api/admin/road-graph/build")
+async def road_graph_build(request: Request):
+    """
+    Descarga de OpenStreetMap la red de caminos alrededor de la ruta y la
+    guarda como grafo para el paquete offline.
+
+    Tarda entre medio minuto y dos: Overpass es un servicio público y
+    compartido. Se hace desde el panel, una vez por ruta (y otra si la ruta
+    cambia de zona), nunca desde el móvil del jugador.
+    """
+    import main
+    from backend.app.runtime import road_graph
+
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+    if main._httpx is None:
+        return JSONResponse(status_code=500, content={"status": "error", "detail": "httpx not available"})
+
+    puntos = []
+    for stage in main.get_runtime_stages():
+        lat, lon = stage.get("lat"), stage.get("lon")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            puntos.append((float(lat), float(lon)))
+        for p in stage.get("route_track") or []:
+            if isinstance(p, (list, tuple)) and len(p) >= 2:
+                try:
+                    puntos.append((float(p[0]), float(p[1])))
+                except (TypeError, ValueError):
+                    pass
+            elif isinstance(p, dict):
+                try:
+                    puntos.append((float(p.get("lat")), float(p.get("lon", p.get("lng")))))
+                except (TypeError, ValueError):
+                    pass
+    if not puntos:
+        return JSONResponse(status_code=400, content={"status": "error", "detail": "la ruta no tiene nodos con posición"})
+
+    try:
+        margen = float((data or {}).get("margen_km") or 12)
+    except (TypeError, ValueError):
+        margen = 12.0
+    # Hasta 45 km: la red tiene que cubrir desde donde la gente LLEGA a la
+    # ruta (el pueblo de al lado, el aparcamiento), no sólo la ruta. Con 12
+    # km, quien probaba a decenas de km veía la guía recta y creía que
+    # no funcionaba. A 40 km el grafo ronda los 15-20 MB en el paquete.
+    margen = max(3.0, min(45.0, margen))
+
+    # En segundo plano. Con 40 km son unas 25 baldosas con pausas entre
+    # ellas: cinco o seis minutos. Una petición HTTP tan larga caduca por el
+    # camino (túnel, navegador); el panel arranca la construcción y va
+    # preguntando por ella con /road-graph/status.
+    if road_graph.construccion.get("en_curso"):
+        return {"status": "ok", "arrancada": False, **road_graph.estado(main.DATA_DIR)}
+
+    import asyncio
+
+    async def _construir():
+        try:
+            await road_graph.descargar_y_construir(main._httpx, puntos, margen, main.DATA_DIR)
+        except Exception:
+            pass  # el error queda en road_graph.construccion["error"]
+
+    asyncio.create_task(_construir())
+    road_graph.construccion.update({"en_curso": True, "hechas": 0, "total": 0, "error": "", "margen_km": margen})
+    return {"status": "ok", "arrancada": True, **road_graph.estado(main.DATA_DIR)}
