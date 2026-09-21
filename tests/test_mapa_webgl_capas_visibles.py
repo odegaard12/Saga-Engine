@@ -319,6 +319,22 @@ def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
     assert "for (const [zoom, radioKm, presupuesto, etiqueta] of NIVELES)" in fonte
 
 
+def test_centrar_en_min_espera_a_posicion(fonte: str) -> None:
+    """
+    Pulsar "centrar en mí" antes de tener posición consumía el encuadre y el
+    mapa no se centraba nunca al llegar el GPS. El token queda pendiente.
+    """
+    assert "if (focusRequest.target === 'player' && !playerPosition) return" in fonte
+    assert "playerPosition?.lat, playerPosition?.lon])" in fonte
+
+
+def test_a_comprobacion_do_paquete_ensenase() -> None:
+    """Con el paquete completo la barra avanza con la cuenta real de teselas, no salta a 100."""
+    fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "label: 'Comprobando el mapa guardado'" in fonte
+    assert "teselas en el móvil" in fonte
+
+
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     """
     El vigilante sólo actúa si el estilo NO tiene capas.

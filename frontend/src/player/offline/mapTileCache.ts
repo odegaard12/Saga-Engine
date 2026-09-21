@@ -417,14 +417,41 @@ async function fetchAndCacheUrls(
    * cartel de "Primera vez: se guarda el mapa" puesto siempre.
    */
   const guardadas = await urlsYaGuardadas(cache)
-  const faltan = urls.filter((url) => !guardadas.has(url))
+
+  /**
+   * La comprobación se ENSEÑA, tesela a tesela.
+   *
+   * Con el paquete ya completo, la barra pasaba unos segundos "calculando"
+   * y saltaba de 0 a 100 de golpe: parecía que no se cargaba nada, o que
+   * se cargaba mal. Lo que pasa de verdad es que las cuatro mil teselas ya
+   * están en el móvil y sólo hay que comprobarlo; ahora esa comprobación
+   * avanza en la barra con la cuenta real -"3.120 de 4.312 teselas en el
+   * móvil"-, cediendo el hilo cada bloque para que la barra se pinte. Dura
+   * un segundo largo y se ve lo que ocurre. Lo que falte se baja después,
+   * con su propia barra.
+   */
+  const faltan: string[] = []
+  const bloque = 150
+  for (let i = 0; i < urls.length; i += bloque) {
+    for (const url of urls.slice(i, i + bloque)) {
+      if (!guardadas.has(url)) faltan.push(url)
+    }
+    const hechas = Math.min(urls.length, i + bloque)
+    onProgress?.({
+      label: 'Comprobando el mapa guardado',
+      done: hechas,
+      total: urls.length || 1,
+      detail: `${hechas.toLocaleString('es')} de ${urls.length.toLocaleString('es')} teselas en el móvil`,
+    })
+    await new Promise((resolver) => window.setTimeout(resolver, 0))
+  }
 
   if (!faltan.length) {
     onProgress?.({
       label: 'Mapa listo',
       done: urls.length,
       total: urls.length || 1,
-      detail: 'El mapa ya está guardado en este teléfono',
+      detail: `Las ${urls.length.toLocaleString('es')} teselas ya están en este teléfono`,
     })
     return 0
   }
