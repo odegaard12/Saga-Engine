@@ -28,6 +28,11 @@ RUN npm run build
 
 # Stage 2: Python Application Server
 FROM python:3.13-slim
+# La hora del contenedor es la de la misión, no UTC. Sin esto, una fecha de
+# salida escrita en el panel (sin zona) se leía como UTC en el servidor y como
+# hora local en el móvil: la cortina se levantaba a la hora y el servidor
+# seguía rechazando avanzar durante una o dos horas más.
+ENV TZ=Europe/Madrid
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
