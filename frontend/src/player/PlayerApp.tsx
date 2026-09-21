@@ -333,6 +333,8 @@ export default function PlayerApp() {
    * veía descolgado del diseño.
    */
   const [mapaTresD, setMapaTresD] = useState(true)
+  /** Rumbo del mapa 3D: cuando no es 0, la aguja del botón de encuadre gira. */
+  const [rumboMapa, setRumboMapa] = useState(0)
   const [uiNotice, setUiNotice] = useState<UiNotice>(null)
   const [uiQuiet, setUiQuiet] = useState<QuietNoticeData>(null)
   const [overlayState, setOverlayState] = useState<OverlayState>(null)
@@ -3017,6 +3019,13 @@ export default function PlayerApp() {
             currentLevel={payload.level || 0}
             playerPosition={playerPosition}
             tresD={mapaTresD}
+            focusRequest={focusRequest}
+            followPlayer={followPlayer}
+            onUserMapMove={() => {
+              setFollowPlayer(false)
+              setRouteOverviewActive(false)
+            }}
+            onRumbo={setRumboMapa}
             fieldProofs={todasAsFotos}
             onOpenFieldProofs={setSelectedFieldProofs}
             initialCenter={
@@ -3341,10 +3350,10 @@ export default function PlayerApp() {
             {state.config?.map_engine === 'maplibre' ? (
               <button
                 type="button"
-                // Verde -como el resto de la fila- mientras el mapa está en 3D;
-                // apagado cuando está en 2D. Se lee como "estás en el modo
-                // principal / no lo estás". Pedido así, dos veces.
-                style={mapaTresD ? mapQuickButtonActive : mapRouteToggleInlineButton}
+                // El color va con la ETIQUETA: "3D" claro, "2D" oscuro. Es lo
+                // que dice a dónde vas: claro invita a subir a 3D, oscuro a
+                // bajar a plano.
+                style={mapaTresD ? mapRouteToggleInlineButton : mapQuickButtonActive}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
@@ -3376,7 +3385,19 @@ export default function PlayerApp() {
               title={routeOverviewActive ? 'Volver a mi ubicación y seguirme' : 'Ver todos los nodos'}
             >
               <span aria-hidden="true" style={mapQuickIcon}>
-                {routeOverviewActive ? <IconoUbicacion /> : <IconoBrujula />}
+                {/* La aguja gira con el mapa: si el norte no está arriba, se ve
+                    aquí, y un toque encuadra con el norte arriba. Un solo
+                    botón para encuadrar y enderezar; no hace falta otro. */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-flex',
+                    transform: rumboMapa !== 0 ? `rotate(${-rumboMapa}deg)` : undefined,
+                    transition: 'transform 140ms linear',
+                  }}
+                >
+                  {routeOverviewActive ? <IconoUbicacion /> : <IconoBrujula />}
+                </span>
               </span>
             </button>
 

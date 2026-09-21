@@ -73,6 +73,10 @@ const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
 const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
 const ICONO_AVATAR = 'avatar-propio'
+const FUENTE_GUIA = 'saga-guia'
+const CAPA_GUIA = 'saga-guia-capa'
+/** Fases de la "hormiga" de la guía: el trazo avanza hacia el nodo. */
+const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001]]
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
@@ -424,6 +428,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
@@ -591,6 +596,25 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * La guía: una línea a trazos de ti al nodo que toca, con los
+         * trazos avanzando hacia él (ver el bucle del pulso). Es la
+         * animación "entre el jugador y el nodo" que había en el motor de
+         * siempre y que aquí faltaba. Recta a propósito: no dice por
+         * dónde ir -eso lo dice el trazado-, dice hacia dónde.
+         */
+        id: CAPA_GUIA,
+        type: 'line',
+        source: FUENTE_GUIA,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': COLOR_NODO_ACTUAL,
+          'line-opacity': 0.9,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
+          'line-dasharray': [0.001, 3],
+        },
+      },
+      {
+        /**
          * Fotos de campo como símbolos del mapa, por lo mismo que los
          * nodos: un marcador del DOM va un fotograma por detrás del
          * terreno y "no se queda en su sitio" con relieve y zoom. La
@@ -690,14 +714,25 @@ export function MapSurfaceGL({
   onOpenFieldProofs,
   selfProfile,
   onListo,
+  focusRequest,
+  followPlayer = false,
+  onUserMapMove,
+  onRumbo,
 }: MapSurfacePropsGL) {
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
   const onListoRef = useRef(onListo)
   onListoRef.current = onListo
-  /** Rumbo actual del mapa, para enseñar el botón de norte sólo cuando hace falta. */
-  const [rumbo, setRumbo] = useState(0)
+  /** Callbacks por ref: los escuchadores del mapa se registran una vez. */
+  const onUserMapMoveRef = useRef(onUserMapMove)
+  onUserMapMoveRef.current = onUserMapMove
+  const onRumboRef = useRef(onRumbo)
+  onRumboRef.current = onRumbo
+  const followPlayerRef = useRef(followPlayer)
+  followPlayerRef.current = followPlayer
+  /** Último encuadre atendido, para no repetir el mismo `token`. */
+  const ultimoEncuadreRef = useRef<number | null>(null)
   /** Tu ficha (color, foto, iniciales) para dibujar el avatar cuando el mapa lo pida. */
   const fichaRef = useRef<{ color: string; foto: string; iniciales: string }>({
     color: COLOR_NODO_HECHO,
@@ -877,6 +912,10 @@ export function MapSurfaceGL({
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
             vivo.setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity', 0.12 + 0.5 * (0.5 + 0.5 * Math.sin(fase)))
           }
+          if (vivo.getLayer(CAPA_GUIA)) {
+            const paso = Math.floor(performance.now() / 160) % PATRONES_GUIA.length
+            vivo.setPaintProperty(CAPA_GUIA, 'line-dasharray', PATRONES_GUIA[paso])
+          }
         } catch {
           // Entre un rehecho del estilo y el siguiente la capa puede no estar.
         }
@@ -897,8 +936,22 @@ export function MapSurfaceGL({
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.
-    const alGirar = () => setRumbo(Math.round(mapa.getBearing()))
+    const alGirar = () => onRumboRef.current?.(Math.round(mapa.getBearing()))
     mapa.on('rotate', alGirar)
+    alGirar()
+
+    /**
+     * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
+     * gestos con `originalEvent`: los movimientos que hace el propio
+     * código (seguir, encuadrar) no cuentan, o se apagaría solo.
+     */
+    const alTocar = (evento: { originalEvent?: unknown }) => {
+      if (evento.originalEvent) onUserMapMoveRef.current?.()
+    }
+    mapa.on('dragstart', alTocar)
+    mapa.on('zoomstart', alTocar)
+    mapa.on('rotatestart', alTocar)
+    mapa.on('pitchstart', alTocar)
 
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
@@ -950,6 +1003,10 @@ export function MapSurfaceGL({
     return () => {
       pulsoVivo = false
       mapa.off('rotate', alGirar)
+      mapa.off('dragstart', alTocar)
+      mapa.off('zoomstart', alTocar)
+      mapa.off('rotatestart', alTocar)
+      mapa.off('pitchstart', alTocar)
       mapa.off('styledata', volcarPendientes)
       document.removeEventListener('visibilitychange', vigilarEstilo)
       window.clearInterval(relojVigilante)
@@ -1031,6 +1088,11 @@ export function MapSurfaceGL({
         },
       ],
     })
+
+    // Seguirme: la cámara va contigo, suave, mientras nadie toque el mapa.
+    if (followPlayerRef.current && mapa) {
+      mapa.easeTo({ center: [playerPosition.lon, playerPosition.lat], duration: 600, essential: true })
+    }
   }, [
     playerPosition?.lat,
     playerPosition?.lon,
@@ -1039,6 +1101,68 @@ export function MapSurfaceGL({
     selfProfile?.display_name,
     pintarFuente,
   ])
+
+  // La guía de ti al nodo que toca.
+  useEffect(() => {
+    if (!playerPosition || currentStage?.lat == null || currentStage?.lon == null) {
+      pintarFuente(FUENTE_GUIA, COLECCION_VACIA)
+      return
+    }
+    pintarFuente(FUENTE_GUIA, {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [playerPosition.lon, playerPosition.lat],
+              [currentStage.lon as number, currentStage.lat as number],
+            ],
+          },
+        },
+      ],
+    })
+  }, [playerPosition?.lat, playerPosition?.lon, currentStage?.lat, currentStage?.lon, pintarFuente])
+
+  /**
+   * Los tres encuadres, siempre con el norte arriba.
+   *
+   * "Ver la ruta" y "volver a mí" giran el mapa al norte además de
+   * encuadrar: es lo que hace de este botón también el de la brújula, y
+   * por eso no hace falta otro. La aguja de la barra dice si el mapa está
+   * girado; un toque aquí lo endereza.
+   */
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa || !focusRequest) return
+    if (ultimoEncuadreRef.current === focusRequest.token) return
+    ultimoEncuadreRef.current = focusRequest.token
+
+    if (focusRequest.target === 'route') {
+      const nodos = (Array.isArray(missionStages) ? missionStages : []).filter(
+        (nodo) => typeof nodo.lat === 'number' && typeof nodo.lon === 'number'
+      )
+      if (nodos.length === 0) return
+      const limites = new maplibregl.LngLatBounds()
+      nodos.forEach((nodo) => limites.extend([nodo.lon as number, nodo.lat as number]))
+      if (playerPosition) limites.extend([playerPosition.lon, playerPosition.lat])
+      mapa.fitBounds(limites, { padding: 70, bearing: 0, duration: 800, maxZoom: 16 })
+      return
+    }
+    const destino =
+      focusRequest.target === 'player' && playerPosition
+        ? { lat: playerPosition.lat, lon: playerPosition.lon }
+        : currentStage?.lat != null && currentStage?.lon != null
+          ? { lat: currentStage.lat as number, lon: currentStage.lon as number }
+          : null
+    if (!destino) return
+    mapa.easeTo({ center: [destino.lon, destino.lat], zoom: 17, bearing: 0, duration: 700, essential: true })
+    // `missionStages`/posición se leen en el momento del encuadre; no hay
+    // que reencuadrar cuando cambian.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest?.token, focusRequest?.target])
 
   // Radio del nodo actual.
   useEffect(() => {
@@ -1234,52 +1358,6 @@ export function MapSurfaceGL({
         aria-label="Mapa de la misión (WebGL)"
         style={{ position: 'absolute', inset: 0 }}
       />
-      {rumbo !== 0 ? (
-        /**
-         * Volver al norte. Sólo aparece cuando el mapa está girado.
-         *
-         * En 3D el mapa se gira con dos dedos sin querer, y con el norte
-         * fuera de sitio cuesta relacionar lo que ves con lo que tienes
-         * delante. La aguja gira con el mapa, así que además dice hacia
-         * dónde queda el norte antes de pulsar.
-         */
-        <button
-          type="button"
-          aria-label="Volver a poner el norte arriba"
-          title="Norte arriba"
-          onClick={() => mapaRef.current?.easeTo({ bearing: 0, duration: 450 })}
-          style={{
-            position: 'absolute',
-            right: 12,
-            top: '50%',
-            width: 42,
-            height: 42,
-            borderRadius: 999,
-            border: '1px solid rgba(255,255,255,.35)',
-            background: 'rgba(var(--theme-ink), .72)',
-            color: '#ffffff',
-            display: 'grid',
-            placeItems: 'center',
-            font: '900 12px system-ui, sans-serif',
-            cursor: 'pointer',
-            zIndex: 5,
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              display: 'inline-block',
-              transform: `rotate(${-rumbo}deg)`,
-              transition: 'transform 120ms linear',
-              lineHeight: 1,
-            }}
-          >
-            ▲
-            <br />
-            N
-          </span>
-        </button>
-      ) : null}
 
     </section>
   )

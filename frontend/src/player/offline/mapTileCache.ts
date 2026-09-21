@@ -31,6 +31,25 @@ const TILE_SUMMARY_KEY = 'saga:offline-map-tiles:v3'
  */
 const MAX_TILE_URLS = 8000
 
+/**
+ * Los niveles de contexto, de lejos a cerca: zoom, radio máximo en km y
+ * presupuesto de teselas (que es lo que fija el lado del cuadrado).
+ * Van en una tabla, y no en llamadas sueltas, para que formen parte de la
+ * FIRMA del plan (ver abajo).
+ */
+const NIVELES: Array<[number, number, number, string]> = [
+  [3, 3000, 9, 'nivel-continente-z3'],
+  [4, 3000, 9, 'nivel-continente-z4'],
+  [5, 2000, 25, 'nivel-continente-z5'],
+  [6, 1000, 25, 'nivel-pais-z6'],
+  [7, 700, 49, 'nivel-pais-z7'],
+  [8, 400, 81, 'nivel-region-z8'],
+  [9, 260, 121, 'nivel-region-z9'],
+  [10, 180, 169, 'nivel-comarca-z10'],
+  [11, 110, 289, 'nivel-comarca-z11'],
+  [12, 60, 289, 'nivel-entorno-z12'],
+]
+
 const REGIONAL_RADIUS_KM = 30 // contexto amplio, zoom bajo
 const MISSION_AREA_RADIUS_KM = 10 // zona jugable amplia, zoom medio
 const ROUTE_CORRIDOR_KM = 2 // ancho alrededor de la ruta
@@ -44,6 +63,8 @@ export type OfflineMapTileProgress = {
 }
 
 export type OfflineMapTileSummary = {
+  /** Firma del plan con el que se hizo. Si no coincide con la actual, no vale. */
+  firma?: string
   cached_at: string
   requested: number
   saved: number
@@ -119,6 +140,24 @@ function demTileUrl(zoom: number, x: number, y: number) {
  * desnivel no se lee a ese zoom. Unas 1000 teselas, ~90 MB.
  */
 const ZOOMS_RELIEVE = [11, 12, 13, 14]
+
+/**
+ * FIRMA DEL PLAN: cambia sola cuando cambia lo que lleva el paquete.
+ *
+ * El resumen guardado en el móvil dice "completo" y la pantalla de carga
+ * se lo cree. Cada vez que se tocó qué lleva el paquete -relieve nuevo,
+ * niveles nuevos, tope nuevo- ese resumen viejo seguía diciendo completo,
+ * la barra pasaba al 100 % de golpe y lo nuevo no se bajaba: el jugador
+ * entraba y el mapa cargaba de la red mientras se movía. Tres veces.
+ * Con la firma dentro del resumen, un resumen de otro plan no vale, sin
+ * que nadie tenga que acordarse de cambiar una clave.
+ */
+const FIRMA_DEL_PLAN = JSON.stringify({
+  tope: MAX_TILE_URLS,
+  relieve: ZOOMS_RELIEVE,
+  niveles: NIVELES,
+  mision: [MISSION_AREA_RADIUS_KM, ROUTE_CORRIDOR_KM, NODE_DETAIL_RADIUS_KM],
+})
 
 function metersPerTile(lat: number, zoom: number) {
   return ((156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom) * 256
@@ -462,7 +501,10 @@ export function getOfflineMapTileSummary(): OfflineMapTileSummary | null {
   try {
     const raw = window.localStorage.getItem(TILE_SUMMARY_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as OfflineMapTileSummary
+    const resumen = JSON.parse(raw) as OfflineMapTileSummary
+    // Un resumen de otro plan no cuenta: hay que volver a bajar lo que falte.
+    if (resumen.firma !== FIRMA_DEL_PLAN) return null
+    return resumen
   } catch {
     return null
   }
@@ -502,18 +544,9 @@ export async function prefetchMissionMapTiles(
      * zoom es lo que fija el lado del cuadrado; el radio en km es el
      * máximo que se pide, por si algún día la ruta cae en otra latitud.
      */
-    addSquareAroundPointWithBudget(urls, center, 3, 3000, 9, 'nivel-continente-z3')
-    addSquareAroundPointWithBudget(urls, center, 4, 3000, 9, 'nivel-continente-z4')
-    addSquareAroundPointWithBudget(urls, center, 5, 2000, 25, 'nivel-continente-z5')
-    addSquareAroundPointWithBudget(urls, center, 6, 1000, 25, 'nivel-pais-z6')
-    addSquareAroundPointWithBudget(urls, center, 7, 700, 49, 'nivel-pais-z7')
-    addSquareAroundPointWithBudget(urls, center, 8, 400, 81, 'nivel-region-z8')
-    addSquareAroundPointWithBudget(urls, center, 9, 260, 121, 'nivel-region-z9')
-    addSquareAroundPointWithBudget(urls, center, 10, 180, 169, 'nivel-comarca-z10')
-    addSquareAroundPointWithBudget(urls, center, 11, 110, 289, 'nivel-comarca-z11')
-    // Entorno a z12 (±58 km): es lo que se ve al desampliar desde casa
-    // hacia la ruta. Sólo imagen; el relieve a esta distancia no hace falta.
-    addSquareAroundPointWithBudget(urls, center, 12, 60, 289, 'nivel-entorno-z12')
+    for (const [zoom, radioKm, presupuesto, etiqueta] of NIVELES) {
+      addSquareAroundPointWithBudget(urls, center, zoom, radioKm, presupuesto, etiqueta)
+    }
 
     // Zona amplia de misión.
     addBBoxTilesWithBudget(urls, routePoints, 12, MISSION_AREA_RADIUS_KM, 200, 'mission-z12')
@@ -600,6 +633,7 @@ export async function prefetchMissionMapTiles(
   const detalleDeNodos = Array.from(urls.values()).filter((p) => p === 'node-z18').length
 
   const summary: OfflineMapTileSummary = {
+    firma: FIRMA_DEL_PLAN,
     cached_at: new Date().toISOString(),
     requested: orderedUrls.length,
     saved,
