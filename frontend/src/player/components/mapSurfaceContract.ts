@@ -52,6 +52,18 @@ export type MapSurfacePropsGL = {
   fieldProofs?: FieldProof[]
   /** Se abre el visor al tocar una foto. */
   onOpenFieldProofs?: (proofs: FieldProof[]) => void
+  /**
+   * Tu ficha: foto, color e iniciales.
+   *
+   * Sin esto tu posición sale como la chincheta por defecto de la
+   * librería, indistinguible de un nodo. En una app donde lo que buscas en
+   * el mapa es "dónde estoy yo", eso es un fallo de lectura, no un detalle
+   * estético.
+   */
+  selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus> & {
+    user?: string
+    display_name?: string
+  }
 }
 
 /**
@@ -68,8 +80,6 @@ export type CapasPendentesGL = {
   gps: PlayerGpsStatus
   /** Cono de orientación (brújula). */
   conoDeOrientacion: true
-  /** Perfil propio: foto, color, iniciales. */
-  perfilPropio: Partial<PlayerProfile & TeamProfileLiveStatus>
   /** Los tres encuadres: seguirme, ver el nodo, ver toda la ruta. */
   encuadres: FocusRequestGL
   /** Modo depuración: tocar el mapa para moverse. */
