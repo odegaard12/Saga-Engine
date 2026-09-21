@@ -97,10 +97,18 @@ type Lectura = {
 /** Lee el estado real del mapa. Nada de esto se puede deducir mirando. */
 function leerMapa(mapa: maplibregl.Map | undefined): Lectura | null {
   if (!mapa) return null
-  const datos = (id: string) => {
+  /**
+   * Por `serialize()`, que es API pública.
+   *
+   * Antes se leía `_data`, un campo interno que en esta versión de MapLibre
+   * ya no existe: el banco decía 0 con los datos puestos. Un banco que
+   * miente es peor que no tenerlo, y ya van dos veces.
+   */
+  const datos = (id: string): GeoJSON.FeatureCollection | null => {
     try {
-      const fuente = mapa.getSource(id) as { _data?: GeoJSON.FeatureCollection } | undefined
-      return fuente?._data ?? null
+      const fuente = mapa.getSource(id) as { serialize?: () => { data?: unknown } } | undefined
+      const data = fuente?.serialize?.().data
+      return data && typeof data === 'object' ? (data as GeoJSON.FeatureCollection) : null
     } catch {
       return null
     }
