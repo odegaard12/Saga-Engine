@@ -64,6 +64,16 @@ export type MapSurfacePropsGL = {
     user?: string
     display_name?: string
   }
+  /**
+   * Se llama UNA vez, cuando el mapa ha terminado de pintar la primera
+   * vista: estilo montado, teselas e imágenes cargadas, relieve construido.
+   *
+   * Es lo que permite que la pantalla de carga no se retire hasta que el
+   * mapa esté de verdad: sin esto, el velo se iba y el trabajo de
+   * decodificar y levantar el terreno caía encima del jugador mientras se
+   * movía.
+   */
+  onListo?: () => void
 }
 
 /**

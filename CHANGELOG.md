@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.18.1
+## 5.18.2
+
+- **El mapa se pinta debajo de la pantalla de carga.** El velo ya no se
+  retira hasta que el mapa 3D avisa de que ha pintado su primera vista
+  -estilo montado, teselas e imágenes cargadas, relieve construido-, con un
+  tope de siete segundos por si el aviso no llega (sin paquete y sin
+  cobertura, o con la app en segundo plano). Antes el velo se iba en cuanto
+  había permisos y todo ese trabajo caía encima del jugador: "tuvo que
+  renderizar todo mientras me movía".
+- Las gemelas de relieve del paquete offline se calculan DESPUÉS del
+  corredor: el bucle recorre lo que ya está en la lista, y puesto antes no
+  veía las teselas de z15, las que el terreno pide al caminar.
+
+
 
 - **Sin cobertura, el relieve.** El service worker servía desde la caché
   las teselas de imagen pero no las de elevación (`/dem-tiles/`): sin red
