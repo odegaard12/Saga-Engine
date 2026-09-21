@@ -35,13 +35,24 @@ def parse_launch_at(value):
         return None
 
     if momento.tzinfo is None:
-        # Sin zona: es lo que manda el <input type="datetime-local"> del
-        # panel, en la hora LOCAL de quien lo escribió. Se asume la del
-        # servidor -no hay otra referencia razonable- para no comparar horas
-        # de dos husos distintos sin saberlo.
-        momento = momento.astimezone()
-
+        # Sin zona: es lo que mandaba el <input type="datetime-local"> del
+        # panel, en la hora LOCAL de quien lo escribió. Se asumía "la del
+        # servidor", y el servidor es un contenedor en UTC: una salida a las
+        # 09:00 se leía aquí como 09:00 UTC (11:00 en Galicia en verano)
+        # mientras el móvil la leía como 09:00 local. La cortina se
+        # levantaba y /api/advance seguía diciendo que no durante dos horas.
+        # La misión es en España: ésa es la zona, dicha con todas las letras.
+        momento = momento.replace(tzinfo=_zona_de_la_mision())
     return momento
+
+
+def _zona_de_la_mision():
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo("Europe/Madrid")
+    except Exception:  # sin base de zonas en el sistema: la hora del proceso
+        return datetime.now().astimezone().tzinfo
 
 
 def mission_is_locked(launch_at_raw, now=None):
