@@ -144,7 +144,15 @@ export type CapaNodosTresD = {
   capa: maplibregl.CustomLayerInterface
   setNodos: (nodos: NodoTresD[]) => void
   setVisible: (visible: boolean) => void
-  estadisticas: () => { piezas: number; visible: boolean; anadida: boolean }
+  estadisticas: () => {
+    piezas: number
+    visible: boolean
+    anadida: boolean
+    animar: boolean
+    renders: number
+    rendersConPiezas: number
+    ultimoError: string
+  }
 }
 
 export function crearCapaNodosTresD(id: string): CapaNodosTresD {
@@ -157,6 +165,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let visible = true
   let anadida = false
   let repintadoProgramado = false
+  let animar = false
+  let renders = 0
+  let rendersConPiezas = 0
+  let ultimoError = ''
   const reloj = new THREE.Clock()
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -254,6 +266,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     onAdd(m, gl) {
       mapa = m
       anadida = true
+      // La animación arranca después del primer idle del mapa (ver arriba).
+      m.once('idle', () => {
+        animar = true
+        m.triggerRepaint()
+      })
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
       renderer.autoClear = false
       escena.add(new THREE.HemisphereLight(0xdbeafe, 0x3b5a3a, 1.1))
@@ -272,8 +289,23 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       anadida = false
       mapa = null
     },
-    render(_gl, matriz) {
+    render(_gl, opciones) {
+      renders += 1
       if (!renderer || !mapa || !visible || piezas.length === 0) return
+      /**
+       * MapLibre 6 pasa un objeto con la matriz dentro
+       * (`defaultProjectionData.mainMatrix`); las versiones viejas pasaban
+       * la matriz directamente. Leerla "a la antigua" daba una proyección
+       * inválida y los nodos no se dibujaban, sin un solo error.
+       */
+      const bruto = opciones as unknown as { defaultProjectionData?: { mainMatrix?: ArrayLike<number> } } | ArrayLike<number>
+      const matriz =
+        (bruto as { defaultProjectionData?: { mainMatrix?: ArrayLike<number> } }).defaultProjectionData?.mainMatrix ??
+        (bruto as ArrayLike<number>)
+      if (!matriz || typeof (matriz as ArrayLike<number>).length !== 'number' || (matriz as ArrayLike<number>).length < 16) {
+        ultimoError = 'matriz de proyección no reconocida'
+        return
+      }
       const t = reloj.getElapsedTime()
       const rumbo = (mapa.getBearing() * Math.PI) / 180
       const inclinacion = (mapa.getPitch() * Math.PI) / 180
@@ -310,14 +342,24 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         }
       }
 
-      camara.projectionMatrix.fromArray(matriz as unknown as number[])
-      renderer.resetState()
-      renderer.render(escena, camara)
+      camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
+      try {
+        renderer.resetState()
+        renderer.render(escena, camara)
+        rendersConPiezas += 1
+      } catch (fallo) {
+        ultimoError = String(fallo).slice(0, 200)
+      }
 
-      // La animación necesita fotogramas: se pide el siguiente a ~20 por
-      // segundo, sólo con la pestaña visible. Es lo que gasta batería, y
-      // por eso no va a 60.
-      if (!repintadoProgramado && document.visibilityState === 'visible') {
+      /**
+       * La animación necesita fotogramas: se pide el siguiente a ~20 por
+       * segundo, sólo con la pestaña visible y sólo cuando el mapa ya ha
+       * estado "idle" una vez. Pedir repintados desde el primer fotograma
+       * hacía que el mapa nunca llegara a idle, y de idle dependen el
+       * aviso de "mapa pintado" y la carga de la red de caminos: sin él,
+       * la guía fuera del trazado volvía a salir recta.
+       */
+      if (animar && !repintadoProgramado && document.visibilityState === 'visible') {
         repintadoProgramado = true
         window.setTimeout(() => {
           repintadoProgramado = false
@@ -340,6 +382,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       visible = v
       mapa?.triggerRepaint()
     },
-    estadisticas: () => ({ piezas: piezas.length, visible, anadida }),
+    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError }),
   }
 }

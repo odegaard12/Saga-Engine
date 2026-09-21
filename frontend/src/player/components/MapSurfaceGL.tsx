@@ -1071,6 +1071,7 @@ export function MapSurfaceGL({
       // monta el estilo (espera un fotograma). Con esto se puede forzar
       // desde fuera y medir las capas de datos aunque nadie mire.
       ventana.__sagaEstilo = estiloDelMapa
+      ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () => capaNodosRef.current?.estadisticas()
     }
 
     return () => {
