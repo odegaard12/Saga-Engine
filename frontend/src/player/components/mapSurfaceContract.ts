@@ -48,6 +48,22 @@ export type MapSurfacePropsGL = {
    * cuenta era exactamente lo que se veía descolgado del diseño.
    */
   tresD?: boolean
+  /** Fotos de campo sobre el mapa. */
+  fieldProofs?: FieldProof[]
+  /** Se abre el visor al tocar una foto. */
+  onOpenFieldProofs?: (proofs: FieldProof[]) => void
+  /**
+   * Tu ficha: foto, color e iniciales.
+   *
+   * Sin esto tu posición sale como la chincheta por defecto de la
+   * librería, indistinguible de un nodo. En una app donde lo que buscas en
+   * el mapa es "dónde estoy yo", eso es un fallo de lectura, no un detalle
+   * estético.
+   */
+  selfProfile?: Partial<PlayerProfile & TeamProfileLiveStatus> & {
+    user?: string
+    display_name?: string
+  }
 }
 
 /**
@@ -58,25 +74,12 @@ export type MapSurfacePropsGL = {
  * defecto -y no antes-.
  */
 export type CapasPendentesGL = {
-  /**
-   * Trazado por CAMINOS reales.
-   *
-   * Probado en el móvil con línea recta de nodo a nodo y descartado: no
-   * es "el trazado a medias", es información falsa -cruza el monte por
-   * donde no se puede andar, y quien la mire caminando se fía-. Hasta que
-   * siga caminos, el motor nuevo no pinta ninguna ruta.
-   */
-  trazadoPorCamiños: true
   /** Avatares del resto del grupo, con agrupación cuando se juntan. */
   grupo: TeamProfileLiveStatus[]
-  /** Fotos de campo sobre el mapa. */
-  fotos: FieldProof[]
   /** Estado del GPS y el aura de precisión. */
   gps: PlayerGpsStatus
   /** Cono de orientación (brújula). */
   conoDeOrientacion: true
-  /** Perfil propio: foto, color, iniciales. */
-  perfilPropio: Partial<PlayerProfile & TeamProfileLiveStatus>
   /** Los tres encuadres: seguirme, ver el nodo, ver toda la ruta. */
   encuadres: FocusRequestGL
   /** Modo depuración: tocar el mapa para moverse. */

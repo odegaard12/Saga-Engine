@@ -6,6 +6,135 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.13.6
+
+- **Los nodos pasan a ser 3D de verdad, no un dibujo que lo imita.** Cada
+  nodo levanta un volumen extruido desde el suelo, con altura en METROS: se
+  inclina con la cámara, lo tapa el monte que tiene delante y crece en
+  perspectiva al acercarse. Un marcador del DOM nunca podía hacer eso -es
+  una calcomanía pegada a la pantalla- por mucha sombra que se le pintara.
+  El nodo en juego se levanta más que los demás, para localizarlo de lejos.
+- **Fuera el volcado falso de las fotos.** Se les había puesto un `rotateX`
+  en CSS para que parecieran tumbadas sobre el terreno. Es mentira y se
+  nota: un giro de CSS no sigue a la cámara, así que al desplazar o girar
+  el mapa quedaban inclinadas hacia un lado que no correspondía a nada.
+- **Al abrir, el mapa va al nodo actual, no a la ruta entera.** Encuadrar
+  los diez nodos de golpe sonaba bien y quedó peor: a zoom 13 los
+  alfileres, que miden lo mismo en píxeles a cualquier escala, se amontonan
+  en una fila de chinchetas sobre medio mapa de Galicia.
+
+
+
+- **El mapa podía quedarse EN BLANCO, y esto explica el "está todo mal".**
+  MapLibre v6 monta el estilo dentro de un `requestAnimationFrame`, y un
+  navegador no ejecuta fotogramas en una pestaña que no se está pintando.
+  Si el mapa nace con la pantalla bloqueada o con la app en segundo plano
+  -normalísimo durante los segundos que tarda la descarga offline- ese
+  fotograma no llega nunca: no hay teselas, no hay relieve, no hay radio ni
+  trazado. Y encima los nodos SÍ se ven, porque son marcadores del DOM, así
+  que parece que el mapa casi funciona en vez de estar sin estilo. Sin un
+  solo error en consola. Ahora hay un vigilante que vuelve a aplicar el
+  estilo al recuperar visibilidad, con tope de cinco intentos.
+- **La ruta se encuadra al entrar** cuando todavía no hay GPS. Abriendo
+  siempre a zoom 16 sobre un punto, los diez nodos de una ruta de
+  kilómetros caen fuera de la pantalla o salen alineados contra un borde.
+
+
+
+- **El radio y el trazado, por fin.** 5.13.1 y 5.13.3 no lo arreglaron, y
+  las dos veces se dio por bueno sin comprobarlo en la página. El estilo se
+  declara en línea, así que MapLibre lo monta dentro del constructor: el
+  evento `style.load` ya ha ocurrido cuando se engancha el escuchador, y
+  `isStyleLoaded()` no vale de red porque es más estricto que el evento
+  -exige además que carguen todas las fuentes-. Entre las dos señales, el
+  código se quedaba en tierra de nadie y no pintaba nunca.
+  Ahora las dos fuentes y sus cuatro capas **nacen declaradas en el
+  estilo**, así que existen desde el primer fotograma y no hay nada que
+  esperar. El estado de "estilo listo" desaparece.
+
+
+
+- **El radio y el trazado seguían sin pintarse, y ahora se sabe por qué.**
+  En 5.13.1 se cambió `load` por `style.load` dando por hecho que era el
+  evento correcto. Lo es, pero llega tarde: el estilo se declara EN LÍNEA
+  -no por URL- y MapLibre lo monta de forma síncrona dentro del
+  constructor, así que para cuando se engancha el escuchador el evento ya
+  ocurrió y no vuelve a ocurrir. Ahora se pregunta con `isStyleLoaded()`
+  antes de escuchar. Se cazó porque el asa de depuración de 5.13.2 no
+  aparecía en la página, que es exactamente para lo que se puso.
+
+
+
+- **Tu posición vuelve a ser tu avatar, no una chincheta.** En el motor
+  nuevo había quedado el marcador por defecto de MapLibre, y eso no es un
+  detalle estético: en un mapa lleno de chinchetas numeradas, una chincheta
+  más no dice "este eres tú". Ahora va tu foto, con tu color de halo, como
+  en el motor de siempre.
+- **Relieve más marcado.** A la altura a la que se juega -zoom 17-18, unos
+  cientos de metros de ancho- el desnivel real de un valle son unos pocos
+  metros: geométricamente correcto e invisible. El sombreado de laderas
+  pasa de 0,5 a 0,85 y la exageración del terreno de 1,5 a 2,2, que es lo
+  que hace legible la FORMA del terreno a esa escala.
+- Asa de depuración del mapa con `?depurar-mapa=1`. Sin ella no había modo
+  de comprobar desde fuera si el terreno estaba puesto o qué capas había, y
+  se estaba verificando a ojo -que es justo como se colaron los fallos de
+  esta pantalla-. No se expone nunca por defecto.
+
+## 5.13.1
+
+Tres cosas del mapa 3D que no se veían, y ninguna daba error: el mapa se
+mostraba perfecto y simplemente faltaban capas encima.
+
+- **El trazado y el radio de entrada no se pintaban nunca.** Los dos
+  esperaban al evento `load` de MapLibre, que con el relieve activado no
+  dispara hasta que carga el terreno. Los nodos y las fotos sí aparecían
+  porque son marcadores del DOM y no esperan a nada, y por eso el síntoma
+  despistaba tanto: faltaban justo las dos capas de datos. Ahora se
+  enganchan a `style.load`, que es lo único que hace falta para poder
+  añadir fuentes.
+- **Las chinchetas se veían como bolas.** El giro que les da forma de gota
+  estaba puesto en el propio elemento del marcador, y MapLibre reescribe
+  ese `transform` en cada fotograma para colocarlo en pantalla. La forma
+  vive ahora en un hijo, donde sobrevive.
+- **El trazado era ilegible aunque se pintara**: una línea blanca de 3 px
+  al 55 % sobre FOTO SATÉLITE desaparece sobre asfalto o arena. Lleva
+  contorno oscuro por debajo y grosor según el zoom, como las apps de
+  senderismo.
+
+Y de paso, volumen donde antes había calcomanías:
+
+- Radio de entrada con borde a trazos, para que no se confunda con una
+  rotonda o un depósito de la propia imagen aérea.
+- Chinchetas con degradado y sombra en el suelo: se leen como clavadas en
+  el terreno, no pegadas al cristal de la pantalla. Fotos volcadas hacia
+  atrás por el mismo motivo.
+- Chinchetas y fotos crecen al acercar el zoom. Un tamaño fijo obliga a
+  elegir entre tapar media ruta de lejos o no distinguir nada de cerca.
+
+## 5.13.0
+
+Cuatro cosas que faltaban en el mapa 3D, dichas mirándolo en el móvil.
+
+- **Chinchetas, no puntos planos.** Un círculo suelto sobre la foto aérea
+  no dice DÓNDE toca el suelo: con la cámara inclinada parece flotar. La
+  forma de gota con la punta abajo, anclada por la punta, se clava en el
+  sitio exacto aunque el mapa se incline. Con el número dentro, derecho
+  (el giro es de la chincheta, no del texto).
+- **El radio del nodo ahora se ve**: el borde era azul de 2 px y se perdía
+  sobre foto aérea con sol. Blanco de 3 px. Ese círculo dice a qué
+  distancia entras en el nodo; si no se ve, no sirve de nada.
+- **Trazado real de vuelta.** No la línea recta que se quitó por mentir,
+  sino el `route_track` que guarda administración en cada nodo — el mismo
+  que dibuja el motor de Leaflet, leído del mismo sitio y con el mismo
+  lector.
+- **Fotos de campo** sobre el mapa, y al tocarlas se abre el visor con
+  todas las de ese punto. Marcadores del DOM por lo mismo que los nodos:
+  una capa de MapLibre quedaría enterrada bajo el relieve, y una foto ES
+  una miniatura.
+
+Quedan: avatares del grupo, los tres encuadres, el aura de GPS, el cono de
+orientación y el modo depuración.
+
 ## 5.12.1
 
 Los nodos no se veían en el mapa 3D. Y no daba ningún error, que es lo que
