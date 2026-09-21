@@ -6,6 +6,37 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.13.1
+
+Tres cosas del mapa 3D que no se veían, y ninguna daba error: el mapa se
+mostraba perfecto y simplemente faltaban capas encima.
+
+- **El trazado y el radio de entrada no se pintaban nunca.** Los dos
+  esperaban al evento `load` de MapLibre, que con el relieve activado no
+  dispara hasta que carga el terreno. Los nodos y las fotos sí aparecían
+  porque son marcadores del DOM y no esperan a nada, y por eso el síntoma
+  despistaba tanto: faltaban justo las dos capas de datos. Ahora se
+  enganchan a `style.load`, que es lo único que hace falta para poder
+  añadir fuentes.
+- **Las chinchetas se veían como bolas.** El giro que les da forma de gota
+  estaba puesto en el propio elemento del marcador, y MapLibre reescribe
+  ese `transform` en cada fotograma para colocarlo en pantalla. La forma
+  vive ahora en un hijo, donde sobrevive.
+- **El trazado era ilegible aunque se pintara**: una línea blanca de 3 px
+  al 55 % sobre FOTO SATÉLITE desaparece sobre asfalto o arena. Lleva
+  contorno oscuro por debajo y grosor según el zoom, como las apps de
+  senderismo.
+
+Y de paso, volumen donde antes había calcomanías:
+
+- Radio de entrada con borde a trazos, para que no se confunda con una
+  rotonda o un depósito de la propia imagen aérea.
+- Chinchetas con degradado y sombra en el suelo: se leen como clavadas en
+  el terreno, no pegadas al cristal de la pantalla. Fotos volcadas hacia
+  atrás por el mismo motivo.
+- Chinchetas y fotos crecen al acercar el zoom. Un tamaño fijo obliga a
+  elegir entre tapar media ruta de lejos o no distinguir nada de cerca.
+
 ## 5.13.0
 
 Cuatro cosas que faltaban en el mapa 3D, dichas mirándolo en el móvil.
