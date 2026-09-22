@@ -1523,33 +1523,17 @@ export default function PlayerApp() {
   const ultimoDetalleRef = useRef('Preparando la misión…')
 
   /**
-   * Una sola barra para todas las fases, que ni parpadea ni salta.
+   * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
+   * sin número.
    *
-   * Cada fase mandaba su propia cuenta: la comprobación del mapa guardado
-   * iba de 0 a 100, la descarga volvía a empezar en 0 y entre medias había
-   * tramos sin total, donde la barra se ponía en modo indeterminado. Eso es
-   * el parpadeo, y el salto final al 100 %. Ahora cada fase ocupa su trozo
-   * del recorrido, el valor nunca retrocede y lo que queda se recorre
-   * andando, no de un brinco.
+   * Se probó una escala única repartida entre fases y avanzando sola
+   * mientras esperaba al servidor: "avanzó 3, 5 % y de golpe pasó a 100".
+   * Un número que no mide nada real siempre acaba mintiendo. Ahora sólo
+   * la descarga de teselas lleva porcentaje —ésa sí se cuenta— y nunca
+   * retrocede; conectar, calcular y comprobar van con la barra en
+   * movimiento y sin cifra.
    */
-  const objetivoCargaRef = useRef(0)
-  const [cargaPintada, setCargaPintada] = useState(0)
-  useEffect(() => {
-    const paso = window.setInterval(() => {
-      setCargaPintada((actual) => {
-        const objetivo = objetivoCargaRef.current
-        if (actual < objetivo) return Math.min(objetivo, actual + Math.max(0.5, (objetivo - actual) * 0.12))
-        /**
-         * Sin noticias -conectando con la misión, calculando el mapa- la
-         * barra avanza despacio hasta un tercio, porque algo se está
-         * haciendo. Clavada en el 3 % mientras el servidor respondía
-         * parecía que se había colgado, y luego el salto al 100 %.
-         */
-        return actual < 30 ? Math.min(30, actual + 0.12) : actual
-      })
-    }, 60)
-    return () => window.clearInterval(paso)
-  }, [])
+  const ultimoRatioRef = useRef(0)
 
   /**
    * CAUSA REAL DEL SALTO, medida en el codigo, no supuesta.
@@ -1627,17 +1611,11 @@ export default function PlayerApp() {
     // hay porcentaje que enseñar, y fingir un 0% era lo que hacia parecer que
     // la aplicacion se habia quedado parada.
     const hayTotal = Boolean(mapProgress && mapProgress.total > 0)
-    // Cada fase, su trozo del recorrido. Ver `objetivoCargaRef`.
-    const TRAMOS: Record<string, [number, number]> = {
-      'Comprobando el mapa guardado': [5, 60],
-      'Mapa offline': [60, 97],
-      'Mapa listo': [97, 100],
-    }
-    const tramo = TRAMOS[mapProgress?.label ?? '']
-    const dentro = hayTotal ? Math.max(0, Math.min(1, mapProgress!.done / mapProgress!.total)) : 0
-    const global = tramo ? tramo[0] + (tramo[1] - tramo[0]) * dentro : 3
-    objetivoCargaRef.current = Math.max(objetivoCargaRef.current, global)
-    const ratio = cargaPintada > 0 ? cargaPintada : undefined
+    // Ver `ultimoRatioRef`: número sólo en la descarga real.
+    const descargando = hayTotal && mapProgress?.label === 'Mapa offline'
+    const real = descargando ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100)) : 0
+    ultimoRatioRef.current = descargando ? Math.max(ultimoRatioRef.current, real) : 0
+    const ratio = descargando ? ultimoRatioRef.current : undefined
 
     // Se guarda para que el velo de salida siga diciendo lo mismo que decia
     // la pantalla un instante antes: si cambia el texto a la vez que empieza
@@ -1647,8 +1625,8 @@ export default function PlayerApp() {
     return (
       <SplashScreen
         progress={ratio}
-        done={hayTotal ? mapProgress!.done : undefined}
-        total={hayTotal ? mapProgress!.total : undefined}
+        done={descargando ? mapProgress!.done : undefined}
+        total={descargando ? mapProgress!.total : undefined}
         primeiraVez={!initialLoadDoneRef.current}
         detail={mapProgress?.detail || 'Preparando la misión…'}
         entradaSuave

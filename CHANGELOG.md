@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.21
+## 5.25.22
+
+- **Barra de carga: porcentaje sólo cuando descarga de verdad.** La escala
+  única repartida entre fases acababa mintiendo ("avanzó 3, 5 % y de golpe
+  pasó a 100"). Ahora sólo la descarga de teselas lleva número, y nunca
+  retrocede; conectar, calcular y comprobar van con la barra en movimiento
+  y sin cifra.
+- **Los nodos 3D dejan de cambiar de tamaño al girar.** El tamaño se medía
+  por nodo y por fotograma con la perspectiva, así que al girar el mapa
+  cada nodo cambiaba de tamaño a su aire: parpadeo. Ahora el tamaño depende
+  sólo del zoom, igual para todos, y el cercano se ve mayor que el lejano
+  como todo lo demás del mapa.
+- La cota del terreno bajo el nodo se toma al instante, sin arrastre: el
+  suavizado hacía que el modelo subiera y bajara despacio al hacer zoom.
+
+
 
 - **El tamaño del nodo ya no se queda clavado al acercarse.** El factor
   partía del fotograma anterior: un modelo que de lejos medía 600 m tenía
