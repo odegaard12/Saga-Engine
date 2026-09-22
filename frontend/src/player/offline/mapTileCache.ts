@@ -158,6 +158,12 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   niveles: NIVELES,
   mision: [MISSION_AREA_RADIUS_KM, ROUTE_CORRIDOR_KM, NODE_DETAIL_RADIUS_KM],
   grafo: 2,
+  // 3: zona de misión también a z15-z16 y detalle de nodo a z19. Con
+  // teselas de 256 px el mapa pide un nivel MÁS que el zoom que enseña:
+  // al desampliar hasta ver todos los nodos (zoom 14) pedía z15 en toda la
+  // zona y sólo estaba el corredor; junto a un nodo (zoom 18) pedía z19 y
+  // no había nada. "El mapa aún tiene que cargar".
+  plan: 3,
 })
 
 function metersPerTile(lat: number, zoom: number) {
@@ -588,6 +594,11 @@ export async function prefetchMissionMapTiles(
       'mission-z14'
     )
 
+    // Zona de misión también a z15 y z16, con menos margen: es lo que el
+    // mapa pide al desampliar hasta ver todos los nodos (ver FIRMA, plan 3).
+    addBBoxTilesWithBudget(urls, routePoints, 15, Math.min(MISSION_AREA_RADIUS_KM, 3), 360, 'mission-z15')
+    addBBoxTilesWithBudget(urls, routePoints, 16, Math.min(MISSION_AREA_RADIUS_KM, 1.8), 560, 'mission-z16')
+
     // Corredor ancho, no línea fina.
     addRouteCorridor(urls, routePoints, 15, ROUTE_CORRIDOR_KM, 1600, 280, 'corridor-z15')
     addRouteCorridor(
@@ -644,9 +655,11 @@ export async function prefetchMissionMapTiles(
     }
 
 
-    // Detalle alto solo cerca de nodos.
+    // Detalle alto solo cerca de nodos: z18 y, pegado al nodo, z19, que
+    // es lo que el mapa pide con el jugador encima.
     for (const point of routePoints) {
       addSquareAroundPointWithBudget(urls, point, 18, NODE_DETAIL_RADIUS_KM, 25, 'node-z18')
+      addSquareAroundPointWithBudget(urls, point, 19, Math.min(NODE_DETAIL_RADIUS_KM, 0.15), 36, 'node-z19')
     }
   }
 
@@ -673,7 +686,7 @@ export async function prefetchMissionMapTiles(
     cached_at: new Date().toISOString(),
     requested: orderedUrls.length,
     saved,
-    zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    zooms: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
     recortado: descartadasEnEstaVuelta > 0,
     descartadas: descartadasEnEstaVuelta,
     detalle_de_nodos: detalleDeNodos,

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react'
+import React, { useEffect, useRef, useState, type ReactNode } from 'react'
 
 interface SplashScreenProps {
   /**
@@ -31,6 +31,26 @@ interface SplashScreenProps {
   entradaSuave?: boolean
 }
 
+/**
+ * El hueco de debajo (la tarjeta de permisos) cambia de alto con
+ * animación. Al concederse el último permiso la tarjeta se recogía de
+ * golpe y la barra, centrada en vertical, saltaba de arriba al medio.
+ */
+function useAltoAnimado() {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [alto, setAlto] = useState<number | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const medir = () => setAlto(el.offsetHeight)
+    const observador = new ResizeObserver(medir)
+    observador.observe(el)
+    medir()
+    return () => observador.disconnect()
+  }, [])
+  return { ref, alto }
+}
+
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   progress,
   detail,
@@ -40,6 +60,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   children,
   entradaSuave = false,
 }) => {
+  const hijos = useAltoAnimado()
   const known = typeof progress === 'number' && Number.isFinite(progress)
   const pct = known ? Math.max(0, Math.min(100, Math.round(progress))) : 0
 
@@ -254,7 +275,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             : detail || 'Preparando la misión…'}
       </div>
 
-      {children ? <div style={{ marginTop: 26, width: '100%', display: 'grid', placeItems: 'center' }}>{children}</div> : null}
+      <div
+        style={{
+          width: '100%',
+          overflow: 'hidden',
+          height: hijos.alto === null ? 'auto' : hijos.alto,
+          marginTop: hijos.alto === 0 ? 0 : 26,
+          transition: 'height 420ms ease, margin-top 420ms ease',
+        }}
+      >
+        <div ref={hijos.ref} style={{ display: 'grid', placeItems: 'center' }}>
+          {children}
+        </div>
+      </div>
 
       <style>
         {`
