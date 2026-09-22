@@ -12,7 +12,7 @@ import * as maplibregl from 'maplibre-gl'
  *
  * El diseño acordado: monolito blanco, sobrio; la BASE y la tapa con la
  * forma del tipo de nodo (redonda checkpoint, cuadrada QR, triangular
- * minijuego); el COLOR es el estado (verde hecho, azul en juego, rojo
+ * minijuego, hexagonal coleccionable); el COLOR es el estado (verde hecho, azul en juego, rojo
  * pendiente) en una franja de luz vertical, la tapa y un disco en el suelo;
  * el número grande siempre de frente e icono pequeño del tipo debajo. La
  * animación es mínima: la luz respira; el nodo en juego lleva un anillo
@@ -23,7 +23,25 @@ import * as maplibregl from 'maplibre-gl'
  * flotando por el de abajo.
  */
 
-export type TipoDeNodo = 'checkpoint' | 'qr' | 'minijuego'
+export type TipoDeNodo = 'checkpoint' | 'qr' | 'minijuego' | 'coleccionable'
+
+/**
+ * Zoom por debajo del cual NO se pintan los modelos: manda la chincheta
+ * plana del mapa.
+ *
+ * Un modelo que mantiene su tamaño en pantalla mide cientos de metros al
+ * desampliar —a zoom 12 harían falta ocho kilómetros de monolito para que
+ * siguiera midiendo 118 píxeles—: atraviesa los montes, se amontona con
+ * los vecinos y queda fatal. De lejos, chincheta; de cerca, modelo.
+ */
+export const ZOOM_MINIMO_3D = 16.5
+
+/**
+ * Altura máxima del modelo en el mundo, en metros. Por encima de esto deja
+ * de crecer y empieza a encogerse en pantalla, hasta que a ZOOM_MINIMO_3D
+ * toma el relevo la chincheta.
+ */
+const ALTURA_MAX_MUNDO = 120
 export type EstadoDeNodo = 'hecho' | 'actual' | 'pendiente'
 
 export type NodoTresD = {
@@ -103,6 +121,27 @@ function texturaIcono(tipo: TipoDeNodo): THREE.CanvasTexture {
       q(176, 176, 16)
       q(148, 176, 12)
       q(176, 148, 12)
+    } else if (tipo === 'coleccionable') {
+      // Gema: algo que se recoge y se guarda en la mochila.
+      g.beginPath()
+      g.moveTo(128, 58)
+      g.lineTo(198, 112)
+      g.lineTo(170, 198)
+      g.lineTo(86, 198)
+      g.lineTo(58, 112)
+      g.closePath()
+      g.fill()
+      g.strokeStyle = '#ffffff'
+      g.lineWidth = 9
+      g.beginPath()
+      g.moveTo(90, 112)
+      g.lineTo(166, 112)
+      g.moveTo(128, 58)
+      g.lineTo(108, 112)
+      g.lineTo(128, 198)
+      g.lineTo(148, 112)
+      g.closePath()
+      g.stroke()
     } else {
       g.beginPath()
       g.roundRect(52, 102, 152, 72, 36)
@@ -148,6 +187,7 @@ function invertirCaras(g: THREE.BufferGeometry): void {
 function formaDelTipo(tipo: TipoDeNodo, radio: number, alto: number): THREE.BufferGeometry {
   if (tipo === 'qr') return new THREE.BoxGeometry(radio * 1.8, alto, radio * 1.8)
   if (tipo === 'minijuego') return new THREE.CylinderGeometry(radio * 1.15, radio * 1.15, alto, 3)
+  if (tipo === 'coleccionable') return new THREE.CylinderGeometry(radio * 1.05, radio * 1.05, alto, 6)
   return new THREE.CylinderGeometry(radio, radio, alto, 48)
 }
 
@@ -213,14 +253,23 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   /** Píxeles de pantalla que se quieren por nodo según su estado. */
   const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 118 : p.nodo.estado === 'pendiente' ? 76 : 92)
 
-  /** Factor de escala para que el nodo mida `objetivoPx` en pantalla; mínimo 1 (tamaño real). */
+  /**
+   * Factor de escala para que el nodo mida `objetivoPx` en pantalla, entre
+   * su tamaño real y ALTURA_MAX_MUNDO.
+   *
+   * Sin tope, al desampliar el factor se dispara —a zoom 12 pasa de 800— y
+   * el monolito se vuelve un pilar de kilómetros que cruza los montes.
+   * Tampoco sirve `map.project` para un nodo detrás de la cámara: devuelve
+   * un disparate, y el tope también lo corta.
+   */
   function escalaDePantalla(p: Pieza): number {
     if (!mapa) return 1
     const a = mapa.project([p.nodo.lon, p.nodo.lat])
     const b = mapa.project([p.nodo.lon, p.nodo.lat + 1 / 111320])
     const pxPorMetro = Math.hypot(a.x - b.x, a.y - b.y)
     if (!Number.isFinite(pxPorMetro) || pxPorMetro <= 0) return 1
-    return Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))
+    const tope = ALTURA_MAX_MUNDO / alturaTotal(p)
+    return Math.min(tope, Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p))))
   }
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -389,6 +438,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        */
       const elevacionObjetivo = 0
 
+      // De lejos mandan las chinchetas planas del mapa: ver ZOOM_MINIMO_3D.
+      const zoomDeMas = mapa.getZoom() >= ZOOM_MINIMO_3D
+
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
         // las teselas de elevación llegan cuando llegan.
@@ -399,7 +451,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         }
         // Con relieve y sin altura conocida todavía, el modelo se quedaría
         // a cota 0: enterrado bajo el monte. Mejor no pintarlo hasta saberla.
-        p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)
+        p.grupo.visible = zoomDeMas && (!conTerreno || Number.isFinite(p.elevacion))
         if (!p.grupo.visible) continue
         const mc = maplibregl.MercatorCoordinate.fromLngLat(
           [p.nodo.lon, p.nodo.lat],

@@ -34,7 +34,7 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
-import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
+import { crearCapaNodosTresD, ZOOM_MINIMO_3D, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
  * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
@@ -124,9 +124,26 @@ const FUERA_DE_TRAZADO_M = 500
 const DE_VUELTA_AL_TRAZADO_M = 400
 
 /** checkpoint / qr / minijuego, del campo `kind` del servidor (o del tipo, si viene). */
-function tipoDelNodo(nodo: { kind?: string; type?: string }): TipoDeNodo {
+function tipoDelNodo(nodo: {
+  kind?: string
+  type?: string
+  physical_node_kind?: string
+  physical_item_kind?: string
+  is_map_collectible?: boolean
+}): TipoDeNodo {
   const texto = String(nodo.kind || nodo.type || '').toLowerCase()
+  const fisico = String(nodo.physical_node_kind || nodo.physical_item_kind || '').toLowerCase()
   if (texto === 'checkpoint') return 'checkpoint'
+  /**
+   * Un coleccionable se recoge: para el jugador no es lo mismo que un
+   * minijuego, y hasta ahora los diez nodos de la ruta real salían con la
+   * misma forma porque todos eran `minijuego`. El servidor ya lo dice en
+   * `kind`; se mira también el campo físico por si el nodo viene de un
+   * paquete guardado antes.
+   */
+  if (texto === 'coleccionable' || fisico.includes('collectible') || nodo.is_map_collectible === true) {
+    return 'coleccionable'
+  }
   if (texto.includes('qr')) return 'qr'
   return 'minijuego'
 }
@@ -913,8 +930,18 @@ export function MapSurfaceGL({
         }
         const enTresD = tresDRef.current
         capaNodosRef.current?.setVisible(enTresD)
-        for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_VOLUMEN]) {
-          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', enTresD ? 'none' : 'visible')
+        if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
+          vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
+        }
+        if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
+          /**
+           * En 3D las chinchetas planas no se apagan: se quedan para el
+           * mapa de lejos, donde un modelo de tamaño constante en pantalla
+           * mediría cientos de metros. Por debajo de ZOOM_MINIMO_3D manda
+           * la chincheta; por encima, el modelo.
+           */
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
+          vivo.setLayerZoomRange(CAPA_NODOS_ICONOS, 0, enTresD ? ZOOM_MINIMO_3D : 24)
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.

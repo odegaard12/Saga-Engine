@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.15
+## 5.25.16
+
+- **Los nodos dejan de crecer al desampliar.** El tamaño en pantalla era
+  constante sin tope: a zoom 12 el factor pasaba de 800 y el monolito era
+  un pilar de kilómetros atravesando los montes. Ahora el modelo no pasa
+  de 120 m en el mundo y por debajo de zoom 16,5 no se pinta: de lejos
+  manda la chincheta plana del mapa, de cerca el modelo.
+- **Cada clase de nodo tiene su forma.** Los diez nodos de la ruta salían
+  iguales porque el servidor los mandaba todos como "minijuego": cinco de
+  ellos llevan algo que recoger y eso no llegaba al mapa. Se añade la
+  clase `coleccionable` —base hexagonal e icono de gema— junto a las de
+  siempre: redonda el checkpoint, cuadrada el QR, triangular el
+  minijuego. El coleccionable va antes que el QR: lo que importa es que
+  ahí hay algo que recoger, aunque se recoja escaneando.
+
+
 
 - Nodos 3D: el cuerpo sale blanco de verdad. Las caras laterales reciben
   mitad cielo y mitad suelo de la luz hemisférica; con el suelo verde
