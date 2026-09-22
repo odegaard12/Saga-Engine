@@ -214,7 +214,10 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     (con tope). Así decodificar teselas y levantar el relieve pasa DEBAJO
     del velo, no encima del jugador mientras se mueve.
     """
-    assert "mapa.once('idle'" in fonte and "onListoRef.current?.()" in fonte
+    # NO idle: el pulso del trazado ensucia el estilo diez veces por segundo
+    # y el mapa nunca está ocioso. "Pintado" = capas y teselas cargadas.
+    assert "mapa.once('idle'" not in fonte
+    assert "vivo.areTilesLoaded()" in fonte and "onListoRef.current?.()" in fonte
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "onListo={() => setMapaListo(true)}" in app
     assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
@@ -350,7 +353,7 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     # 21 MB en un fichero: fuera del paquete de teselas, pedido tras pintar.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert "urls.set('/api/road-graph'" not in pack
-    assert "void cargarGrafo().then" in fonte.split("mapa.once('idle'")[1]
+    assert "void cargarGrafo().then" in fonte.split("const esperarPintado = window.setInterval(")[1]
 
 
 def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
@@ -364,7 +367,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # MapLibre 6: la matriz viene en defaultProjectionData.mainMatrix; y la
     # animación no puede arrancar antes del primer idle (mataba el idle).
     assert "defaultProjectionData?.mainMatrix" in capa
-    assert "m.once('idle', () => {" in capa and "animar = true" in capa
+    assert "m.once('idle'" not in capa and "arrancarAnimacion()" in capa
+    assert "p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)" in capa
     assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )

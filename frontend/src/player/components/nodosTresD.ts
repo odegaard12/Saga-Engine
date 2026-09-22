@@ -144,6 +144,8 @@ export type CapaNodosTresD = {
   capa: maplibregl.CustomLayerInterface
   setNodos: (nodos: NodoTresD[]) => void
   setVisible: (visible: boolean) => void
+  /** Empieza a pedir fotogramas (~20/s). Se llama cuando el mapa ha pintado. */
+  arrancarAnimacion: () => void
   estadisticas: () => {
     piezas: number
     visible: boolean
@@ -250,7 +252,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       g.add(pulso)
     }
     escena.add(g)
-    return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, elevacion: 0, elevacionEn: 0 }
+    return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, elevacion: Number.NaN, elevacionEn: 0 }
   }
 
   function aplicarNodos(nodos: NodoTresD[]) {
@@ -266,11 +268,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     onAdd(m, gl) {
       mapa = m
       anadida = true
-      // La animación arranca después del primer idle del mapa (ver arriba).
-      m.once('idle', () => {
-        animar = true
-        m.triggerRepaint()
-      })
+      // La animación la arranca el mapa cuando ha pintado (ver
+      // `arrancarAnimacion`): el mapa nunca llega a "idle" porque el pulso
+      // del trazado cambia el estilo diez veces por segundo.
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
       renderer.autoClear = false
       escena.add(new THREE.HemisphereLight(0xdbeafe, 0x3b5a3a, 1.1))
@@ -320,6 +320,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           if (typeof e === 'number' && Number.isFinite(e)) p.elevacion = e
           p.elevacionEn = ahora
         }
+        // Con relieve y sin altura conocida todavía, el modelo se quedaría
+        // a cota 0: enterrado bajo el monte. Mejor no pintarlo hasta saberla.
+        p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)
+        if (!p.grupo.visible) continue
         const mc = maplibregl.MercatorCoordinate.fromLngLat([p.nodo.lon, p.nodo.lat], conTerreno ? p.elevacion - 0.3 : 0)
         const s = mc.meterInMercatorCoordinateUnits()
         p.grupo.matrix
@@ -387,6 +391,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     },
     setVisible(v) {
       visible = v
+      mapa?.triggerRepaint()
+    },
+    arrancarAnimacion() {
+      animar = true
       mapa?.triggerRepaint()
     },
     estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError }),

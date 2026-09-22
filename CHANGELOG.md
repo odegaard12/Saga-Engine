@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.2
+## 5.25.3
+
+- **El mapa nunca estaba "idle", y de idle colgaba casi todo.** El pulso del
+  trazado (5.18.0) cambia una propiedad del estilo diez veces por segundo,
+  así que el mapa no está ocioso nunca: el aviso de "mapa pintado" al velo
+  de carga, la carga de la red de caminos y la animación de los nodos 3D
+  no se ejecutaban jamás. De ahí la guía recta, el velo esperando su tope
+  y los modelos invisibles (se quedaban a cota 0, bajo el monte, porque su
+  altura sólo se refresca al animar). Ahora "pintado" es "capas y teselas
+  cargadas", preguntado cada cuarto de segundo con tope de ocho.
+- Con relieve, un nodo 3D no se pinta hasta conocer la altura del terreno
+  bajo él: a cota 0 quedaba enterrado.
+
+
 
 - **Los nodos 3D seguían sin verse: estaban en el origen del mundo.** Con
   `matrixAutoUpdate` apagado, three.js no recalcula la matriz de mundo
