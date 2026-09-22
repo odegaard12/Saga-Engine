@@ -832,6 +832,14 @@ export function MapSurfaceGL({
       // tirón cada vez que entras.
       pitch: tresD ? PITCH_3D : 0,
       attributionControl: false,
+      /**
+       * Contexto WebGL con antialiasing (MSAA). MapLibre lo crea sin él
+       * por defecto, y lo que dibuja three.js encima -las bolas, los aros,
+       * la peana- salía con dientes de sierra: "las líneas alrededor del
+       * nodo son como píxeles". En MapLibre 6 va en los atributos del
+       * contexto (antes era `antialias` a secas).
+       */
+      canvasContextAttributes: { antialias: true },
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo

@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.23
+## 5.25.24
+
+- **Los nodos 3D se dibujan con antialiasing.** MapLibre crea el contexto
+  WebGL sin él, y las bolas, los aros y la peana salían con dientes de
+  sierra. Se activa el MSAA del contexto, la opción que MapLibre documenta
+  para las capas personalizadas.
+- **La animación va al ritmo de la pantalla**, no a veinte fotogramas por
+  segundo: la bola flotaba a tirones.
+- El cartel del número se pinta a 512 px para verse nítido de cerca.
+
+
 
 - **Los nodos son bolas.** Una esfera del color del estado flotando sobre
   un mástil fino, con el número en un cartel redondo delante y la chapa del

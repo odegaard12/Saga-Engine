@@ -66,9 +66,14 @@ const COLOR: Record<EstadoDeNodo, number> = { hecho: 0x22c55e, actual: 0x3b82f6,
 
 function lienzoCrudo(pintar: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   const c = document.createElement('canvas')
-  c.width = c.height = 256
+  // 512 px, dibujando a escala 2: el cartel se ve nítido también de
+  // cerca, cuando ocupa más de cien píxeles de pantalla.
+  c.width = c.height = 512
   const g = c.getContext('2d')
-  if (g) pintar(g)
+  if (g) {
+    g.scale(2, 2)
+    pintar(g)
+  }
   return c
 }
 
@@ -658,12 +663,19 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * aviso de "mapa pintado" y la carga de la red de caminos: sin él,
        * la guía fuera del trazado volvía a salir recta.
        */
+      /**
+       * Al ritmo del navegador, no a veinte por segundo. El repintado iba
+       * con un temporizador de 50 ms y la bola flotaba a tirones: "el
+       * renderizado no es fluido". Ahora se pide el fotograma siguiente y
+       * MapLibre pinta a la cadencia de la pantalla mientras la pestaña se
+       * vea; oculta, nada.
+       */
       if (animar && !repintadoProgramado && document.visibilityState === 'visible') {
         repintadoProgramado = true
-        window.setTimeout(() => {
+        window.requestAnimationFrame(() => {
           repintadoProgramado = false
           mapa?.triggerRepaint()
-        }, 50)
+        })
       }
     },
   }
