@@ -379,6 +379,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))" in capa
     # El cielo de Mercator está en +z: la hemisférica apuntando a +y dejaba el cuerpo gris.
     assert "cielo.position.set(0, 0, 1)" in capa
+    # Determinante negativo en Mercator: sin invertir las caras, WebGL
+    # descartaba las delanteras (número, icono y anillos invisibles).
+    assert "invertirCaras(malla.geometry)" in capa and "malla.frustumCulled = false" in capa
     assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )
