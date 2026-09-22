@@ -113,7 +113,10 @@ import {
 } from './components/PlayerLayout'
 
 type LoadState =
-  | { status: 'idle' | 'loading'; mapProgress?: { done: number; total: number; detail?: string } }
+  | {
+      status: 'idle' | 'loading'
+      mapProgress?: { done: number; total: number; detail?: string; label?: string }
+    }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
@@ -829,6 +832,7 @@ export default function PlayerApp() {
                     done: progress.done,
                     total: progress.total,
                     detail: progress.detail,
+                    label: progress.label,
                   },
                 })
               }
@@ -1519,6 +1523,29 @@ export default function PlayerApp() {
   const ultimoDetalleRef = useRef('Preparando la misión…')
 
   /**
+   * Una sola barra para todas las fases, que ni parpadea ni salta.
+   *
+   * Cada fase mandaba su propia cuenta: la comprobación del mapa guardado
+   * iba de 0 a 100, la descarga volvía a empezar en 0 y entre medias había
+   * tramos sin total, donde la barra se ponía en modo indeterminado. Eso es
+   * el parpadeo, y el salto final al 100 %. Ahora cada fase ocupa su trozo
+   * del recorrido, el valor nunca retrocede y lo que queda se recorre
+   * andando, no de un brinco.
+   */
+  const objetivoCargaRef = useRef(0)
+  const [cargaPintada, setCargaPintada] = useState(0)
+  useEffect(() => {
+    const paso = window.setInterval(() => {
+      setCargaPintada((actual) => {
+        const objetivo = objetivoCargaRef.current
+        if (actual >= objetivo) return actual
+        return Math.min(objetivo, actual + Math.max(0.7, (objetivo - actual) * 0.16))
+      })
+    }, 60)
+    return () => window.clearInterval(paso)
+  }, [])
+
+  /**
    * CAUSA REAL DEL SALTO, medida en el codigo, no supuesta.
    *
    * Esto vivia en un `useEffect`. Los efectos de `useEffect` son PASIVOS: se
@@ -1594,9 +1621,17 @@ export default function PlayerApp() {
     // hay porcentaje que enseñar, y fingir un 0% era lo que hacia parecer que
     // la aplicacion se habia quedado parada.
     const hayTotal = Boolean(mapProgress && mapProgress.total > 0)
-    const ratio = hayTotal
-      ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100))
-      : undefined
+    // Cada fase, su trozo del recorrido. Ver `objetivoCargaRef`.
+    const TRAMOS: Record<string, [number, number]> = {
+      'Comprobando el mapa guardado': [5, 60],
+      'Mapa offline': [60, 97],
+      'Mapa listo': [97, 100],
+    }
+    const tramo = TRAMOS[mapProgress?.label ?? '']
+    const dentro = hayTotal ? Math.max(0, Math.min(1, mapProgress!.done / mapProgress!.total)) : 0
+    const global = tramo ? tramo[0] + (tramo[1] - tramo[0]) * dentro : 3
+    objetivoCargaRef.current = Math.max(objetivoCargaRef.current, global)
+    const ratio = cargaPintada > 0 ? cargaPintada : undefined
 
     // Se guarda para que el velo de salida siga diciendo lo mismo que decia
     // la pantalla un instante antes: si cambia el texto a la vez que empieza
@@ -2491,7 +2526,12 @@ export default function PlayerApp() {
       await prefetchMissionMapTiles(stages, (progress) => {
         setState({
           status: 'loading',
-          mapProgress: { done: progress.done, total: progress.total, detail: progress.detail },
+          mapProgress: {
+            done: progress.done,
+            total: progress.total,
+            detail: progress.detail,
+            label: progress.label,
+          },
         })
       })
     } catch (err) {

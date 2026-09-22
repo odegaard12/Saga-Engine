@@ -44,17 +44,36 @@ function iosPideMovimiento(): boolean {
 const CLAVE_CAMARA = 'saga:permiso:camara'
 const CLAVE_MOVIMIENTO = 'saga:permiso:movimiento'
 
+/**
+ * La memoria dura lo que dure la sesión, no para siempre.
+ *
+ * Con memoria permanente la tarjeta de "antes de salir" dejó de aparecer
+ * nunca: se entraba al juego sin que nadie pidiera nada, y si el sistema
+ * había retirado la cámara no se sabía hasta estar en el monte con el
+ * cronómetro corriendo. Con `sessionStorage`, cada vez que se abre la app
+ * se piden una vez —sin ventana del sistema si ya estaban dados, porque el
+ * móvil resuelve en silencio lo que ya concedió— y las recargas dentro de
+ * la misma sesión no molestan.
+ */
 function recordado(clave: string): boolean {
   try {
-    return window.localStorage.getItem(clave) === 'ok'
+    return window.sessionStorage.getItem(clave) === 'ok'
   } catch {
     return false
   }
 }
 
+function olvidar(clave: string) {
+  try {
+    window.sessionStorage.removeItem(clave)
+  } catch {
+    // Sin almacenamiento: no había nada que olvidar.
+  }
+}
+
 function recordar(clave: string) {
   try {
-    window.localStorage.setItem(clave, 'ok')
+    window.sessionStorage.setItem(clave, 'ok')
   } catch {
     // Sin almacenamiento (modo privado): se pedirá otra vez, sin más.
   }
@@ -170,7 +189,14 @@ export function usePermisos() {
 
       try {
         const estado = await navigator.permissions.query({ name: 'camera' as PermissionName })
-        if (!cancelado && estado.state === 'granted') setCamara('ok')
+        if (cancelado) return
+        if (estado.state === 'granted') {
+          setCamara('ok')
+        } else {
+          // El navegador dice que NO está concedida: la memoria mentía.
+          olvidar(CLAVE_CAMARA)
+          setCamara('idle')
+        }
       } catch {
         // Navegador sin Permissions API para la cámara: se queda pendiente y
         // se pedirá con el botón. No es un error.

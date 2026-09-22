@@ -6,7 +6,31 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.18
+## 5.25.19
+
+- **Vuelven los nodos 3D.** El relevo a la chincheta plana estaba puesto en
+  zoom 16,5 y el mapa del jugador vive en 16: no se veía un solo modelo,
+  sólo chinchetas dentro de una vista 3D. El relevo baja a 14,5 y el tope
+  de 120 m desaparece, que era lo que dejaba el nodo en treinta píxeles.
+- **El tamaño se mide en la pantalla, no en el suelo.** Con el mapa
+  inclinado, un metro de suelo ocupa muchos más píxeles al pie de la
+  pantalla que arriba: por eso un nodo cercano llegaba a taparla entera al
+  girar. Ahora se proyectan el pie y la punta del modelo con la matriz del
+  mapa y se ajusta el alto real en píxeles.
+- **Los permisos vuelven a pedirse antes de salir.** Lo concedido se
+  recordaba para siempre, así que la tarjeta no salía nunca y se entraba al
+  juego sin que nadie pidiera nada; si el sistema había retirado la cámara,
+  se descubría en el monte. Ahora la memoria dura lo que dura la sesión, y
+  si el navegador dice que la cámara no está concedida se olvida.
+- **La barra de carga, una sola y sin parpadeos.** Cada fase mandaba su
+  propia cuenta y entre medias había tramos sin total, que la ponían en
+  modo indeterminado. Ahora cada fase ocupa su trozo, el valor no retrocede
+  y lo que queda se recorre andando, no de un brinco.
+- **La guía deja de pintar una recta mientras carga la red de caminos.**
+  Fuera del trazado dibujaba el tramo recto y lo recolocaba al terminar la
+  descarga. Mientras no hay red, ese tramo no se pinta.
+
+
 
 - Las franjas de color se ven en los cuatro tipos: iban por dentro del
   cuerpo hexagonal del coleccionable, que salía blanco liso y sin estado.
