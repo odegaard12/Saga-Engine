@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.3
+## 5.25.4
+
+- **Los nodos 3D estaban en el cielo.** Con relieve, MapLibre expresa las
+  alturas de las capas 3D relativas a la altura del terreno bajo el
+  objetivo de la cámara, no absolutas. Con la absoluta, un nodo a 892 m se
+  dibujaba 892 m por encima del suelo, fuera de plano. Medido en el banco
+  (elevación del nodo 892, del objetivo 892, nada en pantalla). Ahora la
+  altura es la diferencia.
+
+
 
 - **El mapa nunca estaba "idle", y de idle colgaba casi todo.** El pulso del
   trazado (5.18.0) cambia una propiedad del estilo diez veces por segundo,
