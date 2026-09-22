@@ -311,6 +311,15 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       const inclinacion = (mapa.getPitch() * Math.PI) / 180
       const conTerreno = Boolean(mapa.getTerrain())
       const ahora = performance.now()
+      /**
+       * Con relieve, MapLibre expresa las alturas de las capas 3D RELATIVAS
+       * a la altura del terreno bajo el objetivo de la cámara, no
+       * absolutas. Con la altura absoluta, un nodo a 892 m se dibujaba 892 m
+       * por encima del suelo: en el cielo, fuera de plano, invisible. Medido
+       * en el banco: elevación del nodo 892, elevación del objetivo 892, y
+       * nada en pantalla.
+       */
+      const elevacionObjetivo = conTerreno && typeof mapa.getCameraTargetElevation === 'function' ? mapa.getCameraTargetElevation() : 0
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
@@ -324,7 +333,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         // a cota 0: enterrado bajo el monte. Mejor no pintarlo hasta saberla.
         p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)
         if (!p.grupo.visible) continue
-        const mc = maplibregl.MercatorCoordinate.fromLngLat([p.nodo.lon, p.nodo.lat], conTerreno ? p.elevacion - 0.3 : 0)
+        const mc = maplibregl.MercatorCoordinate.fromLngLat(
+          [p.nodo.lon, p.nodo.lat],
+          conTerreno ? p.elevacion - elevacionObjetivo - 0.3 : 0
+        )
         const s = mc.meterInMercatorCoordinateUnits()
         p.grupo.matrix
           .makeTranslation(mc.x, mc.y, mc.z)

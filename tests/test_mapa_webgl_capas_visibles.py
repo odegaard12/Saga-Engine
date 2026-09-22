@@ -369,6 +369,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "defaultProjectionData?.mainMatrix" in capa
     assert "m.once('idle'" not in capa and "arrancarAnimacion()" in capa
     assert "p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)" in capa
+    # Altura RELATIVA al objetivo de la cámara: absoluta ponía los nodos en el cielo.
+    assert "p.elevacion - elevacionObjetivo - 0.3" in capa and "getCameraTargetElevation()" in capa
     assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )
