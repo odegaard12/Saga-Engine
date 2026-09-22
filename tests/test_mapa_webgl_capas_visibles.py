@@ -368,7 +368,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # animación no puede arrancar antes del primer idle (mataba el idle).
     assert "defaultProjectionData?.mainMatrix" in capa
     assert "m.once('idle'" not in capa and "arrancarAnimacion()" in capa
-    assert "p.grupo.visible = !conTerreno || Number.isFinite(p.elevacion)" in capa
+    assert "p.grupo.visible = zoomDeMas && (!conTerreno || Number.isFinite(p.elevacion))" in capa
     # Altura ABSOLUTA en unidades Mercator: medido proyectando con la matriz
     # de MapLibre. "Relativa al objetivo de la cámara" se iba fuera de plano.
     assert "const elevacionObjetivo = 0" in capa and "getCameraTargetElevation()" not in capa
@@ -377,6 +377,14 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Tamaño de pantalla constante: a escala real (4,6 m) medían 2 px a zoom 17.
     assert "escalaDePantalla(p)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
     assert "Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))" in capa
+    # Tope de tamaño en el mundo y relevo de la chincheta: sin ellos, al
+    # desampliar el factor pasa de 800 y el nodo es un pilar de kilómetros.
+    assert "const tope = ALTURA_MAX_MUNDO / alturaTotal(p)" in capa
+    assert "export const ZOOM_MINIMO_3D" in capa
+    assert "setLayerZoomRange(CAPA_NODOS_ICONOS, 0, enTresD ? ZOOM_MINIMO_3D : 24)" in fonte
+    # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
+    # nodos de la ruta real salían iguales.
+    assert "'coleccionable'" in capa and "alto, 6)" in capa
     # El cielo de Mercator está en +z: la hemisférica apuntando a +y dejaba el cuerpo gris.
     assert "cielo.position.set(0, 0, 1)" in capa
     # Determinante negativo en Mercator: sin invertir las caras, WebGL
@@ -404,3 +412,24 @@ def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     bloque = fonte[fonte.index("const vigilarEstilo"):fonte.index("document.addEventListener('visibilitychange'")]
     assert "vivo.isStyleLoaded()" not in bloque, "el vigilante volvió a mirar isStyleLoaded()"
     assert "getStyle().layers.length" in bloque
+
+
+def test_un_coleccionable_non_e_un_minixogo_calquera() -> None:
+    """
+    La forma del nodo en el mapa sale de `kind`, y un coleccionable tiene la
+    suya. Los diez nodos de la ruta real son minijuegos por interacción;
+    cinco de ellos llevan algo que recoger, y sin esto salían idénticos.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from backend.app.runtime.mision import kind_del_nodo
+
+    assert kind_del_nodo({"interaction": {"type": "checkpoint"}}) == "checkpoint"
+    assert kind_del_nodo({"interaction": {"type": "qr_code"}}) == "qr"
+    assert kind_del_nodo({"interaction": {"type": "signal_hunt"}}) == "minijuego"
+    assert (
+        kind_del_nodo({"interaction": {"type": "signal_hunt"}, "physical_node_kind": "collectible"})
+        == "coleccionable"
+    )
+    assert kind_del_nodo({"interaction": {"type": "signal_hunt"}, "is_map_collectible": True}) == "coleccionable"
