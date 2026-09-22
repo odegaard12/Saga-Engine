@@ -385,19 +385,21 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Tamaño de pantalla constante, medido con la matriz: con el mapa
     # inclinado, los píxeles por metro del suelo mienten y un nodo cercano
     # llegaba a tapar la pantalla.
-    assert "escalaDeNodo(p, medirPx, mengua)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
-    assert "medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w" in capa
+    # Tamaño que depende SÓLO del zoom: medir cada nodo con la perspectiva
+    # hacía que cada uno cambiara de tamaño a su aire al girar (parpadeo).
+    assert "escalaPorZoom(p, zoomActual)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
+    assert "Math.pow(2, 17 - zoom) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
     # Sonda de un metro como punto de partida: del factor anterior, al
     # acercarse la punta quedaba detrás de la cámara y el factor se clavaba
     # (618 m medidos a zoom 19,4).
-    assert "const quieroPx = objetivoPx(p) * mengua" in capa and "const pxPorMetro = medirPx(1)" in capa
     # En 3D, modelos a cualquier zoom: Óscar no quiere chinchetas planas
     # "en 2D dentro del 3D". Y el cuerpo se pinta entero, sin que la malla
     # basta del terreno se coma trozos al mover la cámara.
     assert "const tope = ALTURA_MAX_MUNDO / alturaTotal(p)" in capa
     assert "export const ZOOM_MINIMO_3D = 0" in capa
     assert capa.count("renderer.clearDepth()") >= 2
-    assert "p.elevacion + (e - p.elevacion) * 0.2" in capa
+    # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
+    assert "p.elevacion + (e - p.elevacion)" not in capa
     assert "setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', enTresD ? 'none' : 'visible')" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
@@ -459,9 +461,10 @@ def test_a_barra_de_carga_non_parpadea() -> None:
     indeterminado. Una sola escala, sin retrocesos y sin brincos.
     """
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert "const TRAMOS: Record<string, [number, number]>" in app
-    assert "objetivoCargaRef.current = Math.max(objetivoCargaRef.current, global)" in app
-    assert "const ratio = cargaPintada > 0 ? cargaPintada : undefined" in app
+    # Número sólo en la descarga real; el resto, barra animada sin cifra.
+    assert "const descargando = hayTotal && mapProgress?.label === 'Mapa offline'" in app
+    assert "const ratio = descargando ? ultimoRatioRef.current : undefined" in app
+    assert "TRAMOS" not in app
 
 
 def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:

@@ -277,8 +277,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   /** Diagnóstico: framebuffer enlazado al entrar, y el píxel del nodo antes y después de pintar. */
   let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
   const reloj = new THREE.Clock()
-  const medidaPie = new THREE.Vector4()
-  const medidaPunta = new THREE.Vector4()
 
   /** Altura total del modelo con cartel, en metros. */
   const alturaTotal = (p: Pieza) => p.altura + 5.1
@@ -286,37 +284,27 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   /** Píxeles de pantalla que se quieren por nodo según su estado. */
   const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 118 : p.nodo.estado === 'pendiente' ? 76 : 92)
 
+  /** Altura del nodo "normal" a zoom 17, en metros: la que se veía bien. */
+  const ALTURA_A_ZOOM_17 = 45
+
   /**
-   * Factor para que el nodo ocupe `quieroPx` de alto EN PANTALLA, medido
-   * con la propia matriz de MapLibre.
+   * Factor de escala que depende SÓLO del zoom, igual para todos los nodos.
    *
-   * Medir píxeles por metro en el suelo y multiplicar no vale con el mapa
-   * inclinado: el metro de suelo se ve mucho más grande al pie de la
-   * pantalla que arriba, así que un nodo cercano salía gigante —llegó a
-   * tapar la pantalla entera— y uno lejano, diminuto. Aquí se proyectan el
-   * pie y la punta del modelo y se corrige el factor con lo que sale; dos
-   * vueltas bastan porque se parte del factor del fotograma anterior.
+   * Se probó medir cada nodo con la perspectiva para que ocupara siempre
+   * los mismos píxeles, y era peor: al girar el mapa la perspectiva de
+   * cada nodo cambia a su aire, así que cada uno cambiaba de tamaño por su
+   * cuenta, fotograma a fotograma; Óscar lo vio como parpadeo. Con el
+   * zoom como única entrada, todos los nodos miden lo mismo en el mundo,
+   * el cercano se ve mayor que el lejano —como todo lo demás del mapa— y
+   * nada cambia de tamaño si no cambia el zoom. La altura se dobla por
+   * cada nivel de zoom que se aleja, de lejos mengua a la mitad y nunca
+   * baja del tamaño real ni pasa del tope.
    */
-  function escalaDeNodo(p: Pieza, medirPx: (metros: number) => number, mengua: number): number {
-    const quieroPx = objetivoPx(p) * mengua
+  function escalaPorZoom(p: Pieza, zoom: number): number {
     const tope = ALTURA_MAX_MUNDO / alturaTotal(p)
-    /**
-     * Se parte SIEMPRE de una sonda de un metro, que casi siempre se puede
-     * proyectar. Partir del factor del fotograma anterior fallaba al
-     * acercarse: un modelo que de lejos medía 600 m tenía la punta detrás
-     * de la cámara, la medida no salía y el factor se quedaba clavado en
-     * 600 m con la cámara encima. Medido: 618 m a zoom 19,4. Eso era el
-     * "se corta" y el "se buguea" de cerca.
-     */
-    const pxPorMetro = medirPx(1)
-    if (!(pxPorMetro > 0.00001)) return Math.min(tope, Math.max(1, p.escala))
-    let k = Math.min(tope, Math.max(1, quieroPx / (pxPorMetro * alturaTotal(p))))
-    for (let vuelta = 0; vuelta < 2; vuelta += 1) {
-      const px = medirPx(k * alturaTotal(p))
-      if (!(px > 0.5)) break
-      k = Math.min(tope, Math.max(1, (k * quieroPx) / px))
-    }
-    return k
+    const relativo = objetivoPx(p) / 92
+    const altura = ALTURA_A_ZOOM_17 * Math.pow(2, 17 - zoom) * menguaPorZoom(zoom) * relativo
+    return Math.min(tope, Math.max(1, altura / alturaTotal(p)))
   }
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -505,23 +493,21 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * el modelo se queda flotando o hundido hasta que el giro termina.
        */
       const enMovimiento = mapa.isMoving() || mapa.isZooming() || mapa.isRotating()
-      // La matriz, ANTES del bucle: con ella se mide en píxeles de pantalla.
       camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
-      const mitadAlto = Math.max(1, mapa.getCanvas().clientHeight) / 2
-      const mengua = menguaPorZoom(mapa.getZoom())
+      const zoomActual = mapa.getZoom()
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
         // las teselas de elevación llegan cuando llegan.
         if (conTerreno && (enMovimiento || ahora - p.elevacionEn > 500)) {
           const e = mapa.queryTerrainElevation({ lng: p.nodo.lon, lat: p.nodo.lat })
-          if (typeof e === 'number' && Number.isFinite(e)) {
-            // Al cambiar de nivel de tesela la cota da un saltito y el
-            // modelo brincaba con el mapa en movimiento: se llega a la
-            // cota nueva en unos fotogramas, salvo la primera vez.
-            const cerca = Number.isFinite(p.elevacion) && Math.abs(e - p.elevacion) < 40
-            p.elevacion = cerca ? p.elevacion + (e - p.elevacion) * 0.2 : e
-          }
+          /**
+           * Al instante, sin arrastre. Se probó llegar a la cota nueva en
+           * unos fotogramas y al hacer zoom el modelo se veía subir y bajar
+           * despacio, "arriba abajo, como loco". La malla del terreno
+           * cambia de golpe al cambiar de tesela; el nodo, igual.
+           */
+          if (typeof e === 'number' && Number.isFinite(e)) p.elevacion = e
           p.elevacionEn = ahora
         }
         // Con relieve y sin altura conocida todavía, el modelo se quedaría
@@ -539,13 +525,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
          * veía. Nunca por debajo de su tamaño real, así al acercarse mucho
          * crece como cualquier cosa del mundo.
          */
-        const medirPx = (metros: number) => {
-          medidaPie.set(mc.x, mc.y, mc.z, 1).applyMatrix4(camara.projectionMatrix)
-          medidaPunta.set(mc.x, mc.y, mc.z + s * metros, 1).applyMatrix4(camara.projectionMatrix)
-          if (medidaPie.w <= 0 || medidaPunta.w <= 0) return 0
-          return Math.abs(medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w) * mitadAlto
-        }
-        const k = escalaDeNodo(p, medirPx, mengua)
+        const k = escalaPorZoom(p, zoomActual)
         p.escala = k
         p.grupo.matrix
           .makeTranslation(mc.x, mc.y, mc.z)
