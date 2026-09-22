@@ -183,10 +183,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   const reloj = new THREE.Clock()
 
   /** Altura total del modelo con cartel, en metros. */
-  const alturaTotal = (p: Pieza) => p.altura + 3.2
+  const alturaTotal = (p: Pieza) => p.altura + 5.1
 
   /** Píxeles de pantalla que se quieren por nodo según su estado. */
-  const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 92 : p.nodo.estado === 'pendiente' ? 58 : 70)
+  const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 118 : p.nodo.estado === 'pendiente' ? 76 : 92)
 
   /** Factor de escala para que el nodo mida `objetivoPx` en pantalla; mínimo 1 (tamaño real). */
   function escalaDePantalla(p: Pieza): number {
@@ -224,42 +224,42 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     const luz = (k: number) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: k, roughness: 0.3 })
 
     // Zócalo hundido: muerde la ladera en vez de flotar.
-    const zocalo = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.95, 0.9), zocaloMat)
+    const zocalo = new THREE.Mesh(formaDelTipo(nodo.tipo, 1.3, 0.9), zocaloMat)
     zocalo.position.y = 0.15
     g.add(zocalo)
-    const disco = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.3, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false }))
+    const disco = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.8, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false }))
     disco.rotation.x = -Math.PI / 2
     disco.position.y = 0.62
     g.add(disco)
 
     // Cuerpo con la forma del tipo, blanco mate.
-    const cuerpo = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.55, H), cuerpoMat)
+    const cuerpo = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.85, H), cuerpoMat)
     cuerpo.position.y = 0.6 + H / 2
     g.add(cuerpo)
 
     // Franja de luz en cuatro caras.
     const franjas: THREE.Mesh[] = []
     for (let i = 0; i < 4; i += 1) {
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.14, H - 1.0, 0.03), luz(1.1))
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.2, H - 1.0, 0.03), luz(1.1))
       const a = (i / 4) * Math.PI * 2
-      f.position.set(Math.sin(a) * 0.56, 0.6 + H / 2 - 0.1, Math.cos(a) * 0.56)
+      f.position.set(Math.sin(a) * 0.86, 0.6 + H / 2 - 0.1, Math.cos(a) * 0.86)
       f.rotation.y = a
       g.add(f)
       franjas.push(f)
     }
-    const tapa = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.58, 0.16), luz(1.4))
+    const tapa = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.9, 0.18), luz(1.4))
     tapa.position.y = 0.6 + H + 0.08
     g.add(tapa)
 
     // Cartel con el número y, debajo, el icono. Se orientan a la cámara en cada fotograma.
     const carteles: THREE.Mesh[] = []
-    const numero = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.9), new THREE.MeshBasicMaterial({ map: texturaNumero(nodo.numero, hex), transparent: true, depthWrite: false }))
-    numero.position.y = 0.6 + H + 1.6
+    const numero = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: texturaNumero(nodo.numero, hex), transparent: true, depthWrite: false }))
+    numero.position.y = 0.6 + H + 2.9
     numero.renderOrder = 10
     g.add(numero)
     carteles.push(numero)
-    const icono = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshBasicMaterial({ map: texturaIcono(nodo.tipo), transparent: true, depthWrite: false }))
-    icono.position.y = 0.6 + H + 0.62
+    const icono = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ map: texturaIcono(nodo.tipo), transparent: true, depthWrite: false }))
+    icono.position.y = 0.6 + H + 0.85
     icono.renderOrder = 10
     g.add(icono)
     carteles.push(icono)
@@ -267,11 +267,11 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     let anillo: THREE.Mesh | null = null
     let pulso: THREE.Mesh | null = null
     if (nodo.estado === 'actual') {
-      anillo = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.035, 10, 96), luz(1.2))
+      anillo = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.05, 10, 96), luz(1.2))
       anillo.position.y = 0.6 + H - 0.4
       anillo.rotation.x = Math.PI / 2 + 0.2
       g.add(anillo)
-      pulso = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.1, 64), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }))
+      pulso = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.55, 64), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }))
       pulso.rotation.x = -Math.PI / 2
       pulso.position.y = 0.64
       g.add(pulso)
@@ -298,10 +298,15 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       // del trazado cambia el estilo diez veces por segundo.
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true })
       renderer.autoClear = false
-      escena.add(new THREE.HemisphereLight(0xdbeafe, 0x3b5a3a, 1.1))
-      const sol = new THREE.DirectionalLight(0xfff3d6, 1.4)
-      sol.position.set(0.5, 1, 0.7)
+      // En Mercator el cielo está en +z (no en +y como en three.js por
+      // defecto): las luces se orientan a ese eje o el cuerpo blanco sale gris.
+      const cielo = new THREE.HemisphereLight(0xffffff, 0x4b6b45, 1.6)
+      cielo.position.set(0, 0, 1)
+      escena.add(cielo)
+      const sol = new THREE.DirectionalLight(0xfff3d6, 1.6)
+      sol.position.set(0.35, -0.3, 1)
       escena.add(sol)
+      escena.add(new THREE.AmbientLight(0xffffff, 0.35))
       if (pendientes) {
         aplicarNodos(pendientes)
         pendientes = null
