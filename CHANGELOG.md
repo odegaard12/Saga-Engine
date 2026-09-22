@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.27
+## 5.25.28
+
+- **Vuelven los nodos con volumen, y sin dientes de sierra.** La escena
+  3D se pinta ahora en un objetivo propio con cuatro muestras por píxel y
+  se vuelca al lienzo del mapa como una textura ya suavizada: el
+  antialiasing es nuestro y el mapa no se entera, así que las fotos no se
+  ven afectadas. En 3D, los modelos; en 2D, las bolas horneadas como
+  símbolos.
+
+
 
 - **Los nodos salen del lienzo 3D.** Dibujarlos con three.js dentro del
   lienzo de MapLibre daba dientes de sierra en el móvil (sin antialiasing

@@ -292,6 +292,51 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let renderer: THREE.WebGLRenderer | null = null
   const escena = new THREE.Scene()
   const camara = new THREE.Camera()
+
+  /**
+   * Antialiasing PROPIO, sin depender del lienzo del mapa.
+   *
+   * MapLibre crea su lienzo sin multimuestreo, y pedírselo rompía las
+   * fotos (con relieve decide qué símbolos tapa el terreno leyendo
+   * profundidad, y con el lienzo multimuestreado esa lectura falla). Así
+   * que la escena 3D se pinta en un objetivo nuestro con 4 muestras por
+   * píxel (WebGL2) y luego se vuelca al lienzo del mapa como una textura
+   * ya suavizada. El mapa no se entera de nada. Es la "calidad alta sin
+   * depender del antialiasing" que pidió Óscar.
+   */
+  let objetivo: THREE.WebGLRenderTarget | null = null
+  const objetivoDe = (ancho: number, alto: number): THREE.WebGLRenderTarget => {
+    if (!objetivo || objetivo.width !== ancho || objetivo.height !== alto) {
+      objetivo?.dispose()
+      objetivo = new THREE.WebGLRenderTarget(ancho, alto, { samples: 4, depthBuffer: true, stencilBuffer: false })
+      materialVolcado.map = objetivo.texture
+      materialVolcado.needsUpdate = true
+    }
+    return objetivo
+  }
+  /**
+   * El volcado: un rectángulo a pantalla completa con la textura del
+   * objetivo. La resolución del multimuestreo deja el color multiplicado
+   * por la cobertura (los bordes se promedian con transparente), así que
+   * se mezcla como premultiplicado: UNO y UNO-MENOS-ALFA. Con la mezcla
+   * normal los bordes salían con un cerco oscuro.
+   */
+  const materialVolcado = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+  })
+  const escenaVolcado = new THREE.Scene()
+  const camaraVolcado = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+  const rectanguloVolcado = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), materialVolcado)
+  rectanguloVolcado.frustumCulled = false
+  escenaVolcado.add(rectanguloVolcado)
   const piezas: Pieza[] = []
   let pendientes: NodoTresD[] | null = null
   let visible = true
@@ -492,6 +537,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     },
     onRemove() {
       limpiar()
+      objetivo?.dispose()
+      objetivo = null
       renderer?.dispose()
       renderer = null
       anadida = false
@@ -675,13 +722,20 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
          * ángulo, al mover la cámara los trozos aparecían y desaparecían.
          * "Se buguean". Un señalizador se ve entero, siempre.
          */
-        renderer.clearDepth()
+        // Las dos pasadas van al objetivo multimuestreado (ver `objetivoDe`).
+        renderer.setRenderTarget(objetivoDe(lienzo.width, lienzo.height))
+        renderer.setClearColor(0x000000, 0)
+        renderer.clear(true, true, false)
         camara.layers.set(0)
         renderer.render(escena, camara)
         renderer.clearDepth()
         camara.layers.set(1)
         renderer.render(escena, camara)
         camara.layers.set(0)
+        // Y el volcado, ya suavizado, al lienzo del mapa.
+        renderer.setRenderTarget(null)
+        renderer.setViewport(0, 0, lienzo.width, lienzo.height)
+        renderer.render(escenaVolcado, camaraVolcado)
         // … y DESPUÉS: si no cambia, no se está dibujando en este framebuffer.
         const despues = leer()
         diagnosticoPixel = { fbAlEntrar, antes, despues, en: px || [] }
