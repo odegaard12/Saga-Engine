@@ -396,6 +396,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # fase propia y la peana lleva la forma del tipo.
     assert "new THREE.SphereGeometry(R, 40, 28)" in capa and "fase: Math.random()" in capa
     assert "const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)" in capa
+    # El aro del suelo es un degradado, no geometría de dos píxeles; y la
+    # cota se toma con el mapa quieto, que en movimiento daba saltos.
+    assert "function texturaBrillo(" in capa and "RingGeometry" not in capa
+    assert "(sinCota || (!enMovimiento && ahora - p.elevacionEn > 500))" in capa
     # Sonda de un metro como punto de partida: del factor anterior, al
     # acercarse la punta quedaba detrás de la cámara y el factor se clavaba
     # (618 m medidos a zoom 19,4).

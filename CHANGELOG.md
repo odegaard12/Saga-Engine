@@ -6,7 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.24
+## 5.25.25
+
+- **El aro del suelo es un brillo difuminado, no una línea.** Era un
+  anillo de geometría que a la distancia de juego medía dos píxeles: se
+  veía serrado con o sin antialiasing y temblaba al mover el mapa. Un
+  degradado con transparencia no tiene canto que serrar, y en cuesta se
+  lee como luz sobre el suelo. El pulso del nodo en juego, igual.
+- **Se acaban los saltos al mover el mapa.** La cota del terreno bajo cada
+  nodo se consultaba en cada fotograma mientras el mapa se movía, y al
+  cambiar de tesela devolvía un valor distinto cada vez: el nodo subía y
+  bajaba a tirones. Ahora se toma con el mapa quieto, cada medio segundo.
+
+
 
 - **Los nodos 3D se dibujan con antialiasing.** MapLibre crea el contexto
   WebGL sin él, y las bolas, los aros y la peana salían con dientes de
