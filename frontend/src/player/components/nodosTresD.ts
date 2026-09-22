@@ -120,6 +120,30 @@ function texturaIcono(tipo: TipoDeNodo): THREE.CanvasTexture {
   })
 }
 
+/**
+ * Invierte el sentido de las caras de una geometría.
+ *
+ * En Mercator la y crece hacia el sur, así que la matriz que coloca el
+ * modelo (x este, y arriba, z sur) tiene determinante negativo y three.js
+ * pasa a `frontFace(CW)`. Pero la proyección de MapLibre no espeja nada:
+ * en pantalla las caras delanteras siguen siendo CCW y WebGL las
+ * descartaba. Medido en el banco: los planos del número y del icono y los
+ * anillos del suelo (una sola cara) no se veían nunca, y de los sólidos
+ * se pintaba el interior. Invertir el índice lo cuadra sin tocar las
+ * normales, así la luz sigue siendo correcta.
+ */
+function invertirCaras(g: THREE.BufferGeometry): void {
+  const idx = g.getIndex()
+  if (!idx) return
+  const a = idx.array
+  for (let i = 0; i + 2 < a.length; i += 3) {
+    const t = a[i + 1]
+    a[i + 1] = a[i + 2]
+    a[i + 2] = t
+  }
+  idx.needsUpdate = true
+}
+
 /** Base y tapa con la forma del tipo: redonda, cuadrada o triangular. */
 function formaDelTipo(tipo: TipoDeNodo, radio: number, alto: number): THREE.BufferGeometry {
   if (tipo === 'qr') return new THREE.BoxGeometry(radio * 1.8, alto, radio * 1.8)
@@ -277,6 +301,15 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       pulso.position.y = 0.64
       g.add(pulso)
     }
+    g.traverse((o) => {
+      const malla = o as THREE.Mesh
+      if (!malla.isMesh) return
+      invertirCaras(malla.geometry)
+      // El recorte por frustum de three.js con la matriz de MapLibre
+      // descartaba 71 de 102 mallas que estaban en pantalla. Son cien
+      // mallas: se pintan todas y punto.
+      malla.frustumCulled = false
+    })
     escena.add(g)
     return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, elevacion: Number.NaN, elevacionEn: 0 }
   }

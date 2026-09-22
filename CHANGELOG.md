@@ -6,7 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.13
+## 5.25.14
+
+- **Nodos 3D: se ven el número, el icono y los anillos.** En Mercator la
+  y crece hacia el sur; la matriz del modelo tiene determinante negativo
+  y three.js pasaba a `frontFace(CW)`, pero la proyección de MapLibre no
+  espeja: WebGL descartaba las caras delanteras. Los planos de una sola
+  cara (número, icono, anillos del suelo) no se pintaban nunca y de los
+  sólidos se veía el interior. Se invierte el índice de caras de cada
+  geometría al construir el nodo, sin tocar normales. Además se apaga el
+  recorte por frustum de three.js, que con esa matriz descartaba 71 de
+  las 102 mallas aunque estuvieran en pantalla.
+
+
 
 - Diagnóstico de la capa 3D: `__sagaCapa3D()` en el banco da acceso a la
   escena viva.
