@@ -300,10 +300,20 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   function escalaDeNodo(p: Pieza, medirPx: (metros: number) => number, mengua: number): number {
     const quieroPx = objetivoPx(p) * mengua
     const tope = ALTURA_MAX_MUNDO / alturaTotal(p)
-    let k = Math.min(tope, Math.max(1, p.escala))
+    /**
+     * Se parte SIEMPRE de una sonda de un metro, que casi siempre se puede
+     * proyectar. Partir del factor del fotograma anterior fallaba al
+     * acercarse: un modelo que de lejos medía 600 m tenía la punta detrás
+     * de la cámara, la medida no salía y el factor se quedaba clavado en
+     * 600 m con la cámara encima. Medido: 618 m a zoom 19,4. Eso era el
+     * "se corta" y el "se buguea" de cerca.
+     */
+    const pxPorMetro = medirPx(1)
+    if (!(pxPorMetro > 0.00001)) return Math.min(tope, Math.max(1, p.escala))
+    let k = Math.min(tope, Math.max(1, quieroPx / (pxPorMetro * alturaTotal(p))))
     for (let vuelta = 0; vuelta < 2; vuelta += 1) {
       const px = medirPx(k * alturaTotal(p))
-      if (!(px > 0.5)) return k
+      if (!(px > 0.5)) break
       k = Math.min(tope, Math.max(1, (k * quieroPx) / px))
     }
     return k
