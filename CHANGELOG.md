@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.7
+## 5.25.8
+
+- **Los nodos 3D se pintan encima del terreno.** Con la proyección medida
+  y correcta seguían sin verse: MapLibre deja puestos su viewport, su
+  recorte y el búfer de profundidad del terreno al llamar a la capa. Ahora
+  la capa fija el viewport entero, quita el recorte y limpia la
+  profundidad antes de pintar. Un señalizador debe verse siempre, también
+  detrás de una loma.
+
+
 
 - **La altura de los nodos 3D vuelve a ser absoluta.** Medido proyectando a
   mano con la matriz que pasa MapLibre: con la elevación absoluta el nodo

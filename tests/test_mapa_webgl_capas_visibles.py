@@ -372,6 +372,8 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Altura ABSOLUTA en unidades Mercator: medido proyectando con la matriz
     # de MapLibre. "Relativa al objetivo de la cámara" se iba fuera de plano.
     assert "const elevacionObjetivo = 0" in capa and "getCameraTargetElevation()" not in capa
+    # Viewport entero, sin recorte y profundidad limpia: si no, el terreno los tapa.
+    assert "renderer.clearDepth()" in capa and "renderer.setScissorTest(false)" in capa
     assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )

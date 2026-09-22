@@ -390,7 +390,20 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         }
       }
       try {
+        /**
+         * MapLibre deja puestos su viewport, su recorte y su búfer de
+         * profundidad (el del terreno). Con la proyección ya medida y
+         * correcta, los modelos seguían sin verse: o el recorte los
+         * descartaba o la profundidad del terreno los tapaba. Se fija el
+         * viewport entero, se quita el recorte y se limpia la profundidad
+         * antes de pintar: los nodos van siempre encima del terreno, que
+         * es además lo que se quiere para un señalizador.
+         */
         renderer.resetState()
+        const lienzo = mapa.getCanvas()
+        renderer.setViewport(0, 0, lienzo.width, lienzo.height)
+        renderer.setScissorTest(false)
+        renderer.clearDepth()
         renderer.render(escena, camara)
         rendersConPiezas += 1
       } catch (fallo) {
