@@ -1538,8 +1538,14 @@ export default function PlayerApp() {
     const paso = window.setInterval(() => {
       setCargaPintada((actual) => {
         const objetivo = objetivoCargaRef.current
-        if (actual >= objetivo) return actual
-        return Math.min(objetivo, actual + Math.max(0.7, (objetivo - actual) * 0.16))
+        if (actual < objetivo) return Math.min(objetivo, actual + Math.max(0.5, (objetivo - actual) * 0.12))
+        /**
+         * Sin noticias -conectando con la misión, calculando el mapa- la
+         * barra avanza despacio hasta un tercio, porque algo se está
+         * haciendo. Clavada en el 3 % mientras el servidor respondía
+         * parecía que se había colgado, y luego el salto al 100 %.
+         */
+        return actual < 30 ? Math.min(30, actual + 0.12) : actual
       })
     }, 60)
     return () => window.clearInterval(paso)

@@ -388,11 +388,14 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "escalaDeNodo(p, medirPx, mengua)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
     assert "medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w" in capa
     assert "const quieroPx = objetivoPx(p) * mengua" in capa and "pxPorMetro" not in capa
-    # El relevo de la chincheta va por DEBAJO del zoom al que se juega (16):
-    # con 16,5 no se veía un solo modelo, sólo chinchetas planas.
+    # En 3D, modelos a cualquier zoom: Óscar no quiere chinchetas planas
+    # "en 2D dentro del 3D". Y el cuerpo se pinta entero, sin que la malla
+    # basta del terreno se coma trozos al mover la cámara.
     assert "const tope = ALTURA_MAX_MUNDO / alturaTotal(p)" in capa
-    assert "export const ZOOM_MINIMO_3D = 14.5" in capa
-    assert "setLayerZoomRange(CAPA_NODOS_ICONOS, 0, enTresD ? ZOOM_MINIMO_3D : 24)" in fonte
+    assert "export const ZOOM_MINIMO_3D = 0" in capa
+    assert capa.count("renderer.clearDepth()") >= 2
+    assert "p.elevacion + (e - p.elevacion) * 0.2" in capa
+    assert "setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', enTresD ? 'none' : 'visible')" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa
@@ -465,4 +468,6 @@ def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
     """
     fonte = COMPONENTE.read_text(encoding="utf-8")
     assert "const esperandoCaminos = mejorMetros > 120 && !grafoRef.current" in fonte
+    # La red se pide desde el principio, no después de pintar el mapa.
+    assert fonte.index("void cargarGrafo()") > fonte.index("}, 250)")
     assert "...(esperandoCaminos ? [] :" in fonte
