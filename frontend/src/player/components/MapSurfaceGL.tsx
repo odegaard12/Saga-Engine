@@ -991,14 +991,42 @@ export function MapSurfaceGL({
      * Sólo se avisa una vez: después, cada zoom vuelve a pasar por `idle`
      * y eso ya no le importa a nadie.
      */
-    mapa.once('idle', () => {
+    /**
+     * "El mapa ha pintado" NO es el evento `idle`.
+     *
+     * `idle` sólo salta cuando no queda nada por hacer, y el pulso del
+     * trazado cambia una propiedad del estilo diez veces por segundo: el
+     * mapa no está ocioso NUNCA. Todo lo que colgaba de idle -el aviso al
+     * velo de carga, la red de caminos, la animación de los nodos 3D- no
+     * se ejecutaba jamás: la guía salía recta, los modelos se quedaban
+     * bajo el monte y el velo esperaba su tope. Lo que importa es que las
+     * teselas de la vista estén: se pregunta cada cuarto de segundo, con
+     * tope de ocho segundos por si alguna tesela no llega nunca.
+     */
+    const desde = performance.now()
+    const esperarPintado = window.setInterval(() => {
+      const vivo = mapaRef.current
+      if (!vivo) {
+        window.clearInterval(esperarPintado)
+        return
+      }
+      let capas = 0
+      try {
+        capas = vivo.getStyle().layers.length
+      } catch {
+        capas = 0
+      }
+      const listo = capas > 0 && vivo.areTilesLoaded()
+      if (!listo && performance.now() - desde < 8000) return
+      window.clearInterval(esperarPintado)
       onListoRef.current?.()
+      capaNodosRef.current?.arrancarAnimacion()
       // La red de caminos (21 MB) se pide DESPUÉS de pintar, para no
       // competir con las teselas. El service worker la guarda al pasar.
       void cargarGrafo().then((grafo) => {
         grafoRef.current = grafo
       })
-    })
+    }, 250)
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.
@@ -1076,6 +1104,7 @@ export function MapSurfaceGL({
 
     return () => {
       pulsoVivo = false
+      window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
       mapa.off('moveend', alSoltar)
       mapa.off('dragstart', alTocar)
