@@ -194,6 +194,29 @@ function pintarIcono(g: CanvasRenderingContext2D, tipo: TipoDeNodo): void {
 const lienzoIcono = (tipo: TipoDeNodo) => lienzoCrudo((g) => pintarIcono(g, tipo))
 
 /**
+ * Aro de luz difuminado para el suelo, como textura.
+ *
+ * El aro era geometría: un anillo de 30 cm que a la distancia de juego
+ * mide dos píxeles. Una línea de dos píxeles sobre foto aérea se ve
+ * serrada por narices, con o sin antialiasing, y al mover el mapa tiembla
+ * porque cae entre píxeles distintos en cada fotograma. Un degradado con
+ * transparencia no tiene canto que serrar: se ve suave a cualquier tamaño
+ * y en cuesta se lee como luz sobre el suelo, no como un plato flotando.
+ */
+function texturaBrillo(hex: string): THREE.CanvasTexture {
+  return lienzo((g) => {
+    const grad = g.createRadialGradient(128, 128, 0, 128, 128, 124)
+    grad.addColorStop(0, hex + '00')
+    grad.addColorStop(0.5, hex + '1f')
+    grad.addColorStop(0.74, hex + 'b3')
+    grad.addColorStop(0.86, hex + '73')
+    grad.addColorStop(1, hex + '00')
+    g.fillStyle = grad
+    g.fillRect(0, 0, 256, 256)
+  })
+}
+
+/**
  * Invierte el sentido de las caras de una geometría.
  *
  * En Mercator la y crece hacia el sur, así que la matriz que coloca el
@@ -354,9 +377,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     g.add(peana)
 
     // Aro del color del estado en el suelo.
-    const disco = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.55, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false }))
+    const brillo = texturaBrillo(hex)
+    const disco = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: brillo, transparent: true, opacity: 0.85, depthWrite: false }))
     disco.rotation.x = -Math.PI / 2
-    disco.position.y = 0.42
+    disco.position.y = 0.3
     g.add(disco)
 
     // Mástil fino de la peana a la bola.
@@ -401,9 +425,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       anillo.position.y = H
       anillo.rotation.x = Math.PI / 2 + 0.35
       g.add(anillo)
-      pulso = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.45, 64), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }))
+      pulso = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: brillo, transparent: true, depthWrite: false }))
       pulso.rotation.x = -Math.PI / 2
-      pulso.position.y = 0.46
+      pulso.position.y = 0.34
       g.add(pulso)
     }
     g.traverse((o) => {
@@ -520,7 +544,18 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
         // las teselas de elevación llegan cuando llegan.
-        if (conTerreno && (enMovimiento || ahora - p.elevacionEn > 500)) {
+        /**
+         * La cota se toma con el mapa QUIETO, cada medio segundo, y al
+         * instante sólo si aún no se conoce. Consultarla en cada fotograma
+         * mientras se mueve parecía lo correcto y era el origen de los
+         * saltos: al desplazar o ampliar, el terreno cambia de tesela y la
+         * consulta devuelve una cota distinta a cada fotograma, así que el
+         * nodo subía y bajaba a tirones. Quieto, un ajuste por gesto como
+         * mucho; y la bola flota sobre un mástil, medio metro de más o de
+         * menos no se nota.
+         */
+        const sinCota = !Number.isFinite(p.elevacion)
+        if (conTerreno && (sinCota || (!enMovimiento && ahora - p.elevacionEn > 500))) {
           const e = mapa.queryTerrainElevation({ lng: p.nodo.lon, lat: p.nodo.lat })
           /**
            * Al instante, sin arrastre. Se probó llegar a la cota nueva en
