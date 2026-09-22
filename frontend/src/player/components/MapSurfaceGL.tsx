@@ -1315,8 +1315,16 @@ export function MapSurfaceGL({
       }
     }
 
+    /**
+     * Fuera del trazado y con la red de caminos todavía cargando, el tramo
+     * de ti al camino se pintaba RECTO y se recolocaba solo al terminar la
+     * descarga. Era mentira y encima saltaba a la vista. Mientras no haya
+     * red, ese tramo no se pinta: la guía empieza en el trazado.
+     */
+    const esperandoCaminos = mejorMetros > 120 && !grafoRef.current
+
     const coordenadas: [number, number][] = [
-      [playerPosition.lon, playerPosition.lat],
+      ...(esperandoCaminos ? [] : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
       ...porCaminos,
       ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
     ]

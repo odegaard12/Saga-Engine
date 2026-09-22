@@ -34,14 +34,24 @@ export type TipoDeNodo = 'checkpoint' | 'qr' | 'minijuego' | 'coleccionable'
  * siguiera midiendo 118 píxeles—: atraviesa los montes, se amontona con
  * los vecinos y queda fatal. De lejos, chincheta; de cerca, modelo.
  */
-export const ZOOM_MINIMO_3D = 16.5
+export const ZOOM_MINIMO_3D = 14.5
 
 /**
- * Altura máxima del modelo en el mundo, en metros. Por encima de esto deja
- * de crecer y empieza a encogerse en pantalla, hasta que a ZOOM_MINIMO_3D
- * toma el relevo la chincheta.
+ * Tope de cordura para la altura del modelo en el mundo, en metros.
+ *
+ * NO es un tamaño: con 120 m, al zoom al que se juega —16— el nodo medía
+ * treinta píxeles y no se veía nada en 3D, sólo las chinchetas planas. Un
+ * señalizador que mantiene su tamaño en pantalla mide lo que tenga que
+ * medir; esto sólo corta un disparate.
  */
-const ALTURA_MAX_MUNDO = 120
+const ALTURA_MAX_MUNDO = 2500
+
+/**
+ * De lejos el nodo mengua: a ZOOM_MINIMO_3D ocupa la mitad que de cerca,
+ * así diez nodos juntos no tapan el mapa antes de que tomen el relevo las
+ * chinchetas.
+ */
+const menguaPorZoom = (z: number) => Math.min(1, Math.max(0.5, (z - 13.5) / 3))
 export type EstadoDeNodo = 'hecho' | 'actual' | 'pendiente'
 
 export type NodoTresD = {
@@ -219,6 +229,8 @@ type Pieza = {
   pulso: THREE.Mesh | null
   carteles: THREE.Mesh[]
   altura: number
+  /** Factor de escala del fotograma anterior: punto de partida de la medida. */
+  escala: number
   elevacion: number
   elevacionEn: number
 }
@@ -265,6 +277,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   /** Diagnóstico: framebuffer enlazado al entrar, y el píxel del nodo antes y después de pintar. */
   let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
   const reloj = new THREE.Clock()
+  const medidaPie = new THREE.Vector4()
+  const medidaPunta = new THREE.Vector4()
 
   /** Altura total del modelo con cartel, en metros. */
   const alturaTotal = (p: Pieza) => p.altura + 5.1
@@ -273,22 +287,26 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 118 : p.nodo.estado === 'pendiente' ? 76 : 92)
 
   /**
-   * Factor de escala para que el nodo mida `objetivoPx` en pantalla, entre
-   * su tamaño real y ALTURA_MAX_MUNDO.
+   * Factor para que el nodo ocupe `quieroPx` de alto EN PANTALLA, medido
+   * con la propia matriz de MapLibre.
    *
-   * Sin tope, al desampliar el factor se dispara —a zoom 12 pasa de 800— y
-   * el monolito se vuelve un pilar de kilómetros que cruza los montes.
-   * Tampoco sirve `map.project` para un nodo detrás de la cámara: devuelve
-   * un disparate, y el tope también lo corta.
+   * Medir píxeles por metro en el suelo y multiplicar no vale con el mapa
+   * inclinado: el metro de suelo se ve mucho más grande al pie de la
+   * pantalla que arriba, así que un nodo cercano salía gigante —llegó a
+   * tapar la pantalla entera— y uno lejano, diminuto. Aquí se proyectan el
+   * pie y la punta del modelo y se corrige el factor con lo que sale; dos
+   * vueltas bastan porque se parte del factor del fotograma anterior.
    */
-  function escalaDePantalla(p: Pieza): number {
-    if (!mapa) return 1
-    const a = mapa.project([p.nodo.lon, p.nodo.lat])
-    const b = mapa.project([p.nodo.lon, p.nodo.lat + 1 / 111320])
-    const pxPorMetro = Math.hypot(a.x - b.x, a.y - b.y)
-    if (!Number.isFinite(pxPorMetro) || pxPorMetro <= 0) return 1
+  function escalaDeNodo(p: Pieza, medirPx: (metros: number) => number, mengua: number): number {
+    const quieroPx = objetivoPx(p) * mengua
     const tope = ALTURA_MAX_MUNDO / alturaTotal(p)
-    return Math.min(tope, Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p))))
+    let k = Math.min(tope, Math.max(1, p.escala))
+    for (let vuelta = 0; vuelta < 2; vuelta += 1) {
+      const px = medirPx(k * alturaTotal(p))
+      if (!(px > 0.5)) return k
+      k = Math.min(tope, Math.max(1, (k * quieroPx) / px))
+    }
+    return k
   }
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -393,7 +411,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       malla.frustumCulled = false
     })
     escena.add(g)
-    return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, elevacion: Number.NaN, elevacionEn: 0 }
+    return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, escala: 1, elevacion: Number.NaN, elevacionEn: 0 }
   }
 
   function aplicarNodos(nodos: NodoTresD[]) {
@@ -479,6 +497,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * el modelo se queda flotando o hundido hasta que el giro termina.
        */
       const enMovimiento = mapa.isMoving() || mapa.isZooming() || mapa.isRotating()
+      // La matriz, ANTES del bucle: con ella se mide en píxeles de pantalla.
+      camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
+      const mitadAlto = Math.max(1, mapa.getCanvas().clientHeight) / 2
+      const mengua = menguaPorZoom(mapa.getZoom())
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
@@ -499,13 +521,18 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         const s = mc.meterInMercatorCoordinateUnits()
         /**
          * Tamaño de PANTALLA constante, como un pin. A escala real un
-         * monolito de 4,6 m mide 2 px a zoom 17 (medido: 0,49 px por
-         * metro): se pintaba bien y no se veía. Se mide cuántos píxeles
-         * ocupa un metro junto al nodo y se escala el modelo para que mida
-         * `objetivoPx`; nunca por debajo de su tamaño real, así al acercarse
-         * mucho crece como cualquier cosa del mundo.
+         * monolito de 4,6 m mide 2 px a zoom 17: se pintaba bien y no se
+         * veía. Nunca por debajo de su tamaño real, así al acercarse mucho
+         * crece como cualquier cosa del mundo.
          */
-        const k = escalaDePantalla(p)
+        const medirPx = (metros: number) => {
+          medidaPie.set(mc.x, mc.y, mc.z, 1).applyMatrix4(camara.projectionMatrix)
+          medidaPunta.set(mc.x, mc.y, mc.z + s * metros, 1).applyMatrix4(camara.projectionMatrix)
+          if (medidaPie.w <= 0 || medidaPunta.w <= 0) return 0
+          return Math.abs(medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w) * mitadAlto
+        }
+        const k = escalaDeNodo(p, medirPx, mengua)
+        p.escala = k
         p.grupo.matrix
           .makeTranslation(mc.x, mc.y, mc.z)
           .multiply(new THREE.Matrix4().makeScale(s * k, -s * k, s * k))
@@ -533,7 +560,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         }
       }
 
-      camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
       if (piezas.length && piezas[0].grupo.visible) {
         // Proyectar a mano el origen del primer nodo: si no cae en -1..1,
         // la convención de la matriz no es la que se cree.

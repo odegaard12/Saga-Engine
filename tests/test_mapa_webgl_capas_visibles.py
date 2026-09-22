@@ -307,6 +307,10 @@ def test_os_permisos_concedidos_lembranse() -> None:
     hook = (COMPONENTE.parents[1] / "hooks" / "usePermisos.ts").read_text(encoding="utf-8")
     assert "recordar(CLAVE_CAMARA)" in hook and "recordar(CLAVE_MOVIMIENTO)" in hook
     assert "recordado(CLAVE_MOVIMIENTO)" in hook and "addEventListener('pointerdown', alPrimerToque" in hook
+    # Memoria de SESIÓN: permanente dejó de pedirlos nunca, y si el sistema
+    # retiró la cámara no se sabía hasta estar en el monte.
+    assert "sessionStorage.getItem(clave)" in hook and "localStorage" not in hook
+    assert "olvidar(CLAVE_CAMARA)" in hook
 
 
 def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
@@ -378,13 +382,16 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "camara.layers.set(1)" in capa and "numero.layers.set(1)" in capa
     # El icono del tipo va dentro del cartel: suelto era de 1,2 m y no se leía.
     assert "g.drawImage(lienzoIcono(tipo)" in capa
-    # Tamaño de pantalla constante: a escala real (4,6 m) medían 2 px a zoom 17.
-    assert "escalaDePantalla(p)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
-    assert "Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))" in capa
-    # Tope de tamaño en el mundo y relevo de la chincheta: sin ellos, al
-    # desampliar el factor pasa de 800 y el nodo es un pilar de kilómetros.
+    # Tamaño de pantalla constante, medido con la matriz: con el mapa
+    # inclinado, los píxeles por metro del suelo mienten y un nodo cercano
+    # llegaba a tapar la pantalla.
+    assert "escalaDeNodo(p, medirPx, mengua)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
+    assert "medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w" in capa
+    assert "const quieroPx = objetivoPx(p) * mengua" in capa and "pxPorMetro" not in capa
+    # El relevo de la chincheta va por DEBAJO del zoom al que se juega (16):
+    # con 16,5 no se veía un solo modelo, sólo chinchetas planas.
     assert "const tope = ALTURA_MAX_MUNDO / alturaTotal(p)" in capa
-    assert "export const ZOOM_MINIMO_3D" in capa
+    assert "export const ZOOM_MINIMO_3D = 14.5" in capa
     assert "setLayerZoomRange(CAPA_NODOS_ICONOS, 0, enTresD ? ZOOM_MINIMO_3D : 24)" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
@@ -437,3 +444,25 @@ def test_un_coleccionable_non_e_un_minixogo_calquera() -> None:
         == "coleccionable"
     )
     assert kind_del_nodo({"interaction": {"type": "signal_hunt"}, "is_map_collectible": True}) == "coleccionable"
+
+
+def test_a_barra_de_carga_non_parpadea() -> None:
+    """
+    Cada fase mandaba su cuenta: la comprobación 0-100, la descarga otra vez
+    0-100 y entre medias tramos sin total, que ponían la barra en modo
+    indeterminado. Una sola escala, sin retrocesos y sin brincos.
+    """
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "const TRAMOS: Record<string, [number, number]>" in app
+    assert "objetivoCargaRef.current = Math.max(objetivoCargaRef.current, global)" in app
+    assert "const ratio = cargaPintada > 0 ? cargaPintada : undefined" in app
+
+
+def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
+    """
+    Fuera del trazado, el tramo de ti al camino se pintaba recto y se
+    recolocaba al terminar la descarga de la red de caminos.
+    """
+    fonte = COMPONENTE.read_text(encoding="utf-8")
+    assert "const esperandoCaminos = mejorMetros > 120 && !grafoRef.current" in fonte
+    assert "...(esperandoCaminos ? [] :" in fonte
