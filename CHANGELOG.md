@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.4
+## 5.25.5
+
+- Diagnóstico de la capa 3D: el asa de depuración enseña dónde cae el primer
+  nodo en el espacio de recorte y en pantalla, para comprobar la
+  convención de la matriz sin ver la pantalla.
+
+
 
 - **Los nodos 3D estaban en el cielo.** Con relieve, MapLibre expresa las
   alturas de las capas 3D relativas a la altura del terreno bajo el

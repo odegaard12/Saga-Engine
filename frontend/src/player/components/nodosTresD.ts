@@ -154,6 +154,7 @@ export type CapaNodosTresD = {
     renders: number
     rendersConPiezas: number
     ultimoError: string
+    ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null
   }
 }
 
@@ -171,6 +172,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let renders = 0
   let rendersConPiezas = 0
   let ultimoError = ''
+  /** Diagnóstico: dónde cae el primer nodo en el espacio de recorte (-1..1) y en pantalla. */
+  let ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null = null
   const reloj = new THREE.Clock()
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -366,6 +369,23 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       }
 
       camara.projectionMatrix.fromArray(Array.from(matriz as ArrayLike<number>))
+      if (piezas.length && piezas[0].grupo.visible) {
+        // Proyectar a mano el origen del primer nodo: si no cae en -1..1,
+        // la convención de la matriz no es la que se cree.
+        const p0 = piezas[0]
+        const mc0 = maplibregl.MercatorCoordinate.fromLngLat(
+          [p0.nodo.lon, p0.nodo.lat],
+          conTerreno ? p0.elevacion - elevacionObjetivo : 0
+        )
+        const v = new THREE.Vector4(mc0.x, mc0.y, mc0.z, 1).applyMatrix4(camara.projectionMatrix)
+        const pt = mapa.project([p0.nodo.lon, p0.nodo.lat])
+        ultimoClip = {
+          ndc: [v.x / v.w, v.y / v.w, v.z / v.w].map((k) => Math.round(k * 1000) / 1000),
+          pantalla: [Math.round(pt.x), Math.round(pt.y)],
+          mc: [mc0.x, mc0.y, mc0.z],
+          altura: conTerreno ? p0.elevacion - elevacionObjetivo : 0,
+        }
+      }
       try {
         renderer.resetState()
         renderer.render(escena, camara)
@@ -409,6 +429,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       animar = true
       mapa?.triggerRepaint()
     },
-    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError }),
+    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip }),
   }
 }
