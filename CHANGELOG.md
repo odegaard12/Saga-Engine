@@ -6,7 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.16
+## 5.25.17
+
+- **Los nodos se meten en el terreno.** El monolito se pintaba siempre por
+  delante de todo, también de un monte que estuviera en medio: parecía
+  pegado al cristal. Ahora se pinta en dos pasadas: el cuerpo respeta la
+  profundidad del relieve y el cartel del número va siempre encima, así
+  que un nodo detrás de una loma se sigue sabiendo dónde está.
+- **El icono del tipo va dentro del cartel**, como una chapa en la
+  esquina del número. Suelto medía 1,2 m pegado al cuerpo y a la
+  distancia a la que se juega no se leía.
+- La cota del terreno bajo cada nodo se vuelve a medir en cada fotograma
+  mientras el mapa se mueve. Con medio segundo de retraso, al girar o al
+  ampliar el modelo se quedaba flotando o hundido.
+
+
 
 - **Los nodos dejan de crecer al desampliar.** El tamaño en pantalla era
   constante sin tope: a zoom 12 el factor pasaba de 800 y el monolito era

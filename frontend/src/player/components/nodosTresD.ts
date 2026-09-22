@@ -55,36 +55,53 @@ export type NodoTresD = {
 
 const COLOR: Record<EstadoDeNodo, number> = { hecho: 0x22c55e, actual: 0x3b82f6, pendiente: 0xef4444 }
 
-function lienzo(pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+function lienzoCrudo(pintar: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = c.height = 256
   const g = c.getContext('2d')
   if (g) pintar(g)
+  return c
+}
+
+function lienzo(pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+  const c = lienzoCrudo(pintar)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 4
   return t
 }
 
-function texturaNumero(numero: number, hex: string): THREE.CanvasTexture {
+function texturaNumero(numero: number, hex: string, tipo: TipoDeNodo): THREE.CanvasTexture {
   return lienzo((g) => {
     g.fillStyle = '#ffffff'
     g.beginPath()
-    g.roundRect(28, 48, 200, 160, 40)
+    g.roundRect(16, 62, 190, 154, 38)
     g.fill()
     g.lineWidth = 14
     g.strokeStyle = hex
     g.stroke()
-    g.font = `900 ${numero >= 10 ? 104 : 124}px system-ui, -apple-system, sans-serif`
+    g.font = `900 ${numero >= 10 ? 96 : 116}px system-ui, -apple-system, sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillStyle = '#0b1220'
-    g.fillText(String(numero), 128, 132)
+    g.fillText(String(numero), 111, 141)
+    /**
+     * El icono del tipo va DENTRO del cartel, como una chapa en la esquina.
+     * Antes era un plano de 1,2 m pegado al cuerpo del monolito: a la
+     * distancia a la que se juega no se leía, así que el jugador no sabía
+     * si el nodo era un minijuego o algo que recoger.
+     */
+    g.beginPath()
+    g.arc(200, 76, 48, 0, Math.PI * 2)
+    g.fillStyle = hex
+    g.fill()
+    g.drawImage(lienzoIcono(tipo), 160, 36, 80, 80)
   })
 }
 
-function texturaIcono(tipo: TipoDeNodo): THREE.CanvasTexture {
-  return lienzo((g) => {
+/** El glifo del tipo: círculo blanco con el dibujo dentro, en 256×256. */
+function pintarIcono(g: CanvasRenderingContext2D, tipo: TipoDeNodo): void {
+  {
     g.fillStyle = '#ffffff'
     g.beginPath()
     g.arc(128, 128, 112, 0, Math.PI * 2)
@@ -156,8 +173,10 @@ function texturaIcono(tipo: TipoDeNodo): THREE.CanvasTexture {
       g.arc(182, 148, 8, 0, Math.PI * 2)
       g.fill()
     }
-  })
+  }
 }
+
+const lienzoIcono = (tipo: TipoDeNodo) => lienzoCrudo((g) => pintarIcono(g, tipo))
 
 /**
  * Invierte el sentido de las caras de una geometría.
@@ -327,16 +346,17 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
 
     // Cartel con el número y, debajo, el icono. Se orientan a la cámara en cada fotograma.
     const carteles: THREE.Mesh[] = []
-    const numero = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: texturaNumero(nodo.numero, hex), transparent: true, depthWrite: false }))
-    numero.position.y = 0.6 + H + 2.9
+    const numero = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, 3.4),
+      new THREE.MeshBasicMaterial({ map: texturaNumero(nodo.numero, hex, nodo.tipo), transparent: true, depthWrite: false })
+    )
+    numero.position.y = 0.6 + H + 3.0
     numero.renderOrder = 10
+    // Capa 1: el cartel se pinta en una segunda pasada, por encima del
+    // terreno, para no perderlo detrás de una loma. Ver render().
+    numero.layers.set(1)
     g.add(numero)
     carteles.push(numero)
-    const icono = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ map: texturaIcono(nodo.tipo), transparent: true, depthWrite: false }))
-    icono.position.y = 0.6 + H + 0.85
-    icono.renderOrder = 10
-    g.add(icono)
-    carteles.push(icono)
 
     let anillo: THREE.Mesh | null = null
     let pulso: THREE.Mesh | null = null
@@ -440,11 +460,17 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
 
       // De lejos mandan las chinchetas planas del mapa: ver ZOOM_MINIMO_3D.
       const zoomDeMas = mapa.getZoom() >= ZOOM_MINIMO_3D
+      /**
+       * Con el mapa quieto basta medio segundo; mientras se mueve, cada
+       * fotograma. Girando o ampliando, con la cota de hace medio segundo
+       * el modelo se queda flotando o hundido hasta que el giro termina.
+       */
+      const enMovimiento = mapa.isMoving() || mapa.isZooming() || mapa.isRotating()
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
         // las teselas de elevación llegan cuando llegan.
-        if (conTerreno && ahora - p.elevacionEn > 500) {
+        if (conTerreno && (enMovimiento || ahora - p.elevacionEn > 500)) {
           const e = mapa.queryTerrainElevation({ lng: p.nodo.lon, lat: p.nodo.lat })
           if (typeof e === 'number' && Number.isFinite(e)) p.elevacion = e
           p.elevacionEn = ahora
@@ -526,7 +552,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         const lienzo = mapa.getCanvas()
         renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.setScissorTest(false)
-        renderer.clearDepth()
         // Píxel del nodo ANTES de pintar (lo que MapLibre dejó) …
         const px = ultimoClip ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
         const leer = () => {
@@ -539,7 +564,19 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           return Array.from(buf)
         }
         const antes = leer()
+        /**
+         * Dos pasadas. La primera respeta la profundidad que deja MapLibre:
+         * el monte que haya delante tapa el monolito, que es lo que hace
+         * que parezca plantado en el terreno y no pegado al cristal. La
+         * segunda limpia la profundidad y pinta sólo los carteles (capa 1),
+         * así el número nunca se pierde detrás de una loma.
+         */
+        camara.layers.set(0)
         renderer.render(escena, camara)
+        renderer.clearDepth()
+        camara.layers.set(1)
+        renderer.render(escena, camara)
+        camara.layers.set(0)
         // … y DESPUÉS: si no cambia, no se está dibujando en este framebuffer.
         const despues = leer()
         diagnosticoPixel = { fbAlEntrar, antes, despues, en: px || [] }
