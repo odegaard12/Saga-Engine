@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.20
+## 5.25.21
+
+- **El tamaño del nodo ya no se queda clavado al acercarse.** El factor
+  partía del fotograma anterior: un modelo que de lejos medía 600 m tenía
+  la punta detrás de la cámara al acercarse, la medida fallaba y se
+  quedaba en 600 m con la cámara encima (medido: 618 m a zoom 19,4). Era
+  el "se corta" de cerca. Ahora se parte siempre de una sonda de un metro.
+
+
 
 - **Los nodos 3D dejan de "buguearse" de cerca y al mover la cámara.** La
   malla del terreno es basta vista de cerca y su superficie queda metros

@@ -387,7 +387,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # llegaba a tapar la pantalla.
     assert "escalaDeNodo(p, medirPx, mengua)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
     assert "medidaPunta.y / medidaPunta.w - medidaPie.y / medidaPie.w" in capa
-    assert "const quieroPx = objetivoPx(p) * mengua" in capa and "pxPorMetro" not in capa
+    # Sonda de un metro como punto de partida: del factor anterior, al
+    # acercarse la punta quedaba detrás de la cámara y el factor se clavaba
+    # (618 m medidos a zoom 19,4).
+    assert "const quieroPx = objetivoPx(p) * mengua" in capa and "const pxPorMetro = medirPx(1)" in capa
     # En 3D, modelos a cualquier zoom: Óscar no quiere chinchetas planas
     # "en 2D dentro del 3D". Y el cuerpo se pinta entero, sin que la malla
     # basta del terreno se coma trozos al mover la cámara.
