@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.14
+## 5.25.15
+
+- Nodos 3D: el cuerpo sale blanco de verdad. Las caras laterales reciben
+  mitad cielo y mitad suelo de la luz hemisférica; con el suelo verde
+  oscuro quedaban grises. Suelo claro y más luz ambiental.
+
+
 
 - **Nodos 3D: se ven el número, el icono y los anillos.** En Mercator la
   y crece hacia el sur; la matriz del modelo tiene determinante negativo

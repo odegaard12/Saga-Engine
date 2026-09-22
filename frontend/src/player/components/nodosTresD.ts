@@ -334,13 +334,16 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       renderer.autoClear = false
       // En Mercator el cielo está en +z (no en +y como en three.js por
       // defecto): las luces se orientan a ese eje o el cuerpo blanco sale gris.
-      const cielo = new THREE.HemisphereLight(0xffffff, 0x4b6b45, 1.6)
+      // Las caras laterales de un cilindro tienen la normal horizontal y
+      // reciben mitad cielo, mitad suelo: con el suelo verde oscuro el
+      // cuerpo blanco salía gris. Suelo claro y más ambiental.
+      const cielo = new THREE.HemisphereLight(0xffffff, 0xc7cfc4, 1.5)
       cielo.position.set(0, 0, 1)
       escena.add(cielo)
-      const sol = new THREE.DirectionalLight(0xfff3d6, 1.6)
+      const sol = new THREE.DirectionalLight(0xfff3d6, 1.3)
       sol.position.set(0.35, -0.3, 1)
       escena.add(sol)
-      escena.add(new THREE.AmbientLight(0xffffff, 0.35))
+      escena.add(new THREE.AmbientLight(0xffffff, 0.7))
       if (pendientes) {
         aplicarNodos(pendientes)
         pendientes = null
