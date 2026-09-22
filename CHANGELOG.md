@@ -6,7 +6,27 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.19
+## 5.25.20
+
+- **Los nodos 3D dejan de "buguearse" de cerca y al mover la cámara.** La
+  malla del terreno es basta vista de cerca y su superficie queda metros
+  por encima o por debajo del suelo real: al respetar su profundidad se
+  comía trozos del modelo, y como eso depende del ángulo, los trozos iban
+  y venían al mover la cámara. El cuerpo se pinta entero, siempre. La cota
+  del terreno se suaviza en unos fotogramas para que el modelo no brinque
+  al cambiar de nivel de tesela.
+- Las cuatro franjas de luz sueltas, que de cerca flotaban separadas del
+  cuerpo, son ahora dos bandas con la misma forma del cuerpo que lo
+  abrazan.
+- **En 3D no hay chinchetas planas a ningún zoom.** Los modelos menguan de
+  lejos y con eso basta.
+- **La guía hasta el nodo está desde el principio.** La red de caminos se
+  pide al arrancar, no después de pintar el mapa: el juego empezaba sin
+  esa línea y aparecía segundos después.
+- La barra de carga avanza despacio mientras espera al servidor, en vez
+  de quedarse clavada en el 3 % y saltar luego.
+
+
 
 - **Vuelven los nodos 3D.** El relevo a la chincheta plana estaba puesto en
   zoom 16,5 y el mapa del jugador vive en 16: no se veía un solo modelo,

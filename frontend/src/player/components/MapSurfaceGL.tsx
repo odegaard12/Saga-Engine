@@ -34,7 +34,7 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
-import { crearCapaNodosTresD, ZOOM_MINIMO_3D, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
+import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
  * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
@@ -935,13 +935,13 @@ export function MapSurfaceGL({
         }
         if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
           /**
-           * En 3D las chinchetas planas no se apagan: se quedan para el
-           * mapa de lejos, donde un modelo de tamaño constante en pantalla
-           * mediría cientos de metros. Por debajo de ZOOM_MINIMO_3D manda
-           * la chincheta; por encima, el modelo.
+           * En 3D no hay chinchetas planas a NINGÚN zoom. Se probó que
+           * tomaran el relevo de lejos y Óscar las vio "en 2D dentro del
+           * 3D": no las quiere. Los modelos menguan de lejos y con eso
+           * basta.
            */
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
-          vivo.setLayerZoomRange(CAPA_NODOS_ICONOS, 0, enTresD ? ZOOM_MINIMO_3D : 24)
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', enTresD ? 'none' : 'visible')
+          vivo.setLayerZoomRange(CAPA_NODOS_ICONOS, 0, 24)
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -1048,12 +1048,17 @@ export function MapSurfaceGL({
       window.clearInterval(esperarPintado)
       onListoRef.current?.()
       capaNodosRef.current?.arrancarAnimacion()
-      // La red de caminos (21 MB) se pide DESPUÉS de pintar, para no
-      // competir con las teselas. El service worker la guarda al pasar.
-      void cargarGrafo().then((grafo) => {
-        grafoRef.current = grafo
-      })
     }, 250)
+
+    /**
+     * La red de caminos se pide desde el primer momento, no después de
+     * pintar. Esperando al mapa, el juego arrancaba sin la guía hasta el
+     * nodo y ésta aparecía segundos después. El service worker la guarda al
+     * pasar, así que a partir de la segunda vez llega al instante.
+     */
+    void cargarGrafo().then((grafo) => {
+      grafoRef.current = grafo
+    })
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.

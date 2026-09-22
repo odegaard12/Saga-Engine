@@ -34,7 +34,7 @@ export type TipoDeNodo = 'checkpoint' | 'qr' | 'minijuego' | 'coleccionable'
  * siguiera midiendo 118 píxeles—: atraviesa los montes, se amontona con
  * los vecinos y queda fatal. De lejos, chincheta; de cerca, modelo.
  */
-export const ZOOM_MINIMO_3D = 14.5
+export const ZOOM_MINIMO_3D = 0
 
 /**
  * Tope de cordura para la altura del modelo en el mundo, en metros.
@@ -348,18 +348,16 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     cuerpo.position.y = 0.6 + H / 2
     g.add(cuerpo)
 
-    // Franja de luz en cuatro caras.
+    /**
+     * Dos bandas de luz con la MISMA forma que el cuerpo, un pelo más
+     * anchas, que lo abrazan. Antes eran cuatro franjas sueltas a 1,05 m
+     * del eje: de lejos pasaban, pero de cerca se veían flotando separadas
+     * del cuerpo, como un fallo de dibujo.
+     */
     const franjas: THREE.Mesh[] = []
-    for (let i = 0; i < 4; i += 1) {
-      /**
-       * Radio 1,05: por fuera de la cara de cualquier forma. A 0,86 las
-       * franjas quedaban DENTRO del cuerpo hexagonal del coleccionable y
-       * el nodo salía blanco liso, sin el color de su estado.
-       */
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.24, H - 1.0, 0.03), luz(1.1))
-      const a = (i / 4) * Math.PI * 2
-      f.position.set(Math.sin(a) * 1.05, 0.6 + H / 2 - 0.1, Math.cos(a) * 1.05)
-      f.rotation.y = a
+    for (const y of [0.6 + H * 0.3, 0.6 + H * 0.72]) {
+      const f = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.89, 0.34), luz(1.1))
+      f.position.y = y
       g.add(f)
       franjas.push(f)
     }
@@ -507,7 +505,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         // las teselas de elevación llegan cuando llegan.
         if (conTerreno && (enMovimiento || ahora - p.elevacionEn > 500)) {
           const e = mapa.queryTerrainElevation({ lng: p.nodo.lon, lat: p.nodo.lat })
-          if (typeof e === 'number' && Number.isFinite(e)) p.elevacion = e
+          if (typeof e === 'number' && Number.isFinite(e)) {
+            // Al cambiar de nivel de tesela la cota da un saltito y el
+            // modelo brincaba con el mapa en movimiento: se llega a la
+            // cota nueva en unos fotogramas, salvo la primera vez.
+            const cerca = Number.isFinite(p.elevacion) && Math.abs(e - p.elevacion) < 40
+            p.elevacion = cerca ? p.elevacion + (e - p.elevacion) * 0.2 : e
+          }
           p.elevacionEn = ahora
         }
         // Con relieve y sin altura conocida todavía, el modelo se quedaría
@@ -610,6 +614,16 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
          * segunda limpia la profundidad y pinta sólo los carteles (capa 1),
          * así el número nunca se pierde detrás de una loma.
          */
+        /**
+         * Sin oclusión por el terreno, tampoco para el cuerpo. Se probó
+         * respetar la profundidad del relieve para que un monte tapara el
+         * nodo: de cerca la malla del terreno es basta (teselas z14 vistas
+         * a z19), su superficie queda metros por encima o por debajo del
+         * suelo real y se comía trozos del modelo; y como eso cambia con el
+         * ángulo, al mover la cámara los trozos aparecían y desaparecían.
+         * "Se buguean". Un señalizador se ve entero, siempre.
+         */
+        renderer.clearDepth()
         camara.layers.set(0)
         renderer.render(escena, camara)
         renderer.clearDepth()
