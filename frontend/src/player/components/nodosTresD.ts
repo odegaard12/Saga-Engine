@@ -158,6 +158,7 @@ export type CapaNodosTresD = {
     ultimasOpciones: unknown
     diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null
   }
+  interno: () => { escena: THREE.Scene; piezas: unknown[]; renderer: THREE.WebGLRenderer | null }
 }
 
 export function crearCapaNodosTresD(id: string): CapaNodosTresD {
@@ -495,5 +496,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       mapa?.triggerRepaint()
     },
     estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip, ultimasOpciones, diagnosticoPixel }),
+    /** Solo depuración: la escena viva, para tocar materiales desde el banco. */
+    interno: () => ({ escena, piezas, renderer }),
   }
 }

@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.11
+## 5.25.12
+
+- Diagnóstico de la capa 3D: el asa expone la escena viva (solo en el
+  banco) para tocar materiales sin redesplegar. Se investiga por qué el
+  cartel del número y el anillo del suelo, los únicos con transparencia,
+  no aparecen.
+
+
 
 - **Nodos 3D: luz y proporciones.** Las luces apuntaban al +y de three.js,
   pero en Mercator el cielo está en +z: el cuerpo blanco salía gris oscuro.
