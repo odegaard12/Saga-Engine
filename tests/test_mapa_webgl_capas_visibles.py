@@ -372,8 +372,12 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Altura ABSOLUTA en unidades Mercator: medido proyectando con la matriz
     # de MapLibre. "Relativa al objetivo de la cámara" se iba fuera de plano.
     assert "const elevacionObjetivo = 0" in capa and "getCameraTargetElevation()" not in capa
-    # Viewport entero, sin recorte y profundidad limpia: si no, el terreno los tapa.
-    assert "renderer.clearDepth()" in capa and "renderer.setScissorTest(false)" in capa
+    # Viewport entero y sin recorte; la profundidad se limpia SOLO para la
+    # segunda pasada: el cuerpo lo tapa el monte, el cartel no.
+    assert "renderer.setScissorTest(false)" in capa
+    assert "camara.layers.set(1)" in capa and "numero.layers.set(1)" in capa
+    # El icono del tipo va dentro del cartel: suelto era de 1,2 m y no se leía.
+    assert "g.drawImage(lienzoIcono(tipo)" in capa
     # Tamaño de pantalla constante: a escala real (4,6 m) medían 2 px a zoom 17.
     assert "escalaDePantalla(p)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
     assert "Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))" in capa
