@@ -6,7 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.26
+## 5.25.27
+
+- **Los nodos salen del lienzo 3D.** Dibujarlos con three.js dentro del
+  lienzo de MapLibre daba dientes de sierra en el móvil (sin antialiasing
+  de contexto, y activarlo rompía las fotos) y temblores al mover. Ahora
+  son símbolos del propio mapa con la bola horneada en la imagen, a tres
+  veces la resolución de pantalla: luz, sombra, brillo, número, chapa del
+  tipo y peana con la forma del tipo. MapLibre los pinta en el mismo
+  fotograma que el terreno y a su altura exacta; nítidos a cualquier
+  zoom, sin nada que parpadee, en 2D y en 3D. El nodo en juego lleva un
+  resplandor que late.
+
+
 
 - **Las fotos del mapa dejan de aparecer y desaparecer.** Era el
   antialiasing de contexto de la 5.25.24: con relieve, MapLibre decide qué
