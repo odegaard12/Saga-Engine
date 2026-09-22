@@ -833,13 +833,18 @@ export function MapSurfaceGL({
       pitch: tresD ? PITCH_3D : 0,
       attributionControl: false,
       /**
-       * Contexto WebGL con antialiasing (MSAA). MapLibre lo crea sin él
-       * por defecto, y lo que dibuja three.js encima -las bolas, los aros,
-       * la peana- salía con dientes de sierra: "las líneas alrededor del
-       * nodo son como píxeles". En MapLibre 6 va en los atributos del
-       * contexto (antes era `antialias` a secas).
+       * SIN antialiasing de contexto (MSAA). Se probó en 5.25.24 y en el
+       * móvil no se notó nada, pero desde entonces las fotos del mapa
+       * aparecían y desaparecían: con relieve, MapLibre decide qué
+       * símbolos tapa el terreno leyendo profundidad, y con el lienzo
+       * multimuestreado eso se rompe. La calidad de lo 3D va por otro
+       * lado: texturas difuminadas y geometría con más caras.
+       *
+       * Tope de zoom 19,5: la foto aérea no tiene más detalle que z19, y
+       * por encima el mapa estira píxeles; eso era "amplío mucho y se
+       * pixela", y ningún antialiasing lo arregla.
        */
-      canvasContextAttributes: { antialias: true },
+      maxZoom: 19.5,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
