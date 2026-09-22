@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.8
+## 5.25.9
+
+- Diagnóstico de la capa 3D: framebuffer enlazado al entrar y color del
+  píxel del nodo antes y después de pintar, para saber si no se dibuja o
+  si se dibuja y algo lo pisa.
+
+
 
 - **Los nodos 3D se pintan encima del terreno.** Con la proyección medida
   y correcta seguían sin verse: MapLibre deja puestos su viewport, su

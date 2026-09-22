@@ -156,6 +156,7 @@ export type CapaNodosTresD = {
     ultimoError: string
     ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null
     ultimasOpciones: unknown
+    diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null
   }
 }
 
@@ -177,6 +178,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null = null
   /** Diagnóstico: lo último que MapLibre pasó a render(), tal cual. */
   let ultimasOpciones: unknown = null
+  /** Diagnóstico: framebuffer enlazado al entrar, y el píxel del nodo antes y después de pintar. */
+  let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
   const reloj = new THREE.Clock()
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -295,9 +298,10 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       anadida = false
       mapa = null
     },
-    render(_gl, opciones) {
+    render(gl, opciones) {
       renders += 1
       ultimasOpciones = opciones
+      const fbAlEntrar = gl.getParameter(gl.FRAMEBUFFER_BINDING) ? 'offscreen' : 'lienzo'
       if (!renderer || !mapa || !visible || piezas.length === 0) return
       /**
        * MapLibre 6 pasa un objeto con la matriz dentro
@@ -404,7 +408,22 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         renderer.setViewport(0, 0, lienzo.width, lienzo.height)
         renderer.setScissorTest(false)
         renderer.clearDepth()
+        // Píxel del nodo ANTES de pintar (lo que MapLibre dejó) …
+        const px = ultimoClip ? [ultimoClip.pantalla[0], ultimoClip.pantalla[1]] : null
+        const leer = () => {
+          if (!px) return [-1, -1, -1, -1]
+          const escala = lienzo.width / Math.max(1, lienzo.clientWidth)
+          const x = Math.round(px[0] * escala)
+          const y = Math.round(lienzo.height - px[1] * escala)
+          const buf = new Uint8Array(4)
+          gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf)
+          return Array.from(buf)
+        }
+        const antes = leer()
         renderer.render(escena, camara)
+        // … y DESPUÉS: si no cambia, no se está dibujando en este framebuffer.
+        const despues = leer()
+        diagnosticoPixel = { fbAlEntrar, antes, despues, en: px || [] }
         rendersConPiezas += 1
       } catch (fallo) {
         ultimoError = String(fallo).slice(0, 200)
@@ -445,6 +464,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       animar = true
       mapa?.triggerRepaint()
     },
-    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip, ultimasOpciones }),
+    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip, ultimasOpciones, diagnosticoPixel }),
   }
 }
