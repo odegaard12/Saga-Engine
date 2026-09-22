@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.6
+## 5.25.7
+
+- **La altura de los nodos 3D vuelve a ser absoluta.** Medido proyectando a
+  mano con la matriz que pasa MapLibre: con la elevación absoluta el nodo
+  cae exactamente donde el mapa lo pinta; relativa al objetivo de la
+  cámara (5.25.4) se iba fuera de plano. Aquel cambio fue un error; los
+  fallos reales eran los dos anteriores (matriz de MapLibre 6 y matriz de
+  mundo de three.js), ya corregidos.
+
+
 
 - Diagnóstico de la capa 3D: el asa expone también lo último que MapLibre
   pasa a `render()` (matrices y coordenadas de tesela), para averiguar en

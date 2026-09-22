@@ -319,14 +319,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       const conTerreno = Boolean(mapa.getTerrain())
       const ahora = performance.now()
       /**
-       * Con relieve, MapLibre expresa las alturas de las capas 3D RELATIVAS
-       * a la altura del terreno bajo el objetivo de la cámara, no
-       * absolutas. Con la altura absoluta, un nodo a 892 m se dibujaba 892 m
-       * por encima del suelo: en el cielo, fuera de plano, invisible. Medido
-       * en el banco: elevación del nodo 892, elevación del objetivo 892, y
-       * nada en pantalla.
+       * Altura ABSOLUTA en unidades Mercator. Medido proyectando a mano el
+       * nodo con la matriz que pasa MapLibre: con la elevación absoluta el
+       * punto cae donde `map.project` lo pinta (0.105, 0.733 frente a
+       * 0.105, 0.737); relativa al objetivo de la cámara se va fuera de
+       * plano. Aquí hubo una vuelta con "relativa" que era un error.
        */
-      const elevacionObjetivo = conTerreno && typeof mapa.getCameraTargetElevation === 'function' ? mapa.getCameraTargetElevation() : 0
+      const elevacionObjetivo = 0
 
       for (const p of piezas) {
         // Elevación del terreno bajo el nodo, refrescada cada medio segundo:
