@@ -390,7 +390,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
 
     // La bola, del color del estado. Una esfera se ve igual desde cualquier
     // lado: ni se deforma al girar ni al acercarse.
-    const bola = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 28), luz(0.55))
+    const bola = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 44), luz(0.55))
     bola.position.y = H
     g.add(bola)
 
@@ -699,18 +699,17 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
        * la guía fuera del trazado volvía a salir recta.
        */
       /**
-       * Al ritmo del navegador, no a veinte por segundo. El repintado iba
-       * con un temporizador de 50 ms y la bola flotaba a tirones: "el
-       * renderizado no es fluido". Ahora se pide el fotograma siguiente y
-       * MapLibre pinta a la cadencia de la pantalla mientras la pestaña se
-       * vea; oculta, nada.
+       * Treinta fotogramas por segundo, con temporizador. A veinte (50 ms)
+       * la bola flotaba a tirones; a la cadencia de la pantalla (rAF) el
+       * mapa entero se repintaba sin parar y las fotos parpadeaban. Treinta
+       * es fluido a la vista y deja respirar al móvil.
        */
       if (animar && !repintadoProgramado && document.visibilityState === 'visible') {
         repintadoProgramado = true
-        window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
           repintadoProgramado = false
           mapa?.triggerRepaint()
-        })
+        }, 33)
       }
     },
   }

@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.25
+## 5.25.26
+
+- **Las fotos del mapa dejan de aparecer y desaparecer.** Era el
+  antialiasing de contexto de la 5.25.24: con relieve, MapLibre decide qué
+  símbolos tapa el terreno leyendo profundidad, y con el lienzo
+  multimuestreado eso se rompía. Fuera; en el móvil no se notaba de todos
+  modos.
+- **Tope de zoom en 19,5.** La foto aérea no tiene más detalle que z19 y
+  por encima el mapa estira píxeles: eso era la pixelación al ampliar
+  mucho, y no la arregla ningún antialiasing.
+- La bola lleva más caras, y la animación va a treinta fotogramas por
+  segundo: repintar sin parar hacía parpadear a las fotos.
+
+
 
 - **El aro del suelo es un brillo difuminado, no una línea.** Era un
   anillo de geometría que a la distancia de juego medía dos píxeles: se

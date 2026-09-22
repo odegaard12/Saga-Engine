@@ -394,7 +394,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
     # Bolas: una esfera no se deforma al girar ni al acercarse. Flota con
     # fase propia y la peana lleva la forma del tipo.
-    assert "new THREE.SphereGeometry(R, 40, 28)" in capa and "fase: Math.random()" in capa
+    assert "new THREE.SphereGeometry(R, 64, 44)" in capa and "fase: Math.random()" in capa
     assert "const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)" in capa
     # El aro del suelo es un degradado, no geometría de dos píxeles; y la
     # cota se toma con el mapa quieto, que en movimiento daba saltos.
@@ -425,10 +425,12 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     )
     assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
     assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
-    # MSAA en el contexto: sin él, todo lo de three.js sale con dientes de sierra.
-    assert "canvasContextAttributes: { antialias: true }" in fonte
-    # Repintado al ritmo de la pantalla, no cada 50 ms.
-    assert "window.requestAnimationFrame(() => {" in capa and "}, 50)" not in capa
+    # Sin MSAA de contexto (rompía la oclusión de símbolos con relieve:
+    # las fotos aparecían y desaparecían) y con tope de zoom donde acaba
+    # el detalle de la foto aérea.
+    assert "antialias: true" not in fonte and "maxZoom: 19.5," in fonte
+    # Repintado a treinta por segundo: ni a tirones ni sin parar.
+    assert "}, 33)" in capa and "}, 50)" not in capa
     assert "capaNodosRef.current?.setNodos(" in fonte
     mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
     assert '"kind": kind_del_nodo(node)' in mision
