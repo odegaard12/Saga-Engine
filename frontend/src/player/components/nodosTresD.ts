@@ -182,6 +182,22 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let diagnosticoPixel: { fbAlEntrar: string; antes: number[]; despues: number[]; en: number[] } | null = null
   const reloj = new THREE.Clock()
 
+  /** Altura total del modelo con cartel, en metros. */
+  const alturaTotal = (p: Pieza) => p.altura + 3.2
+
+  /** Píxeles de pantalla que se quieren por nodo según su estado. */
+  const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 92 : p.nodo.estado === 'pendiente' ? 58 : 70)
+
+  /** Factor de escala para que el nodo mida `objetivoPx` en pantalla; mínimo 1 (tamaño real). */
+  function escalaDePantalla(p: Pieza): number {
+    if (!mapa) return 1
+    const a = mapa.project([p.nodo.lon, p.nodo.lat])
+    const b = mapa.project([p.nodo.lon, p.nodo.lat + 1 / 111320])
+    const pxPorMetro = Math.hypot(a.x - b.x, a.y - b.y)
+    if (!Number.isFinite(pxPorMetro) || pxPorMetro <= 0) return 1
+    return Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))
+  }
+
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
   const zocaloMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7, metalness: 0.05 })
 
@@ -348,9 +364,18 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
           conTerreno ? p.elevacion - elevacionObjetivo - 0.3 : 0
         )
         const s = mc.meterInMercatorCoordinateUnits()
+        /**
+         * Tamaño de PANTALLA constante, como un pin. A escala real un
+         * monolito de 4,6 m mide 2 px a zoom 17 (medido: 0,49 px por
+         * metro): se pintaba bien y no se veía. Se mide cuántos píxeles
+         * ocupa un metro junto al nodo y se escala el modelo para que mida
+         * `objetivoPx`; nunca por debajo de su tamaño real, así al acercarse
+         * mucho crece como cualquier cosa del mundo.
+         */
+        const k = escalaDePantalla(p)
         p.grupo.matrix
           .makeTranslation(mc.x, mc.y, mc.z)
-          .multiply(new THREE.Matrix4().makeScale(s, -s, s))
+          .multiply(new THREE.Matrix4().makeScale(s * k, -s * k, s * k))
           .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2))
         /**
          * Con `matrixAutoUpdate` apagado, three.js NO recalcula la matriz
