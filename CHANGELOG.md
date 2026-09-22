@@ -6,7 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.12
+## 5.25.13
+
+- Diagnóstico de la capa 3D: `__sagaCapa3D()` en el banco da acceso a la
+  escena viva.
+
+
 
 - Diagnóstico de la capa 3D: el asa expone la escena viva (solo en el
   banco) para tocar materiales sin redesplegar. Se investiga por qué el
