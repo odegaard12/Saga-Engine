@@ -421,6 +421,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     )
     assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
     assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
+    # MSAA en el contexto: sin él, todo lo de three.js sale con dientes de sierra.
+    assert "canvasContextAttributes: { antialias: true }" in fonte
+    # Repintado al ritmo de la pantalla, no cada 50 ms.
+    assert "window.requestAnimationFrame(() => {" in capa and "}, 50)" not in capa
     assert "capaNodosRef.current?.setNodos(" in fonte
     mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
     assert '"kind": kind_del_nodo(node)' in mision
