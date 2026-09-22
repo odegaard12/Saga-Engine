@@ -10,17 +10,16 @@ import * as maplibregl from 'maplibre-gl'
  * inclinan, se tapan y se escalan con el relieve como cualquier otra cosa
  * del mapa. Nada de calcomanías.
  *
- * El diseño acordado: monolito blanco, sobrio; la BASE y la tapa con la
- * forma del tipo de nodo (redonda checkpoint, cuadrada QR, triangular
- * minijuego, hexagonal coleccionable); el COLOR es el estado (verde hecho, azul en juego, rojo
- * pendiente) en una franja de luz vertical, la tapa y un disco en el suelo;
- * el número grande siempre de frente e icono pequeño del tipo debajo. La
- * animación es mínima: la luz respira; el nodo en juego lleva un anillo
- * fino girando y un pulso suave en el suelo.
- *
- * En cuesta: el zócalo se hunde 30 cm en el terreno y es alto, así que en
- * una ladera "muerde" el suelo por el lado de arriba en vez de quedar
- * flotando por el de abajo.
+ * El diseño: una BOLA del color del estado (verde hecho, azul en juego,
+ * rojo pendiente) flotando sobre un mástil fino, con el número en un
+ * cartel redondo delante y la chapa del tipo en su esquina; la PEANA en
+ * el suelo lleva la forma del tipo (redonda checkpoint, cuadrada QR,
+ * triangular minijuego, hexagonal coleccionable) y un aro de color. Óscar
+ * lo pidió así: "prefería las bolas". Y tiene una ventaja que el monolito
+ * no tenía: una esfera se ve igual desde cualquier lado, así que ni se
+ * deforma al girar ni al acercarse mucho. La animación es mínima: la
+ * bola flota despacio y su halo respira; el nodo en juego lleva un anillo
+ * girando y un pulso en el suelo.
  */
 
 export type TipoDeNodo = 'checkpoint' | 'qr' | 'minijuego' | 'coleccionable'
@@ -83,18 +82,19 @@ function lienzo(pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasText
 
 function texturaNumero(numero: number, hex: string, tipo: TipoDeNodo): THREE.CanvasTexture {
   return lienzo((g) => {
-    g.fillStyle = '#ffffff'
+    // Cartel redondo, a juego con la bola.
     g.beginPath()
-    g.roundRect(16, 62, 190, 154, 38)
+    g.arc(128, 128, 116, 0, Math.PI * 2)
+    g.fillStyle = '#ffffff'
     g.fill()
-    g.lineWidth = 14
+    g.lineWidth = 12
     g.strokeStyle = hex
     g.stroke()
-    g.font = `900 ${numero >= 10 ? 96 : 116}px system-ui, -apple-system, sans-serif`
+    g.font = `900 ${numero >= 10 ? 104 : 122}px system-ui, -apple-system, sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillStyle = '#0b1220'
-    g.fillText(String(numero), 111, 141)
+    g.fillText(String(numero), 122, 140)
     /**
      * El icono del tipo va DENTRO del cartel, como una chapa en la esquina.
      * Antes era un plano de 1,2 m pegado al cuerpo del monolito: a la
@@ -102,10 +102,10 @@ function texturaNumero(numero: number, hex: string, tipo: TipoDeNodo): THREE.Can
      * si el nodo era un minijuego o algo que recoger.
      */
     g.beginPath()
-    g.arc(200, 76, 48, 0, Math.PI * 2)
+    g.arc(192, 66, 40, 0, Math.PI * 2)
     g.fillStyle = hex
     g.fill()
-    g.drawImage(lienzoIcono(tipo), 160, 36, 80, 80)
+    g.drawImage(lienzoIcono(tipo), 160, 34, 64, 64)
   })
 }
 
@@ -228,7 +228,10 @@ type Pieza = {
   anillo: THREE.Mesh | null
   pulso: THREE.Mesh | null
   carteles: THREE.Mesh[]
+  /** Altura del centro de la bola sobre el suelo, en metros. */
   altura: number
+  /** Fase del vaivén, distinta en cada nodo para que no floten a la vez. */
+  fase: number
   /** Factor de escala del fotograma anterior: punto de partida de la medida. */
   escala: number
   elevacion: number
@@ -279,13 +282,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   const reloj = new THREE.Clock()
 
   /** Altura total del modelo con cartel, en metros. */
-  const alturaTotal = (p: Pieza) => p.altura + 5.1
+  const alturaTotal = (p: Pieza) => p.altura + 2.4
 
   /** Píxeles de pantalla que se quieren por nodo según su estado. */
   const objetivoPx = (p: Pieza) => (p.nodo.estado === 'actual' ? 118 : p.nodo.estado === 'pendiente' ? 76 : 92)
 
   /** Altura del nodo "normal" a zoom 17, en metros: la que se veía bien. */
-  const ALTURA_A_ZOOM_17 = 45
+  const ALTURA_A_ZOOM_17 = 70
 
   /**
    * Factor de escala que depende SÓLO del zoom, igual para todos los nodos.
@@ -303,7 +306,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   function escalaPorZoom(p: Pieza, zoom: number): number {
     const tope = ALTURA_MAX_MUNDO / alturaTotal(p)
     const relativo = objetivoPx(p) / 92
-    const altura = ALTURA_A_ZOOM_17 * Math.pow(2, 17 - zoom) * menguaPorZoom(zoom) * relativo
+    /**
+     * Exponente 0,85 y no 1: con tamaño de pantalla exactamente constante,
+     * al acercarse el nodo parecía cada vez más pequeño frente a las
+     * casas y los caminos, que sí crecen. Así crece un poco al acercarse
+     * y mengua un poco más al alejarse.
+     */
+    const altura = ALTURA_A_ZOOM_17 * Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom) * relativo
     return Math.min(tope, Math.max(1, altura / alturaTotal(p)))
   }
 
@@ -329,58 +338,53 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     const hex = '#' + color.toString(16).padStart(6, '0')
     const g = new THREE.Group()
     g.matrixAutoUpdate = false
-    const H = nodo.estado === 'actual' ? 4.6 : 4.0
+    /** Radio de la bola y altura de su centro sobre el suelo, en metros. */
+    const R = nodo.estado === 'actual' ? 1.75 : 1.5
+    const H = nodo.estado === 'actual' ? 4.4 : 3.9
     const luz = (k: number) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: k, roughness: 0.3 })
 
-    // Zócalo hundido: muerde la ladera en vez de flotar.
-    const zocalo = new THREE.Mesh(formaDelTipo(nodo.tipo, 1.3, 0.9), zocaloMat)
-    zocalo.position.y = 0.15
-    g.add(zocalo)
-    const disco = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.8, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false }))
+    // Peana oscura con la forma del tipo: redonda, cuadrada, triangular o hexagonal.
+    const peana = new THREE.Mesh(formaDelTipo(nodo.tipo, 1.0, 0.5), zocaloMat)
+    peana.position.y = 0.1
+    g.add(peana)
+
+    // Aro del color del estado en el suelo.
+    const disco = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.55, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false }))
     disco.rotation.x = -Math.PI / 2
-    disco.position.y = 0.78
+    disco.position.y = 0.42
     g.add(disco)
 
-    // Cuerpo con la forma del tipo, blanco mate.
-    const cuerpo = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.85, H), cuerpoMat)
-    cuerpo.position.y = 0.6 + H / 2
-    g.add(cuerpo)
+    // Mástil fino de la peana a la bola.
+    const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, H - 0.35, 12), cuerpoMat)
+    mastil.position.y = 0.35 + (H - 0.35) / 2
+    g.add(mastil)
 
-    /**
-     * Dos bandas de luz con la MISMA forma que el cuerpo, un pelo más
-     * anchas, que lo abrazan. Antes eran cuatro franjas sueltas a 1,05 m
-     * del eje: de lejos pasaban, pero de cerca se veían flotando separadas
-     * del cuerpo, como un fallo de dibujo.
-     */
-    const franjas: THREE.Mesh[] = []
-    for (const y of [0.6 + H * 0.3, 0.6 + H * 0.72]) {
-      const f = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.89, 0.34), luz(1.1))
-      f.position.y = y
-      g.add(f)
-      franjas.push(f)
-    }
-    /**
-     * El coleccionable remata en punta, como la gema de su icono: a la
-     * distancia a la que se juega, la silueta distingue más que la forma
-     * de la base, que casi no se ve.
-     */
-    const tapa =
-      nodo.tipo === 'coleccionable'
-        ? new THREE.Mesh(new THREE.ConeGeometry(1.05, 1.5, 6), luz(1.4))
-        : new THREE.Mesh(formaDelTipo(nodo.tipo, 0.9, 0.18), luz(1.4))
-    tapa.position.y = 0.6 + H + (nodo.tipo === 'coleccionable' ? 0.7 : 0.08)
-    g.add(tapa)
+    // La bola, del color del estado. Una esfera se ve igual desde cualquier
+    // lado: ni se deforma al girar ni al acercarse.
+    const bola = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 28), luz(0.55))
+    bola.position.y = H
+    g.add(bola)
 
-    // Cartel con el número y, debajo, el icono. Se orientan a la cámara en cada fotograma.
+    // Halo suave alrededor, que respira.
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(R * 1.18, 32, 20),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, transparent: true, opacity: 0.16, depthWrite: false, roughness: 1 })
+    )
+    halo.position.y = H
+    g.add(halo)
+    const franjas: THREE.Mesh[] = [halo]
+
+    // Cartel redondo con el número y la chapa del tipo, delante de la bola,
+    // siempre de frente. Más pequeño que la bola: queda un aro de color
+    // alrededor y se lee como una bola con etiqueta.
     const carteles: THREE.Mesh[] = []
     const numero = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.4, 3.4),
+      new THREE.PlaneGeometry(R * 1.55, R * 1.55),
       new THREE.MeshBasicMaterial({ map: texturaNumero(nodo.numero, hex, nodo.tipo), transparent: true, depthWrite: false })
     )
-    numero.position.y = 0.6 + H + 3.0
+    numero.position.y = H
     numero.renderOrder = 10
-    // Capa 1: el cartel se pinta en una segunda pasada, por encima del
-    // terreno, para no perderlo detrás de una loma. Ver render().
+    // Capa 1: el cartel se pinta en una segunda pasada, por encima de todo.
     numero.layers.set(1)
     g.add(numero)
     carteles.push(numero)
@@ -388,13 +392,13 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     let anillo: THREE.Mesh | null = null
     let pulso: THREE.Mesh | null = null
     if (nodo.estado === 'actual') {
-      anillo = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.05, 10, 96), luz(1.2))
-      anillo.position.y = 0.6 + H - 0.4
-      anillo.rotation.x = Math.PI / 2 + 0.2
+      anillo = new THREE.Mesh(new THREE.TorusGeometry(R * 1.45, 0.06, 10, 96), luz(1.2))
+      anillo.position.y = H
+      anillo.rotation.x = Math.PI / 2 + 0.35
       g.add(anillo)
-      pulso = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.55, 64), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }))
+      pulso = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.45, 64), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }))
       pulso.rotation.x = -Math.PI / 2
-      pulso.position.y = 0.64
+      pulso.position.y = 0.46
       g.add(pulso)
     }
     g.traverse((o) => {
@@ -402,12 +406,24 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       if (!malla.isMesh) return
       invertirCaras(malla.geometry)
       // El recorte por frustum de three.js con la matriz de MapLibre
-      // descartaba 71 de 102 mallas que estaban en pantalla. Son cien
-      // mallas: se pintan todas y punto.
+      // descartaba mallas que estaban en pantalla. Se pintan todas.
       malla.frustumCulled = false
     })
     escena.add(g)
-    return { grupo: g, nodo, franjas, tapa, anillo, pulso, carteles, altura: H, escala: 1, elevacion: Number.NaN, elevacionEn: 0 }
+    return {
+      grupo: g,
+      nodo,
+      franjas,
+      tapa: bola,
+      anillo,
+      pulso,
+      carteles,
+      altura: H,
+      fase: Math.random() * Math.PI * 2,
+      escala: 1,
+      elevacion: Number.NaN,
+      elevacionEn: 0,
+    }
   }
 
   function aplicarNodos(nodos: NodoTresD[]) {
@@ -547,6 +563,12 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
         for (const f of p.franjas) (f.material as THREE.MeshStandardMaterial).emissiveIntensity = respira
         ;(p.tapa.material as THREE.MeshStandardMaterial).emissiveIntensity = respira + 0.2
         if (p.anillo) p.anillo.rotation.z = t * 0.6
+        // La bola flota: sube y baja despacio, cada nodo con su fase.
+        const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)
+        p.tapa.position.y = flota
+        for (const f of p.franjas) f.position.y = flota
+        for (const c of p.carteles) c.position.y = flota
+        if (p.anillo) p.anillo.position.y = flota
         if (p.pulso) {
           const f = (t * 0.45) % 1
           p.pulso.scale.setScalar(1 + f * 1.4)

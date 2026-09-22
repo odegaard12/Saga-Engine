@@ -525,7 +525,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.32 },
+        // Un velo, no una mancha: al 0,32 sobre el relieve quedaba un
+        // charco oscuro que tapaba el terreno. "Demasiado oscuro, fatal".
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.1 },
         },
         {
         id: CAPA_RADIO_BORDE,
@@ -541,8 +543,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          */
         paint: {
           'line-color': '#ffffff',
-          'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2.5, 17, 4.5, 19, 7],
+          'line-opacity': 0.7,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 17, 2.5, 19, 4],
           // Sin trazos: las líneas a trazos tienen historial de no pintarse
           // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
         },

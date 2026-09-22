@@ -232,6 +232,9 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
+    # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
+    assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
+    assert "plan: 3," in fonte
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -388,7 +391,11 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Tamaño que depende SÓLO del zoom: medir cada nodo con la perspectiva
     # hacía que cada uno cambiara de tamaño a su aire al girar (parpadeo).
     assert "escalaPorZoom(p, zoomActual)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
-    assert "Math.pow(2, 17 - zoom) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
+    assert "Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
+    # Bolas: una esfera no se deforma al girar ni al acercarse. Flota con
+    # fase propia y la peana lleva la forma del tipo.
+    assert "new THREE.SphereGeometry(R, 40, 28)" in capa and "fase: Math.random()" in capa
+    assert "const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)" in capa
     # Sonda de un metro como punto de partida: del factor anterior, al
     # acercarse la punta quedaba detrás de la cámara y el factor se clavaba
     # (618 m medidos a zoom 19,4).

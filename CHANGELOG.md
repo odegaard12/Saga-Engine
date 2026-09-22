@@ -6,7 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.22
+## 5.25.23
+
+- **Los nodos son bolas.** Una esfera del color del estado flotando sobre
+  un mástil fino, con el número en un cartel redondo delante y la chapa del
+  tipo en su esquina; la peana del suelo lleva la forma del tipo y un aro
+  de color. Una esfera se ve igual desde cualquier lado: ni se deforma al
+  girar ni al acercarse. Más grandes que el monolito, y crecen un poco al
+  acercarse en vez de parecer cada vez más pequeñas frente a las casas.
+- **El radio de entrada deja de ser una mancha oscura** sobre el terreno:
+  relleno al 10 % y borde más fino.
+- **El paquete offline guarda lo que el mapa pide de verdad.** Con
+  teselas de 256 px el mapa pide un nivel más que el zoom que enseña: al
+  desampliar hasta ver todos los nodos pedía z15 en toda la zona y sólo
+  estaba el corredor; junto a un nodo pedía z19 y no había nada. Se añaden
+  la zona de misión a z15-z16 y el detalle de nodo a z19; el paquete se
+  vuelve a comprobar solo.
+- **La barra de la pantalla de carga se recoloca con animación** cuando se
+  recoge la tarjeta de permisos, en vez de saltar de arriba al medio.
+
+
 
 - **Barra de carga: porcentaje sólo cuando descarga de verdad.** La escala
   única repartida entre fases acababa mintiendo ("avanzó 3, 5 % y de golpe
