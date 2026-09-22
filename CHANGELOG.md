@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.5
+## 5.25.6
+
+- Diagnóstico de la capa 3D: el asa expone también lo último que MapLibre
+  pasa a `render()` (matrices y coordenadas de tesela), para averiguar en
+  qué sistema de coordenadas espera los modelos.
+
+
 
 - Diagnóstico de la capa 3D: el asa de depuración enseña dónde cae el primer
   nodo en el espacio de recorte y en pantalla, para comprobar la
