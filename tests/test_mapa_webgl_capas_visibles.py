@@ -374,6 +374,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "const elevacionObjetivo = 0" in capa and "getCameraTargetElevation()" not in capa
     # Viewport entero, sin recorte y profundidad limpia: si no, el terreno los tapa.
     assert "renderer.clearDepth()" in capa and "renderer.setScissorTest(false)" in capa
+    # Tamaño de pantalla constante: a escala real (4,6 m) medían 2 px a zoom 17.
+    assert "escalaDePantalla(p)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
+    assert "Math.max(1, objetivoPx(p) / (pxPorMetro * alturaTotal(p)))" in capa
     assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )

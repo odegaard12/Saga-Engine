@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.9
+## 5.25.10
+
+- **Los nodos 3D se ven: tenían tamaño real, no de pantalla.** El
+  diagnóstico de 5.25.9 lo dejó claro: se pintaban en el lienzo, en el
+  sitio correcto, pero un monolito de 4,6 m mide 2 píxeles a zoom 17
+  (0,49 px por metro medidos). Ahora cada nodo se escala cada fotograma
+  para medir un tamaño fijo en pantalla (92 px el actual, 70 los demás,
+  58 los pendientes), como un pin, y nunca por debajo de su tamaño real.
+
+
 
 - Diagnóstico de la capa 3D: framebuffer enlazado al entrar y color del
   píxel del nodo antes y después de pintar, para saber si no se dibuja o
