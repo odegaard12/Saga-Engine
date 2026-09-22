@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.10
+## 5.25.11
+
+- **Nodos 3D: luz y proporciones.** Las luces apuntaban al +y de three.js,
+  pero en Mercator el cielo está en +z: el cuerpo blanco salía gris oscuro.
+  Ahora la hemisférica y el sol vienen de arriba de verdad. El cuerpo es
+  más ancho (0,85 m de radio), el zócalo y el anillo crecen a juego y el
+  cartel del número pasa de 1,9 a 3,2 m, para leerse desde cualquier
+  distancia (118 px el nodo actual, 92 los demás, 76 los pendientes).
+
+
 
 - **Los nodos 3D se ven: tenían tamaño real, no de pantalla.** El
   diagnóstico de 5.25.9 lo dejó claro: se pintaban en el lienzo, en el
