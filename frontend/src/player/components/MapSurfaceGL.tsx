@@ -82,6 +82,8 @@ const CAPA_GUIA = 'saga-guia-capa'
 const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001]]
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
+const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
+const ICONO_HALO = 'halo-actual'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -265,6 +267,196 @@ function dibujarChincheta(numero: string, color: string): ImageData | null {
   ctx.textBaseline = 'middle'
   ctx.fillText(numero, cx, cy + 0.5)
 
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/**
+ * La BOLA de un nodo, como imagen para un símbolo del mapa.
+ *
+ * Los nodos se dibujaban con three.js dentro del lienzo de MapLibre y en
+ * el móvil salían serrados -sin antialiasing de contexto, y activarlo
+ * rompía las fotos-, además de temblar al mover el mapa. Un símbolo lo
+ * pinta el propio MapLibre, a tres veces la resolución de pantalla, en el
+ * mismo fotograma y a la altura exacta del terreno: nítido a cualquier
+ * zoom y sin nada que parpadee. El aspecto de bola (luz, sombra, brillo)
+ * va horneado en la imagen; el número, la chapa del tipo y la peana con
+ * la forma del tipo, también.
+ */
+function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', tipo: TipoDeNodo): ImageData | null {
+  const escala = 3
+  const ancho = 64
+  const alto = 92
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * escala
+  lienzo.height = alto * escala
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(escala, escala)
+
+  const color = estado === 'hecho' ? COLOR_NODO_HECHO : estado === 'actual' ? COLOR_NODO_ACTUAL : COLOR_NODO_PENDIENTE
+  const oscuro = estado === 'hecho' ? '#14532d' : estado === 'actual' ? '#1e3a8a' : '#7f1d1d'
+  const cx = ancho / 2
+  const suelo = alto - 8
+  const r = estado === 'actual' ? 21 : 18
+  const cy = suelo - 34 - r
+
+  // Suelo: sombra, aro de color y peana con la forma del tipo, aplastados
+  // como los vería la cámara inclinada.
+  ctx.save()
+  ctx.translate(cx, suelo)
+  ctx.scale(1, 0.4)
+  const sombra = ctx.createRadialGradient(0, 0, 2, 0, 0, 20)
+  sombra.addColorStop(0, 'rgba(0,0,0,.5)')
+  sombra.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sombra
+  ctx.beginPath()
+  ctx.arc(0, 0, 20, 0, Math.PI * 2)
+  ctx.fill()
+  const aro = ctx.createRadialGradient(0, 0, 10, 0, 0, 19)
+  aro.addColorStop(0, 'rgba(0,0,0,0)')
+  aro.addColorStop(0.55, color + 'cc')
+  aro.addColorStop(1, color + '00')
+  ctx.fillStyle = aro
+  ctx.beginPath()
+  ctx.arc(0, 0, 19, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(15,23,42,.85)' // no-tema: peana horneada en la imagen, no un color de pantalla
+  ctx.beginPath()
+  if (tipo === 'qr') {
+    ctx.rect(-8, -8, 16, 16)
+  } else if (tipo === 'minijuego') {
+    ctx.moveTo(0, -10)
+    ctx.lineTo(10, 7)
+    ctx.lineTo(-10, 7)
+    ctx.closePath()
+  } else if (tipo === 'coleccionable') {
+    for (let i = 0; i < 6; i += 1) {
+      const a = (Math.PI / 3) * i
+      const x = Math.cos(a) * 9.5
+      const y = Math.sin(a) * 9.5
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+  } else {
+    ctx.arc(0, 0, 9, 0, Math.PI * 2)
+  }
+  ctx.fill()
+  ctx.restore()
+
+  // Mástil: canto oscuro y alma clara.
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = 'rgba(11,18,32,.5)'
+  ctx.lineWidth = 4.5
+  ctx.beginPath()
+  ctx.moveTo(cx, suelo - 2)
+  ctx.lineTo(cx, cy + r - 2)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'
+  ctx.lineWidth = 2.5
+  ctx.stroke()
+
+  // La bola: luz arriba a la izquierda, sombra abajo a la derecha.
+  const luz = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05)
+  luz.addColorStop(0, 'rgba(255,255,255,.95)')
+  luz.addColorStop(0.28, color)
+  luz.addColorStop(1, oscuro)
+  ctx.fillStyle = luz
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(11,18,32,.55)'
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(255,255,255,.35)'
+  ctx.beginPath()
+  ctx.ellipse(cx - r * 0.3, cy - r * 0.45, r * 0.32, r * 0.2, -0.6, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Disco claro con el número: se lee sobre cualquier color.
+  const rd = r * 0.62
+  ctx.beginPath()
+  ctx.arc(cx, cy, rd, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,.95)'
+  ctx.fill()
+  ctx.fillStyle = '#0b1220'
+  ctx.font = `900 ${numero.length > 1 ? rd * 1.15 : rd * 1.35}px system-ui, -apple-system, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(numero, cx, cy + 0.5)
+
+  // Chapa del tipo, arriba a la derecha.
+  const bx = cx + r * 0.72
+  const by = cy - r * 0.72
+  ctx.beginPath()
+  ctx.arc(bx, by, 7.5, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = color
+  ctx.stroke()
+  ctx.fillStyle = oscuro
+  ctx.strokeStyle = oscuro
+  ctx.lineWidth = 1.6
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  if (tipo === 'checkpoint') {
+    ctx.moveTo(bx - 2.5, by - 4)
+    ctx.lineTo(bx - 2.5, by + 4)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(bx - 2.5, by - 4)
+    ctx.lineTo(bx + 3.5, by - 4)
+    ctx.lineTo(bx + 2, by - 1.5)
+    ctx.lineTo(bx + 3.5, by + 1)
+    ctx.lineTo(bx - 2.5, by + 1)
+    ctx.closePath()
+    ctx.fill()
+  } else if (tipo === 'qr') {
+    ctx.rect(bx - 4, by - 4, 2.8, 2.8)
+    ctx.rect(bx + 1.2, by - 4, 2.8, 2.8)
+    ctx.rect(bx - 4, by + 1.2, 2.8, 2.8)
+    ctx.rect(bx + 1.6, by + 1.6, 2, 2)
+    ctx.fill()
+  } else if (tipo === 'coleccionable') {
+    ctx.moveTo(bx, by - 4.2)
+    ctx.lineTo(bx + 4, by - 1)
+    ctx.lineTo(bx, by + 4.2)
+    ctx.lineTo(bx - 4, by - 1)
+    ctx.closePath()
+    ctx.fill()
+  } else {
+    ctx.moveTo(bx - 2.6, by - 3.6)
+    ctx.lineTo(bx + 3.6, by)
+    ctx.lineTo(bx - 2.6, by + 3.6)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
+function dibujarHalo(): ImageData | null {
+  const escala = 3
+  const ancho = 64
+  const alto = 92
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * escala
+  lienzo.height = alto * escala
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(escala, escala)
+  const cx = ancho / 2
+  const r = 21
+  const cy = alto - 8 - 34 - r
+  const g = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.5)
+  g.addColorStop(0, COLOR_NODO_ACTUAL + 'aa')
+  g.addColorStop(1, COLOR_NODO_ACTUAL + '00')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2)
+  ctx.fill()
   return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
 }
 
@@ -681,6 +873,23 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
       },
       {
+        // Resplandor del nodo en juego: late por icon-opacity (ver `latir`).
+        id: CAPA_NODOS_HALO,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        filter: ['==', ['get', 'estado'], 'actual'],
+        layout: {
+          'icon-image': ICONO_HALO,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
+        },
+        paint: { 'icon-opacity': 0.6 },
+      },
+      {
         /**
          * Los nodos como SÍMBOLOS del mapa, no como marcadores del DOM.
          *
@@ -708,7 +917,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // aplastaría con la inclinación.
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.45, 15, 0.7, 17, 0.95, 19, 1.2],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -890,6 +1099,19 @@ export function MapSurfaceGL({
         imagen.src = url
         return
       }
+      if (evento.id === ICONO_HALO) {
+        if (mapa.hasImage(ICONO_HALO)) return
+        const halo = dibujarHalo()
+        if (halo) mapa.addImage(ICONO_HALO, halo, { pixelRatio: 3 })
+        return
+      }
+      const bola = /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (bola) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarBola(bola[1], bola[2] as 'hecho' | 'actual' | 'pendiente', bola[3] as TipoDeNodo)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const partes = /^nodo-(\d+)-(hecho|actual|pendiente)$/.exec(evento.id)
       if (!partes) return
       if (mapa.hasImage(evento.id)) return
@@ -940,23 +1162,18 @@ export function MapSurfaceGL({
        * extruidos se ocultan. En 2D, al revés.
        */
       try {
-        if (vivo.getStyle().layers.length > 0 && !vivo.getLayer(CAPA_NODOS_TRES_D) && capaNodosRef.current) {
-          vivo.addLayer(capaNodosRef.current.capa)
-        }
+        /**
+         * La capa 3D de three.js NO se añade. En el móvil salía serrada
+         * -sin antialiasing de contexto, y activarlo rompía las fotos- y
+         * temblaba al mover. Los nodos son símbolos con la bola horneada
+         * en la imagen (`dibujarBola`), en 2D y en 3D.
+         */
         const enTresD = tresDRef.current
-        capaNodosRef.current?.setVisible(enTresD)
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
           vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
         }
-        if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
-          /**
-           * En 3D no hay chinchetas planas a NINGÚN zoom. Se probó que
-           * tomaran el relevo de lejos y Óscar las vio "en 2D dentro del
-           * 3D": no las quiere. Los modelos menguan de lejos y con eso
-           * basta.
-           */
-          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', enTresD ? 'none' : 'visible')
-          vivo.setLayerZoomRange(CAPA_NODOS_ICONOS, 0, 24)
+        for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO]) {
+          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', 'visible')
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -1014,6 +1231,10 @@ export function MapSurfaceGL({
           if (vivo.getLayer(CAPA_RUTA_PULSO)) {
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
             vivo.setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity', 0.12 + 0.5 * (0.5 + 0.5 * Math.sin(fase)))
+          }
+          if (vivo.getLayer(CAPA_NODOS_HALO)) {
+            const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.8)
+            vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(fase)))
           }
           if (vivo.getLayer(CAPA_GUIA)) {
             const paso = Math.floor(performance.now() / 160) % PATRONES_GUIA.length
@@ -1453,23 +1674,15 @@ export function MapSurfaceGL({
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
 
-    capaNodosRef.current?.setNodos(
-      nodos.map((nodo, indice) => ({
-        id: String((nodo as { id?: unknown }).id ?? indice),
-        lat: nodo.lat as number,
-        lon: nodo.lon as number,
-        numero: indice + 1,
-        tipo: tipoDelNodo(nodo),
-        estado: estado(indice),
-      }))
-    )
-
     pintarFuente(FUENTE_NODOS_ICONOS, {
       type: 'FeatureCollection',
       features: nodos.map((nodo, indice) => ({
         type: 'Feature' as const,
         properties: {
-          icono: `nodo-${indice + 1}-${estado(indice)}`,
+          // Número, estado y tipo van en el nombre: la imagen se hornea
+          // al vuelo con los tres (ver `styleimagemissing`).
+          icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },
         geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },

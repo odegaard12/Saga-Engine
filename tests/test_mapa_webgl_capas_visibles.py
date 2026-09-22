@@ -411,7 +411,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert capa.count("renderer.clearDepth()") >= 2
     # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
     assert "p.elevacion + (e - p.elevacion)" not in capa
-    assert "setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', enTresD ? 'none' : 'visible')" in fonte
+    assert "for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO])" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa
@@ -424,14 +424,18 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )
     assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
-    assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
-    # Sin MSAA de contexto (rompía la oclusión de símbolos con relieve:
-    # las fotos aparecían y desaparecían) y con tope de zoom donde acaba
-    # el detalle de la foto aérea.
+    # La capa three.js ya NO se añade al mapa: en el móvil salía serrada y
+    # su convivencia con el lienzo hacía parpadear a las fotos. Los nodos
+    # son símbolos con la bola horneada en la imagen, a tres veces la
+    # resolución de pantalla.
+    assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
+    assert "function dibujarBola(" in fonte and "function dibujarHalo(" in fonte
+    assert "mapa.addImage(evento.id, imagen, { pixelRatio: 3 })" in fonte
+    assert "id: CAPA_NODOS_HALO" in fonte and "setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity'" in fonte
     assert "antialias: true" not in fonte and "maxZoom: 19.5," in fonte
     # Repintado a treinta por segundo: ni a tirones ni sin parar.
     assert "}, 33)" in capa and "}, 50)" not in capa
-    assert "capaNodosRef.current?.setNodos(" in fonte
+    assert "capaNodosRef.current?.setNodos(" not in fonte
     mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
     assert '"kind": kind_del_nodo(node)' in mision
 
