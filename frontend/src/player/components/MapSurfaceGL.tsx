@@ -1163,17 +1163,22 @@ export function MapSurfaceGL({
        */
       try {
         /**
-         * La capa 3D de three.js NO se añade. En el móvil salía serrada
-         * -sin antialiasing de contexto, y activarlo rompía las fotos- y
-         * temblaba al mover. Los nodos son símbolos con la bola horneada
-         * en la imagen (`dibujarBola`), en 2D y en 3D.
+         * En 3D los nodos son los modelos con volumen de three.js, con su
+         * propio antialiasing (ver nodosTresD.ts). En 2D, las bolas
+         * horneadas como símbolos (`dibujarBola`). La capa 3D se añade
+         * cuando el estilo tiene capas y se vuelve a añadir tras un
+         * rehecho del estilo, que la borra.
          */
+        if (vivo.getStyle().layers.length > 0 && !vivo.getLayer(CAPA_NODOS_TRES_D) && capaNodosRef.current) {
+          vivo.addLayer(capaNodosRef.current.capa)
+        }
         const enTresD = tresDRef.current
+        capaNodosRef.current?.setVisible(enTresD)
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
           vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
         }
         for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO]) {
-          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', 'visible')
+          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', enTresD ? 'none' : 'visible')
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -1673,6 +1678,17 @@ export function MapSurfaceGL({
 
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
+
+    capaNodosRef.current?.setNodos(
+      nodos.map((nodo, indice) => ({
+        id: String((nodo as { id?: unknown }).id ?? indice),
+        lat: nodo.lat as number,
+        lon: nodo.lon as number,
+        numero: indice + 1,
+        tipo: tipoDelNodo(nodo),
+        estado: estado(indice),
+      }))
+    )
 
     pintarFuente(FUENTE_NODOS_ICONOS, {
       type: 'FeatureCollection',
