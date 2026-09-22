@@ -322,7 +322,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     g.add(zocalo)
     const disco = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.8, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false }))
     disco.rotation.x = -Math.PI / 2
-    disco.position.y = 0.62
+    disco.position.y = 0.78
     g.add(disco)
 
     // Cuerpo con la forma del tipo, blanco mate.
@@ -333,15 +333,28 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     // Franja de luz en cuatro caras.
     const franjas: THREE.Mesh[] = []
     for (let i = 0; i < 4; i += 1) {
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.2, H - 1.0, 0.03), luz(1.1))
+      /**
+       * Radio 1,05: por fuera de la cara de cualquier forma. A 0,86 las
+       * franjas quedaban DENTRO del cuerpo hexagonal del coleccionable y
+       * el nodo salía blanco liso, sin el color de su estado.
+       */
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.24, H - 1.0, 0.03), luz(1.1))
       const a = (i / 4) * Math.PI * 2
-      f.position.set(Math.sin(a) * 0.86, 0.6 + H / 2 - 0.1, Math.cos(a) * 0.86)
+      f.position.set(Math.sin(a) * 1.05, 0.6 + H / 2 - 0.1, Math.cos(a) * 1.05)
       f.rotation.y = a
       g.add(f)
       franjas.push(f)
     }
-    const tapa = new THREE.Mesh(formaDelTipo(nodo.tipo, 0.9, 0.18), luz(1.4))
-    tapa.position.y = 0.6 + H + 0.08
+    /**
+     * El coleccionable remata en punta, como la gema de su icono: a la
+     * distancia a la que se juega, la silueta distingue más que la forma
+     * de la base, que casi no se ve.
+     */
+    const tapa =
+      nodo.tipo === 'coleccionable'
+        ? new THREE.Mesh(new THREE.ConeGeometry(1.05, 1.5, 6), luz(1.4))
+        : new THREE.Mesh(formaDelTipo(nodo.tipo, 0.9, 0.18), luz(1.4))
+    tapa.position.y = 0.6 + H + (nodo.tipo === 'coleccionable' ? 0.7 : 0.08)
     g.add(tapa)
 
     // Cartel con el número y, debajo, el icono. Se orientan a la cámara en cada fotograma.

@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.17
+## 5.25.18
+
+- Las franjas de color se ven en los cuatro tipos: iban por dentro del
+  cuerpo hexagonal del coleccionable, que salía blanco liso y sin estado.
+- El coleccionable remata en punta, como la gema de su icono. De lejos la
+  silueta distingue más que la forma de la base.
+
+
 
 - **Los nodos se meten en el terreno.** El monolito se pintaba siempre por
   delante de todo, también de un monte que estuviera en medio: parecía
