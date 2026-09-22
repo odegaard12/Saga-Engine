@@ -155,6 +155,7 @@ export type CapaNodosTresD = {
     rendersConPiezas: number
     ultimoError: string
     ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null
+    ultimasOpciones: unknown
   }
 }
 
@@ -174,6 +175,8 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
   let ultimoError = ''
   /** Diagnóstico: dónde cae el primer nodo en el espacio de recorte (-1..1) y en pantalla. */
   let ultimoClip: { ndc: number[]; pantalla: number[]; mc: number[]; altura: number } | null = null
+  /** Diagnóstico: lo último que MapLibre pasó a render(), tal cual. */
+  let ultimasOpciones: unknown = null
   const reloj = new THREE.Clock()
 
   const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 })
@@ -294,6 +297,7 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     },
     render(_gl, opciones) {
       renders += 1
+      ultimasOpciones = opciones
       if (!renderer || !mapa || !visible || piezas.length === 0) return
       /**
        * MapLibre 6 pasa un objeto con la matriz dentro
@@ -429,6 +433,6 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
       animar = true
       mapa?.triggerRepaint()
     },
-    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip }),
+    estadisticas: () => ({ piezas: piezas.length, visible, anadida, animar, renders, rendersConPiezas, ultimoError, ultimoClip, ultimasOpciones }),
   }
 }
