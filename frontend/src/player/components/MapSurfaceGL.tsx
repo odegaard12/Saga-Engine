@@ -34,7 +34,15 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
-import { ALTO_BOLA_PX, ANCHO_BOLA_PX, CENTRO_HALO_3D_PX, DESPLAZAMIENTO_ANCLA_PX, renderizarBola } from './bolaRenderizada'
+import {
+  ALTO_BOLA_PX,
+  ANCHO_BOLA_PX,
+  CENTRO_HALO_3D_PX,
+  COLOR_TIPO,
+  DESPLAZAMIENTO_ANCLA_PX,
+  OSCURO_TIPO,
+  renderizarBola,
+} from './bolaRenderizada'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
@@ -84,6 +92,8 @@ const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
+/** La moneda de la poképarada, en su propia capa para que flote (ver `latir`). */
+const CAPA_NODOS_MONEDA = 'saga-nodos-moneda-capa'
 const ICONO_HALO = 'halo-actual'
 const ICONO_HALO_3D = 'halo-actual-3d'
 /**
@@ -306,8 +316,9 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
   if (!ctx) return null
   ctx.scale(escala, escala)
 
-  const color = estado === 'hecho' ? COLOR_NODO_HECHO : estado === 'actual' ? COLOR_NODO_ACTUAL : COLOR_NODO_PENDIENTE
-  const oscuro = estado === 'hecho' ? '#14532d' : estado === 'actual' ? '#1e3a8a' : '#7f1d1d'
+  // El color es el TIPO, como en 3D (poképaradas); el hecho, apagado.
+  const color = estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+  const oscuro = estado === 'hecho' ? '#475569' : OSCURO_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
   const cx = ancho / 2
   const suelo = alto - 8
   const r = estado === 'actual' ? 21 : 18
@@ -939,6 +950,32 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * La moneda de la poképarada, encima de su base. Mismo encuadre,
+         * mismo ancla y mismo tamaño que la base, así que encajan exactas;
+         * va aparte para que suba y baje sola (`icon-translate`, ver
+         * `latir`). Sólo en 3D.
+         */
+        id: CAPA_NODOS_MONEDA,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'icono3dm'],
+          'icon-anchor': 'bottom',
+          'icon-offset': [0, DESPLAZAMIENTO_ANCLA_PX],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
+          'symbol-sort-key': ['get', 'orden'],
+          visibility: 'none',
+        },
+        paint: { 'icon-translate': [0, 0], 'icon-translate-anchor': 'viewport' },
+      },
+      {
+        /**
          * TÚ, como símbolo del mapa y no como marcador del DOM.
          *
          * El avatar era el último marcador del DOM que quedaba, y por eso
@@ -1134,13 +1171,21 @@ export function MapSurfaceGL({
         if (halo) mapa.addImage(ICONO_HALO_3D, halo, { pixelRatio: 3 })
         return
       }
+      const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (moneda3d) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = renderizarBola(Number(moneda3d[1]), moneda3d[2] as 'hecho' | 'actual' | 'pendiente', moneda3d[3] as TipoDeNodo, 'moneda')
+        // Sin WebGL, la base ya lleva la bola dibujada entera: la moneda, vacía.
+        mapa.addImage(evento.id, imagen ?? new ImageData(1, 1), { pixelRatio: 3 })
+        return
+      }
       const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola3d) {
         if (mapa.hasImage(evento.id)) return
         const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente'
         const tipo3d = bola3d[3] as TipoDeNodo
         // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada.
-        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d) ?? dibujarBola(bola3d[1], estado3d, tipo3d)
+        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base') ?? dibujarBola(bola3d[1], estado3d, tipo3d)
         if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
         return
       }
@@ -1219,6 +1264,9 @@ export function MapSurfaceGL({
           vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
           vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
+        if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
+          vivo.setLayoutProperty(CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
+        }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
           vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
           vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
@@ -1284,6 +1332,12 @@ export function MapSurfaceGL({
           if (vivo.getLayer(CAPA_NODOS_HALO)) {
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.8)
             vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(fase)))
+          }
+          if (tresDRef.current && vivo.getLayer(CAPA_NODOS_MONEDA)) {
+            // La moneda sube y baja despacio, como en una poképarada.
+            const flota = -3 - 3 * Math.sin((performance.now() / 1000) * ((Math.PI * 2) / 2.6))
+            vivo.setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate', [0, flota])
+            if (vivo.getLayer(CAPA_NODOS_HALO)) vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-translate', [0, flota])
           }
           if (vivo.getLayer(CAPA_GUIA)) {
             const paso = Math.floor(performance.now() / 160) % PATRONES_GUIA.length
@@ -1745,6 +1799,7 @@ export function MapSurfaceGL({
           // al vuelo con los tres (ver `styleimagemissing`).
           icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },

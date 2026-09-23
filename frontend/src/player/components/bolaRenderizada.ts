@@ -1,30 +1,32 @@
 import * as THREE from 'three'
-import { COLOR, texturaBrillo, texturaNumero, type EstadoDeNodo, type TipoDeNodo } from './nodosTresD'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import type { EstadoDeNodo, TipoDeNodo } from './nodosTresD'
 
 /**
- * El nodo como OBJETO 3D renderizado una vez.
+ * El nodo como POKÉPARADA, renderizada una vez con three.js.
  *
- * Dibujar los nodos en vivo dentro del lienzo de MapLibre (nodosTresD.ts)
- * salía serrado en el móvil y parpadeaba al girar: cada fotograma se
- * volvía a rasterizar con la matriz nueva, "como si se generara en el
- * momento". Aquí el objeto se renderiza UNA vez con three.js, con luz y
- * sombra, a tres veces la resolución de pantalla y con sobremuestreo, en
- * un lienzo propio con antialiasing. Lo que sale es una imagen que el
- * mapa coloca como símbolo, en el mismo fotograma que el terreno y a su
- * altura; no cambia entre fotogramas y no tiembla. Como se renderiza una
- * vez, aquí sí valen las partes finas (una bandera, un cartel): no hay
- * nada que serrar después.
+ * Óscar eligió el boceto A (2026-09-23): base blanca con aro de color,
+ * poste, cubo con el icono del tipo en las caras y, encima, una MONEDA con
+ * el número grande. Como las poképaradas y los gimnasios de Pokémon GO,
+ * el COLOR es el TIPO, para distinguirlos de lejos sin leer nada:
+ *   checkpoint    verde      bandera a cuadros
+ *   qr            azul       código QR
+ *   coleccionable dorado     cofre
+ *   minijuego     magenta    mando
+ * El estado va como en Pokémon GO: el pendiente a todo color; el que toca,
+ * más grande y con resplandor (capa de halo del mapa); el hecho, apagado y
+ * con un check verde, como una poképarada ya visitada.
  *
- * Un objeto reconocible por tipo, con sus colores de verdad:
- *   checkpoint    BANDERA A CUADROS ondeando en un poste alto
- *   qr            CARTEL blanco con un código QR
- *   coleccionable COFRE del tesoro abierto, con luz de oro dentro
- *   minijuego     MANDO de juego con sus botones
- * El estado (verde hecho, azul en juego, rojo pendiente) va en el poste,
- * en el brillo del suelo y en el cartel del número, que va encima.
+ * Se renderiza UNA vez por nodo, con luz de entorno, a tres veces la
+ * resolución y con sobremuestreo, en un lienzo propio con antialiasing: lo
+ * que sale es una imagen que el mapa coloca como símbolo, sin serrar ni
+ * temblar. En dos PARTES con el mismo encuadre: la base (suelo, poste,
+ * cubo) y la moneda. El mapa las pone en dos capas y mueve sólo la de la
+ * moneda, que flota subiendo y bajando.
  */
 
-/** Tamaño de la imagen en píxeles CSS, y a cuánto se hornea. */
+/** Tamaño de la imagen en píxeles CSS. */
 export const ANCHO_BOLA_PX = 72
 export const ALTO_BOLA_PX = 116
 const ESCALA = 3
@@ -36,21 +38,37 @@ const PHI = (ELEVACION_CAMARA_GRADOS * Math.PI) / 180
 const MEDIO_ANCHO = 2.7
 const ABAJO = -(2.1 * Math.sin(PHI) + 0.25)
 const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
-/** Altura del centro del objeto y del cartel, en metros. */
-const CENTRO_OBJETO = 4.5
-const CENTRO_CARTEL = 7.1
+/** Altura del centro de la moneda, en metros. */
+const CENTRO_MONEDA = 4.75
+const RADIO_MONEDA = 1.3
+
+/** Color de cada tipo, y su tono oscuro para los dibujos. */
+export const COLOR_TIPO: Record<TipoDeNodo, string> = {
+  checkpoint: '#10b981', // no-tema: color del tipo, horneado en la imagen
+  qr: '#0ea5e9', // no-tema: color del tipo, horneado en la imagen
+  coleccionable: '#f59e0b', // no-tema: color del tipo, horneado en la imagen
+  minijuego: '#d946ef', // no-tema: color del tipo, horneado en la imagen
+}
+export const OSCURO_TIPO: Record<TipoDeNodo, string> = {
+  checkpoint: '#065f46', // no-tema: color del tipo, horneado en la imagen
+  qr: '#075985', // no-tema: color del tipo, horneado en la imagen
+  coleccionable: '#92400e', // no-tema: color del tipo, horneado en la imagen
+  minijuego: '#86198f', // no-tema: color del tipo, horneado en la imagen
+}
 
 /**
  * Cuánto hay que bajar la imagen (píxeles CSS, con el ancla abajo) para
- * que el punto del suelo caiga sobre la coordenada del nodo: el brillo del
- * suelo sobresale por debajo de ese punto.
+ * que el punto del suelo caiga sobre la coordenada del nodo.
  */
 export const DESPLAZAMIENTO_ANCLA_PX = Math.round((-ABAJO / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
 
-/** Centro del objeto en píxeles CSS desde arriba: donde va el halo del nodo en juego. */
-export const CENTRO_HALO_3D_PX = Math.round((1 - (CENTRO_OBJETO * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
+/** Centro de la moneda en píxeles CSS desde arriba: donde va el halo del nodo en juego. */
+export const CENTRO_HALO_3D_PX = Math.round((1 - (CENTRO_MONEDA * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO_BOLA_PX)
+
+export type ParteDeNodo = 'base' | 'moneda'
 
 let renderer: THREE.WebGLRenderer | null = null
+let entorno: THREE.Texture | null = null
 let intentado = false
 const cache = new Map<string, ImageData | null>()
 
@@ -64,95 +82,224 @@ function asegurarRenderer(): THREE.WebGLRenderer | null {
     renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: true, premultipliedAlpha: true })
     renderer.setClearColor(0x000000, 0)
     renderer.setSize(lienzo.width, lienzo.height, false)
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.05
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    // Luz de entorno: sin ella el metal del canto sale negro.
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    entorno = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
   } catch {
     renderer = null
   }
   return renderer
 }
 
-function lienzo256(pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+// ---------------------------------------------------------------- texturas
+function lienzo(tam: number, pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
   const c = document.createElement('canvas')
-  c.width = c.height = 256
+  c.width = c.height = tam
   const g = c.getContext('2d')
   if (g) pintar(g)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 4
+  t.anisotropy = 8
   return t
 }
 
-/** Cara del cartel QR: código con tres localizadores de siete módulos, líneas de tiempo y datos. Se lee como QR. */
-function texturaQR(): THREE.CanvasTexture {
-  return lienzo256((g) => {
-    g.fillStyle = '#ffffff'
-    g.fillRect(0, 0, 256, 256)
-    const n = 25
-    const m = 8
-    const desde = 28
-    const negro = (i: number, j: number) => g.fillRect(desde + i * m, desde + j * m, m, m)
-    g.fillStyle = '#0b1220'
-    const finder = (fi: number, fj: number) => {
-      for (let i = 0; i < 7; i += 1) {
-        for (let j = 0; j < 7; j += 1) {
-          const borde = i === 0 || j === 0 || i === 6 || j === 6
-          const centro = i >= 2 && i <= 4 && j >= 2 && j <= 4
-          if (borde || centro) negro(fi + i, fj + j)
-        }
-      }
-    }
-    finder(0, 0)
-    finder(n - 7, 0)
-    finder(0, n - 7)
-    for (let k = 8; k < n - 8; k += 2) {
-      negro(k, 6)
-      negro(6, k)
-    }
-    for (let i = 0; i < n; i += 1) {
-      for (let j = 0; j < n; j += 1) {
-        const enFinder = (i < 8 && j < 8) || (i >= n - 8 && j < 8) || (i < 8 && j >= n - 8)
-        const enTiempo = i === 6 || j === 6
-        if (enFinder || enTiempo) continue
-        if ((i * 7 + j * 13 + i * j * 3) % 5 < 2) negro(i, j)
-      }
-    }
-  })
+function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  g.beginPath()
+  g.roundRect(x, y, w, h, r)
 }
 
-/** Bandera a cuadros blancos y negros: la de meta, la de checkpoint. */
-function texturaCuadros(): THREE.CanvasTexture {
-  return lienzo256((g) => {
-    const cx = 8
-    const cy = 6
-    const w = 256 / cx
-    const h = 256 / cy
-    for (let i = 0; i < cx; i += 1) {
-      for (let j = 0; j < cy; j += 1) {
-        g.fillStyle = (i + j) % 2 === 0 ? '#0b1220' : '#ffffff'
-        g.fillRect(i * w, j * h, w + 1, h + 1)
-      }
-    }
-  })
-}
-
-/** Destello de cuatro puntas, dorado, para el cofre. */
-function texturaChispa(): THREE.CanvasTexture {
-  return lienzo256((g) => {
-    const brillo = g.createRadialGradient(128, 128, 0, 128, 128, 120)
-    brillo.addColorStop(0, 'rgba(255,241,180,0.95)')
-    brillo.addColorStop(0.3, 'rgba(255,225,120,0.35)')
-    brillo.addColorStop(1, 'rgba(255,225,120,0)')
-    g.fillStyle = brillo
-    g.fillRect(0, 0, 256, 256)
-    g.fillStyle = '#fff7d6'
+/** El dibujo del tipo, en `col` con detalles en `osc`, centrado en (cx, cy) y de lado `s`. */
+export function pintarGlifo(g: CanvasRenderingContext2D, tipo: TipoDeNodo, cx: number, cy: number, s: number, col: string, osc: string): void {
+  g.save()
+  if (tipo === 'checkpoint') {
+    g.fillStyle = col
+    rr(g, cx - s * 0.44, cy - s * 0.5, s * 0.09, s, s * 0.045)
+    g.fill()
+    const x0 = cx - s * 0.36
+    const y0 = cy - s * 0.45
+    const w = s * 0.82
+    const h = s * 0.54
     g.beginPath()
-    g.moveTo(128, 8)
-    g.quadraticCurveTo(136, 120, 248, 128)
-    g.quadraticCurveTo(136, 136, 128, 248)
-    g.quadraticCurveTo(120, 136, 8, 128)
-    g.quadraticCurveTo(120, 120, 128, 8)
+    g.moveTo(x0, y0)
+    g.bezierCurveTo(x0 + w * 0.35, y0 - h * 0.22, x0 + w * 0.65, y0 + h * 0.22, x0 + w, y0)
+    g.lineTo(x0 + w, y0 + h)
+    g.bezierCurveTo(x0 + w * 0.65, y0 + h + h * 0.22, x0 + w * 0.35, y0 + h - h * 0.22, x0, y0 + h)
+    g.closePath()
+    g.fillStyle = col
+    g.fill()
+    g.clip()
+    g.fillStyle = osc
+    const nx = 5
+    const ny = 3
+    for (let i = 0; i < nx; i += 1) {
+      for (let j = 0; j < ny; j += 1) {
+        if ((i + j) % 2) continue
+        const ola = Math.sin(((i + 0.5) / nx) * Math.PI * 2) * -h * 0.1
+        g.fillRect(x0 + (i * w) / nx, y0 + (j * h) / ny + ola, w / nx + 1, h / ny + 1)
+      }
+    }
+  } else if (tipo === 'qr') {
+    g.fillStyle = col
+    rr(g, cx - s * 0.5, cy - s * 0.5, s, s, s * 0.14)
+    g.fill()
+    const m = s / 9
+    const x0 = cx - s * 0.5 + m * 0.9
+    const y0 = cy - s * 0.5 + m * 0.9
+    const cel = (i: number, j: number, k = 1) => g.fillRect(x0 + i * m, y0 + j * m, k * m, k * m)
+    for (const [fi, fj] of [[0, 0], [4.4, 0], [0, 4.4]]) {
+      g.fillStyle = osc
+      cel(fi, fj, 2.8)
+      g.fillStyle = col
+      g.fillRect(x0 + (fi + 0.55) * m, y0 + (fj + 0.55) * m, 1.7 * m, 1.7 * m)
+      g.fillStyle = osc
+      g.fillRect(x0 + (fi + 0.95) * m, y0 + (fj + 0.95) * m, 0.9 * m, 0.9 * m)
+    }
+    g.fillStyle = osc
+    for (const [i, j] of [[4.4, 4.4], [5.5, 5.5], [6.6, 4.4], [4.4, 6.6], [6.6, 6.6], [3.2, 5.5], [5.5, 3.2]]) cel(i, j, 0.85)
+  } else if (tipo === 'coleccionable') {
+    g.fillStyle = col
+    rr(g, cx - s * 0.5, cy - s * 0.02, s, s * 0.5, s * 0.08)
+    g.fill()
+    g.beginPath()
+    g.moveTo(cx - s * 0.5, cy - s * 0.02)
+    g.bezierCurveTo(cx - s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.02)
     g.closePath()
     g.fill()
+    g.fillStyle = osc
+    g.fillRect(cx - s * 0.5, cy - s * 0.06, s, s * 0.08)
+    g.fillRect(cx - s * 0.33, cy - s * 0.36, s * 0.07, s * 0.84)
+    g.fillRect(cx + s * 0.26, cy - s * 0.36, s * 0.07, s * 0.84)
+    rr(g, cx - s * 0.1, cy - s * 0.08, s * 0.2, s * 0.24, s * 0.04)
+    g.fill()
+    g.fillStyle = col
+    g.beginPath()
+    g.arc(cx, cy + s * 0.02, s * 0.035, 0, Math.PI * 2)
+    g.fill()
+  } else {
+    g.fillStyle = col
+    g.beginPath()
+    g.moveTo(cx - s * 0.28, cy - s * 0.24)
+    g.lineTo(cx + s * 0.28, cy - s * 0.24)
+    g.bezierCurveTo(cx + s * 0.5, cy - s * 0.24, cx + s * 0.56, cy + s * 0.05, cx + s * 0.54, cy + s * 0.22)
+    g.bezierCurveTo(cx + s * 0.52, cy + s * 0.42, cx + s * 0.32, cy + s * 0.42, cx + s * 0.24, cy + s * 0.22)
+    g.lineTo(cx - s * 0.24, cy + s * 0.22)
+    g.bezierCurveTo(cx - s * 0.32, cy + s * 0.42, cx - s * 0.52, cy + s * 0.42, cx - s * 0.54, cy + s * 0.22)
+    g.bezierCurveTo(cx - s * 0.56, cy + s * 0.05, cx - s * 0.5, cy - s * 0.24, cx - s * 0.28, cy - s * 0.24)
+    g.closePath()
+    g.fill()
+    g.fillStyle = osc
+    rr(g, cx - s * 0.36, cy - s * 0.04, s * 0.2, s * 0.07, s * 0.02)
+    g.fill()
+    rr(g, cx - s * 0.295, cy - s * 0.11, s * 0.07, s * 0.2, s * 0.02)
+    g.fill()
+    for (const [dx, dy] of [[0.26, -0.1], [0.36, 0], [0.16, 0], [0.26, 0.1]]) {
+      g.beginPath()
+      g.arc(cx + s * dx, cy + s * dy, s * 0.045, 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+  g.restore()
+}
+
+function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.CanvasTexture {
+  return lienzo(512, (g) => {
+    const grad = g.createRadialGradient(200, 170, 20, 256, 256, 250)
+    grad.addColorStop(0, '#ffffff')
+    grad.addColorStop(1, estado === 'hecho' ? '#cbd5e1' : '#e8eef5')
+    g.fillStyle = grad
+    g.beginPath()
+    g.arc(256, 256, 256, 0, Math.PI * 2)
+    g.fill()
+    g.lineWidth = 16
+    g.strokeStyle = estado === 'hecho' ? '#94a3b8' : COLOR_TIPO[tipo] // no-tema: color horneado en la imagen del nodo
+    g.beginPath()
+    g.arc(256, 256, 228, 0, Math.PI * 2)
+    g.stroke()
+    g.fillStyle = estado === 'hecho' ? '#475569' : '#0b1220' // no-tema: color horneado en la imagen del nodo
+    g.font = `900 ${n >= 10 ? 250 : 300}px "Segoe UI", system-ui, -apple-system, sans-serif`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText(String(n), 256, 272)
   })
+}
+
+function texCaraCubo(tipo: TipoDeNodo, fondo: string): THREE.CanvasTexture {
+  return lienzo(512, (g) => {
+    g.fillStyle = fondo
+    g.fillRect(0, 0, 512, 512)
+    pintarGlifo(g, tipo, 256, 256, 300, '#ffffff', OSCURO_TIPO[tipo])
+  })
+}
+
+function texBrillo(hex: string): THREE.CanvasTexture {
+  return lienzo(256, (g) => {
+    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 126)
+    gr.addColorStop(0, hex + '00')
+    gr.addColorStop(0.5, hex + '22')
+    gr.addColorStop(0.72, hex + 'cc')
+    gr.addColorStop(0.84, hex + '66')
+    gr.addColorStop(1, hex + '00')
+    g.fillStyle = gr
+    g.fillRect(0, 0, 256, 256)
+  })
+}
+
+function texSombra(): THREE.CanvasTexture {
+  return lienzo(256, (g) => {
+    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 126)
+    gr.addColorStop(0, 'rgba(0,0,0,0.5)')
+    gr.addColorStop(1, 'rgba(0,0,0,0)')
+    g.fillStyle = gr
+    g.fillRect(0, 0, 256, 256)
+  })
+}
+
+function texCheck(): THREE.CanvasTexture {
+  return lienzo(256, (g) => {
+    g.fillStyle = '#16a34a'
+    g.beginPath()
+    g.arc(128, 128, 118, 0, Math.PI * 2)
+    g.fill()
+    g.lineWidth = 12
+    g.strokeStyle = '#ffffff'
+    g.stroke()
+    g.lineWidth = 30
+    g.lineCap = 'round'
+    g.lineJoin = 'round'
+    g.beginPath()
+    g.moveTo(70, 132)
+    g.lineTo(110, 172)
+    g.lineTo(186, 90)
+    g.stroke()
+  })
+}
+
+// -------------------------------------------------------------- materiales
+/** Color del tipo; apagado si el nodo ya está hecho. */
+function colorDe(tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Color {
+  const c = new THREE.Color(COLOR_TIPO[tipo])
+  if (estado === 'hecho') {
+    const hsl = { h: 0, s: 0, l: 0 }
+    c.getHSL(hsl)
+    c.setHSL(hsl.h, hsl.s * 0.35, Math.min(0.75, hsl.l + 0.12))
+  }
+  return c
+}
+
+const metal = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
+  new THREE.MeshStandardMaterial({ color: c, metalness: 0.55, roughness: 0.22, envMapIntensity: 1.2, ...extra })
+const plastico = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
+  new THREE.MeshStandardMaterial({ color: c, metalness: 0, roughness: 0.35, ...extra })
+
+function plano(tex: THREE.Texture, w: number, h: number, opacidad = 1): THREE.Mesh {
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: opacidad })
+  )
 }
 
 function liberar(escena: THREE.Scene): void {
@@ -171,195 +318,90 @@ function liberar(escena: THREE.Scene): void {
   })
 }
 
-/** Rectángulo con las esquinas redondeadas, para extruir con bisel. */
-function rectanguloRedondeado(ancho: number, alto: number, radio: number): THREE.Shape {
-  const s = new THREE.Shape()
-  const x = -ancho / 2
-  const y = -alto / 2
-  s.moveTo(x + radio, y)
-  s.lineTo(x + ancho - radio, y)
-  s.quadraticCurveTo(x + ancho, y, x + ancho, y + radio)
-  s.lineTo(x + ancho, y + alto - radio)
-  s.quadraticCurveTo(x + ancho, y + alto, x + ancho - radio, y + alto)
-  s.lineTo(x + radio, y + alto)
-  s.quadraticCurveTo(x, y + alto, x, y + alto - radio)
-  s.lineTo(x, y + radio)
-  s.quadraticCurveTo(x, y, x + radio, y)
-  return s
-}
+/** Construye la poképarada y devuelve la base y la moneda por separado. */
+function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, tipo: TipoDeNodo): { base: THREE.Group; moneda: THREE.Group } {
+  const c = colorDe(tipo, estado)
+  const base = new THREE.Group()
+  const moneda = new THREE.Group()
 
-/** Bloque con cantos redondeados y biselados: bonito bajo la luz, sin aristas duras. */
-function bloque(ancho: number, alto: number, fondo: number, radio: number, materiales: THREE.Material | THREE.Material[]): THREE.Mesh {
-  const geometria = new THREE.ExtrudeGeometry(rectanguloRedondeado(ancho, alto, radio), {
-    depth: fondo,
-    bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.05,
-    bevelSegments: 3,
-    curveSegments: 8,
-  })
-  geometria.center()
-  return new THREE.Mesh(geometria, materiales)
-}
+  // Suelo: sombra y brillo del color del tipo.
+  const sombra = plano(texSombra(), 2.9, 2.9)
+  sombra.rotation.x = -Math.PI / 2
+  sombra.position.y = 0.01
+  base.add(sombra)
+  const brillo = plano(texBrillo(COLOR_TIPO[tipo]), 4.8, 4.8, estado === 'hecho' ? 0.35 : estado === 'actual' ? 1 : 0.8)
+  brillo.rotation.x = -Math.PI / 2
+  brillo.position.y = 0.02
+  base.add(brillo)
 
-/** Poste del color del estado desde el suelo hasta `alto` metros. */
-function poste(alto: number, color: number): THREE.Mesh {
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.17, alto - 0.15, 20),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25, roughness: 0.5 })
+  // Peana blanca con aro del color.
+  const peana = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.16, 64), plastico(0xf8fafc, { roughness: 0.3 }))
+  peana.position.y = 0.08
+  base.add(peana)
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.07, 16, 64), metal(c))
+  aro.rotation.x = Math.PI / 2
+  aro.position.y = 0.17
+  base.add(aro)
+
+  // Poste.
+  const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.55, 32), metal(c, { roughness: 0.3 }))
+  poste.position.y = 2.55 / 2
+  base.add(poste)
+
+  // Cubo con el icono del tipo en las caras.
+  const cubo = new THREE.Mesh(
+    new RoundedBoxGeometry(0.9, 0.9, 0.9, 5, 0.14),
+    new THREE.MeshStandardMaterial({
+      map: texCaraCubo(tipo, COLOR_TIPO[tipo]),
+      roughness: 0.35,
+      color: estado === 'hecho' ? 0xb8b8c0 : 0xffffff,
+    })
   )
-  m.position.y = 0.15 + (alto - 0.15) / 2
-  return m
-}
+  cubo.position.y = 2.85
+  cubo.rotation.set(0.12, Math.PI / 4 - 0.15, 0)
+  base.add(cubo)
 
-function deCaraALaCamara(malla: THREE.Object3D, y: number, adelante = 0): void {
-  malla.position.set(0, y, 0).add(new THREE.Vector3(0, Math.sin(PHI), Math.cos(PHI)).multiplyScalar(adelante))
-  malla.rotation.x = -PHI
-}
+  // La moneda: canto metálico del color del tipo y cara con el número.
+  const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(RADIO_MONEDA, RADIO_MONEDA, 0.24, 96), [
+    metal(c),
+    plastico(0xf1f5f9),
+    plastico(0xf1f5f9),
+  ])
+  cuerpo.rotation.x = Math.PI / 2
+  // La cara, en un círculo aparte: las tapas del cilindro giran la textura.
+  const cara = new THREE.Mesh(
+    new THREE.CircleGeometry(RADIO_MONEDA * 0.99, 96),
+    new THREE.MeshStandardMaterial({ map: texNumero(numero, tipo, estado), roughness: 0.35, envMapIntensity: 0.6 })
+  )
+  cara.position.z = 0.124
+  const canto = new THREE.Mesh(new THREE.TorusGeometry(RADIO_MONEDA, 0.15, 24, 128), metal(c, { roughness: 0.18 }))
+  const disco = new THREE.Group()
+  disco.add(cuerpo, cara, canto)
+  disco.position.y = CENTRO_MONEDA
+  disco.rotation.y = -0.45
+  moneda.add(disco)
 
-const mate = (color: number, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, ...extra })
+  if (estado === 'hecho') {
+    // Check verde, de cara a la cámara, en la esquina de la moneda.
+    const check = plano(texCheck(), 1.0, 1.0)
+    check.position.set(RADIO_MONEDA * 0.8, CENTRO_MONEDA - RADIO_MONEDA * 0.75, 0.6)
+    check.rotation.x = -PHI
+    check.renderOrder = 10
+    moneda.add(check)
+  }
+
+  escena.add(base, moneda)
+  if (estado === 'actual') escena.scale.setScalar(1.08)
+  return { base, moneda }
+}
 
 /**
- * Añade a la escena el objeto del tipo. El objeto tiene sus colores de
- * verdad (la bandera a cuadros, el QR blanco y negro, el cofre de madera y
- * oro); el estado va en el poste, en el brillo del suelo y en el cartel.
+ * La imagen de una parte del nodo, o null si este navegador no puede
+ * renderizarla. Base y moneda comparten encuadre, así que se superponen
+ * exactas con el mismo ancla.
  */
-function construirObjeto(escena: THREE.Scene, tipo: TipoDeNodo, color: number): void {
-  if (tipo === 'checkpoint') {
-    // Bandera a cuadros ondeando en un poste alto, con remate dorado.
-    escena.add(poste(5.4, color))
-    const geometria = new THREE.PlaneGeometry(1.9, 1.25, 20, 10)
-    const posiciones = geometria.getAttribute('position') as THREE.BufferAttribute
-    for (let k = 0; k < posiciones.count; k += 1) {
-      const x = posiciones.getX(k) + 0.95
-      posiciones.setZ(k, Math.sin(x * 3.4) * 0.11 * (0.25 + x / 1.9))
-    }
-    geometria.computeVertexNormals()
-    const bandera = new THREE.Mesh(
-      geometria,
-      new THREE.MeshStandardMaterial({ map: texturaCuadros(), side: THREE.DoubleSide, roughness: 0.7 })
-    )
-    bandera.position.set(1.03, 4.65, 0)
-    bandera.rotation.y = -0.3
-    escena.add(bandera)
-    const remate = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 20), mate(0xd4a017, { metalness: 0.6, roughness: 0.3 }))
-    remate.position.y = 5.55
-    escena.add(remate)
-    return
-  }
-
-  if (tipo === 'qr') {
-    // Cartel blanco con el código QR, marco del color del estado.
-    escena.add(poste(3.2, color))
-    const grupo = new THREE.Group()
-    const tabla = bloque(2.6, 2.6, 0.18, 0.22, [mate(0xffffff, { roughness: 0.6 }), mate(color, { emissive: color, emissiveIntensity: 0.25 })])
-    grupo.add(tabla)
-    /**
-     * El código va en un plano aparte, pegado a la cara: la geometría
-     * extruida reparte la textura por coordenadas del mundo, no de 0 a 1, y
-     * el QR salía diminuto en el centro del cartel.
-     */
-    const codigo = new THREE.Mesh(new THREE.PlaneGeometry(2.25, 2.25), new THREE.MeshStandardMaterial({ map: texturaQR(), roughness: 0.6 }))
-    codigo.position.z = 0.09 + 0.05 + 0.01
-    grupo.add(codigo)
-    grupo.position.y = CENTRO_OBJETO - 0.1
-    grupo.rotation.x = -0.35
-    escena.add(grupo)
-    return
-  }
-
-  if (tipo === 'coleccionable') {
-    // Cofre del tesoro abierto, con la tapa levantada y luz de oro dentro.
-    escena.add(poste(3.1, color))
-    const madera = mate(0x8a5a2b, { roughness: 0.75 })
-    const maderaOscura = mate(0x5e3a19, { roughness: 0.8 })
-    const oro = mate(0xe0b030, { metalness: 0.7, roughness: 0.3, emissive: 0xb07a10, emissiveIntensity: 0.25 })
-    const y0 = CENTRO_OBJETO - 0.55
-    const cuerpo = bloque(2.3, 1.25, 1.5, 0.12, [madera, maderaOscura])
-    cuerpo.position.y = y0
-    escena.add(cuerpo)
-    for (const x of [-0.72, 0.72]) {
-      const banda = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.32, 1.56), oro)
-      banda.position.set(x, y0, 0)
-      escena.add(banda)
-    }
-    const cierre = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.14), oro)
-    cierre.position.set(0, y0 + 0.2, 0.8)
-    escena.add(cierre)
-    // Tapa: medio cilindro con bisagra atrás, abierta hacia atrás.
-    const tapa = new THREE.Group()
-    const cascaron = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.76, 0.76, 2.3, 28, 1, false, 0, Math.PI),
-      new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.75, side: THREE.DoubleSide })
-    )
-    cascaron.rotation.z = Math.PI / 2
-    cascaron.rotation.y = Math.PI / 2
-    cascaron.position.set(0, 0, 0.76)
-    tapa.add(cascaron)
-    for (const x of [-0.72, 0.72]) {
-      const aro = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.09, 8, 28, Math.PI), oro)
-      aro.rotation.y = Math.PI / 2
-      aro.position.set(x, 0, 0.76)
-      tapa.add(aro)
-    }
-    tapa.position.set(0, y0 + 0.62, -0.75)
-    tapa.rotation.x = -1.05
-    escena.add(tapa)
-    // El tesoro: luz dorada dentro y un destello encima.
-    const tesoro = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5, 24, 16),
-      new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffc83c, emissiveIntensity: 1.4, roughness: 0.4 })
-    )
-    tesoro.position.set(0, y0 + 0.55, 0.1)
-    escena.add(tesoro)
-    const chispa = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 1.25), new THREE.MeshBasicMaterial({ map: texturaChispa(), transparent: true, depthWrite: false }))
-    deCaraALaCamara(chispa, y0 + 1.35, 0.9)
-    chispa.position.x = 0.55
-    chispa.renderOrder = 5
-    escena.add(chispa)
-    return
-  }
-
-  // Minijuego: un mando, del color del estado, con sus botones.
-  escena.add(poste(3.3, color))
-  const mando = new THREE.Group()
-  const carcasa = mate(color, { emissive: color, emissiveIntensity: 0.3, roughness: 0.45 })
-  const cuerpo = bloque(2.2, 1.0, 0.5, 0.35, carcasa)
-  mando.add(cuerpo)
-  for (const lado of [-1, 1]) {
-    const asa = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.62, 6, 14), carcasa)
-    asa.position.set(lado * 0.78, -0.5, 0.02)
-    asa.rotation.z = lado * 0.42
-    mando.add(asa)
-  }
-  const blanco = mate(0xffffff, { roughness: 0.4 })
-  const oscuro = mate(0x0b1220, { roughness: 0.5 })
-  const cruzH = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.1), blanco)
-  cruzH.position.set(-0.68, 0.1, 0.28)
-  const cruzV = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.1), blanco)
-  cruzV.position.set(-0.68, 0.1, 0.28)
-  mando.add(cruzH, cruzV)
-  const botones: [number, number][] = [[0.68, 0.34], [0.9, 0.1], [0.46, 0.1], [0.68, -0.14]]
-  for (const [x, y] of botones) {
-    const boton = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), blanco)
-    boton.position.set(x, y, 0.28)
-    mando.add(boton)
-  }
-  for (const x of [-0.3, 0.3]) {
-    const palanca = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.18, 16), oscuro)
-    palanca.rotation.x = Math.PI / 2
-    palanca.position.set(x, -0.28, 0.3)
-    mando.add(palanca)
-  }
-  mando.position.y = CENTRO_OBJETO
-  mando.rotation.x = -0.45
-  escena.add(mando)
-}
-
-/** La imagen del nodo, o null si este navegador no puede renderizarla. */
-export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoDeNodo): ImageData | null {
-  const clave = `${numero}-${estado}-${tipo}`
+export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoDeNodo, parte: ParteDeNodo = 'base'): ImageData | null {
+  const clave = `${numero}-${estado}-${tipo}-${parte}`
   if (cache.has(clave)) return cache.get(clave) ?? null
   const r = asegurarRenderer()
   if (!r) {
@@ -368,34 +410,15 @@ export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoD
   }
   const escena = new THREE.Scene()
   try {
-    const color = COLOR[estado]
-    const hex = '#' + color.toString(16).padStart(6, '0')
-
-    escena.add(new THREE.HemisphereLight(0xffffff, 0xc7cfc4, 1.4))
-    const sol = new THREE.DirectionalLight(0xfff3d6, 1.5)
-    sol.position.set(1.4, 2.4, 1.8)
+    escena.environment = entorno
+    const sol = new THREE.DirectionalLight(0xfff4e0, 1.6)
+    sol.position.set(4, 8, 6)
     escena.add(sol)
-    escena.add(new THREE.AmbientLight(0xffffff, 0.5))
+    escena.add(new THREE.HemisphereLight(0xffffff, 0x445533, 0.5))
 
-    // Brillo difuminado en el suelo, del color del estado.
-    const brillo = new THREE.Mesh(
-      new THREE.PlaneGeometry(4.2, 4.2),
-      new THREE.MeshBasicMaterial({ map: texturaBrillo(hex), transparent: true, opacity: 0.85, depthWrite: false })
-    )
-    brillo.rotation.x = -Math.PI / 2
-    brillo.position.y = 0.02
-    escena.add(brillo)
-
-    construirObjeto(escena, tipo, color)
-
-    // El cartel con el número y la chapa del tipo, encima del objeto.
-    const cartel = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.0, 2.0),
-      new THREE.MeshBasicMaterial({ map: texturaNumero(numero, hex, tipo), transparent: true, depthWrite: false })
-    )
-    deCaraALaCamara(cartel, CENTRO_CARTEL, 0.4)
-    cartel.renderOrder = 10
-    escena.add(cartel)
+    const { base, moneda } = construir(escena, numero, estado, tipo)
+    base.visible = parte === 'base'
+    moneda.visible = parte === 'moneda'
 
     const camara = new THREE.OrthographicCamera(-MEDIO_ANCHO, MEDIO_ANCHO, ARRIBA, ABAJO, 0.1, 100)
     camara.position.set(0, Math.sin(PHI) * 30, Math.cos(PHI) * 30)
