@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.29
+## 5.25.30
+
+- **Fuera la peana negra de los nodos.** En cuesta salía medio enterrada
+  o flotando por un lado. En el suelo queda sólo el brillo difuminado; la
+  forma del tipo sigue en la chapa del cartel.
+- **El mástil ya no se transparenta.** Con 10 cm de radio era un píxel a
+  la distancia de juego y el suavizado lo dejaba translúcido. Ahora tiene
+  22 cm y se ve sólido.
+- El suavizado usa todas las muestras que dé el móvil (4 u 8).
+
+
 
 - **Fuera el aro dentado alrededor de la bola.** Eran el halo transparente
   y el anillo del nodo en juego: dos superficies finas que en el móvil
