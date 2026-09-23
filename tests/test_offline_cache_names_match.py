@@ -32,9 +32,14 @@ def test_cache_de_fotos_de_ruta_coincide_con_el_service_worker():
     )
 
 
+def test_cache_da_rede_de_caminos_coincide_co_service_worker():
+    assert _constante(TESELAS, "ROAD_GRAPH_CACHE") == _constante(SW, "ROAD_GRAPH_CACHE")
+
+
 def test_el_service_worker_borra_las_caches_viejas_con_esos_prefijos():
     # Si esta limpieza desapareciera, el test de arriba dejaría de importar:
     # se deja explícito para que quede claro por qué deben coincidir.
     texto = SW.read_text(encoding="utf-8")
     assert "key.startsWith('saga-route-tile-coverage-')" in texto
     assert "key.startsWith('saga-field-proof-assets-')" in texto
+    assert "key.startsWith('saga-road-graph-')" in texto

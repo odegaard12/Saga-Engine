@@ -822,8 +822,10 @@ export default function PlayerApp() {
             resumenMapa.saved >= resumenMapa.requested * 0.98
         )
 
-        const guardarMapa = async () => {
+        const guardarMapa = async (enPrimerPlano: boolean) => {
           try {
+            // La red de caminos sólo en la pantalla de carga: por detrás,
+            // mientras se juega, la pide el worker de la guía y bastaba.
             await prefetchMissionMapTiles(payload.stages, (progress) => {
               if (!cancelled && !hayMapa) {
                 setState({
@@ -836,7 +838,7 @@ export default function PlayerApp() {
                   },
                 })
               }
-            })
+            }, { redDeCaminos: enPrimerPlano })
           } catch (err) {
             console.error('No se pudo guardar el mapa para jugar sin cobertura', err)
           }
@@ -855,7 +857,7 @@ export default function PlayerApp() {
               mapProgress: { done: 0, total: 0, detail: 'Calculando el mapa de la ruta…' },
             })
           }
-          await guardarMapa()
+          await guardarMapa(true)
         }
 
         if (!cancelled) {
@@ -864,7 +866,7 @@ export default function PlayerApp() {
         }
 
         // Ya se está jugando: lo que falte del mapa se completa por detrás.
-        if (puedeGuardarMapa && hayMapa) void guardarMapa()
+        if (puedeGuardarMapa && hayMapa) void guardarMapa(false)
       } catch (error) {
         const offlinePack = await getStoredMissionPack(user).catch(() => null)
 

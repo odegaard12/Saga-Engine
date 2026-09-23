@@ -217,14 +217,28 @@ def kind_del_nodo(node):
     Sin esta rama los diez nodos de la ruta real salían como "minijuego" y
     todos tenían la misma forma en el mapa.
     """
-    tipo = str((node.get("interaction") or {}).get("type") or node.get("type") or "").lower()
+    interaccion = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
+    tipo = str(interaccion.get("type") or node.get("type") or "").lower()
+    config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
+    if not config and isinstance(node.get("config"), dict):
+        config = node["config"]
+    # El motor normaliza los tipos: "checkpoint" pasa a signal_hunt con
+    # game_id simple_checkpoint, y "qr_collectible" a circuit_matrix con
+    # game_id qr_collectible. Mirar sólo el tipo daba "minijuego" para todo
+    # (medido en la ruta real: 10 de 10) y los nodos salían todos iguales.
+    juego = str(config.get("game_id") or "").lower()
+    en_el_mapa = bool(config.get("is_map_collectible")) or bool(node.get("is_map_collectible"))
     fisico = str(node.get("physical_node_kind") or node.get("physical_item_kind") or "").lower()
-    if tipo == "checkpoint":
+    if tipo == "checkpoint" or juego == "simple_checkpoint":
         return "checkpoint"
-    if "collectible" in fisico or "coleccionable" in fisico or bool(node.get("is_map_collectible")):
+    # Un QR que deja objeto EN EL MAPA es un coleccionable; el que sólo se
+    # escanea es un QR. Es la distinción que hace el editor con esa casilla.
+    if en_el_mapa:
         return "coleccionable"
-    if "qr" in tipo:
+    if "qr" in juego or "qr" in tipo:
         return "qr"
+    if "collectible" in fisico or "coleccionable" in fisico:
+        return "coleccionable"
     return "minijuego"
 
 

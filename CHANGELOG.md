@@ -6,7 +6,89 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.30
+## 5.26.5
+
+- **Los nodos crecen al acercarse.** Con una escala casi fija en píxeles,
+  al ampliar parecían cada vez más pequeños frente a las casas y los
+  caminos, que sí crecen. Ahora su tamaño sube un 50 % por nivel de zoom.
+
+
+
+- El código QR ocupa el cartel entero: la geometría biselada repartía la
+  textura por coordenadas del mundo y el código salía diminuto en el
+  centro. Ahora va en un plano pegado a la cara.
+
+
+
+- **Nodos rediseñados del todo, con objetos reconocibles.** Bandera a
+  cuadros ondeando en un poste alto el checkpoint; cartel blanco con un
+  código QR de verdad (localizadores, líneas de tiempo, datos) el QR;
+  cofre del tesoro abierto, de madera y oro, con luz dentro y destello,
+  el coleccionable; mando de juego con cruceta, botones y palancas el
+  jugable. Cantos redondeados y biselados. El estado va en el poste, en el
+  brillo del suelo y en el cartel del número, que va encima.
+
+
+
+- **Cada tipo de nodo tiene su objeto.** Bandera en mástil alto el
+  checkpoint; panel cuadrado con un código QR en la cara el QR; gema
+  facetada flotando, con destello, el coleccionable; dado con sus puntos
+  el minijuego. El color sigue siendo el estado, y el cartel del número
+  va encima del objeto. La silueta se distingue de lejos.
+- **El servidor clasificaba mal los nodos.** El motor normaliza los tipos
+  al cargar (checkpoint pasa a signal_hunt con game_id simple_checkpoint;
+  qr_collectible a circuit_matrix con game_id qr_collectible), y la
+  clasificación miraba sólo el tipo: en la ruta real los diez salían como
+  minijuego o coleccionable. Ahora mira el juego de verdad: un checkpoint,
+  dos QR, tres coleccionables (los QR que dejan objeto en el mapa) y cuatro
+  jugables.
+
+
+
+- **La guía desde lejos ya no tarda un minuto.** Quien ya tenía el mapa
+  guardado se saltaba la pantalla de carga, y la red de caminos se bajaba
+  entonces por detrás mientras jugaba, dos veces a la vez (la pasada de
+  fondo del paquete y el worker de la guía). Ahora el paquete se vuelve a
+  comprobar una vez (rápido) y baja la red en la pantalla de carga; la
+  pasada de fondo no la toca, y no se baja si ya está guardada.
+- **Una forma por tipo de nodo.** Salían todos iguales porque sólo los
+  distinguía la chapa pequeña. Bola lisa el checkpoint, dado de veinte
+  caras el minijuego, gema el coleccionable, cubo el QR. Sólidos, sin
+  partes finas.
+- **Los nodos, un 40 % más grandes.** Eran demasiado pequeños para leer
+  el número.
+- **Fuera el círculo del radio de entrada.** El nodo en juego se marca
+  con su propio brillo en el suelo.
+
+
+
+- **La guía va por carretera cuando estás lejos.** El servidor guarda
+  ahora la clase de cada vía (autovía, primaria, secundaria, terciaria,
+  calle, servicio, pista, senda) y el móvil pondera: a menos de 3 km del
+  trazado valen las pistas; a partir de 8 km una pista cuesta tres veces y
+  media su longitud y una senda cinco, así que desde lejos la línea sigue
+  la carretera y no "un camino raro por el monte". Hay que reconstruir la
+  red de caminos en el panel para que lleve la clase.
+- **El trazado y las fotos dejan de aparecer "mucho después".** La red de
+  caminos (21 MB) se analizaba en el hilo principal nada más entrar y
+  dejaba el mapa congelado unos segundos, además de competir con las
+  teselas y las fotos por la conexión. Ahora se descarga en la pantalla
+  de carga, como fase propia, y se analiza y se calcula en un worker.
+- **Las fotos aparecen y no desaparecen.** Dos causas: el mapa pedía la
+  foto ENTERA para una chincheta de 40 px (decenas de megas), y con
+  relieve MapLibre esconde un símbolo cuyo anclaje queda por debajo de la
+  malla basta del terreno. Ahora hay miniaturas de 360 px hechas en el
+  servidor, y las fotos, los nodos y tú vais tres metros por encima del
+  suelo.
+- **Los nodos 3D son objetos renderizados una vez, no dibujados en vivo.**
+  Dentro del lienzo del mapa salían serrados y parpadeaban al girar. Ahora
+  la bola se renderiza con three.js una vez, con luz, sombra y brillo, a
+  tres veces la resolución y con sobremuestreo, en un lienzo propio con
+  antialiasing, y el mapa la coloca como símbolo en el mismo fotograma
+  que el terreno. Una bola sobre un mástil se ve igual desde cualquier
+  lado, así que no cambia nada al girar.
+
+
 
 - **Fuera la peana negra de los nodos.** En cuesta salía medio enterrada
   o flotando por un lado. En el suelo queda sólo el brillo difuminado; la

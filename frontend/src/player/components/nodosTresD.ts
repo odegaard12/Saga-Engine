@@ -62,7 +62,7 @@ export type NodoTresD = {
   estado: EstadoDeNodo
 }
 
-const COLOR: Record<EstadoDeNodo, number> = { hecho: 0x22c55e, actual: 0x3b82f6, pendiente: 0xef4444 }
+export const COLOR: Record<EstadoDeNodo, number> = { hecho: 0x22c55e, actual: 0x3b82f6, pendiente: 0xef4444 }
 
 function lienzoCrudo(pintar: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   const c = document.createElement('canvas')
@@ -85,7 +85,7 @@ function lienzo(pintar: (g: CanvasRenderingContext2D) => void): THREE.CanvasText
   return t
 }
 
-function texturaNumero(numero: number, hex: string, tipo: TipoDeNodo): THREE.CanvasTexture {
+export function texturaNumero(numero: number, hex: string, tipo: TipoDeNodo): THREE.CanvasTexture {
   return lienzo((g) => {
     // Cartel redondo, a juego con la bola.
     g.beginPath()
@@ -203,7 +203,7 @@ const lienzoIcono = (tipo: TipoDeNodo) => lienzoCrudo((g) => pintarIcono(g, tipo
  * transparencia no tiene canto que serrar: se ve suave a cualquier tamaño
  * y en cuesta se lee como luz sobre el suelo, no como un plato flotando.
  */
-function texturaBrillo(hex: string): THREE.CanvasTexture {
+export function texturaBrillo(hex: string): THREE.CanvasTexture {
   return lienzo((g) => {
     const grad = g.createRadialGradient(128, 128, 0, 128, 128, 124)
     grad.addColorStop(0, hex + '00')
