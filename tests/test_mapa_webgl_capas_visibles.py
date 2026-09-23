@@ -437,15 +437,17 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # La capa three.js en vivo NO va al mapa (serrada y parpadeando en el
     # móvil). En 3D, objetos 3D renderizados una vez como símbolos.
     assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
-    assert "renderizarBola(Number(bola3d[1]), estado3d, tipo3d)" in fonte
+    assert "renderizarBola(Number(bola3d[1]), estado3d, tipo3d, 'base')" in fonte
     assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
     # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
     # iguales" ya no: la silueta distingue, no una chapa pequeña.
-    assert "function texturaQR(" in bola and "function texturaCuadros(" in bola and "function texturaChispa(" in bola
-    # Bandera a cuadros, cartel QR con bisel, cofre con tapa y oro, mando con asas.
-    assert "new THREE.ExtrudeGeometry(" in bola and "new THREE.CapsuleGeometry(" in bola and "const tapa = new THREE.Group()" in bola
+    # Poképarada (boceto A elegido): color = tipo, cubo con el icono,
+    # moneda con el número en su propia capa, que flota.
+    assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
+    assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" in fonte
+    assert "'moneda')" in fonte and "'base') ?? dibujarBola(" in fonte
     # La red de caminos NO se baja en la pasada de fondo (la pide el worker),
     # y sólo se baja si no está ya guardada.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
@@ -457,7 +459,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "id: CAPA_RADIO_RELLENO" not in fonte
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 4
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 5
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
     # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
     assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
