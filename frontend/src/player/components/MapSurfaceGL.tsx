@@ -890,7 +890,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 15, 0.9, 17, 1.25, 19, 1.6],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
         },
         paint: { 'icon-opacity': 0.6 },
       },
@@ -924,9 +924,15 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // aplastaría con la inclinación.
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          // Grandes: "demasiado pequeños, casi no se leen". La imagen 3D es
-          // de 72×116 px CSS; a zoom 17 sale de 90×145.
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 15, 0.9, 17, 1.25, 19, 1.6],
+          /**
+           * Crecen con el mapa al acercarse, como cualquier cosa del mundo.
+           * Con una escala casi fija en píxeles, al ampliar el nodo parecía
+           * cada vez más pequeño frente a las casas y los caminos, que sí
+           * crecen: "cuanto más me acerco más pequeños se hacen". Base 1,5
+           * por nivel de zoom: la mitad que el terreno (que dobla), para que
+           * de cerca no tapen el mapa.
+           */
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
