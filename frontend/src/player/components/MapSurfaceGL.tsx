@@ -33,7 +33,8 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
-import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
+import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
+import { CENTRO_HALO_3D_PX, DESPLAZAMIENTO_ANCLA_PX, renderizarBola } from './bolaRenderizada'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
@@ -84,6 +85,18 @@ const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
 const ICONO_HALO = 'halo-actual'
+const ICONO_HALO_3D = 'halo-actual-3d'
+/**
+ * Los símbolos (fotos, nodos, tú) van tres metros por encima del suelo.
+ *
+ * Con relieve, MapLibre esconde un símbolo cuyo punto de anclaje queda
+ * por debajo de la malla del terreno, y esa malla es basta: en cuesta el
+ * anclaje caía unos centímetros bajo ella según el ángulo de la cámara,
+ * y las fotos "a veces sí, a veces no, cuando quieren". Tres metros no se
+ * notan (un par de píxeles al zoom de juego) y sacan el anclaje de la
+ * zona de duda.
+ */
+const ALTURA_SIMBOLOS_M = 3
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -437,7 +450,7 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
 }
 
 /** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
-function dibujarHalo(): ImageData | null {
+function dibujarHalo(centroY = 92 - 8 - 34 - 21): ImageData | null {
   const escala = 3
   const ancho = 64
   const alto = 92
@@ -449,7 +462,7 @@ function dibujarHalo(): ImageData | null {
   ctx.scale(escala, escala)
   const cx = ancho / 2
   const r = 21
-  const cy = alto - 8 - 34 - r
+  const cy = centroY
   const g = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.5)
   g.addColorStop(0, COLOR_NODO_ACTUAL + 'aa')
   g.addColorStop(1, COLOR_NODO_ACTUAL + '00')
@@ -862,6 +875,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_FOTOS,
         layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
           'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
@@ -879,6 +894,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         source: FUENTE_NODOS_ICONOS,
         filter: ['==', ['get', 'estado'], 'actual'],
         layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
           'icon-image': ICONO_HALO,
           'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
@@ -908,6 +925,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
         layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
           'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
@@ -936,6 +955,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_JUGADOR,
         layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
           'icon-image': ICONO_AVATAR,
           'icon-anchor': 'center',
           'icon-allow-overlap': true,
@@ -989,7 +1010,13 @@ export function MapSurfaceGL({
   const tresDRef = useRef(tresD)
   tresDRef.current = tresD
   /** La red de caminos, si el panel la preparó; null mientras no está o si no hay. */
-  const grafoRef = useRef<GrafoDeCaminos | null>(null)
+  /** La red de caminos, en su worker; `redLista` re-pinta la guía al llegar. */
+  const redRef = useRef<RedDeCaminos | null>(null)
+  if (!redRef.current) redRef.current = crearRedDeCaminos()
+  const [redLista, setRedLista] = useState(false)
+  /** Sube cada vez que el worker devuelve una ruta: re-pinta la guía. */
+  const [rutaVersion, setRutaVersion] = useState(0)
+  const pedidaRef = useRef<{ desde: Punto; hastaClave: string } | null>(null)
   /** Última ruta por caminos calculada, para no recalcular a cada aviso del GPS. */
   const rutaCaminosRef = useRef<{ desde: Punto; hastaClave: string; coords: [number, number][] } | null>(null)
   /** Última posición a la que se siguió, para no encadenar animaciones por 2 metros. */
@@ -1105,6 +1132,22 @@ export function MapSurfaceGL({
         if (halo) mapa.addImage(ICONO_HALO, halo, { pixelRatio: 3 })
         return
       }
+      if (evento.id === ICONO_HALO_3D) {
+        if (mapa.hasImage(ICONO_HALO_3D)) return
+        const halo = dibujarHalo(CENTRO_HALO_3D_PX)
+        if (halo) mapa.addImage(ICONO_HALO_3D, halo, { pixelRatio: 3 })
+        return
+      }
+      const bola3d = /^nodo3d-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (bola3d) {
+        if (mapa.hasImage(evento.id)) return
+        const estado3d = bola3d[2] as 'hecho' | 'actual' | 'pendiente'
+        const tipo3d = bola3d[3] as TipoDeNodo
+        // Objeto 3D renderizado una vez; si este navegador no puede, la bola dibujada.
+        const imagen = renderizarBola(Number(bola3d[1]), estado3d, tipo3d) ?? dibujarBola(bola3d[1], estado3d, tipo3d)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const bola = /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (bola) {
         if (mapa.hasImage(evento.id)) return
@@ -1163,22 +1206,27 @@ export function MapSurfaceGL({
        */
       try {
         /**
-         * En 3D los nodos son los modelos con volumen de three.js, con su
-         * propio antialiasing (ver nodosTresD.ts). En 2D, las bolas
-         * horneadas como símbolos (`dibujarBola`). La capa 3D se añade
-         * cuando el estilo tiene capas y se vuelve a añadir tras un
-         * rehecho del estilo, que la borra.
+         * La capa three.js en vivo NO se añade al mapa. Dibujar dentro del
+         * lienzo de MapLibre salía serrado y parpadeaba al girar en el
+         * móvil: "se genera en el momento y con el giro hace píxeles
+         * nuevos". En 3D los nodos son objetos 3D renderizados UNA vez,
+         * con luz y sombra, a tres veces la resolución y con sobremuestreo,
+         * que el mapa coloca como símbolos (`renderizarBola`). En 2D, la
+         * bola dibujada (`dibujarBola`). Misma capa, distinta imagen.
          */
-        if (vivo.getStyle().layers.length > 0 && !vivo.getLayer(CAPA_NODOS_TRES_D) && capaNodosRef.current) {
-          vivo.addLayer(capaNodosRef.current.capa)
-        }
         const enTresD = tresDRef.current
-        capaNodosRef.current?.setVisible(enTresD)
         if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
           vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
         }
-        for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO]) {
-          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', enTresD ? 'none' : 'visible')
+        if (vivo.getLayer(CAPA_NODOS_ICONOS)) {
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'visibility', 'visible')
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-image', ['get', enTresD ? 'icono3d' : 'icono'])
+          vivo.setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
+        }
+        if (vivo.getLayer(CAPA_NODOS_HALO)) {
+          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
+          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-image', enTresD ? ICONO_HALO_3D : ICONO_HALO)
+          vivo.setLayoutProperty(CAPA_NODOS_HALO, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])
         }
       } catch {
         // Estilo a medio montar: se repite en el siguiente `styledata`.
@@ -1292,14 +1340,13 @@ export function MapSurfaceGL({
     }, 250)
 
     /**
-     * La red de caminos se pide desde el primer momento, no después de
-     * pintar. Esperando al mapa, el juego arrancaba sin la guía hasta el
-     * nodo y ésta aparecía segundos después. El service worker la guarda al
-     * pasar, así que a partir de la segunda vez llega al instante.
+     * La red de caminos se carga en un worker desde el primer momento: la
+     * descarga (guardada por el service worker desde la pantalla de carga)
+     * y el análisis de 21 MB de JSON no tocan el hilo principal. Antes se
+     * analizaba aquí mismo y el mapa se quedaba congelado unos segundos
+     * nada más entrar: "el trazado aparece mucho después".
      */
-    void cargarGrafo().then((grafo) => {
-      grafoRef.current = grafo
-    })
+    void redRef.current?.cargar().then((ok) => setRedLista(ok))
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
     // cuando el mapa está girado.
@@ -1540,34 +1587,37 @@ export function MapSurfaceGL({
      * del GPS gastaría batería para nada.
      */
     let porCaminos: [number, number][] = []
+    /**
+     * Fuera del trazado y sin ruta por caminos todavía (la red cargando, o
+     * el worker calculando), el tramo de ti al camino NO se pinta: recto
+     * era mentira y se recolocaba a la vista. La guía empieza en el
+     * trazado y el tramo aparece cuando llega, por carreteras si estás
+     * lejos y por pistas si estás cerca (ver `factorPorLejania`).
+     */
+    let esperandoCaminos = false
     const objetivo = camino[mejor]
     const claveObjetivo = `${objetivo.lat.toFixed(5)},${objetivo.lon.toFixed(5)}`
-    if (mejorMetros > 120 && grafoRef.current) {
+    if (mejorMetros > 120) {
       const previa = rutaCaminosRef.current
-      if (
-        previa &&
-        previa.hastaClave === claveObjetivo &&
-        metrosEntre(previa.desde, playerPosition) < 15
-      ) {
+      if (previa && previa.hastaClave === claveObjetivo && metrosEntre(previa.desde, playerPosition) < 15) {
         porCaminos = previa.coords
       } else {
-        const calculada = rutaPorCaminos(grafoRef.current, playerPosition, objetivo, 400)
-        porCaminos = calculada ?? []
-        rutaCaminosRef.current = {
-          desde: { lat: playerPosition.lat, lon: playerPosition.lon },
-          hastaClave: claveObjetivo,
-          coords: porCaminos,
+        esperandoCaminos = true
+        const red = redRef.current
+        const pedida = pedidaRef.current
+        const yaPedida =
+          pedida !== null && pedida.hastaClave === claveObjetivo && metrosEntre(pedida.desde, playerPosition) < 15
+        if (red && redLista && !yaPedida) {
+          const peticion = { desde: { lat: playerPosition.lat, lon: playerPosition.lon }, hastaClave: claveObjetivo }
+          pedidaRef.current = peticion
+          void red.ruta(peticion.desde, objetivo, mejorMetros).then((coords) => {
+            if (pedidaRef.current !== peticion) return
+            rutaCaminosRef.current = { desde: peticion.desde, hastaClave: claveObjetivo, coords: coords ?? [] }
+            setRutaVersion((v) => v + 1)
+          })
         }
       }
     }
-
-    /**
-     * Fuera del trazado y con la red de caminos todavía cargando, el tramo
-     * de ti al camino se pintaba RECTO y se recolocaba solo al terminar la
-     * descarga. Era mentira y encima saltaba a la vista. Mientras no haya
-     * red, ese tramo no se pinta: la guía empieza en el trazado.
-     */
-    const esperandoCaminos = mejorMetros > 120 && !grafoRef.current
 
     const coordenadas: [number, number][] = [
       ...(esperandoCaminos ? [] : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
@@ -1587,7 +1637,7 @@ export function MapSurfaceGL({
       if (antes === null) return mejorMetros > FUERA_DE_TRAZADO_M ? Math.round(mejorMetros) : null
       return mejorMetros > DE_VUELTA_AL_TRAZADO_M ? Math.round(mejorMetros) : null
     })
-  }, [playerPosition?.lat, playerPosition?.lon, currentStage, pintarFuente])
+  }, [playerPosition?.lat, playerPosition?.lon, currentStage, pintarFuente, redLista, rutaVersion])
 
   /**
    * Los tres encuadres, siempre con el norte arriba.
@@ -1698,6 +1748,7 @@ export function MapSurfaceGL({
           // Número, estado y tipo van en el nombre: la imagen se hornea
           // al vuelo con los tres (ver `styleimagemissing`).
           icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },

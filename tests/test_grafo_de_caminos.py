@@ -26,7 +26,7 @@ def test_duas_vias_que_se_cruzan() -> None:
     grafo = construir_grafo(elementos)
     assert len(grafo["nodos"]) == 5
     assert len(grafo["tramos"]) == 4
-    for a, b, longitud, _forma in grafo["tramos"]:
+    for a, b, longitud, _forma, _clase in grafo["tramos"]:
         assert a != b and 60 < longitud < 130  # ~83 m entre puntos a 0,001º
 
 

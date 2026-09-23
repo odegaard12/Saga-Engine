@@ -351,16 +351,26 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     de OpenStreetMap que prepara el panel) hasta el punto más cercano de la
     ruta. Sin red preparada, recta como antes.
     """
-    assert "rutaPorCaminos(grafoRef.current, playerPosition, objetivo, 400)" in fonte
-    assert "mejorMetros > 120 && grafoRef.current" in fonte
+    # La ruta se pide al worker (no bloquea el hilo principal) y se pondera
+    # por clase de vía según la lejanía: en casa, por carretera.
+    assert "red.ruta(peticion.desde, objetivo, mejorMetros)" in fonte
+    assert "if (mejorMetros > 120) {" in fonte
     ruta = (COMPONENTE.parents[1] / "routing" / "roadGraph.ts").read_text(encoding="utf-8")
     assert "export function rutaPorCaminos(" in ruta and "class Monticulo" in ruta
+    assert "export function factorPorLejania(" in ruta and "v.peso * factor(v.clase)" in ruta
+    worker = (COMPONENTE.parents[1] / "routing" / "roadGraph.worker.ts").read_text(encoding="utf-8")
+    assert "indexarGrafo(" in worker and "factorPorLejania(m.lejaniaM)" in worker
+    red = (COMPONENTE.parents[1] / "routing" / "redDeCaminos.ts").read_text(encoding="utf-8")
+    assert "new Worker(new URL('./roadGraph.worker.ts', import.meta.url)" in red
     sw = (COMPONENTE.parents[3] / "public" / "sw.js").read_text(encoding="utf-8")
-    assert "url.pathname === '/api/road-graph'" in sw
-    # 21 MB en un fichero: fuera del paquete de teselas, pedido tras pintar.
+    assert "url.pathname === '/api/road-graph'" in sw and "ROAD_GRAPH_CACHE" in sw
+    # 21 MB en un fichero: fase propia del paquete, no una tesela más.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert "urls.set('/api/road-graph'" not in pack
-    assert "void cargarGrafo().then" in fonte.split("const esperarPintado = window.setInterval(")[1]
+    assert "async function descargarRedDeCaminos(" in pack and "await descargarRedDeCaminos(onProgress)" in pack
+    # La clase de vía la pone el servidor en cada tramo.
+    grafo = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "road_graph.py").read_text(encoding="utf-8")
+    assert "CLASES_DE_VIA" in grafo and "tramos.append([a, b, round(longitud, 1), intermedios, clase])" in grafo
 
 
 def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
@@ -411,7 +421,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "renderer.clear(true, true, false)" in capa and "renderer.clearDepth()" in capa
     # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
     assert "p.elevacion + (e - p.elevacion)" not in capa
-    assert "for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO])" in fonte
+    assert "setLayoutProperty(CAPA_NODOS_ICONOS, 'icon-offset', [0, enTresD ? DESPLAZAMIENTO_ANCLA_PX : 0])" in fonte
     # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
     # nodos de la ruta real salían iguales.
     assert "'coleccionable'" in capa and "alto, 6)" in capa
@@ -424,10 +434,16 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
         "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
     )
     assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
-    # En 3D, modelos con volumen y antialiasing PROPIO (objetivo con 4
-    # muestras y volcado al lienzo): pedírselo al lienzo del mapa rompía las
-    # fotos. En 2D, las bolas horneadas como símbolos.
-    assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
+    # La capa three.js en vivo NO va al mapa (serrada y parpadeando en el
+    # móvil). En 3D, objetos 3D renderizados una vez como símbolos.
+    assert "vivo.addLayer(capaNodosRef.current.capa)" not in fonte
+    assert "renderizarBola(Number(bola3d[1]), estado3d, tipo3d)" in fonte
+    assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
+    bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
+    assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
+    # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
+    # bajo la malla basta del terreno los escondía "a veces".
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 4
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
     # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
     assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
@@ -497,7 +513,7 @@ def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
     recolocaba al terminar la descarga de la red de caminos.
     """
     fonte = COMPONENTE.read_text(encoding="utf-8")
-    assert "const esperandoCaminos = mejorMetros > 120 && !grafoRef.current" in fonte
+    assert "let esperandoCaminos = false" in fonte
     # La red se pide desde el principio, no después de pintar el mapa.
-    assert fonte.index("void cargarGrafo()") > fonte.index("}, 250)")
+    assert fonte.index("void redRef.current?.cargar()") > fonte.index("}, 250)")
     assert "...(esperandoCaminos ? [] :" in fonte

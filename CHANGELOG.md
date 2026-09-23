@@ -6,7 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.30
+## 5.26.0
+
+- **La guía va por carretera cuando estás lejos.** El servidor guarda
+  ahora la clase de cada vía (autovía, primaria, secundaria, terciaria,
+  calle, servicio, pista, senda) y el móvil pondera: a menos de 3 km del
+  trazado valen las pistas; a partir de 8 km una pista cuesta tres veces y
+  media su longitud y una senda cinco, así que desde casa la línea sigue
+  la carretera y no "un camino raro por el monte". Hay que reconstruir la
+  red de caminos en el panel para que lleve la clase.
+- **El trazado y las fotos dejan de aparecer "mucho después".** La red de
+  caminos (21 MB) se analizaba en el hilo principal nada más entrar y
+  dejaba el mapa congelado unos segundos, además de competir con las
+  teselas y las fotos por la conexión. Ahora se descarga en la pantalla
+  de carga, como fase propia, y se analiza y se calcula en un worker.
+- **Las fotos aparecen y no desaparecen.** Dos causas: el mapa pedía la
+  foto ENTERA para una chincheta de 40 px (decenas de megas), y con
+  relieve MapLibre esconde un símbolo cuyo anclaje queda por debajo de la
+  malla basta del terreno. Ahora hay miniaturas de 360 px hechas en el
+  servidor, y las fotos, los nodos y tú vais tres metros por encima del
+  suelo.
+- **Los nodos 3D son objetos renderizados una vez, no dibujados en vivo.**
+  Dentro del lienzo del mapa salían serrados y parpadeaban al girar. Ahora
+  la bola se renderiza con three.js una vez, con luz, sombra y brillo, a
+  tres veces la resolución y con sobremuestreo, en un lienzo propio con
+  antialiasing, y el mapa la coloca como símbolo en el mismo fotograma
+  que el terreno. Una bola sobre un mástil se ve igual desde cualquier
+  lado, así que no cambia nada al girar.
+
+
 
 - **Fuera la peana negra de los nodos.** En cuesta salía medio enterrada
   o flotando por un lado. En el suelo queda sólo el brillo difuminado; la

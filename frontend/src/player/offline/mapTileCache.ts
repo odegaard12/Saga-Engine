@@ -544,6 +544,31 @@ export function getOfflineMapTileSummary(): OfflineMapTileSummary | null {
   }
 }
 
+async function descargarRedDeCaminos(onProgress?: (progress: OfflineMapTileProgress) => void): Promise<void> {
+  // Sin service worker al mando no hay quien la guarde: no se baja dos veces.
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return
+  try {
+    onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: 'Red de caminos para la guía…' })
+    const respuesta = await fetch('/api/road-graph')
+    if (!respuesta.ok || !respuesta.body) return
+    const lector = respuesta.body.getReader()
+    let bytes = 0
+    let avisados = 0
+    for (;;) {
+      const { done, value } = await lector.read()
+      if (done) break
+      bytes += value.byteLength
+      if (bytes - avisados > 512 * 1024) {
+        avisados = bytes
+        const mb = (bytes / 1048576).toFixed(1).replace('.', ',')
+        onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: `Red de caminos · ${mb} MB` })
+      }
+    }
+  } catch {
+    // Sin red de caminos la guía va recta: no es motivo para parar el paquete.
+  }
+}
+
 export async function prefetchMissionMapTiles(
   stages: PlayerStage[],
   onProgress?: (progress: OfflineMapTileProgress) => void
@@ -663,16 +688,19 @@ export async function prefetchMissionMapTiles(
     }
   }
 
-  /**
-   * La red de caminos NO va en este paquete. Son 21 MB en un solo fichero
-   * y la barra cuenta teselas: se quedaba en 100 % "esperando una tesela"
-   * durante minutos, compitiendo con la carga del mapa. La guarda el
-   * service worker (primero lo guardado) la primera vez que el mapa la
-   * pide, y el mapa la pide DESPUÉS de haber pintado.
-   */
-
   const orderedUrls = Array.from(urls.keys()).slice(0, MAX_TILE_URLS)
   await fetchAndCacheUrls(orderedUrls, onProgress)
+
+  /**
+   * La red de caminos, DESPUÉS de las teselas y como fase propia. Así la
+   * primera vez que se juega ya está guardada por el service worker, que
+   * la sirve luego sin cobertura, y el mapa no tiene que bajar 21 MB
+   * mientras pinta: eso dejaba el trazado y las fotos para después. No va
+   * en la lista de teselas (la barra cuenta teselas y se quedaba "esperando
+   * una tesela" durante minutos) ni lleva porcentaje: comprimida no se sabe
+   * cuánto ocupa.
+   */
+  await descargarRedDeCaminos(onProgress)
 
   // Lo que hay guardado de esta ruta, no lo que se ha bajado en esta vuelta:
   // el panel de "antes de salir" tiene que decir si el mapa está o no está, y

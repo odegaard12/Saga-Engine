@@ -92,6 +92,10 @@ def field_proof_image_url(proof_id):
     return f"/api/field-proofs/{proof_id}/image"
 
 
+def field_proof_thumb_url(proof_id):
+    return f"/api/field-proofs/{proof_id}/thumb"
+
+
 def row_to_field_proof(row):
     return {
         "id": row["id"],
@@ -107,7 +111,7 @@ def row_to_field_proof(row):
         "visibility": row["visibility"],
         "status": row["status"],
         "image_url": field_proof_image_url(row["id"]),
-        "thumbnail_url": field_proof_image_url(row["id"]),
+        "thumbnail_url": field_proof_thumb_url(row["id"]),
     }
 
 
@@ -338,6 +342,71 @@ async def download_field_proofs(request: Request, user: str = ""):
             "Cache-Control": "no-store",
         },
     )
+
+
+LADO_MINIATURA_PX = 360
+
+
+@router.get("/api/field-proofs/{proof_id}/thumb")
+async def get_field_proof_thumb(request: Request, proof_id: str):
+    """
+    Miniatura para el mapa: 360 px de lado mayor, JPEG.
+
+    El mapa pedía la foto ENTERA para pintar una chincheta de 40 px. Con
+    diecisiete fotos de móvil son decenas de megas que compiten con las
+    teselas: en el monte "las fotos no aparecen". Se hace una vez, se guarda
+    junto a la original y pesa unos 20 KB. Misma puerta que la foto entera.
+    Sin Pillow (o con una foto que no se pueda leer), se sirve la original.
+    """
+    from main import exigir_ser_del_grupo
+
+    exigir_ser_del_grupo(request)
+
+    safe_id = _as_str(proof_id).strip()
+    if not safe_id:
+        raise HTTPException(status_code=404, detail="proof not found")
+
+    init_field_proof_schema()
+    conn = connect_runtime_sqlite()
+    try:
+        row = conn.execute(
+            """
+            SELECT image_filename, media_type
+            FROM field_proofs
+            WHERE id = ? AND status = 'active'
+            """,
+            (safe_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="proof not found")
+
+    filename = _as_str(row["image_filename"]).strip()
+    media_type = _as_str(row["media_type"] or "image/jpeg").strip() or "image/jpeg"
+    base_dir = resolve_field_proofs_dir().resolve()
+    target = (base_dir / filename).resolve()
+    if not target.is_relative_to(base_dir):
+        raise HTTPException(status_code=400, detail="invalid proof path")
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="proof image not found")
+
+    cabeceras = {"Cache-Control": "private, max-age=604800"}
+    miniatura = base_dir / "thumbs" / (target.name + ".jpg")
+    if not miniatura.exists():
+        try:
+            from PIL import Image, ImageOps
+
+            miniatura.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(target) as imagen:
+                imagen = ImageOps.exif_transpose(imagen)
+                imagen = imagen.convert("RGB")
+                imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX))
+                imagen.save(miniatura, "JPEG", quality=82, optimize=True)
+        except Exception:
+            return FileResponse(target, media_type=media_type, headers=cabeceras)
+    return FileResponse(miniatura, media_type="image/jpeg", headers=cabeceras)
 
 
 @router.get("/api/field-proofs/{proof_id}/image")

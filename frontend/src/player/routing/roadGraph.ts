@@ -13,9 +13,10 @@
 
 export type Punto = { lat: number; lon: number }
 
-type Tramo = [number, number, number, [number, number][]]
+/** [a, b, metros, forma intermedia, clase de vía (0 si la red es vieja)]. */
+type Tramo = [number, number, number, [number, number][], number?]
 
-type Vecino = { a: number; peso: number; tramo: number; sentido: 1 | -1 }
+type Vecino = { a: number; peso: number; tramo: number; sentido: 1 | -1; clase: number }
 
 export type GrafoDeCaminos = {
   nodos: [number, number][]
@@ -44,9 +45,10 @@ export function indexarGrafo(cuerpo: { nodos: [number, number][]; tramos: Tramo[
   const nodos = cuerpo.nodos
   const tramos = cuerpo.tramos
   const vecinos: Vecino[][] = nodos.map(() => [])
-  tramos.forEach(([a, b, peso], indice) => {
-    vecinos[a].push({ a: b, peso, tramo: indice, sentido: 1 })
-    vecinos[b].push({ a, peso, tramo: indice, sentido: -1 })
+  tramos.forEach(([a, b, peso, , clase], indice) => {
+    const c = typeof clase === 'number' ? clase : 0
+    vecinos[a].push({ a: b, peso, tramo: indice, sentido: 1, clase: c })
+    vecinos[b].push({ a, peso, tramo: indice, sentido: -1, clase: c })
   })
   const celdas = new Map<string, number[]>()
   nodos.forEach(([lat, lon], indice) => {
@@ -150,11 +152,33 @@ class Monticulo {
  * (el orden de GeoJSON). Los puntos se pegan al nodo más cercano a menos
  * de `pegadoM`; si alguno queda más lejos, no hay ruta y se devuelve null.
  */
+/**
+ * Cuánto cuesta cada clase de vía según lo lejos que estés del trazado.
+ *
+ * Clases: 0 desconocida, 1 autovía, 2 primaria, 3 secundaria, 4 terciaria,
+ * 5 calle o local, 6 servicio, 7 pista, 8 senda. A menos de 3 km del
+ * trazado vale casi todo, que a pie se va por pistas; a partir de 8 km
+ * -en casa, yendo en coche- una pista cuesta tres veces y media su
+ * longitud y una senda cinco: la guía va por carretera. Entre medias,
+ * a escala. Todos los factores son >= 1 para que la heurística de A*
+ * (línea recta en metros) siga siendo válida.
+ */
+export function factorPorLejania(lejaniaM: number): (clase: number) => number {
+  const t = Math.max(0, Math.min(1, (lejaniaM - 3000) / 5000))
+  const cerca = [1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.1, 1.2]
+  const lejos = [1.6, 1.0, 1.0, 1.0, 1.05, 1.15, 1.8, 3.5, 5.0]
+  return (clase) => {
+    const c = clase >= 0 && clase < cerca.length ? clase : 0
+    return cerca[c] + (lejos[c] - cerca[c]) * t
+  }
+}
+
 export function rutaPorCaminos(
   grafo: GrafoDeCaminos,
   desde: Punto,
   hasta: Punto,
-  pegadoM = 400
+  pegadoM = 400,
+  factor: (clase: number) => number = () => 1
 ): [number, number][] | null {
   const origen = nodoMasCercano(grafo, desde, pegadoM)
   const destino = nodoMasCercano(grafo, hasta, pegadoM)
@@ -174,10 +198,12 @@ export function rutaPorCaminos(
   while (abiertos.tamano) {
     const actual = abiertos.sacar()
     if (actual === destino) break
-    if (expansiones++ > 250000) return null
+    // Desde casa, a 30 km, hacen falta muchas más expansiones que desde
+    // el monte. Va en un worker: no bloquea nada.
+    if (expansiones++ > 900000) return null
     const gActual = coste.get(actual) ?? Infinity
     for (const v of grafo.vecinos[actual]) {
-      const g = gActual + v.peso
+      const g = gActual + v.peso * factor(v.clase)
       if (g >= (coste.get(v.a) ?? Infinity)) continue
       coste.set(v.a, g)
       de.set(v.a, { nodo: actual, tramo: v.tramo, sentido: v.sentido })
