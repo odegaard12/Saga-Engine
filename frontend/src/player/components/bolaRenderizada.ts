@@ -252,11 +252,20 @@ function construirObjeto(escena: THREE.Scene, tipo: TipoDeNodo, color: number): 
   if (tipo === 'qr') {
     // Cartel blanco con el código QR, marco del color del estado.
     escena.add(poste(3.2, color))
-    const cara = new THREE.MeshStandardMaterial({ map: texturaQR(), roughness: 0.6 })
-    const cartel = bloque(2.5, 2.5, 0.18, 0.22, [cara, mate(color, { emissive: color, emissiveIntensity: 0.25 })])
-    cartel.position.y = CENTRO_OBJETO - 0.1
-    cartel.rotation.x = -0.35
-    escena.add(cartel)
+    const grupo = new THREE.Group()
+    const tabla = bloque(2.6, 2.6, 0.18, 0.22, [mate(0xffffff, { roughness: 0.6 }), mate(color, { emissive: color, emissiveIntensity: 0.25 })])
+    grupo.add(tabla)
+    /**
+     * El código va en un plano aparte, pegado a la cara: la geometría
+     * extruida reparte la textura por coordenadas del mundo, no de 0 a 1, y
+     * el QR salía diminuto en el centro del cartel.
+     */
+    const codigo = new THREE.Mesh(new THREE.PlaneGeometry(2.25, 2.25), new THREE.MeshStandardMaterial({ map: texturaQR(), roughness: 0.6 }))
+    codigo.position.z = 0.09 + 0.05 + 0.01
+    grupo.add(codigo)
+    grupo.position.y = CENTRO_OBJETO - 0.1
+    grupo.rotation.x = -0.35
+    escena.add(grupo)
     return
   }
 
