@@ -6,7 +6,349 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.24.2
+## 5.25.30
+
+- **Fuera la peana negra de los nodos.** En cuesta salía medio enterrada
+  o flotando por un lado. En el suelo queda sólo el brillo difuminado; la
+  forma del tipo sigue en la chapa del cartel.
+- **El mástil ya no se transparenta.** Con 10 cm de radio era un píxel a
+  la distancia de juego y el suavizado lo dejaba translúcido. Ahora tiene
+  22 cm y se ve sólido.
+- El suavizado usa todas las muestras que dé el móvil (4 u 8).
+
+
+
+- **Fuera el aro dentado alrededor de la bola.** Eran el halo transparente
+  y el anillo del nodo en juego: dos superficies finas que en el móvil
+  salían como un aro con píxeles y que ningún suavizado arregla del todo.
+  La bola queda sola, lisa; el nodo en juego se distingue por el pulso en
+  el suelo y por respirar más.
+
+
+
+- **Vuelven los nodos con volumen, y sin dientes de sierra.** La escena
+  3D se pinta ahora en un objetivo propio con cuatro muestras por píxel y
+  se vuelca al lienzo del mapa como una textura ya suavizada: el
+  antialiasing es nuestro y el mapa no se entera, así que las fotos no se
+  ven afectadas. En 3D, los modelos; en 2D, las bolas horneadas como
+  símbolos.
+
+
+
+- **Los nodos salen del lienzo 3D.** Dibujarlos con three.js dentro del
+  lienzo de MapLibre daba dientes de sierra en el móvil (sin antialiasing
+  de contexto, y activarlo rompía las fotos) y temblores al mover. Ahora
+  son símbolos del propio mapa con la bola horneada en la imagen, a tres
+  veces la resolución de pantalla: luz, sombra, brillo, número, chapa del
+  tipo y peana con la forma del tipo. MapLibre los pinta en el mismo
+  fotograma que el terreno y a su altura exacta; nítidos a cualquier
+  zoom, sin nada que parpadee, en 2D y en 3D. El nodo en juego lleva un
+  resplandor que late.
+
+
+
+- **Las fotos del mapa dejan de aparecer y desaparecer.** Era el
+  antialiasing de contexto de la 5.25.24: con relieve, MapLibre decide qué
+  símbolos tapa el terreno leyendo profundidad, y con el lienzo
+  multimuestreado eso se rompía. Fuera; en el móvil no se notaba de todos
+  modos.
+- **Tope de zoom en 19,5.** La foto aérea no tiene más detalle que z19 y
+  por encima el mapa estira píxeles: eso era la pixelación al ampliar
+  mucho, y no la arregla ningún antialiasing.
+- La bola lleva más caras, y la animación va a treinta fotogramas por
+  segundo: repintar sin parar hacía parpadear a las fotos.
+
+
+
+- **El aro del suelo es un brillo difuminado, no una línea.** Era un
+  anillo de geometría que a la distancia de juego medía dos píxeles: se
+  veía serrado con o sin antialiasing y temblaba al mover el mapa. Un
+  degradado con transparencia no tiene canto que serrar, y en cuesta se
+  lee como luz sobre el suelo. El pulso del nodo en juego, igual.
+- **Se acaban los saltos al mover el mapa.** La cota del terreno bajo cada
+  nodo se consultaba en cada fotograma mientras el mapa se movía, y al
+  cambiar de tesela devolvía un valor distinto cada vez: el nodo subía y
+  bajaba a tirones. Ahora se toma con el mapa quieto, cada medio segundo.
+
+
+
+- **Los nodos 3D se dibujan con antialiasing.** MapLibre crea el contexto
+  WebGL sin él, y las bolas, los aros y la peana salían con dientes de
+  sierra. Se activa el MSAA del contexto, la opción que MapLibre documenta
+  para las capas personalizadas.
+- **La animación va al ritmo de la pantalla**, no a veinte fotogramas por
+  segundo: la bola flotaba a tirones.
+- El cartel del número se pinta a 512 px para verse nítido de cerca.
+
+
+
+- **Los nodos son bolas.** Una esfera del color del estado flotando sobre
+  un mástil fino, con el número en un cartel redondo delante y la chapa del
+  tipo en su esquina; la peana del suelo lleva la forma del tipo y un aro
+  de color. Una esfera se ve igual desde cualquier lado: ni se deforma al
+  girar ni al acercarse. Más grandes que el monolito, y crecen un poco al
+  acercarse en vez de parecer cada vez más pequeñas frente a las casas.
+- **El radio de entrada deja de ser una mancha oscura** sobre el terreno:
+  relleno al 10 % y borde más fino.
+- **El paquete offline guarda lo que el mapa pide de verdad.** Con
+  teselas de 256 px el mapa pide un nivel más que el zoom que enseña: al
+  desampliar hasta ver todos los nodos pedía z15 en toda la zona y sólo
+  estaba el corredor; junto a un nodo pedía z19 y no había nada. Se añaden
+  la zona de misión a z15-z16 y el detalle de nodo a z19; el paquete se
+  vuelve a comprobar solo.
+- **La barra de la pantalla de carga se recoloca con animación** cuando se
+  recoge la tarjeta de permisos, en vez de saltar de arriba al medio.
+
+
+
+- **Barra de carga: porcentaje sólo cuando descarga de verdad.** La escala
+  única repartida entre fases acababa mintiendo ("avanzó 3, 5 % y de golpe
+  pasó a 100"). Ahora sólo la descarga de teselas lleva número, y nunca
+  retrocede; conectar, calcular y comprobar van con la barra en movimiento
+  y sin cifra.
+- **Los nodos 3D dejan de cambiar de tamaño al girar.** El tamaño se medía
+  por nodo y por fotograma con la perspectiva, así que al girar el mapa
+  cada nodo cambiaba de tamaño a su aire: parpadeo. Ahora el tamaño depende
+  sólo del zoom, igual para todos, y el cercano se ve mayor que el lejano
+  como todo lo demás del mapa.
+- La cota del terreno bajo el nodo se toma al instante, sin arrastre: el
+  suavizado hacía que el modelo subiera y bajara despacio al hacer zoom.
+
+
+
+- **El tamaño del nodo ya no se queda clavado al acercarse.** El factor
+  partía del fotograma anterior: un modelo que de lejos medía 600 m tenía
+  la punta detrás de la cámara al acercarse, la medida fallaba y se
+  quedaba en 600 m con la cámara encima (medido: 618 m a zoom 19,4). Era
+  el "se corta" de cerca. Ahora se parte siempre de una sonda de un metro.
+
+
+
+- **Los nodos 3D dejan de "buguearse" de cerca y al mover la cámara.** La
+  malla del terreno es basta vista de cerca y su superficie queda metros
+  por encima o por debajo del suelo real: al respetar su profundidad se
+  comía trozos del modelo, y como eso depende del ángulo, los trozos iban
+  y venían al mover la cámara. El cuerpo se pinta entero, siempre. La cota
+  del terreno se suaviza en unos fotogramas para que el modelo no brinque
+  al cambiar de nivel de tesela.
+- Las cuatro franjas de luz sueltas, que de cerca flotaban separadas del
+  cuerpo, son ahora dos bandas con la misma forma del cuerpo que lo
+  abrazan.
+- **En 3D no hay chinchetas planas a ningún zoom.** Los modelos menguan de
+  lejos y con eso basta.
+- **La guía hasta el nodo está desde el principio.** La red de caminos se
+  pide al arrancar, no después de pintar el mapa: el juego empezaba sin
+  esa línea y aparecía segundos después.
+- La barra de carga avanza despacio mientras espera al servidor, en vez
+  de quedarse clavada en el 3 % y saltar luego.
+
+
+
+- **Vuelven los nodos 3D.** El relevo a la chincheta plana estaba puesto en
+  zoom 16,5 y el mapa del jugador vive en 16: no se veía un solo modelo,
+  sólo chinchetas dentro de una vista 3D. El relevo baja a 14,5 y el tope
+  de 120 m desaparece, que era lo que dejaba el nodo en treinta píxeles.
+- **El tamaño se mide en la pantalla, no en el suelo.** Con el mapa
+  inclinado, un metro de suelo ocupa muchos más píxeles al pie de la
+  pantalla que arriba: por eso un nodo cercano llegaba a taparla entera al
+  girar. Ahora se proyectan el pie y la punta del modelo con la matriz del
+  mapa y se ajusta el alto real en píxeles.
+- **Los permisos vuelven a pedirse antes de salir.** Lo concedido se
+  recordaba para siempre, así que la tarjeta no salía nunca y se entraba al
+  juego sin que nadie pidiera nada; si el sistema había retirado la cámara,
+  se descubría en el monte. Ahora la memoria dura lo que dura la sesión, y
+  si el navegador dice que la cámara no está concedida se olvida.
+- **La barra de carga, una sola y sin parpadeos.** Cada fase mandaba su
+  propia cuenta y entre medias había tramos sin total, que la ponían en
+  modo indeterminado. Ahora cada fase ocupa su trozo, el valor no retrocede
+  y lo que queda se recorre andando, no de un brinco.
+- **La guía deja de pintar una recta mientras carga la red de caminos.**
+  Fuera del trazado dibujaba el tramo recto y lo recolocaba al terminar la
+  descarga. Mientras no hay red, ese tramo no se pinta.
+
+
+
+- Las franjas de color se ven en los cuatro tipos: iban por dentro del
+  cuerpo hexagonal del coleccionable, que salía blanco liso y sin estado.
+- El coleccionable remata en punta, como la gema de su icono. De lejos la
+  silueta distingue más que la forma de la base.
+
+
+
+- **Los nodos se meten en el terreno.** El monolito se pintaba siempre por
+  delante de todo, también de un monte que estuviera en medio: parecía
+  pegado al cristal. Ahora se pinta en dos pasadas: el cuerpo respeta la
+  profundidad del relieve y el cartel del número va siempre encima, así
+  que un nodo detrás de una loma se sigue sabiendo dónde está.
+- **El icono del tipo va dentro del cartel**, como una chapa en la
+  esquina del número. Suelto medía 1,2 m pegado al cuerpo y a la
+  distancia a la que se juega no se leía.
+- La cota del terreno bajo cada nodo se vuelve a medir en cada fotograma
+  mientras el mapa se mueve. Con medio segundo de retraso, al girar o al
+  ampliar el modelo se quedaba flotando o hundido.
+
+
+
+- **Los nodos dejan de crecer al desampliar.** El tamaño en pantalla era
+  constante sin tope: a zoom 12 el factor pasaba de 800 y el monolito era
+  un pilar de kilómetros atravesando los montes. Ahora el modelo no pasa
+  de 120 m en el mundo y por debajo de zoom 16,5 no se pinta: de lejos
+  manda la chincheta plana del mapa, de cerca el modelo.
+- **Cada clase de nodo tiene su forma.** Los diez nodos de la ruta salían
+  iguales porque el servidor los mandaba todos como "minijuego": cinco de
+  ellos llevan algo que recoger y eso no llegaba al mapa. Se añade la
+  clase `coleccionable` —base hexagonal e icono de gema— junto a las de
+  siempre: redonda el checkpoint, cuadrada el QR, triangular el
+  minijuego. El coleccionable va antes que el QR: lo que importa es que
+  ahí hay algo que recoger, aunque se recoja escaneando.
+
+
+
+- Nodos 3D: el cuerpo sale blanco de verdad. Las caras laterales reciben
+  mitad cielo y mitad suelo de la luz hemisférica; con el suelo verde
+  oscuro quedaban grises. Suelo claro y más luz ambiental.
+
+
+
+- **Nodos 3D: se ven el número, el icono y los anillos.** En Mercator la
+  y crece hacia el sur; la matriz del modelo tiene determinante negativo
+  y three.js pasaba a `frontFace(CW)`, pero la proyección de MapLibre no
+  espeja: WebGL descartaba las caras delanteras. Los planos de una sola
+  cara (número, icono, anillos del suelo) no se pintaban nunca y de los
+  sólidos se veía el interior. Se invierte el índice de caras de cada
+  geometría al construir el nodo, sin tocar normales. Además se apaga el
+  recorte por frustum de three.js, que con esa matriz descartaba 71 de
+  las 102 mallas aunque estuvieran en pantalla.
+
+
+
+- Diagnóstico de la capa 3D: `__sagaCapa3D()` en el banco da acceso a la
+  escena viva.
+
+
+
+- Diagnóstico de la capa 3D: el asa expone la escena viva (solo en el
+  banco) para tocar materiales sin redesplegar. Se investiga por qué el
+  cartel del número y el anillo del suelo, los únicos con transparencia,
+  no aparecen.
+
+
+
+- **Nodos 3D: luz y proporciones.** Las luces apuntaban al +y de three.js,
+  pero en Mercator el cielo está en +z: el cuerpo blanco salía gris oscuro.
+  Ahora la hemisférica y el sol vienen de arriba de verdad. El cuerpo es
+  más ancho (0,85 m de radio), el zócalo y el anillo crecen a juego y el
+  cartel del número pasa de 1,9 a 3,2 m, para leerse desde cualquier
+  distancia (118 px el nodo actual, 92 los demás, 76 los pendientes).
+
+
+
+- **Los nodos 3D se ven: tenían tamaño real, no de pantalla.** El
+  diagnóstico de 5.25.9 lo dejó claro: se pintaban en el lienzo, en el
+  sitio correcto, pero un monolito de 4,6 m mide 2 píxeles a zoom 17
+  (0,49 px por metro medidos). Ahora cada nodo se escala cada fotograma
+  para medir un tamaño fijo en pantalla (92 px el actual, 70 los demás,
+  58 los pendientes), como un pin, y nunca por debajo de su tamaño real.
+
+
+
+- Diagnóstico de la capa 3D: framebuffer enlazado al entrar y color del
+  píxel del nodo antes y después de pintar, para saber si no se dibuja o
+  si se dibuja y algo lo pisa.
+
+
+
+- **Los nodos 3D se pintan encima del terreno.** Con la proyección medida
+  y correcta seguían sin verse: MapLibre deja puestos su viewport, su
+  recorte y el búfer de profundidad del terreno al llamar a la capa. Ahora
+  la capa fija el viewport entero, quita el recorte y limpia la
+  profundidad antes de pintar. Un señalizador debe verse siempre, también
+  detrás de una loma.
+
+
+
+- **La altura de los nodos 3D vuelve a ser absoluta.** Medido proyectando a
+  mano con la matriz que pasa MapLibre: con la elevación absoluta el nodo
+  cae exactamente donde el mapa lo pinta; relativa al objetivo de la
+  cámara (5.25.4) se iba fuera de plano. Aquel cambio fue un error; los
+  fallos reales eran los dos anteriores (matriz de MapLibre 6 y matriz de
+  mundo de three.js), ya corregidos.
+
+
+
+- Diagnóstico de la capa 3D: el asa expone también lo último que MapLibre
+  pasa a `render()` (matrices y coordenadas de tesela), para averiguar en
+  qué sistema de coordenadas espera los modelos.
+
+
+
+- Diagnóstico de la capa 3D: el asa de depuración enseña dónde cae el primer
+  nodo en el espacio de recorte y en pantalla, para comprobar la
+  convención de la matriz sin ver la pantalla.
+
+
+
+- **Los nodos 3D estaban en el cielo.** Con relieve, MapLibre expresa las
+  alturas de las capas 3D relativas a la altura del terreno bajo el
+  objetivo de la cámara, no absolutas. Con la absoluta, un nodo a 892 m se
+  dibujaba 892 m por encima del suelo, fuera de plano. Medido en el banco
+  (elevación del nodo 892, del objetivo 892, nada en pantalla). Ahora la
+  altura es la diferencia.
+
+
+
+- **El mapa nunca estaba "idle", y de idle colgaba casi todo.** El pulso del
+  trazado (5.18.0) cambia una propiedad del estilo diez veces por segundo,
+  así que el mapa no está ocioso nunca: el aviso de "mapa pintado" al velo
+  de carga, la carga de la red de caminos y la animación de los nodos 3D
+  no se ejecutaban jamás. De ahí la guía recta, el velo esperando su tope
+  y los modelos invisibles (se quedaban a cota 0, bajo el monte, porque su
+  altura sólo se refresca al animar). Ahora "pintado" es "capas y teselas
+  cargadas", preguntado cada cuarto de segundo con tope de ocho.
+- Con relieve, un nodo 3D no se pinta hasta conocer la altura del terreno
+  bajo él: a cota 0 quedaba enterrado.
+
+
+
+- **Los nodos 3D seguían sin verse: estaban en el origen del mundo.** Con
+  `matrixAutoUpdate` apagado, three.js no recalcula la matriz de mundo
+  aunque cambie `matrix`; había que marcarla. Los monolitos se quedaban en
+  lat 85° N, lon -180°, sin un solo error.
+- El banco de mapa enseña las estadísticas de la capa 3D (piezas,
+  fotogramas pintados, último error) para poder diagnosticarla desde una
+  captura.
+
+
+
+- **Los nodos 3D no se dibujaban.** MapLibre 6 pasa a la capa un objeto con
+  la matriz dentro (`defaultProjectionData.mainMatrix`); se leía "a la
+  antigua" y la proyección salía inválida, sin un solo error. Ahora se lee
+  de donde está, y el asa de depuración enseña cuántos fotogramas pintó la
+  capa y su último error.
+- **La guía fuera del trazado volvía a salir recta.** La capa 3D pedía
+  repintados sin parar desde el primer fotograma, así que el mapa nunca
+  llegaba a "idle", y de idle dependían el aviso de "mapa pintado" y la
+  carga de la red de caminos. La animación arranca ahora DESPUÉS del
+  primer idle.
+
+
+
+- **Nodos 3D de verdad dentro del mapa.** Una capa personalizada de MapLibre
+  dibuja con three.js sobre el mismo lienzo, con la matriz de proyección
+  del mapa: los modelos viven en metros sobre el relieve y se inclinan, se
+  tapan y se escalan con él. Diseño acordado: monolito blanco sobrio; la
+  base y la tapa con la forma del tipo (redonda checkpoint, cuadrada QR,
+  triangular minijuego); el color es el estado (verde hecho, azul en juego,
+  rojo pendiente) en una franja de luz, la tapa y un disco en el suelo; el
+  número grande siempre de frente e icono pequeño del tipo. Animación
+  mínima: la luz respira; el nodo en juego, un anillo fino girando y un
+  pulso en el suelo. En cuesta, el zócalo se hunde 30 cm y muerde la
+  ladera en vez de flotar. A ~20 fotogramas por segundo y sólo con la
+  pestaña visible, por la batería. En 2D siguen las chinchetas planas.
+- El servidor manda siempre `kind` (checkpoint / qr / minijuego) en cada
+  nodo: sólo dice qué clase de sitio es, nada del contenido.
+
+
 
 - **La barra de carga ya no se queda en 0 % ni en 100 %.** El grafo de
   caminos (21 MB) había entrado en el paquete como "una tesela más": la

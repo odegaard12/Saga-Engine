@@ -34,6 +34,7 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { cargarGrafo, rutaPorCaminos, type GrafoDeCaminos } from '../routing/roadGraph'
+import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
  * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
@@ -75,11 +76,14 @@ const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
 const ICONO_AVATAR = 'avatar-propio'
 const FUENTE_GUIA = 'saga-guia'
+const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
 const CAPA_GUIA = 'saga-guia-capa'
 /** Fases de la "hormiga" de la guía: el trazo avanza hacia el nodo. */
 const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001]]
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
+const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
+const ICONO_HALO = 'halo-actual'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -120,6 +124,31 @@ function metrosEntre(a: Punto, b: Punto): number {
 /** A partir de cuántos metros del camino se avisa; se apaga algo más cerca, para no parpadear. */
 const FUERA_DE_TRAZADO_M = 500
 const DE_VUELTA_AL_TRAZADO_M = 400
+
+/** checkpoint / qr / minijuego, del campo `kind` del servidor (o del tipo, si viene). */
+function tipoDelNodo(nodo: {
+  kind?: string
+  type?: string
+  physical_node_kind?: string
+  physical_item_kind?: string
+  is_map_collectible?: boolean
+}): TipoDeNodo {
+  const texto = String(nodo.kind || nodo.type || '').toLowerCase()
+  const fisico = String(nodo.physical_node_kind || nodo.physical_item_kind || '').toLowerCase()
+  if (texto === 'checkpoint') return 'checkpoint'
+  /**
+   * Un coleccionable se recoge: para el jugador no es lo mismo que un
+   * minijuego, y hasta ahora los diez nodos de la ruta real salían con la
+   * misma forma porque todos eran `minijuego`. El servidor ya lo dice en
+   * `kind`; se mira también el campo físico por si el nodo viene de un
+   * paquete guardado antes.
+   */
+  if (texto === 'coleccionable' || fisico.includes('collectible') || nodo.is_map_collectible === true) {
+    return 'coleccionable'
+  }
+  if (texto.includes('qr')) return 'qr'
+  return 'minijuego'
+}
 
 function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
   const coords: [number, number][] = []
@@ -238,6 +267,196 @@ function dibujarChincheta(numero: string, color: string): ImageData | null {
   ctx.textBaseline = 'middle'
   ctx.fillText(numero, cx, cy + 0.5)
 
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/**
+ * La BOLA de un nodo, como imagen para un símbolo del mapa.
+ *
+ * Los nodos se dibujaban con three.js dentro del lienzo de MapLibre y en
+ * el móvil salían serrados -sin antialiasing de contexto, y activarlo
+ * rompía las fotos-, además de temblar al mover el mapa. Un símbolo lo
+ * pinta el propio MapLibre, a tres veces la resolución de pantalla, en el
+ * mismo fotograma y a la altura exacta del terreno: nítido a cualquier
+ * zoom y sin nada que parpadee. El aspecto de bola (luz, sombra, brillo)
+ * va horneado en la imagen; el número, la chapa del tipo y la peana con
+ * la forma del tipo, también.
+ */
+function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', tipo: TipoDeNodo): ImageData | null {
+  const escala = 3
+  const ancho = 64
+  const alto = 92
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * escala
+  lienzo.height = alto * escala
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(escala, escala)
+
+  const color = estado === 'hecho' ? COLOR_NODO_HECHO : estado === 'actual' ? COLOR_NODO_ACTUAL : COLOR_NODO_PENDIENTE
+  const oscuro = estado === 'hecho' ? '#14532d' : estado === 'actual' ? '#1e3a8a' : '#7f1d1d'
+  const cx = ancho / 2
+  const suelo = alto - 8
+  const r = estado === 'actual' ? 21 : 18
+  const cy = suelo - 34 - r
+
+  // Suelo: sombra, aro de color y peana con la forma del tipo, aplastados
+  // como los vería la cámara inclinada.
+  ctx.save()
+  ctx.translate(cx, suelo)
+  ctx.scale(1, 0.4)
+  const sombra = ctx.createRadialGradient(0, 0, 2, 0, 0, 20)
+  sombra.addColorStop(0, 'rgba(0,0,0,.5)')
+  sombra.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sombra
+  ctx.beginPath()
+  ctx.arc(0, 0, 20, 0, Math.PI * 2)
+  ctx.fill()
+  const aro = ctx.createRadialGradient(0, 0, 10, 0, 0, 19)
+  aro.addColorStop(0, 'rgba(0,0,0,0)')
+  aro.addColorStop(0.55, color + 'cc')
+  aro.addColorStop(1, color + '00')
+  ctx.fillStyle = aro
+  ctx.beginPath()
+  ctx.arc(0, 0, 19, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(15,23,42,.85)' // no-tema: peana horneada en la imagen, no un color de pantalla
+  ctx.beginPath()
+  if (tipo === 'qr') {
+    ctx.rect(-8, -8, 16, 16)
+  } else if (tipo === 'minijuego') {
+    ctx.moveTo(0, -10)
+    ctx.lineTo(10, 7)
+    ctx.lineTo(-10, 7)
+    ctx.closePath()
+  } else if (tipo === 'coleccionable') {
+    for (let i = 0; i < 6; i += 1) {
+      const a = (Math.PI / 3) * i
+      const x = Math.cos(a) * 9.5
+      const y = Math.sin(a) * 9.5
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+  } else {
+    ctx.arc(0, 0, 9, 0, Math.PI * 2)
+  }
+  ctx.fill()
+  ctx.restore()
+
+  // Mástil: canto oscuro y alma clara.
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = 'rgba(11,18,32,.5)'
+  ctx.lineWidth = 4.5
+  ctx.beginPath()
+  ctx.moveTo(cx, suelo - 2)
+  ctx.lineTo(cx, cy + r - 2)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'
+  ctx.lineWidth = 2.5
+  ctx.stroke()
+
+  // La bola: luz arriba a la izquierda, sombra abajo a la derecha.
+  const luz = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05)
+  luz.addColorStop(0, 'rgba(255,255,255,.95)')
+  luz.addColorStop(0.28, color)
+  luz.addColorStop(1, oscuro)
+  ctx.fillStyle = luz
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(11,18,32,.55)'
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(255,255,255,.35)'
+  ctx.beginPath()
+  ctx.ellipse(cx - r * 0.3, cy - r * 0.45, r * 0.32, r * 0.2, -0.6, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Disco claro con el número: se lee sobre cualquier color.
+  const rd = r * 0.62
+  ctx.beginPath()
+  ctx.arc(cx, cy, rd, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,.95)'
+  ctx.fill()
+  ctx.fillStyle = '#0b1220'
+  ctx.font = `900 ${numero.length > 1 ? rd * 1.15 : rd * 1.35}px system-ui, -apple-system, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(numero, cx, cy + 0.5)
+
+  // Chapa del tipo, arriba a la derecha.
+  const bx = cx + r * 0.72
+  const by = cy - r * 0.72
+  ctx.beginPath()
+  ctx.arc(bx, by, 7.5, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = color
+  ctx.stroke()
+  ctx.fillStyle = oscuro
+  ctx.strokeStyle = oscuro
+  ctx.lineWidth = 1.6
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  if (tipo === 'checkpoint') {
+    ctx.moveTo(bx - 2.5, by - 4)
+    ctx.lineTo(bx - 2.5, by + 4)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(bx - 2.5, by - 4)
+    ctx.lineTo(bx + 3.5, by - 4)
+    ctx.lineTo(bx + 2, by - 1.5)
+    ctx.lineTo(bx + 3.5, by + 1)
+    ctx.lineTo(bx - 2.5, by + 1)
+    ctx.closePath()
+    ctx.fill()
+  } else if (tipo === 'qr') {
+    ctx.rect(bx - 4, by - 4, 2.8, 2.8)
+    ctx.rect(bx + 1.2, by - 4, 2.8, 2.8)
+    ctx.rect(bx - 4, by + 1.2, 2.8, 2.8)
+    ctx.rect(bx + 1.6, by + 1.6, 2, 2)
+    ctx.fill()
+  } else if (tipo === 'coleccionable') {
+    ctx.moveTo(bx, by - 4.2)
+    ctx.lineTo(bx + 4, by - 1)
+    ctx.lineTo(bx, by + 4.2)
+    ctx.lineTo(bx - 4, by - 1)
+    ctx.closePath()
+    ctx.fill()
+  } else {
+    ctx.moveTo(bx - 2.6, by - 3.6)
+    ctx.lineTo(bx + 3.6, by)
+    ctx.lineTo(bx - 2.6, by + 3.6)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
+function dibujarHalo(): ImageData | null {
+  const escala = 3
+  const ancho = 64
+  const alto = 92
+  const lienzo = document.createElement('canvas')
+  lienzo.width = ancho * escala
+  lienzo.height = alto * escala
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(escala, escala)
+  const cx = ancho / 2
+  const r = 21
+  const cy = alto - 8 - 34 - r
+  const g = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.5)
+  g.addColorStop(0, COLOR_NODO_ACTUAL + 'aa')
+  g.addColorStop(1, COLOR_NODO_ACTUAL + '00')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2)
+  ctx.fill()
   return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
 }
 
@@ -498,7 +717,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_RADIO_RELLENO,
         type: 'fill',
         source: FUENTE_RADIO,
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.32 },
+        // Un velo, no una mancha: al 0,32 sobre el relieve quedaba un
+        // charco oscuro que tapaba el terreno. "Demasiado oscuro, fatal".
+        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.1 },
         },
         {
         id: CAPA_RADIO_BORDE,
@@ -514,8 +735,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          */
         paint: {
           'line-color': '#ffffff',
-          'line-opacity': 0.95,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2.5, 17, 4.5, 19, 7],
+          'line-opacity': 0.7,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 17, 2.5, 19, 4],
           // Sin trazos: las líneas a trazos tienen historial de no pintarse
           // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
         },
@@ -652,6 +873,23 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
       },
       {
+        // Resplandor del nodo en juego: late por icon-opacity (ver `latir`).
+        id: CAPA_NODOS_HALO,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        filter: ['==', ['get', 'estado'], 'actual'],
+        layout: {
+          'icon-image': ICONO_HALO,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
+        },
+        paint: { 'icon-opacity': 0.6 },
+      },
+      {
         /**
          * Los nodos como SÍMBOLOS del mapa, no como marcadores del DOM.
          *
@@ -679,7 +917,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // aplastaría con la inclinación.
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.45, 15, 0.7, 17, 0.95, 19, 1.2],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -743,6 +981,13 @@ export function MapSurfaceGL({
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
   const gestoRef = useRef(false)
+  /** Para reaplicar el modo 2D/3D (capas visibles) cuando cambia el botón. */
+  const aplicarModoRef = useRef<(() => void) | null>(null)
+  /** Los nodos en 3D (three.js dentro del mapa). Se crea una vez. */
+  const capaNodosRef = useRef<CapaNodosTresD | null>(null)
+  if (!capaNodosRef.current) capaNodosRef.current = crearCapaNodosTresD(CAPA_NODOS_TRES_D)
+  const tresDRef = useRef(tresD)
+  tresDRef.current = tresD
   /** La red de caminos, si el panel la preparó; null mientras no está o si no hay. */
   const grafoRef = useRef<GrafoDeCaminos | null>(null)
   /** Última ruta por caminos calculada, para no recalcular a cada aviso del GPS. */
@@ -796,6 +1041,19 @@ export function MapSurfaceGL({
       // tirón cada vez que entras.
       pitch: tresD ? PITCH_3D : 0,
       attributionControl: false,
+      /**
+       * SIN antialiasing de contexto (MSAA). Se probó en 5.25.24 y en el
+       * móvil no se notó nada, pero desde entonces las fotos del mapa
+       * aparecían y desaparecían: con relieve, MapLibre decide qué
+       * símbolos tapa el terreno leyendo profundidad, y con el lienzo
+       * multimuestreado eso se rompe. La calidad de lo 3D va por otro
+       * lado: texturas difuminadas y geometría con más caras.
+       *
+       * Tope de zoom 19,5: la foto aérea no tiene más detalle que z19, y
+       * por encima el mapa estira píxeles; eso era "amplío mucho y se
+       * pixela", y ningún antialiasing lo arregla.
+       */
+      maxZoom: 19.5,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
@@ -841,6 +1099,19 @@ export function MapSurfaceGL({
         imagen.src = url
         return
       }
+      if (evento.id === ICONO_HALO) {
+        if (mapa.hasImage(ICONO_HALO)) return
+        const halo = dibujarHalo()
+        if (halo) mapa.addImage(ICONO_HALO, halo, { pixelRatio: 3 })
+        return
+      }
+      const bola = /^nodo-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (bola) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarBola(bola[1], bola[2] as 'hecho' | 'actual' | 'pendiente', bola[3] as TipoDeNodo)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const partes = /^nodo-(\d+)-(hecho|actual|pendiente)$/.exec(evento.id)
       if (!partes) return
       if (mapa.hasImage(evento.id)) return
@@ -884,7 +1155,36 @@ export function MapSurfaceGL({
         const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
         fuente?.setData(datos)
       }
+      /**
+       * La capa 3D (three.js) se añade cuando el estilo tiene capas, y se
+       * vuelve a añadir tras un rehecho del estilo, que la borra. En 3D
+       * los nodos son los modelos; las chinchetas planas y los discos
+       * extruidos se ocultan. En 2D, al revés.
+       */
+      try {
+        /**
+         * En 3D los nodos son los modelos con volumen de three.js, con su
+         * propio antialiasing (ver nodosTresD.ts). En 2D, las bolas
+         * horneadas como símbolos (`dibujarBola`). La capa 3D se añade
+         * cuando el estilo tiene capas y se vuelve a añadir tras un
+         * rehecho del estilo, que la borra.
+         */
+        if (vivo.getStyle().layers.length > 0 && !vivo.getLayer(CAPA_NODOS_TRES_D) && capaNodosRef.current) {
+          vivo.addLayer(capaNodosRef.current.capa)
+        }
+        const enTresD = tresDRef.current
+        capaNodosRef.current?.setVisible(enTresD)
+        if (vivo.getLayer(CAPA_NODOS_VOLUMEN)) {
+          vivo.setLayoutProperty(CAPA_NODOS_VOLUMEN, 'visibility', enTresD ? 'none' : 'visible')
+        }
+        for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO]) {
+          if (vivo.getLayer(id)) vivo.setLayoutProperty(id, 'visibility', enTresD ? 'none' : 'visible')
+        }
+      } catch {
+        // Estilo a medio montar: se repite en el siguiente `styledata`.
+      }
     }
+    aplicarModoRef.current = volcarPendientes
     mapa.on('styledata', volcarPendientes)
 
     let rescates = 0
@@ -937,6 +1237,10 @@ export function MapSurfaceGL({
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
             vivo.setPaintProperty(CAPA_RUTA_PULSO, 'line-opacity', 0.12 + 0.5 * (0.5 + 0.5 * Math.sin(fase)))
           }
+          if (vivo.getLayer(CAPA_NODOS_HALO)) {
+            const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.8)
+            vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(fase)))
+          }
           if (vivo.getLayer(CAPA_GUIA)) {
             const paso = Math.floor(performance.now() / 160) % PATRONES_GUIA.length
             vivo.setPaintProperty(CAPA_GUIA, 'line-dasharray', PATRONES_GUIA[paso])
@@ -955,13 +1259,46 @@ export function MapSurfaceGL({
      * Sólo se avisa una vez: después, cada zoom vuelve a pasar por `idle`
      * y eso ya no le importa a nadie.
      */
-    mapa.once('idle', () => {
+    /**
+     * "El mapa ha pintado" NO es el evento `idle`.
+     *
+     * `idle` sólo salta cuando no queda nada por hacer, y el pulso del
+     * trazado cambia una propiedad del estilo diez veces por segundo: el
+     * mapa no está ocioso NUNCA. Todo lo que colgaba de idle -el aviso al
+     * velo de carga, la red de caminos, la animación de los nodos 3D- no
+     * se ejecutaba jamás: la guía salía recta, los modelos se quedaban
+     * bajo el monte y el velo esperaba su tope. Lo que importa es que las
+     * teselas de la vista estén: se pregunta cada cuarto de segundo, con
+     * tope de ocho segundos por si alguna tesela no llega nunca.
+     */
+    const desde = performance.now()
+    const esperarPintado = window.setInterval(() => {
+      const vivo = mapaRef.current
+      if (!vivo) {
+        window.clearInterval(esperarPintado)
+        return
+      }
+      let capas = 0
+      try {
+        capas = vivo.getStyle().layers.length
+      } catch {
+        capas = 0
+      }
+      const listo = capas > 0 && vivo.areTilesLoaded()
+      if (!listo && performance.now() - desde < 8000) return
+      window.clearInterval(esperarPintado)
       onListoRef.current?.()
-      // La red de caminos (21 MB) se pide DESPUÉS de pintar, para no
-      // competir con las teselas. El service worker la guarda al pasar.
-      void cargarGrafo().then((grafo) => {
-        grafoRef.current = grafo
-      })
+      capaNodosRef.current?.arrancarAnimacion()
+    }, 250)
+
+    /**
+     * La red de caminos se pide desde el primer momento, no después de
+     * pintar. Esperando al mapa, el juego arrancaba sin la guía hasta el
+     * nodo y ésta aparecía segundos después. El service worker la guarda al
+     * pasar, así que a partir de la segunda vez llega al instante.
+     */
+    void cargarGrafo().then((grafo) => {
+      grafoRef.current = grafo
     })
 
     // El rumbo cambia con dos dedos; el botón de norte sólo tiene sentido
@@ -1035,10 +1372,13 @@ export function MapSurfaceGL({
       // monta el estilo (espera un fotograma). Con esto se puede forzar
       // desde fuera y medir las capas de datos aunque nadie mire.
       ventana.__sagaEstilo = estiloDelMapa
+      ;(window as unknown as { __sagaNodos3D?: () => unknown }).__sagaNodos3D = () => capaNodosRef.current?.estadisticas()
+      ;(window as unknown as { __sagaCapa3D?: () => unknown }).__sagaCapa3D = () => capaNodosRef.current?.interno()
     }
 
     return () => {
       pulsoVivo = false
+      window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
       mapa.off('moveend', alSoltar)
       mapa.off('dragstart', alTocar)
@@ -1158,6 +1498,11 @@ export function MapSurfaceGL({
     pintarFuente,
   ])
 
+  // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
+  useEffect(() => {
+    aplicarModoRef.current?.()
+  }, [tresD])
+
   /**
    * La guía de ti al nodo que toca, POR EL CAMINO.
    *
@@ -1216,8 +1561,16 @@ export function MapSurfaceGL({
       }
     }
 
+    /**
+     * Fuera del trazado y con la red de caminos todavía cargando, el tramo
+     * de ti al camino se pintaba RECTO y se recolocaba solo al terminar la
+     * descarga. Era mentira y encima saltaba a la vista. Mientras no haya
+     * red, ese tramo no se pinta: la guía empieza en el trazado.
+     */
+    const esperandoCaminos = mejorMetros > 120 && !grafoRef.current
+
     const coordenadas: [number, number][] = [
-      [playerPosition.lon, playerPosition.lat],
+      ...(esperandoCaminos ? [] : ([[playerPosition.lon, playerPosition.lat]] as [number, number][])),
       ...porCaminos,
       ...camino.slice(mejor).map((punto) => [punto.lon, punto.lat] as [number, number]),
     ]
@@ -1326,12 +1679,26 @@ export function MapSurfaceGL({
     const estado = (indice: number) =>
       indice < currentLevel ? 'hecho' : indice === currentLevel ? 'actual' : 'pendiente'
 
+    capaNodosRef.current?.setNodos(
+      nodos.map((nodo, indice) => ({
+        id: String((nodo as { id?: unknown }).id ?? indice),
+        lat: nodo.lat as number,
+        lon: nodo.lon as number,
+        numero: indice + 1,
+        tipo: tipoDelNodo(nodo),
+        estado: estado(indice),
+      }))
+    )
+
     pintarFuente(FUENTE_NODOS_ICONOS, {
       type: 'FeatureCollection',
       features: nodos.map((nodo, indice) => ({
         type: 'Feature' as const,
         properties: {
-          icono: `nodo-${indice + 1}-${estado(indice)}`,
+          // Número, estado y tipo van en el nombre: la imagen se hornea
+          // al vuelo con los tres (ver `styleimagemissing`).
+          icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },
         geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },

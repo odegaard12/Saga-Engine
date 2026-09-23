@@ -203,6 +203,31 @@ def _minigame_con_url_de_foto(node, fotos_por_url=False):
     return salida
 
 
+def kind_del_nodo(node):
+    """
+    checkpoint / qr / coleccionable / minijuego.
+
+    Es lo que decide la FORMA del nodo en el mapa 3D (base redonda,
+    cuadrada, hexagonal o triangular) y su icono. Va siempre en la
+    proyección pública: no dice nada del contenido —ni qué minijuego es, ni
+    su configuración, ni el código—, sólo de qué clase de sitio es.
+
+    El coleccionable va antes que el QR a propósito: lo que le importa al
+    jugador es que ahí hay algo que recoger, aunque se recoja escaneando.
+    Sin esta rama los diez nodos de la ruta real salían como "minijuego" y
+    todos tenían la misma forma en el mapa.
+    """
+    tipo = str((node.get("interaction") or {}).get("type") or node.get("type") or "").lower()
+    fisico = str(node.get("physical_node_kind") or node.get("physical_item_kind") or "").lower()
+    if tipo == "checkpoint":
+        return "checkpoint"
+    if "collectible" in fisico or "coleccionable" in fisico or bool(node.get("is_map_collectible")):
+        return "coleccionable"
+    if "qr" in tipo:
+        return "qr"
+    return "minijuego"
+
+
 def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False):
     """Un nodo, tal y como lo recibe el móvil.
 
@@ -220,6 +245,8 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         "lat": node["location"]["lat"],
         "lon": node["location"]["lon"],
         "radius": node["location"]["radius_m"],
+        # Qué clase de nodo es, para dibujarlo: no revela contenido jugable.
+        "kind": kind_del_nodo(node),
     }
 
     if include_runtime:

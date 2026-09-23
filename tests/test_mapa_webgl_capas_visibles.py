@@ -214,7 +214,10 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     (con tope). Así decodificar teselas y levantar el relieve pasa DEBAJO
     del velo, no encima del jugador mientras se mueve.
     """
-    assert "mapa.once('idle'" in fonte and "onListoRef.current?.()" in fonte
+    # NO idle: el pulso del trazado ensucia el estilo diez veces por segundo
+    # y el mapa nunca está ocioso. "Pintado" = capas y teselas cargadas.
+    assert "mapa.once('idle'" not in fonte
+    assert "vivo.areTilesLoaded()" in fonte and "onListoRef.current?.()" in fonte
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "onListo={() => setMapaListo(true)}" in app
     assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
@@ -229,6 +232,9 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     """
     fonte = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
+    # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
+    assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
+    assert "plan: 3," in fonte
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -304,6 +310,10 @@ def test_os_permisos_concedidos_lembranse() -> None:
     hook = (COMPONENTE.parents[1] / "hooks" / "usePermisos.ts").read_text(encoding="utf-8")
     assert "recordar(CLAVE_CAMARA)" in hook and "recordar(CLAVE_MOVIMIENTO)" in hook
     assert "recordado(CLAVE_MOVIMIENTO)" in hook and "addEventListener('pointerdown', alPrimerToque" in hook
+    # Memoria de SESIÓN: permanente dejó de pedirlos nunca, y si el sistema
+    # retiró la cámara no se sabía hasta estar en el monte.
+    assert "sessionStorage.getItem(clave)" in hook and "localStorage" not in hook
+    assert "olvidar(CLAVE_CAMARA)" in hook
 
 
 def test_o_resumo_offline_leva_a_firma_do_plan() -> None:
@@ -350,7 +360,87 @@ def test_a_guia_redirixe_por_caminos_fora_do_trazado(fonte: str) -> None:
     # 21 MB en un fichero: fuera del paquete de teselas, pedido tras pintar.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
     assert "urls.set('/api/road-graph'" not in pack
-    assert "void cargarGrafo().then" in fonte.split("mapa.once('idle'")[1]
+    assert "void cargarGrafo().then" in fonte.split("const esperarPintado = window.setInterval(")[1]
+
+
+def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
+    """
+    Los nodos son objetos three.js dentro del mapa (capa personalizada con
+    la matriz de proyección de MapLibre), en metros sobre el relieve. Base y
+    tapa con la forma del tipo; color = estado; número siempre de frente.
+    """
+    capa = (COMPONENTE.parent / "nodosTresD.ts").read_text(encoding="utf-8")
+    assert "renderingMode: '3d'" in capa and "queryTerrainElevation" in capa
+    # MapLibre 6: la matriz viene en defaultProjectionData.mainMatrix; y la
+    # animación no puede arrancar antes del primer idle (mataba el idle).
+    assert "defaultProjectionData?.mainMatrix" in capa
+    assert "m.once('idle'" not in capa and "arrancarAnimacion()" in capa
+    assert "p.grupo.visible = zoomDeMas && (!conTerreno || Number.isFinite(p.elevacion))" in capa
+    # Altura ABSOLUTA en unidades Mercator: medido proyectando con la matriz
+    # de MapLibre. "Relativa al objetivo de la cámara" se iba fuera de plano.
+    assert "const elevacionObjetivo = 0" in capa and "getCameraTargetElevation()" not in capa
+    # Viewport entero y sin recorte; la profundidad se limpia SOLO para la
+    # segunda pasada: el cuerpo lo tapa el monte, el cartel no.
+    assert "renderer.setScissorTest(false)" in capa
+    assert "camara.layers.set(1)" in capa and "numero.layers.set(1)" in capa
+    # El icono del tipo va dentro del cartel: suelto era de 1,2 m y no se leía.
+    assert "g.drawImage(lienzoIcono(tipo)" in capa
+    # Tamaño de pantalla constante, medido con la matriz: con el mapa
+    # inclinado, los píxeles por metro del suelo mienten y un nodo cercano
+    # llegaba a tapar la pantalla.
+    # Tamaño que depende SÓLO del zoom: medir cada nodo con la perspectiva
+    # hacía que cada uno cambiara de tamaño a su aire al girar (parpadeo).
+    assert "escalaPorZoom(p, zoomActual)" in capa and "makeScale(s * k, -s * k, s * k)" in capa
+    assert "Math.pow(2, (17 - zoom) * 0.85) * menguaPorZoom(zoom)" in capa and "medirPx" not in capa
+    # Bolas: una esfera no se deforma al girar ni al acercarse. Flota con
+    # fase propia y la peana lleva la forma del tipo.
+    assert "new THREE.SphereGeometry(R, 64, 44)" in capa and "fase: Math.random()" in capa
+    assert "const flota = p.altura + 0.22 * Math.sin(t * 1.1 * v + p.fase)" in capa
+    # El aro del suelo es un degradado, no geometría de dos píxeles; y la
+    # cota se toma con el mapa quieto, que en movimiento daba saltos.
+    assert "function texturaBrillo(" in capa and "RingGeometry" not in capa
+    assert "(sinCota || (!enMovimiento && ahora - p.elevacionEn > 500))" in capa
+    # Sonda de un metro como punto de partida: del factor anterior, al
+    # acercarse la punta quedaba detrás de la cámara y el factor se clavaba
+    # (618 m medidos a zoom 19,4).
+    # En 3D, modelos a cualquier zoom: Óscar no quiere chinchetas planas
+    # "en 2D dentro del 3D". Y el cuerpo se pinta entero, sin que la malla
+    # basta del terreno se coma trozos al mover la cámara.
+    assert "const tope = ALTURA_MAX_MUNDO / alturaTotal(p)" in capa
+    assert "export const ZOOM_MINIMO_3D = 0" in capa
+    assert "renderer.clear(true, true, false)" in capa and "renderer.clearDepth()" in capa
+    # Cota al instante: el arrastre hacía subir y bajar el modelo al hacer zoom.
+    assert "p.elevacion + (e - p.elevacion)" not in capa
+    assert "for (const id of [CAPA_NODOS_ICONOS, CAPA_NODOS_HALO])" in fonte
+    # Cuatro formas, una por clase de nodo: sin el coleccionable los diez
+    # nodos de la ruta real salían iguales.
+    assert "'coleccionable'" in capa and "alto, 6)" in capa
+    # El cielo de Mercator está en +z: la hemisférica apuntando a +y dejaba el cuerpo gris.
+    assert "cielo.position.set(0, 0, 1)" in capa
+    # Determinante negativo en Mercator: sin invertir las caras, WebGL
+    # descartaba las delanteras (número, icono y anillos invisibles).
+    assert "invertirCaras(malla.geometry)" in capa and "malla.frustumCulled = false" in capa
+    assert "p.grupo.matrixWorldNeedsUpdate = true" in capa, (
+        "con matrixAutoUpdate apagado, sin esto los modelos se quedan en el origen"
+    )
+    assert "function formaDelTipo(" in capa and "c.rotation.set(-(Math.PI / 2 - inclinacion), -rumbo, 0, 'YXZ')" in capa
+    # En 3D, modelos con volumen y antialiasing PROPIO (objetivo con 4
+    # muestras y volcado al lienzo): pedírselo al lienzo del mapa rompía las
+    # fotos. En 2D, las bolas horneadas como símbolos.
+    assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
+    assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
+    # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
+    assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
+    assert "blendSrc: THREE.OneFactor" in capa and "blendDst: THREE.OneMinusSrcAlphaFactor" in capa
+    assert "function dibujarBola(" in fonte and "function dibujarHalo(" in fonte
+    assert "mapa.addImage(evento.id, imagen, { pixelRatio: 3 })" in fonte
+    assert "id: CAPA_NODOS_HALO" in fonte and "setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity'" in fonte
+    assert "antialias: true" not in fonte and "maxZoom: 19.5," in fonte
+    # Repintado a treinta por segundo: ni a tirones ni sin parar.
+    assert "}, 33)" in capa and "}, 50)" not in capa
+    assert "capaNodosRef.current?.setNodos(" in fonte
+    mision = (COMPONENTE.parents[4] / "backend" / "app" / "runtime" / "mision.py").read_text(encoding="utf-8")
+    assert '"kind": kind_del_nodo(node)' in mision
 
 
 def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
@@ -365,3 +455,49 @@ def test_o_vixiante_non_refai_un_estilo_san(fonte: str) -> None:
     bloque = fonte[fonte.index("const vigilarEstilo"):fonte.index("document.addEventListener('visibilitychange'")]
     assert "vivo.isStyleLoaded()" not in bloque, "el vigilante volvió a mirar isStyleLoaded()"
     assert "getStyle().layers.length" in bloque
+
+
+def test_un_coleccionable_non_e_un_minixogo_calquera() -> None:
+    """
+    La forma del nodo en el mapa sale de `kind`, y un coleccionable tiene la
+    suya. Los diez nodos de la ruta real son minijuegos por interacción;
+    cinco de ellos llevan algo que recoger, y sin esto salían idénticos.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from backend.app.runtime.mision import kind_del_nodo
+
+    assert kind_del_nodo({"interaction": {"type": "checkpoint"}}) == "checkpoint"
+    assert kind_del_nodo({"interaction": {"type": "qr_code"}}) == "qr"
+    assert kind_del_nodo({"interaction": {"type": "signal_hunt"}}) == "minijuego"
+    assert (
+        kind_del_nodo({"interaction": {"type": "signal_hunt"}, "physical_node_kind": "collectible"})
+        == "coleccionable"
+    )
+    assert kind_del_nodo({"interaction": {"type": "signal_hunt"}, "is_map_collectible": True}) == "coleccionable"
+
+
+def test_a_barra_de_carga_non_parpadea() -> None:
+    """
+    Cada fase mandaba su cuenta: la comprobación 0-100, la descarga otra vez
+    0-100 y entre medias tramos sin total, que ponían la barra en modo
+    indeterminado. Una sola escala, sin retrocesos y sin brincos.
+    """
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    # Número sólo en la descarga real; el resto, barra animada sin cifra.
+    assert "const descargando = hayTotal && mapProgress?.label === 'Mapa offline'" in app
+    assert "const ratio = descargando ? ultimoRatioRef.current : undefined" in app
+    assert "TRAMOS" not in app
+
+
+def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
+    """
+    Fuera del trazado, el tramo de ti al camino se pintaba recto y se
+    recolocaba al terminar la descarga de la red de caminos.
+    """
+    fonte = COMPONENTE.read_text(encoding="utf-8")
+    assert "const esperandoCaminos = mejorMetros > 120 && !grafoRef.current" in fonte
+    # La red se pide desde el principio, no después de pintar el mapa.
+    assert fonte.index("void cargarGrafo()") > fonte.index("}, 250)")
+    assert "...(esperandoCaminos ? [] :" in fonte

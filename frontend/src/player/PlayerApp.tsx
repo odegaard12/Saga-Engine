@@ -113,7 +113,10 @@ import {
 } from './components/PlayerLayout'
 
 type LoadState =
-  | { status: 'idle' | 'loading'; mapProgress?: { done: number; total: number; detail?: string } }
+  | {
+      status: 'idle' | 'loading'
+      mapProgress?: { done: number; total: number; detail?: string; label?: string }
+    }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
 
@@ -829,6 +832,7 @@ export default function PlayerApp() {
                     done: progress.done,
                     total: progress.total,
                     detail: progress.detail,
+                    label: progress.label,
                   },
                 })
               }
@@ -1519,6 +1523,19 @@ export default function PlayerApp() {
   const ultimoDetalleRef = useRef('Preparando la misión…')
 
   /**
+   * Porcentaje SÓLO cuando se descarga de verdad; el resto, barra animada
+   * sin número.
+   *
+   * Se probó una escala única repartida entre fases y avanzando sola
+   * mientras esperaba al servidor: "avanzó 3, 5 % y de golpe pasó a 100".
+   * Un número que no mide nada real siempre acaba mintiendo. Ahora sólo
+   * la descarga de teselas lleva porcentaje —ésa sí se cuenta— y nunca
+   * retrocede; conectar, calcular y comprobar van con la barra en
+   * movimiento y sin cifra.
+   */
+  const ultimoRatioRef = useRef(0)
+
+  /**
    * CAUSA REAL DEL SALTO, medida en el codigo, no supuesta.
    *
    * Esto vivia en un `useEffect`. Los efectos de `useEffect` son PASIVOS: se
@@ -1594,9 +1611,11 @@ export default function PlayerApp() {
     // hay porcentaje que enseñar, y fingir un 0% era lo que hacia parecer que
     // la aplicacion se habia quedado parada.
     const hayTotal = Boolean(mapProgress && mapProgress.total > 0)
-    const ratio = hayTotal
-      ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100))
-      : undefined
+    // Ver `ultimoRatioRef`: número sólo en la descarga real.
+    const descargando = hayTotal && mapProgress?.label === 'Mapa offline'
+    const real = descargando ? Math.max(0, Math.min(100, (mapProgress!.done / mapProgress!.total) * 100)) : 0
+    ultimoRatioRef.current = descargando ? Math.max(ultimoRatioRef.current, real) : 0
+    const ratio = descargando ? ultimoRatioRef.current : undefined
 
     // Se guarda para que el velo de salida siga diciendo lo mismo que decia
     // la pantalla un instante antes: si cambia el texto a la vez que empieza
@@ -1606,8 +1625,8 @@ export default function PlayerApp() {
     return (
       <SplashScreen
         progress={ratio}
-        done={hayTotal ? mapProgress!.done : undefined}
-        total={hayTotal ? mapProgress!.total : undefined}
+        done={descargando ? mapProgress!.done : undefined}
+        total={descargando ? mapProgress!.total : undefined}
         primeiraVez={!initialLoadDoneRef.current}
         detail={mapProgress?.detail || 'Preparando la misión…'}
         entradaSuave
@@ -2491,7 +2510,12 @@ export default function PlayerApp() {
       await prefetchMissionMapTiles(stages, (progress) => {
         setState({
           status: 'loading',
-          mapProgress: { done: progress.done, total: progress.total, detail: progress.detail },
+          mapProgress: {
+            done: progress.done,
+            total: progress.total,
+            detail: progress.detail,
+            label: progress.label,
+          },
         })
       })
     } catch (err) {
