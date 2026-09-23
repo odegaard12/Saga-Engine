@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.1
+## 5.26.2
+
+- **Cada tipo de nodo tiene su objeto.** Bandera en mástil alto el
+  checkpoint; panel cuadrado con un código QR en la cara el QR; gema
+  facetada flotando, con destello, el coleccionable; dado con sus puntos
+  el minijuego. El color sigue siendo el estado, y el cartel del número
+  va encima del objeto. La silueta se distingue de lejos.
+- **El servidor clasificaba mal los nodos.** El motor normaliza los tipos
+  al cargar (checkpoint pasa a signal_hunt con game_id simple_checkpoint;
+  qr_collectible a circuit_matrix con game_id qr_collectible), y la
+  clasificación miraba sólo el tipo: en la ruta real los diez salían como
+  minijuego o coleccionable. Ahora mira el juego de verdad: un checkpoint,
+  dos QR, tres coleccionables (los QR que dejan objeto en el mapa) y cuatro
+  jugables.
+
+
 
 - **La guía desde lejos ya no tarda un minuto.** Quien ya tenía el mapa
   guardado se saltaba la pantalla de carga, y la red de caminos se bajaba
