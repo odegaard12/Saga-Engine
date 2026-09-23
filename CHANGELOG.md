@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.3
+## 5.26.4
+
+- El código QR ocupa el cartel entero: la geometría biselada repartía la
+  textura por coordenadas del mundo y el código salía diminuto en el
+  centro. Ahora va en un plano pegado a la cara.
+
+
 
 - **Nodos rediseñados del todo, con objetos reconocibles.** Bandera a
   cuadros ondeando en un poste alto el checkpoint; cartel blanco con un
