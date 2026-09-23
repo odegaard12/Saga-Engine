@@ -305,10 +305,16 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
    * depender del antialiasing" que pidió Óscar.
    */
   let objetivo: THREE.WebGLRenderTarget | null = null
+  const muestrasMaximas = (): number => {
+    const gl = renderer?.getContext() as WebGL2RenderingContext | undefined
+    const max = gl && 'MAX_SAMPLES' in gl ? Number(gl.getParameter(gl.MAX_SAMPLES)) : 4
+    return Math.max(4, Math.min(8, Number.isFinite(max) ? max : 4))
+  }
   const objetivoDe = (ancho: number, alto: number): THREE.WebGLRenderTarget => {
     if (!objetivo || objetivo.width !== ancho || objetivo.height !== alto) {
       objetivo?.dispose()
-      objetivo = new THREE.WebGLRenderTarget(ancho, alto, { samples: 4, depthBuffer: true, stencilBuffer: false })
+      // Todas las muestras que dé el móvil (4 en la mayoría, 8 en algunos).
+      objetivo = new THREE.WebGLRenderTarget(ancho, alto, { samples: muestrasMaximas(), depthBuffer: true, stencilBuffer: false })
       materialVolcado.map = objetivo.texture
       materialVolcado.needsUpdate = true
     }
@@ -416,10 +422,12 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     const H = nodo.estado === 'actual' ? 4.4 : 3.9
     const luz = (k: number) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: k, roughness: 0.3 })
 
-    // Peana oscura con la forma del tipo: redonda, cuadrada, triangular o hexagonal.
-    const peana = new THREE.Mesh(formaDelTipo(nodo.tipo, 1.0, 0.5), zocaloMat)
-    peana.position.y = 0.1
-    g.add(peana)
+    /**
+     * Sin peana. La base oscura con la forma del tipo se clavaba en el
+     * terreno y en cuesta salía medio enterrada o flotando por un lado:
+     * "hace que se buguee". La forma del tipo ya va en la chapa del
+     * cartel; en el suelo queda sólo el brillo difuminado.
+     */
 
     // Aro del color del estado en el suelo.
     const brillo = texturaBrillo(hex)
@@ -428,9 +436,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     disco.position.y = 0.3
     g.add(disco)
 
-    // Mástil fino de la peana a la bola.
-    const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, H - 0.35, 12), cuerpoMat)
-    mastil.position.y = 0.35 + (H - 0.35) / 2
+    /**
+     * Mástil grueso. Con 10 cm de radio era uno o dos píxeles a la
+     * distancia de juego, y el suavizado por muestras deja un objeto de
+     * un píxel con cobertura parcial: se veía translúcido, "a veces se
+     * transparenta". Con 22 cm ocupa varios píxeles y se ve sólido.
+     */
+    const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, H - 0.2, 16), cuerpoMat)
+    mastil.position.y = 0.2 + (H - 0.2) / 2
     g.add(mastil)
 
     // La bola, del color del estado. Una esfera se ve igual desde cualquier

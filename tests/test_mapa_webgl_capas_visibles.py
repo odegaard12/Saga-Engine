@@ -428,7 +428,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # muestras y volcado al lienzo): pedírselo al lienzo del mapa rompía las
     # fotos. En 2D, las bolas horneadas como símbolos.
     assert "vivo.addLayer(capaNodosRef.current.capa)" in fonte
-    assert "samples: 4" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
+    assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
+    # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
+    assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
     assert "blendSrc: THREE.OneFactor" in capa and "blendDst: THREE.OneMinusSrcAlphaFactor" in capa
     assert "function dibujarBola(" in fonte and "function dibujarHalo(" in fonte
     assert "mapa.addImage(evento.id, imagen, { pixelRatio: 3 })" in fonte
