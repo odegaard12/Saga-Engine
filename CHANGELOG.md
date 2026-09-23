@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.2
+## 5.26.3
+
+- **Nodos rediseñados del todo, con objetos reconocibles.** Bandera a
+  cuadros ondeando en un poste alto el checkpoint; cartel blanco con un
+  código QR de verdad (localizadores, líneas de tiempo, datos) el QR;
+  cofre del tesoro abierto, de madera y oro, con luz dentro y destello,
+  el coleccionable; mando de juego con cruceta, botones y palancas el
+  jugable. Cantos redondeados y biselados. El estado va en el poste, en el
+  brillo del suelo y en el cartel del número, que va encima.
+
+
 
 - **Cada tipo de nodo tiene su objeto.** Bandera en mástil alto el
   checkpoint; panel cuadrado con un código QR en la cara el QR; gema

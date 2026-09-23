@@ -443,8 +443,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
     # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
     # iguales" ya no: la silueta distingue, no una chapa pequeña.
-    assert "function texturaQR(" in bola and "function texturaDado(" in bola and "function texturaChispa(" in bola
-    assert "new THREE.ShapeGeometry(forma)" in bola and "OctahedronGeometry" in bola
+    assert "function texturaQR(" in bola and "function texturaCuadros(" in bola and "function texturaChispa(" in bola
+    # Bandera a cuadros, cartel QR con bisel, cofre con tapa y oro, mando con asas.
+    assert "new THREE.ExtrudeGeometry(" in bola and "new THREE.CapsuleGeometry(" in bola and "const tapa = new THREE.Group()" in bola
     # La red de caminos NO se baja en la pasada de fondo (la pide el worker),
     # y sólo se baja si no está ya guardada.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
