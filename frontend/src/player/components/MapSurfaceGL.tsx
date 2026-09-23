@@ -34,7 +34,7 @@ import {
 } from '../../shared/playerIdentity'
 import type { MapSurfacePropsGL } from './mapSurfaceContract'
 import { crearRedDeCaminos, type RedDeCaminos } from '../routing/redDeCaminos'
-import { CENTRO_HALO_3D_PX, DESPLAZAMIENTO_ANCLA_PX, renderizarBola } from './bolaRenderizada'
+import { ALTO_BOLA_PX, ANCHO_BOLA_PX, CENTRO_HALO_3D_PX, DESPLAZAMIENTO_ANCLA_PX, renderizarBola } from './bolaRenderizada'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
@@ -450,10 +450,8 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
 }
 
 /** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
-function dibujarHalo(centroY = 92 - 8 - 34 - 21): ImageData | null {
+function dibujarHalo(centroY = 92 - 8 - 34 - 21, ancho = 64, alto = 92): ImageData | null {
   const escala = 3
-  const ancho = 64
-  const alto = 92
   const lienzo = document.createElement('canvas')
   lienzo.width = ancho * escala
   lienzo.height = alto * escala
@@ -892,7 +890,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 1.0, 17, 1.4, 19, 1.8],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 15, 0.9, 17, 1.25, 19, 1.6],
         },
         paint: { 'icon-opacity': 0.6 },
       },
@@ -926,8 +924,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // aplastaría con la inclinación.
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          // Un 40 % más grandes que la chincheta: "demasiado pequeños, casi no se leen".
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 1.0, 17, 1.4, 19, 1.8],
+          // Grandes: "demasiado pequeños, casi no se leen". La imagen 3D es
+          // de 72×116 px CSS; a zoom 17 sale de 90×145.
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 15, 0.9, 17, 1.25, 19, 1.6],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -1125,7 +1124,7 @@ export function MapSurfaceGL({
       }
       if (evento.id === ICONO_HALO_3D) {
         if (mapa.hasImage(ICONO_HALO_3D)) return
-        const halo = dibujarHalo(CENTRO_HALO_3D_PX)
+        const halo = dibujarHalo(CENTRO_HALO_3D_PX, ANCHO_BOLA_PX, ALTO_BOLA_PX)
         if (halo) mapa.addImage(ICONO_HALO_3D, halo, { pixelRatio: 3 })
         return
       }

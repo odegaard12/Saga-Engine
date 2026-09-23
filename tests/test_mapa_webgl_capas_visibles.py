@@ -441,8 +441,10 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
-    # Una forma por tipo: bola, dado, gema, cubo. "Todos iguales" ya no.
-    assert "IcosahedronGeometry" in bola and "OctahedronGeometry" in bola and "BoxGeometry" in bola
+    # Un objeto por tipo: bandera, panel QR, gema con destello, dado. "Todos
+    # iguales" ya no: la silueta distingue, no una chapa pequeña.
+    assert "function texturaQR(" in bola and "function texturaDado(" in bola and "function texturaChispa(" in bola
+    assert "new THREE.ShapeGeometry(forma)" in bola and "OctahedronGeometry" in bola
     # La red de caminos NO se baja en la pasada de fondo (la pide el worker),
     # y sólo se baja si no está ya guardada.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
@@ -503,6 +505,26 @@ def test_un_coleccionable_non_e_un_minixogo_calquera() -> None:
         == "coleccionable"
     )
     assert kind_del_nodo({"interaction": {"type": "signal_hunt"}, "is_map_collectible": True}) == "coleccionable"
+    # Lo que hay de verdad en la ruta: el motor normaliza "checkpoint" a
+    # signal_hunt + simple_checkpoint y "qr_collectible" a circuit_matrix +
+    # qr_collectible. Un QR con objeto EN EL MAPA es coleccionable; sin él, QR.
+    assert kind_del_nodo({"interaction": {"type": "signal_hunt", "config": {"game_id": "simple_checkpoint"}}}) == "checkpoint"
+    assert (
+        kind_del_nodo(
+            {"interaction": {"type": "circuit_matrix", "config": {"game_id": "qr_collectible"}}, "physical_node_kind": "collectible"}
+        )
+        == "qr"
+    )
+    assert (
+        kind_del_nodo(
+            {
+                "interaction": {"type": "circuit_matrix", "config": {"game_id": "qr_collectible", "is_map_collectible": True}},
+                "physical_node_kind": "collectible",
+            }
+        )
+        == "coleccionable"
+    )
+    assert kind_del_nodo({"interaction": {"type": "circuit_matrix", "config": {"game_id": "tilt_maze"}}}) == "minijuego"
 
 
 def test_a_barra_de_carga_non_parpadea() -> None:
