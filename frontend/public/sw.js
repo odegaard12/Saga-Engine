@@ -10,6 +10,9 @@
 const CACHE_NAME = 'saga-player-shell'
 const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
 const FIELD_PROOF_ASSET_CACHE = 'saga-field-proof-assets-v3.9.6'
+// La red de caminos, aparte de las teselas: cambia cuando se reconstruye en
+// el panel (v2: con la clase de cada vía) sin obligar a bajar el mapa entero.
+const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 
 const DEFAULT_SHELL_URL = '/'
 const CORE_URLS = [DEFAULT_SHELL_URL, '/manifest.webmanifest', '/sw.js', '/saga-app-icon.svg', '/saga-app-icon-180.png', '/saga-app-icon-192.png', '/saga-app-icon-512.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/saga-header-mark.svg']
@@ -248,11 +251,19 @@ self.addEventListener('activate', (event) => {
                 // de descargar y no cambian entre versiones.
                 if (key.startsWith('saga-route-tile-coverage-') && key !== TILE_CACHE_NAME) return true
                 if (key.startsWith('saga-field-proof-assets-') && key !== FIELD_PROOF_ASSET_CACHE) return true
+                if (key.startsWith('saga-road-graph-') && key !== ROAD_GRAPH_CACHE) return true
                 return false
               })
               .map((key) => caches.delete(key))
           )
         )
+      )
+      // La red vivía en la caché de teselas hasta la v2: fuera de ahí.
+      .then(() =>
+        caches
+          .open(TILE_CACHE_NAME)
+          .then((cache) => cache.delete('/api/road-graph', MATCH_OPTIONS))
+          .catch(() => undefined)
       )
       .then(() => self.clients.claim())
   )
@@ -436,10 +447,14 @@ self.addEventListener('fetch', (event) => {
    */
   // La red de caminos va con las teselas: misma caché, mismo "primero lo
   // guardado", para que la guía redirija por carreteras sin cobertura.
+  if (url.pathname === '/api/road-graph') {
+    event.respondWith(customCacheFirst(ROAD_GRAPH_CACHE, request))
+    return
+  }
+
   if (
     url.pathname.startsWith('/map-tiles/') ||
-    url.pathname.startsWith('/dem-tiles/') ||
-    url.pathname === '/api/road-graph'
+    url.pathname.startsWith('/dem-tiles/')
   ) {
     event.respondWith(customCacheFirst(TILE_CACHE_NAME, request))
     return

@@ -23,6 +23,7 @@ from pathlib import Path
 
 # Vías por las que se puede ir a pie. Fuera: autopistas y autovías.
 HIGHWAYS_A_PIE = (
+    "motorway|motorway_link|trunk|trunk_link|"
     "residential|unclassified|tertiary|secondary|primary|living_street|service|"
     "track|path|footway|cycleway|pedestrian|steps|bridleway|road|"
     "tertiary_link|secondary_link|primary_link"
@@ -60,6 +61,22 @@ PBF_URL = "https://download.geofabrik.de/europe/spain/galicia-latest.osm.pbf"
 PBF_NOMBRE = "galicia-latest.osm.pbf"
 PBF_CADUCIDAD_DIAS = 60
 VIAS_A_PIE = set(HIGHWAYS_A_PIE.split("|"))
+
+# Clase de cada tramo, como código corto. El móvil pondera con esto: de
+# lejos (en casa, a 30 km) la guía tiene que ir por carretera, y una pista
+# o una senda tienen que costar mucho más que su longitud; cerca del
+# trazado valen todas. Sin la clase, el camino más corto en metros iba
+# "por el monte, por un camino raro".
+CLASES_DE_VIA = {
+    "motorway": 1, "motorway_link": 1, "trunk": 1, "trunk_link": 1,
+    "primary": 2, "primary_link": 2,
+    "secondary": 3, "secondary_link": 3,
+    "tertiary": 4, "tertiary_link": 4,
+    "unclassified": 5, "residential": 5, "living_street": 5, "road": 5,
+    "service": 6,
+    "track": 7,
+    "path": 8, "footway": 8, "cycleway": 8, "pedestrian": 8, "steps": 8, "bridleway": 8,
+}
 FICHERO = "road_graph.json"
 TOLERANCIA_M = 3.0  # simplificación de la forma de cada tramo
 
@@ -146,8 +163,8 @@ def construir_grafo(elementos):
     De los elementos de Overpass (nodos y vías) al grafo compacto.
 
     Nodo del grafo = extremo de vía o cruce (nodo usado por dos o más vías).
-    Tramo = trozo de vía entre dos nodos del grafo, con su longitud en metros
-    y la forma intermedia simplificada.
+    Tramo = trozo de vía entre dos nodos del grafo, con su longitud en metros,
+    la forma intermedia simplificada y la clase de vía (CLASES_DE_VIA).
     """
     coords = {}
     vias = []
@@ -157,10 +174,11 @@ def construir_grafo(elementos):
         elif el.get("type") == "way":
             nodos = [n for n in el.get("nodes", []) if isinstance(n, int)]
             if len(nodos) >= 2:
-                vias.append(nodos)
+                tipo = str((el.get("tags") or {}).get("highway", ""))
+                vias.append((nodos, CLASES_DE_VIA.get(tipo, 0)))
 
     usos = {}
-    for nodos in vias:
+    for nodos, _clase in vias:
         for n in nodos:
             usos[n] = usos.get(n, 0) + 1
 
@@ -175,7 +193,7 @@ def construir_grafo(elementos):
         return indice[n]
 
     tramos = []
-    for nodos in vias:
+    for nodos, clase in vias:
         nodos = [n for n in nodos if n in coords]
         if len(nodos) < 2:
             continue
@@ -191,7 +209,7 @@ def construir_grafo(elementos):
             a = id_de(nodos[inicio])
             b = id_de(nodos[i])
             if a != b:
-                tramos.append([a, b, round(longitud, 1), intermedios])
+                tramos.append([a, b, round(longitud, 1), intermedios, clase])
             inicio = i
 
     return {"nodos": puntos, "tramos": tramos}
