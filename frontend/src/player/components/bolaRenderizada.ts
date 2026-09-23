@@ -47,6 +47,18 @@ export const DESPLAZAMIENTO_ANCLA_PX = Math.round((-ABAJO / (ARRIBA - ABAJO)) * 
 /** Centro de la bola del nodo en juego, en píxeles CSS desde arriba: donde va el halo. */
 export const CENTRO_HALO_3D_PX = Math.round((1 - (medidas('actual').H * Math.cos(PHI) - ABAJO) / (ARRIBA - ABAJO)) * ALTO)
 
+/** La geometría del cuerpo según el tipo de nodo. */
+function geometriaDelTipo(tipo: TipoDeNodo, R: number): THREE.BufferGeometry {
+  if (tipo === 'minijuego') return new THREE.IcosahedronGeometry(R * 1.12, 0)
+  if (tipo === 'coleccionable') {
+    const gema = new THREE.OctahedronGeometry(R * 1.05, 0)
+    gema.scale(1, 1.35, 1)
+    return gema
+  }
+  if (tipo === 'qr') return new THREE.BoxGeometry(R * 1.5, R * 1.5, R * 1.5)
+  return new THREE.SphereGeometry(R, 96, 64)
+}
+
 let renderer: THREE.WebGLRenderer | null = null
 let intentado = false
 const cache = new Map<string, ImageData | null>()
@@ -117,13 +129,29 @@ export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoD
     mastil.position.y = 0.2 + (H - 0.2) / 2
     escena.add(mastil)
 
-    // La bola, del color del estado.
-    const bola = new THREE.Mesh(
-      new THREE.SphereGeometry(R, 96, 64),
-      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, roughness: 0.3 })
+    /**
+     * El cuerpo, del color del estado y con la FORMA del tipo: los nodos
+     * salían "todos iguales" porque sólo los distinguía la chapa pequeña.
+     * Bola lisa el checkpoint; dado de veinte caras el minijuego; gema
+     * (octaedro estirado) el coleccionable; cubo el QR. Sólidos y sin
+     * partes finas: nada que serrar.
+     */
+    const facetado = tipo !== 'checkpoint'
+    const cuerpo = new THREE.Mesh(
+      geometriaDelTipo(tipo, R),
+      new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: facetado ? 0.4 : 0.55,
+        roughness: facetado ? 0.4 : 0.3,
+        flatShading: facetado,
+      })
     )
-    bola.position.y = H
-    escena.add(bola)
+    cuerpo.position.y = H
+    if (tipo === 'minijuego') cuerpo.rotation.set(0.35, 0.4, 0)
+    if (tipo === 'coleccionable') cuerpo.rotation.set(0, Math.PI / 4, 0)
+    if (tipo === 'qr') cuerpo.rotation.set(0, Math.PI / 4, 0)
+    escena.add(cuerpo)
 
     // Cartel con el número y la chapa del tipo, de cara a la cámara y
     // delante de la bola.
@@ -131,7 +159,8 @@ export function renderizarBola(numero: number, estado: EstadoDeNodo, tipo: TipoD
       new THREE.PlaneGeometry(R * 1.55, R * 1.55),
       new THREE.MeshBasicMaterial({ map: texturaNumero(numero, hex, tipo), transparent: true, depthWrite: false })
     )
-    cartel.position.set(0, H, 0).add(new THREE.Vector3(0, Math.sin(PHI), Math.cos(PHI)).multiplyScalar(R * 1.02))
+    // Delante del cuerpo: las formas con aristas llegan más lejos que la bola.
+    cartel.position.set(0, H, 0).add(new THREE.Vector3(0, Math.sin(PHI), Math.cos(PHI)).multiplyScalar(R * (facetado ? 1.35 : 1.02)))
     cartel.rotation.x = -PHI
     cartel.renderOrder = 10
     escena.add(cartel)

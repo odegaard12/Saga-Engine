@@ -6,6 +6,8 @@ import type { PlayerStage } from '../../types/player'
 // se pierde en el siguiente arranque y el jugador se queda sin mapa offline
 // creyendo que lo tiene.
 const TILE_CACHE_NAME = 'saga-route-tile-coverage-v3.9.6'
+/** Donde el service worker guarda la red de caminos. Tiene que coincidir con sw.js. */
+const ROAD_GRAPH_CACHE = 'saga-road-graph-v2'
 /**
  * v3 desde 5.18.1. Cambiar la clave es lo que obliga a rehacer el paquete.
  *
@@ -163,7 +165,10 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // al desampliar hasta ver todos los nodos (zoom 14) pedía z15 en toda la
   // zona y sólo estaba el corredor; junto a un nodo (zoom 18) pedía z19 y
   // no había nada. "El mapa aún tiene que cargar".
-  plan: 3,
+  // 4: la red de caminos entra en el paquete (ver descargarRedDeCaminos).
+  // Sin subir esto, quien ya tenía el mapa se saltaba la pantalla de carga
+  // y la red se bajaba mientras jugaba: la guía tardaba un minuto.
+  plan: 4,
 })
 
 function metersPerTile(lat: number, zoom: number) {
@@ -548,6 +553,13 @@ async function descargarRedDeCaminos(onProgress?: (progress: OfflineMapTileProgr
   // Sin service worker al mando no hay quien la guarde: no se baja dos veces.
   if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return
   try {
+    // Ya guardada: nada que bajar. Sin esta comprobación se volvía a pedir
+    // en cada pasada de fondo, a la vez que el worker de la guía la pedía
+    // también: dos descargas de 7 MB mientras se jugaba.
+    if (typeof caches !== 'undefined') {
+      const guardada = await caches.open(ROAD_GRAPH_CACHE).then((c) => c.match('/api/road-graph', { ignoreSearch: true }))
+      if (guardada) return
+    }
     onProgress?.({ label: 'Red de caminos', done: 0, total: 0, detail: 'Red de caminos para la guía…' })
     const respuesta = await fetch('/api/road-graph')
     if (!respuesta.ok || !respuesta.body) return
@@ -571,7 +583,8 @@ async function descargarRedDeCaminos(onProgress?: (progress: OfflineMapTileProgr
 
 export async function prefetchMissionMapTiles(
   stages: PlayerStage[],
-  onProgress?: (progress: OfflineMapTileProgress) => void
+  onProgress?: (progress: OfflineMapTileProgress) => void,
+  opciones: { redDeCaminos?: boolean } = {}
 ): Promise<OfflineMapTileSummary> {
   const routePoints = uniqueStagePoints(stages)
   const urls = new Map<string, string>()
@@ -700,7 +713,7 @@ export async function prefetchMissionMapTiles(
    * una tesela" durante minutos) ni lleva porcentaje: comprimida no se sabe
    * cuánto ocupa.
    */
-  await descargarRedDeCaminos(onProgress)
+  if (opciones.redDeCaminos !== false) await descargarRedDeCaminos(onProgress)
 
   // Lo que hay guardado de esta ruta, no lo que se ha bajado en esta vuelta:
   // el panel de "antes de salir" tiene que decir si el mapa está o no está, y

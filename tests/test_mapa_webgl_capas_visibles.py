@@ -234,7 +234,7 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
     assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 3," in fonte
+    assert "plan: 4," in fonte
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -441,6 +441,17 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "['get', enTresD ? 'icono3d' : 'icono']" in fonte
     bola = (COMPONENTE.parent / "bolaRenderizada.ts").read_text(encoding="utf-8")
     assert "antialias: true" in bola and "new THREE.OrthographicCamera(" in bola
+    # Una forma por tipo: bola, dado, gema, cubo. "Todos iguales" ya no.
+    assert "IcosahedronGeometry" in bola and "OctahedronGeometry" in bola and "BoxGeometry" in bola
+    # La red de caminos NO se baja en la pasada de fondo (la pide el worker),
+    # y sólo se baja si no está ya guardada.
+    pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
+    assert "if (opciones.redDeCaminos !== false) await descargarRedDeCaminos(onProgress)" in pack
+    assert "caches.open(ROAD_GRAPH_CACHE)" in pack
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "void guardarMapa(false)" in app and "await guardarMapa(true)" in app
+    # Sin círculo del radio de entrada ("cutre"): la capa de relleno no existe.
+    assert "id: CAPA_RADIO_RELLENO" not in fonte
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
     assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 4

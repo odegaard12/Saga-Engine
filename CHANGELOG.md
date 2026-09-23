@@ -6,7 +6,24 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.0
+## 5.26.1
+
+- **La guía desde lejos ya no tarda un minuto.** Quien ya tenía el mapa
+  guardado se saltaba la pantalla de carga, y la red de caminos se bajaba
+  entonces por detrás mientras jugaba, dos veces a la vez (la pasada de
+  fondo del paquete y el worker de la guía). Ahora el paquete se vuelve a
+  comprobar una vez (rápido) y baja la red en la pantalla de carga; la
+  pasada de fondo no la toca, y no se baja si ya está guardada.
+- **Una forma por tipo de nodo.** Salían todos iguales porque sólo los
+  distinguía la chapa pequeña. Bola lisa el checkpoint, dado de veinte
+  caras el minijuego, gema el coleccionable, cubo el QR. Sólidos, sin
+  partes finas.
+- **Los nodos, un 40 % más grandes.** Eran demasiado pequeños para leer
+  el número.
+- **Fuera el círculo del radio de entrada.** El nodo en juego se marca
+  con su propio brillo en el suelo.
+
+
 
 - **La guía va por carretera cuando estás lejos.** El servidor guarda
   ahora la clase de cada vía (autovía, primaria, secundaria, terciaria,

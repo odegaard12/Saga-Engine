@@ -726,30 +726,20 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'hillshade-illumination-direction': 315,
         },
         },
-        {
-        id: CAPA_RADIO_RELLENO,
-        type: 'fill',
-        source: FUENTE_RADIO,
-        // Un velo, no una mancha: al 0,32 sobre el relieve quedaba un
-        // charco oscuro que tapaba el terreno. "Demasiado oscuro, fatal".
-        paint: { 'fill-color': COLOR_NODO_ACTUAL, 'fill-opacity': 0.1 },
-        },
+        /**
+         * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
+         * sigue existiendo por si vuelve a hacer falta; lo que marca el
+         * nodo en juego es el brillo en el suelo del propio nodo.
+         */
         {
         id: CAPA_RADIO_BORDE,
         type: 'line',
         source: FUENTE_RADIO,
-        // 3 px y blanco al borde: sobre foto aérea con sol, una línea
-        // azul de 2 px se perdía. El radio dice a qué distancia entras
-        // en el nodo; si no se ve, no sirve de nada.
-        /**
-         * Borde a trazos: un círculo continuo se confunde con una rotonda
-         * o un depósito de la propia foto satélite. A trazos se lee como
-         * lo que es -una marca del juego, no algo del terreno-.
-         */
+        layout: { visibility: 'none' },
         paint: {
           'line-color': '#ffffff',
-          'line-opacity': 0.7,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 17, 2.5, 19, 4],
+          'line-opacity': 0,
+          'line-width': 0,
           // Sin trazos: las líneas a trazos tienen historial de no pintarse
           // bien sobre relieve en MapLibre, y aquí lo primero es que se vea.
         },
@@ -902,7 +892,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 1.0, 17, 1.4, 19, 1.8],
         },
         paint: { 'icon-opacity': 0.6 },
       },
@@ -936,7 +926,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           // aplastaría con la inclinación.
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.3],
+          // Un 40 % más grandes que la chincheta: "demasiado pequeños, casi no se leen".
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 1.0, 17, 1.4, 19, 1.8],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
