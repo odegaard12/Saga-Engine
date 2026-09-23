@@ -6,7 +6,13 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.4
+## 5.26.5
+
+- **Los nodos crecen al acercarse.** Con una escala casi fija en píxeles,
+  al ampliar parecían cada vez más pequeños frente a las casas y los
+  caminos, que sí crecen. Ahora su tamaño sube un 50 % por nivel de zoom.
+
+
 
 - El código QR ocupa el cartel entero: la geometría biselada repartía la
   textura por coordenadas del mundo y el código salía diminuto en el
