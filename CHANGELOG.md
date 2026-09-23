@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.25.28
+## 5.25.29
+
+- **Fuera el aro dentado alrededor de la bola.** Eran el halo transparente
+  y el anillo del nodo en juego: dos superficies finas que en el móvil
+  salían como un aro con píxeles y que ningún suavizado arregla del todo.
+  La bola queda sola, lisa; el nodo en juego se distingue por el pulso en
+  el suelo y por respirar más.
+
+
 
 - **Vuelven los nodos con volumen, y sin dientes de sierra.** La escena
   3D se pinta ahora en un objetivo propio con cuatro muestras por píxel y

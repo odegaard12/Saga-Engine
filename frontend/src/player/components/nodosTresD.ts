@@ -439,14 +439,14 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     bola.position.y = H
     g.add(bola)
 
-    // Halo suave alrededor, que respira.
-    const halo = new THREE.Mesh(
-      new THREE.SphereGeometry(R * 1.18, 32, 20),
-      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, transparent: true, opacity: 0.16, depthWrite: false, roughness: 1 })
-    )
-    halo.position.y = H
-    g.add(halo)
-    const franjas: THREE.Mesh[] = [halo]
+    /**
+     * Sin halo ni anillo alrededor de la bola. Eran dos superficies finas y
+     * transparentes que, vistas desde el móvil, salían como un aro dentado
+     * ("el aro de alrededor se ve con píxeles"), y ninguna medida de
+     * suavizado las arregla del todo. La bola sola, lisa; el nodo en juego
+     * se distingue por el pulso en el suelo y por respirar más.
+     */
+    const franjas: THREE.Mesh[] = []
 
     // Cartel redondo con el número y la chapa del tipo, delante de la bola,
     // siempre de frente. Más pequeño que la bola: queda un aro de color
@@ -463,13 +463,9 @@ export function crearCapaNodosTresD(id: string): CapaNodosTresD {
     g.add(numero)
     carteles.push(numero)
 
-    let anillo: THREE.Mesh | null = null
+    const anillo: THREE.Mesh | null = null
     let pulso: THREE.Mesh | null = null
     if (nodo.estado === 'actual') {
-      anillo = new THREE.Mesh(new THREE.TorusGeometry(R * 1.45, 0.06, 10, 96), luz(1.2))
-      anillo.position.y = H
-      anillo.rotation.x = Math.PI / 2 + 0.35
-      g.add(anillo)
       pulso = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: brillo, transparent: true, depthWrite: false }))
       pulso.rotation.x = -Math.PI / 2
       pulso.position.y = 0.34
