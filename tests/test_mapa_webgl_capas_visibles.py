@@ -573,3 +573,22 @@ def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
     # La red se pide desde el principio, no después de pintar el mapa.
     assert fonte.index("void redRef.current?.cargar()") > fonte.index("}, 250)")
     assert "...(esperandoCaminos ? [] :" in fonte
+
+
+def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -> None:
+    """
+    Al desampliar, el mapa no se vuelve a cargar: más niveles en memoria,
+    más teselas a la vez (salen de la caché) y sin fundido. Y los botones
+    de posición no piden el GPS si ya lo hay: "centrar en mí" centra con la
+    última posición y "ver la ruta" no lo necesita.
+    """
+    assert "maxTileCacheZoomLevels: 8" in fonte and "setMaxParallelImageRequests(32)" in fonte
+    assert "'raster-fade-duration': 0" in fonte
+    assert "[1, 2, 3, 4.5].map((menos)" in fonte, "la carga tiene que pasar por cada nivel de zoom"
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert app.count("playerPosition={posicionEnMapa}") == 2
+    assert "const posicionEnMapa = playerPosition ?? ultimaPosicionViva" in app
+    ruta = app[app.index("function handleToggleRouteOverview()"):app.index("function openInteraction()")]
+    assert "handleRequestLiveGps" not in ruta, "ver la ruta no necesita GPS"
+    centrar = app[app.index("function handleFocusPlayer()"):app.index("function handleFocusNode()")]
+    assert "handleRequestLiveGps({ silent: true, forceFocus: true })" in centrar

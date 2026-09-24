@@ -26,6 +26,12 @@ import urlDelWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
  * dirección. Mismo origen, mismo caché offline que el resto.
  */
 maplibregl.setWorkerUrl(urlDelWorker)
+/**
+ * Teselas en paralelo: casi todas salen de la caché del service worker, no
+ * de la red, así que las 16 de fábrica dejaban el mapa esperando turno al
+ * desampliar -la vista nueva pide de golpe decenas de teselas-.
+ */
+maplibregl.setMaxParallelImageRequests(32)
 import type { FieldProof, PlayerStage } from '../../types/player'
 import {
   getPlayerAvatarInitials,
@@ -746,7 +752,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
       },
       layers: [
-        { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS },
+        // Sin fundido: las teselas salen de la caché al instante, y el
+        // fundido de 300 ms era lo que hacía parecer que el mapa cargaba.
+        { id: CAPA_TESELAS, type: 'raster', source: FUENTE_TESELAS, paint: { 'raster-fade-duration': 0 } },
         // Sombreado de laderas: marca el relieve aunque la foto satélite
         // sea plana. Sin esto el monte está ahí pero no se lee.
         {
@@ -1208,6 +1216,12 @@ export function MapSurfaceGL({
       // Al pellizcar, las teselas pedidas siguen su curso: cancelarlas a
       // cada paso del gesto dejaba el mapa en blanco hasta soltar.
       cancelPendingTileRequestsWhileZooming: false,
+      /**
+       * Más teselas en memoria: ocho niveles de zoom en vez de cinco. Al
+       * desampliar y volver, lo que ya se vio sigue ahí en vez de leerse y
+       * decodificarse otra vez ("se tiene que cargar de vuelta").
+       */
+      maxTileCacheZoomLevels: 8,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
@@ -1563,10 +1577,9 @@ export function MapSurfaceGL({
         pitch: vivo.getPitch(),
         bearing: vivo.getBearing(),
       }
-      const vistas: (() => void)[] = [
-        () => vivo.jumpTo({ zoom: camara.zoom - 2 }),
-        () => vivo.jumpTo({ zoom: camara.zoom - 3.5 }),
-      ]
+      // Cada nivel por el que se desampliará, no saltando: el que se salta
+      // es el que luego falta (ver `maxTileCacheZoomLevels`).
+      const vistas: (() => void)[] = [1, 2, 3, 4.5].map((menos) => () => vivo.jumpTo({ zoom: camara.zoom - menos }))
       const posiciones = nodosParaHornearRef.current
       if (posiciones.length > 1) {
         const limites = new maplibregl.LngLatBounds()

@@ -1389,6 +1389,22 @@ export default function PlayerApp() {
   // La posición antigua no se dibuja ni centra.
   // Solo se usa GPS vivo o posición debug.
   const playerPosition = localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
+  /**
+   * Dónde te pinta el mapa: la posición viva o, si el GPS lleva un rato sin
+   * dar punto (quieto, o volviendo de segundo plano), la ÚLTIMA de esta
+   * sesión. Sin esto, a los 45 s quieto desaparecías del mapa y "centrar en
+   * mí" volvía a pedir el GPS aunque funcionara. La guardada de otro día no
+   * cuenta: no es dónde estás. Para el juego -radios, nodos- manda
+   * `playerPosition`, que sigue exigiendo un punto reciente.
+   */
+  const [ultimaPosicionViva, setUltimaPosicionViva] = useState<{ lat: number; lon: number } | null>(null)
+  if (
+    playerPosition &&
+    (ultimaPosicionViva?.lat !== playerPosition.lat || ultimaPosicionViva?.lon !== playerPosition.lon)
+  ) {
+    setUltimaPosicionViva({ lat: playerPosition.lat, lon: playerPosition.lon })
+  }
+  const posicionEnMapa = playerPosition ?? ultimaPosicionViva
 
   useEffect(() => {
     if (playerPosition) {
@@ -2193,21 +2209,23 @@ export default function PlayerApp() {
 
   function handleFocusPlayer() {
     setRouteOverviewActive(false)
+    setFollowPlayer(true)
 
-    if (!playerPosition) {
-      void handleRequestLiveGps({
-        forceFocus: true,
-      })
+    /**
+     * Con posición -aunque sea la última de hace un rato- se centra YA.
+     * El botón pedía siempre el GPS de nuevo: reiniciaba la escucha, sacaba
+     * "Solicitando permiso de ubicación…" aunque el GPS funcionara y no
+     * centraba hasta el punto siguiente. Si el punto es viejo, se pide otro
+     * en silencio. Sólo sin GPS ninguno se pide con aviso.
+     */
+    if (posicionEnMapa) {
+      setFocusRequest({ target: 'player', token: Date.now() })
+      vibrate(8)
+      if (!playerPosition && !localDebugEnabled) void handleRequestLiveGps({ silent: true, forceFocus: true })
       return
     }
 
-    setFollowPlayer(true)
-    setFocusRequest({
-      target: 'player',
-      token: Date.now(),
-    })
-
-    vibrate(8)
+    void handleRequestLiveGps({ forceFocus: true })
   }
 
   function handleFocusNode() {
@@ -2232,13 +2250,7 @@ export default function PlayerApp() {
   }
 
   function handleToggleRouteOverview() {
-    if (!playerPosition) {
-      void handleRequestLiveGps({
-        forceFocus: true,
-      })
-      return
-    }
-
+    // Ver la ruta no necesita GPS: sin punto reciente, este botón también lo pedía.
     const stages = Array.isArray(payload.stages) ? payload.stages : []
 
     const hasRouteNodes = stages.some(
@@ -2248,12 +2260,8 @@ export default function PlayerApp() {
     const nextToken = Date.now()
 
     if (routeOverviewActive || !hasRouteNodes) {
-      setRouteOverviewActive(false)
-      setFollowPlayer(true)
-      setFocusRequest({
-        target: 'player',
-        token: nextToken,
-      })
+      // De vuelta a ti, con la misma regla que "centrar en mí".
+      handleFocusPlayer()
       return
     }
 
@@ -3046,7 +3054,7 @@ export default function PlayerApp() {
             currentStage={currentStage}
             missionStages={payload.stages || []}
             currentLevel={payload.level || 0}
-            playerPosition={playerPosition}
+            playerPosition={posicionEnMapa}
             tresD={mapaTresD}
             focusRequest={focusRequest}
             followPlayer={followPlayer}
@@ -3075,7 +3083,7 @@ export default function PlayerApp() {
         currentStage={currentStage}
         missionStages={payload.stages || []}
         currentLevel={payload.level || 0}
-        playerPosition={playerPosition}
+        playerPosition={posicionEnMapa}
         gpsState={gpsState}
         debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
         followPlayer={followPlayer}
@@ -3458,8 +3466,7 @@ export default function PlayerApp() {
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                setFollowPlayer(true)
-                void handleRequestLiveGps({ forceFocus: true })
+                handleFocusPlayer()
               }}
               aria-label="Centrar en mi ubicación"
               title="Centrar en mi ubicación"

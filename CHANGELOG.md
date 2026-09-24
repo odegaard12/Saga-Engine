@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.2
+## 5.28.3
+
+- **El mapa no se vuelve a cargar al desampliar.** Guarda en memoria ocho
+  niveles de zoom en vez de cinco, pide 32 teselas a la vez en vez de 16
+  (salen de la caché, no de la red) y las enseña sin fundido. La pantalla
+  de carga pasa por cada nivel de zoom hacia fuera, no a saltos.
+- **Botones de posición.** "Centrar en mí" centra al momento con la
+  última posición. Antes pedía el GPS de nuevo cada vez: reiniciaba la
+  escucha, avisaba "Solicitando permiso de ubicación…" aunque funcionara y
+  no centraba hasta el punto siguiente. Si el punto es viejo, se pide otro
+  en silencio. "Ver la ruta" ya no pide GPS: no lo necesita.
+- Quieto más de 45 s ya no desapareces del mapa: se te pinta en tu última
+  posición de esta sesión. Para abrir nodos sigue haciendo falta un punto
+  reciente.
+
+
 
 - **Zoom y arrastre más fluidos.** Las animaciones del mapa (pulso del
   trazado, moneda que flota, halo, guía) se pausan mientras el mapa se
