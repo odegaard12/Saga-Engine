@@ -121,6 +121,91 @@ const ALTURA_SIMBOLOS_M = 3
 const ALTURA_NODOS_M = 2
 /** El halo del suelo del nodo, tumbado en el mapa (sólo en 3D). */
 const CAPA_NODOS_SUELO = 'saga-nodos-suelo-capa'
+
+/**
+ * Tamaño de nodos, fotos y jugador según el zoom, SIN escalones.
+ *
+ * Con una interpolación sólo por zoom, MapLibre topa el tamaño de cada
+ * símbolo en el de un zoom por encima de su tesela (`evaluateCameraSize`
+ * acaba en `Math.min(…, layoutSize)`): ampliando deprisa, el nodo se
+ * quedaba quieto hasta que llegaba la tesela siguiente y entonces pegaba el
+ * salto ("se nota que se recarga el tamaño"). Si el tamaño depende además
+ * de un dato del punto -aquí uno que no existe y vale 1-, MapLibre guarda
+ * los dos extremos en cada punto y mezcla en la GPU, sin techo. Y sólo dos
+ * paradas: con más, el tramo que cubre cada tesela vuelve a tener tope.
+ */
+const SIN_ESCALON: maplibregl.ExpressionSpecification = ['number', ['get', 'escala'], 1]
+// Base 1,15 entre 0,6 (z12) y 3,6 (z19,5): 1,12 en z14, 1,44 en z15, 1,81 en z16,
+// 2,24 en z17 y 3,29 en z19; lo mismo que la curva de seis paradas de antes.
+const TAMANO_NODOS: maplibregl.ExpressionSpecification = [
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.6, SIN_ESCALON],
+  19.5, ['*', 3.6, SIN_ESCALON],
+]
+const TAMANO_FOTOS: maplibregl.ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'],
+  12, ['*', 0.5, SIN_ESCALON],
+  19.5, ['*', 1.3, SIN_ESCALON],
+]
+const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'],
+  12, ['*', 0.6, SIN_ESCALON],
+  19.5, ['*', 1.15, SIN_ESCALON],
+]
+
+/** Cuántas fotos de un mismo sitio se enseñan repartidas; el visor las tiene todas. */
+const MAX_FOTOS_GRUPO = 8
+/**
+ * Dónde va cada foto de un grupo, en píxeles a tamaño 1: en filas de
+ * cuatro, en leve sonrisa. Junto a un nodo, por DEBAJO de su peana, para
+ * no taparle el número; en campo abierto, alrededor del punto. Las fotos de
+ * un nodo estaban todas en el mismo punto, apiladas y bajo el nodo: al
+ * ampliar no se separaban y no había forma de tocar una.
+ */
+function huecoDeFoto(enNodo: boolean, n: number, i: number): [number, number] {
+  const fila = Math.floor(i / 4)
+  const enFila = Math.min(4, n - fila * 4)
+  const x = ((i % 4) - (enFila - 1) / 2) * 64
+  const y = (enNodo ? 72 : n > 1 ? 34 : 0) + fila * 70 + Math.abs(x) * 0.2
+  return [Math.round(x), Math.round(y)]
+}
+const DESPLAZAMIENTO_FOTOS = ((): maplibregl.ExpressionSpecification => {
+  // Tabla fija: una propiedad con un array dentro llega al estilo como texto.
+  const casos: unknown[] = []
+  for (const enNodo of [false, true]) {
+    for (let n = 1; n <= MAX_FOTOS_GRUPO; n += 1) {
+      for (let i = 0; i < n; i += 1) casos.push(`${enNodo ? 1 : 0}-${n}-${i}`, ['literal', huecoDeFoto(enNodo, n, i)])
+    }
+  }
+  return ['match', ['get', 'hueco'], ...casos, ['literal', [0, 0]]] as unknown as maplibregl.ExpressionSpecification
+})()
+
+/**
+ * La guía por caminos se guarda: al volver a abrir la app en el mismo
+ * sitio (en casa, por ejemplo), sale al instante en vez de esperar a que
+ * el worker cargue la red y la calcule otra vez.
+ */
+const CLAVE_GUIA_GUARDADA = 'saga:guia-por-caminos:v1'
+type RutaGuia = { desde: Punto; hastaClave: string; coords: [number, number][] }
+function leerGuiaGuardada(): RutaGuia | null {
+  try {
+    const crudo = window.localStorage.getItem(CLAVE_GUIA_GUARDADA)
+    if (!crudo) return null
+    const ruta = JSON.parse(crudo) as RutaGuia
+    if (typeof ruta?.hastaClave !== 'string' || !Array.isArray(ruta.coords)) return null
+    if (typeof ruta.desde?.lat !== 'number' || typeof ruta.desde?.lon !== 'number') return null
+    return ruta
+  } catch {
+    return null
+  }
+}
+function guardarGuia(ruta: RutaGuia): void {
+  try {
+    window.localStorage.setItem(CLAVE_GUIA_GUARDADA, JSON.stringify(ruta))
+  } catch {
+    // Sin almacenamiento: se calcula cada vez, como antes.
+  }
+}
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -917,31 +1002,6 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
-         * Fotos de campo como símbolos del mapa, por lo mismo que los
-         * nodos: un marcador del DOM va un fotograma por detrás del
-         * terreno y "no se queda en su sitio" con relieve y zoom. La
-         * miniatura se carga y se enmarca en un canvas bajo demanda (ver
-         * `styleimagemissing`), y el motor la coloca en el mismo fotograma
-         * que el resto del mapa.
-         */
-        id: CAPA_FOTOS,
-        type: 'symbol',
-        source: FUENTE_FOTOS,
-        layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
-          'symbol-height-anchor': 'ground' as const,
-          'icon-image': ['get', 'icono'],
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-pitch-alignment': 'viewport',
-          'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 0.75, 17, 1, 19, 1.25],
-          'symbol-sort-key': ['get', 'orden'],
-        },
-      },
-      {
-        /**
          * El suelo de cada nodo: sombra y halo del color del tipo, TUMBADOS
          * sobre el mapa. Con la perspectiva real, en cualquier punto de la
          * pantalla y con cualquier inclinación, el nodo queda asentado.
@@ -959,7 +1019,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'map',
           'icon-rotation-alignment': 'map',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
+          'icon-size': TAMANO_NODOS,
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
@@ -979,9 +1039,39 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
+          'icon-size': TAMANO_NODOS,
         },
         paint: { 'icon-opacity': 0.6 },
+      },
+      {
+        /**
+         * Fotos de campo como símbolos del mapa, por lo mismo que los
+         * nodos: un marcador del DOM va un fotograma por detrás del
+         * terreno y "no se queda en su sitio" con relieve y zoom. La
+         * miniatura se carga y se enmarca en un canvas bajo demanda (ver
+         * `styleimagemissing`), y el motor la coloca en el mismo fotograma
+         * que el resto del mapa.
+         *
+         * Va ENCIMA del suelo y del halo de los nodos, y debajo del nodo:
+         * las de un nodo se reparten bajo su peana.
+         */
+        id: CAPA_FOTOS,
+        type: 'symbol',
+        source: FUENTE_FOTOS,
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_FOTOS,
+          // Repartidas por grupo (ver `huecoDeFoto`): se pueden tocar una a una.
+          'icon-offset': DESPLAZAMIENTO_FOTOS,
+          'symbol-sort-key': ['get', 'orden'],
+        },
       },
       {
         /**
@@ -1021,7 +1111,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            * por nivel de zoom: la mitad que el terreno (que dobla), para que
            * de cerca no tapen el mapa.
            */
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
+          'icon-size': TAMANO_NODOS,
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -1046,7 +1136,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
+          'icon-size': TAMANO_NODOS,
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
@@ -1074,7 +1164,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 0.9, 19, 1.1],
+          'icon-size': TAMANO_JUGADOR,
         },
       },
     ],
@@ -1131,7 +1221,8 @@ export function MapSurfaceGL({
   const [rutaVersion, setRutaVersion] = useState(0)
   const pedidaRef = useRef<{ desde: Punto; hastaClave: string } | null>(null)
   /** Última ruta por caminos calculada, para no recalcular a cada aviso del GPS. */
-  const rutaCaminosRef = useRef<{ desde: Punto; hastaClave: string; coords: [number, number][] } | null>(null)
+  const rutaCaminosRef = useRef<RutaGuia | null>(null)
+  const guiaLeidaRef = useRef(false)
   /** Última posición a la que se siguió, para no encadenar animaciones por 2 metros. */
   const ultimoSeguimientoRef = useRef<Punto | null>(null)
   /** Callbacks por ref: los escuchadores del mapa se registran una vez. */
@@ -1154,6 +1245,8 @@ export function MapSurfaceGL({
   const fotosPorIconoRef = useRef(new Map<string, string>())
   /** Lo último recibido, para resolver un toque sobre una foto sin cerrar props viejas. */
   const fotosRef = useRef<FieldProof[]>([])
+  /** Las fotos por sitio: el visor abre el grupo entero, empezando por la tocada. */
+  const gruposFotosRef = useRef<FieldProof[][]>([])
   const abrirFotosRef = useRef<((proofs: FieldProof[]) => void) | undefined>(undefined)
 
   /** Lo último que se mandó pintar a cada fuente, para poder reintentarlo. */
@@ -1685,12 +1778,14 @@ export function MapSurfaceGL({
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
     mapa.on('click', CAPA_FOTOS, (evento) => {
-      const props = evento.features?.[0]?.properties as { lat?: number; lon?: number } | undefined
-      if (!props || typeof props.lat !== 'number' || typeof props.lon !== 'number') return
-      // Se abren TODAS las de ese punto: en un nodo suele haber varias y el
-      // visor ya sabe pasarlas.
-      const grupo = fotosRef.current.filter((otra) => otra.lat === props.lat && otra.lon === props.lon)
-      if (grupo.length) abrirFotosRef.current?.(grupo)
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
+      if (!props || typeof props.grupo !== 'number') return
+      // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
+      // visor ya sabe pasarlas-, empezando por la que se ha tocado.
+      const grupo = gruposFotosRef.current[props.grupo] || []
+      const tocada = grupo.findIndex((foto) => String(foto.id) === String(props.id))
+      const ordenadas = tocada > 0 ? [...grupo.slice(tocada), ...grupo.slice(0, tocada)] : grupo
+      if (ordenadas.length) abrirFotosRef.current?.(ordenadas)
     })
     mapa.on('mouseenter', CAPA_FOTOS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
@@ -1915,11 +2010,21 @@ export function MapSurfaceGL({
     const objetivo = camino[mejor]
     const claveObjetivo = `${objetivo.lat.toFixed(5)},${objetivo.lon.toFixed(5)}`
     if (mejorMetros > 120) {
+      if (!guiaLeidaRef.current) {
+        guiaLeidaRef.current = true
+        rutaCaminosRef.current = rutaCaminosRef.current ?? leerGuiaGuardada()
+      }
       const previa = rutaCaminosRef.current
-      if (previa && previa.hastaClave === claveObjetivo && metrosEntre(previa.desde, playerPosition) < 15) {
+      const mismaMeta = previa !== null && previa.hastaClave === claveObjetivo
+      const desdePrevia = previa !== null && mismaMeta ? metrosEntre(previa.desde, playerPosition) : Infinity
+      if (previa && desdePrevia < 15) {
         porCaminos = previa.coords
       } else {
-        esperandoCaminos = true
+        // Mientras se calcula la buena, la de antes si sale de cerca (hasta
+        // 150 m; p. ej. la guardada de la última vez en casa): aparece al
+        // instante y se cambia en cuanto llega la nueva.
+        if (previa && desdePrevia < 150 && previa.coords.length > 0) porCaminos = previa.coords
+        else esperandoCaminos = true
         const red = redRef.current
         const pedida = pedidaRef.current
         const yaPedida =
@@ -1930,6 +2035,7 @@ export function MapSurfaceGL({
           void red.ruta(peticion.desde, objetivo, mejorMetros).then((coords) => {
             if (pedidaRef.current !== peticion) return
             rutaCaminosRef.current = { desde: peticion.desde, hastaClave: claveObjetivo, coords: coords ?? [] }
+            if (coords && coords.length > 0) guardarGuia(rutaCaminosRef.current)
             setRutaVersion((v) => v + 1)
           })
         }
@@ -2190,20 +2296,56 @@ export function MapSurfaceGL({
     })
     fotosPorIconoRef.current = tabla
 
+    /**
+     * Por sitio: las que están a 30 m de un nodo van con ese nodo y se
+     * reparten bajo él; las demás se juntan si están a menos de 20 m.
+     */
+    const nodos = (Array.isArray(missionStages) ? missionStages : [])
+      .filter((nodo) => typeof nodo.lat === 'number' && typeof nodo.lon === 'number')
+      .map((nodo) => ({ lat: nodo.lat as number, lon: nodo.lon as number }))
+    type GrupoDeFotos = { lat: number; lon: number; nodo: number; fotos: FieldProof[] }
+    const grupos: GrupoDeFotos[] = []
+    for (const foto of fotos) {
+      const punto = { lat: foto.lat as number, lon: foto.lon as number }
+      let nodo = -1
+      let mejor = 30
+      nodos.forEach((candidato, indice) => {
+        const metros = metrosEntre(candidato, punto)
+        if (metros < mejor) {
+          mejor = metros
+          nodo = indice
+        }
+      })
+      let grupo =
+        nodo >= 0
+          ? grupos.find((otro) => otro.nodo === nodo)
+          : grupos.find((otro) => otro.nodo < 0 && metrosEntre(otro, punto) < 20)
+      if (!grupo) {
+        grupo = { ...(nodo >= 0 ? nodos[nodo] : punto), nodo, fotos: [] }
+        grupos.push(grupo)
+      }
+      grupo.fotos.push(foto)
+    }
+    gruposFotosRef.current = grupos.map((grupo) => grupo.fotos)
+
     pintarFuente(FUENTE_FOTOS, {
       type: 'FeatureCollection',
-      features: fotos.map((foto, indice) => ({
-        type: 'Feature' as const,
-        properties: {
-          icono: `foto-${foto.id}`,
-          lat: foto.lat,
-          lon: foto.lon,
-          orden: indice,
-        },
-        geometry: { type: 'Point' as const, coordinates: [foto.lon, foto.lat] },
-      })),
+      features: grupos.flatMap((grupo, indiceGrupo) => {
+        const vistas = grupo.fotos.slice(0, MAX_FOTOS_GRUPO)
+        return vistas.map((foto, indice) => ({
+          type: 'Feature' as const,
+          properties: {
+            icono: `foto-${foto.id}`,
+            id: foto.id,
+            grupo: indiceGrupo,
+            hueco: `${grupo.nodo >= 0 ? 1 : 0}-${vistas.length}-${indice}`,
+            orden: indice,
+          },
+          geometry: { type: 'Point' as const, coordinates: [grupo.lon, grupo.lat] },
+        }))
+      }),
     })
-  }, [fieldProofs, onOpenFieldProofs, pintarFuente])
+  }, [fieldProofs, onOpenFieldProofs, pintarFuente, missionStages])
 
 
   // 2D / 3D. Inclinar la cámara es gratis aquí -es la misma escena, otra

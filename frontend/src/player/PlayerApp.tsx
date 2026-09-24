@@ -2217,11 +2217,15 @@ export default function PlayerApp() {
      * "Solicitando permiso de ubicación…" aunque el GPS funcionara y no
      * centraba hasta el punto siguiente. Si el punto es viejo, se pide otro
      * en silencio. Sólo sin GPS ninguno se pide con aviso.
+     *
+     * El punto nuevo NO vuelve a encuadrar (sin `forceFocus`): eran dos
+     * encuadres seguidos, y con el GPS bailando bajo techo el segundo movía
+     * el mapa otra vez. Ya en modo seguir, el mapa se desliza solo hasta él.
      */
     if (posicionEnMapa) {
       setFocusRequest({ target: 'player', token: Date.now() })
       vibrate(8)
-      if (!playerPosition && !localDebugEnabled) void handleRequestLiveGps({ silent: true, forceFocus: true })
+      if (!playerPosition && !localDebugEnabled) void handleRequestLiveGps({ silent: true })
       return
     }
 
