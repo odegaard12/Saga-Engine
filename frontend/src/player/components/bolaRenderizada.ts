@@ -42,6 +42,10 @@ const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
 const CENTRO_MONEDA = 4.75
 const RADIO_MONEDA = 1.3
 
+/** Gris de los nodos ya hechos: todo el nodo, sin color del tipo. */
+const GRIS_HECHO = '#9ca3af' // no-tema: color horneado en la imagen del nodo
+const GRIS_HECHO_OSCURO = '#4b5563' // no-tema: color horneado en la imagen del nodo
+
 /** Color de cada tipo, y su tono oscuro para los dibujos. */
 export const COLOR_TIPO: Record<TipoDeNodo, string> = {
   checkpoint: '#10b981', // no-tema: color del tipo, horneado en la imagen
@@ -227,11 +231,11 @@ function texNumero(n: number, tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Can
   })
 }
 
-function texCaraCubo(tipo: TipoDeNodo, fondo: string): THREE.CanvasTexture {
+function texCaraCubo(tipo: TipoDeNodo, fondo: string, oscuro: string): THREE.CanvasTexture {
   return lienzo(512, (g) => {
     g.fillStyle = fondo
     g.fillRect(0, 0, 512, 512)
-    pintarGlifo(g, tipo, 256, 256, 300, '#ffffff', OSCURO_TIPO[tipo])
+    pintarGlifo(g, tipo, 256, 256, 300, '#ffffff', oscuro)
   })
 }
 
@@ -281,13 +285,8 @@ function texCheck(): THREE.CanvasTexture {
 // -------------------------------------------------------------- materiales
 /** Color del tipo; apagado si el nodo ya está hecho. */
 function colorDe(tipo: TipoDeNodo, estado: EstadoDeNodo): THREE.Color {
-  const c = new THREE.Color(COLOR_TIPO[tipo])
-  if (estado === 'hecho') {
-    const hsl = { h: 0, s: 0, l: 0 }
-    c.getHSL(hsl)
-    c.setHSL(hsl.h, hsl.s * 0.35, Math.min(0.75, hsl.l + 0.12))
-  }
-  return c
+  // Hecho: gris del todo, sin rastro del color. A medio apagar "queda raro".
+  return new THREE.Color(estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo])
 }
 
 const metal = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
@@ -325,22 +324,22 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   const moneda = new THREE.Group()
 
   // Suelo: sombra y brillo del color del tipo.
-  const sombra = plano(texSombra(), 2.9, 2.9)
+  const sombra = plano(texSombra(), 3.4, 3.4)
   sombra.rotation.x = -Math.PI / 2
   sombra.position.y = 0.01
   base.add(sombra)
-  const brillo = plano(texBrillo(COLOR_TIPO[tipo]), 4.8, 4.8, estado === 'hecho' ? 0.35 : estado === 'actual' ? 1 : 0.8)
+  const brillo = plano(texBrillo(estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]), 5.3, 5.3, estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85)
   brillo.rotation.x = -Math.PI / 2
   brillo.position.y = 0.02
   base.add(brillo)
 
   // Peana blanca con aro del color.
-  const peana = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.16, 64), plastico(0xf8fafc, { roughness: 0.3 }))
-  peana.position.y = 0.08
+  const peana = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.28, 0.2, 72), plastico(0xf8fafc, { roughness: 0.3 }))
+  peana.position.y = 0.1
   base.add(peana)
-  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.07, 16, 64), metal(c))
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.11, 20, 96), metal(c))
   aro.rotation.x = Math.PI / 2
-  aro.position.y = 0.17
+  aro.position.y = 0.2
   base.add(aro)
 
   // Poste.
@@ -352,9 +351,8 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   const cubo = new THREE.Mesh(
     new RoundedBoxGeometry(0.9, 0.9, 0.9, 5, 0.14),
     new THREE.MeshStandardMaterial({
-      map: texCaraCubo(tipo, COLOR_TIPO[tipo]),
+      map: estado === 'hecho' ? texCaraCubo(tipo, GRIS_HECHO, GRIS_HECHO_OSCURO) : texCaraCubo(tipo, COLOR_TIPO[tipo], OSCURO_TIPO[tipo]),
       roughness: 0.35,
-      color: estado === 'hecho' ? 0xb8b8c0 : 0xffffff,
     })
   )
   cubo.position.y = 2.85
@@ -383,8 +381,8 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
 
   if (estado === 'hecho') {
     // Check verde, de cara a la cámara, en la esquina de la moneda.
-    const check = plano(texCheck(), 1.0, 1.0)
-    check.position.set(RADIO_MONEDA * 0.8, CENTRO_MONEDA - RADIO_MONEDA * 0.75, 0.6)
+    const check = plano(texCheck(), 1.75, 1.75)
+    check.position.set(RADIO_MONEDA * 0.72, CENTRO_MONEDA - RADIO_MONEDA * 0.55, 0.9)
     check.rotation.x = -PHI
     check.renderOrder = 10
     moneda.add(check)

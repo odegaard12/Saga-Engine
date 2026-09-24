@@ -901,7 +901,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
         },
         paint: { 'icon-opacity': 0.6 },
       },
@@ -943,7 +943,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            * por nivel de zoom: la mitad que el terreno (que dobla), para que
            * de cerca no tapen el mapa.
            */
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -968,7 +968,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.32, 15, 0.7, 17, 1.4, 19, 2.8],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
