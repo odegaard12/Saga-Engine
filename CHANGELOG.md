@@ -6,7 +6,24 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.26.5
+## 5.27.1
+
+- Los nodos, un 30 % más grandes, con la peana y el aro de la base más
+  anchos.
+- Los completados, en gris del todo (poste, cubo, moneda y brillo del
+  suelo) y con el check verde más grande. A medio apagar quedaban raros.
+
+
+
+- **Los nodos son poképaradas** (boceto A, elegido por Óscar). Base blanca
+  con aro, poste, cubo con el icono del tipo y una moneda con el número
+  grande que flota subiendo y bajando. Como en Pokémon GO, el color es el
+  tipo: verde checkpoint (bandera), azul QR, dorado coleccionable (cofre),
+  magenta jugable (mando). El que toca es más grande y brilla; el hecho
+  sale apagado con un check verde, como una poképarada visitada. La vista
+  2D usa los mismos colores.
+
+
 
 - **Los nodos crecen al acercarse.** Con una escala casi fija en píxeles,
   al ampliar parecían cada vez más pequeños frente a las casas y los
