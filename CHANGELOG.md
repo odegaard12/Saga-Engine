@@ -6,7 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.3
+## 5.28.4
+
+- **Los nodos ya no "se recargan" más grandes al ampliar.** MapLibre topaba
+  el tamaño de cada símbolo en el del zoom siguiente a su tesela: ampliando
+  deprisa, el nodo se quedaba quieto hasta que llegaba la tesela y pegaba
+  el salto. Ahora el tamaño crece sin escalones (nodos, fotos y jugador),
+  con la misma curva.
+- **Fotos de los nodos, que se pueden tocar.** Estaban todas en el mismo
+  punto, apiladas y debajo del nodo: al ampliar no se separaban. Ahora las
+  de cada sitio se reparten en filas bajo la peana del nodo, por encima del
+  halo, y al tocar una se abre el visor con todas empezando por esa.
+- **La guía por caminos se guarda.** Al volver a abrir la app en el mismo
+  sitio sale al instante, sin esperar a que se cargue la red y se calcule.
+- **Centrar en mí** encuadra una sola vez: el punto nuevo del GPS ya no
+  vuelve a mover el mapa con otro encuadre.
+
+
 
 - **El mapa no se vuelve a cargar al desampliar.** Guarda en memoria ocho
   niveles de zoom en vez de cinco, pide 32 teselas a la vez en vez de 16

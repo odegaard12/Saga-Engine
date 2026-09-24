@@ -591,4 +591,13 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     ruta = app[app.index("function handleToggleRouteOverview()"):app.index("function openInteraction()")]
     assert "handleRequestLiveGps" not in ruta, "ver la ruta no necesita GPS"
     centrar = app[app.index("function handleFocusPlayer()"):app.index("function handleFocusNode()")]
-    assert "handleRequestLiveGps({ silent: true, forceFocus: true })" in centrar
+    assert "handleRequestLiveGps({ silent: true })" in centrar and "forceFocus: true })\n      return" not in centrar
+    # Tamaño sin escalones: dependiendo de un dato del punto, MapLibre no lo
+    # topa en el zoom de la tesela (el nodo "se recargaba" más grande).
+    assert fonte.count("'icon-size': TAMANO_NODOS,") == 4 and "'icon-size': TAMANO_FOTOS," in fonte
+    assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
+    # Fotos repartidas por sitio y encima del halo, debajo del nodo.
+    assert "'icon-offset': DESPLAZAMIENTO_FOTOS," in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    assert fonte.index("id: CAPA_NODOS_HALO,") < fonte.index("id: CAPA_FOTOS,") < fonte.index("id: CAPA_NODOS_ICONOS,")
+    # La guía por caminos se guarda y sale al instante al volver.
+    assert "guardarGuia(rutaCaminosRef.current)" in fonte and "leerGuiaGuardada()" in fonte
