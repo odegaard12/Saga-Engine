@@ -275,8 +275,12 @@ export function dibujarSuelo(estado: EstadoDeNodo, tipo: TipoDeNodo): ImageData 
   sombra.addColorStop(1, 'rgba(0,0,0,0)')
   g.fillStyle = sombra
   g.fillRect(0, 0, lado, lado)
+  // El nodo en juego, sólo la sombra: su halo es el radio REAL de entrada,
+  // en otra capa. Este, siempre del mismo tamaño en pantalla, a zoom medio
+  // salía "enorme, más grande que el trazado".
+  if (estado === 'actual') return g.getImageData(0, 0, lado, lado)
   const hex = estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]
-  g.globalAlpha = estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85
+  g.globalAlpha = estado === 'hecho' ? 0.45 : 0.85
   const halo = g.createRadialGradient(c, c, 0, c, c, r)
   halo.addColorStop(0, hex + '00')
   halo.addColorStop(0.5, hex + '22')

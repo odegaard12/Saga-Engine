@@ -477,7 +477,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
     assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
-    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 4
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 5
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
@@ -597,7 +597,11 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert fonte.count("'icon-size': TAMANO_NODOS,") == 4 and "'icon-size': TAMANO_FOTOS," in fonte
     assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
     # Fotos repartidas por sitio y encima del halo, debajo del nodo.
-    assert "'icon-offset': DESPLAZAMIENTO_FOTOS," in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    # ...pero sólo de muy cerca: de lejos, juntas y se ve una.
+    assert "ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS]" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    # El nodo en juego marca su radio de entrada REAL (base 2 = tamaño del mapa).
+    assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': TAMANO_ENTRADA," in fonte
+    assert "'interpolate', ['exponential', 2], ['zoom']" in fonte
     assert fonte.index("id: CAPA_NODOS_HALO,") < fonte.index("id: CAPA_FOTOS,") < fonte.index("id: CAPA_NODOS_ICONOS,")
     # La guía por caminos se guarda y sale al instante al volver.
     assert "guardarGuia(rutaCaminosRef.current)" in fonte and "leerGuiaGuardada()" in fonte

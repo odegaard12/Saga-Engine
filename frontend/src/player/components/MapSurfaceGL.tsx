@@ -121,6 +121,26 @@ const ALTURA_SIMBOLOS_M = 3
 const ALTURA_NODOS_M = 2
 /** El halo del suelo del nodo, tumbado en el mapa (sólo en 3D). */
 const CAPA_NODOS_SUELO = 'saga-nodos-suelo-capa'
+/** El radio de entrada del nodo en juego, a su tamaño real en el mapa. */
+const CAPA_NODO_ENTRADA = 'saga-nodo-entrada-capa'
+/** Radio de la imagen del radio de entrada, en píxeles CSS (ver `dibujarEntrada`). */
+const RADIO_ENTRADA_PX = 128
+/**
+ * Metros por píxel a zoom 0 en el ecuador, con el zoom de MapLibre
+ * (mundo de 512 px): 40 075 016,686 / 512.
+ */
+const METROS_POR_PX_Z0 = 78271.517
+/**
+ * Tamaño del radio de entrada: el REAL. `entradaK` (por nodo) = metros de
+ * radio / (metros por píxel a zoom 0 × radio de la imagen), y el tamaño es
+ * `entradaK · 2^zoom`: base 2 exacta entre dos paradas, así que crece y
+ * mengua con el mapa, sin escalones, como un dibujo sobre el terreno.
+ */
+const TAMANO_ENTRADA: maplibregl.ExpressionSpecification = [
+  'interpolate', ['exponential', 2], ['zoom'],
+  10, ['*', 1024, ['number', ['get', 'entradaK'], 0]],
+  20, ['*', 1048576, ['number', ['get', 'entradaK'], 0]],
+]
 
 /**
  * Tamaño de nodos, fotos y jugador según el zoom, SIN escalones.
@@ -153,6 +173,8 @@ const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
   19.5, ['*', 1.15, SIN_ESCALON],
 ]
 
+/** Desde qué zoom se reparten las fotos de un mismo sitio. */
+const ZOOM_FOTOS_REPARTIDAS = 18
 /** Cuántas fotos de un mismo sitio se enseñan repartidas; el visor las tiene todas. */
 const MAX_FOTOS_GRUPO = 8
 /**
@@ -589,6 +611,32 @@ function dibujarBola(numero: string, estado: 'hecho' | 'actual' | 'pendiente', t
 }
 
 /** Resplandor del nodo en juego, del mismo tamaño que la bola: late por `icon-opacity`. */
+/**
+ * El radio de entrada, visto desde arriba: velo muy suave dentro y un anillo
+ * que brilla justo en el borde, del color del tipo. Nada de relleno oscuro
+ * (el círculo de antes, "cutre" y "demasiado oscuro").
+ */
+function dibujarEntrada(tipo: TipoDeNodo): ImageData | null {
+  const escala = 2
+  const lado = RADIO_ENTRADA_PX * 2 * escala
+  const lienzo = document.createElement('canvas')
+  lienzo.width = lado
+  lienzo.height = lado
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  const c = lado / 2
+  const hex = COLOR_TIPO[tipo]
+  const g = ctx.createRadialGradient(c, c, 0, c, c, c)
+  g.addColorStop(0, hex + '0f')
+  g.addColorStop(0.78, hex + '1a')
+  g.addColorStop(0.9, hex + '59')
+  g.addColorStop(0.965, hex + 'e6')
+  g.addColorStop(1, hex + '00')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, lado, lado)
+  return ctx.getImageData(0, 0, lado, lado)
+}
+
 function dibujarHalo(centroY = 92 - 8 - 34 - 21, ancho = 64, alto = 92): ImageData | null {
   const escala = 3
   const lienzo = document.createElement('canvas')
@@ -1002,6 +1050,30 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * El radio de entrada del nodo en juego, a su tamaño REAL, tumbado
+         * en el mapa. El halo que marcaba el nodo en juego medía lo mismo en
+         * pantalla a cualquier zoom: de lejos era "enorme, más grande que el
+         * trazado". Éste es el círculo donde el juego te deja entrar.
+         */
+        id: CAPA_NODO_ENTRADA,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        filter: ['==', ['get', 'estado'], 'actual'],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'iconoEntrada'],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+          'icon-size': TAMANO_ENTRADA,
+        },
+        paint: { 'icon-opacity': 0.9 },
+      },
+      {
+        /**
          * El suelo de cada nodo: sombra y halo del color del tipo, TUMBADOS
          * sobre el mapa. Con la perspectiva real, en cualquier punto de la
          * pantalla y con cualquier inclinación, el nodo queda asentado.
@@ -1069,9 +1141,15 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-rotation-alignment': 'viewport',
           'icon-size': TAMANO_FOTOS,
           // Repartidas por grupo (ver `huecoDeFoto`): se pueden tocar una a una.
-          'icon-offset': DESPLAZAMIENTO_FOTOS,
+          /**
+           * Repartidas SÓLO de muy cerca (zoom 18): de lejos, repartidas
+           * "quedan fatal". Hasta ahí van juntas en su sitio y se ve una.
+           */
+          'icon-offset': ['step', ['zoom'], ['literal', [0, 0]], ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS],
           'symbol-sort-key': ['get', 'orden'],
         },
+        // De lejos, sólo la primera de cada sitio; el toque abre todas.
+        paint: { 'icon-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'orden'], 0], 1, 0], ZOOM_FOTOS_REPARTIDAS, 1] },
       },
       {
         /**
@@ -1372,6 +1450,13 @@ export function MapSurfaceGL({
         if (halo) mapa.addImage(ICONO_HALO_3D, halo, { pixelRatio: 3 })
         return
       }
+      const entrada = /^entrada-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (entrada) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarEntrada(entrada[1] as TipoDeNodo)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
+        return
+      }
       const suelo = /^suelo-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (suelo) {
         if (mapa.hasImage(evento.id)) return
@@ -1564,6 +1649,9 @@ export function MapSurfaceGL({
           if (vivo.getLayer(CAPA_NODOS_HALO)) {
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.8)
             vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-opacity', 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(fase)))
+            if (vivo.getLayer(CAPA_NODO_ENTRADA)) {
+              vivo.setPaintProperty(CAPA_NODO_ENTRADA, 'icon-opacity', 0.6 + 0.35 * (0.5 + 0.5 * Math.sin(fase)))
+            }
           }
           if (tresDRef.current && vivo.getLayer(CAPA_NODOS_MONEDA)) {
             // La moneda sube y baja despacio, como en una poképarada.
@@ -1629,12 +1717,14 @@ export function MapSurfaceGL({
       const tope = desde + 12000
       const respiro = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
       const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
+      const entradas = claves.filter((clave) => clave.includes('-actual-')).map((clave) => `entrada-${clave.split('-')[2]}`)
       const imagenes = tresDRef.current
         ? [
+            ...entradas,
             ICONO_HALO_3D,
             ...claves.flatMap((clave) => [`suelo-${clave.replace(/^\d+-/, '')}`, `nodo3d-${clave}`, `nodo3dm-${clave}`]),
           ]
-        : [ICONO_HALO, ...claves.map((clave) => `nodo-${clave}`)]
+        : [ICONO_HALO, ...entradas, ...claves.map((clave) => `nodo-${clave}`)]
       for (const id of imagenes) {
         if (!mapaRef.current || performance.now() > tope) return
         if (vivo.hasImage(id)) continue
@@ -2174,6 +2264,10 @@ export function MapSurfaceGL({
           icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           iconoSuelo: `suelo-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          iconoEntrada: `entrada-${tipoDelNodo(nodo)}`,
+          entradaK:
+            (typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30) /
+            (METROS_POR_PX_Z0 * Math.cos(((nodo.lat as number) * Math.PI) / 180) * RADIO_ENTRADA_PX),
           estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },

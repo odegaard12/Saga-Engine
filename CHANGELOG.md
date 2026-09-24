@@ -6,7 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.4
+## 5.28.5
+
+- **El nodo en juego marca su radio de entrada real.** Su halo medía lo
+  mismo en pantalla a cualquier zoom y de lejos quedaba enorme, más grande
+  que el trazado. Ahora es el círculo donde el juego te deja entrar, a su
+  tamaño de verdad sobre el mapa: velo suave y un anillo que late en el
+  borde, del color del tipo.
+- **Fotos juntas de lejos.** Repartidas a cualquier zoom quedaban fatal.
+  Ahora se ve una por sitio hasta el zoom 18 y sólo de muy cerca se
+  reparten bajo el nodo para poder tocarlas. Tocar la de lejos abre todas.
+
+
 
 - **Los nodos ya no "se recargan" más grandes al ampliar.** MapLibre topaba
   el tamaño de cada símbolo en el del zoom siguiente a su tesela: ampliando
