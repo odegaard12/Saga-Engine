@@ -88,8 +88,6 @@ const ICONO_AVATAR = 'avatar-propio'
 const FUENTE_GUIA = 'saga-guia'
 const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
 const CAPA_GUIA = 'saga-guia-capa'
-/** Fases de la "hormiga" de la guía: el trazo avanza hacia el nodo. */
-const PATRONES_GUIA: [number, number][] = [[0.001, 3], [1, 2], [2, 1], [3, 0.001]]
 const CAPA_FOTOS = 'saga-fotos-capa'
 const CAPA_NODOS_ICONOS = 'saga-nodos-iconos-capa'
 const CAPA_NODOS_HALO = 'saga-nodos-halo-capa'
@@ -905,7 +903,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'line-color': COLOR_NODO_ACTUAL,
           'line-opacity': 0.9,
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 19, 5],
-          'line-dasharray': [0.001, 3],
+          // Trazo fijo: cambiarlo al vuelo recarga la fuente entera (ver `latir`).
+          'line-dasharray': [2, 1.2],
         },
       },
       {
@@ -1151,6 +1150,19 @@ export function MapSurfaceGL({
 
   /** Lo último que se mandó pintar a cada fuente, para poder reintentarlo. */
   const ultimoDatoRef = useRef(new Map<string, GeoJSON.FeatureCollection>())
+  /**
+   * Lo que tiene DE VERDAD cada fuente: el objeto de la fuente y los datos
+   * que se le dieron. `setData` no mira si es lo mismo: recorta y recoloca
+   * la fuente entera cada vez. Y `volcarPendientes` cuelga de `styledata`,
+   * que salta con CADA cambio de estilo -diez por segundo, por `latir`-:
+   * todo el trazado, los nodos y las fotos se reteselaban sin parar. Eran
+   * los nodos y fotos que aparecían y desaparecían y los tirones al hacer
+   * zoom. Sólo se vuelca a una fuente nueva (tras rehacer el estilo) o lo
+   * que de verdad ha cambiado.
+   */
+  const aplicadoRef = useRef(
+    new Map<string, { fuente: maplibregl.GeoJSONSource; datos: GeoJSON.FeatureCollection; json: string }>()
+  )
   /** La ruta se encuadra una vez al entrar, no cada vez que llegan datos. */
   const encuadreInicialRef = useRef(false)
   /** Sube cuando hay que repintar todo: el estilo se rehizo por debajo. */
@@ -1327,7 +1339,11 @@ export function MapSurfaceGL({
       if (!vivo) return
       for (const [id, datos] of ultimoDatoRef.current) {
         const fuente = vivo.getSource(id) as maplibregl.GeoJSONSource | undefined
-        fuente?.setData(datos)
+        if (!fuente) continue
+        const previo = aplicadoRef.current.get(id)
+        if (previo && previo.fuente === fuente && previo.datos === datos) continue
+        aplicadoRef.current.set(id, { fuente, datos, json: JSON.stringify(datos) })
+        fuente.setData(datos)
       }
       /**
        * La capa 3D (three.js) se añade cuando el estilo tiene capas, y se
@@ -1413,10 +1429,26 @@ export function MapSurfaceGL({
      * visible: en segundo plano no hay nadie mirando y sí batería.
      */
     let pulsoVivo = true
+    /**
+     * Mientras el mapa se mueve, nada de animar.
+     *
+     * Cada `setPaintProperty` da el estilo por cambiado y, con relieve,
+     * MapLibre tira entonces TODAS las texturas del terreno -la foto, el
+     * sombreado y las líneas pintadas encima- y las repinta en el
+     * fotograma siguiente. Diez veces por segundo, en pleno pellizco: eran
+     * los tirones al ampliar y desampliar. Parado no se nota; moviéndose,
+     * se pausa hasta un momento después de soltar.
+     */
+    let ultimoMovimiento = 0
+    const enMovimiento = (m: maplibregl.Map) => {
+      const ahora = performance.now()
+      if (m.isMoving()) ultimoMovimiento = ahora
+      return ahora - ultimoMovimiento < 300
+    }
     const latir = () => {
       if (!pulsoVivo) return
       const vivo = mapaRef.current
-      if (vivo && document.visibilityState === 'visible') {
+      if (vivo && document.visibilityState === 'visible' && !enMovimiento(vivo)) {
         try {
           if (vivo.getLayer(CAPA_RUTA_PULSO)) {
             const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.6)
@@ -1433,8 +1465,14 @@ export function MapSurfaceGL({
             if (vivo.getLayer(CAPA_NODOS_HALO)) vivo.setPaintProperty(CAPA_NODOS_HALO, 'icon-translate', [0, flota])
           }
           if (vivo.getLayer(CAPA_GUIA)) {
-            const paso = Math.floor(performance.now() / 160) % PATRONES_GUIA.length
-            vivo.setPaintProperty(CAPA_GUIA, 'line-dasharray', PATRONES_GUIA[paso])
+            /**
+             * La guía late en opacidad. Antes el trazo "crecía" cambiando
+             * `line-dasharray`, y esa propiedad no es una más: MapLibre
+             * recarga la fuente entera cada vez que cambia -cada 160 ms-,
+             * con su reteselado en el worker y el terreno repintado.
+             */
+            const fase = (performance.now() / 1000) * ((Math.PI * 2) / 1.2)
+            vivo.setPaintProperty(CAPA_GUIA, 'line-opacity', 0.55 + 0.4 * (0.5 + 0.5 * Math.sin(fase)))
           }
         } catch {
           // Entre un rehecho del estilo y el siguiente la capa puede no estar.
@@ -1725,7 +1763,17 @@ export function MapSurfaceGL({
       const mapa = mapaRef.current
       if (!mapa) return
       const fuente = mapa.getSource(id) as maplibregl.GeoJSONSource | undefined
-      fuente?.setData(datos as GeoJSON.FeatureCollection)
+      if (!fuente) return
+      const coleccion = datos as GeoJSON.FeatureCollection
+      const json = JSON.stringify(coleccion)
+      const previo = aplicadoRef.current.get(id)
+      // Lo mismo otra vez (el efecto se rehace al refrescar la misión): no se toca.
+      if (previo && previo.fuente === fuente && previo.json === json) {
+        previo.datos = coleccion
+        return
+      }
+      aplicadoRef.current.set(id, { fuente, datos: coleccion, json })
+      fuente.setData(coleccion)
     },
     // `versionEstilo` no se usa dentro, pero al cambiar obliga a repintar
     // tras un rescate del estilo, que es justo lo que hace falta.
