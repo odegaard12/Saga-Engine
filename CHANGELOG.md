@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.27.0
+## 5.27.1
+
+- Los nodos, un 30 % más grandes, con la peana y el aro de la base más
+  anchos.
+- Los completados, en gris del todo (poste, cubo, moneda y brillo del
+  suelo) y con el check verde más grande. A medio apagar quedaban raros.
+
+
 
 - **Los nodos son poképaradas** (boceto A, elegido por Óscar). Base blanca
   con aro, poste, cubo con el icono del tipo y una moneda con el número
