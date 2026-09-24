@@ -40,6 +40,7 @@ import {
   CENTRO_HALO_3D_PX,
   COLOR_TIPO,
   DESPLAZAMIENTO_ANCLA_PX,
+  dibujarSuelo,
   OSCURO_TIPO,
   renderizarBola,
 } from './bolaRenderizada'
@@ -107,6 +108,15 @@ const ICONO_HALO_3D = 'halo-actual-3d'
  * zona de duda.
  */
 const ALTURA_SIMBOLOS_M = 3
+/**
+ * Los nodos, más pegados: a tres metros, con el mapa inclinado se veían
+ * por encima de su sitio (la línea del camino acababa bajo el halo) y
+ * "no asentados". Con el relieve de una sola resolución (ver la fuente de
+ * elevación) la malla y la cota del nodo coinciden y dos metros bastan.
+ */
+const ALTURA_NODOS_M = 2
+/** El halo del suelo del nodo, tumbado en el mapa (sólo en 3D). */
+const CAPA_NODOS_SUELO = 'saga-nodos-suelo-capa'
 const CAPA_NODOS_VOLUMEN = 'saga-nodos-volumen-capa'
 
 /**
@@ -718,7 +728,15 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           type: 'raster-dem',
           tiles: [`${window.location.origin}/dem-tiles/{z}/{x}/{y}.png`],
           tileSize: 256,
-          maxzoom: 14,
+          /**
+           * La FORMA del terreno, sólo hasta z12 (el sombreado sí usa z14).
+           * El dato de España es de ~30 m y z12 ya lo tiene entero; z13 y
+           * z14 son el mismo dato remuestreado, un poco distinto en cada
+           * nivel. Con la exageración de 2,2, al cruzar de un zoom a otro
+           * el suelo -y los nodos encima- daba saltos. Desde z12 la malla
+           * no cambia al ampliar, y de cerca el relieve sale más suave.
+           */
+          maxzoom: 12,
           encoding: 'terrarium',
         },
         [FUENTE_RELIEVE_SOMBRAS]: {
@@ -916,13 +934,37 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         },
       },
       {
+        /**
+         * El suelo de cada nodo: sombra y halo del color del tipo, TUMBADOS
+         * sobre el mapa. Con la perspectiva real, en cualquier punto de la
+         * pantalla y con cualquier inclinación, el nodo queda asentado.
+         * Mismo ancla y mismo tamaño que el nodo: el poste cae en el centro.
+         */
+        id: CAPA_NODOS_SUELO,
+        type: 'symbol',
+        source: FUENTE_NODOS_ICONOS,
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'iconoSuelo'],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'map',
+          'icon-rotation-alignment': 'map',
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
+          'symbol-sort-key': ['get', 'orden'],
+          visibility: 'none',
+        },
+      },
+      {
         // Resplandor del nodo en juego: late por icon-opacity (ver `latir`).
         id: CAPA_NODOS_HALO,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
         filter: ['==', ['get', 'estado'], 'actual'],
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ICONO_HALO,
           'icon-anchor': 'bottom',
@@ -953,7 +995,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono'],
           'icon-anchor': 'bottom',
@@ -988,7 +1030,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
         layout: {
-          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
           'icon-image': ['get', 'icono3dm'],
           'icon-anchor': 'bottom',
@@ -1211,6 +1253,13 @@ export function MapSurfaceGL({
         if (halo) mapa.addImage(ICONO_HALO_3D, halo, { pixelRatio: 3 })
         return
       }
+      const suelo = /^suelo-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
+      if (suelo) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarSuelo(suelo[1] as 'hecho' | 'actual' | 'pendiente', suelo[2] as TipoDeNodo)
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 3 })
+        return
+      }
       const moneda3d = /^nodo3dm-(\d+)-(hecho|actual|pendiente)-(checkpoint|qr|minijuego|coleccionable)$/.exec(evento.id)
       if (moneda3d) {
         if (mapa.hasImage(evento.id)) return
@@ -1307,6 +1356,9 @@ export function MapSurfaceGL({
         }
         if (vivo.getLayer(CAPA_NODOS_MONEDA)) {
           vivo.setLayoutProperty(CAPA_NODOS_MONEDA, 'visibility', enTresD ? 'visible' : 'none')
+        }
+        if (vivo.getLayer(CAPA_NODOS_SUELO)) {
+          vivo.setLayoutProperty(CAPA_NODOS_SUELO, 'visibility', enTresD ? 'visible' : 'none')
         }
         if (vivo.getLayer(CAPA_NODOS_HALO)) {
           vivo.setLayoutProperty(CAPA_NODOS_HALO, 'visibility', 'visible')
@@ -1433,7 +1485,10 @@ export function MapSurfaceGL({
       const respiro = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
       const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
       const imagenes = tresDRef.current
-        ? [ICONO_HALO_3D, ...claves.flatMap((clave) => [`nodo3d-${clave}`, `nodo3dm-${clave}`])]
+        ? [
+            ICONO_HALO_3D,
+            ...claves.flatMap((clave) => [`suelo-${clave.replace(/^\d+-/, '')}`, `nodo3d-${clave}`, `nodo3dm-${clave}`]),
+          ]
         : [ICONO_HALO, ...claves.map((clave) => `nodo-${clave}`)]
       for (const id of imagenes) {
         if (!mapaRef.current || performance.now() > tope) return
@@ -1951,6 +2006,7 @@ export function MapSurfaceGL({
           icono: `nodo-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           icono3d: `nodo3d-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+          iconoSuelo: `suelo-${estado(indice)}-${tipoDelNodo(nodo)}`,
           estado: estado(indice),
           orden: indice === currentLevel ? 1000 : indice,
         },

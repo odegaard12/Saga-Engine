@@ -465,7 +465,12 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "id: CAPA_RADIO_RELLENO" not in fonte
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 5
+    # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
+    # mapa (con el relieve de una sola resolución, la cota ya coincide).
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 4
+    assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
+    assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
     # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
     assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
