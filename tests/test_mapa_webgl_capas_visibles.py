@@ -221,7 +221,13 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "onListo={() => setMapaListo(true)}" in app
     assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
-    assert "setTimeout(() => setMapaListo(true), 7000)" in app, "sin tope, la carga podría ser eterna"
+    assert "setTimeout(() => setMapaListo(true), 16000)" in app, "sin tope, la carga podría ser eterna"
+    # Bajo el velo se hornean los nodos y se pasa por los zooms de alrededor:
+    # antes los nodos salían al llegar a la zona y al desampliar había blanco.
+    assert "void calentar(vivo).finally(" in fonte and "alFaltarImagen({ id })" in fonte
+    assert "fadeDuration: 0" in fonte and "cancelPendingTileRequestsWhileZooming: false" in fonte
+    # El trazado llega hasta el nodo aunque el track se grabara a unos metros.
+    assert fonte.count("cerrarTramo(leerTrackDelNodo(") == 2
 
 
 def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:

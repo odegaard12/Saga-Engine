@@ -201,6 +201,35 @@ function circuloGeoJSON(centro: Punto, radioMetros: number, lados = 64) {
  * Mismo lector que el motor de Leaflet, y acepta las mismas dos formas en
  * que se ha ido guardando: pares [lat, lon] y objetos con lat/lon.
  */
+/**
+ * El trazado de un nodo, cosido a sus nodos: empieza en el anterior y
+ * acaba EN este. El track grabado se queda a veces a unos metros -se grabó
+ * por el camino y el nodo está al lado- y la línea no llegaba al halo.
+ * Hasta 250 m se cose con un tramito recto; más lejos sería inventarse el
+ * camino.
+ */
+function cerrarTramo(track: Punto[], desde: PlayerStage | null, hasta: PlayerStage): Punto[] {
+  if (track.length < 2) return track
+  const punto = (stage: PlayerStage | null): Punto | null => {
+    if (!stage || stage.lat == null || stage.lon == null) return null
+    const lat = Number(stage.lat)
+    const lon = Number(stage.lon)
+    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
+  }
+  const coser = (a: Punto, b: Punto | null): b is Punto => {
+    if (!b) return false
+    const metros = metrosEntre(a, b)
+    return metros > 0.5 && metros < 250
+  }
+  const inicio = punto(desde)
+  const fin = punto(hasta)
+  return [
+    ...(coser(track[0], inicio) ? [inicio] : []),
+    ...track,
+    ...(coser(track[track.length - 1], fin) ? [fin] : []),
+  ]
+}
+
 function leerTrackDelNodo(stage: PlayerStage): Punto[] {
   const salida: Punto[] = []
   const crudo = (stage as unknown as Record<string, unknown>).route_track
@@ -901,7 +930,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
         },
         paint: { 'icon-opacity': 0.6 },
       },
@@ -943,7 +972,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
            * por nivel de zoom: la mitad que el terreno (que dobla), para que
            * de cerca no tapen el mapa.
            */
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
         },
@@ -968,7 +997,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-ignore-placement': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
-          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.42, 15, 0.92, 17, 1.82, 19, 3.3],
+          'icon-size': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.6, 14, 1.0, 15, 1.35, 16, 1.8, 17, 2.25, 19, 3.3],
           'symbol-sort-key': ['get', 'orden'],
           visibility: 'none',
         },
@@ -1031,6 +1060,8 @@ export function MapSurfaceGL({
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
   const onListoRef = useRef(onListo)
   onListoRef.current = onListo
+  /** `número-estado-tipo` y posición de cada nodo: lo que se hornea bajo la carga. */
+  const nodosParaHornearRef = useRef<{ clave: string; lon: number; lat: number }[]>([])
   /** Metros al camino cuando estás fuera de él; null cuando vas por él. */
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
@@ -1114,6 +1145,15 @@ export function MapSurfaceGL({
        * pixela", y ningún antialiasing lo arregla.
        */
       maxZoom: 19.5,
+      /**
+       * Nodos y fotos sin fundido: al cruzar de un zoom a otro MapLibre
+       * rehace los símbolos y los fundía -300 ms- entre el viejo y el
+       * nuevo. Era el "desamplío y los nodos desaparecen y aparecen".
+       */
+      fadeDuration: 0,
+      // Al pellizcar, las teselas pedidas siguen su curso: cancelarlas a
+      // cada paso del gesto dejaba el mapa en blanco hasta soltar.
+      cancelPendingTileRequestsWhileZooming: false,
       // El estilo va declarado en crudo, NO por URL: una URL de estilo
       // sería una petición más que falla sin cobertura, justo lo que no
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
@@ -1133,7 +1173,7 @@ export function MapSurfaceGL({
      *
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
-    mapa.on('styleimagemissing', (evento) => {
+    const alFaltarImagen = (evento: { id: string }) => {
       if (evento.id === ICONO_AVATAR) {
         if (mapa.hasImage(ICONO_AVATAR)) return
         pintarAvatar(mapa, fichaRef.current)
@@ -1207,7 +1247,8 @@ export function MapSurfaceGL({
             : COLOR_NODO_PENDIENTE
       const imagen = dibujarChincheta(partes[1], color)
       if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
-    })
+    }
+    mapa.on('styleimagemissing', alFaltarImagen)
 
     /**
      * Vigilante: si el estilo no montó, volver a aplicarlo.
@@ -1370,6 +1411,112 @@ export function MapSurfaceGL({
      * tope de ocho segundos por si alguna tesela no llega nunca.
      */
     const desde = performance.now()
+
+    /**
+     * Todo lo que el juego va a enseñar, preparado BAJO la pantalla de
+     * carga y no cuando aparece.
+     *
+     * 1. Los nodos. Cada poképarada es un render de three.js que se hacía
+     *    la primera vez que el nodo salía en pantalla: llegabas a la zona y
+     *    no había puntos, el mapa se trababa horneándolos y salían después.
+     * 2. Los zooms de alrededor. Al entrar sólo estaba el zoom de la vista;
+     *    al desampliar, 2-3 segundos en blanco mientras se leían las
+     *    teselas. Se pasa por dos zooms más lejanos y por la ruta entera,
+     *    y se vuelve: todo eso queda en la memoria del mapa.
+     *
+     * Con tope: a los doce segundos de crear el mapa se deja lo que falte.
+     * El de la carga (ver PlayerApp) es mayor, así que el velo nunca se
+     * levanta con la cámara aún dando saltos.
+     */
+    const calentar = async (vivo: maplibregl.Map) => {
+      const tope = desde + 12000
+      const respiro = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+      const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
+      const imagenes = tresDRef.current
+        ? [ICONO_HALO_3D, ...claves.flatMap((clave) => [`nodo3d-${clave}`, `nodo3dm-${clave}`])]
+        : [ICONO_HALO, ...claves.map((clave) => `nodo-${clave}`)]
+      for (const id of imagenes) {
+        if (!mapaRef.current || performance.now() > tope) return
+        if (vivo.hasImage(id)) continue
+        alFaltarImagen({ id })
+        await respiro()
+      }
+
+      let capas = 0
+      try {
+        capas = vivo.getStyle().layers.length
+      } catch {
+        capas = 0
+      }
+      if (capas === 0) return
+      const esperarTeselas = (maximo: number) =>
+        new Promise<void>((resolve) => {
+          const inicio = performance.now()
+          const fin = Math.min(inicio + maximo, tope)
+          const id = window.setInterval(() => {
+            const ahora = performance.now()
+            // Unos fotogramas de gracia: justo tras mover la cámara, las
+            // teselas nuevas aún no se han pedido y "todo cargado" miente.
+            if (mapaRef.current && ahora - inicio < 200) return
+            if (!mapaRef.current || vivo.areTilesLoaded() || ahora > fin) {
+              window.clearInterval(id)
+              resolve()
+            }
+          }, 100)
+        })
+      const camara = {
+        center: vivo.getCenter(),
+        zoom: vivo.getZoom(),
+        pitch: vivo.getPitch(),
+        bearing: vivo.getBearing(),
+      }
+      const vistas: (() => void)[] = [
+        () => vivo.jumpTo({ zoom: camara.zoom - 2 }),
+        () => vivo.jumpTo({ zoom: camara.zoom - 3.5 }),
+      ]
+      const posiciones = nodosParaHornearRef.current
+      if (posiciones.length > 1) {
+        const limites = new maplibregl.LngLatBounds()
+        for (const nodo of posiciones) limites.extend([nodo.lon, nodo.lat])
+        vistas.push(() => vivo.fitBounds(limites, { padding: 70, duration: 0, maxZoom: 16, pitch: camara.pitch }))
+      }
+      for (const ver of vistas) {
+        if (!mapaRef.current || performance.now() > tope) break
+        ver()
+        await esperarTeselas(2500)
+      }
+      if (!mapaRef.current) return
+      vivo.jumpTo(camara)
+      await esperarTeselas(1500)
+    }
+
+    /**
+     * Y en ratos libres, lo que pedirá el siguiente paso: el nodo en juego
+     * ya hecho y el siguiente en juego. Así, al completar uno, el cambio de
+     * imagen no se hornea en ese momento.
+     */
+    const adelantarSiguientes = () => {
+      if (!tresDRef.current) return
+      const claves = nodosParaHornearRef.current.map((nodo) => nodo.clave)
+      const enJuego = claves.findIndex((clave) => clave.includes('-actual-'))
+      if (enJuego < 0) return
+      const siguientes = [claves[enJuego].replace('-actual-', '-hecho-')]
+      if (claves[enJuego + 1]) siguientes.push(claves[enJuego + 1].replace('-pendiente-', '-actual-'))
+      const trabajos = siguientes.flatMap((clave) => {
+        const [numero, estadoSig, tipoSig] = clave.split('-')
+        return (['base', 'moneda'] as const).map(
+          (parte) => () => renderizarBola(Number(numero), estadoSig as 'hecho' | 'actual' | 'pendiente', tipoSig as TipoDeNodo, parte)
+        )
+      })
+      const siguiente = () => {
+        const trabajo = trabajos.shift()
+        if (!trabajo || !mapaRef.current) return
+        trabajo()
+        window.setTimeout(siguiente, 400)
+      }
+      window.setTimeout(siguiente, 1500)
+    }
+
     const esperarPintado = window.setInterval(() => {
       const vivo = mapaRef.current
       if (!vivo) {
@@ -1385,8 +1532,12 @@ export function MapSurfaceGL({
       const listo = capas > 0 && vivo.areTilesLoaded()
       if (!listo && performance.now() - desde < 8000) return
       window.clearInterval(esperarPintado)
-      onListoRef.current?.()
-      capaNodosRef.current?.arrancarAnimacion()
+      void calentar(vivo).finally(() => {
+        if (!mapaRef.current) return
+        onListoRef.current?.()
+        capaNodosRef.current?.arrancarAnimacion()
+        adelantarSiguientes()
+      })
     }, 250)
 
     /**
@@ -1616,7 +1767,7 @@ export function MapSurfaceGL({
       return
     }
     const nodo = { lat: currentStage.lat as number, lon: currentStage.lon as number }
-    const track = leerTrackDelNodo(currentStage)
+    const track = cerrarTramo(leerTrackDelNodo(currentStage), null, currentStage)
     const camino = track.length > 1 ? track : [nodo]
 
     let mejor = 0
@@ -1806,6 +1957,11 @@ export function MapSurfaceGL({
         geometry: { type: 'Point' as const, coordinates: [nodo.lon as number, nodo.lat as number] },
       })),
     })
+    nodosParaHornearRef.current = nodos.map((nodo, indice) => ({
+      clave: `${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
+      lon: nodo.lon as number,
+      lat: nodo.lat as number,
+    }))
 
     /**
      * El volumen de cada nodo: un poste corto que sale del suelo.
@@ -1876,7 +2032,10 @@ export function MapSurfaceGL({
     // Cada tramo es el trazado que LLEGA a su nodo, así que hereda el
     // estado de ese nodo: andado, en juego o pendiente.
     const tramos = nodos
-      .map((nodo, indice) => ({ track: leerTrackDelNodo(nodo), estado: estado(indice) }))
+      .map((nodo, indice) => ({
+        track: cerrarTramo(leerTrackDelNodo(nodo), indice > 0 ? nodos[indice - 1] : null, nodo),
+        estado: estado(indice),
+      }))
       .filter((tramo) => tramo.track.length > 1)
 
     pintarFuente(

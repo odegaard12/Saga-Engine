@@ -1576,7 +1576,7 @@ export default function PlayerApp() {
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
     // Y mientras el mapa 3D no haya pintado su primera vista (con tope).
     if (state.status === 'ready' && state.config?.map_engine === 'maplibre' && !mapaListo) {
-      ultimoDetalleRef.current = 'Pintando el mapa…'
+      ultimoDetalleRef.current = 'Preparando el mapa y los nodos…'
       return undefined
     }
     // Dos fotogramas antes de empezar a apagarlo: si se pone opacity:0 en el
@@ -1603,7 +1603,10 @@ export default function PlayerApp() {
    */
   useEffect(() => {
     if (!velo || mapaListo) return undefined
-    const tope = window.setTimeout(() => setMapaListo(true), 7000)
+    // 16 s: el mapa se da doce para hornear los nodos y pasar por los
+    // zooms de alrededor (ver `calentar` en MapSurfaceGL), más lo que
+    // tarde en llegar maplibre. Así el velo no se levanta a mitad.
+    const tope = window.setTimeout(() => setMapaListo(true), 16000)
     return () => window.clearTimeout(tope)
   }, [velo, mapaListo])
 
