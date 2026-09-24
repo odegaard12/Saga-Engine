@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.0
+## 5.28.1
+
+- **Sin saltos al ampliar y desampliar.** La forma del relieve se queda
+  en una sola resolución desde el zoom 12: el dato es de ~30 m y los
+  niveles 13 y 14 eran ese mismo dato remuestreado, distinto en cada uno;
+  con la exageración, al cruzar de zoom el suelo y los nodos saltaban.
+  De cerca, además, el relieve sale más suave. El sombreado sigue a z14.
+- **Nodos asentados.** El halo y la sombra de cada nodo van tumbados
+  sobre el mapa, con su perspectiva real en cualquier punto de la
+  pantalla, y los nodos van a 2 m del suelo en vez de 3.
+- **Check integrado.** Es una chapa verde en 3D pegada al canto de la
+  moneda: gira, flota y se ilumina con ella. Antes era una pegatina plana.
+
+
 
 - **La pantalla de carga deja el mapa preparado.** Antes de quitarse
   hornea todos los nodos (salían tarde, al llegar a la zona, y el mapa se

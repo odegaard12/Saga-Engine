@@ -29,21 +29,27 @@ import type { EstadoDeNodo, TipoDeNodo } from './nodosTresD'
 /** Grados sobre el horizonte desde los que mira la cámara: el mapa va a 58° de inclinación. */
 const ELEVACION_CAMARA_GRADOS = 32
 const PHI = (ELEVACION_CAMARA_GRADOS * Math.PI) / 180
-/** Escala: píxeles CSS por metro del modelo. La de siempre; lo que crece es el encuadre. */
+/** Escala: píxeles CSS por metro del modelo, la misma para el nodo y para su suelo. */
 const PX_POR_METRO = 72 / 5.4
 /**
- * Radio del brillo del suelo -el halo-, en metros del modelo. Con 2,65
- * el camino llegaba al nodo y no tocaba el halo: "se quedan aparte".
+ * Radio del halo del suelo, en metros del modelo. Va en su propia imagen,
+ * TUMBADA sobre el mapa (ver `dibujarSuelo`), no dentro del nodo: pintado
+ * en la imagen de pie, el halo se veía siempre desde el mismo ángulo, y
+ * arriba o abajo de la pantalla, o con otra inclinación, no casaba con el
+ * suelo: el nodo parecía no estar asentado.
  */
-const RADIO_BRILLO = 4.1
-/** Tamaño de la imagen en píxeles CSS: cabe el halo entero sin recortar. */
-export const ANCHO_BOLA_PX = 110
-export const ALTO_BOLA_PX = 132
+const RADIO_SUELO = 4.1
+/** Lado de la imagen del suelo, en píxeles CSS. */
+export const LADO_SUELO_PX = Math.round(RADIO_SUELO * 2 * PX_POR_METRO)
+/** Tamaño de la imagen del nodo en píxeles CSS: peana, poste, cubo y moneda. */
+export const ANCHO_BOLA_PX = 72
+export const ALTO_BOLA_PX = 100
 const ESCALA = 3
 const SOBREMUESTREO = 2
 /** Encuadre: medio ancho del mundo visible, y de dónde a dónde en vertical (metros en pantalla). */
 const MEDIO_ANCHO = ANCHO_BOLA_PX / PX_POR_METRO / 2
-const ABAJO = -(RADIO_BRILLO * Math.sin(PHI) + 0.25)
+// Por debajo, lo justo para la peana y su aro.
+const ABAJO = -(1.5 * Math.sin(PHI) + 0.25)
 const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
 /** Altura del centro de la moneda, en metros. */
 const CENTRO_MONEDA = 4.75
@@ -52,6 +58,9 @@ const RADIO_MONEDA = 1.3
 /** Gris de los nodos ya hechos: todo el nodo, sin color del tipo. */
 const GRIS_HECHO = '#9ca3af' // no-tema: color horneado en la imagen del nodo
 const GRIS_HECHO_OSCURO = '#4b5563' // no-tema: color horneado en la imagen del nodo
+
+/** Verde del check de los nodos hechos. */
+const VERDE_CHECK = '#16a34a' // no-tema: color horneado en la imagen del nodo
 
 /** Color de cada tipo, y su tono oscuro para los dibujos. */
 export const COLOR_TIPO: Record<TipoDeNodo, string> = {
@@ -246,38 +255,44 @@ function texCaraCubo(tipo: TipoDeNodo, fondo: string, oscuro: string): THREE.Can
   })
 }
 
-function texBrillo(hex: string): THREE.CanvasTexture {
-  return lienzo(256, (g) => {
-    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 126)
-    gr.addColorStop(0, hex + '00')
-    gr.addColorStop(0.5, hex + '22')
-    gr.addColorStop(0.72, hex + 'cc')
-    gr.addColorStop(0.84, hex + '66')
-    gr.addColorStop(1, hex + '00')
-    g.fillStyle = gr
-    g.fillRect(0, 0, 256, 256)
-  })
-}
-
-function texSombra(): THREE.CanvasTexture {
-  return lienzo(256, (g) => {
-    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 126)
-    gr.addColorStop(0, 'rgba(0,0,0,0.5)')
-    gr.addColorStop(1, 'rgba(0,0,0,0)')
-    g.fillStyle = gr
-    g.fillRect(0, 0, 256, 256)
-  })
+/**
+ * El suelo del nodo: sombra de contacto y halo del color del tipo, visto
+ * desde arriba. MapLibre lo tumba sobre el mapa (`icon-pitch-alignment:
+ * map`), así que la perspectiva es la de verdad en cualquier punto de la
+ * pantalla y con cualquier inclinación. Es plano: basta un canvas.
+ */
+export function dibujarSuelo(estado: EstadoDeNodo, tipo: TipoDeNodo): ImageData | null {
+  const lado = LADO_SUELO_PX * ESCALA
+  const hoja = document.createElement('canvas')
+  hoja.width = lado
+  hoja.height = lado
+  const g = hoja.getContext('2d')
+  if (!g) return null
+  const c = lado / 2
+  const r = lado / 2 - 1
+  const sombra = g.createRadialGradient(c, c, 0, c, c, r * 0.42)
+  sombra.addColorStop(0, 'rgba(0,0,0,0.5)')
+  sombra.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = sombra
+  g.fillRect(0, 0, lado, lado)
+  const hex = estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]
+  g.globalAlpha = estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85
+  const halo = g.createRadialGradient(c, c, 0, c, c, r)
+  halo.addColorStop(0, hex + '00')
+  halo.addColorStop(0.5, hex + '22')
+  halo.addColorStop(0.72, hex + 'cc')
+  halo.addColorStop(0.84, hex + '66')
+  halo.addColorStop(1, hex + '00')
+  g.fillStyle = halo
+  g.fillRect(0, 0, lado, lado)
+  return g.getImageData(0, 0, lado, lado)
 }
 
 function texCheck(): THREE.CanvasTexture {
   return lienzo(256, (g) => {
-    g.fillStyle = '#16a34a'
-    g.beginPath()
-    g.arc(128, 128, 118, 0, Math.PI * 2)
-    g.fill()
-    g.lineWidth = 12
+    g.fillStyle = VERDE_CHECK
+    g.fillRect(0, 0, 256, 256)
     g.strokeStyle = '#ffffff'
-    g.stroke()
     g.lineWidth = 30
     g.lineCap = 'round'
     g.lineJoin = 'round'
@@ -301,13 +316,6 @@ const metal = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialPa
 const plastico = (c: THREE.ColorRepresentation, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color: c, metalness: 0, roughness: 0.35, ...extra })
 
-function plano(tex: THREE.Texture, w: number, h: number, opacidad = 1): THREE.Mesh {
-  return new THREE.Mesh(
-    new THREE.PlaneGeometry(w, h),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: opacidad })
-  )
-}
-
 function liberar(escena: THREE.Scene): void {
   escena.traverse((objeto) => {
     const malla = objeto as THREE.Mesh
@@ -330,15 +338,7 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   const base = new THREE.Group()
   const moneda = new THREE.Group()
 
-  // Suelo: sombra y brillo del color del tipo.
-  const sombra = plano(texSombra(), 3.4, 3.4)
-  sombra.rotation.x = -Math.PI / 2
-  sombra.position.y = 0.01
-  base.add(sombra)
-  const brillo = plano(texBrillo(estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]), RADIO_BRILLO * 2, RADIO_BRILLO * 2, estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85)
-  brillo.rotation.x = -Math.PI / 2
-  brillo.position.y = 0.02
-  base.add(brillo)
+  // La sombra y el halo del suelo van aparte, tumbados en el mapa (ver `dibujarSuelo`).
 
   // Peana blanca con aro del color.
   const peana = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.28, 0.2, 72), plastico(0xf8fafc, { roughness: 0.3 }))
@@ -387,12 +387,29 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   moneda.add(disco)
 
   if (estado === 'hecho') {
-    // Check verde, de cara a la cámara, en la esquina de la moneda.
-    const check = plano(texCheck(), 1.75, 1.75)
-    check.position.set(RADIO_MONEDA * 0.72, CENTRO_MONEDA - RADIO_MONEDA * 0.55, 0.9)
-    check.rotation.x = -PHI
-    check.renderOrder = 10
-    moneda.add(check)
+    /**
+     * Check verde: una chapa de verdad, no una pegatina. Pegada al canto
+     * de la moneda, gira con ella, flota con ella y la ilumina la misma
+     * luz. Plana y siempre de cara a la cámara "no se sentía integrada".
+     */
+    const R_CHAPA = 0.78
+    const chapa = new THREE.Group()
+    const cuerpoChapa = new THREE.Mesh(new THREE.CylinderGeometry(R_CHAPA, R_CHAPA, 0.26, 64), [
+      metal(VERDE_CHECK, { metalness: 0.3 }),
+      plastico(VERDE_CHECK),
+      plastico(VERDE_CHECK),
+    ])
+    cuerpoChapa.rotation.x = Math.PI / 2
+    const caraChapa = new THREE.Mesh(
+      new THREE.CircleGeometry(R_CHAPA * 0.99, 64),
+      new THREE.MeshStandardMaterial({ map: texCheck(), roughness: 0.3, envMapIntensity: 0.6 })
+    )
+    caraChapa.position.z = 0.132
+    const aroChapa = new THREE.Mesh(new THREE.TorusGeometry(R_CHAPA, 0.09, 16, 64), plastico(0xffffff, { roughness: 0.25 }))
+    aroChapa.position.z = 0.06
+    chapa.add(cuerpoChapa, caraChapa, aroChapa)
+    chapa.position.set(RADIO_MONEDA * 0.68, -RADIO_MONEDA * 0.68, 0.2)
+    disco.add(chapa)
   }
 
   escena.add(base, moneda)
