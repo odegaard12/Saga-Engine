@@ -296,7 +296,16 @@ def test_a_guia_do_xogador_ao_nodo_vai_polo_camino(fonte: str) -> None:
     Recta era mentira. Y a más de 500 m del camino, aviso con histéresis.
     """
     assert "id: CAPA_GUIA" in fonte
-    assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" in fonte
+    # Late en opacidad: cambiar `line-dasharray` recarga la fuente entera.
+    assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" not in fonte
+    assert "setPaintProperty(CAPA_GUIA, 'line-opacity'" in fonte
+    # Y nada se anima con el mapa en movimiento: cada cambio de estilo
+    # repinta todas las texturas del relieve (tirones al hacer zoom).
+    assert "document.visibilityState === 'visible' && !enMovimiento(vivo)" in fonte
+    # Ni se vuelve a meter en una fuente lo que ya tiene: `styledata` salta
+    # con cada cambio de estilo y reteselaba todo diez veces por segundo.
+    assert "previo.fuente === fuente && previo.datos === datos" in fonte
+    assert "previo.fuente === fuente && previo.json === json" in fonte
     assert "...camino.slice(mejor).map(" in fonte, "la guía volvió a ser una recta"
     assert "const FUERA_DE_TRAZADO_M = 500" in fonte and "const DE_VUELTA_AL_TRAZADO_M = 400" in fonte
     assert "Fuera del trazado" in fonte

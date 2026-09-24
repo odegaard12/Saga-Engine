@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.1
+## 5.28.2
+
+- **Zoom y arrastre más fluidos.** Las animaciones del mapa (pulso del
+  trazado, moneda que flota, halo, guía) se pausan mientras el mapa se
+  mueve. Cada una cambia el estilo, y con relieve MapLibre repinta
+  entonces todas las texturas del terreno: diez veces por segundo en pleno
+  pellizco eran tirones.
+- **Nodos y fotos que aparecían y desaparecían.** Con cada cambio de
+  estilo -diez por segundo, por las animaciones- se volvían a cargar todos
+  los datos del mapa: trazado, nodos, fotos y guía se recortaban y
+  recolocaban sin parar. Ahora sólo se cargan cuando cambian de verdad.
+- La guía late en opacidad con un trazo fijo. Su "trazo que crece"
+  cambiaba `line-dasharray` cada 160 ms, y esa propiedad obliga a
+  recargar la fuente entera cada vez.
+
+
 
 - **Sin saltos al ampliar y desampliar.** La forma del relieve se queda
   en una sola resolución desde el zoom 12: el dato es de ~30 m y los
