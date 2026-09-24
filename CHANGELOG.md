@@ -6,7 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.27.1
+## 5.28.0
+
+- **La pantalla de carga deja el mapa preparado.** Antes de quitarse
+  hornea todos los nodos (salían tarde, al llegar a la zona, y el mapa se
+  trababa mientras) y pasa por dos zooms más lejanos y por la ruta entera,
+  así que al desampliar ya no se queda en blanco 2-3 segundos.
+- Nodos y fotos sin fundido al cambiar de zoom: ya no desaparecen y
+  aparecen al desampliar. Las teselas pedidas no se cancelan a mitad del
+  pellizco.
+- Nodos más grandes a zoom medio (de 15 a 17), sin cambiar el de cerca.
+- Halo del suelo más ancho, y el trazado cosido a sus nodos: la línea del
+  camino llega hasta el nodo aunque el track se grabara a unos metros.
+
+
 
 - Los nodos, un 30 % más grandes, con la peana y el aro de la base más
   anchos.

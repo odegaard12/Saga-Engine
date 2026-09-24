@@ -26,17 +26,24 @@ import type { EstadoDeNodo, TipoDeNodo } from './nodosTresD'
  * moneda, que flota subiendo y bajando.
  */
 
-/** Tamaño de la imagen en píxeles CSS. */
-export const ANCHO_BOLA_PX = 72
-export const ALTO_BOLA_PX = 116
-const ESCALA = 3
-const SOBREMUESTREO = 2
 /** Grados sobre el horizonte desde los que mira la cámara: el mapa va a 58° de inclinación. */
 const ELEVACION_CAMARA_GRADOS = 32
 const PHI = (ELEVACION_CAMARA_GRADOS * Math.PI) / 180
+/** Escala: píxeles CSS por metro del modelo. La de siempre; lo que crece es el encuadre. */
+const PX_POR_METRO = 72 / 5.4
+/**
+ * Radio del brillo del suelo -el halo-, en metros del modelo. Con 2,65
+ * el camino llegaba al nodo y no tocaba el halo: "se quedan aparte".
+ */
+const RADIO_BRILLO = 4.1
+/** Tamaño de la imagen en píxeles CSS: cabe el halo entero sin recortar. */
+export const ANCHO_BOLA_PX = 110
+export const ALTO_BOLA_PX = 132
+const ESCALA = 3
+const SOBREMUESTREO = 2
 /** Encuadre: medio ancho del mundo visible, y de dónde a dónde en vertical (metros en pantalla). */
-const MEDIO_ANCHO = 2.7
-const ABAJO = -(2.1 * Math.sin(PHI) + 0.25)
+const MEDIO_ANCHO = ANCHO_BOLA_PX / PX_POR_METRO / 2
+const ABAJO = -(RADIO_BRILLO * Math.sin(PHI) + 0.25)
 const ARRIBA = ABAJO + MEDIO_ANCHO * 2 * (ALTO_BOLA_PX / ANCHO_BOLA_PX)
 /** Altura del centro de la moneda, en metros. */
 const CENTRO_MONEDA = 4.75
@@ -328,7 +335,7 @@ function construir(escena: THREE.Scene, numero: number, estado: EstadoDeNodo, ti
   sombra.rotation.x = -Math.PI / 2
   sombra.position.y = 0.01
   base.add(sombra)
-  const brillo = plano(texBrillo(estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]), 5.3, 5.3, estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85)
+  const brillo = plano(texBrillo(estado === 'hecho' ? GRIS_HECHO : COLOR_TIPO[tipo]), RADIO_BRILLO * 2, RADIO_BRILLO * 2, estado === 'hecho' ? 0.45 : estado === 'actual' ? 1 : 0.85)
   brillo.rotation.x = -Math.PI / 2
   brillo.position.y = 0.02
   base.add(brillo)
