@@ -163,6 +163,31 @@ export function loginAdmin(password: string) {
   return adminPostJson<AdminLoginResponse>('/api/admin/login', { password })
 }
 
+/**
+ * Cambiar la contraseña de admin. Con fetch propio, no `adminPostJson`: los
+ * errores del servidor ("demasiado corta", "no coinciden") vienen en el
+ * cuerpo con código 400 y hay que enseñárselos a quien la está cambiando.
+ */
+export async function changeAdminPassword(
+  actual: string,
+  nueva: string,
+  confirmar: string
+): Promise<{ ok: boolean; detalle?: string }> {
+  const res = await fetch('/api/admin/change-password', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: actual, new_password: nueva, confirm_password: confirmar }),
+  })
+  let cuerpo: { status?: string; detail?: string } = {}
+  try {
+    cuerpo = await res.json()
+  } catch {
+    cuerpo = {}
+  }
+  return res.ok && cuerpo.status === 'ok' ? { ok: true } : { ok: false, detalle: cuerpo.detail || `HTTP ${res.status}` }
+}
+
 export function logoutAdmin() {
   return adminPostJson<AdminLoginResponse>('/api/admin/logout', {})
 }
@@ -220,34 +245,6 @@ async function adminPostJsonResilient(url: string, body: unknown): Promise<unkno
   return payload
 }
 
-async function adminGetJsonResilient(url: string): Promise<unknown> {
-  const res = await fetch(url, {
-    method: 'GET',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-
-  let payload: unknown = null
-
-  try {
-    payload = await res.json()
-  } catch {
-    payload = null
-  }
-
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'message' in payload
-        ? String((payload as { message?: unknown }).message)
-        : `HTTP ${res.status}`
-
-    throw new Error(message)
-  }
-
-  return payload
-}
 
 function adminPayloadVariantsResilient(password?: string, extra: Record<string, unknown> = {}) {
   if (!password) {
@@ -261,15 +258,6 @@ function adminPayloadVariantsResilient(password?: string, extra: Record<string, 
     { admin_key: password, ...extra },
     { key: password, ...extra },
   ]
-}
-
-function adminQueryVariantsResilient(password?: string) {
-  if (!password) {
-    return ['/api/admin/stages']
-  }
-
-  const keys = ['password', 'admin_password', 'admin_pass', 'admin_key', 'key']
-  return keys.map((key) => `/api/admin/stages?${key}=${encodeURIComponent(password)}`)
 }
 
 function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResponse {
@@ -352,21 +340,6 @@ export async function fetchAdminStages(password?: string): Promise<AdminStagesRe
       errors.push(normalized.message || 'Unknown stages POST response error.')
     } catch (err) {
       errors.push(err instanceof Error ? err.message : 'Unknown stages POST request error.')
-    }
-  }
-
-  for (const url of adminQueryVariantsResilient(password)) {
-    try {
-      const payload = await adminGetJsonResilient(url)
-      const normalized = normalizeAdminStagesPayloadResilient(payload)
-
-      if (normalized.status === 'ok') {
-        return normalized
-      }
-
-      errors.push(normalized.message || 'Unknown stages GET response error.')
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : 'Unknown stages GET request error.')
     }
   }
 

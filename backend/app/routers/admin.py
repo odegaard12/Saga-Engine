@@ -202,10 +202,13 @@ async def admin_react_overview(request: Request):
         for idx, stage in enumerate(stages)
     ]
 
+    # Las cinco familias del editor (familyConfigs.ts), no sólo tres.
     family_counts = {
         "signal_hunt": 0,
         "bearing_hunt": 0,
         "circuit_matrix": 0,
+        "motion_challenge": 0,
+        "audio_challenge": 0,
     }
     for stage in stage_summaries:
         stage_type = stage.get("type")
@@ -246,9 +249,11 @@ async def admin_react_overview(request: Request):
             "family_counts": family_counts,
         },
         "families": [
-            {"id": "signal_hunt", "label": "Signal Hunt"},
-            {"id": "bearing_hunt", "label": "Bearing Hunt"},
-            {"id": "circuit_matrix", "label": "Circuit Matrix"},
+            {"id": "signal_hunt", "label": "Checkpoints GPS"},
+            {"id": "bearing_hunt", "label": "Caza de rumbo"},
+            {"id": "circuit_matrix", "label": "Matriz de circuitos"},
+            {"id": "motion_challenge", "label": "Reto de movimiento"},
+            {"id": "audio_challenge", "label": "Reto de sonido"},
         ],
         "stages": stage_summaries,
         "profiles": profile_summaries,

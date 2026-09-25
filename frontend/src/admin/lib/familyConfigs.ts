@@ -16,7 +16,7 @@ export const familyCards: Array<{
   {
     id: 'motion_challenge',
     icon: '⚡',
-    title: 'Motion Challenge',
+    title: 'Reto de movimiento',
     detail: 'Movimiento del móvil, agitar, calibrar y retos físicos.',
   },
   {
@@ -28,19 +28,19 @@ export const familyCards: Array<{
   {
     id: 'bearing_hunt',
     icon: '🧭',
-    title: 'Bearing Hunt',
-    detail: 'Compass heading, sector lock and orientation capture.',
+    title: 'Caza de rumbo',
+    detail: 'Rumbo con la brújula: apuntar a un sector y mantenerlo.',
   },
   {
     id: 'circuit_matrix',
     icon: '🧩',
-    title: 'Circuit Matrix',
-    detail: 'Logic grids, route repair and lock-style board puzzles.',
+    title: 'Matriz de circuitos',
+    detail: 'Rejillas lógicas, reparar rutas y puzles de tablero.',
   },
   {
     id: 'audio_challenge',
     icon: '🎤',
-    title: 'Audio Challenge',
+    title: 'Reto de sonido',
     detail: 'Micrófono del dispositivo, soplado o volumen de sonido.',
   },
 ]
