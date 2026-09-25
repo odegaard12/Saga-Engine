@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
 import FamiliesPanel from './FamiliesPanel'
@@ -408,6 +408,26 @@ export default function AdminMissionControlShell({
     }
   }
 
+  const barraComandosRef = useRef<HTMLDivElement>(null)
+  const [posicionHud, setPosicionHud] = useState<{ top: number; centro: number; ancho: number } | null>(null)
+  useEffect(() => {
+    const barra = barraComandosRef.current
+    if (!barra) return undefined
+    const medir = () => {
+      const caja = barra.getBoundingClientRect()
+      if (caja.width === 0) return
+      setPosicionHud({ top: Math.round(caja.bottom + 8), centro: Math.round(caja.left + caja.width / 2), ancho: Math.round(caja.width) })
+    }
+    medir()
+    const observador = new ResizeObserver(medir)
+    observador.observe(barra)
+    window.addEventListener('resize', medir)
+    return () => {
+      observador.disconnect()
+      window.removeEventListener('resize', medir)
+    }
+  }, [])
+
   function togglePanel(panel: CmsPanel) {
     onSetCmsPanel(cmsPanel === panel ? 'none' : panel)
   }
@@ -578,43 +598,56 @@ export default function AdminMissionControlShell({
           </div>
         ) : null}
 
-        <div className="saga-panel-switcher">
-          <button
-            type="button"
-            className={cmsPanel === 'players' ? 'active' : ''}
-            onClick={() => togglePanel('players')}
-          >
-            {t('admin.players')}
-          </button>
-          <button
-            type="button"
-            className={cmsPanel === 'labels' ? 'active' : ''}
-            onClick={() => togglePanel('labels')}
-          >
-            {t('admin.families')}
-          </button>
-          <button
-            type="button"
-            className={cmsPanel === 'objects' ? 'active' : ''}
-            onClick={() => togglePanel('objects')}
-          >
-            Objetos 🎒
-          </button>
-          <button
-            type="button"
-            className={cmsPanel === 'mission' ? 'active' : ''}
-            onClick={() => togglePanel('mission')}
-          >
-            {t('admin.settings')}
-          </button>
-          <button
-            type="button"
-            className={cmsPanel === 'simulation' ? 'active' : ''}
-            onClick={() => togglePanel('simulation')}
-          >
-            Banco de pruebas 🧪
-          </button>
-        </div>
+        {/*
+          Menú por grupos. Antes eran cinco botones sueltos en rejilla, sin
+          orden, y "Crear" (el asistente de plantillas) sólo existía en el
+          menú del móvil: en escritorio no había forma de llegar a él.
+        */}
+        <nav className="saga-panel-switcher saga-menu-agrupado" aria-label="Menú del admin">
+          {(
+            [
+              {
+                titulo: 'Misión',
+                entradas: [
+                  { panel: 'builder', icono: '✨', etiqueta: t('admin.builder') },
+                  { panel: 'mission', icono: '⚙️', etiqueta: t('admin.settings') },
+                ],
+              },
+              {
+                titulo: 'Contenido',
+                entradas: [
+                  { panel: 'labels', icono: '🎮', etiqueta: 'Juegos' },
+                  { panel: 'objects', icono: '🎒', etiqueta: 'Objetos' },
+                ],
+              },
+              {
+                titulo: 'Personas y pruebas',
+                entradas: [
+                  { panel: 'players', icono: '👥', etiqueta: t('admin.players') },
+                  { panel: 'simulation', icono: '🧪', etiqueta: 'Simular' },
+                ],
+              },
+            ] as { titulo: string; entradas: { panel: CmsPanel; icono: string; etiqueta: string }[] }[]
+          ).map((grupo) => (
+            <div key={grupo.titulo} className="saga-menu-grupo">
+              <span className="saga-menu-titulo">{grupo.titulo}</span>
+              <div className="saga-menu-botones">
+                {grupo.entradas.map((entrada) => (
+                  <button
+                    key={entrada.panel}
+                    type="button"
+                    className={cmsPanel === entrada.panel ? 'active' : ''}
+                    aria-pressed={cmsPanel === entrada.panel}
+                    onClick={() => togglePanel(entrada.panel)}
+                  >
+                    <span aria-hidden="true">{entrada.icono}</span>
+                    <span className="saga-menu-etiqueta">{entrada.etiqueta}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
 
         <section className="saga-route-list" aria-label="Route nodes">
           <div className="saga-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -719,7 +752,7 @@ export default function AdminMissionControlShell({
       </aside>
 
       <section className="saga-map-workspace" aria-label="Map workspace">
-        <div className="saga-command-bar">
+        <div className="saga-command-bar" ref={barraComandosRef}>
           <div className="saga-command-main">
             <button
               type="button"
@@ -840,9 +873,17 @@ export default function AdminMissionControlShell({
         <div
           className="saga-centered-route-hud"
           style={{
-            position: 'absolute',
-            top: 75,
-            left: '50%',
+            /**
+             * Debajo de la barra de botones y centrada en el hueco del mapa,
+             * midiendo la barra de verdad. Iba fija a 75 px y centrada en la
+             * pantalla entera: con los botones en dos filas tapaba media barra,
+             * y por la izquierda se metía bajo el menú ("RU…").
+             */
+            position: 'fixed',
+            top: posicionHud ? posicionHud.top : 75,
+            left: posicionHud ? posicionHud.centro : '50%',
+            maxWidth: posicionHud ? posicionHud.ancho : undefined,
+            overflowX: 'auto',
             transform: 'translateX(-50%)',
             zIndex: 90,
             background: 'rgba(2, 6, 23, 0.52)',

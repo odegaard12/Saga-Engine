@@ -6,7 +6,54 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.7
+## 5.29.3
+
+- **Las fotos de cada nodo, en un montón al lado de su base.** No se veían
+  hasta ampliar mucho (zoom 18) y entonces salían en fila, pequeñas y encima
+  del camino. Ahora cada nodo con fotos lleva un montón con la primera y
+  cuántas hay, que crece con el nodo y se ve desde lejos; al tocarlo se
+  abren todas en grande. Las fotos sueltas por el campo, como antes.
+
+
+
+- **Centrado exacto también al volver de "ver la ruta".** Medido con un
+  móvil simulado en la ruta real: tras ver la ruta (centro en un alto) y
+  volver a ti, el centro del mapa estaba en tus coordenadas pero tú salías
+  100 px más abajo, porque MapLibre dejaba la cámara con la altura del
+  terreno del sitio anterior. Al acabar cada movimiento se iguala la altura
+  del centro con la del terreno.
+
+
+
+- **"Centrar en mí" ya centra.** El precalentado de la pantalla de carga
+  (pasa por varios zooms y vuelve) seguía moviendo la cámara si la carga se
+  quitaba por tope antes de acabar, y al terminar devolvía la cámara a
+  donde estaba al empezar: pisaba el centrado y el seguimiento del GPS, y
+  al entrar el jugador podía quedar fuera de la pantalla. Ahora se para en
+  cuanto tocas el mapa, pides encuadrar o el GPS te sigue, y no restaura
+  nada.
+
+
+
+Repaso del panel de administración, que estaba abandonado:
+
+- **Menú por grupos**: Misión (Crear, Ajustes) · Contenido (Juegos,
+  Objetos) · Personas y pruebas (Jugadores, Simular). "Crear" (el asistente
+  de plantillas) sólo existía en el menú del móvil; ahora también en
+  escritorio. "Familias" pasa a llamarse "Juegos".
+- **Cambio de contraseña**: si el servidor pide cambiarla, el panel ya
+  tiene pantalla para hacerlo (antes se quedaba en "Access denied" sin
+  salida). Pantalla de acceso en castellano y centrada.
+- **Seguridad**: fuera un último intento de carga que mandaba la
+  contraseña en la dirección (?password=…) a una ruta que ni existía.
+- **Barra de datos de la ruta** (distancia, tiempo, desnivel, PLAY): tapaba
+  la fila de botones cuando éstos ocupaban dos líneas y se metía bajo el
+  menú. Ahora se coloca debajo, midiendo la barra de verdad.
+- Las cinco familias de juego en los recuentos del servidor (contaba tres)
+  y sus nombres en castellano (Reto de movimiento, Caza de rumbo, Matriz de
+  circuitos, Reto de sonido).
+
+
 
 - **Textos que no se actualizaban, en toda la app.** El puente de idioma
   (traduce los textos de la página por detrás de React) guardaba el texto
