@@ -221,7 +221,13 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "onListo={() => setMapaListo(true)}" in app
     assert "&& !mapaListo) {" in app, "el velo tiene que esperar al mapa"
-    assert "setTimeout(() => setMapaListo(true), 7000)" in app, "sin tope, la carga podría ser eterna"
+    assert "setTimeout(() => setMapaListo(true), 16000)" in app, "sin tope, la carga podría ser eterna"
+    # Bajo el velo se hornean los nodos y se pasa por los zooms de alrededor:
+    # antes los nodos salían al llegar a la zona y al desampliar había blanco.
+    assert "void calentar(vivo).finally(" in fonte and "alFaltarImagen({ id })" in fonte
+    assert "fadeDuration: 0" in fonte and "cancelPendingTileRequestsWhileZooming: false" in fonte
+    # El trazado llega hasta el nodo aunque el track se grabara a unos metros.
+    assert fonte.count("cerrarTramo(leerTrackDelNodo(") == 2
 
 
 def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
@@ -290,7 +296,16 @@ def test_a_guia_do_xogador_ao_nodo_vai_polo_camino(fonte: str) -> None:
     Recta era mentira. Y a más de 500 m del camino, aviso con histéresis.
     """
     assert "id: CAPA_GUIA" in fonte
-    assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" in fonte
+    # Late en opacidad: cambiar `line-dasharray` recarga la fuente entera.
+    assert "setPaintProperty(CAPA_GUIA, 'line-dasharray'" not in fonte
+    assert "setPaintProperty(CAPA_GUIA, 'line-opacity'" in fonte
+    # Y nada se anima con el mapa en movimiento: cada cambio de estilo
+    # repinta todas las texturas del relieve (tirones al hacer zoom).
+    assert "document.visibilityState === 'visible' && !enMovimiento(vivo)" in fonte
+    # Ni se vuelve a meter en una fuente lo que ya tiene: `styledata` salta
+    # con cada cambio de estilo y reteselaba todo diez veces por segundo.
+    assert "previo.fuente === fuente && previo.datos === datos" in fonte
+    assert "previo.fuente === fuente && previo.json === json" in fonte
     assert "...camino.slice(mejor).map(" in fonte, "la guía volvió a ser una recta"
     assert "const FUERA_DE_TRAZADO_M = 500" in fonte and "const DE_VUELTA_AL_TRAZADO_M = 400" in fonte
     assert "Fuera del trazado" in fonte
@@ -459,7 +474,12 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "id: CAPA_RADIO_RELLENO" not in fonte
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 5
+    # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
+    # mapa (con el relieve de una sola resolución, la cota ya coincide).
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 5
+    assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
+    assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
     # Sin peana (en cuesta se enterraba) y mástil grueso (fino se veía translúcido).
     assert "const peana" not in capa and "CylinderGeometry(0.2, 0.26, H - 0.2, 16)" in capa
@@ -553,3 +573,36 @@ def test_a_guia_non_pinta_unha_recta_mentres_carga_a_rede() -> None:
     # La red se pide desde el principio, no después de pintar el mapa.
     assert fonte.index("void redRef.current?.cargar()") > fonte.index("}, 250)")
     assert "...(esperandoCaminos ? [] :" in fonte
+
+
+def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -> None:
+    """
+    Al desampliar, el mapa no se vuelve a cargar: más niveles en memoria,
+    más teselas a la vez (salen de la caché) y sin fundido. Y los botones
+    de posición no piden el GPS si ya lo hay: "centrar en mí" centra con la
+    última posición y "ver la ruta" no lo necesita.
+    """
+    assert "maxTileCacheZoomLevels: 8" in fonte and "setMaxParallelImageRequests(32)" in fonte
+    assert "'raster-fade-duration': 0" in fonte
+    assert "[1, 2, 3, 4.5].map((menos)" in fonte, "la carga tiene que pasar por cada nivel de zoom"
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert app.count("playerPosition={posicionEnMapa}") == 2
+    assert "const posicionEnMapa = playerPosition ?? ultimaPosicionViva" in app
+    ruta = app[app.index("function handleToggleRouteOverview()"):app.index("function openInteraction()")]
+    assert "handleRequestLiveGps" not in ruta, "ver la ruta no necesita GPS"
+    centrar = app[app.index("function handleFocusPlayer()"):app.index("function handleFocusNode()")]
+    assert "handleRequestLiveGps({ silent: true })" in centrar and "forceFocus: true })\n      return" not in centrar
+    # Tamaño sin escalones: dependiendo de un dato del punto, MapLibre no lo
+    # topa en el zoom de la tesela (el nodo "se recargaba" más grande).
+    assert fonte.count("'icon-size': TAMANO_NODOS,") == 4 and "'icon-size': TAMANO_FOTOS," in fonte
+    assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
+    # Fotos repartidas por sitio y encima del halo, debajo del nodo.
+    # ...pero sólo de muy cerca: de lejos, juntas y se ve una.
+    assert "ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS]" in fonte
+    assert "['!=', ['get', 'enNodo'], true]" in fonte and "props.enNodo === true && mapa.getZoom() < ZOOM_FOTOS_REPARTIDAS" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    # El nodo en juego marca su radio de entrada REAL (base 2 = tamaño del mapa).
+    assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': TAMANO_ENTRADA," in fonte
+    assert "'interpolate', ['exponential', 2], ['zoom']" in fonte
+    assert fonte.index("id: CAPA_NODOS_HALO,") < fonte.index("id: CAPA_FOTOS,") < fonte.index("id: CAPA_NODOS_ICONOS,")
+    # La guía por caminos se guarda y sale al instante al volver.
+    assert "guardarGuia(rutaCaminosRef.current)" in fonte and "leerGuiaGuardada()" in fonte

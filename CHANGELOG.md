@@ -6,7 +6,109 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.27.1
+## 5.28.7
+
+- **Textos que no se actualizaban, en toda la app.** El puente de idioma
+  (traduce los textos de la página por detrás de React) guardaba el texto
+  de la primera vez y, cuando React lo cambiaba, lo devolvía a aquel: un
+  estado, un contador o la etiqueta de un botón que alterna se quedaban
+  congelados con el primer valor. Ahora acepta el texto nuevo.
+- **Un bucle que no paraba.** El mismo puente reescribía cada texto aunque
+  fuera igual, eso volvía a dispararlo y recorría la página entera en cada
+  fotograma, siempre. Ahora sólo escribe si cambia: menos trabajo para el
+  móvil y más fluidez.
+
+
+
+- **Fotos de los nodos, sólo de cerca.** De lejos quedaban apiladas y
+  clavadas en el poste del nodo. Ahora no se ven hasta el zoom 18, donde
+  salen repartidas bajo el nodo; tocar el nodo de lejos ya no las abre.
+  Las fotos en campo abierto siguen viéndose (una por sitio).
+
+
+
+- **El nodo en juego marca su radio de entrada real.** Su halo medía lo
+  mismo en pantalla a cualquier zoom y de lejos quedaba enorme, más grande
+  que el trazado. Ahora es el círculo donde el juego te deja entrar, a su
+  tamaño de verdad sobre el mapa: velo suave y un anillo que late en el
+  borde, del color del tipo.
+- **Fotos juntas de lejos.** Repartidas a cualquier zoom quedaban fatal.
+  Ahora se ve una por sitio hasta el zoom 18 y sólo de muy cerca se
+  reparten bajo el nodo para poder tocarlas. Tocar la de lejos abre todas.
+
+
+
+- **Los nodos ya no "se recargan" más grandes al ampliar.** MapLibre topaba
+  el tamaño de cada símbolo en el del zoom siguiente a su tesela: ampliando
+  deprisa, el nodo se quedaba quieto hasta que llegaba la tesela y pegaba
+  el salto. Ahora el tamaño crece sin escalones (nodos, fotos y jugador),
+  con la misma curva.
+- **Fotos de los nodos, que se pueden tocar.** Estaban todas en el mismo
+  punto, apiladas y debajo del nodo: al ampliar no se separaban. Ahora las
+  de cada sitio se reparten en filas bajo la peana del nodo, por encima del
+  halo, y al tocar una se abre el visor con todas empezando por esa.
+- **La guía por caminos se guarda.** Al volver a abrir la app en el mismo
+  sitio sale al instante, sin esperar a que se cargue la red y se calcule.
+- **Centrar en mí** encuadra una sola vez: el punto nuevo del GPS ya no
+  vuelve a mover el mapa con otro encuadre.
+
+
+
+- **El mapa no se vuelve a cargar al desampliar.** Guarda en memoria ocho
+  niveles de zoom en vez de cinco, pide 32 teselas a la vez en vez de 16
+  (salen de la caché, no de la red) y las enseña sin fundido. La pantalla
+  de carga pasa por cada nivel de zoom hacia fuera, no a saltos.
+- **Botones de posición.** "Centrar en mí" centra al momento con la
+  última posición. Antes pedía el GPS de nuevo cada vez: reiniciaba la
+  escucha, avisaba "Solicitando permiso de ubicación…" aunque funcionara y
+  no centraba hasta el punto siguiente. Si el punto es viejo, se pide otro
+  en silencio. "Ver la ruta" ya no pide GPS: no lo necesita.
+- Quieto más de 45 s ya no desapareces del mapa: se te pinta en tu última
+  posición de esta sesión. Para abrir nodos sigue haciendo falta un punto
+  reciente.
+
+
+
+- **Zoom y arrastre más fluidos.** Las animaciones del mapa (pulso del
+  trazado, moneda que flota, halo, guía) se pausan mientras el mapa se
+  mueve. Cada una cambia el estilo, y con relieve MapLibre repinta
+  entonces todas las texturas del terreno: diez veces por segundo en pleno
+  pellizco eran tirones.
+- **Nodos y fotos que aparecían y desaparecían.** Con cada cambio de
+  estilo -diez por segundo, por las animaciones- se volvían a cargar todos
+  los datos del mapa: trazado, nodos, fotos y guía se recortaban y
+  recolocaban sin parar. Ahora sólo se cargan cuando cambian de verdad.
+- La guía late en opacidad con un trazo fijo. Su "trazo que crece"
+  cambiaba `line-dasharray` cada 160 ms, y esa propiedad obliga a
+  recargar la fuente entera cada vez.
+
+
+
+- **Sin saltos al ampliar y desampliar.** La forma del relieve se queda
+  en una sola resolución desde el zoom 12: el dato es de ~30 m y los
+  niveles 13 y 14 eran ese mismo dato remuestreado, distinto en cada uno;
+  con la exageración, al cruzar de zoom el suelo y los nodos saltaban.
+  De cerca, además, el relieve sale más suave. El sombreado sigue a z14.
+- **Nodos asentados.** El halo y la sombra de cada nodo van tumbados
+  sobre el mapa, con su perspectiva real en cualquier punto de la
+  pantalla, y los nodos van a 2 m del suelo en vez de 3.
+- **Check integrado.** Es una chapa verde en 3D pegada al canto de la
+  moneda: gira, flota y se ilumina con ella. Antes era una pegatina plana.
+
+
+
+- **La pantalla de carga deja el mapa preparado.** Antes de quitarse
+  hornea todos los nodos (salían tarde, al llegar a la zona, y el mapa se
+  trababa mientras) y pasa por dos zooms más lejanos y por la ruta entera,
+  así que al desampliar ya no se queda en blanco 2-3 segundos.
+- Nodos y fotos sin fundido al cambiar de zoom: ya no desaparecen y
+  aparecen al desampliar. Las teselas pedidas no se cancelan a mitad del
+  pellizco.
+- Nodos más grandes a zoom medio (de 15 a 17), sin cambiar el de cerca.
+- Halo del suelo más ancho, y el trazado cosido a sus nodos: la línea del
+  camino llega hasta el nodo aunque el track se grabara a unos metros.
+
+
 
 - Los nodos, un 30 % más grandes, con la peana y el aro de la base más
   anchos.
