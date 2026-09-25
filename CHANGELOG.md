@@ -6,7 +6,21 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.30.1
+## 5.31.0
+
+Admin: funciones del servidor que el panel no usaba.
+
+- **Actividad** (menú "Seguimiento"): el registro de eventos del servidor
+  (latidos, QR escaneados, acciones de admin), con filtro por estado y
+  "marcar como leído".
+- **Datos personales** (en Jugadores): ver cuántas fotos de campo y
+  posiciones GPS hay guardadas y borrarlas. La misión, los nodos y el
+  progreso no se tocan. Borra datos de personas reales sin vuelta atrás,
+  así que hay que escribir BORRAR para confirmarlo.
+- Editor de nodos: fuera 120 líneas muertas (pestañas que nunca se
+  conectaron, un panel sin usar y una cabecera duplicada oculta).
+
+
 
 - **Sin halos en los nodos completados ni en los pendientes.** Su halo de
   color en el suelo "quedaba fatal sobre el terreno". Ahora sólo llevan la

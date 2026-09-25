@@ -41,7 +41,7 @@ import { TEMA_POR_DEFECTO } from '../shared/tema'
 
 type LoadState = 'loading' | 'ready' | 'error'
 type OverviewState = 'locked' | 'loading' | 'ready' | 'error'
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity'
 
 function slugifyMissionItemId(value: string): string {
   return value

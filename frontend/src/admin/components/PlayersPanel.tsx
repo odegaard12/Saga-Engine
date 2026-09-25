@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
-import type { AdminProfileAction, AdminReactOverviewProfile, AdminReactOverviewStage } from '../lib/adminApi'
+import {
+  fetchDatosPersonales,
+  purgeDatosPersonales,
+  type AdminDatosPersonalesConteo,
+  type AdminProfileAction,
+  type AdminReactOverviewProfile,
+  type AdminReactOverviewStage,
+} from '../lib/adminApi'
 import type { PlayerDraft } from '../lib/playerDrafts'
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
@@ -102,6 +109,62 @@ export default function PlayersPanel({
 }: PlayersPanelProps) {
   /** Ficha desplegada, o null si están todas plegadas. */
   const [expandedPlayer, setExpandedPlayer] = useState<number | null>(null)
+
+  // Datos personales: fotos de campo y posiciones GPS de gente real. Es
+  // global -no de un jugador concreto-, por eso vive aparte de las fichas.
+  const [conteoPersonales, setConteoPersonales] = useState<AdminDatosPersonalesConteo | null>(null)
+  const [borradoPersonales, setBorradoPersonales] = useState<{ fotos: number; imagenes: number; posiciones_gps: number } | null>(null)
+  const [cargandoPersonales, setCargandoPersonales] = useState(false)
+  const [avisoPersonales, setAvisoPersonales] = useState('')
+
+  async function verDatosPersonales() {
+    setCargandoPersonales(true)
+    setAvisoPersonales('')
+    setBorradoPersonales(null)
+    try {
+      const respuesta = await fetchDatosPersonales()
+      if (respuesta.status === 'ok' && respuesta.datos) {
+        setConteoPersonales(respuesta.datos)
+      } else {
+        setAvisoPersonales(respuesta.detail || 'No se pudo consultar.')
+      }
+    } catch (error) {
+      setAvisoPersonales(error instanceof Error ? error.message : 'No se pudo consultar.')
+    } finally {
+      setCargandoPersonales(false)
+    }
+  }
+
+  async function borrarDatosPersonales() {
+    if (!conteoPersonales) return
+    const resumen =
+      `Se van a borrar ${conteoPersonales.fotos} fotos (${conteoPersonales.ficheros_de_imagen} ficheros) ` +
+      `y ${conteoPersonales.posiciones_gps} posiciones GPS de jugadores reales. ` +
+      `La misión, los nodos y el progreso NO se tocan. Esto no se puede deshacer.`
+    // Borra fotos de personas reales y sin vuelta atrás: un "Aceptar" por
+    // descuido no basta, hay que escribirlo.
+    const escrito = window.prompt(`${resumen}
+
+Para confirmar, escribe BORRAR:`)
+    if ((escrito || '').trim().toUpperCase() !== 'BORRAR') return
+
+    setCargandoPersonales(true)
+    setAvisoPersonales('')
+    try {
+      const respuesta = await purgeDatosPersonales({ fotos: true, posiciones: true })
+      if (respuesta.status === 'ok' && respuesta.borrado) {
+        setBorradoPersonales(respuesta.borrado)
+        setConteoPersonales(respuesta.queda || null)
+      } else {
+        setAvisoPersonales(respuesta.detail || 'No se pudo borrar.')
+      }
+    } catch (error) {
+      setAvisoPersonales(error instanceof Error ? error.message : 'No se pudo borrar.')
+    } finally {
+      setCargandoPersonales(false)
+    }
+  }
+
   async function handleAvatarFile(event: ChangeEvent<HTMLInputElement>, index: number) {
     const file = event.currentTarget.files?.[0]
     if (!file) return
@@ -530,6 +593,56 @@ export default function PlayersPanel({
           })}
         </div>
       )}
+
+      <section
+        className="admin-cms-local-panel admin-panel-modern"
+        style={{ marginTop: '1.25rem', padding: '1rem', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: 10 }}
+      >
+        <div className="admin-panel-hero">
+          <div>
+            <span className="admin-kicker" style={{ color: '#fca5a5' }}>⚠️ Datos personales</span>
+            <h2>Fotos de campo y posiciones GPS</h2>
+            <p>
+              SAGA guarda las fotos que hacen los jugadores y el rastro GPS de cada latido. Aquí se
+              puede ver cuánto hay guardado y borrarlo. NO toca la misión, ni la configuración, ni
+              el progreso o los tiempos de partida -para eso está Reset.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+          <button type="button" className="admin-inline-soft" disabled={cargandoPersonales} onClick={() => void verDatosPersonales()}>
+            {cargandoPersonales ? 'Consultando…' : 'Ver qué hay guardado'}
+          </button>
+
+          {conteoPersonales ? (
+            <button
+              type="button"
+              className="admin-inline-danger"
+              disabled={cargandoPersonales || (conteoPersonales.fotos === 0 && conteoPersonales.posiciones_gps === 0)}
+              onClick={() => void borrarDatosPersonales()}
+            >
+              🗑️ Borrar fotos y posiciones GPS
+            </button>
+          ) : null}
+        </div>
+
+        {avisoPersonales ? <p style={{ color: '#f87171', fontSize: 13, marginTop: 8 }}>{avisoPersonales}</p> : null}
+
+        {conteoPersonales ? (
+          <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>
+            Guardado ahora: {conteoPersonales.fotos} fotos ({conteoPersonales.ficheros_de_imagen} ficheros de
+            imagen) · {conteoPersonales.posiciones_gps} posiciones GPS.
+          </p>
+        ) : null}
+
+        {borradoPersonales ? (
+          <p style={{ color: '#4ade80', fontSize: 13, marginTop: 8 }}>
+            ✓ Borrado: {borradoPersonales.fotos} fotos · {borradoPersonales.imagenes} ficheros de imagen ·{' '}
+            {borradoPersonales.posiciones_gps} posiciones GPS.
+          </p>
+        ) : null}
+      </section>
 
       {playerSaveState === 'error' && playerSaveError ? (
         <div className="admin-save-error">
