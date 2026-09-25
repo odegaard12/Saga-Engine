@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.5
+## 5.28.6
+
+- **Fotos de los nodos, sólo de cerca.** De lejos quedaban apiladas y
+  clavadas en el poste del nodo. Ahora no se ven hasta el zoom 18, donde
+  salen repartidas bajo el nodo; tocar el nodo de lejos ya no las abre.
+  Las fotos en campo abierto siguen viéndose (una por sitio).
+
+
 
 - **El nodo en juego marca su radio de entrada real.** Su halo medía lo
   mismo en pantalla a cualquier zoom y de lejos quedaba enorme, más grande
