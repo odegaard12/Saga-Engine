@@ -6,6 +6,7 @@ import type { PublicConfig } from '../types/player'
 import {
   fetchAdminReactOverview,
   fetchAdminStages,
+  changeAdminPassword,
   loginAdmin,
   saveAdminConfig,
   saveAdminStages,
@@ -118,6 +119,17 @@ export default function AdminApp() {
   const [overview, setOverview] = useState<AdminReactOverviewResponse | null>(null)
   const [overviewState, setOverviewState] = useState<OverviewState>('locked')
   const [overviewError, setOverviewError] = useState<string | null>(null)
+  /**
+   * El servidor pide cambiar la contraseña (la de fábrica o una débil). Antes
+   * no había pantalla para eso: el login decía "ok", el panel respondía
+   * "password_change_required" y sólo se veía "Access denied", sin salida.
+   */
+  const [cambioClave, setCambioClave] = useState<{ actual: string } | null>(null)
+  const [claveNueva, setClaveNueva] = useState('')
+  const [claveRepetida, setClaveRepetida] = useState('')
+  const [claveActualCampo, setClaveActualCampo] = useState('')
+  const [cambioClaveError, setCambioClaveError] = useState<string | null>(null)
+  const [cambiandoClave, setCambiandoClave] = useState(false)
   const [selectedStage, setSelectedStage] = useState<AdminReactOverviewStage | null>(null)
   const [cmsPanel, setCmsPanel] = useState<CmsPanel>('none')
   const [localNotice, setLocalNotice] = useState<string | null>(null)
@@ -597,7 +609,7 @@ export default function AdminApp() {
     const typedPassword = password.trim()
 
     if (!typedPassword && !overviewReady) {
-      setOverviewError('Enter the admin password to unlock Mission Control.')
+      setOverviewError('Escribe la contraseña de admin para entrar.')
       setOverviewState('error')
       return
     }
@@ -612,15 +624,28 @@ export default function AdminApp() {
         if (login.status !== 'ok') {
           setOverview(null)
           setSelectedStage(null)
-          setOverviewError(login.message || 'Admin login failed.')
+          setOverviewError(login.message || 'No se pudo entrar.')
           setOverviewState('error')
           return
         }
 
         setPassword('')
+
+        if (login.must_change) {
+          setCambioClave({ actual: typedPassword })
+          setOverviewState('locked')
+          return
+        }
       }
 
       const payload = await fetchAdminReactOverview()
+
+      if (payload.status === 'password_change_required') {
+        // Sesión abierta de antes, pero la clave hay que cambiarla: pedir la actual.
+        setCambioClave({ actual: '' })
+        setOverviewState('locked')
+        return
+      }
 
       if (payload.status !== 'ok') {
         setOverview(null)
@@ -1212,6 +1237,47 @@ export default function AdminApp() {
     loadOverview()
   }
 
+  async function handleCambioClave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!cambioClave) return
+    const actual = cambioClave.actual || claveActualCampo.trim()
+    if (!actual) {
+      setCambioClaveError('Escribe la contraseña actual.')
+      return
+    }
+    setCambiandoClave(true)
+    setCambioClaveError(null)
+    try {
+      const resultado = await changeAdminPassword(actual, claveNueva.trim(), claveRepetida.trim())
+      if (!resultado.ok) {
+        const detalle = resultado.detalle || ''
+        setCambioClaveError(
+          /at least 10/i.test(detalle)
+            ? 'Tiene que tener al menos 10 caracteres.'
+            : /weak/i.test(detalle)
+              ? 'Es demasiado fácil. Evita palabras comunes y patrones simples.'
+              : /match/i.test(detalle)
+                ? 'Las dos contraseñas nuevas no coinciden.'
+                : /bad password/i.test(detalle)
+                  ? 'La contraseña actual no es correcta.'
+                  : `No se pudo cambiar (${detalle}).`
+        )
+        return
+      }
+      // Hecho: se entra ya con la nueva.
+      setCambioClave(null)
+      setClaveNueva('')
+      setClaveRepetida('')
+      setClaveActualCampo('')
+      setPassword(claveNueva.trim())
+      window.setTimeout(() => void loadOverview(), 0)
+    } catch (fallo) {
+      setCambioClaveError(fallo instanceof Error ? fallo.message : 'No se pudo cambiar.')
+    } finally {
+      setCambiandoClave(false)
+    }
+  }
+
   if (!overviewReady) {
     return (
       <div className="admin-root">
@@ -1222,49 +1288,90 @@ export default function AdminApp() {
           <div className="admin-login-orb admin-login-orb-b" aria-hidden="true" />
 
           <form
-            onSubmit={handleOverviewSubmit}
+            onSubmit={(event) => (cambioClave ? void handleCambioClave(event) : handleOverviewSubmit(event))}
             className="admin-login-card admin-login-card-minimal"
           >
             <div className="admin-brand">SAGA ENGINE · ADMIN</div>
 
             <div className="admin-login-copy">
-              <h1>Mission Control</h1>
-              <p>Protected admin access</p>
+              <h1>Control de misión</h1>
+              <p>{cambioClave ? 'Antes de entrar, cambia la contraseña' : 'Acceso protegido'}</p>
             </div>
 
-            <div className="admin-login-form">
-              <label>Admin password</label>
-              <input
-                type="password"
-                value={password}
-                placeholder="Enter admin password once"
-                autoComplete="current-password"
-                autoFocus
-                onChange={(event) => setPassword(event.target.value)}
-              />
-              <button type="submit" disabled={overviewState === 'loading'}>
-                {overviewState === 'loading' ? 'Unlocking…' : 'Unlock'}
-              </button>
-            </div>
+            {cambioClave ? (
+              <div className="admin-login-form">
+                {!cambioClave.actual ? (
+                  <>
+                    <label>Contraseña actual</label>
+                    <input
+                      type="password"
+                      value={claveActualCampo}
+                      autoComplete="current-password"
+                      onChange={(event) => setClaveActualCampo(event.target.value)}
+                    />
+                  </>
+                ) : null}
+                <label>Contraseña nueva (10 caracteres o más)</label>
+                <input
+                  type="password"
+                  value={claveNueva}
+                  autoComplete="new-password"
+                  autoFocus
+                  onChange={(event) => setClaveNueva(event.target.value)}
+                />
+                <label>Repite la nueva</label>
+                <input
+                  type="password"
+                  value={claveRepetida}
+                  autoComplete="new-password"
+                  onChange={(event) => setClaveRepetida(event.target.value)}
+                />
+                <button type="submit" disabled={cambiandoClave}>
+                  {cambiandoClave ? 'Cambiando…' : 'Cambiar y entrar'}
+                </button>
+              </div>
+            ) : (
+              <div className="admin-login-form">
+                <label>Contraseña de admin</label>
+                <input
+                  type="password"
+                  value={password}
+                  placeholder="Contraseña"
+                  autoComplete="current-password"
+                  autoFocus
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button type="submit" disabled={overviewState === 'loading'}>
+                  {overviewState === 'loading' ? 'Entrando…' : 'Entrar'}
+                </button>
+              </div>
+            )}
 
-            {overviewState === 'error' ? (
+            {cambioClave && cambioClaveError ? (
               <div className="admin-error">
-                <strong>Access denied</strong>
+                <strong>No se ha cambiado</strong>
+                <span>{cambioClaveError}</span>
+              </div>
+            ) : null}
+
+            {!cambioClave && overviewState === 'error' ? (
+              <div className="admin-error">
+                <strong>Acceso denegado</strong>
                 <span>{overviewError}</span>
               </div>
             ) : null}
 
             {state === 'error' ? (
               <div className="admin-error">
-                <strong>Public config unavailable</strong>
+                <strong>No se pudo leer la configuración pública</strong>
                 <span>{error}</span>
               </div>
             ) : null}
 
             <div className="admin-login-foot">
-              <span>No mission data is shown before unlock.</span>
+              <span>Sin entrar no se enseña ningún dato de la misión.</span>
               <div>
-                <a href="/">Player entry</a>
+                <a href="/">Entrada de jugadores</a>
               </div>
             </div>
           </form>
@@ -2084,6 +2191,8 @@ const styles = `
 .admin-login-minimal {
   position: relative;
   width: min(430px, 100%);
+  /* Centrada: en escritorio quedaba pegada arriba a la izquierda. */
+  margin: max(8vh, 24px) auto 0;
 }
 
 .admin-login-card-minimal {

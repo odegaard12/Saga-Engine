@@ -6,7 +6,27 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.7
+## 5.29.0
+
+Repaso del panel de administración, que estaba abandonado:
+
+- **Menú por grupos**: Misión (Crear, Ajustes) · Contenido (Juegos,
+  Objetos) · Personas y pruebas (Jugadores, Simular). "Crear" (el asistente
+  de plantillas) sólo existía en el menú del móvil; ahora también en
+  escritorio. "Familias" pasa a llamarse "Juegos".
+- **Cambio de contraseña**: si el servidor pide cambiarla, el panel ya
+  tiene pantalla para hacerlo (antes se quedaba en "Access denied" sin
+  salida). Pantalla de acceso en castellano y centrada.
+- **Seguridad**: fuera un último intento de carga que mandaba la
+  contraseña en la dirección (?password=…) a una ruta que ni existía.
+- **Barra de datos de la ruta** (distancia, tiempo, desnivel, PLAY): tapaba
+  la fila de botones cuando éstos ocupaban dos líneas y se metía bajo el
+  menú. Ahora se coloca debajo, midiendo la barra de verdad.
+- Las cinco familias de juego en los recuentos del servidor (contaba tres)
+  y sus nombres en castellano (Reto de movimiento, Caza de rumbo, Matriz de
+  circuitos, Reto de sonido).
+
+
 
 - **Textos que no se actualizaban, en toda la app.** El puente de idioma
   (traduce los textos de la página por detrás de React) guardaba el texto
