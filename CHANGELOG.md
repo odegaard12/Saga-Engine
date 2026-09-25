@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.29.3
+## 5.30.0
+
+- **Primera carga del mapa mucho más rápida.** El paquete offline (unas
+  3.000 teselas) se bajaba tesela a tesela, y cada una tardaba ~0,7 s en ir
+  y volver por el túnel de Cloudflare aunque la Pi la sirviera de su disco
+  en 60 ms: medido en un móvil nuevo, más de 20 minutos. Ahora se baja por
+  lotes de 120 (nueva ruta /api/teselas/lote), tres a la vez; si el
+  servidor no sabe dar lotes, se vuelve a la descarga de una en una.
+- **Relieve de cerca sin cobertura.** El paquete apenas traía el relieve
+  z12 (3 teselas), que es el que usa la forma del terreno: sin cobertura
+  el monte de cerca salía plano. Ahora entra el de toda la zona de misión.
+- **Relieve menos exagerado (×1,5, era ×2,2).** Con 2,2, cerca de un monte
+  la cámara quedaba dentro del relieve y MapLibre le bajaba a la fuerza la
+  inclinación y el zoom: saltos al ampliar y centrado descolocado.
+
+
 
 - **Las fotos de cada nodo, en un montón al lado de su base.** No se veían
   hasta ampliar mucho (zoom 18) y entonces salían en fila, pequeñas y encima
