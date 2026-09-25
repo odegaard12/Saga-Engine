@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.29.1
+## 5.29.2
+
+- **Centrado exacto también al volver de "ver la ruta".** Medido con un
+  móvil simulado en la ruta real: tras ver la ruta (centro en un alto) y
+  volver a ti, el centro del mapa estaba en tus coordenadas pero tú salías
+  100 px más abajo, porque MapLibre dejaba la cámara con la altura del
+  terreno del sitio anterior. Al acabar cada movimiento se iguala la altura
+  del centro con la del terreno.
+
+
 
 - **"Centrar en mí" ya centra.** El precalentado de la pantalla de carga
   (pasa por varios zooms y vuelve) seguía moviendo la cámara si la carga se
