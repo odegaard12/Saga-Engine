@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.29.2
+## 5.29.3
+
+- **Las fotos de cada nodo, en un montón al lado de su base.** No se veían
+  hasta ampliar mucho (zoom 18) y entonces salían en fila, pequeñas y encima
+  del camino. Ahora cada nodo con fotos lleva un montón con la primera y
+  cuántas hay, que crece con el nodo y se ve desde lejos; al tocarlo se
+  abren todas en grande. Las fotos sueltas por el campo, como antes.
+
+
 
 - **Centrado exacto también al volver de "ver la ruta".** Medido con un
   móvil simulado en la ruta real: tras ver la ruta (centro en un alto) y

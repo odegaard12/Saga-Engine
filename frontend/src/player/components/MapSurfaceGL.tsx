@@ -173,6 +173,17 @@ const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
   19.5, ['*', 1.15, SIN_ESCALON],
 ]
 
+/** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
+const CAPA_FOTOS_PILA = 'saga-fotos-pila-capa'
+/**
+ * El montón crece con el nodo (la mitad que él): así queda pegado a su base a
+ * cualquier zoom. A la derecha de la peana, de pie en el suelo.
+ */
+const TAMANO_PILA: maplibregl.ExpressionSpecification = [
+  'interpolate', ['exponential', 1.15], ['zoom'],
+  12, ['*', 0.3, SIN_ESCALON],
+  19.5, ['*', 1.8, SIN_ESCALON],
+]
 /** Desde qué zoom se reparten las fotos de un mismo sitio. */
 const ZOOM_FOTOS_REPARTIDAS = 18
 /** Cuántas fotos de un mismo sitio se enseñan repartidas; el visor las tiene todas. */
@@ -664,6 +675,76 @@ function dibujarHalo(centroY = 92 - 8 - 34 - 21, ancho = 64, alto = 92): ImageDa
  * Sin imagen (aún cargando, o fallida) deja el marco con un gris neutro:
  * el sitio se ve igual, la foto llega cuando llega.
  */
+/**
+ * El montón de fotos de un nodo: dos tarjetas detrás, la primera foto
+ * delante y cuántas hay. Antes las de un nodo no se veían hasta el zoom 18 y
+ * entonces salían en fila, pequeñas y encima del camino ("se ven mal").
+ */
+function dibujarPila(imagen: HTMLImageElement | null, cuantas: number): ImageData | null {
+  const lado = 64
+  const lienzo = document.createElement('canvas')
+  lienzo.width = lado * 2
+  lienzo.height = lado * 2
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(2, 2)
+  const tarjeta = (angulo: number, dx: number, dy: number) => {
+    ctx.save()
+    ctx.translate(30 + dx, 36 + dy)
+    ctx.rotate((angulo * Math.PI) / 180)
+    ctx.beginPath()
+    ctx.roundRect(-21, -21, 42, 42, 7)
+    ctx.fillStyle = '#e2e8f0'
+    ctx.shadowColor = 'rgba(0,0,0,.4)'
+    ctx.shadowBlur = 5
+    ctx.shadowOffsetY = 2
+    ctx.fill()
+    ctx.restore()
+  }
+  if (cuantas > 2) tarjeta(-12, -4, 1)
+  if (cuantas > 1) tarjeta(9, 4, 0)
+  // La de delante, con la foto.
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(8, 14, 44, 44, 8)
+  ctx.fillStyle = '#f8fafc'
+  ctx.shadowColor = 'rgba(0,0,0,.45)'
+  ctx.shadowBlur = 6
+  ctx.shadowOffsetY = 2
+  ctx.fill()
+  ctx.restore()
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(11, 17, 38, 38, 6)
+  ctx.clip()
+  if (imagen) {
+    const escala = Math.max(38 / imagen.width, 38 / imagen.height)
+    const w = imagen.width * escala
+    const h = imagen.height * escala
+    ctx.drawImage(imagen, 11 + (38 - w) / 2, 17 + (38 - h) / 2, w, h)
+  } else {
+    ctx.fillStyle = '#94a3b8' // no-tema: color horneado en la imagen del montón
+    ctx.fillRect(11, 17, 38, 38)
+  }
+  ctx.restore()
+  // Cuántas.
+  if (cuantas > 1) {
+    ctx.beginPath()
+    ctx.arc(50, 15, 11, 0, Math.PI * 2)
+    ctx.fillStyle = '#0f172a' // no-tema: color horneado en la imagen del montón
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = '#ffffff'
+    ctx.stroke()
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '800 12px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(cuantas > 99 ? '99+' : String(cuantas), 50, 15.5)
+  }
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
 function dibujarFoto(imagen: HTMLImageElement | null): ImageData | null {
   const lado = 48
   const ancho = 60
@@ -1130,6 +1211,8 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_FOTOS,
         type: 'symbol',
         source: FUENTE_FOTOS,
+        // Las de los nodos van en su montón (CAPA_FOTOS_PILA).
+        filter: ['!=', ['get', 'tipo'], 'pila'],
         layout: {
           'symbol-height-offset': ALTURA_SIMBOLOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1148,18 +1231,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-offset': ['step', ['zoom'], ['literal', [0, 0]], ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS],
           'symbol-sort-key': ['get', 'orden'],
         },
-        /**
-         * De lejos, sólo la primera de cada sitio en campo abierto, y NINGUNA
-         * de las de un nodo: apiladas en su punto quedaban clavadas en el
-         * poste ("de lejos quedan fatal"). Desde el zoom 18 salen todas,
-         * repartidas bajo el nodo.
-         */
+        // De lejos, sólo la primera de cada sitio; desde el zoom 18, todas repartidas.
         paint: {
-          'icon-opacity': [
-            'step', ['zoom'],
-            ['case', ['all', ['==', ['get', 'orden'], 0], ['!=', ['get', 'enNodo'], true]], 1, 0],
-            ZOOM_FOTOS_REPARTIDAS, 1,
-          ],
+          'icon-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'orden'], 0], 1, 0], ZOOM_FOTOS_REPARTIDAS, 1],
         },
       },
       {
@@ -1203,6 +1277,25 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-size': TAMANO_NODOS,
           // El nodo en juego se pinta el último: queda encima si se solapan.
           'symbol-sort-key': ['get', 'orden'],
+        },
+      },
+      {
+        // Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`).
+        id: CAPA_FOTOS_PILA,
+        type: 'symbol',
+        source: FUENTE_FOTOS,
+        filter: ['==', ['get', 'tipo'], 'pila'],
+        layout: {
+          'symbol-height-offset': ALTURA_NODOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'bottom-left',
+          'icon-offset': [48, -4],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_PILA,
         },
       },
       {
@@ -1435,6 +1528,25 @@ export function MapSurfaceGL({
       if (evento.id === ICONO_AVATAR) {
         if (mapa.hasImage(ICONO_AVATAR)) return
         pintarAvatar(mapa, fichaRef.current)
+        return
+      }
+      const pila = /^pila-(.+)-(\d+)$/.exec(evento.id)
+      if (pila) {
+        if (mapa.hasImage(evento.id)) return
+        const cuantas = Number(pila[2])
+        const vacio = dibujarPila(null, cuantas)
+        if (vacio) mapa.addImage(evento.id, vacio, { pixelRatio: 2 })
+        const url = fotosPorIconoRef.current.get(`foto-${pila[1]}`)
+        if (!url) return
+        const imagen = new Image()
+        imagen.crossOrigin = 'anonymous'
+        imagen.onload = () => {
+          const lista = dibujarPila(imagen, cuantas)
+          if (!lista || !mapaRef.current) return
+          if (mapa.hasImage(evento.id)) mapa.updateImage(evento.id, lista)
+          else mapa.addImage(evento.id, lista, { pixelRatio: 2 })
+        }
+        imagen.src = url
         return
       }
       if (evento.id.startsWith('foto-')) {
@@ -1918,10 +2030,18 @@ export function MapSurfaceGL({
     })
 
     mapa.on('click', CAPA_FOTOS, (evento) => {
-      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number; enNodo?: boolean } | undefined
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
-      // Las de un nodo no se ven de lejos: tocar el nodo no puede abrirlas.
-      if (props.enNodo === true && mapa.getZoom() < ZOOM_FOTOS_REPARTIDAS) return
+      // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
+      // visor ya sabe pasarlas-, empezando por la que se ha tocado.
+      const grupo = gruposFotosRef.current[props.grupo] || []
+      const tocada = grupo.findIndex((foto) => String(foto.id) === String(props.id))
+      const ordenadas = tocada > 0 ? [...grupo.slice(tocada), ...grupo.slice(0, tocada)] : grupo
+      if (ordenadas.length) abrirFotosRef.current?.(ordenadas)
+    })
+    mapa.on('click', CAPA_FOTOS_PILA, (evento) => {
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
+      if (!props || typeof props.grupo !== 'number') return
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2479,14 +2599,29 @@ export function MapSurfaceGL({
     pintarFuente(FUENTE_FOTOS, {
       type: 'FeatureCollection',
       features: grupos.flatMap((grupo, indiceGrupo) => {
+        if (grupo.nodo >= 0) {
+          // Las de un nodo: un solo montón con la primera y cuántas hay.
+          return [
+            {
+              type: 'Feature' as const,
+              properties: {
+                tipo: 'pila',
+                icono: `pila-${grupo.fotos[0].id}-${grupo.fotos.length}`,
+                id: grupo.fotos[0].id,
+                grupo: indiceGrupo,
+              },
+              geometry: { type: 'Point' as const, coordinates: [grupo.lon, grupo.lat] },
+            },
+          ]
+        }
         const vistas = grupo.fotos.slice(0, MAX_FOTOS_GRUPO)
         return vistas.map((foto, indice) => ({
           type: 'Feature' as const,
           properties: {
+            tipo: 'foto',
             icono: `foto-${foto.id}`,
             id: foto.id,
             grupo: indiceGrupo,
-            enNodo: grupo.nodo >= 0,
             hueco: `${grupo.nodo >= 0 ? 1 : 0}-${vistas.length}-${indice}`,
             orden: indice,
           },

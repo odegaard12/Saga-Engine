@@ -485,7 +485,7 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
     assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
-    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 5
+    assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 6
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
     assert "samples: muestrasMaximas()" in capa and "renderer.render(escenaVolcado, camaraVolcado)" in capa
@@ -607,7 +607,10 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     # Fotos repartidas por sitio y encima del halo, debajo del nodo.
     # ...pero sólo de muy cerca: de lejos, juntas y se ve una.
     assert "ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS]" in fonte
-    assert "['!=', ['get', 'enNodo'], true]" in fonte and "props.enNodo === true && mapa.getZoom() < ZOOM_FOTOS_REPARTIDAS" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    # Las de un nodo: un montón con cuántas hay, al lado de la base, a cualquier
+    # zoom; al tocarlo se abren todas. Ocultas hasta z18 "no se veían".
+    assert "id: CAPA_FOTOS_PILA" in fonte and "icono: `pila-${grupo.fotos[0].id}-${grupo.fotos.length}`" in fonte
+    assert "mapa.on('click', CAPA_FOTOS_PILA, (evento) => {" in fonte and "function dibujarPila(" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
     # El nodo en juego marca su radio de entrada REAL (base 2 = tamaño del mapa).
     assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': TAMANO_ENTRADA," in fonte
     assert "'interpolate', ['exponential', 2], ['zoom']" in fonte
