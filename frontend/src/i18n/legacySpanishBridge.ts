@@ -1,6 +1,17 @@
 import { getLocale } from './index'
 
-const sources = new WeakMap<Text, string>()
+/**
+ * Por cada texto: su ORIGINAL y lo último que escribió este puente.
+ *
+ * Antes se guardaba sólo el original de la primera vez, y cuando React
+ * cambiaba el texto (un contador, un estado, «pidiendo…» → «HTTP 200»), el
+ * puente lo devolvía a aquel original: la pantalla se quedaba congelada con
+ * el primer valor aunque React tuviera el nuevo. Ahora, si el texto ya no es
+ * el que escribimos nosotros, es que lo ha cambiado React y ese pasa a ser el
+ * original.
+ */
+const sources = new WeakMap<Text, { source: string; escrito: string }>()
+const atributos = new WeakMap<Element, Record<string, { source: string; escrito: string }>>()
 
 const ES: Record<string, string> = {
   'Locked / success copy': 'Mensaje de bloqueo / éxito',
@@ -461,15 +472,17 @@ function translateNode(text: Text) {
   if (shouldSkip(text)) return
 
   const current = text.nodeValue || ''
-  const source = sources.get(text) || current
-
-  if (!sources.has(text)) {
-    sources.set(text, source)
+  let registro = sources.get(text)
+  if (!registro || current !== registro.escrito) {
+    registro = { source: current, escrito: current }
+    sources.set(text, registro)
   }
+  const source = registro.source
 
   const locale = getLocale()
   if (locale === 'en') {
-    if (text.nodeValue !== source) text.nodeValue = source
+    if (current !== source) text.nodeValue = source
+    registro.escrito = source
     return
   }
 
@@ -479,7 +492,11 @@ function translateNode(text: Text) {
 
   const prefix = source.match(/^\s*/)?.[0] || ''
   const suffix = source.match(/\s*$/)?.[0] || ''
-  text.nodeValue = `${prefix}${target}${suffix}`
+  const nuevo = `${prefix}${target}${suffix}`
+  // Sólo si cambia: reescribir el mismo texto disparaba el observador y el
+  // puente recorría la página entera en CADA fotograma, para siempre.
+  if (nuevo !== current) text.nodeValue = nuevo
+  registro.escrito = nuevo
 }
 
 function translateAttributes() {
@@ -488,21 +505,22 @@ function translateAttributes() {
       const current = element.getAttribute(attr)
       if (!current) continue
 
-      const sourceAttr = `data-saga-i18n-${attr}`
-      const source = element.getAttribute(sourceAttr) || current
-
-      if (!element.hasAttribute(sourceAttr)) {
-        element.setAttribute(sourceAttr, source)
+      const porAtributo = atributos.get(element) || {}
+      atributos.set(element, porAtributo)
+      let registro = porAtributo[attr]
+      // Cambiado por React (p. ej. la etiqueta de un botón que alterna): nuevo original.
+      if (!registro || current !== registro.escrito) {
+        registro = { source: current, escrito: current }
+        porAtributo[attr] = registro
       }
+      const source = registro.source
 
       const locale = getLocale()
-      if (locale === 'en') {
-        element.setAttribute(attr, source)
-        continue
-      }
-
-      const translated = translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
-      if (translated) element.setAttribute(attr, translated)
+      const translated =
+        locale === 'en' ? source : translateText(source) || (locale === 'es' ? GL_TO_ES[source] || source : null)
+      // Sólo si cambia: escribir lo mismo vuelve a disparar el observador.
+      if (translated && translated !== current) element.setAttribute(attr, translated)
+      if (translated) registro.escrito = translated
     }
   })
 }
