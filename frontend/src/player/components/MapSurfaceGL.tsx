@@ -1148,8 +1148,19 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
           'icon-offset': ['step', ['zoom'], ['literal', [0, 0]], ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS],
           'symbol-sort-key': ['get', 'orden'],
         },
-        // De lejos, sólo la primera de cada sitio; el toque abre todas.
-        paint: { 'icon-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'orden'], 0], 1, 0], ZOOM_FOTOS_REPARTIDAS, 1] },
+        /**
+         * De lejos, sólo la primera de cada sitio en campo abierto, y NINGUNA
+         * de las de un nodo: apiladas en su punto quedaban clavadas en el
+         * poste ("de lejos quedan fatal"). Desde el zoom 18 salen todas,
+         * repartidas bajo el nodo.
+         */
+        paint: {
+          'icon-opacity': [
+            'step', ['zoom'],
+            ['case', ['all', ['==', ['get', 'orden'], 0], ['!=', ['get', 'enNodo'], true]], 1, 0],
+            ZOOM_FOTOS_REPARTIDAS, 1,
+          ],
+        },
       },
       {
         /**
@@ -1868,8 +1879,10 @@ export function MapSurfaceGL({
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
     mapa.on('click', CAPA_FOTOS, (evento) => {
-      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
+      const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number; enNodo?: boolean } | undefined
       if (!props || typeof props.grupo !== 'number') return
+      // Las de un nodo no se ven de lejos: tocar el nodo no puede abrirlas.
+      if (props.enNodo === true && mapa.getZoom() < ZOOM_FOTOS_REPARTIDAS) return
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2432,6 +2445,7 @@ export function MapSurfaceGL({
             icono: `foto-${foto.id}`,
             id: foto.id,
             grupo: indiceGrupo,
+            enNodo: grupo.nodo >= 0,
             hueco: `${grupo.nodo >= 0 ? 1 : 0}-${vistas.length}-${indice}`,
             orden: indice,
           },

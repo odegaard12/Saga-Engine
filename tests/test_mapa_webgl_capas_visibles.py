@@ -598,7 +598,8 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert "['number', ['get', 'escala'], 1]" in fonte and "'icon-size': ['interpolate'" not in fonte
     # Fotos repartidas por sitio y encima del halo, debajo del nodo.
     # ...pero sólo de muy cerca: de lejos, juntas y se ve una.
-    assert "ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS]" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
+    assert "ZOOM_FOTOS_REPARTIDAS, DESPLAZAMIENTO_FOTOS]" in fonte
+    assert "['!=', ['get', 'enNodo'], true]" in fonte and "props.enNodo === true && mapa.getZoom() < ZOOM_FOTOS_REPARTIDAS" in fonte and "gruposFotosRef.current[props.grupo]" in fonte
     # El nodo en juego marca su radio de entrada REAL (base 2 = tamaño del mapa).
     assert "id: CAPA_NODO_ENTRADA" in fonte and "'icon-size': TAMANO_ENTRADA," in fonte
     assert "'interpolate', ['exponential', 2], ['zoom']" in fonte
