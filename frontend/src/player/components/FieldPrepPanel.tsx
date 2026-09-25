@@ -6,6 +6,7 @@ import {
   IconoUbicacion,
 } from './PlayerIcons'
 import { createPortal } from 'react-dom'
+import { useI18n } from '../../i18n/useI18n'
 import type { PlayerGpsStatus } from '../../types/player'
 
 export type EstadoPermiso = 'idle' | 'pidiendo' | 'ok' | 'error'
@@ -46,6 +47,71 @@ interface FieldPrepPanelProps {
  * Centrada y de cristal, como los minijuegos. Sólo enseña lo que falta: una fila
  * por cosa, con su botón. Lo que ya está hecho se resume abajo en una línea.
  */
+/**
+ * Los textos del panel, en los dos idiomas de las misiones.
+ *
+ * Estaban escritos a mano mezclados: unos en gallego ("Movemento", "Seguir
+ * sen iso") y otros en castellano ("Lo denegaste. Ajustes del móvil ›
+ * Safari"). El puente de idioma sólo pasa de gallego a castellano, así que en
+ * una misión en gallego lo que estaba en castellano se quedaba así.
+ */
+const TEXTOS_PANEL = {
+  es: {
+    antetitulo: 'ANTES DE SALIR',
+    todoListo: 'Todo listo',
+    falta: 'Falta',
+    faltan: (n: number) => `Faltan ${n} permisos`,
+    listos: (a: number, b: number) => `${a} de ${b} listos`,
+    misionOffline: 'Misión offline',
+    paraJugarSinCobertura: 'Para jugar sin cobertura',
+    descargando: 'Descargando…',
+    descargar: 'Descargar',
+    ubicacion: 'Ubicación',
+    paraUbicacion: 'Tu flecha y la línea al siguiente nodo',
+    buscando: 'Buscando…',
+    permitir: 'Permitir',
+    movimiento: 'Movimiento',
+    paraMovimiento: 'La brújula y el laberinto',
+    esperando: 'Esperando…',
+    camara: 'Cámara',
+    paraCamara: 'Escanear las pegatinas QR',
+    listo: 'Listo',
+    denegadoIos: 'Lo denegaste. Ajustes › Safari › permisos del sitio.',
+    denegadoOtro: 'Lo denegaste. Toca el candado de la barra de direcciones › Permisos.',
+    seguirSinEso: 'Seguir sin eso',
+  },
+  gl: {
+    antetitulo: 'ANTES DE SAÍR',
+    todoListo: 'Todo listo',
+    falta: 'Falta',
+    faltan: (n: number) => `Faltan ${n} permisos`,
+    listos: (a: number, b: number) => `${a} de ${b} listos`,
+    misionOffline: 'Misión offline',
+    paraJugarSinCobertura: 'Para xogar sen cobertura',
+    descargando: 'Descargando…',
+    descargar: 'Descargar',
+    ubicacion: 'Localización',
+    paraUbicacion: 'A túa frecha e a liña ao seguinte nodo',
+    buscando: 'Buscando…',
+    permitir: 'Permitir',
+    movimiento: 'Movemento',
+    paraMovimiento: 'A brúxula e o labirinto',
+    esperando: 'Agardando…',
+    camara: 'Cámara',
+    paraCamara: 'Escanear as pegatinas QR',
+    listo: 'Listo',
+    denegadoIos: 'Denegáchelo. Axustes › Safari › permisos do sitio.',
+    denegadoOtro: 'Denegáchelo. Toca o cadeado da barra de enderezos › Permisos.',
+    seguirSinEso: 'Seguir sen iso',
+  },
+}
+
+/** iPhone o iPad (también el iPad que se presenta como Mac). */
+function esIos(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 export function FieldPrepPanel({
   visible,
   mobile,
@@ -69,6 +135,8 @@ export function FieldPrepPanel({
    * distinto con su propio portal, no heredó el arreglo. Mismo patrón:
    * se queda montado mientras sale y se desmonta cuando termina.
    */
+  const { locale } = useI18n()
+  const tx = locale === 'gl' ? TEXTOS_PANEL.gl : TEXTOS_PANEL.es
   const [montado, setMontado] = useState(visible)
   const [saliendo, setSaliendo] = useState(false)
 
@@ -125,9 +193,9 @@ export function FieldPrepPanel({
       hecho: hasOfflineMission,
       clave: 'mision',
       icono: <IconoDescarga />,
-      que: 'Misión offline',
-      para: 'Para jugar sin cobertura',
-      etiqueta: offlinePrepState === 'saving' ? 'Descargando…' : 'Descargar',
+      que: tx.misionOffline,
+      para: tx.paraJugarSinCobertura,
+      etiqueta: offlinePrepState === 'saving' ? tx.descargando : tx.descargar,
       accion: onPrepareOfflinePack,
       ocupado: offlinePrepState === 'saving',
       fallo: offlinePrepState === 'error',
@@ -139,9 +207,9 @@ export function FieldPrepPanel({
       hecho: hasBrowserGps,
       clave: 'gps',
       icono: <IconoUbicacion />,
-      que: 'Ubicación',
-      para: 'Tu flecha y la línea al siguiente nodo',
-      etiqueta: browserGpsStatus === 'searching' ? 'Buscando…' : 'Permitir',
+      que: tx.ubicacion,
+      para: tx.paraUbicacion,
+      etiqueta: browserGpsStatus === 'searching' ? tx.buscando : tx.permitir,
       accion: onRequestGps,
       ocupado: browserGpsStatus === 'searching',
       fallo: browserGpsStatus === 'error',
@@ -161,9 +229,9 @@ export function FieldPrepPanel({
       hecho: permisoMovimiento === 'ok',
       clave: 'movimiento',
       icono: <IconoBrujula />,
-      que: 'Movemento',
-      para: 'A brúxula e o labirinto',
-      etiqueta: permisoMovimiento === 'pidiendo' ? 'Esperando…' : 'Permitir',
+      que: tx.movimiento,
+      para: tx.paraMovimiento,
+      etiqueta: permisoMovimiento === 'pidiendo' ? tx.esperando : tx.permitir,
       accion: onRequestMotion,
       ocupado: permisoMovimiento === 'pidiendo',
       fallo: permisoMovimiento === 'error',
@@ -175,9 +243,9 @@ export function FieldPrepPanel({
       hecho: permisoCamara === 'ok',
       clave: 'camara',
       icono: <IconoCamara />,
-      que: 'Cámara',
-      para: 'Escanear as pegatinas QR',
-      etiqueta: permisoCamara === 'pidiendo' ? 'Esperando…' : 'Permitir',
+      que: tx.camara,
+      para: tx.paraCamara,
+      etiqueta: permisoCamara === 'pidiendo' ? tx.esperando : tx.permitir,
       accion: onRequestCamera,
       ocupado: permisoCamara === 'pidiendo',
       fallo: permisoCamara === 'error',
@@ -225,16 +293,16 @@ export function FieldPrepPanel({
             debajo en texto pequeño, que es su sitio: es el detalle. */}
         <header style={cabecera}>
           <div style={{ minWidth: 0 }}>
-            <div style={antetitulo}>ANTES DE SALIR</div>
+            <div style={antetitulo}>{tx.antetitulo}</div>
             <strong style={titulo}>
               {pendientes.length === 0
-                ? 'Todo listo'
+                ? tx.todoListo
                 : pendientes.length === 1
-                  ? `Falta ${pendientes[0].que.toLowerCase()}`
-                  : `Faltan ${pendientes.length} permisos`}
+                  ? `${tx.falta} ${pendientes[0].que.toLowerCase()}`
+                  : tx.faltan(pendientes.length)}
             </strong>
             <div style={recuento}>
-              {listos.length} de {listos.length + pendientes.length} listos
+              {tx.listos(listos.length, listos.length + pendientes.length)}
             </div>
           </div>
 
@@ -268,9 +336,11 @@ export function FieldPrepPanel({
                 }}
               >
                 {f.hecho
-                  ? 'Listo'
+                  ? tx.listo
                   : f.fallo
-                    ? 'Lo denegaste. Ajustes del móvil › Safari.'
+                    ? esIos()
+                      ? tx.denegadoIos
+                      : tx.denegadoOtro
                     : f.para}
               </div>
             </div>
@@ -282,7 +352,7 @@ export function FieldPrepPanel({
              * tarjeta encogia de golpe con el dedo todavia encima.
              */}
             {f.hecho ? (
-              <span style={vistoFila} aria-label="Listo">
+              <span style={vistoFila} aria-label={tx.listo}>
                 ✓
               </span>
             ) : (
@@ -314,7 +384,7 @@ export function FieldPrepPanel({
           >
             {pendientes[0].ocupado
               ? pendientes[0].etiqueta
-              : `Permitir ${pendientes[0].que.toLowerCase()}`}
+              : `${tx.permitir} ${pendientes[0].que.toLowerCase()}`}
           </button>
         ) : null}
 
@@ -322,7 +392,7 @@ export function FieldPrepPanel({
             camino y no todo el mundo la busca: con permisos denegados desde
             los ajustes del movil, esta pantalla era un callejon aparente. */}
         <button type="button" style={botonSecundario} onClick={onDismiss}>
-          Seguir sen iso
+          {tx.seguirSinEso}
         </button>
     </>
   )

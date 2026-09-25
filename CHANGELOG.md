@@ -6,7 +6,16 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.31.0
+## 5.31.1
+
+- **Panel "Antes de salir" en un solo idioma.** Mezclaba gallego
+  ("Movemento", "Seguir sen iso") y castellano ("Lo denegaste…"). Ahora
+  cada texto sale en el idioma de la misión.
+- **El aviso de permiso denegado dice qué tocar según el móvil**: en
+  iPhone, Ajustes › Safari; en Android, el candado de la barra de
+  direcciones › Permisos. Antes decía Safari a todo el mundo.
+
+
 
 Admin: funciones del servidor que el panel no usaba.
 
