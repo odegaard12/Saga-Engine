@@ -1290,6 +1290,14 @@ export function MapSurfaceGL({
   onListoRef.current = onListo
   /** `número-estado-tipo` y posición de cada nodo: lo que se hornea bajo la carga. */
   const nodosParaHornearRef = useRef<{ clave: string; lon: number; lat: number }[]>([])
+  /**
+   * El precalentado en curso (ver `calentar`), para pararlo. Se medía en el
+   * móvil: si la carga se quitaba por tope antes de acabar, la cámara seguía
+   * saltando de zoom delante del jugador y, al final, volvía a donde estaba
+   * al empezar, pisando el "centrar en mí" o el seguimiento del GPS: "no se
+   * centra bien".
+   */
+  const calentadoRef = useRef<{ cancelar: (restaurarZoom: boolean) => void } | null>(null)
   /** Metros al camino cuando estás fuera de él; null cuando vas por él. */
   const [fueraDeTrazado, setFueraDeTrazado] = useState<number | null>(null)
   /** Un gesto del jugador en curso: seguirle ahora le quitaría el mapa de las manos. */
@@ -1759,7 +1767,7 @@ export function MapSurfaceGL({
             // Unos fotogramas de gracia: justo tras mover la cámara, las
             // teselas nuevas aún no se han pedido y "todo cargado" miente.
             if (mapaRef.current && ahora - inicio < 200) return
-            if (!mapaRef.current || vivo.areTilesLoaded() || ahora > fin) {
+            if (!mapaRef.current || cancelado || vivo.areTilesLoaded() || ahora > fin) {
               window.clearInterval(id)
               resolve()
             }
@@ -1771,6 +1779,18 @@ export function MapSurfaceGL({
         pitch: vivo.getPitch(),
         bearing: vivo.getBearing(),
       }
+      let cancelado = false
+      calentadoRef.current = {
+        // Quien mueve el mapa de verdad manda: se deja de saltar y, si es el
+        // propio juego (seguir, encuadrar), se devuelve el zoom antes de que
+        // él ponga el centro.
+        cancelar: (restaurarZoom) => {
+          if (cancelado) return
+          cancelado = true
+          calentadoRef.current = null
+          if (restaurarZoom) vivo.jumpTo({ zoom: camara.zoom, pitch: camara.pitch, bearing: camara.bearing })
+        },
+      }
       // Cada nivel por el que se desampliará, no saltando: el que se salta
       // es el que luego falta (ver `maxTileCacheZoomLevels`).
       const vistas: (() => void)[] = [1, 2, 3, 4.5].map((menos) => () => vivo.jumpTo({ zoom: camara.zoom - menos }))
@@ -1781,11 +1801,12 @@ export function MapSurfaceGL({
         vistas.push(() => vivo.fitBounds(limites, { padding: 70, duration: 0, maxZoom: 16, pitch: camara.pitch }))
       }
       for (const ver of vistas) {
-        if (!mapaRef.current || performance.now() > tope) break
+        if (!mapaRef.current || cancelado || performance.now() > tope) break
         ver()
         await esperarTeselas(2500)
       }
-      if (!mapaRef.current) return
+      if (!mapaRef.current || cancelado) return
+      calentadoRef.current = null
       vivo.jumpTo(camara)
       await esperarTeselas(1500)
     }
@@ -1862,6 +1883,7 @@ export function MapSurfaceGL({
      */
     const alTocar = (evento: { originalEvent?: unknown }) => {
       if (evento.originalEvent) {
+        calentadoRef.current?.cancelar(false)
         gestoRef.current = true
         onUserMapMoveRef.current?.()
       }
@@ -2043,6 +2065,7 @@ export function MapSurfaceGL({
       const anterior = ultimoSeguimientoRef.current
       if (!anterior || metrosEntre(anterior, playerPosition) >= 3) {
         ultimoSeguimientoRef.current = { lat: playerPosition.lat, lon: playerPosition.lon }
+        calentadoRef.current?.cancelar(true)
         mapa.easeTo({
           center: [playerPosition.lon, playerPosition.lat],
           duration: 1400,
@@ -2186,6 +2209,7 @@ export function MapSurfaceGL({
      */
     if (focusRequest.target === 'player' && !playerPosition) return
     ultimoEncuadreRef.current = focusRequest.token
+    calentadoRef.current?.cancelar(true)
 
     if (focusRequest.target === 'route') {
       const nodos = (Array.isArray(missionStages) ? missionStages : []).filter(

@@ -225,6 +225,11 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     # Bajo el velo se hornean los nodos y se pasa por los zooms de alrededor:
     # antes los nodos salían al llegar a la zona y al desampliar había blanco.
     assert "void calentar(vivo).finally(" in fonte and "alFaltarImagen({ id })" in fonte
+    # El precalentado se para si alguien mueve el mapa de verdad (gesto, seguir,
+    # encuadrar) y entonces NO devuelve la cámara a donde estaba: pisaba el
+    # "centrar en mí" cuando la carga se quitaba por tope antes de acabar.
+    assert fonte.count("calentadoRef.current?.cancelar(true)") == 2 and "calentadoRef.current?.cancelar(false)" in fonte
+    assert "if (!mapaRef.current || cancelado) return" in fonte
     assert "fadeDuration: 0" in fonte and "cancelPendingTileRequestsWhileZooming: false" in fonte
     # El trazado llega hasta el nodo aunque el track se grabara a unos metros.
     assert fonte.count("cerrarTramo(leerTrackDelNodo(") == 2
