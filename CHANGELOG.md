@@ -6,7 +6,14 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.30.0
+## 5.30.1
+
+- **Sin halos en los nodos completados ni en los pendientes.** Su halo de
+  color en el suelo "quedaba fatal sobre el terreno". Ahora sólo llevan la
+  sombra de contacto, y el único halo es el del nodo que toca: su radio
+  real de entrada.
+
+
 
 - **Primera carga del mapa mucho más rápida.** El paquete offline (unas
   3.000 teselas) se bajaba tesela a tesela, y cada una tardaba ~0,7 s en ir
