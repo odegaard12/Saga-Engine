@@ -6,7 +6,19 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.28.6
+## 5.28.7
+
+- **Textos que no se actualizaban, en toda la app.** El puente de idioma
+  (traduce los textos de la página por detrás de React) guardaba el texto
+  de la primera vez y, cuando React lo cambiaba, lo devolvía a aquel: un
+  estado, un contador o la etiqueta de un botón que alterna se quedaban
+  congelados con el primer valor. Ahora acepta el texto nuevo.
+- **Un bucle que no paraba.** El mismo puente reescribía cada texto aunque
+  fuera igual, eso volvía a dispararlo y recorría la página entera en cada
+  fotograma, siempre. Ahora sólo escribe si cambia: menos trabajo para el
+  móvil y más fluidez.
+
+
 
 - **Fotos de los nodos, sólo de cerca.** De lejos quedaban apiladas y
   clavadas en el poste del nodo. Ahora no se ven hasta el zoom 18, donde
