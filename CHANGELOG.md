@@ -6,7 +6,17 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.29.0
+## 5.29.1
+
+- **"Centrar en mí" ya centra.** El precalentado de la pantalla de carga
+  (pasa por varios zooms y vuelve) seguía moviendo la cámara si la carga se
+  quitaba por tope antes de acabar, y al terminar devolvía la cámara a
+  donde estaba al empezar: pisaba el centrado y el seguimiento del GPS, y
+  al entrar el jugador podía quedar fuera de la pantalla. Ahora se para en
+  cuanto tocas el mapa, pides encuadrar o el GPS te sigue, y no restaura
+  nada.
+
+
 
 Repaso del panel de administración, que estaba abandonado:
 
