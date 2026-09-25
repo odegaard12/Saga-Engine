@@ -230,6 +230,9 @@ def test_o_velo_espera_a_que_o_mapa_pinte(fonte: str) -> None:
     # "centrar en mí" cuando la carga se quitaba por tope antes de acabar.
     assert fonte.count("calentadoRef.current?.cancelar(true)") == 2 and "calentadoRef.current?.cancelar(false)" in fonte
     assert "if (!mapaRef.current || cancelado) return" in fonte
+    # Tras cada movimiento, la altura del centro se iguala a la del terreno:
+    # MapLibre dejaba la de antes y el jugador salía 100 px bajo el centro.
+    assert "if (Math.abs(mapa.getCenterElevation() - real) > 2) mapa.setCenterElevation(real)" in fonte
     assert "fadeDuration: 0" in fonte and "cancelPendingTileRequestsWhileZooming: false" in fonte
     # El trazado llega hasta el nodo aunque el track se grabara a unos metros.
     assert fonte.count("cerrarTramo(leerTrackDelNodo(") == 2

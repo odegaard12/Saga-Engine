@@ -1900,6 +1900,23 @@ export function MapSurfaceGL({
     document.addEventListener('visibilitychange', vigilarEstilo)
     const relojVigilante = window.setInterval(vigilarEstilo, 4000)
 
+    /**
+     * Al acabar cada movimiento, la altura del centro = la del terreno ahí.
+     *
+     * Medido en el móvil simulado: tras "ver la ruta" (centro en un alto,
+     * 943 m con la exageración) y volver a ti (886 m), MapLibre dejaba la
+     * cámara con la altura del centro de antes. El centro estaba en tus
+     * coordenadas, pero tú salías 100 px más abajo: "centra, pero se mueve
+     * más hacia arriba de más". Con la altura corregida quedas en el centro
+     * exacto. Si ya coincide (lo normal), no se toca nada.
+     */
+    mapa.on('moveend', () => {
+      if (!mapa.getTerrain()) return
+      const real = mapa.queryTerrainElevation(mapa.getCenter())
+      if (real == null || !Number.isFinite(real)) return
+      if (Math.abs(mapa.getCenterElevation() - real) > 2) mapa.setCenterElevation(real)
+    })
+
     mapa.on('click', CAPA_FOTOS, (evento) => {
       const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number; enNodo?: boolean } | undefined
       if (!props || typeof props.grupo !== 'number') return
