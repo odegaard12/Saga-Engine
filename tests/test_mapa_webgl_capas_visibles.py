@@ -248,7 +248,7 @@ def test_as_xemelas_de_relevo_van_despois_do_corredor() -> None:
     assert fonte.index("'corridor-z17'") < fonte.index("Relieve: las gemelas de lo que ya se va a bajar")
     # Teselas de 256 px: el mapa pide un nivel MÁS que el zoom que enseña.
     assert "'mission-z15'" in fonte and "'mission-z16'" in fonte and "'node-z19'" in fonte
-    assert "plan: 4," in fonte
+    assert "plan: 5," in fonte
 
 
 def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
@@ -263,7 +263,9 @@ def test_o_paquete_offline_ten_niveis_por_distancia() -> None:
         assert etiqueta in fonte, "falta el nivel %s" % etiqueta
     # Relieve de z8 arriba (región, comarca, misión, corredor). Se decidió
     # con el enlace dado días antes para bajar en casa: pesa ~50 MB más.
-    assert "if (!/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue" in fonte
+    assert "if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue" in fonte
+    # El relieve z12 (el que usa la forma del terreno) entra también desde "entorno".
+    assert "const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')" in fonte
     assert "const MAX_TILE_URLS = 8000" in fonte, (
         "con 1500 el corredor y el detalle de nodos se quedaban fuera por orden de llegada"
     )

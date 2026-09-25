@@ -5,7 +5,10 @@ Segunda tajada de sacar las rutas de `main.py`. Estas ya no son sólo ficheros
 —leen la configuración de la misión y las fichas de jugador— pero siguen sin
 tocar la partida de nadie: ninguna cambia el estado del juego.
 """
+import asyncio
 import base64
+import re
+import struct
 
 from pathlib import Path
 
@@ -323,6 +326,102 @@ async def dem_tile_proxy(z: int, x: int, y: int):
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Teselas en lote: el paquete offline de una vez, no tesela a tesela
+# ---------------------------------------------------------------------------
+_RE_TESELA_LOTE = re.compile(r"^/(map-tiles|dem-tiles)/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$")
+_MAX_TESELAS_LOTE = 200
+
+
+async def _tesela_para_lote(cliente, tipo: str, z: int, x: int, y: int):
+    """(bytes, tipo) de la caché en disco de la Pi o del origen; None si no hay."""
+    if tipo == "map-tiles":
+        if z < 0 or z > 19:
+            return None
+        ruta_binario, ruta_tipo = _tile_cache_paths(z, x, y)
+        url = "%s/%s/%s/%s" % (_BASE_TESELAS, z, y, x)
+        tipo_defecto = "image/jpeg"
+    else:
+        if z < 0 or z > 15:
+            return None
+        ruta_binario, ruta_tipo = _dem_cache_paths(z, x, y)
+        url = "%s/%s/%s/%s.png" % (_BASE_RELIEVE, z, x, y)
+        tipo_defecto = "image/png"
+
+    if ruta_binario.exists():
+        try:
+            tipo_leido = ruta_tipo.read_text(encoding="utf-8").strip() if ruta_tipo.exists() else ""
+            return ruta_binario.read_bytes(), tipo_leido or tipo_defecto
+        except OSError:
+            pass
+
+    if cliente is None:
+        return None
+    resp = await cliente.get(url, headers=_CABECERAS_TESELAS, follow_redirects=True)
+    if resp.status_code != 200:
+        return None
+    tipo_respuesta = resp.headers.get("Content-Type", tipo_defecto)
+    try:
+        ruta_binario.parent.mkdir(parents=True, exist_ok=True)
+        ruta_binario.write_bytes(resp.content)
+        ruta_tipo.write_text(tipo_respuesta, encoding="utf-8")
+    except OSError:
+        pass
+    return resp.content, tipo_respuesta
+
+
+@router.post("/api/teselas/lote", include_in_schema=False)
+async def teselas_en_lote(request: Request):
+    """Hasta 200 teselas (imagen o relieve) en UNA respuesta.
+
+    El paquete offline son unas 3.000 teselas y cada una, pedida suelta por
+    el túnel de Cloudflare, tarda ~0,7 s en ir y volver: medido en
+    sagagia.es, más de 20 minutos la primera vez en un móvil nuevo, aunque la
+    Pi las sirve de su disco en 60 ms. En lote son unas 25 peticiones.
+
+    Formato binario, little-endian: b"SAGT", u32 número de teselas, y por
+    cada una: u16 + ruta, u16 + tipo, u32 + datos (0 bytes si no hay).
+    """
+    import main
+
+    try:
+        datos = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid JSON body")
+    lista = datos.get("teselas") if isinstance(datos, dict) else None
+    if not isinstance(lista, list) or len(lista) > _MAX_TESELAS_LOTE:
+        raise HTTPException(status_code=400, detail="teselas: lista de hasta %d rutas" % _MAX_TESELAS_LOTE)
+
+    pedidas = []
+    for ruta in lista:
+        trozos = _RE_TESELA_LOTE.match(str(ruta))
+        if trozos:
+            pedidas.append((str(ruta), trozos.group(1), int(trozos.group(2)), int(trozos.group(3)), int(trozos.group(4))))
+
+    semaforo = asyncio.Semaphore(8)
+
+    async def una(cliente, pedida):
+        async with semaforo:
+            try:
+                return pedida[0], await _tesela_para_lote(cliente, *pedida[1:])
+            except Exception:
+                return pedida[0], None
+
+    if main._HTTPX_AVAILABLE:
+        async with main._httpx.AsyncClient(timeout=10.0) as cliente:
+            resultados = await asyncio.gather(*(una(cliente, pedida) for pedida in pedidas))
+    else:
+        resultados = await asyncio.gather(*(una(None, pedida) for pedida in pedidas))
+
+    partes = [b"SAGT", struct.pack("<I", len(resultados))]
+    for ruta, resultado in resultados:
+        ruta_b = ruta.encode("utf-8")
+        tipo_b = (resultado[1] if resultado else "").encode("utf-8")
+        cuerpo = resultado[0] if resultado else b""
+        partes += [struct.pack("<H", len(ruta_b)), ruta_b, struct.pack("<H", len(tipo_b)), tipo_b, struct.pack("<I", len(cuerpo)), cuerpo]
+    return Response(content=b"".join(partes), media_type="application/octet-stream", headers={"Cache-Control": "no-store"})
 
 
 @router.api_route("/sw.js", methods=["GET", "HEAD"])

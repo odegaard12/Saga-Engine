@@ -1355,7 +1355,13 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
        * exacta, desde el aire, casi no se aprecia. Subirlo más convierte
        * el monte en una sierra que no existe.
        */
-      terrain: { source: FUENTE_RELIEVE, exaggeration: 2.2 },
+      /**
+       * Exageración 1,5 (era 2,2). Con 2,2, cerca de un monte la cámara -que
+       * va unos 470 m por detrás de ti a zoom 17- quedaba DENTRO del relieve
+       * y MapLibre le bajaba a la fuerza la inclinación y el zoom (medido: de
+       * 55° a 15°), con saltos al ampliar y el centrado descolocado.
+       */
+      terrain: { source: FUENTE_RELIEVE, exaggeration: 1.5 },
   }
 }
 

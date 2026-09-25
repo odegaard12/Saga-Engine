@@ -168,7 +168,10 @@ const FIRMA_DEL_PLAN = JSON.stringify({
   // 4: la red de caminos entra en el paquete (ver descargarRedDeCaminos).
   // Sin subir esto, quien ya tenía el mapa se saltaba la pantalla de carga
   // y la red se bajaba mientras jugaba: la guía tardaba un minuto.
-  plan: 4,
+  // 5: relieve z12 de la zona de misión. La FORMA del terreno usa sólo
+  // hasta z12 (ver la fuente de relieve en MapSurfaceGL) y el paquete casi
+  // no lo traía (3 teselas): sin cobertura, el monte de cerca salía plano.
+  plan: 5,
 })
 
 function metersPerTile(lat: number, zoom: number) {
@@ -470,8 +473,6 @@ async function fetchAndCacheUrls(
 
   let saved = 0
   let completed = 0
-  let index = 0
-  const workers = 6
 
   onProgress?.({
     label: 'Mapa offline',
@@ -480,46 +481,110 @@ async function fetchAndCacheUrls(
     detail: `Descargando ${faltan.length} teselas`,
   })
 
-  async function worker() {
-    while (index < faltan.length) {
-      const url = faltan[index]
-      index += 1
+  const avisar = () =>
+    onProgress?.({
+      label: 'Mapa offline',
+      done: completed,
+      total: faltan.length,
+      detail: `${completed} de ${faltan.length} trozos · ${saved} guardados`,
+    })
 
-      try {
-        const request = new Request(url, {
-          method: 'GET',
-          mode: 'no-cors',
-          cache: 'reload',
-        })
-
-        const response = await fetch(request)
-        await cache.put(request, response.clone())
-        saved += 1
-      } catch {
-        // Best effort. Offline shell still works without every tile.
-      } finally {
-        completed += 1
-
-        // De cinco en cinco, no de cien en cien.
-        //
-        // El aviso salía cada 100 trozos, así que la pantalla se quedaba
-        // clavada en el mismo número un buen rato y luego pegaba un salto. En
-        // la primera descarga —que son más de mil trozos y varios minutos en el
-        // móvil— eso es justo lo que hace pensar que se ha colgado.
-        if (completed === faltan.length || completed % 5 === 0) {
-          onProgress?.({
-            label: 'Mapa offline',
-            done: completed,
-            total: faltan.length,
-            detail: `${completed} de ${faltan.length} trozos · ${saved} guardados`,
-          })
-          await new Promise(resolve => setTimeout(resolve, 0))
+  /**
+   * De una en una: sólo si el servidor no sabe dar lotes (una versión
+   * vieja) o el lote falla. Seis a la vez.
+   */
+  async function unaAUna(urls: string[]) {
+    let siguiente = 0
+    const trabajador = async () => {
+      while (siguiente < urls.length) {
+        const url = urls[siguiente]
+        siguiente += 1
+        try {
+          const request = new Request(url, { method: 'GET', mode: 'no-cors', cache: 'reload' })
+          const response = await fetch(request)
+          await cache.put(request, response.clone())
+          saved += 1
+        } catch {
+          // Best effort. Offline shell still works without every tile.
+        } finally {
+          completed += 1
+          if (completed === faltan.length || completed % 5 === 0) {
+            avisar()
+            await new Promise((resolve) => setTimeout(resolve, 0))
+          }
         }
       }
     }
+    await Promise.all(Array.from({ length: 6 }, () => trabajador()))
   }
 
-  await Promise.all(Array.from({ length: workers }, () => worker()))
+  /**
+   * Un lote: hasta 120 teselas en una sola petición (ver /api/teselas/lote
+   * en el servidor). Cada tesela suelta tardaba ~0,7 s en ir y volver por
+   * el túnel; medido en un móvil nuevo, más de 20 minutos de primera carga
+   * para 3.000 teselas. Devuelve false si el lote no sirve y hay que ir de
+   * una en una.
+   */
+  async function unLote(urls: string[]): Promise<boolean> {
+    let respuesta: Response
+    try {
+      respuesta = await fetch('/api/teselas/lote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teselas: urls }),
+      })
+    } catch {
+      return false
+    }
+    if (!respuesta.ok) return false
+    const buffer = await respuesta.arrayBuffer()
+    const vista = new DataView(buffer)
+    const texto = new TextDecoder()
+    if (buffer.byteLength < 8 || texto.decode(new Uint8Array(buffer, 0, 4)) !== 'SAGT') return false
+    const cuantas = vista.getUint32(4, true)
+    let o = 8
+    for (let n = 0; n < cuantas; n += 1) {
+      const largoRuta = vista.getUint16(o, true)
+      const ruta = texto.decode(new Uint8Array(buffer, o + 2, largoRuta))
+      o += 2 + largoRuta
+      const largoTipo = vista.getUint16(o, true)
+      const tipo = texto.decode(new Uint8Array(buffer, o + 2, largoTipo))
+      o += 2 + largoTipo
+      const largo = vista.getUint32(o, true)
+      o += 4
+      if (largo > 0) {
+        try {
+          await cache.put(
+            new Request(ruta),
+            new Response(buffer.slice(o, o + largo), {
+              headers: { 'Content-Type': tipo || 'image/png', 'Cache-Control': 'public, max-age=86400' },
+            })
+          )
+          saved += 1
+        } catch {
+          // Una que no entra en la caché no tumba el lote.
+        }
+      }
+      o += largo
+    }
+    completed += urls.length
+    avisar()
+    return true
+  }
+
+  const LOTE = 120
+  const lotes: string[][] = []
+  for (let i = 0; i < faltan.length; i += LOTE) lotes.push(faltan.slice(i, i + LOTE))
+  let siguienteLote = 0
+  const trabajadorDeLotes = async () => {
+    while (siguienteLote < lotes.length) {
+      const lote = lotes[siguienteLote]
+      siguienteLote += 1
+      if (!(await unLote(lote))) await unaAUna(lote)
+    }
+  }
+  // Tres lotes a la vez: la Pi pide lo que no tiene en disco de 8 en 8 por lote.
+  await Promise.all(Array.from({ length: 3 }, () => trabajadorDeLotes()))
   return saved
 }
 
@@ -687,7 +752,10 @@ export async function prefetchMissionMapTiles(
        * la vista de toda Galicia hasta el camino.
        */
       const etiqueta = urls.get(clave) || ''
-      if (!/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
+      // z12 entra también desde el nivel "entorno" (que ya la pone antes que
+      // la zona de misión): es la que usa la forma del terreno.
+      const esEntornoZ12 = z === 12 && etiqueta.startsWith('nivel-entorno')
+      if (!esEntornoZ12 && !/^(mission|corridor|nivel-comarca)/.test(etiqueta)) continue
       const urlRelieve = demTileUrl(z, Number(trozos[2]), Number(trozos[3]))
       if (!urls.has(urlRelieve)) urls.set(urlRelieve, `relieve-z${z}`)
     }
