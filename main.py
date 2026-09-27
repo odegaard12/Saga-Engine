@@ -203,6 +203,14 @@ ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
 INVENTORY_DB = os.path.join(DATA_DIR, "inventory.json")
+# Sospechas de trampa (ver backend/app/runtime/anti_cheat.py): FLAG, no
+# bloqueo. Fichero aparte de events.json porque esto no es un evento de
+# partida, es una anotación para que el organizador la revise.
+ANTI_CHEAT_DB = os.path.join(DATA_DIR, "anti_cheat.json")
+# Racha de tramos consecutivos con velocidad implausible entre nodos, por
+# jugador. Aparte de anti_cheat.json: esto no es una sospecha, es sólo la
+# cuenta que decide si la siguiente lo es (ver check_travel_speed).
+SPEED_STREAK_DB = os.path.join(DATA_DIR, "speed_streak.json")
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -964,6 +972,77 @@ def get_player_stage_time_ms(user, level):
     return _player_timers.get_player_stage_time_ms(TIMERS_DB, user, level)
 
 
+from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
+
+
+def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy):
+    """Velocidad implausible ENTRE NODOS, entre el punto anterior y el nuevo.
+
+    `prev_position` es lo que había en positions.json ANTES de sobreescribir
+    con el latido actual: es exactamente el par consecutivo que hace falta,
+    sin guardar historial aparte.
+
+    El nivel y el total de nodos deciden si "entre nodos" tiene sentido aquí
+    -ver check_travel_speed-: antes de completar el primer nodo (viaje de
+    casa al punto de partida) y con la misión ya acabada no se comprueba
+    nada.
+    """
+    prev = prev_position if isinstance(prev_position, dict) else {}
+    profile_id = str(user or "").strip() or "PLAYER 1"
+    nivel = get_player_progress_level(profile_id, get_player_progress_level(user, 0))
+    total_nodos = len(get_runtime_stages())
+    return _anti_cheat.check_travel_speed(
+        ANTI_CHEAT_DB,
+        SPEED_STREAK_DB,
+        user,
+        prev.get("lat"),
+        prev.get("lon"),
+        prev.get("last_seen"),
+        prev.get("accuracy"),
+        new_lat,
+        new_lon,
+        new_at_s,
+        new_accuracy,
+        level=nivel,
+        total_stages=total_nodos,
+    )
+
+
+def anti_cheat_check_completion_time(user, node, time_spent_ms):
+    return _anti_cheat.check_completion_time(ANTI_CHEAT_DB, user, node, time_spent_ms)
+
+
+def anti_cheat_check_future_timestamp(user, local_created_ms, node_id=None):
+    return _anti_cheat.check_future_timestamp(ANTI_CHEAT_DB, user, local_created_ms, node_id=node_id)
+
+
+def anti_cheat_check_client_reported_exit(user, reason, payload):
+    """Anota lo que el CLIENTE ya detectó y decidió: salir de la app o abrir
+    el selector de tareas mientras había un minijuego en pantalla (ver
+    useAntiTrampas.ts). El servidor no vuelve a decidir nada -no puede: no ve
+    la pantalla del móvil-, sólo deja constancia para el panel.
+    """
+    payload = payload if isinstance(payload, dict) else {}
+    return _anti_cheat.record_suspicion(
+        ANTI_CHEAT_DB,
+        user,
+        reason,
+        {
+            "node_id": payload.get("node_id"),
+            "game_id": payload.get("game_id"),
+            "stage_title": payload.get("stage_title"),
+        },
+    )
+
+
+def list_anti_cheat_suspicions(user=None):
+    return _anti_cheat.list_suspicions(ANTI_CHEAT_DB, user)
+
+
+def count_anti_cheat_suspicions():
+    return _anti_cheat.count_suspicions(ANTI_CHEAT_DB)
+
+
 def project_live_profile_status(
     profile, raw=None, now=None, total_nodes=None, timers=None, progress=None
 ):
@@ -1196,6 +1275,18 @@ def apply_synced_player_event(normalized_event, user, profile):
     event = normalized_event if isinstance(normalized_event, dict) else {}
 
     if event.get("type") != "node_completed":
+        # Anti-trampas del CLIENTE durante un minijuego (salir de la app /
+        # abrir el selector de apps: ver useAntiTrampas.ts). Llega por esta
+        # misma cola -no un endpoint aparte- para que funcione también sin
+        # cobertura: es exactamente el mismo camino offline-first que ya usa
+        # cualquier otro evento del jugador.
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        razon = _as_str(payload.get("anti_cheat_reason")).strip()
+        if razon in ("left_app_during_minigame", "opened_app_switcher_during_minigame"):
+            profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
+            anti_cheat_check_client_reported_exit(
+                profile_id, razon, {**payload, "node_id": event.get("node_id") or payload.get("node_id")}
+            )
         return append_event(EVENT_LOG_DB, event)
 
     profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
@@ -1313,6 +1404,16 @@ def apply_synced_player_event(normalized_event, user, profile):
 
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+    # Anti-trampas (ver backend/app/runtime/anti_cheat.py): sólo anota, nunca
+    # bloquea la sincronización. Un evento que llegó por la cola offline es
+    # justo el caso que más hace falta vigilar -nadie estaba mirando en
+    # directo mientras pasaba- y el que más hay que perdonar -sin cobertura
+    # el reloj del móvil y el GPS son los que hay-.
+    anti_cheat_check_completion_time(profile_id, current_node, payload.get("time_spent_ms"))
+    anti_cheat_check_future_timestamp(
+        profile_id, _iso_a_ms(raw_payload.get("local_created_at")) or None, node_id=current_node.get("id")
+    )
 
     # Igual que level_before arriba: un evento de la cola offline puede llegar
     # con este campo corrupto (móvil viejo, IndexedDB a medias...). Sin

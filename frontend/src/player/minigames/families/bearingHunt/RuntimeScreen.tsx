@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 
 type AnyRecord = Record<string, any>
 
@@ -779,6 +780,9 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
       setSensorState('requesting')
 
       if (typeof OrientationCtor.requestPermission === 'function') {
+        // El aviso nativo de permiso no cuenta como "salir de la app" para
+        // el anti-trampas del cliente (ver permissionPromptGuard.ts).
+        avisarPeticionDePermisoPropia()
         const result = await OrientationCtor.requestPermission()
 
         if (result !== 'granted') {

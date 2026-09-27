@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedMotionChallengeMinigame } from '../../core/resolver'
+import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 
 interface Props {
   resolved: ResolvedMotionChallengeMinigame
@@ -435,6 +436,10 @@ async function requestMotionPermission(): Promise<boolean> {
   ).DeviceMotionEvent
 
   if (typeof ctor?.requestPermission === 'function') {
+    // Aviso al anti-trampas del cliente: el blur que puede provocar este
+    // diálogo nativo de permiso no es que el jugador se fuera de la app (ver
+    // permissionPromptGuard.ts).
+    avisarPeticionDePermisoPropia()
     const result = await ctor.requestPermission()
     return result === 'granted'
   }

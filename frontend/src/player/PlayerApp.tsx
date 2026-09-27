@@ -1218,6 +1218,9 @@ export default function PlayerApp() {
   // Última posición conocida para el latido, sin recrear el temporizador.
   const heartbeatPositionRef = useRef<{ lat: number; lon: number } | null>(null)
   const heartbeatSourceRef = useRef<string>('player')
+  // Precisión del fix, en metros. Sólo tiene sentido con GPS real: el modo
+  // de depuración pone la posición a mano, no hay "ruido" que medir.
+  const gpsAccRef = useRef<number | undefined>(undefined)
   heartbeatPositionRef.current =
     localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
   heartbeatSourceRef.current = localDebugPosition
@@ -1225,6 +1228,8 @@ export default function PlayerApp() {
     : browserGpsPosition
       ? 'browser_gps'
       : 'player'
+  gpsAccRef.current =
+    !localDebugPosition && browserGpsFresh ? browserGpsAccuracy ?? undefined : undefined
 
   useEffect(() => {
     if (state.status !== 'ready') return
@@ -1269,6 +1274,7 @@ export default function PlayerApp() {
             ? {
                 lat: effectivePosition.lat,
                 lon: effectivePosition.lon,
+                accuracy: gpsAccRef.current,
                 gps_status: 'ok',
               }
             : {

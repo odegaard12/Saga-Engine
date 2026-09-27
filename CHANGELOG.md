@@ -6,7 +6,39 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.32.1
+## 5.33.1
+
+- **Antitrampas del servidor, revisado.** Velocidad imposible sólo se mira
+  ENTRE NODOS -no en el trayecto de casa al primer nodo, que puede ser en
+  coche- y sólo si se sostiene en 2 tramos consecutivos: un salto suelto de
+  GPS ya no se flaguea. Se quita del todo "nodo completado lejos de su
+  sitio": el GPS en el monte falla demasiado a menudo y acusaba a jugadores
+  honestos. El tiempo mínimo de reto sólo se comprueba en minijuegos -no en
+  checkpoints, QR ni coleccionables, que no tienen partida que jugar- y sube
+  a 5 s.
+- **Antitrampas del cliente, más señales.** `useAntiTrampas.ts` distingue
+  salir de la app (`visibilitychange`/`pagehide`) de abrir el selector de
+  apps sin soltar la pestaña (`blur` sin `hidden`), ignora los avisos de
+  permiso que pide la propia app (cámara, movimiento, GPS), y reporta cada
+  salida al servidor por la misma cola offline-first de siempre para que
+  salga en el panel, en "Sospechas de trampa".
+
+## 5.33.0
+
+- **Antitrampas en el servidor.** Hasta ahora sólo existía en el móvil
+  (salir de la app durante un minijuego). Ahora el servidor MARCA, sin
+  bloquear nunca a nadie: velocidades imposibles entre posiciones (más de
+  40 km/h descontando la precisión del GPS), completar un nodo lejos de
+  él, completar un nodo en menos de 1,5 s y eventos sin cobertura con la
+  hora en el futuro. Las sospechas se ven en el admin, en Actividad ›
+  "Sospechas de trampa". Un jugador honrado con el GPS poco preciso no sale
+  marcado (hay test para eso).
+- El latido del jugador envía también la precisión del GPS, que es lo que
+  permite no castigar a quien tiene mala señal.
+- Revisados carga, cobertura, sincronización y clasificación: sin fallos
+  nuevos reproducibles.
+
+
 
 - **Sincronización sin cobertura que se caía entera.** Si un solo evento de
   la cola traía el tiempo del nodo corrupto (un texto en vez de un número),

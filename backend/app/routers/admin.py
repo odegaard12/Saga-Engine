@@ -309,6 +309,46 @@ async def admin_mission_status(request: Request):
     }
 
 
+@router.post("/api/admin/anti-cheat-flags")
+async def admin_anti_cheat_flags(request: Request):
+    """Sospechas de trampa anotadas por el servidor (ver runtime/anti_cheat.py).
+
+    Sólo lectura: esto NUNCA toca la clasificación por sí solo. El organizador
+    decide caso por caso, a mano, mirando el motivo y la prueba de cada
+    sospecha -no hay aquí ningún botón que la aplique automáticamente-.
+    """
+    import main
+    data = await request.json()
+
+    if not main.admin_request_authorized(request, data):
+        return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
+
+    cfg = main.load_config()
+    perfiles_por_id = {p.get("id"): p for p in main.get_player_profiles(cfg)}
+    sospechas = main.list_anti_cheat_suspicions()
+
+    jugadores = []
+    for profile_id, lista in sospechas.items():
+        if not isinstance(lista, list) or not lista:
+            continue
+        perfil = perfiles_por_id.get(profile_id)
+        jugadores.append({
+            "user": profile_id,
+            "display_name": (perfil or {}).get("display_name") or profile_id,
+            "count": len(lista),
+            # Las más recientes primero: son las que importa mirar primero.
+            "suspicions": list(reversed(lista))[:50],
+        })
+
+    jugadores.sort(key=lambda item: item["count"], reverse=True)
+
+    return {
+        "status": "ok",
+        "server_ts": int(time.time()),
+        "players": jugadores,
+    }
+
+
 @router.post("/api/admin/stages")
 async def get_stages(request: Request):
     import main

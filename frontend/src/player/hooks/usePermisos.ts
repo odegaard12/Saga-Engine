@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { avisarPeticionDePermisoPropia } from '../utils/permissionPromptGuard'
 
 /**
  * Los permisos que la ruta necesita: cámara y movimiento.
@@ -104,6 +105,7 @@ export function usePermisos() {
 
   async function pedirCamara() {
     setCamara('pidiendo')
+    avisarPeticionDePermisoPropia()
 
     try {
       const stream = await navigator.mediaDevices?.getUserMedia({
@@ -135,6 +137,8 @@ export function usePermisos() {
       window.dispatchEvent(new CustomEvent(AVISO_MOVIMIENTO))
       return
     }
+
+    avisarPeticionDePermisoPropia()
 
     try {
       const concedido = (await Orientacion.requestPermission()) === 'granted'

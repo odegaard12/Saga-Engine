@@ -49,7 +49,10 @@ def test_a_clasificacion_segue_chegando():
     c = codigo()
 
     inicio = c.index("const respuesta = await sendHeartbeat")
-    bloque = c[inicio : inicio + 420]
+    # 480, no 420: el latido manda ahora también `accuracy` (ver
+    # backend/app/runtime/anti_cheat.py, comprobación de velocidad
+    # implausible), que alarga un poco el objeto sin mover "equipo: true".
+    bloque = c[inicio : inicio + 480]
 
     assert "equipo: true" in bloque, (
         "el latido sigue trayendo la tabla: es lo que alimenta la clasificación"
