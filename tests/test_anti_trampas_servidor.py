@@ -98,6 +98,7 @@ def _preparar_nodo_minixogo(lat=LAT_BASE, lon=LON_BASE, radius=40, game_id="spar
 def _limpiar_sospechas():
     save_json(main.ANTI_CHEAT_DB, {})
     save_json(main.SPEED_STREAK_DB, {})
+    save_json(main.COMPLETION_TIME_SAMPLES_DB, {})
     save_json(main.MANUAL_POSITION_NOTICE_DB, {})
 
 
@@ -415,50 +416,29 @@ def test_checkpoint_superado_ao_instante_non_se_flaguea(monkeypatch):
     assert main.get_player_progress_level(usuario, 0) == 1
 
 
-# --- Mínimo de tiempo POR FAMILIA de minijuego -------------------------------
+# --- Mínimo de tiempo: suelo conservador + red de seguridad por mediana ----
 
 
-def test_minixogo_con_umbral_baixo_non_se_flaguea_co_tempo_do_seu_propio_umbral(monkeypatch):
-    """spark_radar ('1-2 min') tiene un mínimo mucho más bajo que team_relay
-    ('5-8 min'): 20 s es plausible para el primero."""
+def test_circuito_de_17s_non_se_flaguea(monkeypatch):
+    """logic_circuit medido en la ruta real (~17 s) no puede quedar marcado:
+    muy por encima del suelo genérico de 2 s, sin necesidad de mediana."""
     cliente = _cliente(monkeypatch)
-    _preparar_nodo_minixogo(game_id="spark_radar")
+    _preparar_nodo_minixogo(game_id="logic_circuit")
     _limpiar_sospechas()
-    usuario = "UmbralBaixo"
+    usuario = "Circuito17s"
     main.set_player_progress_level(usuario, 1)
     main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
 
     cliente.post(
         "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 20000, "level_before": 1},
+        json={"user": usuario, "code": "OK", "time_spent_ms": 17000, "level_before": 1},
     )
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
 
 
-def test_minixogo_con_umbral_alto_flaguea_un_tempo_que_o_xenerico_deixaria_pasar(monkeypatch):
-    """team_relay ('5-8 min') exige mucho más que el suelo genérico de 5 s: 20 s
-    sigue siendo demasiado rápido para ese minijuego en concreto."""
-    cliente = _cliente(monkeypatch)
-    _preparar_nodo_minixogo(game_id="team_relay")
-    _limpiar_sospechas()
-    usuario = "UmbralAlto"
-    main.set_player_progress_level(usuario, 1)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
-
-    cliente.post(
-        "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 20000, "level_before": 1},
-    )
-
-    sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
-    assert any(s["reason"] == "completion_faster_than_possible" for s in sospechas)
-    assert sospechas[-1]["evidence"]["min_plausible_ms"] == _anti_cheat.MINIGAME_MIN_DURATION_MS_BY_GAME["team_relay"]
-    assert sospechas[-1]["evidence"]["min_plausible_ms"] > 20000
-
-
 def test_minixogo_sen_entrada_na_taboa_usa_o_suelo_xenerico(monkeypatch):
-    """Un game_id que no está en la tabla no queda sin comprobar: cae en el
+    """Un game_id sin suelo físico propio no queda sin comprobar: cae en el
     suelo genérico de MIN_PLAUSIBLE_STAGE_MS."""
     cliente = _cliente(monkeypatch)
     _preparar_nodo_minixogo(game_id="minixogo_novo_sen_taboa")
@@ -475,6 +455,73 @@ def test_minixogo_sen_entrada_na_taboa_usa_o_suelo_xenerico(monkeypatch):
     sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
     assert any(s["reason"] == "completion_faster_than_possible" for s in sospechas)
     assert sospechas[-1]["evidence"]["min_plausible_ms"] == _anti_cheat.MIN_PLAUSIBLE_STAGE_MS
+
+
+def test_tempo_de_1s_con_mediana_da_mision_en_1_2s_non_se_flaguea(monkeypatch):
+    """Un minijuego cuya mediana real en esta misión ya es de 1-2 s: un nuevo
+    tiempo de 1 s está por debajo del suelo genérico (2 s), pero cerca de lo
+    que de verdad se está viendo aquí -no es sospechoso, es rápido de verdad.
+
+    Las cinco partidas previas (1.2-1.8 s) también quedan por debajo del
+    suelo genérico y sin base propia todavía para juzgarlas -así que se
+    flaguean ellas mismas, como el resto de este minijuego "rápido de serie"-;
+    lo que importa aquí es que quedan REGISTRADAS, y que con esas cinco ya
+    apuntadas, la SEXTA (la que se comprueba) deja de flaguearse."""
+    cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo(game_id="spark_radar")
+    _limpiar_sospechas()
+
+    for i, ms in enumerate([1200, 1400, 1500, 1600, 1800]):
+        jugador = f"Previo{i}"
+        main.set_player_progress_level(jugador, 1)
+        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+        cliente.post(
+            "/api/advance",
+            json={"user": jugador, "code": "OK", "time_spent_ms": ms, "level_before": 1},
+        )
+
+    usuario = "Rapido1s"
+    main.set_player_progress_level(usuario, 1)
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+
+    cliente.post(
+        "/api/advance",
+        json={"user": usuario, "code": "OK", "time_spent_ms": 1000, "level_before": 1},
+    )
+
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+
+def test_tempo_absurdo_de_0_3s_con_mediana_de_20s_si_se_flaguea(monkeypatch):
+    """Con una mediana real de ~20 s en esta misión, 0.3 s sigue siendo
+    absurdo -la red de seguridad no perdona TODO lo que esté bajo el suelo,
+    sólo lo que está cerca de la mediana observada."""
+    cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo(game_id="logic_circuit")
+    _limpiar_sospechas()
+
+    for i, ms in enumerate([18000, 19000, 20000, 21000, 22000]):
+        jugador = f"Normal{i}"
+        main.set_player_progress_level(jugador, 1)
+        main.upsert_live_position_for_user(jugador, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+        cliente.post(
+            "/api/advance",
+            json={"user": jugador, "code": "OK", "time_spent_ms": ms, "level_before": 1},
+        )
+    for i in range(5):
+        assert main.list_anti_cheat_suspicions(f"Normal{i}")[f"Normal{i}"] == []
+
+    usuario = "Absurdo0_3s"
+    main.set_player_progress_level(usuario, 1)
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+
+    cliente.post(
+        "/api/advance",
+        json={"user": usuario, "code": "OK", "time_spent_ms": 300, "level_before": 1},
+    )
+
+    sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
+    assert any(s["reason"] == "completion_faster_than_possible" for s in sospechas)
 
 
 # --- Eventos offline con fecha futura ---------------------------------------

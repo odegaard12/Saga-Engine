@@ -6,6 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.34.1
+
+- **Corrige el mínimo de tiempo de minijuego (regresión de 5.34.0).** La
+  tabla por familia derivaba el umbral de la duración "típica" del catálogo
+  del organizador (p.ej. team_relay ≈66 s), pero con datos reales los
+  circuitos se completaban en ~17 s y otros minijuegos en ~1 s: flagueaba a
+  jugadores honestos. Se sustituye por un suelo único y conservador de 2 s
+  (`MIN_PLAUSIBLE_STAGE_MS`), sin mínimos "por duración típica"; sólo
+  `sequence_code` conserva un suelo propio, y calculado de un límite físico
+  real (nº de pasos de la secuencia del nodo), no de una media. Se añade una
+  red de seguridad basada en datos: con 5 o más partidas ya vistas de ese
+  minijuego en esta misión, sólo se flaguea si el tiempo está por debajo del
+  20 % de la mediana observada, así que un récord rápido pero cercano a
+  otros tiempos reales nunca queda marcado. Se quitan las entradas de
+  `spark_radar` y `team_relay` (prototipos sin cablear en la ruta real).
+  Ningún registro se invalida: sigue siendo FLAG, no bloqueo.
+
 ## 5.34.0
 
 - **Motor antitrampas SAGA Engine: posición manual/debug excluida.** Un
