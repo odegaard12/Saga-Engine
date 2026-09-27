@@ -126,8 +126,12 @@ export type AdminReactOverviewResponse = {
     stages: number
     finished_profiles: number
     family_counts: Record<string, number>
+    /** Mismos nodos, contados por las 5 familias de presentación del admin. */
+    display_family_counts?: Record<string, number>
   }
   families?: Array<{ id: string; label: string }>
+  /** Las 5 familias de presentación del admin (displayFamilies.ts). */
+  display_families?: Array<{ id: string; label: string }>
   stages?: AdminReactOverviewStage[]
   profiles?: AdminReactOverviewProfile[]
   /**

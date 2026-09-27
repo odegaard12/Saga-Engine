@@ -7,6 +7,7 @@ import SimonSaysEditor from './sequenceCode/SimonSaysEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
 import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
+import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
 import {
   type StageLike,
@@ -582,23 +583,58 @@ export default function AdminGameEditor({
                     </button>
                   </div>
 
-                  <div className="saga-guided-v4-catalog-grid">
-                    {gameOptions(showExperimentalGames).map((game) => (
-                      <button
-                        key={game.id}
-                        type="button"
-                        className={selectedGame.id === game.id ? 'active' : ''}
-                        onClick={() => applyGame(game)}
-                      >
-                        <i>{game.icon}</i>
-                        <strong>{game.title}</strong>
-                        <small>{game.summary}</small>
-                        <em className={isExperimentalOrPlanned(game) ? 'warning' : ''}>
-                          {statusLabel(game)} · {offlineLabel(game)} · {game.duration}
-                        </em>
-                      </button>
-                    ))}
-                  </div>
+                  {mode === 'game' && isExperimentalOrPlanned(selectedGame) ? (
+                    <article
+                      className="saga-guided-v4-note wide"
+                      style={{
+                        borderLeft: '3px solid #f59e0b',
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        padding: 14,
+                        borderRadius: 8,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <b>⚠️ {selectedGame.title}: {statusLabel(selectedGame)}</b>
+                      <span>{selectedGame.offlineNote}</span>
+                    </article>
+                  ) : null}
+
+                  {/* Agrupado en las 5 familias del admin: cada juego cae en
+                      exactamente una (ver frontend/src/admin/lib/displayFamilies.ts).
+                      Es solo orden de presentación, no cambia ningún id de juego. */}
+                  {displayFamilyCards.map((familyCard) => {
+                    const gamesInFamily = gameOptions(showExperimentalGames).filter(
+                      (game) => getDisplayFamily(game.id) === familyCard.id
+                    )
+                    if (gamesInFamily.length === 0) return null
+                    return (
+                      <div key={familyCard.id} className="saga-guided-v4-catalog-family wide">
+                        <h4 className="saga-guided-v4-catalog-family-title">
+                          {familyCard.icon} {familyCard.title}
+                        </h4>
+                        <p className="saga-guided-v4-catalog-family-desc">
+                          {familyCard.description}
+                        </p>
+                        <div className="saga-guided-v4-catalog-grid">
+                          {gamesInFamily.map((game) => (
+                            <button
+                              key={game.id}
+                              type="button"
+                              className={selectedGame.id === game.id ? 'active' : ''}
+                              onClick={() => applyGame(game)}
+                            >
+                              <i>{game.icon}</i>
+                              <strong>{game.title}</strong>
+                              <small>{game.summary}</small>
+                              <em className={isExperimentalOrPlanned(game) ? 'warning' : ''}>
+                                {statusLabel(game)} · {offlineLabel(game)} · {game.duration}
+                              </em>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : null}
 

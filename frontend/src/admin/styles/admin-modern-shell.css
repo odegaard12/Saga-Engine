@@ -11228,6 +11228,27 @@ body:has(.admin-game-guide-inline) .saga-build-info--floating {
   padding-right: 4px !important;
 }
 
+.saga-guided-v4-catalog-family {
+  display: grid !important;
+  gap: 6px !important;
+  margin-bottom: 4px !important;
+}
+
+.saga-guided-v4-catalog-family-title {
+  margin: 0 !important;
+  color: #f8fafc !important;
+  font-size: 0.86rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em !important;
+}
+
+.saga-guided-v4-catalog-family-desc {
+  margin: 0 0 2px !important;
+  color: rgba(203, 213, 225, 0.76) !important;
+  font-size: 0.76rem !important;
+  line-height: 1.32 !important;
+}
+
 .saga-guided-v4-choice-grid button,
 .saga-guided-v4-catalog-grid button,
 .saga-guided-v4-review article,

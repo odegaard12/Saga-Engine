@@ -283,11 +283,20 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'motion',
     difficulty: 'Fácil',
     duration: '1-2 min',
-    runtimeStatus: 'runtime_ready',
+    // No 'runtime_ready': el resolver del jugador (resolver.ts) reconoce
+    // circuit_matrix, pero definition.ts de esa familia no tiene caso para
+    // game_id 'spark_radar' -solo tilt_maze/place_mosaic/sequence_code-, así
+    // que la ruta normal de normalización no lo distingue del circuito
+    // genérico. Existe una pantalla propia (families/sparkRadar/RuntimeScreen)
+    // enganchada a mano en FamilyRuntimeHost, pero no está probada de punta a
+    // punta con jugadores reales (ver README de la carpeta y el audit). Se
+    // marca 'runtime_partial' para que no se pueda elegir en un nodo nuevo
+    // desde el selector normal, sin ocultarla si un nodo antiguo ya la usa.
+    runtimeStatus: 'runtime_partial',
     offlineStatus: 'offline_ready',
     completionMethod: 'motion',
     offlineNote:
-      'Todo ocurre en el móvil: no necesita conexión, ni GPS, ni sensores.',
+      'Todo ocurre en el móvil: no necesita conexión, ni GPS, ni sensores. Aviso: no está probada de punta a punta -ver README de sparkRadar-, así que un nodo nuevo no debería usarla todavía.',
     summary: 'Radar de reflejos: toca las señales verdes y esquiva los ecos rojos.',
     playerGoal: 'Alcanzar el número de señales antes de que acabe el tiempo.',
     editorHint:
@@ -426,7 +435,13 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     category: 'team',
     difficulty: 'Media',
     duration: '5-8 min',
-    runtimeStatus: 'runtime_ready',
+    // No 'runtime_ready': la carpeta families/teamRelay/ es un prototipo
+    // huérfano -sin definition.ts ni tipo de backend propio, ver su README y
+    // el audit-. FamilyRuntimeHost la engancha por game_id === 'team_relay'
+    // sobre un signal_hunt genérico, pero no está probada de punta a punta
+    // con dos jugadores reales todavía. 'runtime_partial' la saca del
+    // selector de nodo nuevo sin ocultarla si un nodo antiguo ya la usa.
+    runtimeStatus: 'runtime_partial',
     // No 'offline_ready': el mecanismo de proximidad depende del latido del
     // servidor (ver 4.9.51 en plan-de-mejora.md), así que necesita cobertura
     // de los dos jugadores a la vez, no solo de uno.
