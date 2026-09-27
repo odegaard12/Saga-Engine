@@ -6,6 +6,56 @@ from backend.app.runtime.core_engine import _as_str, _as_bool
 router = APIRouter()
 
 
+# Agrupación de PRESENTACIÓN para el admin: las mismas 5 familias claras que
+# frontend/src/admin/lib/displayFamilies.ts. Solo reordena cómo se cuentan y
+# muestran los nodos en el panel; no cambia ningún "type"/game_id que viaje
+# en datos de misión ni la family técnica que usa el runtime del jugador.
+DISPLAY_FAMILIES = [
+    {"id": "llegar_y_escanear", "label": "Llegar y escanear"},
+    {"id": "puzles", "label": "Puzles"},
+    {"id": "movimiento", "label": "Movimiento"},
+    {"id": "orientacion", "label": "Orientación"},
+    {"id": "sonido", "label": "Sonido"},
+]
+
+GAME_ID_DISPLAY_FAMILY = {
+    "simple_checkpoint": "llegar_y_escanear",
+    "qr_collectible": "llegar_y_escanear",
+    "qr_key_gate": "llegar_y_escanear",
+    "clue_card": "llegar_y_escanear",
+    "bonus_cache": "llegar_y_escanear",
+    "photo_scout": "llegar_y_escanear",
+    "team_relay": "llegar_y_escanear",
+    "logic_circuit": "puzles",
+    "sequence_code": "puzles",
+    "place_mosaic": "puzles",
+    "manual_password": "puzles",
+    "tilt_maze": "movimiento",
+    "spark_radar": "movimiento",
+    "shake_charge": "movimiento",
+    "bearing_hunt": "orientacion",
+    "audio_challenge": "sonido",
+}
+
+# Cuando el nodo no lleva game_id (nodos viejos), se agrupa por su family
+# técnica.
+TYPE_DISPLAY_FAMILY_FALLBACK = {
+    "signal_hunt": "llegar_y_escanear",
+    "checkpoint": "llegar_y_escanear",
+    "circuit_matrix": "puzles",
+    "motion_challenge": "movimiento",
+    "bearing_hunt": "orientacion",
+    "audio_challenge": "sonido",
+}
+
+
+def display_family_for_stage(stage_type, game_id):
+    key = _as_str(game_id).strip().lower()
+    if key in GAME_ID_DISPLAY_FAMILY:
+        return GAME_ID_DISPLAY_FAMILY[key]
+    return TYPE_DISPLAY_FAMILY_FALLBACK.get(_as_str(stage_type).strip().lower(), "llegar_y_escanear")
+
+
 def reiniciar_jugador_por_completo(main, profile_id: str) -> None:
     """Todo lo que significa «reiniciar a este jugador», en un solo sitio.
 
@@ -210,10 +260,17 @@ async def admin_react_overview(request: Request):
         "motion_challenge": 0,
         "audio_challenge": 0,
     }
+    # Las 5 familias de PRESENTACIÓN del admin (displayFamilies.ts), sobre
+    # las mismas plantillas: agrupación distinta de las técnicas de arriba.
+    display_family_counts = {family["id"]: 0 for family in DISPLAY_FAMILIES}
     for stage in stage_summaries:
         stage_type = stage.get("type")
         if stage_type in family_counts:
             family_counts[stage_type] += 1
+
+        game_id = (stage.get("config") or {}).get("game_id") if isinstance(stage.get("config"), dict) else None
+        display_family = display_family_for_stage(stage_type, game_id)
+        display_family_counts[display_family] = display_family_counts.get(display_family, 0) + 1
 
     profile_summaries = [
         main._admin_react_profile_summary(profile, gamestate, positions, inventory_state)
@@ -247,6 +304,8 @@ async def admin_react_overview(request: Request):
             "stages": len(stage_summaries),
             "finished_profiles": sum(1 for item in profile_summaries if item.get("finished")),
             "family_counts": family_counts,
+            # Nuevo: mismos nodos, contados por las 5 familias de admin.
+            "display_family_counts": display_family_counts,
         },
         "families": [
             {"id": "signal_hunt", "label": "Checkpoints GPS"},
@@ -255,6 +314,10 @@ async def admin_react_overview(request: Request):
             {"id": "motion_challenge", "label": "Reto de movimiento"},
             {"id": "audio_challenge", "label": "Reto de sonido"},
         ],
+        # Nuevo: las 5 familias que ve el admin en el selector de juegos.
+        # "families" (arriba) se mantiene por compatibilidad con quien ya lo
+        # lea.
+        "display_families": DISPLAY_FAMILIES,
         "stages": stage_summaries,
         "profiles": profile_summaries,
         # Los perfiles completos, con la foto incrustada.

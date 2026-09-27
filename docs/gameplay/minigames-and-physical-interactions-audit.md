@@ -42,6 +42,27 @@ De esos 10, el frontend solo tiene **5 runtimes nativos** (`resolver.ts: isNativ
 
 También hay una carpeta `families/teamRelay/` sin tipo de backend asociado y sin importar en `resolver.ts` — prototipo huérfano, no forma parte de los 10 tipos soportados.
 
+**Nota de esta revisión (2026-09-28):** `frontend/src/player/minigames/core/FamilyRuntimeHost.tsx` (usado por `InteractionSheet.tsx`, la pantalla real del jugador) SÍ tiene ramas para `resolved.config.game_id === 'spark_radar'` y `=== 'team_relay'` que renderizan sus `RuntimeScreen.tsx` propios. Esto contradice el párrafo de arriba y los README de esas dos carpetas ("sin cablear en el resolver"), y probablemente sea código añadido después del 2026-09-18 sin actualizar ni este audit ni esos README. No se ha verificado de punta a punta con jugadores reales que esas ramas produzcan una partida jugable y correcta (p. ej. la normalización de `circuit_matrix` en `definition.ts` no tiene caso propio para `game_id: 'spark_radar'`, así que el config que le llega a `SparkRadarRuntimeScreen` depende de que el admin haya guardado ya todos los campos que espera). Por eso, en esta reorganización de familias del admin (ver más abajo) se mantienen `spark_radar` y `team_relay` marcados como no disponibles para nodos nuevos, hasta que alguien confirme el pipeline completo y actualice esta nota, los README de `families/sparkRadar/` y `families/teamRelay/`, y el runtimeStatus en `frontend/src/admin/lib/gameCatalog.ts`.
+
+## Reagrupación del admin en 5 familias (2026-09-28)
+
+El editor mostraba los juegos en las 5 familias TÉCNICAS de arriba, que mezclan runtime interno con lo que ve el organizador. Se añadió una capa de agrupación de PRESENTACIÓN, sin tocar ningún id de misión:
+
+- `frontend/src/admin/lib/displayFamilies.ts` — mapa `AdminGameId → DisplayFamilyId` (uno de los 16 juegos del catálogo por familia, ninguno repetido) y las 5 tarjetas en español.
+- `frontend/src/admin/components/AdminGameEditor.tsx` — el selector de juego (paso 1) agrupa por estas 5 familias, con descripción de una línea por familia y por juego (`game.summary`, ya existía).
+- `frontend/src/admin/components/FamiliesPanel.tsx` — las tarjetas de familia del panel muestran los 5 grupos nuevos con el recuento de plantillas.
+- `backend/app/routers/admin.py` — `/api/admin/react-overview` añade `counts.display_family_counts` y `display_families` (5 grupos), calculados por `game_id` del nodo con fallback por su family técnica si no tiene uno. Las claves viejas (`family_counts`, `families`) se mantienen para quien ya las lea.
+
+Las 5 familias y a qué cae cada juego del catálogo:
+
+1. **Llegar y escanear** — `simple_checkpoint`, `qr_collectible`, `qr_key_gate`, `clue_card`, `bonus_cache`, `photo_scout` (planned), `team_relay` (no disponible para nodo nuevo, ver nota de arriba).
+2. **Puzles** — `logic_circuit`, `sequence_code`, `place_mosaic`, `manual_password` (planned, sin validación local todavía).
+3. **Movimiento** — `shake_charge` (motion_challenge), `tilt_maze`, `spark_radar` (no disponible para nodo nuevo, ver nota de arriba).
+4. **Orientación** — `bearing_hunt`.
+5. **Sonido** — `audio_challenge`.
+
+`spark_radar` y `team_relay` se marcaron `runtimeStatus: 'runtime_partial'` (antes `'runtime_ready'`, que era optimista dado lo anterior): siguen existiendo en el catálogo y se pueden ver/editar en un nodo que ya los use -con aviso en el editor-, pero `gameOptions()` (`guidedEditorUtils.ts`) los saca del selector de nodo nuevo salvo que el organizador pulse "Mostrar experimentales".
+
 Relevant family runtime files:
 
 - `frontend/src/player/minigames/core/FamilyRuntimeHost.tsx`

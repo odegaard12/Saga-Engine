@@ -171,7 +171,11 @@ export default function AdminApp() {
 
   const profiles = useMemo(() => overview?.profiles || [], [overview])
   const stages = overview?.stages || []
-  const familyCounts = overview?.counts?.family_counts || {}
+  // Las tarjetas de familia del panel usan las 5 familias de PRESENTACIÓN
+  // (displayFamilies.ts), no las 5 técnicas del runtime. Si un backend viejo
+  // todavía no manda display_family_counts, cae a family_counts para no
+  // dejar los chips en blanco.
+  const familyCounts = overview?.counts?.display_family_counts || overview?.counts?.family_counts || {}
   const overviewReady = overviewState === 'ready' && Boolean(overview)
 
   const title =

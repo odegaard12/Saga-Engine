@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.36.0
+
+- **Reagrupa el catálogo de minijuegos del admin en 5 familias claras en
+  español** ("Llegar y escanear", "Puzles", "Movimiento", "Orientación",
+  "Sonido") en vez de las 5 familias técnicas del runtime, que mezclaban
+  motor interno con lo que ve el organizador. Es solo una capa de
+  presentación (`frontend/src/admin/lib/displayFamilies.ts`): ningún
+  `interaction_type`, `game_id` ni family del runtime del jugador cambia, así
+  que las misiones existentes cargan y se juegan exactamente igual. El
+  selector de juego del editor guiado (`AdminGameEditor.tsx`) y las tarjetas
+  de familia (`FamiliesPanel.tsx`) ahora muestran esas 5 familias; el backend
+  (`/api/admin/react-overview`) añade `display_family_counts` y
+  `display_families` sin quitar las claves técnicas de siempre.
+- **`spark_radar` y `team_relay` dejan de ofrecerse para un nodo nuevo.**
+  Ninguno de los dos está probado de punta a punta con jugadores reales -sus
+  README (`frontend/src/player/minigames/families/sparkRadar` y
+  `.../teamRelay`) los describen como trabajo a medias o prototipo huérfano-,
+  así que se marcan `runtimeStatus: 'runtime_partial'` en lugar del
+  `'runtime_ready'` optimista que tenían. Un nodo antiguo que ya los use
+  sigue abriéndose y editándose con normalidad -con un aviso en el editor-,
+  y el organizador puede seguir eligiéndolos a mano con "Mostrar
+  experimentales" si quiere probarlos.
+- Actualizado `docs/gameplay/minigames-and-physical-interactions-audit.md`
+  con la reagrupación y una nota sobre una contradicción encontrada en el
+  propio código: `FamilyRuntimeHost.tsx` ya tiene ramas para `spark_radar` y
+  `team_relay` que sus README dicen que no existen. Pendiente de que alguien
+  lo confirme de punta a punta antes de reabrirlos en el selector.
+
+---
+
 ## 5.35.1
 
 - **Corrige inyección de fórmulas (CSV injection) en la exportación del
