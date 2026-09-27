@@ -323,6 +323,8 @@ async def admin_anti_cheat_flags(request: Request):
     if not main.admin_request_authorized(request, data):
         return JSONResponse(status_code=403, content={"status": "error", "detail": "bad password"})
 
+    import backend.app.runtime.anti_cheat as _anti_cheat
+
     cfg = main.load_config()
     perfiles_por_id = {p.get("id"): p for p in main.get_player_profiles(cfg)}
     sospechas = main.list_anti_cheat_suspicions()
@@ -332,15 +334,20 @@ async def admin_anti_cheat_flags(request: Request):
         if not isinstance(lista, list) or not lista:
             continue
         perfil = perfiles_por_id.get(profile_id)
+        desglose = _anti_cheat.count_by_severity(lista)
         jugadores.append({
             "user": profile_id,
             "display_name": (perfil or {}).get("display_name") or profile_id,
+            # Compatibilidad con paneles viejos: "count" sigue siendo el
+            # total (sospechas + info neutra).
             "count": len(lista),
+            "suspicion_count": desglose["suspicion_count"],
+            "info_count": desglose["info_count"],
             # Las más recientes primero: son las que importa mirar primero.
             "suspicions": list(reversed(lista))[:50],
         })
 
-    jugadores.sort(key=lambda item: item["count"], reverse=True)
+    jugadores.sort(key=lambda item: item["suspicion_count"], reverse=True)
 
     return {
         "status": "ok",

@@ -24,6 +24,7 @@ data/stages.json
 data/saga.sqlite3
 data/anti_cheat.json
 data/speed_streak.json
+data/manual_position_notice.json
 data/runtime_store.json
 data/tile_cache/
 .DS_Store

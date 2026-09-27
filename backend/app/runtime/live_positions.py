@@ -48,6 +48,12 @@ VALID_HEARTBEAT_SOURCES = {
     "react",
     "pwa",
     "browser_gps",
+    # Posición puesta a mano (modo prueba/debug, ver
+    # frontend/src/player/PlayerApp.tsx handleDebugSetPosition). Nunca es
+    # GPS real: el motor antitrampas la excluye de la comprobación de
+    # velocidad (ver backend/app/runtime/anti_cheat.py,
+    # MANUAL_POSITION_SOURCE) y deja una nota neutra en vez de una sospecha.
+    "manual",
 }
 
 

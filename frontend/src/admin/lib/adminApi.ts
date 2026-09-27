@@ -583,12 +583,18 @@ export type AntiCheatSuspicion = {
   reason: string
   at: number
   evidence?: Record<string, unknown>
+  // Ausente = sospecha (entradas de antes de que existiera este campo). El
+  // motor antitrampas SAGA Engine sólo escribe 'info' para notas neutras
+  // como "usó posición manual" (ver backend/app/runtime/anti_cheat.py).
+  severity?: 'suspicion' | 'info'
 }
 
 export type AntiCheatPlayerFlags = {
   user: string
   display_name: string
   count: number
+  suspicion_count: number
+  info_count: number
   suspicions: AntiCheatSuspicion[]
 }
 

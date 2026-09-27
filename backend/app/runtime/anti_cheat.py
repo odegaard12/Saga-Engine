@@ -1,4 +1,4 @@
-"""Sospechas de trampa: se anotan, no se bloquean.
+"""Motor antitrampas SAGA Engine: sospechas de trampa que se anotan, no se bloquean.
 
 Antes de esto no había ninguna comprobación en el servidor -sólo en el
 cliente, y sólo para "saliste de la aplicación en mitad de un reto" (ver
@@ -20,15 +20,40 @@ por caso, si afecta a la clasificación.
 lejos de su sitio". El GPS en el monte falla con frecuencia -árboles, valles,
 mala cobertura- y esa comprobación acusaba a jugadores honestos casi tan a
 menudo como a quien hacía trampa.
+
+Este módulo es el único sitio con umbrales del motor antitrampas -no hay un
+segundo juego de constantes en otro fichero-. API pública, todo lo demás es
+detalle interno:
+
+- `check_travel_speed`     -> velocidad imposible entre nodos (ignora GPS manual/debug).
+- `check_completion_time`  -> minijuego superado más rápido de lo físicamente
+                               posible, con un mínimo propio por familia de juego
+                               (ver `MINIGAME_MIN_DURATION_MS_BY_GAME`).
+- `check_future_timestamp` -> evento offline sincronizado con fecha futura.
+- `note_manual_position`   -> deja constancia NEUTRA (no es sospecha) de que
+                               el jugador usó GPS manual/debug.
+- `record_suspicion`       -> anota una sospecha (severidad "suspicion").
+- `list_suspicions` / `count_suspicions` -> lo que ve el panel de admin.
 """
 from __future__ import annotations
 
 import math
 import time
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from backend.app.storage.json_store import load_json, update_json
 from backend.app.runtime.mision import kind_del_nodo
+
+#: Severidad de una entrada: "suspicion" (algo a revisar) o "info" (neutro,
+#: no acusa a nadie -p.ej. "usó posición manual"-). El panel las separa.
+SEVERITY_SUSPICION = "suspicion"
+SEVERITY_INFO = "info"
+
+#: Valor de `source` que marca un latido con posición puesta a mano (modo
+#: prueba/debug), nunca GPS real. Debe coincidir con lo que manda el cliente
+#: (ver frontend/src/player/PlayerApp.tsx, heartbeatSourceRef) y con
+#: VALID_HEARTBEAT_SOURCES en backend/app/runtime/live_positions.py.
+MANUAL_POSITION_SOURCE = "manual"
 
 # ---------------------------------------------------------------------------
 # Umbrales. Cada uno documenta el motivo del número, no sólo el número.
@@ -64,8 +89,56 @@ MIN_CONSECUTIVE_SPEED_VIOLATIONS = 2
 
 #: Nadie completa un reto en menos que esto, ni el más rápido: es el tiempo
 #: de leer la pantalla una vez y tocar. Se aplica sólo a minijuegos -ver
-#: check_completion_time-, no a checkpoints, QR ni coleccionables.
+#: check_completion_time-, no a checkpoints, QR ni coleccionables. Es el
+#: SUELO absoluto: ningún mínimo por familia (ver más abajo) puede bajar de
+#: aquí, y es también lo que se usa si el `game_id` no está en la tabla.
 MIN_PLAUSIBLE_STAGE_MS = 5000
+
+#: Fracción de la duración MÍNIMA anunciada al organizador (ver
+#: frontend/src/admin/lib/gameCatalog.ts, campo `duration`, p.ej. "2-5 min")
+#: que se considera "físicamente posible" para ese minijuego. Un jugador
+#: rápido no tarda lo mismo que la media, pero tardar menos de esta fracción
+#: del extremo más corto ya no es "rápido", es sospechoso. 20-25 % es
+#: deliberadamente bajo -mejor no flaguear que flaguear a quien sólo jugó
+#: bien-.
+_UMBRAL_FRACCION_DURACION_MINIMA = 0.22
+
+
+def _ms_desde_minutos(minutos: float) -> int:
+    """`minutos` del extremo corto de gameCatalog.ts -> umbral en ms.
+
+    Redondeado a la centena para que la tabla de abajo tenga números
+    legibles, y con el suelo de MIN_PLAUSIBLE_STAGE_MS aplicado siempre.
+    """
+    bruto = minutos * 60_000 * _UMBRAL_FRACCION_DURACION_MINIMA
+    return max(MIN_PLAUSIBLE_STAGE_MS, int(round(bruto / 100.0)) * 100)
+
+
+#: Mínimo plausible por FAMILIA de minijuego (game_id -> ms), en vez de un
+#: único suelo para todos. Cada valor sale de aplicar
+#: `_UMBRAL_FRACCION_DURACION_MINIMA` al extremo más corto de la duración que
+#: el organizador ve en el catálogo (frontend/src/admin/lib/gameCatalog.ts,
+#: campo `duration`). Sólo se usa cuando `check_completion_time` ya decidió
+#: que el nodo es un minijuego -checkpoint/QR/coleccionable ni pasan por
+#: aquí-. Un `game_id` que no esté aquí (minijuego nuevo, o legado) cae en
+#: MIN_PLAUSIBLE_STAGE_MS por defecto: nunca sin comprobación, nunca más
+#: estricto que el suelo genérico.
+MINIGAME_MIN_DURATION_MS_BY_GAME: Dict[str, int] = {
+    "spark_radar": _ms_desde_minutos(1),        # "1-2 min"
+    "qr_key_gate": _ms_desde_minutos(1),         # "1-3 min"
+    "clue_card": _ms_desde_minutos(1),           # "1-2 min"
+    "bonus_cache": _ms_desde_minutos(1),         # "1-3 min"
+    "shake_charge": _ms_desde_minutos(1),        # "1-2 min"
+    "bearing_hunt": _ms_desde_minutos(1),        # "1-3 min"
+    "sequence_code": _ms_desde_minutos(2),       # "2-5 min"
+    "tilt_maze": _ms_desde_minutos(2),           # "2-6 min"
+    "photo_scout": _ms_desde_minutos(2),         # "2-4 min"
+    "manual_password": _ms_desde_minutos(2),     # "2-5 min"
+    "audio_challenge": _ms_desde_minutos(2),     # "2-4 min"
+    "place_mosaic": _ms_desde_minutos(3),        # "3-8 min"
+    "logic_circuit": _ms_desde_minutos(4),       # "4-7 min"
+    "team_relay": _ms_desde_minutos(5),          # "5-8 min"
+}
 
 #: Margen de reloj entre el móvil y el servidor. Los relojes de los móviles
 #: no siempre van en hora -sobre todo sin red-, y eso no es lo que se
@@ -108,13 +181,26 @@ def _accuracy_margin(*accuracies: Optional[float]) -> float:
 # Almacén: un JSON por jugador, con la lista de sospechas.
 # ---------------------------------------------------------------------------
 
-def record_suspicion(db_path: str, user: str, reason: str, evidence: Optional[dict] = None) -> dict:
-    """Anota una sospecha para `user`. No hace nada más: no bloquea, no penaliza."""
+def record_suspicion(
+    db_path: str,
+    user: str,
+    reason: str,
+    evidence: Optional[dict] = None,
+    severity: str = SEVERITY_SUSPICION,
+) -> dict:
+    """Anota una entrada para `user`. No hace nada más: no bloquea, no penaliza.
+
+    `severity` distingue una sospecha real ("suspicion", el valor por
+    defecto -y lo único que existía antes de esto-) de una nota neutra
+    ("info", p.ej. "usó posición manual") que el panel muestra aparte, sin
+    acusar a nadie.
+    """
     user_key = str(user or "").strip()
     entrada = {
         "reason": str(reason or "").strip() or "unknown",
         "at": int(time.time() * 1000),
         "evidence": evidence if isinstance(evidence, dict) else {},
+        "severity": severity if severity == SEVERITY_INFO else SEVERITY_SUSPICION,
     }
     if not user_key:
         return entrada
@@ -146,7 +232,7 @@ def list_suspicions(db_path: str, user: Optional[str] = None) -> dict:
 
 
 def count_suspicions(db_path: str) -> dict:
-    """Cuántas sospechas tiene cada jugador. Para el resumen del panel."""
+    """Cuántas entradas (sospechas + info) tiene cada jugador. Resumen del panel."""
     data = load_json(db_path, {})
     if not isinstance(data, dict):
         return {}
@@ -155,6 +241,25 @@ def count_suspicions(db_path: str) -> dict:
         for user, lista in data.items()
         if isinstance(lista, list) and lista
     }
+
+
+def _es_sospecha(entrada: Any) -> bool:
+    """True si `entrada` es una sospecha real, no una nota "info" neutra.
+
+    Una entrada SIN `severity` es de antes de que existiera este campo:
+    todo lo que había entonces era sospecha, así que se trata igual
+    -compatibilidad con `anti_cheat.json` ya escrito-.
+    """
+    if not isinstance(entrada, dict):
+        return False
+    return entrada.get("severity") != SEVERITY_INFO
+
+
+def count_by_severity(lista: list) -> dict:
+    """Desglose sospechas/info de la lista de un jugador. Para el panel."""
+    sospechas = sum(1 for entrada in lista if _es_sospecha(entrada))
+    info = len(lista) - sospechas
+    return {"suspicion_count": sospechas, "info_count": info}
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +315,8 @@ def check_travel_speed(
     new_accuracy: Optional[float],
     level: Optional[int] = None,
     total_stages: Optional[int] = None,
+    prev_source: Optional[str] = None,
+    new_source: Optional[str] = None,
 ) -> Optional[dict]:
     """Velocidad implausible ENTRE NODOS, sostenida en más de un tramo.
 
@@ -225,12 +332,23 @@ def check_travel_speed(
     informados) no se comprueba nada -mejor no flaguear que flaguear a
     ciegas-.
 
+    Un tercer motivo, y es a propósito: si CUALQUIERA de los dos puntos del
+    tramo viene de posición MANUAL/debug (`prev_source` o `new_source` ==
+    MANUAL_POSITION_SOURCE), el salto es esperado -es justo para eso existe
+    el modo prueba, ver PlayerApp.tsx handleDebugSetPosition- y no cuenta
+    como velocidad implausible. Se resetea también la racha, así que un
+    tramo real->manual->real no arrastra nada de un lado a otro.
+
     Y un único salto de GPS -por ruidoso que sea el fix- nunca basta: sólo
     cuenta si la velocidad implausible se repite en
     `MIN_CONSECUTIVE_SPEED_VIOLATIONS` tramos consecutivos del mismo jugador.
     Un salto aislado se olvida en el siguiente latido bueno.
     """
     if level is None or total_stages is None or level <= 0 or level >= total_stages:
+        _reset_speed_streak(streak_db_path, user)
+        return None
+
+    if prev_source == MANUAL_POSITION_SOURCE or new_source == MANUAL_POSITION_SOURCE:
         _reset_speed_streak(streak_db_path, user)
         return None
 
@@ -273,6 +391,21 @@ def check_travel_speed(
     )
 
 
+def _game_id_del_nodo(node: dict) -> str:
+    """`game_id` de un nodo, con la misma resolución que `kind_del_nodo`.
+
+    No se reexporta desde mision.py porque aquí sólo interesa el id para
+    mirar la tabla de duraciones -no hace falta el resto de esa función-.
+    """
+    if not isinstance(node, dict):
+        return ""
+    interaccion = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
+    config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
+    if not config and isinstance(node.get("config"), dict):
+        config = node["config"]
+    return str((config or {}).get("game_id") or "").strip().lower()
+
+
 def check_completion_time(
     db_path: str,
     user: str,
@@ -286,11 +419,12 @@ def check_completion_time(
     coleccionable es un pickup: tocar y listo. Medirles un tiempo mínimo de
     partida los flaguearía por hacer exactamente lo que se espera de ellos.
 
-    El umbral es el mismo para todos los tipos de minijuego, y a propósito
-    bajo -MIN_PLAUSIBLE_STAGE_MS-: no se trata de adivinar cuánto tarda cada
-    familia -eso varía con el jugador y el móvil-, sólo de cazar un tiempo que
-    sólo puede venir de un aviso interno reenviado a mano, no de una persona
-    jugando.
+    El umbral YA NO es el mismo para todos los minijuegos: cada familia
+    (`game_id`) tiene su propio mínimo en `MINIGAME_MIN_DURATION_MS_BY_GAME`,
+    derivado de la duración real que ve el organizador en el catálogo
+    (frontend/src/admin/lib/gameCatalog.ts). Un `game_id` sin entrada en la
+    tabla -minijuego nuevo o legado- cae en MIN_PLAUSIBLE_STAGE_MS, nunca
+    queda sin comprobación.
     """
     kind = kind_del_nodo(node) if isinstance(node, dict) else None
     if kind != "minijuego":
@@ -303,7 +437,10 @@ def check_completion_time(
     except (TypeError, ValueError):
         return None
 
-    if ms < 0 or ms >= MIN_PLAUSIBLE_STAGE_MS:
+    game_id = _game_id_del_nodo(node)
+    umbral_ms = MINIGAME_MIN_DURATION_MS_BY_GAME.get(game_id, MIN_PLAUSIBLE_STAGE_MS)
+
+    if ms < 0 or ms >= umbral_ms:
         return None
 
     return record_suspicion(
@@ -312,8 +449,9 @@ def check_completion_time(
         "completion_faster_than_possible",
         {
             "node_id": node.get("id") if isinstance(node, dict) else None,
+            "game_id": game_id or None,
             "time_spent_ms": ms,
-            "min_plausible_ms": MIN_PLAUSIBLE_STAGE_MS,
+            "min_plausible_ms": umbral_ms,
         },
     )
 
@@ -349,4 +487,61 @@ def check_future_timestamp(
             "server_now_ms": now_ms,
             "ahead_ms": adelanto_ms,
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Posición manual/debug: nota NEUTRA, no sospecha (ver MANUAL_POSITION_SOURCE).
+# ---------------------------------------------------------------------------
+
+def _manual_notice_marked(notice_db_path: str, user_key: str) -> bool:
+    data = load_json(notice_db_path, {})
+    return bool(isinstance(data, dict) and data.get(user_key))
+
+
+def _set_manual_notice(notice_db_path: str, user_key: str, marcado: bool) -> None:
+    def _actualizar(actual):
+        actual = dict(actual) if isinstance(actual, dict) else {}
+        if marcado:
+            actual[user_key] = True
+        else:
+            actual.pop(user_key, None)
+        return actual
+
+    update_json(notice_db_path, {}, _actualizar)
+
+
+def note_manual_position(
+    db_path: str,
+    notice_db_path: str,
+    user: str,
+    source: Optional[str],
+) -> Optional[dict]:
+    """Deja constancia de que `user` usó GPS manual/debug -sin acusar de nada-.
+
+    Como mucho una nota "info" por SESIÓN de uso manual: mientras el jugador
+    siga mandando latidos con `source == MANUAL_POSITION_SOURCE` no se repite
+    nada, y en cuanto vuelve a GPS real se olvida la marca -así que si más
+    tarde activa el modo prueba otra vez, se anota de nuevo, porque es una
+    sesión distinta-. El panel de administración la muestra separada de las
+    sospechas, con un estilo neutro (ver ActivityPanel.tsx).
+    """
+    user_key = str(user or "").strip()
+    if not user_key:
+        return None
+
+    if source != MANUAL_POSITION_SOURCE:
+        _set_manual_notice(notice_db_path, user_key, False)
+        return None
+
+    if _manual_notice_marked(notice_db_path, user_key):
+        return None
+
+    _set_manual_notice(notice_db_path, user_key, True)
+    return record_suspicion(
+        db_path,
+        user,
+        "manual_position_used",
+        {},
+        severity=SEVERITY_INFO,
     )

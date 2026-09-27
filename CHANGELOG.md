@@ -6,6 +6,28 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.34.0
+
+- **Motor antitrampas SAGA Engine: posición manual/debug excluida.** Un
+  latido con `source: "manual"` (modo prueba, ver `PlayerApp.tsx`
+  `handleDebugSetPosition`) ya no puede disparar "velocidad imposible": el
+  salto real→manual→real es justo lo que se espera de ese modo. Se anota,
+  como mucho una vez por sesión de uso manual, una nota NEUTRA ("usó
+  posición manual") separada de las sospechas en el panel.
+- **Mínimo de tiempo de minijuego, por familia.** El suelo único de 5 s pasa
+  a ser un suelo por `game_id` (≈20-25 % de la duración mínima real de cada
+  minijuego, ver `gameCatalog.ts`), nunca por debajo de 5 s. Checkpoint, QR
+  y coleccionables siguen exentos, como antes.
+- **Rebranding: "Motor antitrampas SAGA Engine".** Un único módulo
+  (`backend/app/runtime/anti_cheat.py`) con toda la política y los
+  umbrales documentados, y el panel de admin ahora separa sospechas de
+  notas neutras (con su recuento por jugador) bajo esa cabecera.
+- Doc: se deja explícito que un `blur` sin `hidden` más corto que
+  `SALIDA_MINIMA_MS` (1,5 s) -como deslizar el Centro de Control en iOS- no
+  penaliza, con el mismo umbral que ya usaba Android.
+
+---
+
 ## 5.33.1
 
 - **Antitrampas del servidor, revisado.** Velocidad imposible sólo se mira
