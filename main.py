@@ -203,6 +203,10 @@ ADMIN_AUTH_DB = os.path.join(DATA_DIR, "admin_auth.json")
 EVENT_LOG_DB = os.path.join(DATA_DIR, "events.json")
 ADMIN_SESSIONS_DB = os.path.join(DATA_DIR, "admin_sessions.json")
 INVENTORY_DB = os.path.join(DATA_DIR, "inventory.json")
+# Sospechas de trampa (ver backend/app/runtime/anti_cheat.py): FLAG, no
+# bloqueo. Fichero aparte de events.json porque esto no es un evento de
+# partida, es una anotación para que el organizador la revise.
+ANTI_CHEAT_DB = os.path.join(DATA_DIR, "anti_cheat.json")
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -964,6 +968,57 @@ def get_player_stage_time_ms(user, level):
     return _player_timers.get_player_stage_time_ms(TIMERS_DB, user, level)
 
 
+from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
+
+
+def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy):
+    """Velocidad implausible entre el punto anterior guardado y el nuevo.
+
+    `prev_position` es lo que había en positions.json ANTES de sobreescribir
+    con el latido actual: es exactamente el par consecutivo que hace falta,
+    sin guardar historial aparte.
+    """
+    prev = prev_position if isinstance(prev_position, dict) else {}
+    return _anti_cheat.check_travel_speed(
+        ANTI_CHEAT_DB,
+        user,
+        prev.get("lat"),
+        prev.get("lon"),
+        prev.get("last_seen"),
+        prev.get("accuracy"),
+        new_lat,
+        new_lon,
+        new_at_s,
+        new_accuracy,
+    )
+
+
+def anti_cheat_check_node_proximity(user, node):
+    """¿Hay constancia de que este jugador estuviera cerca del nodo que dice completar?"""
+    posicion = get_live_position(user)
+    if not isinstance(posicion, dict):
+        posicion = {}
+    return _anti_cheat.check_node_proximity(
+        ANTI_CHEAT_DB, user, node, posicion.get("lat"), posicion.get("lon"), posicion.get("accuracy")
+    )
+
+
+def anti_cheat_check_completion_time(user, node, time_spent_ms):
+    return _anti_cheat.check_completion_time(ANTI_CHEAT_DB, user, node, time_spent_ms)
+
+
+def anti_cheat_check_future_timestamp(user, local_created_ms, node_id=None):
+    return _anti_cheat.check_future_timestamp(ANTI_CHEAT_DB, user, local_created_ms, node_id=node_id)
+
+
+def list_anti_cheat_suspicions(user=None):
+    return _anti_cheat.list_suspicions(ANTI_CHEAT_DB, user)
+
+
+def count_anti_cheat_suspicions():
+    return _anti_cheat.count_suspicions(ANTI_CHEAT_DB)
+
+
 def project_live_profile_status(
     profile, raw=None, now=None, total_nodes=None, timers=None, progress=None
 ):
@@ -1313,6 +1368,17 @@ def apply_synced_player_event(normalized_event, user, profile):
 
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+    # Anti-trampas (ver backend/app/runtime/anti_cheat.py): sólo anota, nunca
+    # bloquea la sincronización. Un evento que llegó por la cola offline es
+    # justo el caso que más hace falta vigilar -nadie estaba mirando en
+    # directo mientras pasaba- y el que más hay que perdonar -sin cobertura
+    # el reloj del móvil y el GPS son los que hay-.
+    anti_cheat_check_node_proximity(profile_id, current_node)
+    anti_cheat_check_completion_time(profile_id, current_node, payload.get("time_spent_ms"))
+    anti_cheat_check_future_timestamp(
+        profile_id, _iso_a_ms(raw_payload.get("local_created_at")) or None, node_id=current_node.get("id")
+    )
 
     # Igual que level_before arriba: un evento de la cola offline puede llegar
     # con este campo corrupto (móvil viejo, IndexedDB a medias...). Sin

@@ -1,5 +1,19 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchAdminEvents, markAdminEvent, type AdminEvent, type AdminEventStatus } from '../lib/adminApi'
+import {
+  fetchAdminEvents,
+  fetchAntiCheatFlags,
+  markAdminEvent,
+  type AdminEvent,
+  type AdminEventStatus,
+  type AntiCheatPlayerFlags,
+} from '../lib/adminApi'
+
+const ETIQUETA_MOTIVO: Record<string, string> = {
+  impossible_travel_speed: 'Velocidad imposible',
+  node_completed_without_proximity: 'Nodo sin estar cerca',
+  completion_faster_than_possible: 'Reto superado demasiado rápido',
+  offline_event_timestamp_in_future: 'Evento offline con fecha futura',
+}
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'
 
@@ -17,6 +31,13 @@ function formatFecha(iso?: string): string {
   return fecha.toLocaleString()
 }
 
+function formatFechaMs(ms?: number): string {
+  if (!ms) return '—'
+  const fecha = new Date(ms)
+  if (Number.isNaN(fecha.getTime())) return String(ms)
+  return fecha.toLocaleString()
+}
+
 /**
  * Registro de actividad del servidor: heartbeats, QR escaneados, acciones de
  * admin... Antes esto sólo se podía ver leyendo events.json a mano en el
@@ -29,6 +50,26 @@ export default function ActivityPanel() {
   const [aviso, setAviso] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<'' | AdminEventStatus>('')
   const [marcando, setMarcando] = useState<string>('')
+
+  // Sospechas de trampa: sección aparte porque no son "actividad" del
+  // servidor, son avisos para que el organizador decida algo.
+  const [sospechas, setSospechas] = useState<AntiCheatPlayerFlags[]>([])
+  const [estadoSospechas, setEstadoSospechas] = useState<Estado>('idle')
+
+  async function cargarSospechas() {
+    setEstadoSospechas('loading')
+    try {
+      const respuesta = await fetchAntiCheatFlags()
+      if (respuesta.status === 'ok') {
+        setSospechas(respuesta.players || [])
+        setEstadoSospechas('done')
+      } else {
+        setEstadoSospechas('error')
+      }
+    } catch {
+      setEstadoSospechas('error')
+    }
+  }
 
   async function cargar() {
     setEstado('loading')
@@ -56,6 +97,10 @@ export default function ActivityPanel() {
     void cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado])
+
+  useEffect(() => {
+    void cargarSospechas()
+  }, [])
 
   async function marcarLeido(evento: AdminEvent) {
     setMarcando(evento.id)
@@ -94,6 +139,51 @@ export default function ActivityPanel() {
           <span>pendientes</span>
         </div>
       </div>
+
+      <section className="admin-settings-section-modern">
+        <div className="admin-settings-section-head">
+          <strong>⚠️ Sospechas de trampa</strong>
+          <span>
+            Avisos automáticos del servidor: velocidad imposible, nodos completados sin estar cerca, retos
+            demasiado rápidos o eventos offline con fecha futura. No afectan solos a la clasificación —lo decides tú—.
+          </span>
+        </div>
+
+        {estadoSospechas === 'loading' && sospechas.length === 0 ? (
+          <p style={notaError}>Cargando…</p>
+        ) : sospechas.length === 0 ? (
+          <div className="admin-empty-panel admin-empty-panel-modern">
+            <strong>Sin sospechas</strong>
+            <span>De momento no hay ninguna anotación.</span>
+          </div>
+        ) : (
+          <div style={tablaWrap}>
+            <table style={tabla}>
+              <thead>
+                <tr>
+                  <th style={th}>Jugador</th>
+                  <th style={th}>Avisos</th>
+                  <th style={th}>Último motivo</th>
+                  <th style={th}>Cuándo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sospechas.map((jugador) => {
+                  const ultima = jugador.suspicions[0]
+                  return (
+                    <tr key={jugador.user}>
+                      <td style={td}>{jugador.display_name}</td>
+                      <td style={{ ...td, color: '#fbbf24', fontWeight: 800 }}>{jugador.count}</td>
+                      <td style={td}>{ultima ? ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}</td>
+                      <td style={td}>{formatFechaMs(ultima?.at)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">

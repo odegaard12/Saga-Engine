@@ -579,6 +579,40 @@ export function markAdminEvent(eventId: string, status: AdminEventStatus, error?
   })
 }
 
+export type AntiCheatSuspicion = {
+  reason: string
+  at: number
+  evidence?: Record<string, unknown>
+}
+
+export type AntiCheatPlayerFlags = {
+  user: string
+  display_name: string
+  count: number
+  suspicions: AntiCheatSuspicion[]
+}
+
+export type AntiCheatFlagsResponse = {
+  status: 'ok' | 'error'
+  detail?: string
+  server_ts?: number
+  players?: AntiCheatPlayerFlags[]
+}
+
+/**
+ * Sospechas de trampa anotadas por el servidor (ver
+ * backend/app/runtime/anti_cheat.py): velocidad imposible, nodos completados
+ * sin haber estado cerca, retos superados demasiado rápido, o eventos
+ * offline con fecha futura. Sólo lectura -esto nunca toca la clasificación
+ * por sí solo, lo decide el organizador a mano-.
+ */
+export function fetchAntiCheatFlags(password?: string) {
+  return adminPostJson<AntiCheatFlagsResponse>(
+    '/api/admin/anti-cheat-flags',
+    password ? { password } : {}
+  )
+}
+
 export type AdminDatosPersonalesConteo = {
   fotos: number
   ficheros_de_imagen: number
