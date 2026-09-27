@@ -45,8 +45,9 @@ def test_contanse_as_fotos_que_fallan():
 def test_non_se_di_completada_se_faltan_fotos():
     cuerpo = cuerpo_da_descarga()
 
-    # El aviso de exito tiene que estar dentro de una condición, no suelto.
-    exito = cuerpo.index("Descarga de ZIP completada")
+    # El aviso de exito (N.descargaZipCompletada, es/gl en NOTICES) tiene que
+    # estar dentro de una condición, no suelto.
+    exito = cuerpo.index("N.descargaZipCompletada")
     trozo = cuerpo[max(0, exito - 400) : exito]
     assert "fallidas === 0" in trozo or "!fallidas" in trozo, (
         "el aviso de completada tiene que depender de que no falte ninguna"
@@ -56,9 +57,15 @@ def test_non_se_di_completada_se_faltan_fotos():
 def test_sen_cobertura_dise_que_fai_falta_conexion():
     cuerpo = cuerpo_da_descarga()
 
-    assert "conexión" in cuerpo or "conexion" in cuerpo, (
+    assert "N.noSePudoPrepararZip" in cuerpo, (
         "sin red el trozo de jszip no esta en el movil: hay que decirlo"
     )
+
+    # El texto real (es/gl) vive en NOTICES y sigue mencionando la conexión.
+    raiz = JUGADOR.read_text(encoding="utf-8")
+    inicio = raiz.index("noSePudoPrepararZip:")
+    bloque = raiz[inicio : inicio + 200]
+    assert "conexión" in bloque or "conexion" in bloque
 
 
 def test_o_precache_segue_collendo_so_o_que_esta_na_paxina():

@@ -6,7 +6,18 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.31.2
+## 5.32.0
+
+- **Traducción al gallego del jugador.** Unos 70 textos salían en el idioma
+  equivocado: avisos con números dentro (el puente de idioma no podía
+  traducirlos), algunos fijos en inglés ("Centered on node.") y otros fijos
+  en gallego que veía también quien jugaba en castellano ("Saíches do
+  camiño", "Sen cobertura…"). Ahora salen en el idioma de la misión.
+- TODO.md: el acceso escalonado ya estaba hecho (lo decía PROGRESS.md).
+- Los minijuegos sparkRadar y teamRelay llevan un README: son prototipos
+  sin terminar y sin conectar al juego.
+
+
 
 - Misión en gallego: el aviso "Activa GPS para obtener una posición…"
   salía en castellano; ya tiene su traducción.

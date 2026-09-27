@@ -454,8 +454,8 @@ export function QuickProofPanel({
           // Esto sí se queda en pantalla: hay que hacer algo.
           cerrarSolo = false
           setMessage(
-            'Lin a pegatina, pero o nodo non chegou a rexistrarse. ' +
-              'Proba outra vez ou usa o código de respaldo.'
+            'Leí la pegatina, pero el nodo no llegó a registrarse. ' +
+              'Prueba otra vez o usa el código de respaldo.'
           )
         } else {
           setMessage('Pegatina correcta. Nodo completado.')

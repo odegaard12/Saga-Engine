@@ -2369,8 +2369,8 @@ export const MapSurface = React.memo(function MapSurface({
           <div style={avisoFueraDeRuta}>
             <span style={avisoIcono}>⚠</span>
             <div>
-              <div style={avisoTitulo}>Saíches do camiño</div>
-              <div style={avisoDetalle}>Volve á liña verde</div>
+              <div style={avisoTitulo}>Te has salido del camino</div>
+              <div style={avisoDetalle}>Vuelve a la línea verde</div>
             </div>
           </div>
         ) : null}
