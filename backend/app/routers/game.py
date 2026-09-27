@@ -491,8 +491,15 @@ async def advance(request: Request):
             if requirement_status["required"] and requirement_status["consume"]:
                 main.append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
+            # Igual que penalty_ms arriba: viene del móvil sin garantía de forma.
+            # Un valor no numérico (típico de una cola vieja o un cliente roto)
+            # tiraba abajo /api/advance entero con un 500 en vez de avanzar el
+            # nodo, que es lo único que de verdad importa aquí.
             if time_spent_ms is not None:
-                main.record_player_stage_time(profile_id, lvl, int(time_spent_ms))
+                try:
+                    main.record_player_stage_time(profile_id, lvl, max(0, int(time_spent_ms)))
+                except (TypeError, ValueError):
+                    pass
 
             # El cronómetro de la travesía arranca al superar el primer nodo y
             # para al superar el último: lo que cuenta es el reloj, no los
