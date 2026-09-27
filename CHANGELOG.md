@@ -6,7 +6,12 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.31.1
+## 5.31.2
+
+- Misión en gallego: el aviso "Activa GPS para obtener una posición…"
+  salía en castellano; ya tiene su traducción.
+
+
 
 - **Panel "Antes de salir" en un solo idioma.** Mezclaba gallego
   ("Movemento", "Seguir sen iso") y castellano ("Lo denegaste…"). Ahora
