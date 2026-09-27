@@ -282,6 +282,39 @@ def test_exportacion_csv(monkeypatch, tmp_path):
     assert corpo.startswith("created_at,")
 
 
+def test_exportacion_csv_escapa_celas_que_parecen_formulas(monkeypatch, tmp_path):
+    """Un nome de xogador que empece por `=`/`+`/`-`/`@` non pode executar nada
+    ao abrir o CSV nunha folla de cálculo (CSV injection, OWASP).
+
+    `main.match_log_to_csv` -a mesma función que usa o export- ten que
+    escapar iso cunha comilla simple por diante, para que Excel/Sheets o lea
+    como texto e non como o comezo dunha fórmula.
+    """
+    configure_mission(monkeypatch, tmp_path, "2020-01-01T00:00")
+    limpar_rexistro("=cmd|'/c calc'!A1")
+
+    main.match_log_record(
+        "session_open",
+        "=cmd|'/c calc'!A1",
+        payload={"@evil": "SUM(A1:A9)"},
+    )
+
+    entradas = main.match_log_list_timeline(user="=cmd|'/c calc'!A1")
+    assert entradas
+
+    corpo = main.match_log_to_csv(entradas)
+    # A celda leva a comilla por diante -por iso segue aparecendo "=cmd|" no
+    # texto-, pero nunca sen escapar: nin ao comezo de liña nin xusto despois
+    # dunha coma (que é onde comeza unha cela nova no CSV).
+    assert not corpo.startswith("=cmd|")
+    assert ",=cmd|" not in corpo
+    assert "'=cmd|" in corpo
+    assert ",@evil=" not in corpo
+    assert "'@evil=" in corpo
+
+    limpar_rexistro("=cmd|'/c calc'!A1")
+
+
 # ---------------------------------------------------------------------------
 # Purga de datos personais
 # ---------------------------------------------------------------------------

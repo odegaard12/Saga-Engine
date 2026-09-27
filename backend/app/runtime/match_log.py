@@ -210,6 +210,30 @@ _CSV_COLUMNS = [
 ]
 
 
+#: Excel/Sheets/LibreOffice tratan una celda que EMPIEZA por cualquiera de
+#: estos caracteres como una fórmula, no como texto -aunque el CSV la
+#: cite entre comillas-. `user`/`display_name` los escribe el propio
+#: jugador (nombre de perfil) y `payload` puede llevar texto libre suyo
+#: (p.ej. `stage_title`), así que sin escapar esto un nombre como
+#: `=cmd|'/c calc'!A1` exporta un CSV que ejecuta algo al abrirlo en el
+#: ordenador del organizador. Ver CVE-2019-1010192 / OWASP "CSV Injection".
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _celda_csv_segura(valor: Any) -> str:
+    """`valor` como texto de celda, sin dejar que arranque una fórmula.
+
+    Antepone una comilla simple si el primer carácter es de los que un
+    lector de hojas de cálculo interpreta como inicio de fórmula. La
+    comilla no se ve al abrir el CSV como texto: Excel/Sheets la usan
+    como marca de "esto es texto", no como parte del valor.
+    """
+    texto = "" if valor is None else str(valor)
+    if texto.startswith(_CSV_FORMULA_PREFIXES):
+        return f"'{texto}"
+    return texto
+
+
 def to_csv(entries: list[dict[str, Any]]) -> str:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=_CSV_COLUMNS)
@@ -217,13 +241,13 @@ def to_csv(entries: list[dict[str, Any]]) -> str:
     for entry in entries:
         writer.writerow(
             {
-                "created_at": entry.get("created_at", ""),
-                "client_created_at": entry.get("client_created_at", ""),
-                "user": entry.get("user", ""),
-                "display_name": entry.get("display_name", ""),
-                "type": entry.get("type", ""),
-                "severity": entry.get("severity", ""),
-                "payload": _stringify_payload(entry.get("payload")),
+                "created_at": _celda_csv_segura(entry.get("created_at", "")),
+                "client_created_at": _celda_csv_segura(entry.get("client_created_at", "")),
+                "user": _celda_csv_segura(entry.get("user", "")),
+                "display_name": _celda_csv_segura(entry.get("display_name", "")),
+                "type": _celda_csv_segura(entry.get("type", "")),
+                "severity": _celda_csv_segura(entry.get("severity", "")),
+                "payload": _celda_csv_segura(_stringify_payload(entry.get("payload"))),
             }
         )
     return buffer.getvalue()

@@ -6,6 +6,20 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.35.1
+
+- **Corrige inyección de fórmulas (CSV injection) en la exportación del
+  Registro de partida.** `/api/admin/match-log/export?formato=csv` escribía
+  `user`, `display_name` y `payload` tal cual: un nombre de jugador o un
+  texto libre del payload que empezara por `=`, `+`, `-` o `@` se abre como
+  fórmula, no como texto, en Excel/Sheets/LibreOffice -el vector clásico de
+  CSV injection (OWASP)-. `backend/app/runtime/match_log.py::to_csv` ahora
+  antepone una comilla simple a cualquier celda que empiece por uno de esos
+  caracteres (o por tabulador/retorno de carro). Revisadas el resto de capas
+  del motor antitrampas (cliente, transporte offline, motor de servidor,
+  almacenamiento JSON/SQLite y panel de administración): sin más hallazgos
+  que corregir.
+
 ## 5.35.0
 
 - **Nuevo: Registro de partida.** Bitácora por jugador para revisar después
