@@ -14,6 +14,7 @@ const ETIQUETA_MOTIVO: Record<string, string> = {
   offline_event_timestamp_in_future: 'Evento offline con fecha futura',
   left_app_during_minigame: 'Salió de la app durante el minijuego',
   opened_app_switcher_during_minigame: 'Abrió el selector de apps durante el minijuego',
+  manual_position_used: 'Usó posición manual (modo prueba)',
 }
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'
@@ -143,10 +144,11 @@ export default function ActivityPanel() {
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
-          <strong>⚠️ Sospechas de trampa</strong>
+          <strong>🛡️ Motor antitrampas SAGA Engine</strong>
           <span>
-            Avisos automáticos del servidor: velocidad imposible, nodos completados sin estar cerca, retos
-            demasiado rápidos o eventos offline con fecha futura. No afectan solos a la clasificación —lo decides tú—.
+            Avisos automáticos del servidor: velocidad imposible, retos superados demasiado rápido (mínimo propio
+            por minijuego) o eventos offline con fecha futura. No afectan solos a la clasificación —lo decides tú—.
+            Las notas neutras (p.ej. uso de posición manual) se muestran aparte: no son una acusación.
           </span>
         </div>
 
@@ -163,7 +165,8 @@ export default function ActivityPanel() {
               <thead>
                 <tr>
                   <th style={th}>Jugador</th>
-                  <th style={th}>Avisos</th>
+                  <th style={th}>Sospechas</th>
+                  <th style={th}>Notas neutras</th>
                   <th style={th}>Último motivo</th>
                   <th style={th}>Cuándo</th>
                 </tr>
@@ -171,11 +174,17 @@ export default function ActivityPanel() {
               <tbody>
                 {sospechas.map((jugador) => {
                   const ultima = jugador.suspicions[0]
+                  const ultimaEsInfo = ultima?.severity === 'info'
                   return (
                     <tr key={jugador.user}>
                       <td style={td}>{jugador.display_name}</td>
-                      <td style={{ ...td, color: '#fbbf24', fontWeight: 800 }}>{jugador.count}</td>
-                      <td style={td}>{ultima ? ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}</td>
+                      <td style={{ ...td, color: jugador.suspicion_count > 0 ? '#fbbf24' : '#94a3b8', fontWeight: 800 }}>
+                        {jugador.suspicion_count}
+                      </td>
+                      <td style={{ ...td, color: '#94a3b8', fontWeight: 600 }}>{jugador.info_count}</td>
+                      <td style={{ ...td, color: ultimaEsInfo ? '#94a3b8' : undefined }}>
+                        {ultima ? ETIQUETA_MOTIVO[ultima.reason] || ultima.reason : '—'}
+                      </td>
                       <td style={td}>{formatFechaMs(ultima?.at)}</td>
                     </tr>
                   )

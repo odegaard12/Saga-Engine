@@ -211,6 +211,17 @@ ANTI_CHEAT_DB = os.path.join(DATA_DIR, "anti_cheat.json")
 # jugador. Aparte de anti_cheat.json: esto no es una sospecha, es sólo la
 # cuenta que decide si la siguiente lo es (ver check_travel_speed).
 SPEED_STREAK_DB = os.path.join(DATA_DIR, "speed_streak.json")
+# Si ya se avisó (nota "info", no sospecha) de que este jugador está en una
+# sesión de GPS manual/debug -ver anti_cheat.note_manual_position-. Aparte de
+# anti_cheat.json por el mismo motivo que SPEED_STREAK_DB: no es una sospecha,
+# es el estado que decide si hace falta anotar otra.
+MANUAL_POSITION_NOTICE_DB = os.path.join(DATA_DIR, "manual_position_notice.json")
+# Tiempos de partida LIMPIOS (no flagueados) por game_id, en esta misión.
+# Es la base de "lo normal aquí" que usa check_completion_time como red de
+# seguridad antes de flaguear un tiempo por debajo del suelo físico (ver
+# backend/app/runtime/anti_cheat.py, MIN_MUESTRAS_PARA_MEDIANA). Aparte de
+# anti_cheat.json: esto no son sospechas, son datos de referencia.
+COMPLETION_TIME_SAMPLES_DB = os.path.join(DATA_DIR, "completion_time_samples.json")
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -975,12 +986,14 @@ def get_player_stage_time_ms(user, level):
 from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
 
 
-def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy):
+def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_s, new_accuracy, new_source=None):
     """Velocidad implausible ENTRE NODOS, entre el punto anterior y el nuevo.
 
     `prev_position` es lo que había en positions.json ANTES de sobreescribir
     con el latido actual: es exactamente el par consecutivo que hace falta,
-    sin guardar historial aparte.
+    sin guardar historial aparte. `new_source` (y `prev_position["source"]`)
+    es lo que deja fuera de esta comprobación cualquier tramo que empiece o
+    acabe en una posición manual/debug -ver check_travel_speed-.
 
     El nivel y el total de nodos deciden si "entre nodos" tiene sentido aquí
     -ver check_travel_speed-: antes de completar el primer nodo (viaje de
@@ -1005,11 +1018,24 @@ def anti_cheat_check_travel_speed(user, prev_position, new_lat, new_lon, new_at_
         new_accuracy,
         level=nivel,
         total_stages=total_nodos,
+        prev_source=prev.get("source"),
+        new_source=new_source,
     )
 
 
+def anti_cheat_note_manual_position(user, source):
+    """Nota NEUTRA (no sospecha) de que `user` usó GPS manual/debug.
+
+    Ver `backend.app.runtime.anti_cheat.note_manual_position`: como mucho una
+    por sesión de uso manual, mostrada aparte en el panel.
+    """
+    return _anti_cheat.note_manual_position(ANTI_CHEAT_DB, MANUAL_POSITION_NOTICE_DB, user, source)
+
+
 def anti_cheat_check_completion_time(user, node, time_spent_ms):
-    return _anti_cheat.check_completion_time(ANTI_CHEAT_DB, user, node, time_spent_ms)
+    return _anti_cheat.check_completion_time(
+        ANTI_CHEAT_DB, user, node, time_spent_ms, samples_db_path=COMPLETION_TIME_SAMPLES_DB
+    )
 
 
 def anti_cheat_check_future_timestamp(user, local_created_ms, node_id=None):

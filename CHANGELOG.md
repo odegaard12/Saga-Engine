@@ -6,6 +6,45 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.34.1
+
+- **Corrige el mínimo de tiempo de minijuego (regresión de 5.34.0).** La
+  tabla por familia derivaba el umbral de la duración "típica" del catálogo
+  del organizador (p.ej. team_relay ≈66 s), pero con datos reales los
+  circuitos se completaban en ~17 s y otros minijuegos en ~1 s: flagueaba a
+  jugadores honestos. Se sustituye por un suelo único y conservador de 2 s
+  (`MIN_PLAUSIBLE_STAGE_MS`), sin mínimos "por duración típica"; sólo
+  `sequence_code` conserva un suelo propio, y calculado de un límite físico
+  real (nº de pasos de la secuencia del nodo), no de una media. Se añade una
+  red de seguridad basada en datos: con 5 o más partidas ya vistas de ese
+  minijuego en esta misión, sólo se flaguea si el tiempo está por debajo del
+  20 % de la mediana observada, así que un récord rápido pero cercano a
+  otros tiempos reales nunca queda marcado. Se quitan las entradas de
+  `spark_radar` y `team_relay` (prototipos sin cablear en la ruta real).
+  Ningún registro se invalida: sigue siendo FLAG, no bloqueo.
+
+## 5.34.0
+
+- **Motor antitrampas SAGA Engine: posición manual/debug excluida.** Un
+  latido con `source: "manual"` (modo prueba, ver `PlayerApp.tsx`
+  `handleDebugSetPosition`) ya no puede disparar "velocidad imposible": el
+  salto real→manual→real es justo lo que se espera de ese modo. Se anota,
+  como mucho una vez por sesión de uso manual, una nota NEUTRA ("usó
+  posición manual") separada de las sospechas en el panel.
+- **Mínimo de tiempo de minijuego, por familia.** El suelo único de 5 s pasa
+  a ser un suelo por `game_id` (≈20-25 % de la duración mínima real de cada
+  minijuego, ver `gameCatalog.ts`), nunca por debajo de 5 s. Checkpoint, QR
+  y coleccionables siguen exentos, como antes.
+- **Rebranding: "Motor antitrampas SAGA Engine".** Un único módulo
+  (`backend/app/runtime/anti_cheat.py`) con toda la política y los
+  umbrales documentados, y el panel de admin ahora separa sospechas de
+  notas neutras (con su recuento por jugador) bajo esa cabecera.
+- Doc: se deja explícito que un `blur` sin `hidden` más corto que
+  `SALIDA_MINIMA_MS` (1,5 s) -como deslizar el Centro de Control en iOS- no
+  penaliza, con el mismo umbral que ya usaba Android.
+
+---
+
 ## 5.33.1
 
 - **Antitrampas del servidor, revisado.** Velocidad imposible sólo se mira

@@ -55,6 +55,15 @@ export const PENALIZACION_POR_SALIDA_MS = 30_000
  * absorbe una notificación que aparece y desaparece sola sin que el jugador
  * llegue a tocarla: en la mayoría de móviles ni siquiera dispara `blur`,
  * pero si lo hace, dura menos que esto.
+ *
+ * Mismo umbral para iOS: deslizar el Centro de Control o la bandeja de
+ * notificaciones desde el borde superior quita el foco a la página
+ * (`blur` SIN `hidden`, motivo `selector_apps`) igual que la vista de
+ * tareas de Android, pero un vistazo típico dura mucho menos de 1,5 s. Con
+ * el mismo `terminar()` de abajo para las dos señales, ese gesto honesto no
+ * penaliza -no llega a los 1 500 ms-. No se manda al servidor como sospecha
+ * NI como nota: por debajo de este umbral se descarta entera, a propósito,
+ * para no generar ruido por cada vistazo a la hora.
  */
 const SALIDA_MINIMA_MS = 1_500
 
