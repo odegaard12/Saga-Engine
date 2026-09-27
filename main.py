@@ -53,6 +53,8 @@ from backend.app.runtime import live_positions as _live_positions
 from backend.app.runtime import player_events as _player_events
 from backend.app.runtime import admin_overview as _admin_overview
 from backend.app.runtime import mission_schedule as _mission_schedule
+from backend.app.runtime import match_log as _match_log
+from backend.app.storage import match_log_store as _match_log_store
 
 def _split_csv_env(name, default=""):
     raw = str(os.getenv(name, default) or "").strip()
@@ -222,6 +224,12 @@ MANUAL_POSITION_NOTICE_DB = os.path.join(DATA_DIR, "manual_position_notice.json"
 # backend/app/runtime/anti_cheat.py, MIN_MUESTRAS_PARA_MEDIANA). Aparte de
 # anti_cheat.json: esto no son sospechas, son datos de referencia.
 COMPLETION_TIME_SAMPLES_DB = os.path.join(DATA_DIR, "completion_time_samples.json")
+# Registro de partida (ver backend/app/runtime/match_log.py): la bitácora
+# completa por jugador para revisar después de la ruta. Fichero SQLite propio
+# -no events.json- porque tiene su propio límite de tamaño y su propio
+# borrado (purga de datos personales), y no depende de qué backend de
+# eventos esté activo.
+MATCH_LOG_DB = _match_log_store.resolve_match_log_path(DATA_DIR)
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -1231,6 +1239,134 @@ def mission_is_locked(cfg=None):
     return _mission_schedule.mission_is_locked(cfg.get("mission_launch_at"))
 
 
+def match_log_is_active(cfg=None):
+    """¿Hay que escribir en el Registro de partida ahora mismo?
+
+    Ver backend/app/runtime/match_log.py: sólo mientras la misión está
+    PROGRAMADA (`mission_launch_at` puesta) y ACTIVA (esa hora ya llegó).
+    """
+    cfg = cfg or load_config()
+    locked = mission_is_locked(cfg)
+    return _match_log.is_active(cfg, mission_locked=locked)
+
+
+def match_log_display_name(profile_id, profile=None):
+    if isinstance(profile, dict) and profile.get("display_name"):
+        return _as_str(profile.get("display_name"))
+    return _as_str(profile_id)
+
+
+def match_log_record(event_type, user, payload=None, severity=None, client_created_at=None, profile=None, active=None):
+    """Anota una entrada del Registro de partida si la misión está activa."""
+    activo = match_log_is_active() if active is None else active
+    return _match_log.record(
+        MATCH_LOG_DB,
+        active=activo,
+        event_type=event_type,
+        user=user,
+        display_name=match_log_display_name(user, profile),
+        payload=payload,
+        severity=severity,
+        client_created_at=client_created_at,
+    )
+
+
+def match_log_record_position(user, position, now_s, profile=None, active=None):
+    activo = match_log_is_active() if active is None else active
+    position = position if isinstance(position, dict) else {}
+    return _match_log.record_position_sample(
+        MATCH_LOG_DB,
+        active=activo,
+        user=user,
+        display_name=match_log_display_name(user, profile),
+        lat=position.get("lat"),
+        lon=position.get("lon"),
+        accuracy=position.get("accuracy"),
+        source=position.get("source") or "real",
+        now=now_s,
+    )
+
+
+def match_log_record_session_open(user, profile=None, active=None, now_s=None):
+    activo = match_log_is_active() if active is None else active
+    return _match_log.record_session_open(
+        MATCH_LOG_DB,
+        active=activo,
+        user=user,
+        display_name=match_log_display_name(user, profile),
+        now=now_s,
+    )
+
+
+def match_log_list_timeline(user=None, date_from=None, date_to=None, event_type=None, limit=None):
+    return _match_log.list_timeline(
+        MATCH_LOG_DB, user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit
+    )
+
+
+def match_log_count(user=None):
+    return _match_log.count_entries(MATCH_LOG_DB, user=user)
+
+
+def match_log_purge(user=None):
+    return _match_log.purge(MATCH_LOG_DB, user=user)
+
+
+def match_log_to_csv(entries):
+    return _match_log.to_csv(entries)
+
+
+def match_log_offline_sync_delay_ms(raw_events):
+    """Retraso, en ms, entre el evento MÁS VIEJO de la tanda y ahora.
+
+    Busca `local_created_at` (ISO) o `local_created_at_ms` en el payload de
+    cada evento crudo -lo que ya manda missionPack.ts para node_completed-.
+    Sin ninguna fecha reconocible, no hay nada que medir.
+    """
+    if not isinstance(raw_events, list):
+        return None
+
+    momentos_ms = []
+    for raw in raw_events:
+        payload = raw.get("payload") if isinstance(raw, dict) else None
+        payload = payload if isinstance(payload, dict) else {}
+        candidato = payload.get("local_created_at")
+        ms = _iso_a_ms(candidato) if candidato else None
+        if ms is None:
+            try:
+                ms = int(payload.get("local_created_at_ms")) if payload.get("local_created_at_ms") else None
+            except (TypeError, ValueError):
+                ms = None
+        if ms:
+            momentos_ms.append(ms)
+
+    if not momentos_ms:
+        return None
+
+    return max(0, int(time.time() * 1000) - min(momentos_ms))
+
+
+def _match_log_anti_cheat_sink(user, reason, evidence, severity):
+    """Puente entre el motor antitrampas y el Registro de partida.
+
+    Cada `record_suspicion` (sospecha real o nota "info" neutra) también
+    queda anotada en la línea de tiempo del jugador, para no tener que
+    cruzar dos paneles a mano al revisar una partida.
+    """
+    try:
+        match_log_record(
+            "suspicion" if severity != "info" else "info_note",
+            user,
+            payload={"reason": reason, **(evidence if isinstance(evidence, dict) else {})},
+            severity=severity,
+        )
+    except Exception:
+        pass
+
+
+_anti_cheat.configure_match_log_sink(_match_log_anti_cheat_sink)
+
+
 def get_runtime_stages():
     """Los nodos de la mision, normalizados.
 
@@ -1308,11 +1444,23 @@ def apply_synced_player_event(normalized_event, user, profile):
         # cualquier otro evento del jugador.
         payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
         razon = _as_str(payload.get("anti_cheat_reason")).strip()
+        profile_id_evento = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
         if razon in ("left_app_during_minigame", "opened_app_switcher_during_minigame"):
-            profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
             anti_cheat_check_client_reported_exit(
-                profile_id, razon, {**payload, "node_id": event.get("node_id") or payload.get("node_id")}
+                profile_id_evento, razon, {**payload, "node_id": event.get("node_id") or payload.get("node_id")}
             )
+
+        # Registro de partida: todo lo demás que llega por la cola offline
+        # -nodo abierto, QR, mochila, minijuego, equipo- se anota tal cual,
+        # con su tipo de evento como tipo de fila. node_completed tiene su
+        # propio camino más abajo porque además avanza progreso de verdad.
+        match_log_record(
+            event.get("type") or "player_event",
+            profile_id_evento,
+            payload={**payload, "node_id": event.get("node_id")},
+            client_created_at=_as_str(payload.get("local_created_at")) or None,
+            profile=profile,
+        )
         return append_event(EVENT_LOG_DB, event)
 
     profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
@@ -1462,6 +1610,21 @@ def apply_synced_player_event(normalized_event, user, profile):
         "level_after": current_level + 1,
         "server_applied": True,
     }
+
+    match_log_record(
+        "advance",
+        profile_id,
+        payload={
+            "node_id": current_node.get("id"),
+            "level_before": current_level,
+            "level_after": current_level + 1,
+            "time_spent_ms": time_spent_ms,
+            "via": "offline_queue",
+        },
+        client_created_at=_as_str(payload.get("local_created_at")) or None,
+        profile=profile,
+    )
+
     return append_event(EVENT_LOG_DB, event)
 
 

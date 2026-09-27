@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
 import ActivityPanel from './ActivityPanel'
+import MatchLogPanel from './MatchLogPanel'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
@@ -27,7 +28,7 @@ import ReleaseNotesModal from './ReleaseNotesModal'
 import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity' | 'match-log'
 type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
 type MissionSaveState = StandardSaveState | 'dirty'
 
@@ -630,7 +631,10 @@ export default function AdminMissionControlShell({
               },
               {
                 titulo: 'Seguimiento',
-                entradas: [{ panel: 'activity', icono: '📋', etiqueta: 'Actividad' }],
+                entradas: [
+                  { panel: 'activity', icono: '📋', etiqueta: 'Actividad' },
+                  { panel: 'match-log', icono: '🕵️', etiqueta: 'Registro de partida' },
+                ],
               },
             ] as { titulo: string; entradas: { panel: CmsPanel; icono: string; etiqueta: string }[] }[]
           ).map((grupo) => (
@@ -1075,7 +1079,9 @@ export default function AdminMissionControlShell({
                         ? 'Banco de pruebas'
                         : cmsPanel === 'activity'
                           ? 'Actividad'
-                          : t('admin.settings')}
+                          : cmsPanel === 'match-log'
+                            ? 'Registro de partida'
+                            : t('admin.settings')}
             </strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>
               {t('common.close')}
@@ -1137,6 +1143,8 @@ export default function AdminMissionControlShell({
             {cmsPanel === 'simulation' ? <SimulationBenchPanel /> : null}
 
             {cmsPanel === 'activity' ? <ActivityPanel /> : null}
+
+            {cmsPanel === 'match-log' ? <MatchLogPanel /> : null}
           </div>
         </aside>
       ) : null}

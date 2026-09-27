@@ -6,6 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.35.0
+
+- **Nuevo: Registro de partida.** Bitácora por jugador para revisar después
+  de la ruta y detectar trampas: sesión abierta, muestras de posición de
+  heartbeat (máx. una cada 30 s, con precisión y origen real/manual),
+  nodo abierto, avance/completado (con o sin cobertura), QR, mochila,
+  minijuegos, sincronización de la cola offline (cuántos eventos y con
+  cuánto retraso) y las sospechas/notas del motor antitrampas. Sólo se
+  escribe mientras la misión está PROGRAMADA (`mission_launch_at` puesta) y
+  ACTIVA -fuera de esa ventana no se anota nada-. Almacén SQLite propio
+  (`data/match_log.sqlite3`, fuera del repo) con tope de tamaño y poda de
+  lo más antiguo. Incluido en la purga de "Datos personales". Panel nuevo
+  en el admin ("Registro de partida", grupo Seguimiento): línea de tiempo
+  filtrable por jugador y fechas, con sospechas resaltadas, y exportación a
+  JSON y CSV.
+
 ## 5.34.1
 
 - **Corrige el mínimo de tiempo de minijuego (regresión de 5.34.0).** La

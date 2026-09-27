@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
@@ -842,6 +842,75 @@ async def admin_mark_event(request: Request):
     }
 
 
+@router.post("/api/admin/match-log")
+async def admin_match_log(request: Request):
+    """Registro de partida: línea de tiempo de un jugador entre dos fechas.
+
+    Sólo lectura -esto no decide nada por sí solo, es la bitácora completa
+    para que el organizador revise después de la ruta-. Ver
+    backend/app/runtime/match_log.py para qué se anota y cuándo.
+    """
+    import main
+    data = await request.json()
+
+    if not main.admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    user = main.sanitize_event_text(data.get("user"), 120) or None
+    date_from = main.sanitize_event_text(data.get("desde"), 40) or None
+    date_to = main.sanitize_event_text(data.get("hasta"), 40) or None
+    event_type = main.sanitize_event_text(data.get("type"), 80) or None
+
+    limit = data.get("limit", 5000)
+    try:
+        limit = max(1, min(20000, int(limit)))
+    except (TypeError, ValueError):
+        limit = 5000
+
+    entries = main.match_log_list_timeline(
+        user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit
+    )
+
+    return {
+        "status": "ok",
+        "entries": entries,
+        "count": len(entries),
+    }
+
+
+@router.post("/api/admin/match-log/export")
+async def admin_match_log_export(request: Request):
+    """Igual que /api/admin/match-log, pero para descargar: JSON o CSV."""
+    import main
+    data = await request.json()
+
+    if not main.admin_request_authorized(request, data):
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    user = main.sanitize_event_text(data.get("user"), 120) or None
+    date_from = main.sanitize_event_text(data.get("desde"), 40) or None
+    date_to = main.sanitize_event_text(data.get("hasta"), 40) or None
+    formato = (main.sanitize_event_text(data.get("formato"), 10) or "json").lower()
+
+    entries = main.match_log_list_timeline(user=user, date_from=date_from, date_to=date_to, limit=20000)
+
+    nombre_jugador = user or "todos"
+    nombre_fichero = f"registro-de-partida-{nombre_jugador}"
+
+    if formato == "csv":
+        cuerpo = main.match_log_to_csv(entries)
+        return Response(
+            content=cuerpo,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{nombre_fichero}.csv"'},
+        )
+
+    return JSONResponse(
+        {"status": "ok", "entries": entries, "count": len(entries)},
+        headers={"Content-Disposition": f'attachment; filename="{nombre_fichero}.json"'},
+    )
+
+
 @router.post("/api/admin/player/restore-node")
 async def admin_restore_node(request: Request):
     import main
@@ -902,6 +971,7 @@ def _contar_datos_personales():
         "fotos": int(total_fotos),
         "ficheros_de_imagen": ficheros,
         "posiciones_gps": n_posiciones,
+        "registro_de_partida": main.match_log_count(),
     }
 
 
@@ -992,10 +1062,16 @@ async def admin_datos_personales(request: Request):
                     pass
 
     posiciones_borradas = 0
+    registro_de_partida_borrado = 0
     if borrar_posiciones:
         posiciones = main.load_live_positions() or {}
         posiciones_borradas = len(posiciones)
         main.save_live_positions({})
+
+        # El Registro de partida guarda nombres y posiciones de cada
+        # jugador: es justo el mismo tipo de dato que borrar_posiciones ya
+        # cubre, así que se va con él y no queda una copia olvidada aparte.
+        registro_de_partida_borrado = main.match_log_purge()
 
     main.append_event(
         main.EVENT_LOG_DB,
@@ -1008,6 +1084,7 @@ async def admin_datos_personales(request: Request):
                 "fotos_borradas": filas_borradas,
                 "imagenes_borradas": imagenes_borradas,
                 "posiciones_borradas": posiciones_borradas,
+            "registro_de_partida_borrado": registro_de_partida_borrado,
             },
         },
     )
@@ -1020,6 +1097,7 @@ async def admin_datos_personales(request: Request):
             "fotos": filas_borradas,
             "imagenes": imagenes_borradas,
             "posiciones_gps": posiciones_borradas,
+            "registro_de_partida": registro_de_partida_borrado,
         },
         "queda": _contar_datos_personales(),
     }
