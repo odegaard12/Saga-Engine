@@ -4,8 +4,8 @@ Antes de esto no había ninguna comprobación en el servidor -sólo en el
 cliente, y sólo para "saliste de la aplicación en mitad de un reto" (ver
 useAntiTrampas.ts / tests/test_anti_trampas.py)-. El GPS de entrada y la
 progresión de nodos no comprobaban nada más allá de lo que hacía falta para
-que el juego avanzara, así que un jugador podía completar un nodo sin haber
-estado cerca, o "teletransportarse" entre dos, sin que quedara ningún rastro.
+que el juego avanzara, así que un jugador podía "teletransportarse" entre dos
+puntos sin que quedara ningún rastro.
 
 Política, y es la parte que importa: FLAG, no bloqueo. Un GPS ruidoso -de
 serie en el monte- o un jugador que jugó entero sin cobertura y sincronizó
@@ -15,6 +15,11 @@ impide nada: sólo dejan constancia en `anti_cheat.json` para que el
 organizador lo revise a mano desde el panel (ver
 backend/app/routers/admin.py, `/api/admin/anti-cheat-flags`) y decida, caso
 por caso, si afecta a la clasificación.
+
+⚠️ NO existe (y se quitó a propósito) una comprobación de "nodo completado
+lejos de su sitio". El GPS en el monte falla con frecuencia -árboles, valles,
+mala cobertura- y esa comprobación acusaba a jugadores honestos casi tan a
+menudo como a quien hacía trampa.
 """
 from __future__ import annotations
 
@@ -23,6 +28,7 @@ import time
 from typing import Any, Optional
 
 from backend.app.storage.json_store import load_json, update_json
+from backend.app.runtime.mision import kind_del_nodo
 
 # ---------------------------------------------------------------------------
 # Umbrales. Cada uno documenta el motivo del número, no sólo el número.
@@ -49,9 +55,17 @@ MAX_ACCURACY_MARGIN_M = 300.0
 #: móvil pesa más que el movimiento real: no se calcula velocidad.
 MIN_INTERVAL_S = 3.0
 
+#: Una lectura de GPS sola que "salta" no es sospechosa: el propio GPS lo hace
+#: constantemente en el monte, sin que nadie se haya movido. Sólo cuenta si la
+#: velocidad implausible se sostiene en esta cantidad de tramos consecutivos
+#: -cada tramo ya descuenta su propio margen de precisión-, que es lo que un
+#: salto de un solo fix no puede fingir.
+MIN_CONSECUTIVE_SPEED_VIOLATIONS = 2
+
 #: Nadie completa un reto en menos que esto, ni el más rápido: es el tiempo
-#: de leer la pantalla una vez y tocar.
-MIN_PLAUSIBLE_STAGE_MS = 1500
+#: de leer la pantalla una vez y tocar. Se aplica sólo a minijuegos -ver
+#: check_completion_time-, no a checkpoints, QR ni coleccionables.
+MIN_PLAUSIBLE_STAGE_MS = 5000
 
 #: Margen de reloj entre el móvil y el servidor. Los relojes de los móviles
 #: no siempre van en hora -sobre todo sin red-, y eso no es lo que se
@@ -147,8 +161,44 @@ def count_suspicions(db_path: str) -> dict:
 # Comprobaciones. Cada una devuelve la sospecha registrada, o None si no hay.
 # ---------------------------------------------------------------------------
 
+def _reset_speed_streak(streak_db_path: str, user: str) -> None:
+    """El tramo actual no es sospechoso: se olvida cualquier racha anterior."""
+    user_key = str(user or "").strip()
+    if not user_key:
+        return
+
+    def _actualizar(actual):
+        actual = actual if isinstance(actual, dict) else {}
+        if user_key in actual:
+            actual = dict(actual)
+            actual.pop(user_key, None)
+        return actual
+
+    update_json(streak_db_path, {}, _actualizar)
+
+
+def _bump_speed_streak(streak_db_path: str, user: str) -> int:
+    """Un tramo más de velocidad implausible: suma uno a la racha y la devuelve."""
+    user_key = str(user or "").strip()
+    if not user_key:
+        return 1
+
+    resultado = {"n": 1}
+
+    def _actualizar(actual):
+        actual = dict(actual) if isinstance(actual, dict) else {}
+        n = int(actual.get(user_key) or 0) + 1
+        actual[user_key] = n
+        resultado["n"] = n
+        return actual
+
+    update_json(streak_db_path, {}, _actualizar)
+    return resultado["n"]
+
+
 def check_travel_speed(
     db_path: str,
+    streak_db_path: str,
     user: str,
     prev_lat: Optional[float],
     prev_lon: Optional[float],
@@ -158,13 +208,32 @@ def check_travel_speed(
     new_lon: float,
     new_at_s: float,
     new_accuracy: Optional[float],
+    level: Optional[int] = None,
+    total_stages: Optional[int] = None,
 ) -> Optional[dict]:
-    """Velocidad implausible entre dos posiciones consecutivas del mismo jugador.
+    """Velocidad implausible ENTRE NODOS, sostenida en más de un tramo.
 
-    Se resta el margen de precisión de los DOS fixes antes de calcular
-    velocidad: dos lecturas de GPS ruidoso pueden separar cien metros sin que
-    nadie se haya movido un paso, y eso no es una sospecha, es ruido.
+    Dos motivos para no mirar esto en cualquier momento de la partida:
+
+    - **Antes de completar el primer nodo** un jugador puede llegar en coche
+      -de casa al punto de partida- a una velocidad que sería imposible a pie
+      entre dos nodos de la ruta. No es trampa, es cómo se llega al inicio.
+    - **Con la misión ya terminada** no hay "entre nodos" que vigilar.
+
+    Por eso sólo se evalúa con `0 < level < total_stages`: ha completado ya el
+    primero y todavía no ha acabado. Sin ese dato (`level`/`total_stages` no
+    informados) no se comprueba nada -mejor no flaguear que flaguear a
+    ciegas-.
+
+    Y un único salto de GPS -por ruidoso que sea el fix- nunca basta: sólo
+    cuenta si la velocidad implausible se repite en
+    `MIN_CONSECUTIVE_SPEED_VIOLATIONS` tramos consecutivos del mismo jugador.
+    Un salto aislado se olvida en el siguiente latido bueno.
     """
+    if level is None or total_stages is None or level <= 0 or level >= total_stages:
+        _reset_speed_streak(streak_db_path, user)
+        return None
+
     if prev_lat is None or prev_lon is None or not prev_at_s:
         return None
 
@@ -176,10 +245,16 @@ def check_travel_speed(
     margen_m = _accuracy_margin(prev_accuracy, new_accuracy)
     distancia_neta_m = max(0.0, distancia_m - margen_m)
     if distancia_neta_m <= 0:
+        _reset_speed_streak(streak_db_path, user)
         return None
 
     velocidad_kmh = (distancia_neta_m / delta_s) * 3.6
     if velocidad_kmh <= MAX_PLAUSIBLE_SPEED_KMH:
+        _reset_speed_streak(streak_db_path, user)
+        return None
+
+    racha = _bump_speed_streak(streak_db_path, user)
+    if racha < MIN_CONSECUTIVE_SPEED_VIOLATIONS:
         return None
 
     return record_suspicion(
@@ -191,53 +266,9 @@ def check_travel_speed(
             "distance_m": round(distancia_m, 1),
             "elapsed_s": round(delta_s, 1),
             "accuracy_margin_m": round(margen_m, 1),
+            "consecutive_segments": racha,
             "from": {"lat": prev_lat, "lon": prev_lon},
             "to": {"lat": new_lat, "lon": new_lon},
-        },
-    )
-
-
-def check_node_proximity(
-    db_path: str,
-    user: str,
-    node: dict,
-    lat: Optional[float],
-    lon: Optional[float],
-    accuracy: Optional[float],
-) -> Optional[dict]:
-    """El jugador completa un nodo GPS sin haber estado nunca cerca.
-
-    Sólo se comprueba cuando el nodo exige proximidad (`location.lat/lon` con
-    radio) y se conoce la última posición conocida del jugador. Sin GPS no
-    hay nada que comparar -y no se flaguea por no tener GPS, que ya castiga
-    aparte la propia entrada al nodo-.
-    """
-    location = node.get("location") if isinstance(node, dict) else None
-    if not isinstance(location, dict):
-        return None
-
-    node_lat = location.get("lat")
-    node_lon = location.get("lon")
-    radius_m = location.get("radius_m") or 0
-    if node_lat is None or node_lon is None or not radius_m or lat is None or lon is None:
-        return None
-
-    distancia_m = haversine_m(float(node_lat), float(node_lon), float(lat), float(lon))
-    margen_m = _accuracy_margin(accuracy)
-    tolerancia_m = float(radius_m) + margen_m
-    if distancia_m <= tolerancia_m:
-        return None
-
-    return record_suspicion(
-        db_path,
-        user,
-        "node_completed_without_proximity",
-        {
-            "node_id": node.get("id"),
-            "distance_m": round(distancia_m, 1),
-            "radius_m": radius_m,
-            "accuracy_margin_m": round(margen_m, 1),
-            "player_position": {"lat": lat, "lon": lon},
         },
     )
 
@@ -248,13 +279,23 @@ def check_completion_time(
     node: dict,
     time_spent_ms: Optional[int],
 ) -> Optional[dict]:
-    """Un reto superado más rápido de lo físicamente posible.
+    """Un minijuego superado más rápido de lo físicamente posible.
+
+    Sólo aplica a MINIJUEGOS (ver `kind_del_nodo`). Un checkpoint o un QR se
+    "superan" con un solo toque o un escaneo -no hay partida que jugar-, y un
+    coleccionable es un pickup: tocar y listo. Medirles un tiempo mínimo de
+    partida los flaguearía por hacer exactamente lo que se espera de ellos.
 
     El umbral es el mismo para todos los tipos de minijuego, y a propósito
-    bajo: no se trata de adivinar cuánto tarda cada familia -eso varía con el
-    jugador y el móvil-, sólo de cazar un 0 o un 40 ms que sólo puede venir de
-    un aviso interno reenviado a mano, no de una persona jugando.
+    bajo -MIN_PLAUSIBLE_STAGE_MS-: no se trata de adivinar cuánto tarda cada
+    familia -eso varía con el jugador y el móvil-, sólo de cazar un tiempo que
+    sólo puede venir de un aviso interno reenviado a mano, no de una persona
+    jugando.
     """
+    kind = kind_del_nodo(node) if isinstance(node, dict) else None
+    if kind != "minijuego":
+        return None
+
     if time_spent_ms is None:
         return None
     try:

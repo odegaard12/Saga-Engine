@@ -440,6 +440,10 @@ const GL: Record<string, string> = {
   'Ya lo llevas encima. El nodo se abrirá sin problema.': 'Xa o levas encima. O nodo abrirase sen problema.',
   'Este nodo no se abre sin esto. Si no lo tienes, fabrícalo en la Mesa de trabajo.':
     'Este nodo non se abre sen isto. Se non o tes, fabrícao na Mesa de traballo.',
+
+  // Anti-trampas del cliente: selector de apps durante un minijuego.
+  'Abriste el selector de apps durante el reto: empieza de nuevo y se suman 30 s.':
+    'Abriches o selector de apps durante o reto: comeza de novo e súmanse 30 s.',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(

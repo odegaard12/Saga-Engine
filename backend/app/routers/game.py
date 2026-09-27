@@ -514,7 +514,6 @@ async def advance(request: Request):
             # anota, nunca impide el avance. El código ya es válido -eso lo
             # decidió stage_accepts_code arriba-, así que lo que se comprueba
             # aquí es plausibilidad, no permiso.
-            main.anti_cheat_check_node_proximity(profile_id, current_node)
             main.anti_cheat_check_completion_time(profile_id, current_node, time_spent_ms)
 
             # Igual que penalty_ms arriba: viene del móvil sin garantía de forma.
