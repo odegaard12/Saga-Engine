@@ -47,6 +47,10 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
     inventory_state = main.load_inventory_state()
     inventory_snapshot = inventory_state.get(profile_id, {"items": []})
 
+    # Registro de partida: apertura de sesión, con su propio tope (una nota
+    # cada 5 minutos como mucho) para no repetirla en cada recarga de la app.
+    main.match_log_record_session_open(profile_id, profile=profile)
+
     payload = {
         "user": profile_id,
         "display_name": profile.get("display_name", profile_id),
@@ -257,6 +261,18 @@ async def sync_player_events(request: Request):
         },
     )
 
+    # Registro de partida: una fila por TANDA sincronizada, con cuántos
+    # eventos traía y el retraso entre el más viejo de la cola y el momento
+    # en que por fin llegó al servidor -la señal de "cuánto tiempo estuvo
+    # este jugador sin cobertura"-.
+    delay_ms = main.match_log_offline_sync_delay_ms(events)
+    main.match_log_record(
+        "offline_sync_batch",
+        profile.get("id") or user,
+        payload={"event_count": len(stored), "delay_ms": delay_ms},
+        profile=profile,
+    )
+
     return {
         "status": "ok",
         "accepted": len(stored),
@@ -399,6 +415,12 @@ async def heartbeat(request: Request):
 
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
+
+    # Registro de partida (ver backend/app/runtime/match_log.py): muestra de
+    # posición, con su propio tope de una cada 30 s por jugador -aparte del
+    # límite del propio heartbeat, que es otra regla con otro propósito-.
+    if lat is not None and lon is not None:
+        main.match_log_record_position(profile_id, current, now, profile=profile)
 
     respuesta = {
         "status": "ok",
@@ -545,6 +567,20 @@ async def advance(request: Request):
 
             if lvl + 1 >= len(stages):
                 main.mark_player_finished(profile_id)
+
+            main.match_log_record(
+                "advance",
+                profile_id,
+                payload={
+                    "node_id": current_node.get("id"),
+                    "level_before": lvl,
+                    "level_after": lvl + 1,
+                    "time_spent_ms": time_spent_ms,
+                    "penalty_ms": penalty_ms,
+                    "manual": codigo_a_mano,
+                },
+                profile=profile,
+            )
 
             return {
                 "status": "ok",

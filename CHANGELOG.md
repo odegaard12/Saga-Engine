@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.35.1
+
+- **Corrige inyección de fórmulas (CSV injection) en la exportación del
+  Registro de partida.** `/api/admin/match-log/export?formato=csv` escribía
+  `user`, `display_name` y `payload` tal cual: un nombre de jugador o un
+  texto libre del payload que empezara por `=`, `+`, `-` o `@` se abre como
+  fórmula, no como texto, en Excel/Sheets/LibreOffice -el vector clásico de
+  CSV injection (OWASP)-. `backend/app/runtime/match_log.py::to_csv` ahora
+  antepone una comilla simple a cualquier celda que empiece por uno de esos
+  caracteres (o por tabulador/retorno de carro). Revisadas el resto de capas
+  del motor antitrampas (cliente, transporte offline, motor de servidor,
+  almacenamiento JSON/SQLite y panel de administración): sin más hallazgos
+  que corregir.
+
+## 5.35.0
+
+- **Nuevo: Registro de partida.** Bitácora por jugador para revisar después
+  de la ruta y detectar trampas: sesión abierta, muestras de posición de
+  heartbeat (máx. una cada 30 s, con precisión y origen real/manual),
+  nodo abierto, avance/completado (con o sin cobertura), QR, mochila,
+  minijuegos, sincronización de la cola offline (cuántos eventos y con
+  cuánto retraso) y las sospechas/notas del motor antitrampas. Sólo se
+  escribe mientras la misión está PROGRAMADA (`mission_launch_at` puesta) y
+  ACTIVA -fuera de esa ventana no se anota nada-. Almacén SQLite propio
+  (`data/match_log.sqlite3`, fuera del repo) con tope de tamaño y poda de
+  lo más antiguo. Incluido en la purga de "Datos personales". Panel nuevo
+  en el admin ("Registro de partida", grupo Seguimiento): línea de tiempo
+  filtrable por jugador y fechas, con sospechas resaltadas, y exportación a
+  JSON y CSV.
+
 ## 5.34.1
 
 - **Corrige el mínimo de tiempo de minijuego (regresión de 5.34.0).** La

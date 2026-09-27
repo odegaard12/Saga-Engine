@@ -29,6 +29,9 @@ VALID_EVENT_TYPES = {
     "inventory_item_used",
     "offline_sync_received",
     "admin_action",
+    "minigame_started",
+    "minigame_finished",
+    "minigame_restarted",
 }
 
 VALID_EVENT_STATUS = {
