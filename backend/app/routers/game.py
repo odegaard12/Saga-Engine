@@ -382,11 +382,20 @@ async def heartbeat(request: Request):
 
     # Anti-trampas: sólo FLAG, nunca bloquea el latido ni se devuelve al
     # jugador. Sólo tiene sentido con dos posiciones reales -no con el primer
-    # latido de la sesión, que no tiene "anterior"-.
+    # latido de la sesión, que no tiene "anterior"-. `current["source"]` ya
+    # decide dentro si el tramo es manual/debug (ver
+    # anti_cheat_check_travel_speed / check_travel_speed): un salto que
+    # empiece o acabe en posición manual nunca cuenta como velocidad
+    # implausible.
     if lat is not None and lon is not None:
         main.anti_cheat_check_travel_speed(
-            profile_id, posicion_anterior, lat, lon, now, accuracy
+            profile_id, posicion_anterior, lat, lon, now, accuracy, new_source=current["source"]
         )
+
+    # Nota neutra (no sospecha) de que este jugador está usando GPS
+    # manual/debug: como mucho una por sesión de uso manual (ver
+    # anti_cheat_note_manual_position).
+    main.anti_cheat_note_manual_position(profile_id, current["source"])
 
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now

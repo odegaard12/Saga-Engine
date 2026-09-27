@@ -1223,8 +1223,12 @@ export default function PlayerApp() {
   const gpsAccRef = useRef<number | undefined>(undefined)
   heartbeatPositionRef.current =
     localDebugPosition || (browserGpsFresh ? browserGpsPosition : null)
+  // 'manual' marca explícitamente que esta posición se puso a mano (modo
+  // prueba/debug), NUNCA GPS real: el servidor la excluye de la
+  // comprobación de velocidad y la anota como nota neutra, no sospecha (ver
+  // backend/app/runtime/anti_cheat.py, MANUAL_POSITION_SOURCE).
   heartbeatSourceRef.current = localDebugPosition
-    ? 'react'
+    ? 'manual'
     : browserGpsPosition
       ? 'browser_gps'
       : 'player'
@@ -2314,7 +2318,9 @@ export default function PlayerApp() {
       lat: position.lat,
       lon: position.lon,
       gps_status: 'ok',
-      source: 'react',
+      // 'manual': igual que heartbeatSourceRef más abajo, nunca GPS real
+      // (ver backend/app/runtime/anti_cheat.py, MANUAL_POSITION_SOURCE).
+      source: 'manual',
     }).catch(() => undefined)
     showNotice(N.posicionDebugActualizada, 'success')
     vibrate([10, 12, 10])
