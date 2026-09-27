@@ -61,6 +61,7 @@ import { aplicarResetDeRelojes, tiempoDelNodo } from './nodeClock'
 import { marcarInicioQr, tempoDoQr } from './qrClock'
 import { QrScanClock } from './components/QrScanClock'
 import { adoptarIdiomaDeLaMision } from '../i18n'
+import { useI18n } from '../i18n/useI18n'
 import { checkStageItemGate, readStageItemRequirement } from './rewards/stageItemRequirement'
 import { getPlayerNameFromLocation } from '../shared/playerRoute'
 import { buildFallbackPublicConfig, cachePublicConfig, pedirConfigConCache } from '../shared/offlinePublicConfig'
@@ -119,6 +120,115 @@ type LoadState =
     }
   | { status: 'error'; message: string }
   | { status: 'ready'; payload: PlayerGamePayload; config: PublicConfig }
+
+/**
+ * Textos de avisos del jugador (showNotice/confirm), en castellano y galego.
+ *
+ * Antes estaban escritos a pelo en castellano (algunos incluso en inglés) y
+ * el puente de idioma no los tocaba porque llevan números o variables
+ * dentro (metros, contadores, nombres de objeto). Aquí van en los dos
+ * idiomas y PlayerApp elige según `locale`.
+ */
+const NOTICES = {
+  es: {
+    subiendoFoto: 'Subiendo foto…',
+    activaGpsOFotoMapa: 'Activa GPS o usa modo debug para guardar la foto en el mapa.',
+    confirmarBorrarFoto: '¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.',
+    sinCoberturaBorradoFoto: 'Sin cobertura: la foto se borrará en el servidor al volver la red.',
+    sinPosicionParaFoto: 'No hay posición para guardar la foto.',
+    sinCoberturaFotoGuardada: 'Sin cobertura: la foto ya se ve, y se subirá sola. 📷',
+    noSePudoGuardarFotoReintenta: 'No se pudo guardar la foto. Inténtalo de nuevo.',
+    noSePudoGuardarFoto: 'No se pudo guardar la foto.',
+    debugDesactivado: 'Debug desactivado. Recuperando GPS real…',
+    modoPruebaActivo: 'Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.',
+    posicionDebugActualizada: 'Posición debug actualizada.',
+    nodoActivoInexistente: 'No hay ningún nodo activo en este momento.',
+    centradoEnNodo: 'Centrado en el nodo.',
+    seguimientoActivado: 'Seguimiento del jugador activado.',
+    mapaLibreActivado: 'Mapa libre activado.',
+    gpsNoDisponibleDispositivo: 'GPS no disponible en este dispositivo o navegador.',
+    gpsRequiereHttps:
+      'El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.',
+    solicitandoPermisoUbicacion: 'Solicitando permiso de ubicación… acepta el aviso del navegador.',
+    gpsRealActivado: 'GPS real activado.',
+    gpsPrecisoNoResponde:
+      'El GPS de precisión no responde aquí -zona de monte o cobertura densa-. Usando ubicación aproximada por red mientras tanto.',
+    permisoUbicacionDenegado:
+      'Permiso de ubicación denegado. En iPhone revisa Ajustes > Safari > Ubicación, o elimina y vuelve a añadir la PWA.',
+    noSePudoObtenerUbicacion:
+      'No se pudo obtener ubicación. Prueba al aire libre, activa Ubicación precisa y reintenta.',
+    gpsImpreciso: (n: number) =>
+      `GPS impreciso (${n} m). Esperando una lectura mejor para desbloquear el nodo.`,
+    misionDescargada: (n: number) => `Misión descargada para jugar sin conexión (${n} nodos).`,
+    noSePudoDescargarMision: 'No se pudo descargar la misión sin conexión.',
+    preparandoZip: 'Preparando archivo ZIP...',
+    descargaZipCompletada: 'Descarga de ZIP completada',
+    zipFaltanFotos: (fallidas: number, total: number) =>
+      `ZIP descargado, pero faltan ${fallidas} de ${total} fotos. Vuelve a intentarlo con mejor cobertura.`,
+    noSePudoPrepararZip: 'No se pudo preparar el ZIP. Hace falta conexión para armarlo.',
+    teFalta: (label: string) => `Te falta ${label}. Fabrícalo en Mochila › Mesa de trabajo.`,
+    acercateParaEscanear: 'Acércate al nodo físico para escanear su QR.',
+    activaGpsParaQr: 'Activa GPS o usa modo debug para abrir este QR físico.',
+    escaneaTarjetaQr: 'Escanea la tarjeta QR física de este nodo.',
+    completaEtapaAnterior: 'Completa la etapa anterior antes de interactuar aquí.',
+    yaEstasEnRango: 'Ya estás en rango. Pulsa el botón principal para abrir el nodo.',
+    demasiadoLejos: (m: number) => `Demasiado lejos (${m}m). Acércate al nodo.`,
+    fueraDeRango: 'Fuera de rango. Acércate al nodo.',
+    gpsNoDisponibleActivalo: 'GPS no disponible. Actívalo para detectar tu posición.',
+    completaNodoAnterior: 'Completa el nodo anterior antes de acceder a este.',
+    nodoNoDisponibleTodavia: 'Este nodo no está disponible todavía.',
+    unObjeto: 'un objeto',
+  },
+  gl: {
+    subiendoFoto: 'Subindo foto…',
+    activaGpsOFotoMapa: 'Activa o GPS ou usa o modo depuración para gardar a foto no mapa.',
+    confirmarBorrarFoto: '¿Eliminar esta foto do mapa? Só podes borrar as túas propias fotos.',
+    sinCoberturaBorradoFoto: 'Sen cobertura: a foto borrarase no servidor ao volver a rede.',
+    sinPosicionParaFoto: 'Non hai posición para gardar a foto.',
+    sinCoberturaFotoGuardada: 'Sen cobertura: a foto xa se ve, e subirase soa. 📷',
+    noSePudoGuardarFotoReintenta: 'Non se puido gardar a foto. Téntao outra vez.',
+    noSePudoGuardarFoto: 'Non se puido gardar a foto.',
+    debugDesactivado: 'Depuración desactivada. Recuperando GPS real…',
+    modoPruebaActivo: 'Modo proba activo. Toca un punto libre do mapa para colocar a túa ubicación.',
+    posicionDebugActualizada: 'Posición de proba actualizada.',
+    nodoActivoInexistente: 'Non hai ningún nodo activo neste momento.',
+    centradoEnNodo: 'Centrado no nodo.',
+    seguimientoActivado: 'Seguimento do xogador activado.',
+    mapaLibreActivado: 'Mapa libre activado.',
+    gpsNoDisponibleDispositivo: 'GPS non dispoñible neste dispositivo ou navegador.',
+    gpsRequiereHttps:
+      'O GPS require HTTPS ou abrir SAGA como app instalada desde a pantalla de inicio.',
+    solicitandoPermisoUbicacion: 'Solicitando permiso de localización… acepta o aviso do navegador.',
+    gpsRealActivado: 'GPS real activado.',
+    gpsPrecisoNoResponde:
+      'O GPS de precisión non responde aquí -zona de monte ou cobertura densa-. Usando localización aproximada por rede mentres tanto.',
+    permisoUbicacionDenegado:
+      'Permiso de localización denegado. No iPhone revisa Configuración > Safari > Localización, ou elimina e volve a engadir a PWA.',
+    noSePudoObtenerUbicacion:
+      'Non se puido obter a localización. Proba ao aire libre, activa Localización precisa e reténtao.',
+    gpsImpreciso: (n: number) =>
+      `GPS impreciso (${n} m). Agardando unha lectura mellor para desbloquear o nodo.`,
+    misionDescargada: (n: number) => `Misión descargada para xogar sen conexión (${n} nodos).`,
+    noSePudoDescargarMision: 'Non se puido descargar a misión sen conexión.',
+    preparandoZip: 'Preparando arquivo ZIP...',
+    descargaZipCompletada: 'Descarga do ZIP completada',
+    zipFaltanFotos: (fallidas: number, total: number) =>
+      `ZIP descargado, pero faltan ${fallidas} de ${total} fotos. Téntao de novo con mellor cobertura.`,
+    noSePudoPrepararZip: 'Non se puido preparar o ZIP. Fai falta conexión para armalo.',
+    teFalta: (label: string) => `Fáltache ${label}. Fabrícao na Mochila › Mesa de traballo.`,
+    acercateParaEscanear: 'Achégate ao nodo físico para escanear o seu QR.',
+    activaGpsParaQr: 'Activa o GPS ou usa o modo depuración para abrir este QR físico.',
+    escaneaTarjetaQr: 'Escanea a tarxeta QR física deste nodo.',
+    completaEtapaAnterior: 'Completa a etapa anterior antes de interactuar aquí.',
+    yaEstasEnRango: 'Xa estás no rango. Pulsa o botón principal para abrir o nodo.',
+    demasiadoLejos: (m: number) => `Demasiado lonxe (${m}m). Achégate ao nodo.`,
+    fueraDeRango: 'Fóra de rango. Achégate ao nodo.',
+    gpsNoDisponibleActivalo: 'GPS non dispoñible. Actívao para detectar a túa posición.',
+    completaNodoAnterior: 'Completa o nodo anterior antes de acceder a este.',
+    nodoNoDisponibleTodavia: 'Este nodo aínda non está dispoñible.',
+    unObjeto: 'un obxecto',
+  },
+} as const
 
 type NoticeTone = 'info' | 'warn' | 'success'
 type FocusRequest = {
@@ -213,6 +323,8 @@ function mantenerNivel(
 
 export default function PlayerApp() {
   const user = getPlayerNameFromLocation() || getUserFromUrl()
+  const { locale } = useI18n()
+  const N = locale === 'gl' ? NOTICES.gl : NOTICES.es
 
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   // La carga inicial descarga teselas y puede tardar. Mientras tanto el
@@ -1819,7 +1931,7 @@ export default function PlayerApp() {
   const gpsQualityWarning = Boolean(browserGpsPosition) && browserGpsFresh && !gpsAccuracyAcceptable
 
   const hudHelperText = gpsQualityWarning
-    ? `GPS impreciso (${Math.round(browserGpsAccuracy || 0)} m). Esperando una lectura mejor para desbloquear el nodo.`
+    ? N.gpsImpreciso(Math.round(browserGpsAccuracy || 0))
     : gpsActionRequired
       ? 'Activa GPS para obtener una posición actual y entrar en el nodo cuando estés dentro del radio.'
       : runtime.helperText
@@ -1981,12 +2093,12 @@ export default function PlayerApp() {
 
   function handleOpenFieldCamera() {
     if (fieldPhotoUploading) {
-      showNotice('Subiendo foto…', 'info')
+      showNotice(N.subiendoFoto, 'info')
       return
     }
 
     if (!playerPosition) {
-      showNotice('Activa GPS o usa modo debug para guardar la foto en el mapa.', 'warn')
+      showNotice(N.activaGpsOFotoMapa, 'warn')
       vibrate(8)
       return
     }
@@ -1998,9 +2110,7 @@ export default function PlayerApp() {
   async function handleDeleteFieldProof(proofId: string) {
     if (!proofId) return
 
-    const confirmed = window.confirm(
-      '¿Eliminar esta foto del mapa? Solo puedes borrar tus propias fotos.'
-    )
+    const confirmed = window.confirm(N.confirmarBorrarFoto)
     if (!confirmed) return
 
     /**
@@ -2036,14 +2146,14 @@ export default function PlayerApp() {
       encolarBorradoDeFoto(payload.user, proofId)
       setFieldProofs((current) => current.filter((item) => item.id !== proofId))
       setSelectedFieldProofs((current) => current.filter((item) => item.id !== proofId))
-      showNotice('Sen cobertura: a foto borrarase no servidor ao volver a rede.', 'info')
+      showNotice(N.sinCoberturaBorradoFoto, 'info')
       vibrate(8)
     }
   }
 
   async function handleFieldCameraCapture(imageDataUrl: string, note: string) {
     if (!playerPosition) {
-      showNotice('No hay posición para guardar la foto.', 'warn')
+      showNotice(N.sinPosicionParaFoto, 'warn')
       return
     }
 
@@ -2089,13 +2199,13 @@ export default function PlayerApp() {
           stage_title: currentStage?.title || undefined,
         })
         await repasarFotosPendentes(payload.user)
-        showNotice('Sen cobertura: a foto xa se ve, e subirase soa. 📷', 'info')
+        showNotice(N.sinCoberturaFotoGuardada, 'info')
         vibrate([10, 16, 10])
       } catch {
         showNotice(
           error instanceof Error && error.message
-            ? 'Non se puido gardar a foto. Téntao outra vez.'
-            : 'Non se puido gardar a foto.',
+            ? N.noSePudoGuardarFotoReintenta
+            : N.noSePudoGuardarFoto,
           'warn'
         )
         vibrate(8)
@@ -2154,7 +2264,7 @@ export default function PlayerApp() {
         gpsCenteredRef.current = false
       }
 
-      showNotice('Debug desactivado. Recuperando GPS real…', 'info')
+      showNotice(N.debugDesactivado, 'info')
 
       if (hasRememberedGpsReady(user)) {
         void handleRequestLiveGps({ silent: true, forceFocus: true, exitingDebug: true })
@@ -2181,10 +2291,7 @@ export default function PlayerApp() {
     setBrowserGpsAccuracy(null)
     setBrowserGpsCapturedAt(null)
     setLocalDebugEnabled(true)
-    showNotice(
-      'Modo prueba activo. Toca un punto libre del mapa para colocar tu ubicación.',
-      'info'
-    )
+    showNotice(N.modoPruebaActivo, 'info')
     vibrate([10, 16, 10])
   }
 
@@ -2203,7 +2310,7 @@ export default function PlayerApp() {
       gps_status: 'ok',
       source: 'react',
     }).catch(() => undefined)
-    showNotice('Posición debug actualizada.', 'success')
+    showNotice(N.posicionDebugActualizada, 'success')
     vibrate([10, 12, 10])
   }
 
@@ -2234,20 +2341,20 @@ export default function PlayerApp() {
 
   function handleFocusNode() {
     if (!currentStage) {
-      showNotice('No active node is available right now.', 'warn')
+      showNotice(N.nodoActivoInexistente, 'warn')
       vibrate(8)
       return
     }
 
     setFocusRequest({ target: 'node', token: Date.now() })
-    showNotice('Centered on node.', 'info')
+    showNotice(N.centradoEnNodo, 'info')
     vibrate(8)
   }
 
   function handleToggleFollow() {
     setFollowPlayer((current) => {
       const next = !current
-      showNotice(next ? 'Player follow enabled.' : 'Free map enabled.', 'info')
+      showNotice(next ? N.seguimientoActivado : N.mapaLibreActivado, 'info')
       vibrate(8)
       return next
     })
@@ -2289,18 +2396,14 @@ export default function PlayerApp() {
   ) {
     if (typeof window === 'undefined' || !window.navigator.geolocation) {
       setBrowserGpsStatus('unavailable')
-      if (!options.silent) showNotice('GPS no disponible en este dispositivo o navegador.', 'warn')
+      if (!options.silent) showNotice(N.gpsNoDisponibleDispositivo, 'warn')
       return
     }
 
     if (!window.isSecureContext) {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
-      if (!options.silent)
-        showNotice(
-          'El GPS requiere HTTPS o abrir SAGA como app instalada desde la pantalla de inicio.',
-          'warn'
-        )
+      if (!options.silent) showNotice(N.gpsRequiereHttps, 'warn')
       return
     }
 
@@ -2323,8 +2426,7 @@ export default function PlayerApp() {
       setBrowserGpsCapturedAt(null)
     }
 
-    if (!options.silent)
-      showNotice('Solicitando permiso de ubicación… acepta el aviso del navegador.', 'info')
+    if (!options.silent) showNotice(N.solicitandoPermisoUbicacion, 'info')
 
     // function, no const con flecha: onSuccess, cambiarAModoPorRed y onError
     // se referencian entre sí -cambiarAModoPorRed llama a onError dentro de
@@ -2397,7 +2499,7 @@ export default function PlayerApp() {
 
       if (!options.silent && !gpsNoticeShownRef.current) {
         gpsNoticeShownRef.current = true
-        showNotice('GPS real activado.', 'success')
+        showNotice(N.gpsRealActivado, 'success')
       }
     }
 
@@ -2422,10 +2524,7 @@ export default function PlayerApp() {
 
       if (!gpsAvisoModoRef.current) {
         gpsAvisoModoRef.current = true
-        showNotice(
-          'El GPS de precisión no responde aquí -zona de monte o cobertura densa-. Usando ubicación aproximada por red mientras tanto.',
-          'info'
-        )
+        showNotice(N.gpsPrecisoNoResponde, 'info')
       }
     }
 
@@ -2463,12 +2562,7 @@ export default function PlayerApp() {
       setBrowserGpsStatus('error')
       setBrowserGpsFresh(false)
       if (!options.silent) {
-        showNotice(
-          denied
-            ? 'Permiso de ubicación denegado. En iPhone revisa Ajustes > Safari > Ubicación, o elimina y vuelve a añadir la PWA.'
-            : 'No se pudo obtener ubicación. Prueba al aire libre, activa Ubicación precisa y reintenta.',
-          'warn'
-        )
+        showNotice(denied ? N.permisoUbicacionDenegado : N.noSePudoObtenerUbicacion, 'warn')
       }
     }
 
@@ -2569,21 +2663,18 @@ export default function PlayerApp() {
       setOfflinePrepState('saved')
       await cachePlayerShell(playerHref).catch(() => undefined)
       setOfflinePrepVisible(true)
-      showNotice(`Mission downloaded for offline play (${pack.stage_count} nodes).`, 'success')
+      showNotice(N.misionDescargada(pack.stage_count), 'success')
       vibrate([10, 16, 10])
     } catch (error) {
       setOfflinePrepState('error')
-      showNotice(
-        error instanceof Error ? error.message : 'Could not download offline mission.',
-        'warn'
-      )
+      showNotice(error instanceof Error ? error.message : N.noSePudoDescargarMision, 'warn')
       vibrate(10)
     }
   }
 
   async function handleDownloadFieldProofs() {
     if (!fieldProofs.length) return
-    showNotice('Preparando archivo ZIP...', 'info')
+    showNotice(N.preparandoZip, 'info')
 
     let fallidas = 0
 
@@ -2637,21 +2728,15 @@ export default function PlayerApp() {
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000)
 
       if (fallidas === 0) {
-        showNotice('Descarga de ZIP completada', 'success')
+        showNotice(N.descargaZipCompletada, 'success')
       } else {
-        showNotice(
-          `ZIP descargado, pero faltan ${fallidas} de ${fieldProofs.length} fotos. Vuelve a intentarlo con mejor cobertura.`,
-          'warn'
-        )
+        showNotice(N.zipFaltanFotos(fallidas, fieldProofs.length), 'warn')
       }
     } catch (err) {
       console.error('[SAGA] no se pudo armar el ZIP de fotos', err)
       // Lo mas probable con diferencia es que no haya red: el trozo de jszip
       // no viene guardado en el movil. Decir solo "error" no ayuda a nadie.
-      showNotice(
-        'No se pudo preparar el ZIP. Hace falta conexión para armarlo.',
-        'warn'
-      )
+      showNotice(N.noSePudoPrepararZip, 'warn')
     }
   }
   function handlePrimaryAction() {
@@ -2664,10 +2749,10 @@ export default function PlayerApp() {
       if (!runtime.canEnter) {
         showNotice(
           runtime.reason === 'missing_item'
-            ? `Te falta ${stageItemGate?.requirement.label || 'un objeto'}. Fabrícalo en Mochila › Mesa de trabajo.`
+            ? N.teFalta(stageItemGate?.requirement.label || N.unObjeto)
             : runtime.reason === 'out_of_range'
-              ? 'Acércate al nodo físico para escanear su QR.'
-              : 'Activa GPS o usa modo debug para abrir este QR físico.',
+              ? N.acercateParaEscanear
+              : N.activaGpsParaQr,
           'warn'
         )
         vibrate(8)
@@ -2676,7 +2761,7 @@ export default function PlayerApp() {
 
       setFocusRequest({ target: 'node', token: Date.now() })
       setQuickQrOpenSignal(Date.now())
-      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      showNotice(N.escaneaTarjetaQr, 'info')
       vibrate([10, 16, 10])
       return
     }
@@ -2685,10 +2770,7 @@ export default function PlayerApp() {
       // Antes esto salía en silencio y el botón parecía roto. Si lo que falta
       // es un objeto conviene decir dónde se consigue.
       if (runtime.reason === 'missing_item') {
-        showNotice(
-          `Te falta ${stageItemGate?.requirement.label || 'un objeto'}. Fabrícalo en Mochila › Mesa de trabajo.`,
-          'warn'
-        )
+        showNotice(N.teFalta(stageItemGate?.requirement.label || N.unObjeto), 'warn')
         vibrate(8)
       }
       return
@@ -2789,7 +2871,7 @@ export default function PlayerApp() {
     vibrate(8)
 
     if (!currentStage) {
-      showNotice('Complete the previous stage before interacting here.', 'warn')
+      showNotice(N.completaEtapaAnterior, 'warn')
       return
     }
 
@@ -2799,17 +2881,17 @@ export default function PlayerApp() {
       if (!runtime.canEnter) {
         showNotice(
           runtime.reason === 'missing_item'
-            ? `Te falta ${stageItemGate?.requirement.label || 'un objeto'}. Fabrícalo en Mochila › Mesa de trabajo.`
+            ? N.teFalta(stageItemGate?.requirement.label || N.unObjeto)
             : runtime.reason === 'out_of_range'
-              ? 'Acércate al nodo físico para escanear su QR.'
-              : 'Activa GPS o usa modo debug para abrir este QR físico.',
+              ? N.acercateParaEscanear
+              : N.activaGpsParaQr,
           'warn'
         )
         return
       }
 
       setQuickQrOpenSignal(Date.now())
-      showNotice('Escanea la tarjeta QR física de este nodo.', 'info')
+      showNotice(N.escaneaTarjetaQr, 'info')
       return
     }
 
@@ -2817,40 +2899,35 @@ export default function PlayerApp() {
       if (isMapCollectible) {
         handlePrimaryAction()
       } else {
-        showNotice('Ya estás en rango. Pulsa el botón principal para abrir el nodo.', 'info')
+        showNotice(N.yaEstasEnRango, 'info')
       }
       return
     }
 
     if (runtime.reason === 'out_of_range') {
       showNotice(
-        distanceMeters !== null
-          ? `Demasiado lejos (${distanceMeters}m). Acércate al nodo.`
-          : 'Fuera de rango. Acércate al nodo.',
+        distanceMeters !== null ? N.demasiadoLejos(distanceMeters) : N.fueraDeRango,
         'warn'
       )
       return
     }
 
     if (runtime.reason === 'gps_unavailable' || runtime.reason === 'distance_unknown') {
-      showNotice('GPS no disponible. Actívalo para detectar tu posición.', 'info')
+      showNotice(N.gpsNoDisponibleActivalo, 'info')
       return
     }
 
     if (runtime.reason === 'missing_stage') {
-      showNotice('Completa el nodo anterior antes de acceder a este.', 'warn')
+      showNotice(N.completaNodoAnterior, 'warn')
       return
     }
 
     if (runtime.reason === 'missing_item') {
-      showNotice(
-        `Te falta ${stageItemGate?.requirement.label || 'un objeto'}. Fabrícalo en Mochila › Mesa de trabajo.`,
-        'warn'
-      )
+      showNotice(N.teFalta(stageItemGate?.requirement.label || N.unObjeto), 'warn')
       return
     }
 
-    showNotice('Este nodo no está disponible todavía.', 'info')
+    showNotice(N.nodoNoDisponibleTodavia, 'info')
   }
 
   /**

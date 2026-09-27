@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { loadInventorySnapshot, type InventorySnapshot } from '../offline/inventory'
 import { RECIPES, checkCraftingPossible, craftRecipe, type Recipe } from '../offline/recipes'
 import { syncInventoryToServer } from '../offline/localFirst'
+import { useI18n } from '../../i18n/useI18n'
 
 interface CraftingPanelProps {
   user: string
@@ -25,6 +26,7 @@ function RecipeCard({
   const canCraft = checkCraftingPossible(user, recipe)
   const inventoryItems = loadInventorySnapshot(user).items
   const [pressed, setPressed] = useState(false)
+  const { locale } = useI18n()
 
   return (
     <div
@@ -105,9 +107,12 @@ function RecipeCard({
           onPointerLeave={() => setPressed(false)}
           onClick={() => {
             if (craftRecipe(user, recipe.recipe_id)) {
-              onCrafted(`✅ ${recipe.outputs[0]?.label || 'Objeto'} creado con éxito`)
+              const objeto = recipe.outputs[0]?.label || (locale === 'gl' ? 'Obxecto' : 'Objeto')
+              onCrafted(`✅ ${objeto} creado con éxito`)
             } else {
-              onCrafted('❌ No hay materiales suficientes')
+              onCrafted(
+                locale === 'gl' ? '❌ Non hai materiais suficientes' : '❌ No hay materiales suficientes'
+              )
             }
           }}
         >

@@ -38,10 +38,12 @@ _(vacío)_
       que el contenido LLENE, no que la hoja encoja.
 
 ### Login (bloque 3)
-- [ ] Los nombres aparecen de golpe: deben entrar escalonados, cayendo hacia
-      abajo uno tras otro.
-- [ ] Al pulsar un jugador no pasa nada visible durante ~1s. Hace falta
-      respuesta inmediata al toque.
+- [x] Los nombres entran escalonados, cayendo hacia abajo uno tras otro
+      (`LoginApp.tsx`: `animationDelay: index * 55ms` + `sagaFilaCae`). Ya
+      estaba hecho — este TODO estaba desactualizado, ver PROGRESS.md
+      ("Login con nombres escalonados").
+- [x] Al pulsar un jugador se navega ya, sin esperar al GPS (que ahora se
+      pide en la pantalla de carga). Respuesta inmediata al toque.
 
 ## P2 — UX / rendimiento
 

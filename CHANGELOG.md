@@ -6,7 +6,26 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.31.2
+## 5.32.1
+
+- **Sincronización sin cobertura que se caía entera.** Si un solo evento de
+  la cola traía el tiempo del nodo corrupto (un texto en vez de un número),
+  el servidor daba error 500 y NO se sincronizaba ninguno de los hasta 100
+  eventos de la tanda, aunque los demás estuvieran bien. Lo mismo al
+  avanzar nodo con conexión. Ahora ese tiempo se ignora y el resto sigue.
+
+
+
+- **Traducción al gallego del jugador.** Unos 70 textos salían en el idioma
+  equivocado: avisos con números dentro (el puente de idioma no podía
+  traducirlos), algunos fijos en inglés ("Centered on node.") y otros fijos
+  en gallego que veía también quien jugaba en castellano ("Saíches do
+  camiño", "Sen cobertura…"). Ahora salen en el idioma de la misión.
+- TODO.md: el acceso escalonado ya estaba hecho (lo decía PROGRESS.md).
+- Los minijuegos sparkRadar y teamRelay llevan un README: son prototipos
+  sin terminar y sin conectar al juego.
+
+
 
 - Misión en gallego: el aviso "Activa GPS para obtener una posición…"
   salía en castellano; ya tiene su traducción.
