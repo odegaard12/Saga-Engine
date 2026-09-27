@@ -6,7 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.30.1
+## 5.31.2
+
+- Misión en gallego: el aviso "Activa GPS para obtener una posición…"
+  salía en castellano; ya tiene su traducción.
+
+
+
+- **Panel "Antes de salir" en un solo idioma.** Mezclaba gallego
+  ("Movemento", "Seguir sen iso") y castellano ("Lo denegaste…"). Ahora
+  cada texto sale en el idioma de la misión.
+- **El aviso de permiso denegado dice qué tocar según el móvil**: en
+  iPhone, Ajustes › Safari; en Android, el candado de la barra de
+  direcciones › Permisos. Antes decía Safari a todo el mundo.
+
+
+
+Admin: funciones del servidor que el panel no usaba.
+
+- **Actividad** (menú "Seguimiento"): el registro de eventos del servidor
+  (latidos, QR escaneados, acciones de admin), con filtro por estado y
+  "marcar como leído".
+- **Datos personales** (en Jugadores): ver cuántas fotos de campo y
+  posiciones GPS hay guardadas y borrarlas. La misión, los nodos y el
+  progreso no se tocan. Borra datos de personas reales sin vuelta atrás,
+  así que hay que escribir BORRAR para confirmarlo.
+- Editor de nodos: fuera 120 líneas muertas (pestañas que nunca se
+  conectaron, un panel sin usar y una cabecera duplicada oculta).
+
+
 
 - **Sin halos en los nodos completados ni en los pendientes.** Su halo de
   color en el suelo "quedaba fatal sobre el terreno". Ahora sólo llevan la

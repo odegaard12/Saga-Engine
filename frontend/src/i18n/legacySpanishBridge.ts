@@ -213,6 +213,8 @@ const GL: Record<string, string> = {
   'Mochila': 'Mochila',
   'Cerrar mochila': 'Pechar mochila',
   'Herramientas': 'Ferramentas',
+  'Activa GPS para obtener una posición actual y entrar en el nodo cuando estés dentro del radio.':
+    'Activa o GPS para obter unha posición actual e entrar no nodo cando esteas dentro do radio.',
   'Cerrar herramientas': 'Pechar ferramentas',
   'Jugadores': 'Xogadores',
   'CONTROL DE EQUIPO': 'CONTROL DE EQUIPO',

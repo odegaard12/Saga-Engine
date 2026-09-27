@@ -533,3 +533,82 @@ export function cleanupSimulationBench() {
 export function runLongSessionPauseBench(params: { device: string; pause_at?: number; force?: boolean }) {
   return adminPostJsonConEstado('/api/admin/simulation/long-session', params)
 }
+
+/** Estados válidos de un evento, ver backend/app/storage/event_log.py. */
+export type AdminEventStatus = 'pending' | 'synced' | 'failed' | 'ignored'
+
+export type AdminEvent = {
+  id: string
+  type: string
+  status: AdminEventStatus
+  source: string
+  created_at: string
+  user?: string
+  team_id?: string
+  node_id?: string
+  payload?: Record<string, unknown>
+  synced_at?: string
+  error?: string
+}
+
+export type AdminEventsResponse = {
+  status: 'ok' | 'error'
+  detail?: string
+  events?: AdminEvent[]
+}
+
+/** Lista de eventos del registro de actividad (heartbeats, QR, acciones de admin...). */
+export function fetchAdminEvents(
+  params: { limit?: number; status?: string; user?: string; type?: string } = {}
+) {
+  return adminPostJson<AdminEventsResponse>('/api/admin/events', params)
+}
+
+export type AdminMarkEventResponse = {
+  status: 'ok' | 'error'
+  detail?: string
+  event?: AdminEvent
+}
+
+/** Cambia el estado de un evento (p.ej. "synced" para marcarlo como leído). */
+export function markAdminEvent(eventId: string, status: AdminEventStatus, error?: string) {
+  return adminPostJson<AdminMarkEventResponse>('/api/admin/events/mark', {
+    event_id: eventId,
+    status,
+    ...(error ? { error } : {}),
+  })
+}
+
+export type AdminDatosPersonalesConteo = {
+  fotos: number
+  ficheros_de_imagen: number
+  posiciones_gps: number
+}
+
+export type AdminDatosPersonalesResponse = {
+  status: 'ok' | 'error'
+  detail?: string
+  accion?: 'contar' | 'borrar'
+  datos?: AdminDatosPersonalesConteo
+  para_borrar?: string
+  borrado?: { fotos: number; imagenes: number; posiciones_gps: number }
+  queda?: AdminDatosPersonalesConteo
+}
+
+/** Sólo cuenta lo que hay guardado (fotos, posiciones GPS): no borra nada. */
+export function fetchDatosPersonales() {
+  return adminPostJson<AdminDatosPersonalesResponse>('/api/admin/datos-personales', {})
+}
+
+/**
+ * Borra fotos de campo y/o posiciones GPS de verdad. Requiere la confirmación
+ * exacta que exige el backend (ver CONFIRMACION_BORRADO en admin.py):
+ * llamar a esto sin haber confirmado con la persona primero es un borrado sin
+ * vuelta atrás de datos de personas reales.
+ */
+export function purgeDatosPersonales(opts: { fotos?: boolean; posiciones?: boolean } = {}) {
+  return adminPostJson<AdminDatosPersonalesResponse>('/api/admin/datos-personales', {
+    confirmacion: 'BORRAR',
+    ...opts,
+  })
+}

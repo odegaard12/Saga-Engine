@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import AdminMissionMap from '../AdminMissionMap'
+import ActivityPanel from './ActivityPanel'
 import FamiliesPanel from './FamiliesPanel'
 import NodeDetailDrawer from './NodeDetailDrawer'
 import NodePhysicalTypePanel from './NodePhysicalTypePanel'
@@ -26,7 +27,7 @@ import ReleaseNotesModal from './ReleaseNotesModal'
 import { printAllQrs } from '../utils/printQrs'
 import '../styles/admin-modern-shell.css'
 
-type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation'
+type CmsPanel = 'none' | 'players' | 'mission' | 'labels' | 'builder' | 'objects' | 'simulation' | 'activity'
 type StandardSaveState = 'idle' | 'saving' | 'saved' | 'error'
 type MissionSaveState = StandardSaveState | 'dirty'
 
@@ -627,6 +628,10 @@ export default function AdminMissionControlShell({
                   { panel: 'simulation', icono: '🧪', etiqueta: 'Simular' },
                 ],
               },
+              {
+                titulo: 'Seguimiento',
+                entradas: [{ panel: 'activity', icono: '📋', etiqueta: 'Actividad' }],
+              },
             ] as { titulo: string; entradas: { panel: CmsPanel; icono: string; etiqueta: string }[] }[]
           ).map((grupo) => (
             <div key={grupo.titulo} className="saga-menu-grupo">
@@ -1068,7 +1073,9 @@ export default function AdminMissionControlShell({
                       ? 'Objetos y Recetas'
                       : cmsPanel === 'simulation'
                         ? 'Banco de pruebas'
-                        : t('admin.settings')}
+                        : cmsPanel === 'activity'
+                          ? 'Actividad'
+                          : t('admin.settings')}
             </strong>
             <button type="button" onClick={() => onSetCmsPanel('none')}>
               {t('common.close')}
@@ -1128,6 +1135,8 @@ export default function AdminMissionControlShell({
             ) : null}
 
             {cmsPanel === 'simulation' ? <SimulationBenchPanel /> : null}
+
+            {cmsPanel === 'activity' ? <ActivityPanel /> : null}
           </div>
         </aside>
       ) : null}
