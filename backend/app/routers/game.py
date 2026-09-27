@@ -354,9 +354,20 @@ async def heartbeat(request: Request):
     if not isinstance(current, dict):
         current = {}
 
+    # Copia del punto ANTERIOR, antes de pisarlo: es el par consecutivo que
+    # necesita la comprobación anti-trampas de velocidad (ver
+    # anti_cheat_check_travel_speed). Después de este punto `current` ya es
+    # el nuevo.
+    posicion_anterior = dict(current)
+
+    accuracy = main._as_float(data.get("accuracy"))
+    if accuracy is not None and accuracy < 0:
+        accuracy = None
+
     if lat is not None and lon is not None:
         current["lat"] = lat
         current["lon"] = lon
+        current["accuracy"] = accuracy
 
     current["last_seen"] = int(now)
     current["gps_status"] = main.normalize_heartbeat_gps_status(
@@ -368,6 +379,14 @@ async def heartbeat(request: Request):
 
     # Public heartbeat must not be able to toggle debug state remotely.
     current["debug_enabled"] = False
+
+    # Anti-trampas: sólo FLAG, nunca bloquea el latido ni se devuelve al
+    # jugador. Sólo tiene sentido con dos posiciones reales -no con el primer
+    # latido de la sesión, que no tiene "anterior"-.
+    if lat is not None and lon is not None:
+        main.anti_cheat_check_travel_speed(
+            profile_id, posicion_anterior, lat, lon, now, accuracy
+        )
 
     main.upsert_live_position_for_user(profile_id, current)
     main.HEARTBEAT_LAST_SEEN_BY_KEY[rate_key] = now
@@ -490,6 +509,13 @@ async def advance(request: Request):
 
             if requirement_status["required"] and requirement_status["consume"]:
                 main.append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
+
+            # Anti-trampas (ver backend/app/runtime/anti_cheat.py): sólo
+            # anota, nunca impide el avance. El código ya es válido -eso lo
+            # decidió stage_accepts_code arriba-, así que lo que se comprueba
+            # aquí es plausibilidad, no permiso.
+            main.anti_cheat_check_node_proximity(profile_id, current_node)
+            main.anti_cheat_check_completion_time(profile_id, current_node, time_spent_ms)
 
             # Igual que penalty_ms arriba: viene del móvil sin garantía de forma.
             # Un valor no numérico (típico de una cola vieja o un cliente roto)

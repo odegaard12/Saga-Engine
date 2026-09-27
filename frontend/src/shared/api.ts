@@ -288,6 +288,15 @@ export function sendHeartbeat(args: {
   user: string
   lat?: number
   lon?: number
+  /**
+   * Precisión del GPS en metros (`position.coords.accuracy`), si se conoce.
+   *
+   * El servidor la usa para las comprobaciones anti-trampas de velocidad y
+   * cercanía al nodo (ver backend/app/runtime/anti_cheat.py): sin ella asume
+   * un margen generoso, pero con ella un GPS ruidoso deja de parecer un salto
+   * imposible.
+   */
+  accuracy?: number
   gps_status?: string
   source?: string
   /**

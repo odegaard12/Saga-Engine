@@ -6,7 +6,22 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.32.1
+## 5.33.0
+
+- **Antitrampas en el servidor.** Hasta ahora sólo existía en el móvil
+  (salir de la app durante un minijuego). Ahora el servidor MARCA, sin
+  bloquear nunca a nadie: velocidades imposibles entre posiciones (más de
+  40 km/h descontando la precisión del GPS), completar un nodo lejos de
+  él, completar un nodo en menos de 1,5 s y eventos sin cobertura con la
+  hora en el futuro. Las sospechas se ven en el admin, en Actividad ›
+  "Sospechas de trampa". Un jugador honrado con el GPS poco preciso no sale
+  marcado (hay test para eso).
+- El latido del jugador envía también la precisión del GPS, que es lo que
+  permite no castigar a quien tiene mala señal.
+- Revisados carga, cobertura, sincronización y clasificación: sin fallos
+  nuevos reproducibles.
+
+
 
 - **Sincronización sin cobertura que se caía entera.** Si un solo evento de
   la cola traía el tiempo del nodo corrupto (un texto en vez de un número),
