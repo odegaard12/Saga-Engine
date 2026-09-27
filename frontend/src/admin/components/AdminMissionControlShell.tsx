@@ -15,7 +15,7 @@ import type {
   AdminReactOverviewProfile,
   AdminReactOverviewStage,
 } from '../lib/adminApi'
-import { familyCards } from '../lib/familyConfigs'
+import { displayFamilyCards } from '../lib/displayFamilies'
 import { findRecipeForOutput } from '../../shared/recipeCatalog'
 import { fetchMissionBackup } from '../lib/adminApi'
 import { getAdminGameForStage } from '../lib/gameCatalog'
@@ -870,8 +870,8 @@ export default function AdminMissionControlShell({
           </div>
 
           <div className="saga-family-chips" aria-label="Family counts">
-            {familyCards.map((family) => (
-              <span key={family.id}>
+            {displayFamilyCards.map((family) => (
+              <span key={family.id} title={family.title}>
                 {family.icon} {familyCounts[family.id] || 0}
               </span>
             ))}
