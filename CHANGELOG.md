@@ -6,7 +6,15 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
-## 5.32.0
+## 5.32.1
+
+- **Sincronización sin cobertura que se caía entera.** Si un solo evento de
+  la cola traía el tiempo del nodo corrupto (un texto en vez de un número),
+  el servidor daba error 500 y NO se sincronizaba ninguno de los hasta 100
+  eventos de la tanda, aunque los demás estuvieran bien. Lo mismo al
+  avanzar nodo con conexión. Ahora ese tiempo se ignora y el resto sigue.
+
+
 
 - **Traducción al gallego del jugador.** Unos 70 textos salían en el idioma
   equivocado: avisos con números dentro (el puente de idioma no podía

@@ -1314,9 +1314,16 @@ def apply_synced_player_event(normalized_event, user, profile):
     if requirement_status.get("required") and requirement_status.get("consume"):
         append_inventory_item_used_event(user, profile_id, current_node, requirement_status)
 
+    # Igual que level_before arriba: un evento de la cola offline puede llegar
+    # con este campo corrupto (móvil viejo, IndexedDB a medias...). Sin
+    # protegerlo, un solo evento así tiraba abajo TODO /api/events/sync con un
+    # 500 y ningún evento de la tanda -ni los válidos- llegaba a sincronizarse.
     time_spent_ms = payload.get("time_spent_ms")
     if time_spent_ms is not None:
-        record_player_stage_time(profile_id, current_level, int(time_spent_ms))
+        try:
+            record_player_stage_time(profile_id, current_level, max(0, int(time_spent_ms)))
+        except (TypeError, ValueError):
+            pass
 
     set_player_progress_level(profile_id, current_level + 1)
 
