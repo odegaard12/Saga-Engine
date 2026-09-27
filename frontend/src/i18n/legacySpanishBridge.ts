@@ -401,6 +401,45 @@ const GL: Record<string, string> = {
   'Distancia al punto': 'Distancia ao punto',
   'Buscando tu posición GPS…': 'Buscando a túa posición GPS…',
   'Acércate para continuar': 'Achégate para continuar',
+  'Te has salido del camino': 'Saíches do camiño',
+  'Vuelve a la línea verde': 'Volve á liña verde',
+  'Gira el móvil': 'Xira o móbil',
+  'Cambiar cámara': 'Cambiar cámara',
+  'Cámara de campo': 'Cámara de campo',
+  'La cámara aún no está lista.': 'A cámara aínda non está lista.',
+  'La cámara no está disponible en este navegador.': 'A cámara non está dispoñible neste navegador.',
+  'No se pudo abrir la cámara. Revisa los permisos del navegador.':
+    'Non se puido abrir a cámara. Revisa os permisos do navegador.',
+  'Escribe el código...': 'Escribe o código...',
+  'Este nodo no tiene un juego configurado aún. El administrador debe asignarle un tipo de minijuego.':
+    'Este nodo aínda non ten un xogo configurado. O administrador debe asignarlle un tipo de minixogo.',
+  'Objeto de misión': 'Obxecto de misión',
+  'Cómo funciona la mochila': 'Como funciona a mochila',
+  '📖 Cómo funciona la mochila': '📖 Como funciona a mochila',
+  'Leí la pegatina, pero el nodo no llegó a registrarse. Prueba otra vez o usa el código de respaldo.':
+    'Lin a pegatina, pero o nodo non chegou a rexistrarse. Proba outra vez ou usa o código de respaldo.',
+  'No se ve bien. Otra foto, más cerca y sin mover.': 'Non se ve ben. Outra foto, máis preto e sen mover.',
+  'Fallo al leer. Escribe el código abajo.': 'Fallo ao ler. Escribe o código abaixo.',
+  'QR no leído. Prueba otra vez o usa Mochila > Respaldo.': 'QR non lido. Proba outra vez ou usa Mochila > Respaldo.',
+  'Escanea una tarjeta QR de SAGA. Se guardará automáticamente en Objetos.':
+    'Escanea unha tarxeta QR de SAGA. Gardarase automaticamente en Obxectos.',
+  'La cámara no está disponible. Usa Mochila > Respaldo.': 'A cámara non está dispoñible. Usa Mochila > Respaldo.',
+  'Apunta la cámara a la tarjeta QR de SAGA.': 'Apunta a cámara á tarxeta QR de SAGA.',
+  'No se pudo abrir la cámara. Usa Mochila > Respaldo.': 'Non se puido abrir a cámara. Usa Mochila > Respaldo.',
+  'Este móvil no deja encender la linterna desde la aplicación.':
+    'Este móbil non deixa encender a lanterna desde a aplicación.',
+  'Cerrar escáner QR': 'Pechar escáner QR',
+  'Encuadra la pegatina, acércate y pulsa 📸. Las pegatinas con logo sólo se leen con la foto.':
+    'Encadra a pegatina, achégate e preme 📸. As pegatinas con logo só se len coa foto.',
+  'Pegatina validada': 'Pegatina validada',
+  'Escáner': 'Escáner',
+  'INTRODUCE EL CÓDIGO (EJ: PIEDRA_ROJA)': 'INTRODUCE O CÓDIGO (EX: PEDRA_VERMELLA)',
+  '🏁 CLASIFICACIÓN FINAL': '🏁 CLASIFICACIÓN FINAL',
+  '⏳ CLASIFICACIÓN PROVISIONAL': '⏳ CLASIFICACIÓN PROVISIONAL',
+  'Preparando la misión…': 'Preparando a misión…',
+  'Ya lo llevas encima. El nodo se abrirá sin problema.': 'Xa o levas encima. O nodo abrirase sen problema.',
+  'Este nodo no se abre sin esto. Si no lo tienes, fabrícalo en la Mesa de trabajo.':
+    'Este nodo non se abre sen isto. Se non o tes, fabrícao na Mesa de traballo.',
 }
 
 const GL_TO_ES: Record<string, string> = Object.fromEntries(
