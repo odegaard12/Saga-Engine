@@ -6,6 +6,23 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.33.1
+
+- **Antitrampas del servidor, revisado.** Velocidad imposible sólo se mira
+  ENTRE NODOS -no en el trayecto de casa al primer nodo, que puede ser en
+  coche- y sólo si se sostiene en 2 tramos consecutivos: un salto suelto de
+  GPS ya no se flaguea. Se quita del todo "nodo completado lejos de su
+  sitio": el GPS en el monte falla demasiado a menudo y acusaba a jugadores
+  honestos. El tiempo mínimo de reto sólo se comprueba en minijuegos -no en
+  checkpoints, QR ni coleccionables, que no tienen partida que jugar- y sube
+  a 5 s.
+- **Antitrampas del cliente, más señales.** `useAntiTrampas.ts` distingue
+  salir de la app (`visibilitychange`/`pagehide`) de abrir el selector de
+  apps sin soltar la pestaña (`blur` sin `hidden`), ignora los avisos de
+  permiso que pide la propia app (cámara, movimiento, GPS), y reporta cada
+  salida al servidor por la misma cola offline-first de siempre para que
+  salga en el panel, en "Sospechas de trampa".
+
 ## 5.33.0
 
 - **Antitrampas en el servidor.** Hasta ahora sólo existía en el móvil

@@ -9,10 +9,11 @@ import {
 } from '../lib/adminApi'
 
 const ETIQUETA_MOTIVO: Record<string, string> = {
-  impossible_travel_speed: 'Velocidad imposible',
-  node_completed_without_proximity: 'Nodo sin estar cerca',
+  impossible_travel_speed: 'Velocidad imposible entre nodos',
   completion_faster_than_possible: 'Reto superado demasiado rápido',
   offline_event_timestamp_in_future: 'Evento offline con fecha futura',
+  left_app_during_minigame: 'Salió de la app durante el minijuego',
+  opened_app_switcher_during_minigame: 'Abrió el selector de apps durante el minijuego',
 }
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'

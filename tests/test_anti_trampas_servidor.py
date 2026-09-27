@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Anti-trampas del lado del servidor: velocidad, cercanía, tiempo y reloj.
+"""Anti-trampas del lado del servidor: velocidad, tiempo y reloj.
 
 Antes de esto no había NINGUNA comprobación de plausibilidad en el servidor:
 `evaluate_entry` (backend/app/runtime/core_engine.py) calcula si un jugador
 puede ENTRAR a un nodo según su distancia, pero nadie la llama en el
 servidor -sólo existe replicada en el cliente, para la pantalla-, así que
-`/api/advance` y `/api/events/sync` aceptaban un nodo completado sin mirar
-dónde estaba el jugador, en cuánto tiempo, ni si el reloj del evento tenía
-sentido. El único anti-trampas real vivía en el cliente (ver
-tests/test_anti_trampas.py, salir de la aplicación durante un reto).
+`/api/advance` y `/api/events/sync` aceptaban un nodo completado sin mirar en
+cuánto tiempo ni si el reloj del evento tenía sentido. El único anti-trampas
+real vivía en el cliente (ver tests/test_anti_trampas.py, salir de la
+aplicación durante un reto).
 
 Política: FLAG, no bloqueo. Cada prueba de aquí comprueba dos cosas a la
 vez -que la sospecha se anota Y que el jugador avanza igual-, porque una
 comprobación que bloquea a alguien con GPS ruidoso o que jugó sin cobertura
 sería peor que no tener nada.
+
+⚠️ No hay pruebas de "nodo completado lejos de su sitio": esa comprobación se
+quitó del todo (ver backend/app/runtime/anti_cheat.py). El GPS en el monte
+falla demasiado a menudo para que valiera la pena, y acusaba a jugadores
+honestos casi tan seguido como a quien hacía trampa.
 """
 import os
 import tempfile
@@ -29,6 +34,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from backend.app.routers import game as game_router  # noqa: E402
 from backend.app.storage.runtime_store import save_stages  # noqa: E402
+from backend.app.storage.json_store import save_json  # noqa: E402
 from backend.app.runtime import anti_cheat as _anti_cheat  # noqa: E402
 
 # Un punto en Catoira y otro a ~111 km (1º de latitud): de sobra para
@@ -38,6 +44,8 @@ LAT_LEJOS = LAT_BASE + 1.0
 
 
 def _preparar_nodo(lat=LAT_BASE, lon=LON_BASE, radius=40):
+    """Una misión de un solo nodo -checkpoint-, para las pruebas que no
+    necesitan "estar entre dos nodos" (tiempo de reto, reloj del evento)."""
     save_stages(
         main.STAGES_DB,
         [
@@ -55,9 +63,41 @@ def _preparar_nodo(lat=LAT_BASE, lon=LON_BASE, radius=40):
     )
 
 
+def _preparar_nodo_minixogo(lat=LAT_BASE, lon=LON_BASE, radius=40):
+    """Un checkpoint (n0) seguido de un minijuego (n1).
+
+    Hace falta un `n0` para poder completarlo y quedar "entre nodos" en `n1`
+    -condición de check_travel_speed- y para las pruebas de tiempo de reto,
+    que sólo se comprueban en un minijuego, no en un checkpoint.
+    """
+    save_stages(
+        main.STAGES_DB,
+        [
+            {
+                "id": "n0",
+                "title": "Nodo 0",
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "type": "checkpoint",
+                "config": {"game_id": "simple_checkpoint"},
+            },
+            {
+                "id": "n1",
+                "title": "Nodo 1",
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "type": "signal_hunt",
+                "config": {"game_id": "spark_radar"},
+            },
+        ],
+    )
+
+
 def _limpiar_sospechas():
-    from backend.app.storage.json_store import save_json
     save_json(main.ANTI_CHEAT_DB, {})
+    save_json(main.SPEED_STREAK_DB, {})
 
 
 def _cliente(monkeypatch):
@@ -84,31 +124,103 @@ def _un_jugador_coñecido():
     return perfiles[0].get("id")
 
 
-# --- Velocidad imposible entre dos latidos ---------------------------------
+def _latido(cliente, usuario, lat, lon, accuracy, hace_s=0):
+    """Un latido, con la posición "anterior" dejada `hace_s` segundos antes.
+
+    Sin ese hueco, dos latidos seguidos en el mismo tick de reloj -el
+    limitador de peticiones y la resolución en segundos de `last_seen`- no
+    dejan diferencia de tiempo que medir.
+
+    Y aparte del `enforce_player_rate_limit` que ya se parchea en `_cliente`,
+    el propio latido tiene SU limitador de verdad -por IP y tiempo real, no
+    mockeable- para no saturar la Raspberry: dos latidos seguidos DE VERDAD
+    en la misma prueba lo disparan con un 429 antes de llegar a ninguna
+    comprobación anti-trampas. Aquí no importa -las pruebas simulan tramos
+    espaciados, nunca latidos reales pegados-, así que se limpia antes de
+    cada uno.
+    """
+    main.HEARTBEAT_LAST_SEEN_BY_KEY.clear()
+    if hace_s:
+        anterior = main.get_live_position(usuario) or {}
+        main.upsert_live_position_for_user(
+            usuario,
+            {**anterior, "last_seen": int(time.time()) - hace_s},
+        )
+    return cliente.post(
+        "/api/heartbeat", json={"user": usuario, "lat": lat, "lon": lon, "accuracy": accuracy}
+    )
 
 
-def test_velocidade_imposible_entre_dous_latidos_queda_anotada(monkeypatch):
+# --- Velocidad imposible ENTRE NODOS, sostenida ------------------------------
+
+
+def test_viaxe_en_coche_a_pe_do_primeiro_nodo_non_se_flaguea(monkeypatch):
+    """De casa al primer nodo se puede ir en coche: no hay "entre nodos" que vigilar."""
     cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
     usuario = _un_jugador_coñecido()
-    main.set_player_progress_level(usuario, 0)
+    main.set_player_progress_level(usuario, 0)  # Aún no completó ni el primer nodo.
 
-    # El punto "anterior" se deja hace 5 s -no dos latidos seguidos en el
-    # mismo tick de reloj, que el limitador de peticiones y la resolución en
-    # segundos de `last_seen` dejarían sin diferencia de tiempo que medir-.
     main.upsert_live_position_for_user(
         usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 8, "last_seen": int(time.time()) - 5}
     )
-    # 111 km en esos 5 segundos: ningún jugador a pie hace esto.
-    cliente.post("/api/heartbeat", json={"user": usuario, "lat": LAT_LEJOS, "lon": LON_BASE, "accuracy": 8})
+    # 111 km en 5 s: velocidad de coche/avión, imposible a pie -pero antes de
+    # completar el primer nodo, así que no cuenta.
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8)
+
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+
+def test_un_salto_de_gps_soamente_entre_nodos_non_se_flaguea(monkeypatch):
+    """Ya entre nodos, un ÚNICO tramo implausible no basta: puede ser un GPS ruidoso."""
+    cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
+    _limpiar_sospechas()
+    usuario = _un_jugador_coñecido()
+    main.set_player_progress_level(usuario, 1)  # Completó n0, va camino de n1.
+
+    main.upsert_live_position_for_user(
+        usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 8, "last_seen": int(time.time()) - 5}
+    )
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8)
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == [], (
+        "un único tramo implausible no puede bastar: es justo lo que un GPS ruidoso hace solo"
+    )
+
+    # Y si el siguiente tramo vuelve a ser plausible, la racha se olvida:
+    # otro salto suelto más adelante tampoco debería flaguear de golpe.
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8, hace_s=5)
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+
+def test_velocidade_imposible_sostida_entre_nodos_queda_anotada(monkeypatch):
+    """DOS tramos consecutivos implausibles entre nodos sí es sospechoso."""
+    cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
+    _limpiar_sospechas()
+    usuario = _un_jugador_coñecido()
+    main.set_player_progress_level(usuario, 1)  # Completó n0, va camino de n1.
+
+    main.upsert_live_position_for_user(
+        usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 8, "last_seen": int(time.time()) - 5}
+    )
+    # Primer salto: aún no flaguea -es sólo el primer tramo de la racha-.
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8)
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+    # Segundo tramo, también implausible, que sigue desde el punto anterior:
+    # dos de dos, ya no es un salto suelto.
+    _latido(cliente, usuario, LAT_LEJOS + 1.0, LON_BASE, 8, hace_s=5)
 
     sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
-    assert sospechas, "un salto de 111 km en 5 s tenía que quedar anotado"
+    assert sospechas, "dos tramos consecutivos de velocidad imposible tenían que quedar anotados"
     assert sospechas[-1]["reason"] == "impossible_travel_speed"
+    assert sospechas[-1]["evidence"]["consecutive_segments"] >= 2
 
     # El latido en sí no se bloquea: la posición se guarda igual.
     posicion = main.get_live_position(usuario)
-    assert posicion["lat"] == LAT_LEJOS
+    assert posicion["lat"] == LAT_LEJOS + 1.0
 
 
 def test_xogador_honesto_con_gps_ruidoso_non_se_flaguea(monkeypatch):
@@ -120,19 +232,17 @@ def test_xogador_honesto_con_gps_ruidoso_non_se_flaguea(monkeypatch):
     hace más daño que las trampas.
     """
     cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
     usuario = _un_jugador_coñecido()
-    main.set_player_progress_level(usuario, 0)
+    main.set_player_progress_level(usuario, 1)
 
     main.upsert_live_position_for_user(
         usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 45, "last_seen": int(time.time()) - 5}
     )
     # Un pequeño desplazamiento real (~10 m) 5 s después, con un GPS igual de
     # ruidoso: nada de esto debería parecer una carrera imposible.
-    cliente.post(
-        "/api/heartbeat",
-        json={"user": usuario, "lat": LAT_BASE + 0.0001, "lon": LON_BASE, "accuracy": 45},
-    )
+    _latido(cliente, usuario, LAT_BASE + 0.0001, LON_BASE, 45)
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
 
@@ -140,107 +250,89 @@ def test_xogador_honesto_con_gps_ruidoso_non_se_flaguea(monkeypatch):
 def test_primeiro_latido_da_sesion_non_ten_anterior_que_comparar(monkeypatch):
     """Sin un punto "antes", no hay velocidad que calcular."""
     cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
     usuario = _un_jugador_coñecido()
-    main.set_player_progress_level(usuario, 0)
+    main.set_player_progress_level(usuario, 1)
     main.upsert_live_position_for_user(usuario, {})
 
-    cliente.post("/api/heartbeat", json={"user": usuario, "lat": LAT_LEJOS, "lon": LON_BASE, "accuracy": 8})
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8)
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
 
 
-# --- Nodo completado sin estar cerca ---------------------------------------
-
-
-def test_nodo_completado_sen_estar_cerca_queda_anotado_pero_avanza(monkeypatch):
+def test_velocidade_imposible_ao_rematar_a_mision_non_se_flaguea(monkeypatch):
+    """Con la misión ya acabada no hay "entre nodos" que vigilar."""
     cliente = _cliente(monkeypatch)
-    _preparar_nodo()
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
-    usuario = "LonxeDoNodo"
-    main.set_player_progress_level(usuario, 0)
-    # El jugador dice estar a un grado de latitud del nodo -~111 km-.
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_LEJOS, "lon": LON_BASE, "accuracy": 10})
+    usuario = _un_jugador_coñecido()
+    main.set_player_progress_level(usuario, 2)  # len(stages) == 2: ya acabó.
 
-    resposta = cliente.post(
-        "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 15000, "level_before": 0},
+    main.upsert_live_position_for_user(
+        usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 8, "last_seen": int(time.time()) - 5}
     )
-
-    assert resposta.json()["status"] == "ok"
-    assert main.get_player_progress_level(usuario, 0) == 1, "la sospecha no puede bloquear el avance"
-
-    sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
-    assert any(s["reason"] == "node_completed_without_proximity" for s in sospechas)
-
-
-def test_nodo_completado_cerca_non_se_flaguea(monkeypatch):
-    cliente = _cliente(monkeypatch)
-    _preparar_nodo()
-    _limpiar_sospechas()
-    usuario = "CercaDoNodo"
-    main.set_player_progress_level(usuario, 0)
-    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
-
-    cliente.post(
-        "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 15000, "level_before": 0},
-    )
+    _latido(cliente, usuario, LAT_LEJOS, LON_BASE, 8)
+    _latido(cliente, usuario, LAT_LEJOS + 1.0, LON_BASE, 8, hace_s=5)
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
 
 
-def test_sen_posicion_coñecida_non_se_flaguea_por_proximidade(monkeypatch):
-    """Sin GPS no hay nada que comparar: no se flaguea por no tener GPS."""
-    cliente = _cliente(monkeypatch)
-    _preparar_nodo()
-    _limpiar_sospechas()
-    usuario = "SenGps"
-    main.set_player_progress_level(usuario, 0)
-
-    cliente.post(
-        "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 15000, "level_before": 0},
-    )
-
-    assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
-
-
-# --- Reto superado demasiado rápido -----------------------------------------
+# --- Reto superado demasiado rápido (sólo minijuegos) -----------------------
 
 
 def test_reto_superado_en_tempo_imposible_queda_anotado(monkeypatch):
     cliente = _cliente(monkeypatch)
-    _preparar_nodo()
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
     usuario = "MoiRapido"
-    main.set_player_progress_level(usuario, 0)
+    main.set_player_progress_level(usuario, 1)  # En n1, el minijuego.
     main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
 
     cliente.post(
         "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 40, "level_before": 0},
+        json={"user": usuario, "code": "OK", "time_spent_ms": 40, "level_before": 1},
     )
 
     sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
     assert any(s["reason"] == "completion_faster_than_possible" for s in sospechas)
-    assert main.get_player_progress_level(usuario, 0) == 1
+    assert main.get_player_progress_level(usuario, 0) == 2
 
 
 def test_reto_con_tempo_normal_non_se_flaguea(monkeypatch):
     cliente = _cliente(monkeypatch)
-    _preparar_nodo()
+    _preparar_nodo_minixogo()
     _limpiar_sospechas()
     usuario = "TempoNormal"
-    main.set_player_progress_level(usuario, 0)
+    main.set_player_progress_level(usuario, 1)
     main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
 
     cliente.post(
         "/api/advance",
-        json={"user": usuario, "code": "OK", "time_spent_ms": 20000, "level_before": 0},
+        json={"user": usuario, "code": "OK", "time_spent_ms": 20000, "level_before": 1},
     )
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+
+def test_checkpoint_superado_ao_instante_non_se_flaguea(monkeypatch):
+    """Un checkpoint se supera con un toque: no hay partida que cronometrar."""
+    cliente = _cliente(monkeypatch)
+    _preparar_nodo_minixogo()
+    _limpiar_sospechas()
+    usuario = "CheckpointInstantaneo"
+    main.set_player_progress_level(usuario, 0)  # En n0, el checkpoint.
+    main.upsert_live_position_for_user(usuario, {"lat": LAT_BASE, "lon": LON_BASE, "accuracy": 10})
+
+    cliente.post(
+        "/api/advance",
+        json={"user": usuario, "code": "OK", "time_spent_ms": 0, "level_before": 0},
+    )
+
+    assert main.list_anti_cheat_suspicions(usuario)[usuario] == [], (
+        "un checkpoint no juega partida ninguna: 0 ms es lo normal, no una trampa"
+    )
+    assert main.get_player_progress_level(usuario, 0) == 1
 
 
 # --- Eventos offline con fecha futura ---------------------------------------
@@ -292,6 +384,64 @@ def test_evento_offline_con_desfase_de_reloj_pequeno_non_se_flaguea(monkeypatch)
     main.apply_synced_player_event(normalizado, usuario, perfil)
 
     assert main.list_anti_cheat_suspicions(usuario)[usuario] == []
+
+
+# --- Salir de la app / abrir el selector durante un minijuego (cliente) -----
+
+
+def test_evento_de_saida_da_app_reportado_polo_cliente_queda_anotado(monkeypatch):
+    """El cliente ya decidió que fue una salida (useAntiTrampas.ts); el
+    servidor sólo la anota -no la vuelve a evaluar, no puede: no ve la
+    pantalla del móvil-."""
+    _preparar_nodo_minixogo()
+    _limpiar_sospechas()
+    usuario = "SairDaApp"
+    main.set_player_progress_level(usuario, 1)
+
+    evento = {
+        "type": "qr_scanned",
+        "source": "manual",
+        "node_id": "n1",
+        "client_event_id": "salida:1",
+        "payload": {
+            "anti_cheat_reason": "left_app_during_minigame",
+            "game_id": "spark_radar",
+            "stage_title": "Nodo 1",
+        },
+    }
+    perfil = main.get_player_profile(usuario)
+    normalizado = main.normalize_player_event(evento, usuario, perfil)
+    main.apply_synced_player_event(normalizado, usuario, perfil)
+
+    sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
+    assert any(s["reason"] == "left_app_during_minigame" for s in sospechas)
+    assert sospechas[-1]["evidence"]["node_id"] == "n1"
+    assert sospechas[-1]["evidence"]["game_id"] == "spark_radar"
+
+
+def test_evento_de_selector_de_apps_reportado_polo_cliente_queda_anotado(monkeypatch):
+    _preparar_nodo_minixogo()
+    _limpiar_sospechas()
+    usuario = "SelectorDeApps"
+    main.set_player_progress_level(usuario, 1)
+
+    evento = {
+        "type": "qr_scanned",
+        "source": "manual",
+        "node_id": "n1",
+        "client_event_id": "selector:1",
+        "payload": {
+            "anti_cheat_reason": "opened_app_switcher_during_minigame",
+            "game_id": "spark_radar",
+            "stage_title": "Nodo 1",
+        },
+    }
+    perfil = main.get_player_profile(usuario)
+    normalizado = main.normalize_player_event(evento, usuario, perfil)
+    main.apply_synced_player_event(normalizado, usuario, perfil)
+
+    sospechas = main.list_anti_cheat_suspicions(usuario)[usuario]
+    assert any(s["reason"] == "opened_app_switcher_during_minigame" for s in sospechas)
 
 
 # --- El propio cálculo de distancia -----------------------------------------

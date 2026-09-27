@@ -144,6 +144,51 @@ export function InteractionSheet({
     String(stageId ?? '')
   )
 
+  /**
+   * Cada salida detectada por `useAntiTrampas` viaja al servidor.
+   *
+   * Va por la misma cola offline-first que un escaneo QR o un código manual
+   * (`queuePhysicalEvent`), no por un endpoint aparte: así funciona igual sin
+   * cobertura, y el servidor la anota como sospecha de trampa (ver
+   * `apply_synced_player_event` en main.py) con la razón, el nodo y el
+   * minijuego, para que salga en el panel de administración.
+   *
+   * `eventosReportadosRef` sólo avanza, nunca retrocede: si `antiTrampas`
+   * reinicia su lista al cambiar de nodo, este contador se reinicia con ella
+   * más abajo -no antes de leer los que quedaban sin reportar de ESTE nodo-.
+   */
+  const eventosReportadosRef = useRef(0)
+  useEffect(() => {
+    eventosReportadosRef.current = 0
+  }, [stageId])
+
+  useEffect(() => {
+    const nuevos = antiTrampas.eventos.slice(eventosReportadosRef.current)
+    eventosReportadosRef.current = antiTrampas.eventos.length
+    if (!nuevos.length) return
+
+    const gameId = String(
+      (resolvedRuntime?.config as { game_id?: unknown } | undefined)?.game_id || stageType || ''
+    )
+
+    for (const evento of nuevos) {
+      void queuePhysicalEvent({
+        user,
+        source: 'manual',
+        node_id: String(currentStage?.id ?? ''),
+        payload: {
+          anti_cheat_reason:
+            evento.motivo === 'selector_apps'
+              ? 'opened_app_switcher_during_minigame'
+              : 'left_app_during_minigame',
+          game_id: gameId,
+          stage_title: currentStage?.title || '',
+        },
+      }).catch(() => undefined)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [antiTrampas.eventos])
+
   const [activeMs, setActiveMs] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
   /** Candado de avance: impide completar el mismo nodo dos veces. */
@@ -554,7 +599,9 @@ export function InteractionSheet({
             <>
               {antiTrampas.acabaDeVolver ? (
                 <div style={avisoAntiTrampas}>
-                  Saíches da aplicación: o reto empeza de novo e súmanse 30 s.
+                  {antiTrampas.eventos[antiTrampas.eventos.length - 1]?.motivo === 'selector_apps'
+                    ? 'Abriste el selector de apps durante el reto: empieza de nuevo y se suman 30 s.'
+                    : 'Saíches da aplicación: o reto empeza de novo e súmanse 30 s.'}
                 </div>
               ) : null}
 
