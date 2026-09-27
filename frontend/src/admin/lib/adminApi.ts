@@ -623,6 +623,7 @@ export type AdminDatosPersonalesConteo = {
   fotos: number
   ficheros_de_imagen: number
   posiciones_gps: number
+  registro_de_partida?: number
 }
 
 export type AdminDatosPersonalesResponse = {
@@ -631,7 +632,7 @@ export type AdminDatosPersonalesResponse = {
   accion?: 'contar' | 'borrar'
   datos?: AdminDatosPersonalesConteo
   para_borrar?: string
-  borrado?: { fotos: number; imagenes: number; posiciones_gps: number }
+  borrado?: { fotos: number; imagenes: number; posiciones_gps: number; registro_de_partida?: number }
   queda?: AdminDatosPersonalesConteo
 }
 
@@ -651,4 +652,59 @@ export function purgeDatosPersonales(opts: { fotos?: boolean; posiciones?: boole
     confirmacion: 'BORRAR',
     ...opts,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Registro de partida (ver backend/app/runtime/match_log.py)
+// ---------------------------------------------------------------------------
+
+export type MatchLogEntry = {
+  id: string
+  type: string
+  user: string
+  display_name: string
+  created_at: string
+  client_created_at?: string
+  severity?: 'suspicion' | 'info'
+  payload?: Record<string, unknown>
+}
+
+export type MatchLogResponse = {
+  status: 'ok' | 'error'
+  detail?: string
+  entries?: MatchLogEntry[]
+  count?: number
+}
+
+export type MatchLogQuery = {
+  user?: string
+  desde?: string
+  hasta?: string
+  type?: string
+  limit?: number
+}
+
+/** Línea de tiempo de un jugador (o de todos) entre dos fechas. Sólo lectura. */
+export function fetchMatchLog(query: MatchLogQuery = {}) {
+  return adminPostJson<MatchLogResponse>('/api/admin/match-log', query)
+}
+
+/**
+ * Descarga la misma línea de tiempo en JSON o CSV. Usa fetch propio -no
+ * adminPostJson- porque la respuesta no siempre es JSON (el CSV llega como
+ * texto con cabecera de descarga) y hay que quedarse con el Blob entero.
+ */
+export async function downloadMatchLogExport(
+  query: MatchLogQuery & { formato: 'json' | 'csv' }
+): Promise<Blob> {
+  const res = await fetch('/api/admin/match-log/export', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { Accept: '*/*', 'Content-Type': 'application/json' },
+    body: JSON.stringify(query),
+  })
+  if (!res.ok) {
+    throw new Error(`Request failed: HTTP ${res.status}`)
+  }
+  return res.blob()
 }

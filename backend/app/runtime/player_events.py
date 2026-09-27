@@ -28,6 +28,12 @@ PLAYER_EVENT_TYPES = {
     "inventory_item_collected",
     "inventory_item_used",
     "offline_sync_received",
+    # Minijuego: sólo para el Registro de partida (ver
+    # backend/app/runtime/match_log.py) -no tienen efecto en el progreso,
+    # eso sigue decidiéndolo node_completed-.
+    "minigame_started",
+    "minigame_finished",
+    "minigame_restarted",
 }
 
 EVENT_PAYLOAD_MAX_KEYS = 32

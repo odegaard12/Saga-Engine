@@ -58,6 +58,20 @@ SEVERITY_INFO = "info"
 #: VALID_HEARTBEAT_SOURCES en backend/app/runtime/live_positions.py.
 MANUAL_POSITION_SOURCE = "manual"
 
+#: Puente opcional hacia el Registro de partida (ver
+#: backend/app/runtime/match_log.py). `main.py` lo configura una vez al
+#: arrancar con `configure_match_log_sink`: cada sospecha o nota "info" que
+#: se anota aquí se refleja también en la línea de tiempo del jugador, sin
+#: que este módulo tenga que conocer rutas de fichero ni el estado de la
+#: misión -eso lo decide quien configura el sink-.
+_match_log_sink = None
+
+
+def configure_match_log_sink(sink):
+    """Registra `sink(user, reason, evidence, severity)` para cada sospecha/nota."""
+    global _match_log_sink
+    _match_log_sink = sink
+
 # ---------------------------------------------------------------------------
 # Umbrales. Cada uno documenta el motivo del número, no sólo el número.
 # ---------------------------------------------------------------------------
@@ -253,6 +267,13 @@ def record_suspicion(
         return actual
 
     update_json(db_path, {}, _actualizar)
+
+    if _match_log_sink is not None and user_key:
+        try:
+            _match_log_sink(user_key, entrada["reason"], entrada["evidence"], entrada["severity"])
+        except Exception:
+            pass
+
     return entrada
 
 
