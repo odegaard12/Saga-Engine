@@ -216,6 +216,12 @@ SPEED_STREAK_DB = os.path.join(DATA_DIR, "speed_streak.json")
 # anti_cheat.json por el mismo motivo que SPEED_STREAK_DB: no es una sospecha,
 # es el estado que decide si hace falta anotar otra.
 MANUAL_POSITION_NOTICE_DB = os.path.join(DATA_DIR, "manual_position_notice.json")
+# Tiempos de partida LIMPIOS (no flagueados) por game_id, en esta misión.
+# Es la base de "lo normal aquí" que usa check_completion_time como red de
+# seguridad antes de flaguear un tiempo por debajo del suelo físico (ver
+# backend/app/runtime/anti_cheat.py, MIN_MUESTRAS_PARA_MEDIANA). Aparte de
+# anti_cheat.json: esto no son sospechas, son datos de referencia.
+COMPLETION_TIME_SAMPLES_DB = os.path.join(DATA_DIR, "completion_time_samples.json")
 
 def load_inventory_state():
     return load_json(INVENTORY_DB, {})
@@ -1027,7 +1033,9 @@ def anti_cheat_note_manual_position(user, source):
 
 
 def anti_cheat_check_completion_time(user, node, time_spent_ms):
-    return _anti_cheat.check_completion_time(ANTI_CHEAT_DB, user, node, time_spent_ms)
+    return _anti_cheat.check_completion_time(
+        ANTI_CHEAT_DB, user, node, time_spent_ms, samples_db_path=COMPLETION_TIME_SAMPLES_DB
+    )
 
 
 def anti_cheat_check_future_timestamp(user, local_created_ms, node_id=None):
