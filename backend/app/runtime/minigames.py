@@ -766,6 +766,52 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
         return out
 
     if normalized_type == "bearing_hunt":
+        game_id = _as_str(raw.get("game_id")).strip().lower()
+
+        if game_id == "rumbo_doble":
+            # "Rumbo doble": 2 (admin-configurable 2-3) objetivos reales,
+            # cada uno con su etiqueta libre (lo que escribe el organizador,
+            # p.ej. "la torre de la iglesia") y su propio rumbo. A
+            # diferencia del bearing_hunt de objetivo único de abajo, aquí
+            # no hay target_bearing_deg suelto: la lista `targets` es la
+            # fuente de verdad, y el runtime del jugador (RuntimeScreen.tsx)
+            # avanza de uno a otro sin resetear la secuencia si se pierde el
+            # lock de uno solo.
+            raw_targets = raw.get("targets")
+            targets = []
+            if isinstance(raw_targets, list):
+                for item in raw_targets:
+                    if not isinstance(item, dict):
+                        continue
+                    label = _as_str(item.get("label")).strip()[:120]
+                    bearing = _as_float(item.get("bearing_deg"), 0) % 360
+                    targets.append({"label": label, "bearing_deg": bearing})
+
+            # Defensivo: un nodo a medio configurar no debe quedar sin
+            # objetivos jugables. 2 es el mínimo real del juego.
+            fallback_targets = [
+                {"label": "Objetivo 1", "bearing_deg": 0.0},
+                {"label": "Objetivo 2", "bearing_deg": 90.0},
+                {"label": "Objetivo 3", "bearing_deg": 180.0},
+            ]
+            idx = 0
+            while len(targets) < 2 and idx < len(fallback_targets):
+                targets.append(fallback_targets[idx])
+                idx += 1
+
+            targets = targets[:3]
+
+            return {
+                "objective": "bearing_sequence",
+                "game_id": "rumbo_doble",
+                "targets": targets,
+                "tolerance_deg": _clamp_int(raw.get("tolerance_deg"), 12, 1, 90),
+                "hold_ms": _clamp_int(raw.get("hold_ms"), 1200, 100),
+                "show_numeric_bearing": _as_bool(raw.get("show_numeric_bearing"), False),
+                "show_compass_ring": _as_bool(raw.get("show_compass_ring"), True),
+                "allow_recenter": _as_bool(raw.get("allow_recenter"), True),
+            }
+
         target_sequence = raw.get("target_sequence_deg")
         false_targets = raw.get("false_targets")
 

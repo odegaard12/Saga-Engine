@@ -6,6 +6,40 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.38.0
+
+- **Los nodos nuevos del editor guiado no exigían estar cerca.** El editor
+  escribía `requires_proximity` (con s) y la persistencia leía
+  `require_proximity`: todo nodo creado desde el editor se guardaba con
+  `false`, y el servidor abre la puerta a cualquier distancia en ese caso.
+  Los nodos de la misión real no estaban afectados (comprobado: todos con
+  proximidad exigida). Test: `test_o_editor_garda_a_proximidade.py`.
+
+- **Nuevo juego "Rumbo doble" (`rumbo_doble`), familia "Orientación".**
+  Segundo `game_id` de `bearing_hunt` (no un `type`/family nuevo, igual que
+  `team_relay`/`mapa_mudo` dentro de `signal_hunt`): el jugador apunta el
+  móvil, uno tras otro, a 2 (admin-configurable 2-3) objetivos reales
+  visibles desde el nodo -cada uno con una pista de texto que escribe el
+  organizador, p.ej. "la torre de la iglesia", y su propio rumbo- y
+  mantiene el lock `hold_ms` en cada uno. Progreso visible (1/2, 2/2).
+  Perder el lock de un objetivo solo reinicia SU hold, nunca la secuencia
+  entera. `bearing_hunt` de objetivo único sigue exactamente igual -mismos
+  campos, mismo runtime- para cualquier nodo existente.
+  - Backend: `normalize_minigame_config` (`backend/app/runtime/minigames.py`)
+    añade la rama `game_id == "rumbo_doble"` dentro de `bearing_hunt`, con su
+    propia lista `targets` (label + bearing_deg, 2-3 elementos, rumbos
+    recortados por módulo 360).
+  - Anti-trampas: suelo físico propio `_suelo_rumbo_doble`
+    (`backend/app/runtime/anti_cheat.py`), derivado del propio nodo (nº de
+    objetivos × `hold_ms` reales) igual que el de `sequence_code` -nunca un
+    número adivinado, ver el porqué de v5.34.0 en el mismo archivo-.
+  - Admin: entrada en `adminGameCatalog` (`gameCatalog.ts`), familia de
+    presentación "Orientación" (`displayFamilies.ts`) y editor dedicado
+    `RumboDobleEditor.tsx` (lista de objetivos, tolerancia, tiempo de espera).
+  - Jugador: `RuntimeScreen.tsx` de `bearingHunt` gana modo secuencia
+    (`sequenceMode`/`targetIndex`) reutilizando el mismo motor de brújula;
+    textos de progreso/lock en `i18n/index.ts` (en/es/gl).
+
 ## 5.37.0
 
 - **Nuevo juego "Mapa mudo" (`mapa_mudo`), familia "Llegar y escanear".** El

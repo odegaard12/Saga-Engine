@@ -157,6 +157,30 @@ def _suelo_sequence_code(node: dict) -> int:
     return max(MIN_PLAUSIBLE_STAGE_MS, n_pasos * MIN_MS_POR_PASO_DE_SECUENCIA)
 
 
+def _suelo_rumbo_doble(node: dict) -> int:
+    """Mínimo físico de `rumbo_doble`: N objetivos, cada uno exige su propio
+    `hold_ms` de verdad, uno detrás de otro -no se puede mantener dos rumbos
+    a la vez-. Igual que `_suelo_sequence_code`, sale de lo que el propio
+    nodo tiene configurado (`config.targets` / `config.hold_ms`), no de una
+    tabla adivinada: exactamente el bug que se corrigió en v5.34.0 (ver
+    MIN_PLAUSIBLE_STAGE_MS). A propósito NO se suma tiempo estimado de giro
+    entre objetivos -eso sí sería adivinar-, sólo la suma de los holds que
+    el runtime exige de verdad (RuntimeScreen.tsx).
+    """
+    config = _config_del_nodo(node)
+    targets = config.get("targets")
+    n_targets = len(targets) if isinstance(targets, list) and targets else 2
+
+    try:
+        hold_ms = int(config.get("hold_ms"))
+    except (TypeError, ValueError):
+        hold_ms = 1200
+    if hold_ms <= 0:
+        hold_ms = 1200
+
+    return max(MIN_PLAUSIBLE_STAGE_MS, n_targets * hold_ms)
+
+
 #: Mínimo físico por FAMILIA de minijuego, sólo para los que tienen un límite
 #: físico real y calculable (no una "duración típica"). A propósito NO hay
 #: entrada para spark_radar ni team_relay: son prototipos sin cablear en la
@@ -169,6 +193,7 @@ def _suelo_sequence_code(node: dict) -> int:
 #: estricto que ese suelo.
 MINIGAME_HARD_FLOOR_MS_BY_GAME: Dict[str, Any] = {
     "sequence_code": _suelo_sequence_code,  # depende del nodo: nº de pasos real.
+    "rumbo_doble": _suelo_rumbo_doble,  # depende del nodo: nº de objetivos x hold_ms real.
 }
 
 

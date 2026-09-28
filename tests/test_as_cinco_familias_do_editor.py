@@ -43,10 +43,10 @@ def extraer_mapa_de_familias() -> dict[str, str]:
     return dict(pares)
 
 
-def test_o_catalogo_ten_os_dezasete_xogos_esperados():
-    # 17 desde "mapa mudo" (owner-approved): mismo catálogo, un id más.
+def test_o_catalogo_ten_os_dezaoito_xogos_esperados():
+    # 18 desde "Rumbo doble" (owner-approved): mismo catálogo, un id más.
     ids = extraer_ids_do_catalogo()
-    assert len(ids) == 17, f"se esperaban 17 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
+    assert len(ids) == 18, f"se esperaban 18 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
     assert len(set(ids)) == len(ids), "hay ids duplicados en adminGameCatalog"
 
 
@@ -79,6 +79,7 @@ def test_as_familias_obxectivo_teñen_os_xogos_correctos():
         "place_mosaic": "puzles",
         "tilt_maze": "movimiento",
         "bearing_hunt": "orientacion",
+        "rumbo_doble": "orientacion",
         "audio_challenge": "sonido",
     }
     for game_id, familia in esperado.items():

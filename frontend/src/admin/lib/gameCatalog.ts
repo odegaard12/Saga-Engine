@@ -34,6 +34,9 @@ export type AdminGameId =
   | 'manual_password'
   | 'bonus_cache'
   | 'audio_challenge'
+  // Familia bearing_hunt, segundo game_id: 2-3 objetivos reales en secuencia
+  // en vez de un solo rumbo. Ver frontend/src/player/minigames/families/bearingHunt/.
+  | 'rumbo_doble'
 
 export type AdminGameRuntimeStatus = 'runtime_ready' | 'runtime_partial' | 'preset_only' | 'planned'
 export type AdminGameOfflineStatus = 'offline_ready' | 'offline_partial' | 'offline_planned'
@@ -669,6 +672,44 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'Observa los grados que se muestran: gira hacia el lado que indique.',
       gps_unavailable: 'Este reto no necesita GPS, solo la brújula del móvil.',
       locked: 'Bloquea el rumbo para continuar.',
+    },
+  },
+  {
+    // Segundo game_id de la familia bearing_hunt (owner-approved "Rumbo
+    // doble"): el mismo motor de brújula de Caza de rumbo, pero con 2-3
+    // objetivos reales visibles desde el nodo, uno tras otro. La lista
+    // `targets` (label + bearing_deg) es la fuente de verdad; el editor
+    // dedicado vive en admin/components/rumboDoble/RumboDobleEditor.tsx.
+    id: 'rumbo_doble',
+    title: 'Rumbo doble',
+    icon: '🧭',
+    family: 'bearing_hunt',
+    category: 'compass',
+    difficulty: 'Media',
+    duration: '2-4 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'bearing',
+    offlineNote: 'La brújula del móvil funciona sin conexión; solo hace falta el sensor de orientación.',
+    summary: 'Apuntar el móvil, uno tras otro, a 2-3 cosas reales visibles desde el nodo y mantener cada rumbo.',
+    playerGoal: 'Girar hasta cada objetivo de la lista y aguantar quieto el tiempo pedido, en orden.',
+    editorHint:
+      'Escribe la pista de cada objetivo (p.ej. "la torre de la iglesia") y su rumbo en grados (0-359). Perder el rumbo de uno solo no reinicia los demás: solo hay que volver a apuntar a ese.',
+    config: {
+      objective: 'bearing_sequence',
+      game_id: 'rumbo_doble',
+      targets: [
+        { label: 'Objetivo 1', bearing_deg: 0 },
+        { label: 'Objetivo 2', bearing_deg: 90 },
+      ],
+      tolerance_deg: 12,
+      hold_ms: 1200,
+    },
+    content: 'Apunta el móvil a cada objetivo de la lista, en orden, y mantente quieto unos segundos en cada uno.',
+    messages: {
+      hint: 'Mira la pista del objetivo actual y gira hacia el rumbo que se indica.',
+      gps_unavailable: 'Este reto no necesita GPS, solo la brújula del móvil.',
+      locked: 'Bloquea los dos (o tres) rumbos para continuar.',
     },
   },
 ]

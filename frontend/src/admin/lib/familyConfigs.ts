@@ -229,6 +229,44 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
   }
 
   if (type === 'bearing_hunt') {
+    // "Rumbo doble" (game_id rumbo_doble): la rama de objetivo único de
+    // abajo devolvía SIEMPRE esas 4 claves fijas, sin importar lo que
+    // trajera `raw` -así que `targets` (y show_numeric_bearing/
+    // show_compass_ring/allow_recenter) se perdían aquí, ANTES de llegar
+    // siquiera al backend: cada edición de la lista de objetivos en
+    // RumboDobleEditor.tsx se guardaba, pero al pasar por este
+    // normalizador quedaba pisada por los 2 objetivos de relleno por
+    // defecto del backend (normalize_minigame_config, que rellena cuando
+    // `targets` no llega). Encontrado guardando un nodo real en el banco
+    // local, no a ojo: el "Guardado" de la UI parecía correcto pero el
+    // nodo persistido no tenía las pistas ni los rumbos que se habían
+    // escrito.
+    if (raw.game_id === 'rumbo_doble' || raw.objective === 'bearing_sequence') {
+      const rawTargets = Array.isArray(raw.targets) ? raw.targets : []
+      const targets = rawTargets
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+        .slice(0, 3)
+        .map((item) => ({
+          label: String(item.label ?? '').slice(0, 120),
+          bearing_deg: ((toAdminConfigNumber(item.bearing_deg, 0) % 360) + 360) % 360,
+        }))
+
+      while (targets.length < 2) {
+        targets.push({ label: `Objetivo ${targets.length + 1}`, bearing_deg: targets.length === 0 ? 0 : 90 })
+      }
+
+      return {
+        objective: 'bearing_sequence',
+        game_id: 'rumbo_doble',
+        targets,
+        tolerance_deg: toAdminConfigNumber(raw.tolerance_deg, 12),
+        hold_ms: toAdminConfigNumber(raw.hold_ms, 1200),
+        show_numeric_bearing: raw.show_numeric_bearing === true,
+        show_compass_ring: raw.show_compass_ring !== false,
+        allow_recenter: raw.allow_recenter !== false,
+      }
+    }
+
     const bearing =
       raw.target_bearing_deg !== undefined ? raw.target_bearing_deg : raw.target_bearing
 
