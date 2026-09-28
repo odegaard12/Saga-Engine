@@ -76,6 +76,12 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   // grupo que el resto de retos de "llegar" aunque su family técnica sea
   // signal_hunt.
   team_relay: 'llegar_y_escanear',
+  // Cuenta las señales: se juega EN el punto real (require_proximity: true,
+  // igual que un checkpoint) y no es un puzle de lógica -no hay tablero ni
+  // memoria, solo mirar alrededor y contar-, así que cae en "Llegar y
+  // escanear" con el resto de juegos que se completan al llegar, aunque su
+  // family técnica (heredada, como mapa_mudo/team_relay) sea signal_hunt.
+  cuenta_senales: 'llegar_y_escanear',
   logic_circuit: 'puzles',
   sequence_code: 'puzles',
   place_mosaic: 'puzles',

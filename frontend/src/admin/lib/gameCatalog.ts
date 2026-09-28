@@ -37,6 +37,12 @@ export type AdminGameId =
   // Familia bearing_hunt, segundo game_id: 2-3 objetivos reales en secuencia
   // en vez de un solo rumbo. Ver frontend/src/player/minigames/families/bearingHunt/.
   | 'rumbo_doble'
+  // Familia signal_hunt, otro game_id más (owner-approved "Cuenta las
+  // señales"): el jugador cuenta algo real del lugar (bancos, ventanas...)
+  // y teclea el número. Ver
+  // frontend/src/admin/components/cuentaSenales/CuentaSenalesEditor.tsx y
+  // frontend/src/player/minigames/families/signalHunt/CuentaSenalesRuntimeScreen.tsx.
+  | 'cuenta_senales'
 
 export type AdminGameRuntimeStatus = 'runtime_ready' | 'runtime_partial' | 'preset_only' | 'planned'
 export type AdminGameOfflineStatus = 'offline_ready' | 'offline_partial' | 'offline_planned'
@@ -443,6 +449,39 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'No hay pin: fíate de la pista y del círculo de búsqueda.',
       gps_unavailable: 'Necesitas GPS para saber si estás dentro del círculo.',
       locked: 'Entra en el círculo de búsqueda para continuar.',
+    },
+  },
+  {
+    id: 'cuenta_senales',
+    title: 'Cuenta las señales',
+    icon: '🔢',
+    family: 'signal_hunt',
+    category: 'gps',
+    difficulty: 'Fácil',
+    duration: '1-3 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'manual_code',
+    offlineNote:
+      'La pregunta y la respuesta (ya hasheada) viajan dentro del paquete offline del jugador; comprobar la respuesta no necesita red.',
+    summary: 'Observación en el propio lugar: el jugador cuenta algo real (bancos, ventanas...) y teclea el número.',
+    playerGoal: 'Mira alrededor del punto real y responde con un número.',
+    editorHint:
+      'Escríbelas recorriendo la ruta: cuenta tú primero lo que ve el jugador desde el nodo. Entre 2 y 5 preguntas; cada jugador recibe solo una, siempre la misma.',
+    config: {
+      game_id: 'cuenta_senales',
+      objective: 'count_signals',
+      completion_method: 'manual_code',
+      questions: [
+        { question: '¿Cuántos bancos hay alrededor de este punto?', answer: 3, tolerance: 0, hint_image_data_url: '' },
+        { question: '¿Cuántas ventanas tiene la fachada que tienes delante?', answer: 5, tolerance: 1, hint_image_data_url: '' },
+      ],
+    },
+    content: 'Mira a tu alrededor y cuenta lo que se te pide. Escribe el número con el teclado grande.',
+    messages: {
+      hint: 'Cuenta despacio, sin prisa: no hay límite de tiempo para mirar.',
+      gps_unavailable: 'Necesitas estar en el punto real para ver la pregunta.',
+      locked: 'Acércate al punto para poder responder.',
     },
   },
   {

@@ -150,6 +150,28 @@ export type SignalHuntConfig = {
    * misión, nodo a nodo.
    */
   required_members?: number
+  /**
+   * "Cuenta las señales" (owner-approved, game_id 'cuenta_senales'): otro
+   * game_id dentro de esta familia, igual que team_relay/mapa_mudo arriba.
+   * El jugador SOLO recibe su pregunta asignada (una de las 2-5 que
+   * escribió el organizador) con la respuesta ya hasheada -nunca la lista
+   * completa ni la respuesta en claro-. Ver
+   * project_cuenta_senales_for_player en minigames.py (servidor) y
+   * CuentaSenalesRuntimeScreen.tsx (cliente, calcula el mismo hash con
+   * Web Crypto para comprobar sin red).
+   */
+  question?: string
+  hint_image_data_url?: string
+  /**
+   * Un hash por cada valor aceptable (respuesta ± tolerancia): comparar
+   * por igualdad exacta contra un hash no admite rango, así que la
+   * tolerancia se aplica hasheando cada entero válido, no restando sobre
+   * el hash. Ver project_cuenta_senales_for_player en minigames.py.
+   */
+  answer_hashes?: string[]
+  salt?: string
+  max_attempts?: number
+  penalty_ms?: number
 }
 
 export type AudioChallengeObjective = 'blow_charge'

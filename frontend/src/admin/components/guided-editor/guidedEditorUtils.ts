@@ -65,6 +65,10 @@ export const TECHNICAL_CONFIG_KEYS = new Set([
   // "Rumbo doble": lista de objetivos {label, bearing_deg}. La edita
   // RumboDobleEditor.tsx, no el bucle genérico de campos clave/valor.
   'targets',
+  // "Cuenta las señales": lista de preguntas {question, answer, tolerance,
+  // hint_image_data_url}. La edita CuentaSenalesEditor.tsx, igual que
+  // `targets` de arriba.
+  'questions',
 ])
 
 export const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
@@ -639,6 +643,7 @@ export const CUSTOM_GAME_EDITOR_IDS = new Set([
   'place_mosaic',
   'tilt_maze',
   'rumbo_doble',
+  'cuenta_senales',
 ])
 
 export function hasCustomGameEditor(game: AdminGameCatalogItem) {
@@ -650,7 +655,8 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     game.id === 'sequence_code' ||
     game.id === 'place_mosaic' ||
     game.id === 'tilt_maze' ||
-    game.id === 'rumbo_doble'
+    game.id === 'rumbo_doble' ||
+    game.id === 'cuenta_senales'
   ) {
     return []
   }

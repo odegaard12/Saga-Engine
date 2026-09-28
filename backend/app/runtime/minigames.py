@@ -4,7 +4,96 @@ This module intentionally contains pure helpers only. FastAPI routes stay in
 main.py for now; later PRs can move routers after contract tests exist.
 """
 
+import hashlib
+
 MINIGAME_OK_CODE = "OK"
+
+#: "Cuenta las señales" (owner-approved). Nº de preguntas por defecto/tope
+#: -mínimo 2, máximo 5- que escribe el organizador al recorrer la ruta.
+CUENTA_SENALES_MIN_QUESTIONS = 2
+CUENTA_SENALES_MAX_QUESTIONS = 5
+#: Penalización de tiempo tras 3 fallos, reutilizando la misma magnitud (30 s)
+#: que el resto del anti-trampas usa como reinicio penalizado -no se inventa
+#: un número nuevo-. El jugador nunca queda bloqueado: solo suma tiempo.
+CUENTA_SENALES_PENALTY_MS = 30000
+CUENTA_SENALES_MAX_ATTEMPTS = 3
+
+
+def hash_cuenta_senales_answer(answer, salt):
+    """sha256(salt + ':' + respuesta), la MISMA función que corre en el
+    cliente (Web Crypto SubtleCrypto, ver CuentaSenalesRuntimeScreen.tsx)
+    para poder comprobar sin red la respuesta del jugador.
+
+    No es una defensa fuerte -un entero pequeño se fuerza por fuerza bruta
+    en milisegundos-, es solo para que la respuesta no se lea a ojo en
+    DevTools/el payload de red. El check real de "gana el punto" siempre ha
+    sido responsabilidad del cliente en TODOS los minijuegos de SAGA (ver
+    MINIGAME_OK_CODE: el servidor solo acepta el aviso de "completado", no
+    revalida la partida) y el offline exige que el cliente pueda comprobar
+    sin conexión, así que no hay vuelta atrás posible aquí sin romper el
+    modo sin red.
+    """
+    texto = f"{_as_str(salt)}:{_as_str(answer).strip()}"
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def _cuenta_senales_salt(node_id, question_index):
+    return f"{_as_str(node_id)}:{int(question_index)}"
+
+
+def pick_cuenta_senales_question_index(node_id, player_id, question_count):
+    """Índice determinista 0..question_count-1 a partir de hash(player_id +
+    node_id). Estable entre recargas/offline -no usa random- y reparte a
+    cada jugador una pregunta DISTINTA de las 2-5 que escribió el
+    organizador, para que no puedan pasarse la respuesta entre ellos.
+    """
+    if question_count <= 0:
+        return 0
+    texto = f"{_as_str(player_id)}:{_as_str(node_id)}"
+    digest = hashlib.sha256(texto.encode("utf-8")).hexdigest()
+    return int(digest, 16) % int(question_count)
+
+
+def project_cuenta_senales_for_player(config, node_id, player_id):
+    """De la config completa (con las 2-5 preguntas y su respuesta en
+    claro, tal y como la guarda el organizador) a lo que recibe UN jugador:
+    solo SU pregunta asignada, y con la respuesta sustituida por su hash
+    salado (salt = node_id + índice de la pregunta). Nunca viaja la
+    respuesta en claro ni las preguntas de los demás jugadores.
+    """
+    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
+    if not questions:
+        questions = [_default_cuenta_senales_question(1)]
+
+    index = pick_cuenta_senales_question_index(node_id, player_id, len(questions))
+    question = questions[index] if 0 <= index < len(questions) else questions[0]
+    salt = _cuenta_senales_salt(node_id, index)
+
+    tolerance = _clamp_int(question.get("tolerance"), 0, 0, 20)
+    answer = _clamp_int(question.get("answer"), 0, 0, 999)
+    # La tolerancia (±) no se puede aplicar a un hash con una simple resta:
+    # un hash sólo compara igualdad exacta. Así que se hashea CADA valor
+    # aceptable del rango -answer-tolerancia..answer+tolerancia-, no solo
+    # el correcto. Con tolerancia 0 es una lista de un elemento: el mismo
+    # comportamiento de siempre. Sigue siendo un puñado de enteros pequeños
+    # -fuerza bruta trivial-, pero es el mismo trade-off ya aceptado para
+    # `answer_hash`: nunca se lee la respuesta a ojo en DevTools/red.
+    answer_hashes = [
+        hash_cuenta_senales_answer(valor, salt)
+        for valor in range(max(0, answer - tolerance), answer + tolerance + 1)
+    ]
+
+    return {
+        "objective": "count_signals",
+        "game_id": "cuenta_senales",
+        "completion_method": "manual_code",
+        "question": _as_str(question.get("question")).strip(),
+        "hint_image_data_url": _as_str(question.get("hint_image_data_url")).strip(),
+        "answer_hashes": answer_hashes,
+        "salt": salt,
+        "max_attempts": CUENTA_SENALES_MAX_ATTEMPTS,
+        "penalty_ms": CUENTA_SENALES_PENALTY_MS,
+    }
 
 SUPPORTED_MINIGAME_TYPES = {
     "circuit_matrix",
@@ -230,6 +319,60 @@ def _normalize_circuit_path_cells(value, rows, cols):
 
 
 
+def _default_cuenta_senales_question(index):
+    return {
+        "question": f"Objetivo {index}: ¿cuántos hay?",
+        "answer": 1,
+        "tolerance": 0,
+        "hint_image_data_url": "",
+    }
+
+
+def _normalize_cuenta_senales_questions(value):
+    """2-5 preguntas: texto, respuesta entera, tolerancia (± admin) y foto
+    de pista opcional. Igual que rumbo_doble con `targets`, un nodo a medio
+    escribir no debe quedarse sin preguntas jugables -se rellena hasta el
+    mínimo de 2-, y nunca se admiten más de 5 (el enunciado del juego pide
+    2-5 preguntas, una por jugador).
+    """
+    raw_list = value if isinstance(value, list) else []
+    questions = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        text = _as_str(item.get("question")).strip()[:240]
+        answer = _clamp_int(item.get("answer"), 0, 0, 999)
+        tolerance = _clamp_int(item.get("tolerance"), 0, 0, 20)
+        hint = _as_str(item.get("hint_image_data_url")).strip()
+        valid_hint = (
+            len(hint) <= 600000
+            and (
+                hint.startswith("data:image/jpeg;base64,")
+                or hint.startswith("data:image/png;base64,")
+                or hint.startswith("data:image/webp;base64,")
+            )
+        )
+        if not text:
+            continue
+        questions.append(
+            {
+                "question": text,
+                "answer": answer,
+                "tolerance": tolerance,
+                "hint_image_data_url": hint if valid_hint else "",
+            }
+        )
+
+    questions = questions[:CUENTA_SENALES_MAX_QUESTIONS]
+
+    idx = 1
+    while len(questions) < CUENTA_SENALES_MIN_QUESTIONS:
+        questions.append(_default_cuenta_senales_question(idx))
+        idx += 1
+
+    return questions
+
+
 def _normalize_mosaic_choices(value):
     if not isinstance(value, list):
         return [
@@ -292,6 +435,14 @@ def normalize_minigame_config(minigame_type, raw_cfg):
         dato_foto = raw.get("image_data_url")
         if isinstance(dato_foto, str) and dato_foto.startswith("data:"):
             out["image_data_url"] = dato_foto
+    # questions: solo lo usa cuenta_senales (otro game_id de signal_hunt,
+    # igual que mapa_mudo/team_relay arriba). Aquí SÍ va la respuesta en
+    # claro -esto es lo que guarda el organizador en admin, nunca lo que
+    # recibe el jugador: ver project_cuenta_senales_for_player, que es
+    # quien sustituye `questions` por la pregunta+hash de UN jugador antes
+    # de que el payload salga hacia el móvil-.
+    if juego_id == "cuenta_senales":
+        out["questions"] = _normalize_cuenta_senales_questions(raw.get("questions"))
     return out
 
 
