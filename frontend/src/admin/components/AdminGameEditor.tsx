@@ -930,8 +930,21 @@ export default function AdminGameEditor({
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
+                        ) : meta.type === 'boolean' ? (
+                          <input
+                            type="checkbox"
+                            checked={String(config[key]) === 'true'}
+                            onChange={(event) => patchConfig(key, event.target.checked ? 'true' : 'false')}
+                          />
+                        ) : key === 'clue_text' ? (
+                          <textarea rows={3} value={formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)} />
                         ) : (
-                          <input type={meta.type === 'number' ? 'number' : 'text'} value={formatConfigValue(config[key])} onChange={(event) => patchConfig(key, event.target.value)} />
+                          <input
+                            type={meta.type === 'number' ? 'number' : 'text'}
+                            {...(key === 'search_radius_m' ? { min: 150, max: 400 } : {})}
+                            value={formatConfigValue(config[key])}
+                            onChange={(event) => patchConfig(key, event.target.value)}
+                          />
                         )}
                         <small>{meta.help}</small>
                       </label>
@@ -951,6 +964,26 @@ export default function AdminGameEditor({
                   )}
                   {selectedGame.id === 'sequence_code' && (
                     <div className="wide saga-guided-v4-custom-editor"><SimonSaysEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'mapa_mudo' && (
+                    <label className="wide">
+                      <span>Foto de la pista (opcional)</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = () => onPatch({ config: { ...config, image_data_url: String(reader.result || '') } })
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                      <small>JPG, PNG o WebP. Reutiliza el mismo campo de foto que el resto de nodos (image_data_url); no hace falta ninguna foto para que el nodo funcione.</small>
+                      {typeof config.image_data_url === 'string' && config.image_data_url ? (
+                        <img src={String(config.image_data_url)} alt="Vista previa de la foto de la pista" style={{ maxWidth: 160, marginTop: 8, borderRadius: 8 }} />
+                      ) : null}
+                    </label>
                   )}
                 </>
               ) : null}

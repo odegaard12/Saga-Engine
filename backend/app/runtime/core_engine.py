@@ -162,6 +162,15 @@ def normalize_stage(raw):
         if isinstance(cfg, dict) and not cfg.get("game_id"):
             cfg["game_id"] = "simple_checkpoint"
         raw_interaction_type = "signal_hunt"
+    elif raw_interaction_type == "mapa_mudo":
+        # Defensiva/legacy, igual que la rama "checkpoint" de arriba: el
+        # editor moderno guarda directamente type="signal_hunt" +
+        # config.game_id="mapa_mudo" (como team_relay o qr_collectible) y
+        # nunca pasa por aquí. Esta rama sólo cubre un nodo viejo que
+        # guardase "mapa_mudo" como `type` a pelo.
+        if isinstance(cfg, dict) and not cfg.get("game_id"):
+            cfg["game_id"] = "mapa_mudo"
+        raw_interaction_type = "signal_hunt"
 
     interaction_type_fallback_reason = ""
     if not raw_interaction_type:
@@ -177,9 +186,25 @@ def normalize_stage(raw):
     if not isinstance(raw_minigame_config, dict):
         raw_minigame_config = None
 
+    # `cfg` (stage.config) es lo que el editor guiado edita de verdad -cada
+    # `onPatch({ config: ... })` de AdminGameEditor.tsx escribe ahí-, pero
+    # `stage.minigame.config` es una copia que se queda congelada desde que
+    # se eligió el tipo de juego: ningún `onPatch` la vuelve a tocar. Antes
+    # esta función prefería `raw_minigame_config` entero cuando existía, así
+    # que un campo nuevo -`clue_text`/`search_radius_m`/`hot_cold_hint` de
+    # "mapa mudo", pero también cualquier ajuste posterior de otro juego- se
+    # guardaba en `cfg` y se veía en el editor, pero el jugador nunca lo
+    # recibía: se perdía en cuanto esta función normalizaba con la copia
+    # vieja. `cfg` gana campo a campo sobre `raw_minigame_config` -nunca al
+    # revés-, así que sigue sirviendo de base para lo que `cfg` no traiga.
+    merged_minigame_config = None
+    if raw_minigame_config is not None or cfg:
+        merged_minigame_config = dict(raw_minigame_config or {})
+        merged_minigame_config.update(cfg)
+
     interaction_config = normalize_minigame_config(
         interaction_type,
-        raw_minigame_config if raw_minigame_config is not None else cfg
+        merged_minigame_config
     )
 
     item_requirement = read_stage_item_requirement(raw)

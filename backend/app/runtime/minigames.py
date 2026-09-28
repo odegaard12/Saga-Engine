@@ -278,6 +278,20 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     # siempre. Encontrado con sim/playwright-bench, no a ojo.
     if "required_members" in raw:
         out["required_members"] = _clamp_int(raw.get("required_members"), 2, 1, 20)
+    # clue_text/search_radius_m/hot_cold_hint: solo los usa mapa_mudo (otro
+    # game_id de signal_hunt, igual que required_members de team_relay justo
+    # arriba), no son campos reales de esa familia. La foto de la pista
+    # reutiliza el mismo `image_data_url` genérico que ya sirve
+    # `_minigame_con_url_de_foto` (mision.py) para cualquier minijuego -no
+    # se inventa un nombre de campo nuevo-.
+    juego_id = _as_str(out.get("game_id") or raw.get("game_id")).strip()
+    if juego_id == "mapa_mudo":
+        out["clue_text"] = _as_str(raw.get("clue_text")).strip()[:400]
+        out["search_radius_m"] = _clamp_int(raw.get("search_radius_m"), 250, 150, 400)
+        out["hot_cold_hint"] = _as_bool(raw.get("hot_cold_hint"), False)
+        dato_foto = raw.get("image_data_url")
+        if isinstance(dato_foto, str) and dato_foto.startswith("data:"):
+            out["image_data_url"] = dato_foto
     return out
 
 

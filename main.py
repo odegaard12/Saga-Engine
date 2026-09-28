@@ -1225,12 +1225,17 @@ async def saga_no_cache_html(request, call_next):
 # viven ahora en backend/app/runtime/mision.py. Se reexportan porque los routers
 # todavia los piden por main mientras se rompe el import circular.
 from backend.app.runtime.mision import (  # noqa: E402
+    fuzzy_search_circle,
+    hot_cold_band_es,
     project_stage_for_player,
     stage_accepts_code,
     stage_qr_payloads as _stage_qr_payloads,
     validate_stages,
 )
 from backend.app.runtime import mision as _mision  # noqa: E402
+# `haversine_m` ya vive en `_anti_cheat` (importado más arriba); se reexporta
+# aquí con su propio nombre para que game.py lo pida como `main.haversine_m`.
+haversine_m = _anti_cheat.haversine_m  # noqa: E402
 
 
 def mission_is_locked(cfg=None):

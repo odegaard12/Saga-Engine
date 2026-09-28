@@ -26,6 +26,7 @@ GAME_ID_DISPLAY_FAMILY = {
     "bonus_cache": "llegar_y_escanear",
     "photo_scout": "llegar_y_escanear",
     "team_relay": "llegar_y_escanear",
+    "mapa_mudo": "llegar_y_escanear",
     "logic_circuit": "puzles",
     "sequence_code": "puzles",
     "place_mosaic": "puzles",

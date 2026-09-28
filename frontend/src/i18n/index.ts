@@ -125,6 +125,14 @@ export const messages = {
         details: 'Details',
         hideDetails: 'Hide details',
       },
+      mapaMudo: {
+        clueTitle: 'Clue',
+        cluePhotoAlt: 'Clue photo',
+        hotColdLabel: 'How close am I?',
+        cold: 'Cold',
+        warm: 'Warm',
+        hot: 'Hot',
+      },
       inventory: 'Inventory',
       offlineSync: 'Offline sync',
       requirements: {
@@ -259,6 +267,14 @@ export const messages = {
         details: 'Detalles',
         hideDetails: 'Ocultar detalles',
       },
+      mapaMudo: {
+        clueTitle: 'Pista',
+        cluePhotoAlt: 'Foto de la pista',
+        hotColdLabel: '¿Qué tan cerca estoy?',
+        cold: 'Frío',
+        warm: 'Templado',
+        hot: 'Caliente',
+      },
       inventory: 'Inventario',
       offlineSync: 'Sincronización offline',
       requirements: {
@@ -392,6 +408,14 @@ export const messages = {
       hud: {
         details: 'Detalles',
         hideDetails: 'Ocultar detalles',
+      },
+      mapaMudo: {
+        clueTitle: 'Pista',
+        cluePhotoAlt: 'Foto da pista',
+        hotColdLabel: '¿Canto de cerca estou?',
+        cold: 'Frío',
+        warm: 'Templado',
+        hot: 'Quente',
       },
       inventory: 'Inventario',
       offlineSync: 'Sincronización sen conexión',

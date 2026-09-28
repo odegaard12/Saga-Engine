@@ -1006,7 +1006,23 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
          * Sin círculo del radio de entrada. Óscar: "cutre". La fuente
          * sigue existiendo por si vuelve a hacer falta; lo que marca el
          * nodo en juego es el brillo en el suelo del propio nodo.
+         *
+         * EXCEPCIÓN: mapa mudo. Ahí SÍ hace falta un círculo -es la única
+         * pista visual que tiene el jugador, a propósito no hay pin-, así
+         * que estas dos capas se reutilizan (rellenas y visibles) solo
+         * mientras el nodo en juego es de kind 'mapa_mudo' (ver el efecto
+         * "Radio del nodo actual" más abajo, que las enciende/apaga).
          */
+        {
+        id: CAPA_RADIO_RELLENO,
+        type: 'fill',
+        source: FUENTE_RADIO,
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-color': COLOR_NODO_ACTUAL,
+          'fill-opacity': 0.14,
+        },
+        },
         {
         id: CAPA_RADIO_BORDE,
         type: 'line',
@@ -1139,7 +1155,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_NODO_ENTRADA,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
-        filter: ['==', ['get', 'estado'], 'actual'],
+        // Mapa mudo: nunca el aro de entrada exacto, solo el círculo difuso
+        // (CAPA_RADIO_RELLENO/CAPA_RADIO_BORDE) mientras kind === 'mapa_mudo'.
+        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1163,6 +1181,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_NODOS_SUELO,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
+        // Mismo motivo que CAPA_NODO_ENTRADA: sin pin/halo sobre el nodo
+        // mudo, ni siquiera el del suelo -solo el círculo difuso lo marca-.
+        filter: ['!=', ['get', 'mapaMudo'], true],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1182,7 +1203,10 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_NODOS_HALO,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
-        filter: ['==', ['get', 'estado'], 'actual'],
+        // Mapa mudo: sin resplandor -marcaría el punto exacto igual que la
+        // chincheta que este halo acompaña-. Se apaga con el mismo filtro
+        // que CAPA_NODOS_ICONOS.
+        filter: ['all', ['==', ['get', 'estado'], 'actual'], ['!=', ['get', 'mapaMudo'], true]],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1254,6 +1278,10 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_NODOS_ICONOS,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
+        // Mapa mudo: sin chincheta -ni 2D ni 3D- mientras kind === 'mapa_mudo'.
+        // Es la pieza principal que había que ocultar: sin este filtro el
+        // pin marcaba el punto exacto encima del círculo difuso, delatándolo.
+        filter: ['!=', ['get', 'mapaMudo'], true],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -1308,6 +1336,9 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         id: CAPA_NODOS_MONEDA,
         type: 'symbol',
         source: FUENTE_NODOS_ICONOS,
+        // Mapa mudo: sin moneda flotante -es el marcador 3D que delataría el
+        // punto exacto en modo 3D-, mismo filtro que CAPA_NODOS_ICONOS.
+        filter: ['!=', ['get', 'mapaMudo'], true],
         layout: {
           'symbol-height-offset': ALTURA_NODOS_M,
           'symbol-height-anchor': 'ground' as const,
@@ -2241,7 +2272,12 @@ export function MapSurfaceGL({
    * si son más de 500, "fuera del trazado".
    */
   useEffect(() => {
-    if (!playerPosition || currentStage?.lat == null || currentStage?.lon == null) {
+    // Mapa mudo: sin línea guía hacia el nodo mientras esté oculto -llevaría
+    // recto justo al centro del círculo difuso, que es exactamente la pista
+    // que este juego no quiere dar-. Vuelve sola en cuanto kind pasa a
+    // 'checkpoint' (nodo completado).
+    const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
+    if (!playerPosition || currentStage?.lat == null || currentStage?.lon == null || esMapaMudo) {
       pintarFuente(FUENTE_GUIA, COLECCION_VACIA)
       setFueraDeTrazado(null)
       return
@@ -2379,7 +2415,29 @@ export function MapSurfaceGL({
   }, [focusRequest?.token, focusRequest?.target, playerPosition?.lat, playerPosition?.lon])
 
   // Radio del nodo actual.
+  //
+  // Mapa mudo: mientras el kind del nodo en juego siga siendo 'mapa_mudo'
+  // (el servidor no lo cambia a 'checkpoint' hasta completarlo), lat/lon/
+  // radius YA vienen difuminados desde el servidor -no hay nada que
+  // difuminar aquí-, y este es el único sitio del mapa donde se pinta esa
+  // zona: un círculo relleno y de borde suave, sin pin encima (ver el
+  // filtro `mapaMudo` de CAPA_NODO_ENTRADA/CAPA_NODOS_SUELO más abajo).
   useEffect(() => {
+    const mapa = mapaRef.current
+    const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
+
+    if (mapa && mapa.getLayer(CAPA_RADIO_RELLENO) && mapa.getLayer(CAPA_RADIO_BORDE)) {
+      mapa.setLayoutProperty(CAPA_RADIO_RELLENO, 'visibility', esMapaMudo ? 'visible' : 'none')
+      mapa.setLayoutProperty(CAPA_RADIO_BORDE, 'visibility', esMapaMudo ? 'visible' : 'none')
+      if (esMapaMudo) {
+        // Borde suave y difuso a propósito: nada que se lea como "aquí
+        // exactamente", solo "por esta zona".
+        mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-color', '#ffffff')
+        mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-opacity', 0.5)
+        mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-width', 2)
+      }
+    }
+
     if (currentStage?.lat == null || currentStage?.lon == null) {
       pintarFuente(FUENTE_RADIO, COLECCION_VACIA)
       return
@@ -2393,7 +2451,7 @@ export function MapSurfaceGL({
       FUENTE_RADIO,
       circuloGeoJSON({ lat: currentStage.lat, lon: currentStage.lon }, radio)
     )
-  }, [currentStage?.lat, currentStage?.lon, currentStage?.radius, pintarFuente])
+  }, [currentStage?.lat, currentStage?.lon, currentStage?.radius, currentStage?.kind, pintarFuente])
 
   /**
    * Los nodos van como marcadores del DOM, NO como capa de círculos.
@@ -2445,6 +2503,9 @@ export function MapSurfaceGL({
           icono3dm: `nodo3dm-${indice + 1}-${estado(indice)}-${tipoDelNodo(nodo)}`,
           iconoSuelo: `suelo-${estado(indice)}-${tipoDelNodo(nodo)}`,
           iconoEntrada: `entrada-${tipoDelNodo(nodo)}`,
+          // Mapa mudo: nunca pin ni aro de entrada -ver el filtro de
+          // CAPA_NODO_ENTRADA/CAPA_NODOS_SUELO-, solo el círculo difuso.
+          mapaMudo: String((nodo as { kind?: string }).kind || '').toLowerCase() === 'mapa_mudo',
           entradaK:
             (typeof nodo.radius === 'number' && nodo.radius > 0 ? nodo.radius : 30) /
             (METROS_POR_PX_Z0 * Math.cos(((nodo.lat as number) * Math.PI) / 180) * RADIO_ENTRADA_PX),
@@ -2475,24 +2536,29 @@ export function MapSurfaceGL({
      */
     pintarFuente(FUENTE_NODOS_VOLUMEN, {
       type: 'FeatureCollection',
-      features: nodos.map((nodo, indice) => ({
-        type: 'Feature' as const,
-        properties: {
-          color:
-            indice < currentLevel
-              ? COLOR_NODO_HECHO
-              : indice === currentLevel
-                ? COLOR_NODO_ACTUAL
-                : COLOR_NODO_PENDIENTE,
-          base: 0,
-          altura: 1.5,
-        },
-        geometry: circuloGeoJSON(
-          { lat: nodo.lat as number, lon: nodo.lon as number },
-          indice === currentLevel ? 7 : 4.5,
-          24
-        ).features[0].geometry,
-      })),
+      // Mapa mudo: sin disco de suelo bajo el nodo mientras está oculto -es
+      // justo el bulto que delataría "aquí, exacto" bajo el círculo difuso-.
+      features: nodos
+        .map((nodo, indice) => ({ nodo, indice }))
+        .filter(({ nodo }) => String((nodo as { kind?: string }).kind || '').toLowerCase() !== 'mapa_mudo')
+        .map(({ nodo, indice }) => ({
+          type: 'Feature' as const,
+          properties: {
+            color:
+              indice < currentLevel
+                ? COLOR_NODO_HECHO
+                : indice === currentLevel
+                  ? COLOR_NODO_ACTUAL
+                  : COLOR_NODO_PENDIENTE,
+            base: 0,
+            altura: 1.5,
+          },
+          geometry: circuloGeoJSON(
+            { lat: nodo.lat as number, lon: nodo.lon as number },
+            indice === currentLevel ? 7 : 4.5,
+            24
+          ).features[0].geometry,
+        })),
     })
 
     /**
