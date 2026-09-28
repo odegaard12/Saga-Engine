@@ -93,6 +93,22 @@ function validateBearingHuntConfig(
     }
   }
 
+  if (Array.isArray(raw.targets)) {
+    const targets = (raw.targets as unknown[])
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+      .slice(0, 3)
+      .map((item) => ({
+        label: String(item.label ?? '').slice(0, 120),
+        bearing_deg: (((Number(item.bearing_deg) % 360) + 360) % 360) || 0,
+      }))
+
+    if (targets.length > 0 && targets.length < 2) {
+      errors.push('targets must have 2 or 3 entries when provided')
+    }
+
+    value.targets = targets
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors }
   }

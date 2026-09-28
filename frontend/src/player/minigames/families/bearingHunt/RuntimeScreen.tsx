@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import { useI18n } from '../../../../i18n/useI18n'
 
 type AnyRecord = Record<string, any>
 
@@ -557,6 +558,25 @@ function getDeviceOrientationConstructor(): PermissionableDeviceOrientationEvent
   return ctor ?? null
 }
 
+type SequenceTarget = { label: string; bearing_deg: number }
+
+function sanitizeTargets(raw: unknown): SequenceTarget[] | null {
+  if (!Array.isArray(raw)) return null
+
+  const targets: SequenceTarget[] = raw
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .slice(0, 3)
+    .map((item) => ({
+      label: String(item.label ?? '').trim(),
+      bearing_deg: normalizeDegrees(Number(item.bearing_deg) || 0),
+    }))
+
+  // "Rumbo doble" pide 2 (admin-configurable 2-3) objetivos reales. Con
+  // menos de 2 no hay secuencia que jugar: se trata como bearing_hunt de
+  // objetivo único (targets === null) en vez de arriesgar un array de 1.
+  return targets.length >= 2 ? targets : null
+}
+
 function getConfig(props: BearingHuntRuntimeScreenProps) {
   const sources = [
     props.resolved,
@@ -637,16 +657,25 @@ function getConfig(props: BearingHuntRuntimeScreenProps) {
     read('title', 'name', 'label') ?? props.node?.title ?? props.node?.name ?? 'Bearing Hunt'
   )
 
+  const targets = sanitizeTargets(read('targets'))
+
   return {
     targetBearing,
     tolerance,
     holdMs,
     title,
+    targets,
   }
 }
 
 export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
-  const { targetBearing, tolerance, holdMs, title } = useMemo(() => getConfig(props), [props])
+  const { targetBearing, tolerance, holdMs, title, targets } = useMemo(
+    () => getConfig(props),
+    [props]
+  )
+  const { t } = useI18n()
+
+  const sequenceMode = Array.isArray(targets) && targets.length >= 2
 
   const [sensorState, setSensorState] = useState<SensorState>('idle')
   const [heading, setHeading] = useState<number | null>(null)
@@ -654,12 +683,23 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
   const [holdProgress, setHoldProgress] = useState(0)
   const [locked, setLocked] = useState(false)
   const [manualMode, setManualMode] = useState(false)
+  // Índice del objetivo actual en modo secuencia ("Rumbo doble"). Perder el
+  // lock de un objetivo (ver el efecto de abajo, rama `else`) sólo resetea
+  // holdProgress/captureStartRef -NUNCA este índice-, así que la secuencia
+  // nunca retrocede por soltar el rumbo un instante.
+  const [targetIndex, setTargetIndex] = useState(0)
 
   const headingRef = useRef<number | null>(null)
   const listenerRef = useRef<((event: DeviceOrientationEvent) => void) | null>(null)
   const captureStartRef = useRef<number | null>(null)
   const completeSentRef = useRef(false)
   const windowPulseRef = useRef(false)
+
+  const currentTarget: SequenceTarget | null = sequenceMode
+    ? targets![Math.min(targetIndex, targets!.length - 1)]
+    : null
+  const activeBearing = currentTarget ? currentTarget.bearing_deg : targetBearing
+  const isLastTarget = !sequenceMode || targetIndex >= (targets?.length ?? 1) - 1
 
   const completionCallback =
     props.onWin ??
@@ -686,16 +726,35 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
   const delta = useMemo(() => {
     if (heading === null) return null
-    return signedDelta(heading, targetBearing)
-  }, [heading, targetBearing])
+    return signedDelta(heading, activeBearing)
+  }, [heading, activeBearing])
 
   const absDelta = Math.abs(delta ?? 999)
   const inWindow = !locked && heading !== null && absDelta <= tolerance
   const nearWindow = !locked && heading !== null && absDelta <= tolerance * 2.35
 
+  const advanceSequence = useCallback(() => {
+    // Sólo avanza el índice: no toca sensorState ni resetea nada de fuera de
+    // este objetivo. El efecto de hold (más abajo) ya limpia
+    // captureStartRef/holdProgress en cuanto targetIndex cambia.
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate?.(14)
+    }
+    completeSentRef.current = false
+    setHoldProgress(0)
+    captureStartRef.current = null
+    setTargetIndex((current) => current + 1)
+  }, [])
+
   const completeLock = useCallback(async () => {
     if (completeSentRef.current) return
     completeSentRef.current = true
+
+    if (sequenceMode && !isLastTarget) {
+      advanceSequence()
+      return
+    }
+
     setLocked(true)
     setHoldProgress(1)
 
@@ -708,14 +767,27 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     await completionCallback?.({
       type: 'bearing_hunt',
       status: 'locked',
-      targetBearing,
+      game_id: sequenceMode ? 'rumbo_doble' : undefined,
+      targetBearing: sequenceMode ? undefined : targetBearing,
+      targets: sequenceMode ? targets : undefined,
+      targetsCompleted: sequenceMode ? targets?.length ?? 0 : undefined,
       tolerance,
       holdMs,
       heading: finalHeading,
-      delta: finalHeading === null ? null : signedDelta(finalHeading, targetBearing),
+      delta: finalHeading === null ? null : signedDelta(finalHeading, activeBearing),
       completedAt: new Date().toISOString(),
     })
-  }, [completionCallback, holdMs, targetBearing, tolerance])
+  }, [
+    activeBearing,
+    advanceSequence,
+    completionCallback,
+    holdMs,
+    isLastTarget,
+    sequenceMode,
+    targetBearing,
+    targets,
+    tolerance,
+  ])
 
   useEffect(() => {
     if (locked) return
@@ -867,7 +939,11 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
   const command = useMemo(() => {
     if (locked) {
-      return { main: 'LOCKED', sub: 'Rumbo capturado', small: false }
+      return {
+        main: 'LOCKED',
+        sub: sequenceMode ? t('player.minigames.rumboDoble.locked') : 'Rumbo capturado',
+        small: false,
+      }
     }
 
     if (heading === null) {
@@ -879,7 +955,11 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     }
 
     if (inWindow) {
-      return { main: 'HOLD', sub: 'Mantén estable', small: false }
+      return {
+        main: 'HOLD',
+        sub: sequenceMode ? t('player.minigames.rumboDoble.holdSteady') : 'Mantén estable',
+        small: false,
+      }
     }
 
     const amount = Math.round(absDelta)
@@ -890,7 +970,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
       sub: nearWindow ? 'Cerca del vector' : 'Gira hacia el vector',
       small: amount >= 100,
     }
-  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState])
+  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState, sequenceMode, t])
 
   const sensorCopy = useMemo(() => {
     switch (sensorState) {
@@ -965,7 +1045,15 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
           </div>
 
           <div className="bh-live">
-            <span>{statusLabel}</span>
+            {sequenceMode ? (
+              <span>
+                {t('player.minigames.rumboDoble.progress')
+                  .replace('{current}', String(Math.min(targetIndex, targets!.length - 1) + 1))
+                  .replace('{total}', String(targets!.length))}
+              </span>
+            ) : (
+              <span>{statusLabel}</span>
+            )}
             <strong>{formatDeg(rawHeading ?? heading)}°</strong>
           </div>
         </header>
@@ -986,8 +1074,8 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
           <div className="bh-center">
             <div className="bh-lock-burst" />
             <div>
-              <strong>{formatDeg(targetBearing)}°</strong>
-              <span>Target</span>
+              <strong>{formatDeg(activeBearing)}°</strong>
+              <span>{currentTarget?.label || 'Target'}</span>
             </div>
           </div>
         </div>

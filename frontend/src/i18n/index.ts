@@ -144,6 +144,13 @@ export const messages = {
         consume: 'Will be consumed when used',
         previewOnly: 'Preview only: backend enforcement comes later.',
       },
+      minigames: {
+        rumboDoble: {
+          progress: 'Target {current}/{total}',
+          locked: 'Bearing locked',
+          holdSteady: 'Hold steady',
+        },
+      },
     },
   },
   es: {
@@ -286,6 +293,13 @@ export const messages = {
         consume: 'Se consumirá al usarlo',
         previewOnly: 'Solo vista previa: la validación backend viene después.',
       },
+      minigames: {
+        rumboDoble: {
+          progress: 'Objetivo {current}/{total}',
+          locked: 'Rumbo bloqueado',
+          holdSteady: 'Mantén el móvil quieto',
+        },
+      },
     },
   },
   gl: {
@@ -427,6 +441,13 @@ export const messages = {
         quantity: 'Cantidade',
         consume: 'Consumirase ao usalo',
         previewOnly: 'Só vista previa: a validación backend vén despois.',
+      },
+      minigames: {
+        rumboDoble: {
+          progress: 'Obxectivo {current}/{total}',
+          locked: 'Rumbo bloqueado',
+          holdSteady: 'Mantén o móbil quieto',
+        },
       },
     },
   },

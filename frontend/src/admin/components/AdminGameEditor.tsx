@@ -7,6 +7,7 @@ import SimonSaysEditor from './sequenceCode/SimonSaysEditor'
 import PlaceMosaicEditor from './placeMosaic/PlaceMosaicEditor'
 import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
+import RumboDobleEditor from './rumboDoble/RumboDobleEditor'
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
 import {
@@ -189,17 +190,19 @@ export default function AdminGameEditor({
       game_type: game.id,
       game_template_id: game.id,
       completion_method: game.completionMethod,
+      // "bearing" y "manual" NUNCA fueron entry_mode válidos -el backend
+      // sólo acepta gps/free/qr (ver validate_stage en core_engine.py)-, así
+      // que cualquier juego con completionMethod 'bearing' (Caza de rumbo,
+      // Rumbo doble) o 'manual_code' guardaba un nodo que /api/admin/save
+      // rechazaba siempre con 400 "unsupported entry mode". Encontrado
+      // reproduciendo el guardado de Rumbo doble en el banco local: el
+      // jugador tiene que estar físicamente en el punto igual que cualquier
+      // otro minijuego, así que cae en el mismo 'gps' de siempre.
       entry_mode:
-        game.completionMethod === 'bearing'
-          ? 'bearing'
-          : game.completionMethod === 'manual_code'
-            ? 'manual'
-            : game.category === 'motion' ||
-                game.completionMethod === 'motion' ||
-                game.category === 'logic'
-              ? 'free'
-              : 'gps',
-      requires_proximity: !(
+        game.category === 'motion' || game.completionMethod === 'motion' || game.category === 'logic'
+          ? 'free'
+          : 'gps',
+      require_proximity: !(
         game.category === 'logic' ||
         game.category === 'motion' ||
         game.completionMethod === 'motion'
@@ -296,17 +299,16 @@ export default function AdminGameEditor({
         game_type: selectedGame.id,
         game_template_id: selectedGame.id,
         completion_method: selectedGame.completionMethod,
+        // Ver el comentario del mismo entry_mode más arriba en este
+        // archivo (handleSelectGame): 'bearing'/'manual' nunca fueron
+        // entry_mode válidos para el backend.
         entry_mode:
-          selectedGame.completionMethod === 'bearing'
-            ? 'bearing'
-            : selectedGame.completionMethod === 'manual_code'
-              ? 'manual'
-              : selectedGame.category === 'motion' ||
-                  selectedGame.completionMethod === 'motion' ||
-                  selectedGame.category === 'logic'
-                ? 'free'
-                : 'gps',
-        requires_proximity: !(
+          selectedGame.category === 'motion' ||
+          selectedGame.completionMethod === 'motion' ||
+          selectedGame.category === 'logic'
+            ? 'free'
+            : 'gps',
+        require_proximity: !(
           selectedGame.category === 'logic' ||
           selectedGame.category === 'motion' ||
           selectedGame.completionMethod === 'motion'
@@ -362,7 +364,7 @@ export default function AdminGameEditor({
       game_template_id: game.id,
       entry_mode: 'qr',
       completion_method: game.completionMethod,
-      requires_proximity: false,
+      require_proximity: false,
       qr_payload: payload,
       fallback_code: fallbackCode(stage),
       physical_fallback_code: fallbackCode(stage),
@@ -391,7 +393,7 @@ export default function AdminGameEditor({
       game_template_id: 'qr_collectible',
       entry_mode: 'gps',
       completion_method: 'proximity',
-      requires_proximity: true,
+      require_proximity: true,
       qr_payload: '',
       fallback_code: 'OK',
       physical_fallback_code: 'OK',
@@ -964,6 +966,9 @@ export default function AdminGameEditor({
                   )}
                   {selectedGame.id === 'sequence_code' && (
                     <div className="wide saga-guided-v4-custom-editor"><SimonSaysEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'rumbo_doble' && (
+                    <div className="wide saga-guided-v4-custom-editor"><RumboDobleEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
                   )}
                   {selectedGame.id === 'mapa_mudo' && (
                     <label className="wide">

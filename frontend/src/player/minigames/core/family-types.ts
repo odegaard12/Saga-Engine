@@ -103,6 +103,14 @@ export type BearingHuntConfig = {
   show_numeric_bearing?: boolean
   show_compass_ring?: boolean
   allow_recenter?: boolean
+  // "Rumbo doble" (game_id 'rumbo_doble'): 2-3 objetivos reales, uno tras
+  // otro, cada uno con su propia etiqueta que escribe el organizador (p.ej.
+  // "la torre de la iglesia") y su propio rumbo. Perder el lock de uno solo
+  // resetea SU hold, no la secuencia entera (ver RuntimeScreen.tsx). Cuando
+  // este campo trae 2+ objetivos, el runtime pasa a modo secuencia y
+  // target_bearing_deg/tolerance_deg de arriba dejan de usarse para el
+  // rumbo (tolerance_deg/hold_ms sí se reutilizan tal cual).
+  targets?: Array<{ label: string; bearing_deg: number }>
 }
 
 export type SignalHuntConfig = {

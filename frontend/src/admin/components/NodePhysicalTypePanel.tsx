@@ -264,7 +264,7 @@ export default function NodePhysicalTypePanel({
         game_template_id: 'qr_collectible',
         entry_mode: 'gps',
         completion_method: 'proximity',
-        requires_proximity: true,
+        require_proximity: true,
         qr_payload: '',
         fallback_code: 'OK',
         physical_fallback_code: 'OK',
@@ -303,7 +303,7 @@ export default function NodePhysicalTypePanel({
         game_template_id: 'qr_collectible',
         entry_mode: 'qr',
         completion_method: 'qr_scan',
-        requires_proximity: false,
+        require_proximity: false,
         fallback_code: buildFallbackCodeForPhysicalStage(stage),
         physical_fallback_code: buildFallbackCodeForPhysicalStage(stage),
         config: {
@@ -408,7 +408,7 @@ export default function NodePhysicalTypePanel({
                   game_family: baseCheckpoint.type,
                   entry_mode: 'gps',
                   completion_method: 'proximity',
-                  requires_proximity: true,
+                  require_proximity: true,
                   content:
                     String((stage as any).content || '').trim() ||
                     'Escribe aquí el texto o pista que se mostrará al jugador en este checkpoint.',
