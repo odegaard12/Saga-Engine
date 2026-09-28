@@ -87,6 +87,9 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   spark_radar: 'movimiento',
   shake_charge: 'movimiento',
   bearing_hunt: 'orientacion',
+  // Segundo game_id de la familia bearing_hunt (owner-approved "Rumbo
+  // doble"): mismo grupo de presentación que Caza de rumbo.
+  rumbo_doble: 'orientacion',
   audio_challenge: 'sonido',
   // Legacy: sin entrada propia en adminGameCatalog a propósito (ver el
   // comentario de AdminGameId en gameCatalog.ts). Se mapea igual por si
