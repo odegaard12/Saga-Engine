@@ -7,6 +7,7 @@ import { PlaceMosaicRuntimeScreen } from '../families/placeMosaic/RuntimeScreen'
 import { TiltMazeRuntimeScreen } from '../families/tiltMaze/RuntimeScreen'
 import { SparkRadarRuntimeScreen } from '../families/sparkRadar/RuntimeScreen'
 import { CheckpointRuntimeScreen } from '../families/signalHunt/CheckpointRuntimeScreen'
+import { CuentaSenalesRuntimeScreen } from '../families/signalHunt/CuentaSenalesRuntimeScreen'
 import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
 import { AudioChallengeRuntime } from '../families/audioChallenge/AudioChallengeRuntime'
 import { TeamRelayRuntimeScreen } from '../families/teamRelay/RuntimeScreen'
@@ -140,6 +141,19 @@ export function FamilyRuntimeHost({
         helperText={helperText}
         submitting={submitting}
         onWin={onWin}
+      />
+    )
+  }
+
+  if ((resolved.config as any)?.game_id === 'cuenta_senales') {
+    return (
+      <CuentaSenalesRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+        appPosition={appPosition}
       />
     )
   }

@@ -428,6 +428,43 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     }
   }
 
+  // "Cuenta las señales" (game_id cuenta_senales): MISMO bug que rumbo_doble
+  // arriba -el `return` de signal_hunt de siempre, justo debajo, devuelve
+  // SIEMPRE sus 4 claves fijas y tira cualquier otra cosa que traiga `raw`.
+  // Sin esta rama, `questions` (las 2-5 preguntas con su respuesta) se
+  // perdería aquí, ANTES de llegar al backend, exactamente como le pasó a
+  // `targets` de rumbo_doble (ver ese comentario). El editor dedicado vive
+  // en admin/components/cuentaSenales/CuentaSenalesEditor.tsx.
+  if (raw.game_id === 'cuenta_senales' || raw.objective === 'count_signals') {
+    const rawQuestions = Array.isArray(raw.questions) ? raw.questions : []
+    const questions = rawQuestions
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .slice(0, 5)
+      .map((item) => ({
+        question: String(item.question ?? '').slice(0, 240),
+        answer: Math.max(0, Math.min(999, Math.round(toAdminConfigNumber(item.answer, 0)))),
+        tolerance: Math.max(0, Math.min(20, Math.round(toAdminConfigNumber(item.tolerance, 0)))),
+        hint_image_data_url: String(item.hint_image_data_url || '').trim(),
+      }))
+      .filter((item) => item.question.length > 0)
+
+    while (questions.length < 2) {
+      questions.push({
+        question: `Objetivo ${questions.length + 1}: ¿cuántos hay?`,
+        answer: 1,
+        tolerance: 0,
+        hint_image_data_url: '',
+      })
+    }
+
+    return {
+      objective: 'count_signals',
+      game_id: 'cuenta_senales',
+      completion_method: 'manual_code',
+      questions,
+    }
+  }
+
   return {
     objective: String(raw.objective || 'proximity_lock'),
     source_radius_m: toAdminConfigNumber(raw.source_radius_m, 75),

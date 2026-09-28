@@ -6,6 +6,44 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.39.0
+
+- **Nuevo juego "Cuenta las señales" (`cuenta_senales`), grupo "Llegar y
+  escanear".** Otro `game_id` de `signal_hunt` (no un `type`/family nuevo,
+  igual que `team_relay`/`mapa_mudo`/`rumbo_doble`): el jugador tiene que
+  estar en el punto real (`entry_mode: gps`, `require_proximity: true`) y
+  contar algo que se ve desde ahí -bancos, ventanas, farolas...- y teclear
+  el número en un teclado grande, pensado para usarse con una mano y a pleno
+  sol. El organizador escribe 2-5 preguntas por nodo al recorrer la ruta
+  (texto, respuesta entera, tolerancia ± opcional, foto de pista opcional);
+  cada jugador recibe SOLO una, siempre la misma (hash(player_id + node_id),
+  estable entre recargas/offline), para que no se puedan pasar la respuesta
+  entre ellos.
+  - **Protección de la respuesta:** el servidor nunca manda la respuesta en
+    claro ni la lista completa de preguntas. `project_cuenta_senales_for_player`
+    (`backend/app/runtime/minigames.py`) sustituye la respuesta por un hash
+    salado (`salt = node_id:índice_de_pregunta`) justo antes de que el nodo
+    salga hacia el jugador; la tolerancia se traduce en varios hashes
+    aceptables (uno por valor del rango), porque un hash solo compara
+    igualdad exacta. La comprobación corre en el cliente con Web Crypto
+    (SubtleCrypto, sin red) porque el juego tiene que funcionar offline y
+    ningún minijuego de SAGA revalida su partida en el servidor (el servidor
+    solo acepta el aviso de "completado"). Es una defensa deliberadamente
+    débil -un entero pequeño se fuerza por fuerza bruta en milisegundos-,
+    pensada solo para que la respuesta no se lea a ojo en DevTools o en el
+    payload de red.
+  - Tras 3 intentos fallidos no se revela nada: se suma una penalización de
+    tiempo (30 s, la misma magnitud que el reinicio penalizado del
+    anti-trampas) y se deja reintentar sin límite -nunca bloquea el
+    progreso-.
+  - Anti-trampas: se apoya en el suelo genérico de 2 s + mediana de red, sin
+    entrada propia adivinada en `MINIGAME_HARD_FLOOR_MS_BY_GAME` (ver
+    v5.34.0).
+  - Editor dedicado (`CuentaSenalesEditor.tsx`, como `RumboDobleEditor.tsx`):
+    añade/quita preguntas (2-5), con su respuesta, tolerancia y foto de
+    pista opcional, reutilizando la subida de foto de nodo ya existente.
+  - Tests: `tests/test_cuenta_senales.py`.
+
 ## 5.38.0
 
 - **Los nodos nuevos del editor guiado no exigían estar cerca.** El editor
