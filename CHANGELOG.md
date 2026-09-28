@@ -6,6 +6,25 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.39.1
+
+- **Fix: el escáner de campo podía registrar la misma pegatina QR dos veces.**
+  Revisión completa del motor QR (generación y escaneo): la tarjeta
+  compartida (`frontend/src/shared/qrCard.tsx`), la zona de silencio, el
+  nivel de corrección de errores, el auto-test de impresión
+  (`frontend/scripts/comprobar-qr.mjs`) y la validación con cámara antes de
+  descargar en `QrCardStudio.tsx` ya estaban bien -es el trabajo que dejó el
+  bug de el monte-. El único fallo real encontrado: `QuickProofPanel.tsx`
+  tiene dos caminos que pueden leer la misma pegatina -el análisis continuo
+  de fotogramas y el botón "📸 Hacer foto y validar"- y ninguno sabía del
+  otro. Pulsar la foto justo cuando el análisis continuo acababa de leer la
+  misma pegatina disparaba `saveQrItem` dos veces: objeto duplicado en la
+  mochila y, lo que importa, dos llamadas a `onQrValidated` (avance de nodo
+  y tiempo de prueba). Se añade un candado compartido (`processingRef`) que
+  se cierra al entrar en `saveQrItem`, se reabre al fallar la lectura o el
+  guardado, y se reabre también al arrancar una cámara nueva. Test de
+  regresión: `tests/test_escaneo_qr_non_dispara_dobre.py`.
+
 ## 5.39.0
 
 - **Nuevo juego "Cuenta las señales" (`cuenta_senales`), grupo "Llegar y
