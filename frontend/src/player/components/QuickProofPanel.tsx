@@ -139,6 +139,15 @@ export function QuickProofPanel({
   activePayloadRef.current = activeQrPayload
   const recoveryBusyRef = useRef(false)
   const recoveryLastRef = useRef<string | null>(null)
+  /**
+   * Cerrojo entre las dos vías de lectura: el bucle continuo de la cámara y
+   * el botón "Hacer foto" corren en paralelo y ninguno sabe del otro. Sin
+   * esto, pulsar la foto justo cuando el bucle acababa de leer la misma
+   * pegatina disparaba `saveQrItem` dos veces -dos avances de nodo, dos
+   * objetos guardados- por una sola pegatina. Se cierra al entrar en
+   * `saveQrItem` y se abre otra vez al arrancar una cámara nueva.
+   */
+  const processingRef = useRef(false)
   // Cronómetro del escáner: arranca al abrir la cámara y para al leer.
   const [scanElapsedMs, setScanElapsedMs] = useState(0)
   const scanStartRef = useRef<number | null>(null)
@@ -382,10 +391,18 @@ export function QuickProofPanel({
   }
 
   async function saveQrItem(value: string) {
+    // Ver el comentario de `processingRef` arriba: el bucle continuo y el
+    // botón de foto pueden llegar aquí casi a la vez con la misma lectura.
+    // Sólo el primero cuenta; el segundo se ignora en vez de repetir el
+    // registro del objeto y el avance del nodo.
+    if (processingRef.current) return
+    processingRef.current = true
+
     const parsed = parseQrItem(value)
 
     if (!parsed) {
       setMessage('QR no leído. Prueba otra vez o usa Mochila > Respaldo.')
+      processingRef.current = false
       return
     }
 
@@ -484,6 +501,7 @@ export function QuickProofPanel({
       )
     } catch {
       setMessage('No se pudo guardar en este dispositivo. Usa Mochila > Respaldo.')
+      processingRef.current = false
     }
   }
 
@@ -518,6 +536,7 @@ export function QuickProofPanel({
     }
 
     stopCamera()
+    processingRef.current = false
     setMode('qr')
     setNotice('')
     setMessage('')

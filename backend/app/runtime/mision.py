@@ -17,7 +17,7 @@ from backend.app.runtime.core_engine import (
     validate_stage,
     _clean_code,
 )
-from backend.app.runtime.minigames import build_stage_minigame_runtime
+from backend.app.runtime.minigames import build_stage_minigame_runtime, project_cuenta_senales_for_player
 
 
 def validate_stages(raw_stages):
@@ -331,7 +331,7 @@ def kind_del_nodo(node):
     return "minijuego"
 
 
-def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False, completed=False):
+def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False, completed=False, player_id=None):
     """Un nodo, tal y como lo recibe el móvil.
 
     ⚠️ `include_runtime` decide si va el contenido jugable —el minijuego, su
@@ -347,6 +347,15 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
     nunca lo que este proyecta hacia el jugador, así que difuminar aquí no
     afecta a si el nodo se puede completar: sólo a qué ve el jugador ANTES de
     completarlo.
+
+    `player_id` -quién pide el nodo- decide, SOLO para "cuenta_senales", qué
+    UNA de las 2-5 preguntas que escribió el organizador le toca a este
+    jugador (hash(player_id + node_id), estable entre recargas/offline) y
+    sustituye la respuesta en claro por su hash salado: ver
+    `project_cuenta_senales_for_player` en minigames.py. Sin `player_id` -p.ej.
+    una llamada vieja o de test- se elige la pregunta 0 y NO se filtra la
+    lista completa; por eso todo sitio que sirva el nodo a un jugador real
+    tiene que pasar `player_id`.
     """
     node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
 
@@ -376,11 +385,31 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
         out["kind"] = "checkpoint"
 
     if include_runtime:
+        config_efectiva = _config_sen_duplicados(node)
+        minigame_efectivo = _minigame_con_url_de_foto(node, fotos_por_url)
+
+        # "Cuenta las señales": la config del editor y la del minijuego
+        # traen las 2-5 preguntas CON su respuesta en claro (lo que escribió
+        # el organizador). Nunca deben llegar así al móvil -ver
+        # project_cuenta_senales_for_player en minigames.py-: se sustituyen
+        # aquí, justo antes de salir hacia el jugador, por SOLO la pregunta
+        # asignada a `player_id` y su respuesta ya hasheada.
+        if str(_config_del_nodo(node).get("game_id") or "").lower() == "cuenta_senales":
+            if isinstance(config_efectiva, dict):
+                proyectada = project_cuenta_senales_for_player(config_efectiva, node["id"], player_id)
+                config_efectiva = {**config_efectiva, **proyectada}
+                config_efectiva.pop("questions", None)
+            if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+                proyectada_mg = project_cuenta_senales_for_player(minigame_efectivo["config"], node["id"], player_id)
+                nuevo_mg_config = {**minigame_efectivo["config"], **proyectada_mg}
+                nuevo_mg_config.pop("questions", None)
+                minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config}
+
         out.update({
             "content": node["presentation"]["content"],
             "type": node["interaction"]["type"],
-            "config": _config_sen_duplicados(node),
-            "minigame": _minigame_con_url_de_foto(node, fotos_por_url),
+            "config": config_efectiva,
+            "minigame": minigame_efectivo,
             "entry": node["entry"],
             "success": node["success"],
             "requirements": node.get("requirements", {"items": []}),

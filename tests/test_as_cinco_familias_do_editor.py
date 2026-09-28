@@ -43,10 +43,10 @@ def extraer_mapa_de_familias() -> dict[str, str]:
     return dict(pares)
 
 
-def test_o_catalogo_ten_os_dezaoito_xogos_esperados():
-    # 18 desde "Rumbo doble" (owner-approved): mismo catálogo, un id más.
+def test_o_catalogo_ten_os_dezanove_xogos_esperados():
+    # 19 desde "Cuenta las señales" (owner-approved): mismo catálogo, un id más.
     ids = extraer_ids_do_catalogo()
-    assert len(ids) == 18, f"se esperaban 18 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
+    assert len(ids) == 19, f"se esperaban 19 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
     assert len(set(ids)) == len(ids), "hay ids duplicados en adminGameCatalog"
 
 

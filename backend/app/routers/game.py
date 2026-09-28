@@ -32,7 +32,9 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
 
     current_stage = None
     if not finished and 0 <= lvl < len(runtime_stages):
-        current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True, fotos_por_url=fotos_por_url)
+        current_stage = main.project_stage_for_player(
+            runtime_stages[lvl], include_runtime=True, fotos_por_url=fotos_por_url, player_id=profile_id
+        )
         # "Pista de calor" de mapa mudo: sólo una palabra (frío/templado/
         # caliente), nunca la distancia. Se calcula aquí -no dentro de
         # project_stage_for_player- porque hace falta la última posición
@@ -59,6 +61,7 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
             include_runtime=(offline_pack or (i == lvl and not finished)),
             fotos_por_url=fotos_por_url,
             completed=(i < lvl),
+            player_id=profile_id,
         )
         for i, stage in enumerate(runtime_stages)
     ]
