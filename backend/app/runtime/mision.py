@@ -9,6 +9,7 @@ jugador. Dónde están guardados lo decide quien llama, pasando la ruta.
 """
 import hashlib
 import json
+import math
 
 from backend.app.runtime.core_engine import (
     normalize_stage,
@@ -203,9 +204,90 @@ def _minigame_con_url_de_foto(node, fotos_por_url=False):
     return salida
 
 
+def _config_del_nodo(node):
+    """Config efectiva de `node`: interaction.config, o si no hay, node.config.
+
+    Misma resolución que usa `kind_del_nodo` para leer `game_id` -factorizada
+    para que `project_stage_for_player` mire exactamente lo mismo al decidir
+    si hay que ocultar el punto real de un nodo "mapa mudo".
+    """
+    interaccion = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
+    config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
+    if not config and isinstance(node.get("config"), dict):
+        config = node["config"]
+    return config or {}
+
+
+def fuzzy_search_circle(node_id, real_lat, real_lon, search_radius_m):
+    """Círculo de búsqueda difuso para "mapa mudo": el centro NO es el punto real.
+
+    El desplazamiento es "aleatorio pero determinista": se saca de un hash
+    estable de `node_id` -no de `random.random()`-, así que el mismo nodo
+    siempre difumina igual (no cambia entre peticiones ni al reiniciar el
+    servidor), pero un jugador no puede predecirlo sin conocer el hash.
+
+    El punto real SIEMPRE queda dentro del círculo devuelto, con margen: el
+    desplazamiento se limita al 35-70% del radio de búsqueda, y ese radio
+    tiene un suelo de 150 m aunque el admin configure algo menor o inválido.
+    """
+    radio = search_radius_m
+    try:
+        radio = float(radio)
+    except (TypeError, ValueError):
+        radio = 0.0
+    if not (radio > 0):
+        radio = 250.0
+    radio = max(radio, 150.0)
+
+    digest = hashlib.sha256(str(node_id or "").encode("utf-8", errors="replace")).digest()
+    # Dos enteros de 4 bytes del hash -> dos fracciones estables en [0, 1).
+    frac_angulo = int.from_bytes(digest[0:4], "big") / 2**32
+    frac_distancia = int.from_bytes(digest[4:8], "big") / 2**32
+
+    angulo_rad = frac_angulo * 2 * math.pi
+    # 35%-70% del radio: ni pegado al centro ni fuera del círculo.
+    offset_m = radio * (0.35 + 0.35 * frac_distancia)
+
+    norte_m = offset_m * math.cos(angulo_rad)
+    este_m = offset_m * math.sin(angulo_rad)
+
+    lat_centro = real_lat + (norte_m / 111320.0)
+    lon_centro = real_lon + (este_m / (111320.0 * max(0.2, math.cos(math.radians(real_lat)))))
+
+    return {"lat": lat_centro, "lon": lon_centro, "radius_m": radio}
+
+
+def hot_cold_band_es(distance_m, search_radius_m):
+    """Pista de calor en 3 palabras: frío / templado / caliente. Nunca un número.
+
+    Las bandas son relativas al radio de búsqueda del propio nodo -no a una
+    distancia fija en metros-, así un círculo grande y uno pequeño se sienten
+    igual de "jugables" para el jugador.
+    """
+    radio = search_radius_m
+    try:
+        radio = float(radio)
+    except (TypeError, ValueError):
+        radio = 0.0
+    if not (radio > 0):
+        radio = 250.0
+
+    try:
+        distancia = float(distance_m)
+    except (TypeError, ValueError):
+        return "frio"
+
+    proporcion = distancia / radio
+    if proporcion > 0.66:
+        return "frio"
+    if proporcion > 0.33:
+        return "templado"
+    return "caliente"
+
+
 def kind_del_nodo(node):
     """
-    checkpoint / qr / coleccionable / minijuego.
+    checkpoint / mapa_mudo / qr / coleccionable / minijuego.
 
     Es lo que decide la FORMA del nodo en el mapa 3D (base redonda,
     cuadrada, hexagonal o triangular) y su icono. Va siempre en la
@@ -219,9 +301,7 @@ def kind_del_nodo(node):
     """
     interaccion = node.get("interaction") if isinstance(node.get("interaction"), dict) else {}
     tipo = str(interaccion.get("type") or node.get("type") or "").lower()
-    config = interaccion.get("config") if isinstance(interaccion.get("config"), dict) else {}
-    if not config and isinstance(node.get("config"), dict):
-        config = node["config"]
+    config = _config_del_nodo(node)
     # El motor normaliza los tipos: "checkpoint" pasa a signal_hunt con
     # game_id simple_checkpoint, y "qr_collectible" a circuit_matrix con
     # game_id qr_collectible. Mirar sólo el tipo daba "minijuego" para todo
@@ -229,6 +309,15 @@ def kind_del_nodo(node):
     juego = str(config.get("game_id") or "").lower()
     en_el_mapa = bool(config.get("is_map_collectible")) or bool(node.get("is_map_collectible"))
     fisico = str(node.get("physical_node_kind") or node.get("physical_item_kind") or "").lower()
+    # "mapa_mudo" es su propio kind, NO "checkpoint": el jugador tiene que
+    # llegar por GPS igual que un checkpoint -por eso queda fuera de
+    # "minijuego" y el antitrampas no le exige tiempo mínimo de partida
+    # (ver anti_cheat.py, sólo mide "minijuego")-, pero el mapa necesita
+    # distinguirlo para ocultar el marcador y dibujar el círculo difuso en
+    # su lugar. `project_stage_for_player` lo revierte a "checkpoint" en
+    # cuanto el jugador lo completa.
+    if juego == "mapa_mudo":
+        return "mapa_mudo"
     if tipo == "checkpoint" or juego == "simple_checkpoint":
         return "checkpoint"
     # Un QR que deja objeto EN EL MAPA es un coleccionable; el que sólo se
@@ -242,7 +331,7 @@ def kind_del_nodo(node):
     return "minijuego"
 
 
-def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False):
+def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=False, completed=False):
     """Un nodo, tal y como lo recibe el móvil.
 
     ⚠️ `include_runtime` decide si va el contenido jugable —el minijuego, su
@@ -250,18 +339,41 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
     Sin él, un nodo no se puede jugar sin cobertura: no tiene ni juego que
     cargar ni código que aceptar. Cualquier sitio que guarde esto como paquete
     offline tiene que pedirlo con `include_runtime=True`.
+
+    `completed` -si este jugador YA superó este nodo- decide si un nodo
+    "mapa mudo" muestra su punto real o el círculo difuso. La comprobación de
+    proximidad que de verdad completa el nodo (ver `game.py`/`anti_cheat.py`)
+    lee siempre `node["location"]` -las coordenadas guardadas en el servidor-,
+    nunca lo que este proyecta hacia el jugador, así que difuminar aquí no
+    afecta a si el nodo se puede completar: sólo a qué ve el jugador ANTES de
+    completarlo.
     """
     node = raw_stage if isinstance(raw_stage, dict) and raw_stage.get("version") == 2 else normalize_stage(raw_stage)
+
+    kind_real = kind_del_nodo(node)
+    oculto = kind_real == "mapa_mudo" and not completed
+
+    lat = node["location"]["lat"]
+    lon = node["location"]["lon"]
+    radius = node["location"]["radius_m"]
+
+    if oculto:
+        config_mm = _config_del_nodo(node)
+        circulo = fuzzy_search_circle(node["id"], lat, lon, config_mm.get("search_radius_m"))
+        lat, lon, radius = circulo["lat"], circulo["lon"], circulo["radius_m"]
 
     out = {
         "id": node["id"],
         "title": node["presentation"]["title"],
-        "lat": node["location"]["lat"],
-        "lon": node["location"]["lon"],
-        "radius": node["location"]["radius_m"],
+        "lat": lat,
+        "lon": lon,
+        "radius": radius,
         # Qué clase de nodo es, para dibujarlo: no revela contenido jugable.
         "kind": kind_del_nodo(node),
     }
+    if kind_real == "mapa_mudo" and completed:
+        # Ya jugado: se ve como un checkpoint normal, sin nada que ocultar.
+        out["kind"] = "checkpoint"
 
     if include_runtime:
         out.update({
@@ -275,7 +387,19 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
             "messages": node["messages"],
         })
 
-    return preserve_physical_stage_fields(node, out)
+    proyectado = preserve_physical_stage_fields(node, out)
+
+    if oculto:
+        # `route_via`/`route_track` son el trazado que dobla la línea guía
+        # HACIA el nodo -es decir, hacia el punto real-. `preserve_physical_stage_fields`
+        # los copia siempre desde el nodo crudo; en un nodo "mapa mudo" activo
+        # eso apuntaría al sitio exacto que se está ocultando, así que se
+        # quitan de la proyección (el trazado hacia el SIGUIENTE nodo, si lo
+        # hay, no se ve afectado: cada nodo lleva su propio `route_via`).
+        proyectado.pop("route_via", None)
+        proyectado.pop("route_track", None)
+
+    return proyectado
 
 
 def stage_accepts_code(raw_stage, code, manual=False):

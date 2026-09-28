@@ -53,6 +53,14 @@ export interface PlayerStage {
   content?: string
   intro_title?: string
   intro_body?: string
+  /**
+   * Forma del nodo en el mapa 3D: 'checkpoint' | 'mapa_mudo' | 'qr' |
+   * 'coleccionable' | 'minijuego' (ver `kind_del_nodo` en el backend).
+   * Un nodo "mapa mudo" activo es el único kind cuyo lat/lon/radius NO son
+   * el punto real -ver `project_stage_for_player`-, así que el mapa y el HUD
+   * lo miran para decidir qué ocultar y qué pista mostrar.
+   */
+  kind?: string
   config?: StageConfig
   minigame?: StageMinigameRuntime
   entry?: StageEntryRules

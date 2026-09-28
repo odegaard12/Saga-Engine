@@ -480,8 +480,13 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "caches.open(ROAD_GRAPH_CACHE)" in pack
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
     assert "void guardarMapa(false)" in app and "await guardarMapa(true)" in app
-    # Sin círculo del radio de entrada ("cutre"): la capa de relleno no existe.
-    assert "id: CAPA_RADIO_RELLENO" not in fonte
+    # Sin círculo del radio de entrada ("cutre") para el caso normal: la capa
+    # de relleno arranca oculta (visibility 'none') y solo el efecto de
+    # "mapa mudo" la enciende -ver test_o_mapa_mudo_oculta_o_pin_e_pinta_o_circulo_difuso.
+    assert "id: CAPA_RADIO_RELLENO" in fonte
+    idx_radio_relleno = fonte.index("id: CAPA_RADIO_RELLENO")
+    bloque_radio_relleno = fonte[idx_radio_relleno : idx_radio_relleno + 200]
+    assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
     # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el

@@ -28,6 +28,7 @@ export type AdminGameId =
   | 'qr_collectible'
   | 'qr_key_gate'
   | 'clue_card'
+  | 'mapa_mudo'
   | 'photo_scout'
   | 'team_relay'
   | 'manual_password'
@@ -401,6 +402,44 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'La pista no está lejos del punto.',
       gps_unavailable: 'Necesitas abrir el nodo para escanear la pista.',
       locked: 'Acércate para consultar la pista.',
+    },
+  },
+  {
+    id: 'mapa_mudo',
+    title: 'Mapa mudo',
+    icon: '🌫️',
+    family: 'signal_hunt',
+    category: 'gps',
+    difficulty: 'Media',
+    duration: '3-6 min',
+    // El mapa GL suprime la chincheta (2D y 3D), el resplandor y la moneda
+    // flotante del nodo mientras está activo, y pinta en su lugar el círculo
+    // difuso (ver CAPA_NODOS_ICONOS/CAPA_NODOS_HALO/CAPA_NODOS_MONEDA en
+    // MapSurfaceGL.tsx, todas filtradas por la propiedad `mapaMudo`). El
+    // servidor ya manda el centro y radio difusos -nunca el punto real- en
+    // el payload normal, así que el círculo también funciona sin red.
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'proximity',
+    offlineNote:
+      'El nodo llega ya con el centro y el radio difusos calculados por el servidor: el cliente no necesita red para pintar el círculo de búsqueda.',
+    summary: 'Mapa mudo: el jugador ve solo un círculo de búsqueda difuso y una pista, nunca el punto exacto.',
+    playerGoal: 'Sigue la pista y entra en el círculo de búsqueda; el mapa no marca el punto exacto.',
+    editorHint:
+      'Como un checkpoint, pero sin el pin del punto: sube el radio del círculo si quieres que la búsqueda sea más amplia, y activa la pista frío/caliente si el grupo es de jugadores nuevos.',
+    config: {
+      game_id: 'mapa_mudo',
+      objective: 'mapa_mudo',
+      completion_method: 'proximity',
+      clue_text: '',
+      search_radius_m: 250,
+      hot_cold_hint: false,
+    },
+    content: 'Sigue la pista. El mapa solo te muestra una zona de búsqueda, no el punto exacto.',
+    messages: {
+      hint: 'No hay pin: fíate de la pista y del círculo de búsqueda.',
+      gps_unavailable: 'Necesitas GPS para saber si estás dentro del círculo.',
+      locked: 'Entra en el círculo de búsqueda para continuar.',
     },
   },
   {

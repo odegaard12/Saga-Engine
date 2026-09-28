@@ -33,9 +33,33 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
     current_stage = None
     if not finished and 0 <= lvl < len(runtime_stages):
         current_stage = main.project_stage_for_player(runtime_stages[lvl], include_runtime=True, fotos_por_url=fotos_por_url)
+        # "Pista de calor" de mapa mudo: sólo una palabra (frío/templado/
+        # caliente), nunca la distancia. Se calcula aquí -no dentro de
+        # project_stage_for_player- porque hace falta la última posición
+        # conocida del jugador, y esa función no la tiene.
+        if isinstance(current_stage, dict) and current_stage.get("kind") == "mapa_mudo":
+            config_activa = current_stage.get("config") if isinstance(current_stage.get("config"), dict) else {}
+            if config_activa.get("hot_cold_hint"):
+                posicion = live_positions.get(profile_id) if isinstance(live_positions, dict) else None
+                if isinstance(posicion, dict) and posicion.get("lat") is not None and posicion.get("lon") is not None:
+                    real = runtime_stages[lvl].get("location") if isinstance(runtime_stages[lvl], dict) else None
+                    real = real or {}
+                    distancia_m = main.haversine_m(
+                        float(posicion["lat"]), float(posicion["lon"]),
+                        float(real.get("lat", 0.0)), float(real.get("lon", 0.0)),
+                    )
+                    banda = main.hot_cold_band_es(distancia_m, config_activa.get("search_radius_m"))
+                    if isinstance(current_stage.get("minigame"), dict) and isinstance(current_stage["minigame"].get("config"), dict):
+                        current_stage["minigame"]["config"]["hot_cold"] = banda
+                    current_stage["config"] = {**config_activa, "hot_cold": banda}
 
     stages = [
-        main.project_stage_for_player(stage, include_runtime=(offline_pack or (i == lvl and not finished)), fotos_por_url=fotos_por_url)
+        main.project_stage_for_player(
+            stage,
+            include_runtime=(offline_pack or (i == lvl and not finished)),
+            fotos_por_url=fotos_por_url,
+            completed=(i < lvl),
+        )
         for i, stage in enumerate(runtime_stages)
     ]
 

@@ -58,7 +58,7 @@ export const displayFamilyCards: DisplayFamilyCard[] = [
   },
 ]
 
-// Mapa 1:1 con los 16 AdminGameId del catálogo (adminGameCatalog en
+// Mapa 1:1 con los 17 AdminGameId del catálogo (adminGameCatalog en
 // gameCatalog.ts). El test de cobertura recorre ese catálogo y comprueba que
 // cada juego cae en exactamente una de las 5 familias.
 export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
@@ -66,6 +66,10 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   qr_collectible: 'llegar_y_escanear',
   qr_key_gate: 'llegar_y_escanear',
   clue_card: 'llegar_y_escanear',
+  // Mapa mudo completa por proximidad GPS igual que un checkpoint (reutiliza
+  // el runtime de signal_hunt): mismo grupo que el resto de "llegar y
+  // escanear" aunque no muestre el pin exacto.
+  mapa_mudo: 'llegar_y_escanear',
   bonus_cache: 'llegar_y_escanear',
   photo_scout: 'llegar_y_escanear',
   // Relevo de equipo depende de proximidad GPS de varios jugadores: mismo

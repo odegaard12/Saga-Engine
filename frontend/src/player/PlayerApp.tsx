@@ -1987,7 +1987,14 @@ export default function PlayerApp() {
       raiz.config && typeof raiz.config === 'object' ? (raiz.config as Record<string, unknown>) : raiz
     const juego = String(interno.game_id || raiz.game_id || '')
     const objetivo = String(interno.objective || raiz.objective || '')
-    return juego === 'simple_checkpoint' || objetivo === 'checkpoint'
+    // "mapa_mudo" completa igual que un punto de control -por GPS, sin
+    // reto que jugar-: no hay ninguna pantalla de minijuego registrada para
+    // él (no está en resolver.ts), así que si se tratase como signal_hunt
+    // normal intentaría abrir la pantalla de rastreo de señal con una config
+    // que no tiene sus campos (source_radius_m, lock_threshold...). La pista
+    // y el chip frío/templado/caliente se ven en PlayerHud mientras se
+    // acerca, no dentro de ningún reto.
+    return juego === 'simple_checkpoint' || objetivo === 'checkpoint' || juego === 'mapa_mudo'
   })()
 
   const isMapCollectible =

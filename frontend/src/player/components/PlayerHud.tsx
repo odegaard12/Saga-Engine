@@ -305,6 +305,39 @@ export function PlayerHud({
         ? `${radiusLabel} Ya puedes abrir este nodo.`
         : `${radiusLabel} Acércate para abrir este nodo.`
 
+  /**
+   * "Mapa mudo": tarjeta de pista + chip frío/templado/caliente.
+   *
+   * Mientras el nodo está activo y sin completar, `currentStage.kind` sigue
+   * siendo 'mapa_mudo' (el servidor lo revierte a 'checkpoint' al superarlo,
+   * ver `project_stage_for_player`), así que esta tarjeta desaparece sola en
+   * cuanto se completa -no hace falta ningún estado propio aquí-.
+   *
+   * `clue_text`/`image_data_url` vienen en `currentStage.config` (mismo
+   * campo de foto que cualquier otro minijuego, ver `_minigame_con_url_de_foto`
+   * en el backend); `hot_cold` sólo aparece si el admin activó la pista de
+   * calor Y hay una posición reciente del jugador (ver game.py) -si no hay
+   * ninguna todavía, no se pinta ningún chip, en vez de uno falso.
+   */
+  const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
+  const configMapaMudo = (currentStage?.config || {}) as Record<string, unknown>
+  const pistaTexto = typeof configMapaMudo.clue_text === 'string' ? configMapaMudo.clue_text.trim() : ''
+  const pistaFoto =
+    typeof configMapaMudo.image_data_url === 'string' && configMapaMudo.image_data_url.startsWith('data:')
+      ? configMapaMudo.image_data_url
+      : ''
+  const hotCold = typeof configMapaMudo.hot_cold === 'string' ? configMapaMudo.hot_cold : ''
+  const hotColdEtiqueta =
+    hotCold === 'caliente'
+      ? t('player.mapaMudo.hot', locale)
+      : hotCold === 'templado'
+        ? t('player.mapaMudo.warm', locale)
+        : hotCold === 'frio'
+          ? t('player.mapaMudo.cold', locale)
+          : ''
+  const hotColdColor =
+    hotCold === 'caliente' ? '#f87171' : hotCold === 'templado' ? '#fbbf24' : '#60a5fa'
+
   async function handleToolsFallbackSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -356,6 +389,55 @@ export function PlayerHud({
             : '13px 15px 11px',
         }}
       >
+        {esMapaMudo && !finished && (pistaTexto || pistaFoto || hotColdEtiqueta) ? (
+          <div
+            data-saga-mapa-mudo-pista
+            style={{
+              display: 'flex',
+              gap: 10,
+              alignItems: 'flex-start',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 12,
+              padding: '8px 10px',
+              marginBottom: 8,
+            }}
+          >
+            {pistaFoto ? (
+              <img
+                src={pistaFoto}
+                alt={t('player.mapaMudo.cluePhotoAlt', locale)}
+                style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : null}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+              {pistaTexto ? (
+                <span style={{ fontSize: 13, lineHeight: 1.35, color: '#f1f5f9' }}>
+                  <strong>{t('player.mapaMudo.clueTitle', locale)}: </strong>
+                  {pistaTexto}
+                </span>
+              ) : null}
+              {hotColdEtiqueta ? (
+                <span
+                  style={{
+                    alignSelf: 'flex-start',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: 0.4,
+                    textTransform: 'uppercase',
+                    color: 'rgb(var(--theme-ink))',
+                    background: hotColdColor,
+                    borderRadius: 999,
+                    padding: '2px 8px',
+                  }}
+                >
+                  {hotColdEtiqueta}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         {/**
          * La ayuda va DENTRO del boton, como segunda linea.
          *
