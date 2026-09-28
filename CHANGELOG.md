@@ -6,6 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.37.0
+
+- **Nuevo juego "Mapa mudo" (`mapa_mudo`), familia "Llegar y escanear".** El
+  jugador recibe una pista (texto y, si el organizador sube una, foto) y un
+  círculo de búsqueda grande (150-400 m, configurable) en vez del punto
+  exacto del nodo: el centro del círculo sale de un desplazamiento
+  determinista por hash de `node_id` (`fuzzy_search_circle` en
+  `backend/app/runtime/mision.py`), no de una posición al azar en cada
+  petición, y el punto real siempre queda dentro. Un chip opcional
+  frío/templado/caliente (`hot_cold_band_es`) da una pista relativa sin
+  números ni distancia. Se completa por GPS dentro del radio de entrada real
+  -como un punto de control-, así que su `kind` NO es `minijuego`: el
+  anti-trampas de tiempo mínimo no le aplica. Una vez completado, el nodo se
+  ve y comporta como un punto de control normal (posición real, sin círculo
+  difuso).
+- Mapa 3D del jugador (`MapSurfaceGL.tsx`): mientras un nodo "mapa mudo" está
+  activo y sin completar, se ocultan su chincheta (2D y 3D), el resplandor
+  del nodo en juego, la moneda flotante en 3D y el disco de suelo -las
+  únicas pistas visuales son el círculo difuso relleno y su pista/chip en el
+  HUD-. También se quita la línea guía y el trazado (`route_via`/
+  `route_track`) hacia ese nodo mientras está oculto.
+- `PlayerHud.tsx` muestra la tarjeta de pista (texto + foto opcional) y el
+  chip frío/templado/caliente cuando el nodo activo es "mapa mudo"; nuevas
+  claves de idioma en `frontend/src/i18n/index.ts` (`player.mapaMudo.*`,
+  es/gl/en).
+- Editor guiado de administración (`AdminGameEditor.tsx`): pista de texto,
+  radio de búsqueda (150-400 m) y subida de foto opcional para `mapa_mudo`,
+  reutilizando el mismo campo `image_data_url` que el resto de nodos.
+
 ## 5.36.0
 
 - **Reagrupa el catálogo de minijuegos del admin en 5 familias claras en

@@ -1582,26 +1582,42 @@ export const MapSurface = React.memo(function MapSurface({
           opacidadRelleno: visual.ringFillOpacity,
         }
 
-        const markerLayer = L.marker(markerCenter, {
-          icon: createMissionNodeIcon(index, 'current', entry.stage),
-          keyboard: false,
-          zIndexOffset: 720,
-        }).addTo(map)
+        /**
+         * Mapa mudo (Leaflet): sin chincheta.
+         *
+         * Este es el motor que de verdad juega la gente -`MapSurfaceGL.tsx`
+         * es el nuevo en migración, ver `mapSurfaceContract.ts`-, así que la
+         * pista visual real vive aquí. `data.lat/lon/radius` YA vienen
+         * difuminados desde el servidor (`project_stage_for_player`), así
+         * que `radiusLayer` de arriba ya dibuja el círculo de búsqueda
+         * correcto sin cambiar nada; lo único que falta es no clavar encima
+         * la chincheta numerada, que marcaría "aquí exacto" justo donde el
+         * juego quiere sólo una zona.
+         */
+        const esMapaMudoActivo = String((entry.stage as { kind?: string }).kind || '') === 'mapa_mudo'
 
-        markerLayer.bindTooltip(`${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, {
+        const markerLayer = esMapaMudoActivo
+          ? null
+          : L.marker(markerCenter, {
+              icon: createMissionNodeIcon(index, 'current', entry.stage),
+              keyboard: false,
+              zIndexOffset: 720,
+            }).addTo(map)
+
+        markerLayer?.bindTooltip(`${getPhysicalNodeTooltipPrefix(entry.stage)}${data.name}`, {
           direction: 'top',
           opacity: 0.92,
         })
 
         if (onNodeTapRef.current && !debugSimulation) {
           radiusLayer.on('click', () => onNodeTapRef.current?.())
-          markerLayer.on('click', () => onNodeTapRef.current?.())
+          markerLayer?.on('click', () => onNodeTapRef.current?.())
         }
 
         nodeRadiusRef.current = radiusLayer
-        nodeMarkerRef.current = markerLayer as unknown as L.CircleMarker
+        nodeMarkerRef.current = (markerLayer as unknown as L.CircleMarker) || null
         encuadreDelNodo = L.latLng(data.lat, data.lon).toBounds(Math.max(40, data.radius) * 2)
-        routeNodeLayersRef.current.push(radiusLayer, markerLayer)
+        routeNodeLayersRef.current.push(radiusLayer, ...(markerLayer ? [markerLayer] : []))
         continue
       }
 

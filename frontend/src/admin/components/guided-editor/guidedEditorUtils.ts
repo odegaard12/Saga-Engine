@@ -90,7 +90,7 @@ export const CONFIG_FIELD_META: Record<
   {
     label: string
     help: string
-    type: 'text' | 'number' | 'select' | 'sequence'
+    type: 'text' | 'number' | 'select' | 'sequence' | 'boolean'
     options?: Array<{ value: string; label: string }>
   }
 > = {
@@ -177,6 +177,21 @@ export const CONFIG_FIELD_META: Record<
     help: 'Lista de valores separados por coma.',
     type: 'sequence',
   },
+  clue_text: {
+    label: 'Pista (texto)',
+    help: 'Lo único que ve el jugador para orientarse: no hay pin, así que la pista tiene que bastar.',
+    type: 'text',
+  },
+  search_radius_m: {
+    label: 'Radio del círculo de búsqueda',
+    help: 'Tamaño del círculo difuso que ve el jugador (150-400 m). El servidor ya lo usa como centro/radio difusos, no es el radio real de entrada.',
+    type: 'number',
+  },
+  hot_cold_hint: {
+    label: 'Pista frío/caliente',
+    help: 'Si se activa, el jugador ve una palabra (frío/templado/caliente) en vez de distancia exacta.',
+    type: 'boolean',
+  },
   game_id: {
     label: 'ID de juego',
     help: 'Identificador del catálogo. No suele hacer falta tocarlo.',
@@ -203,6 +218,9 @@ export const CONFIG_ORDER = [
   'difficulty',
   'expected_code',
   'sequence',
+  'clue_text',
+  'search_radius_m',
+  'hot_cold_hint',
   'game_id',
   'game_title',
 ]
@@ -671,6 +689,12 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     }
   }
 
+  if (game.id === 'mapa_mudo') {
+    for (const key of ['clue_text', 'search_radius_m', 'hot_cold_hint']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
   return Array.from(keys).filter((key) => !TECHNICAL_CONFIG_KEYS.has(key))
 }
 
@@ -748,7 +772,15 @@ export function parseConfigValue(key: string, value: string): unknown {
   const meta = CONFIG_FIELD_META[key]
   if (meta?.type === 'number') {
     const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : 0
+    const rounded = Number.isFinite(parsed) ? parsed : 0
+    // El círculo de búsqueda de mapa mudo se clampa aquí: por debajo de 150 m
+    // deja de ser "mudo" (casi apunta al pin) y por encima de 400 m la
+    // búsqueda se vuelve impracticable a pie.
+    if (key === 'search_radius_m') return Math.min(400, Math.max(150, rounded))
+    return rounded
+  }
+  if (meta?.type === 'boolean') {
+    return value === 'true'
   }
   if (meta?.type === 'sequence') {
     return value
