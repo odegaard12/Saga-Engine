@@ -601,7 +601,7 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert "'raster-fade-duration': 0" in fonte
     assert "[1, 2, 3, 4.5].map((menos)" in fonte, "la carga tiene que pasar por cada nivel de zoom"
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert app.count("playerPosition={posicionEnMapa}") == 2
+    assert app.count("playerPosition={posicionEnMapa}") == 1
     assert "const posicionEnMapa = playerPosition ?? ultimaPosicionViva" in app
     ruta = app[app.index("function handleToggleRouteOverview()"):app.index("function openInteraction()")]
     assert "handleRequestLiveGps" not in ruta, "ver la ruta no necesita GPS"
@@ -624,3 +624,41 @@ def test_o_mapa_queda_en_memoria_e_os_botons_non_piden_gps_de_mais(fonte: str) -
     assert fonte.index("id: CAPA_NODOS_HALO,") < fonte.index("id: CAPA_FOTOS,") < fonte.index("id: CAPA_NODOS_ICONOS,")
     # La guía por caminos se guarda y sale al instante al volver.
     assert "guardarGuia(rutaCaminosRef.current)" in fonte and "leerGuiaGuardada()" in fonte
+
+
+# --- El mapa 3D es el único del jugador (Leaflet retirado del jugador) -------
+
+
+def test_o_mapa_3d_e_o_unico_do_xoxador(fonte: str) -> None:
+    componentes = COMPONENTE.parent
+    assert not (componentes / "MapSurface.tsx").exists(), "ha vuelto el mapa de Leaflet del jugador"
+    app = (componentes.parent / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "components/MapSurface'" not in app
+    # `map_engine` se sigue leyendo en la configuración, pero ya no elige nada.
+    assert "map_engine ===" not in app and "map_engine ==" not in app
+    assert "from 'leaflet'" not in fonte
+
+
+def test_o_modo_proba_toca_o_mapa_para_colocar_ao_xogador(fonte: str) -> None:
+    """Siempre disponible cuando no hay GPS: tocar el mapa mueve al jugador."""
+    assert "alPosicionar?.({ lat: evento.lngLat.lat, lon: evento.lngLat.lng })" in fonte
+    assert "queryRenderedFeatures" not in fonte.replace("sin\n     *   `queryRenderedFeatures`", "")
+    app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
+    assert "onDebugSetPosition={handleDebugSetPosition}" in app
+    assert "debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}" in app
+
+
+def test_sen_webgl_hai_aviso_e_a_carga_non_se_queda_esperando(fonte: str) -> None:
+    assert "setSinWebGL(true)" in fonte
+    assert "Mapa 3D no disponible" in fonte and "WebGL non dispoñible" not in fonte
+    # Sin mapa la pantalla de carga no espera a nadie.
+    assert fonte.index("setSinWebGL(true)") < fonte.index("onListoRef.current?.()", fonte.index("setSinWebGL(true)")) < fonte.index(
+        "const mapa = mapaCreado"
+    )
+    # Y el modo prueba sigue siendo jugable sin mapa.
+    assert "Modo prueba: colocarme en el nodo" in fonte
+
+
+def test_os_compañeiros_e_o_aura_do_gps_seguen_no_mapa_3d(fonte: str) -> None:
+    assert "otherPlayers" in fonte and "agruparJugadores(" in fonte
+    assert "CAPA_AURA" in fonte and "'debug'" in fonte

@@ -22,7 +22,6 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src"
 
-MAPA = FRONT / "player" / "components" / "MapSurface.tsx"
 PREP = FRONT / "player" / "components" / "FieldPrepPanel.tsx"
 
 
@@ -32,20 +31,8 @@ def sin_comentarios(fichero: Path) -> str:
     return re.sub(r"//[^\n]*", "", texto)
 
 
-def test_o_fondo_do_mapa_segue_o_tema():
-    """865 787 px² de gris verdoso debajo de todo."""
-    codigo = sin_comentarios(MAPA)
-
-    assert "#dfe8dd" not in codigo, "queda el gris verdoso escrito a mano"
 
 
-def test_leaflet_declarase_unha_soa_vez_no_mapa():
-    """Dos reglas con !important es un empate que decide el orden."""
-    codigo = sin_comentarios(MAPA)
-
-    assert "background: #0f172a !important" not in codigo, (
-        "queda una segunda regla de .leaflet-container con el azul clavado"
-    )
 
 
 def test_o_velo_do_panel_non_e_azul_marino():
@@ -57,6 +44,6 @@ def test_o_velo_do_panel_non_e_azul_marino():
 
 
 def test_as_tres_superficies_saen_do_tema():
-    for fichero in (MAPA, PREP):
+    for fichero in (PREP,):
         codigo = sin_comentarios(fichero)
         assert "var(--theme" in codigo, f"{fichero.name} no lee ninguna variable del tema"

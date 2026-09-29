@@ -7,21 +7,11 @@ import type {
 } from '../../types/player'
 
 /**
- * El contrato que comparten los DOS motores de mapa.
+ * Las props del mapa del jugador (`MapSurfaceGL.tsx`, MapLibre).
  *
- * Mientras dure la migración a WebGL hay dos componentes dibujando el
- * mismo mapa -`MapSurface.tsx` (Leaflet, el que juega la gente) y
- * `MapSurfaceGL.tsx` (MapLibre, el nuevo)-. Sin un contrato común, en
- * cuanto uno de los dos gane una prop el otro se queda atrás en silencio
- * y la comparación deja de ser justa: parecería que al nuevo le faltan
- * cosas cuando lo que pasa es que ni siquiera se las están pasando.
- *
- * Con esto, añadir una prop obliga a mirarlos a los dos.
- *
- * `MapSurfaceProps` (Leaflet) queda declarado en su propio fichero por
- * ahora; este de aquí es el subconjunto que el motor nuevo ya acepta, y
- * va creciendo a medida que se portan capas. Cuando estén igualados, los
- * dos leerán este mismo tipo.
+ * Es el ÚNICO mapa del jugador: el de Leaflet se retiró, sea cual sea el
+ * `map_engine` de la misión (la clave se sigue leyendo sin efecto, por las
+ * configuraciones antiguas). Leaflet queda sólo en el mapa de administración.
  */
 
 export type FocusRequestTargetGL = 'player' | 'node' | 'route'
@@ -82,24 +72,13 @@ export type MapSurfacePropsGL = {
   onUserMapMove?: () => void
   /** Rumbo del mapa en grados (0 = norte arriba). Para girar la aguja de la barra. */
   onRumbo?: (rumbo: number) => void
-}
-
-/**
- * Lo que TODAVÍA no pinta el motor nuevo, escrito para que no se olvide.
- *
- * Cada línea es una capa por portar; se va borrando conforme caen. Cuando
- * esta lista quede vacía, el motor nuevo puede pasar a ser el de por
- * defecto -y no antes-.
- */
-export type CapasPendentesGL = {
-  /** Avatares del resto del grupo, con agrupación cuando se juntan. */
-  grupo: TeamProfileLiveStatus[]
-  /** Estado del GPS y el aura de precisión. */
-  gps: PlayerGpsStatus
-  /** Cono de orientación (brújula). */
-  conoDeOrientacion: true
-  /** Modo depuración: tocar el mapa para moverse. */
-  depuracion: true
-  /** Aviso de teselas servidas desde la caché sin cobertura. */
-  avisoSenCobertura: true
+  /** Estado del GPS: con `ready`/`stale` se dibuja el aura de precisión alrededor de ti. */
+  gpsState?: PlayerGpsStatus
+  /** Modo prueba: tocar el mapa coloca al jugador ahí (`onDebugSetPosition`). */
+  debugSimulation?: boolean
+  onDebugSetPosition?: (position: { lat: number; lon: number }) => void
+  /** Toque sobre el nodo actual (o su radio de entrada). */
+  onNodeTap?: () => void
+  /** El resto del grupo, con agrupación cuando se juntan. */
+  otherPlayers?: TeamProfileLiveStatus[]
 }

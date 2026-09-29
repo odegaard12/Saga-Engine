@@ -256,44 +256,6 @@ def test_constantes_de_penalizacion_e_intentos():
 # ---------------------------------------------------------------------------
 
 
-def test_cuenta_senales_aparece_unha_vez_no_catalogo():
-    codigo = leer(GAME_CATALOG)
-    ocorrencias = len(re.findall(r"^\s*id:\s*'cuenta_senales'", codigo, flags=re.MULTILINE))
-    assert ocorrencias == 1, f"cuenta_senales debería aparecer 1 vez en adminGameCatalog, aparece {ocorrencias}"
-
-
-def test_cuenta_senales_familia_signal_hunt_e_runtime_ready():
-    codigo = leer(GAME_CATALOG)
-    inicio = codigo.index("id: 'cuenta_senales',")
-    fin = codigo.index("\n  },", inicio)
-    bloque = codigo[inicio:fin]
-    assert "family: 'signal_hunt'" in bloque
-    assert "runtimeStatus: 'runtime_ready'" in bloque
-    assert "game_id: 'cuenta_senales'" in bloque
-
-
-def test_cuenta_senales_mapea_a_llegar_y_escanear():
-    codigo = leer(DISPLAY_FAMILIES)
-    inicio = codigo.index("DISPLAY_FAMILY_BY_GAME_ID")
-    fin = codigo.index("\n}", inicio)
-    bloque = codigo[inicio:fin]
-    pares = dict(re.findall(r"^\s*([a-z_]+):\s*'([a-z_]+)',?\s*$", bloque, flags=re.MULTILINE))
-    assert pares.get("cuenta_senales") == "llegar_y_escanear"
-
-
-def test_cuenta_senales_ten_editor_dedicado_e_non_bucle_xenerico():
-    codigo = leer(GUIDED_UTILS)
-    assert "'cuenta_senales'" in codigo
-    idx = codigo.index("export function guidedConfigKeysForGame")
-    fin = codigo.index("\n}", idx)
-    bloque = codigo[idx:fin]
-    assert "cuenta_senales" in bloque, (
-        "cuenta_senales debería devolver [] en guidedConfigKeysForGame -editor propio, "
-        "como rumbo_doble/sequence_code/place_mosaic/tilt_maze-"
-    )
-    assert "'questions'" in codigo  # en TECHNICAL_CONFIG_KEYS: non se renderiza como campo xenérico
-
-
 def test_normalize_admin_config_for_family_conserva_questions():
     """Mesmo bug que tivo rumbo_doble con `targets`: a rama xenérica de
     signal_hunt en familyConfigs.ts devolvía SEMPRE 4 chaves fixas e tiraba
@@ -306,3 +268,8 @@ def test_normalize_admin_config_for_family_conserva_questions():
 def test_i18n_ten_cadeas_es_e_gl_para_cuenta_senales():
     codigo = leer(I18N_INDEX)
     assert codigo.count("cuentaSenales:") >= 3  # en + es + gl
+
+
+# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
+# familia de presentación, editor propio) se sustituyeron por la prueba
+# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).

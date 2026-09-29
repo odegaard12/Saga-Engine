@@ -32,7 +32,7 @@ maplibregl.setWorkerUrl(urlDelWorker)
  * desampliar -la vista nueva pide de golpe decenas de teselas-.
  */
 maplibregl.setMaxParallelImageRequests(32)
-import type { FieldProof, PlayerStage } from '../../types/player'
+import type { FieldProof, PlayerStage, TeamProfileLiveStatus } from '../../types/player'
 import {
   getPlayerAvatarInitials,
   getPlayerAvatarUrl,
@@ -50,27 +50,36 @@ import {
   OSCURO_TIPO,
   renderizarBola,
 } from './bolaRenderizada'
+import {
+  agruparJugadores,
+  claveDeGrupo,
+  claveDeJugador,
+  contenidoPopupGrupo,
+  contenidoPopupJugador,
+  crearElementoGrupo,
+  crearElementoJugador,
+  desplazar,
+  distanciaEnMetros,
+  radioDeAgrupacion,
+  repartirEnCorro,
+  tipoDePresencia,
+} from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 
 /**
- * El mapa, en WebGL. Motor NUEVO, en paralelo al de Leaflet.
+ * El mapa del jugador, en WebGL (MapLibre): el único que hay.
  *
- * Por qué existe: Leaflet dibuja el mapa como un mosaico de <img> que
- * reposiciona con `transform` en cada gesto. Eso trae de serie tres cosas
- * que llevamos una sesión entera parcheando sin poder cerrarlas: el zoom
- * va por niveles enteros (de 17 a 16, un salto), las teselas contiguas
- * dejan costuras de subpíxel al escalar, y cada nivel nuevo pide un juego
- * de imágenes distinto -blanco mientras llegan-. Son límites del enfoque,
- * no fallos sueltos. Aquí lo dibuja la GPU: zoom continuo, sin costuras.
+ * Sustituyó al de Leaflet, que dibujaba el mapa como un mosaico de <img> con
+ * zoom por niveles enteros, costuras entre teselas y blanco mientras llegaban
+ * las de cada nivel. Aquí lo dibuja la GPU: zoom continuo, relieve y nodos 3D.
  *
- * ⚠️ NO sustituye a MapSurface.tsx todavía. Se elige con `map_engine` en
- * la configuración de la misión, y por defecto manda Leaflet. La lista de
- * capas que faltan está en `mapSurfaceContract.ts`.
+ * Las teselas salen del proxy con caché en disco
+ * (`/map-tiles/{z}/{x}/{y}.png`) y el relieve de `/dem-tiles`: mismo origen,
+ * mismas URL y mismo service worker, así que el modo sin cobertura y el
+ * paquete offline (`offline/mapTileCache.ts`) siguen valiendo.
  *
- * Las teselas son LAS MISMAS que usa Leaflet (`/map-tiles/{z}/{x}/{y}.png`,
- * el proxy con caché en disco): el modo sin cobertura sigue valiendo tal
- * cual -mismo origen, mismas URL, mismo service worker-, y este cambio no
- * arrastra una migración de datos.
+ * Sin WebGL (contexto que no se puede crear) no hay mapa: se muestra un
+ * aviso y la partida sigue con el resto de la interfaz. No hay segundo mapa.
  */
 
 const FUENTE_TESELAS = 'saga-raster'
@@ -90,6 +99,7 @@ const FUENTE_FOTOS = 'saga-fotos'
 const CAPA_RUTA_PULSO = 'saga-ruta-pulso'
 const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
+const CAPA_AURA = 'saga-jugador-aura'
 const ICONO_AVATAR = 'avatar-propio'
 const FUENTE_GUIA = 'saga-guia'
 const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
@@ -1357,6 +1367,26 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * Aura alrededor de ti: cian con GPS (`gps`), naranja en modo prueba
+         * (`debug`). Radio fijo en píxeles, como en el mapa antiguo; no es la
+         * precisión real en metros.
+         */
+        id: CAPA_AURA,
+        type: 'circle',
+        source: FUENTE_JUGADOR,
+        filter: ['!=', ['get', 'aura'], 'ninguna'],
+        paint: {
+          'circle-radius': 27,
+          'circle-pitch-alignment': 'viewport',
+          'circle-color': ['match', ['get', 'aura'], 'debug', '#fb923c', '#22d3ee'],
+          'circle-opacity': 0.14,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': ['match', ['get', 'aura'], 'debug', '#c2410c', '#0891b2'],
+          'circle-stroke-opacity': 0.6,
+        },
+      },
+      {
+        /**
          * TÚ, como símbolo del mapa y no como marcador del DOM.
          *
          * El avatar era el último marcador del DOM que quedaba, y por eso
@@ -1412,7 +1442,23 @@ export function MapSurfaceGL({
   followPlayer = false,
   onUserMapMove,
   onRumbo,
+  gpsState,
+  debugSimulation = false,
+  onDebugSetPosition,
+  onNodeTap,
+  otherPlayers,
 }: MapSurfacePropsGL) {
+  /** WebGL no disponible: no hay mapa, sí aviso. */
+  const [sinWebGL, setSinWebGL] = useState(false)
+  /** Callbacks y datos que leen los escuchadores del mapa (se registran una vez). */
+  const debugRef = useRef({ activo: false, alPosicionar: onDebugSetPosition, alNodo: onNodeTap })
+  debugRef.current = { activo: debugSimulation, alPosicionar: onDebugSetPosition, alNodo: onNodeTap }
+  const etapaActualRef = useRef(currentStage)
+  etapaActualRef.current = currentStage
+  /** Una foto tocada no cuenta como toque al mapa (ni mueve al jugador en modo prueba). */
+  const fotoTocadaRef = useRef(false)
+  const marcadoresJugadoresRef = useRef<Map<string, { marcador: maplibregl.Marker; firma: string }>>(new Map())
+  const [zoomActual, setZoomActual] = useState(16)
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
   /** El aviso de "pintado" se da una vez; la prop puede cambiar de identidad entre renders. */
@@ -1505,7 +1551,23 @@ export function MapSurfaceGL({
         ? { lat: currentStage.lat, lon: currentStage.lon }
         : { lat: 42.4333, lon: -8.65 })
 
-    const mapa = new maplibregl.Map({
+    // Sin WebGL, MapLibre lanza al construirse. Se mira antes -sin dejar un
+    // contexto vivo- y también se atrapa el lanzamiento, por si el
+    // navegador cambia de opinión entre una cosa y otra.
+    const hayWebGL = (() => {
+      try {
+        const lienzo = document.createElement('canvas')
+        const contexto = lienzo.getContext('webgl2') || lienzo.getContext('webgl')
+        contexto?.getExtension('WEBGL_lose_context')?.loseContext()
+        return Boolean(contexto)
+      } catch {
+        return false
+      }
+    })()
+    let mapaCreado: maplibregl.Map | null = null
+    if (hayWebGL) {
+      try {
+        mapaCreado = new maplibregl.Map({
       container: contenedorRef.current,
       center: [centro.lon, centro.lat],
       zoom: 16,
@@ -1547,7 +1609,18 @@ export function MapSurfaceGL({
       // puede pasar en el monte. Sin sprites ni fuentes por el mismo
       // motivo: cada recurso externo es otra cosa que puede faltar.
       style: estiloDelMapa(),
-    })
+        })
+      } catch {
+        mapaCreado = null
+      }
+    }
+    if (!mapaCreado) {
+      setSinWebGL(true)
+      // La pantalla de carga espera a `onListo`: sin mapa, no hay nada que esperar.
+      onListoRef.current?.()
+      return
+    }
+    const mapa = mapaCreado
 
     mapaRef.current = mapa
 
@@ -2024,6 +2097,9 @@ export function MapSurfaceGL({
     const alGirar = () => onRumboRef.current?.(Math.round(mapa.getBearing()))
     mapa.on('rotate', alGirar)
     alGirar()
+    const alZoom = () => setZoomActual(Math.round(mapa.getZoom() * 2) / 2)
+    mapa.on('zoomend', alZoom)
+    alZoom()
 
     /**
      * Si el jugador mueve el mapa con la mano, "seguirme" se apaga. Sólo
@@ -2069,6 +2145,7 @@ export function MapSurfaceGL({
     mapa.on('click', CAPA_FOTOS, (evento) => {
       const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
+      fotoTocadaRef.current = true
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2079,6 +2156,7 @@ export function MapSurfaceGL({
     mapa.on('click', CAPA_FOTOS_PILA, (evento) => {
       const props = evento.features?.[0]?.properties as { grupo?: number; id?: string | number } | undefined
       if (!props || typeof props.grupo !== 'number') return
+      fotoTocadaRef.current = true
       // Se abren TODAS las de ese sitio -en un nodo suele haber varias y el
       // visor ya sabe pasarlas-, empezando por la que se ha tocado.
       const grupo = gruposFotosRef.current[props.grupo] || []
@@ -2090,7 +2168,38 @@ export function MapSurfaceGL({
       mapa.getCanvas().style.cursor = 'pointer'
     })
     mapa.on('mouseleave', CAPA_FOTOS, () => {
-      mapa.getCanvas().style.cursor = ''
+      mapa.getCanvas().style.cursor = debugRef.current.activo ? 'crosshair' : ''
+    })
+
+    /**
+     * Toque en el mapa. Va DESPUÉS de los de las fotos (mismo orden de
+     * registro = mismo orden de disparo), que levantan `fotoTocadaRef`.
+     *
+     * - Modo prueba: coloca al jugador donde se toca. Es el recurso que
+     *   siempre está disponible cuando no hay GPS.
+     * - Si no: un toque sobre el nodo actual (o dentro de su radio de
+     *   entrada) avisa a `onNodeTap`. Se mide en píxeles con `project`, sin
+     *   `queryRenderedFeatures` (no vale en algunos móviles con relieve).
+     */
+    mapa.on('click', (evento) => {
+      if (fotoTocadaRef.current) {
+        fotoTocadaRef.current = false
+        return
+      }
+      const { activo, alPosicionar, alNodo } = debugRef.current
+      if (activo) {
+        alPosicionar?.({ lat: evento.lngLat.lat, lon: evento.lngLat.lng })
+        return
+      }
+      const etapa = etapaActualRef.current
+      if (!alNodo || !etapa || etapa.lat == null || etapa.lon == null) return
+      if (String(etapa.kind || '') === 'mapa_mudo') return
+      const punto = mapa.project([etapa.lon, etapa.lat])
+      const metrosPorPixel =
+        (156543.03392 * Math.cos((etapa.lat * Math.PI) / 180)) / Math.pow(2, mapa.getZoom())
+      const radio = typeof etapa.radius === 'number' && etapa.radius > 0 ? etapa.radius : 30
+      const umbral = Math.max(36, radio / metrosPorPixel)
+      if (Math.hypot(evento.point.x - punto.x, evento.point.y - punto.y) <= umbral) alNodo()
     })
 
     if (
@@ -2128,6 +2237,7 @@ export function MapSurfaceGL({
       pulsoVivo = false
       window.clearInterval(esperarPintado)
       mapa.off('rotate', alGirar)
+      mapa.off('zoomend', alZoom)
       mapa.off('moveend', alSoltar)
       mapa.off('dragstart', alTocar)
       mapa.off('zoomstart', alTocar)
@@ -2138,6 +2248,8 @@ export function MapSurfaceGL({
       window.clearInterval(relojVigilante)
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
+      marcadoresJugadoresRef.current.forEach((entrada) => entrada.marcador.remove())
+      marcadoresJugadoresRef.current.clear()
       mapa.remove()
       mapaRef.current = null
     }
@@ -2219,7 +2331,14 @@ export function MapSurfaceGL({
       features: [
         {
           type: 'Feature',
-          properties: {},
+          // Aura: naranja en modo prueba, cian con GPS vivo o rancio.
+          properties: {
+            aura: debugSimulation
+              ? 'debug'
+              : gpsState === 'ready' || gpsState === 'stale'
+                ? 'gps'
+                : 'ninguna',
+          },
           geometry: { type: 'Point', coordinates: [playerPosition.lon, playerPosition.lat] },
         },
       ],
@@ -2254,8 +2373,92 @@ export function MapSurfaceGL({
     selfProfile?.avatar_url,
     selfProfile?.color,
     selfProfile?.display_name,
+    gpsState,
+    debugSimulation,
     pintarFuente,
   ])
+
+  // Cursor en cruz en modo prueba: se ve que tocar mueve al jugador.
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (mapa) mapa.getCanvas().style.cursor = debugSimulation ? 'crosshair' : ''
+  }, [debugSimulation])
+
+  /**
+   * El resto del grupo: un marcador del DOM por jugador, o uno por grupo
+   * cuando están juntos y el zoom es bajo. Se reutilizan entre pasadas; la
+   * `firma` decide si hay que rehacer el elemento.
+   */
+  useEffect(() => {
+    const mapa = mapaRef.current
+    if (!mapa) return
+    const marcadores = marcadoresJugadoresRef.current
+    const vistos = new Set<string>()
+    const visibles = (otherPlayers || []).filter(
+      (jugador) =>
+        !jugador.is_self && typeof jugador.lat === 'number' && typeof jugador.lon === 'number'
+    )
+    const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoomActual))
+    const totalNodos = missionStages?.length || 0
+
+    const poner = (
+      clave: string,
+      firma: string,
+      punto: Punto,
+      crear: () => { elemento: HTMLElement; popup: HTMLElement }
+    ) => {
+      vistos.add(clave)
+      const previo = marcadores.get(clave)
+      if (previo && previo.firma === firma) {
+        previo.marcador.setLngLat([punto.lon, punto.lat])
+        return
+      }
+      previo?.marcador.remove()
+      const { elemento, popup } = crear()
+      const marcador = new maplibregl.Marker({ element: elemento, anchor: 'center' })
+        .setLngLat([punto.lon, punto.lat])
+        .setPopup(new maplibregl.Popup({ offset: 26, closeButton: true }).setDOMContent(popup))
+        .addTo(mapa)
+      marcadores.set(clave, { marcador, firma })
+    }
+
+    for (const grupo of grupos) {
+      const centro = { lat: grupo.lat, lon: grupo.lon }
+      if (grupo.players.length > 1 && zoomActual < 17) {
+        const cercaDeMi = playerPosition && distanciaEnMetros(centro, playerPosition) <= 18
+        const punto = cercaDeMi ? desplazar(centro, 18, 35) : centro
+        poner(claveDeGrupo(grupo.players), `g${grupo.players.length}`, punto, () => ({
+          elemento: crearElementoGrupo(grupo.players.length),
+          popup: contenidoPopupGrupo(grupo.players),
+        }))
+        continue
+      }
+      grupo.players.forEach((jugador: TeamProfileLiveStatus, indice: number) => {
+        const tipo = tipoDePresencia(jugador)
+        const base =
+          grupo.players.length > 1
+            ? repartirEnCorro(centro, indice, grupo.players.length, zoomActual >= 18 ? 11 : 18, 20)
+            : { lat: Number(jugador.lat), lon: Number(jugador.lon) }
+        const cercaDeMi = playerPosition && distanciaEnMetros(base, playerPosition) <= 12
+        const punto = cercaDeMi ? desplazar(base, 16 + indice * 4, 28 + indice * 46) : base
+        poner(
+          claveDeJugador(jugador),
+          [tipo, jugador.avatar_url, jugador.color, jugador.display_name, jugador.level, jugador.finished, jugador.last_seen].join('|'),
+          punto,
+          () => ({
+            elemento: crearElementoJugador(jugador, tipo),
+            popup: contenidoPopupJugador(jugador, tipo, totalNodos),
+          })
+        )
+      })
+    }
+
+    for (const [clave, entrada] of marcadores.entries()) {
+      if (vistos.has(clave)) continue
+      entrada.marcador.remove()
+      marcadores.delete(clave)
+    }
+  }, [otherPlayers, zoomActual, playerPosition?.lat, playerPosition?.lon, missionStages?.length, playerPosition])
 
   // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
   useEffect(() => {
@@ -2426,7 +2629,8 @@ export function MapSurfaceGL({
     const mapa = mapaRef.current
     const esMapaMudo = String(currentStage?.kind || '') === 'mapa_mudo'
 
-    if (mapa && mapa.getLayer(CAPA_RADIO_RELLENO) && mapa.getLayer(CAPA_RADIO_BORDE)) {
+    const aplicarVisibilidad = (): boolean => {
+      if (!mapa || !mapa.getLayer(CAPA_RADIO_RELLENO) || !mapa.getLayer(CAPA_RADIO_BORDE)) return false
       mapa.setLayoutProperty(CAPA_RADIO_RELLENO, 'visibility', esMapaMudo ? 'visible' : 'none')
       mapa.setLayoutProperty(CAPA_RADIO_BORDE, 'visibility', esMapaMudo ? 'visible' : 'none')
       if (esMapaMudo) {
@@ -2436,11 +2640,25 @@ export function MapSurfaceGL({
         mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-opacity', 0.5)
         mapa.setPaintProperty(CAPA_RADIO_BORDE, 'line-width', 2)
       }
+      return true
+    }
+    // Si el estilo aún no ha montado las capas (los datos llegan antes),
+    // el círculo del mapa mudo se quedaba oculto para siempre: se reintenta
+    // en cada `styledata` hasta que se pueda aplicar.
+    let reintento: (() => void) | null = null
+    if (mapa && !aplicarVisibilidad()) {
+      reintento = () => {
+        if (aplicarVisibilidad() && reintento) mapa.off('styledata', reintento)
+      }
+      mapa.on('styledata', reintento)
+    }
+    const limpiarReintento = () => {
+      if (mapa && reintento) mapa.off('styledata', reintento)
     }
 
     if (currentStage?.lat == null || currentStage?.lon == null) {
       pintarFuente(FUENTE_RADIO, COLECCION_VACIA)
-      return
+      return limpiarReintento
     }
 
     const radio = typeof currentStage.radius === 'number' && currentStage.radius > 0
@@ -2451,6 +2669,7 @@ export function MapSurfaceGL({
       FUENTE_RADIO,
       circuloGeoJSON({ lat: currentStage.lat, lon: currentStage.lon }, radio)
     )
+    return limpiarReintento
   }, [currentStage?.lat, currentStage?.lon, currentStage?.radius, currentStage?.kind, pintarFuente])
 
   /**
@@ -2719,6 +2938,56 @@ export function MapSurfaceGL({
         aria-label="Mapa de la misión (WebGL)"
         style={{ position: 'absolute', inset: 0 }}
       />
+      {sinWebGL ? (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            top: '28%',
+            margin: '0 auto',
+            maxWidth: 360,
+            padding: '14px 16px',
+            borderRadius: 16,
+            background: 'rgba(var(--theme-ink), .88)',
+            color: '#ffffff',
+            border: '1px solid rgba(255,255,255,.35)',
+            font: '700 14px/1.35 system-ui, sans-serif',
+            textAlign: 'center',
+            zIndex: 5,
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Mapa 3D no disponible</div>
+          <div>
+            Este dispositivo no puede mostrar el mapa (WebGL no disponible). Este dispositivo non pode amosar o mapa.
+          </div>
+          <div style={{ marginTop: 6, opacity: 0.85, fontSize: 13 }}>
+            Puedes seguir jugando: usa la brújula, la lista de nodos y el QR. / Podes seguir xogando: usa a brúxula, a lista de nodos e o QR.
+          </div>
+          {debugSimulation && onDebugSetPosition && currentStage?.lat != null && currentStage?.lon != null ? (
+            <button
+              type="button"
+              onClick={() =>
+                onDebugSetPosition({ lat: currentStage.lat as number, lon: currentStage.lon as number })
+              }
+              style={{
+                marginTop: 10,
+                minHeight: 44,
+                padding: '0 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,.5)',
+                background: 'rgba(255,255,255,.14)',
+                color: '#ffffff',
+                font: '800 13px system-ui, sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              Modo prueba: colocarme en el nodo
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {fueraDeTrazado !== null ? (
         /**
          * Aviso de fuera del trazado. Pequeño, en el centro, sin tapar la

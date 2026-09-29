@@ -20,7 +20,6 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "src"
 TEMAS = FRONT / "mobile-themes.css"
-MAPA = FRONT / "player" / "components" / "MapSurface.tsx"
 SHELL = FRONT / "player" / "components" / "PlayerShell.tsx"
 
 VARIABLE = "--theme-radius-dot"
@@ -56,14 +55,6 @@ def test_o_lume_fai_chapas():
     )
 
 
-def test_o_alfinete_do_mapa_sae_do_tema():
-    mapa = MAPA.read_text(encoding="utf-8")
-    pin = re.search(r"\.saga-mission-node-pin \{[^}]*\}", mapa)
-    assert pin, "no encuentro el alfiler del nodo"
-    assert VARIABLE in pin.group(0), (
-        "el alfiler del mapa sigue con el radio escrito a mano: ningún tema "
-        "puede cambiarle la forma"
-    )
 
 
 def test_a_tira_de_puntos_xa_non_esta_na_barra():

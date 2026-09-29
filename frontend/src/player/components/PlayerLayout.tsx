@@ -92,11 +92,6 @@ body {
   overscroll-behavior: none;
 }
 
-.leaflet-container {
-  background: var(--theme-surface) !important;
-  outline: none !important;
-}
-
 .saga-player-edge-fix {
   background: var(--theme-surface) !important;
 }
