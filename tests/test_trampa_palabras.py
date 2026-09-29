@@ -185,7 +185,7 @@ def test_project_non_manda_correct_index_en_claro():
     assert "questions" not in proyectado
     for ronda in proyectado["rounds"]:
         assert "correct_index" not in ronda
-        assert set(ronda.keys()) == {"question", "options", "salt", "answer_hash", "explanation"}
+        assert set(ronda.keys()) == {"question", "options", "salt", "answer_hash", "explanation_enc"}
         assert len(ronda["options"]) == 4
 
 
@@ -220,23 +220,6 @@ def test_reparto_e_estable_entre_chamadas_offline():
 # ---------------------------------------------------------------------------
 # Anti-trampas: suelo dinámico, non un número adivinado
 # ---------------------------------------------------------------------------
-
-
-def test_suelo_trampa_palabras_rexistrado():
-    assert "trampa_palabras" in MINIGAME_HARD_FLOOR_MS_BY_GAME
-
-
-def test_suelo_sae_da_config_real_do_nodo():
-    node = {"interaction": {"type": "word_trap", "config": {"n_rounds": 6, "time_limit_s": 12}}}
-    assert _umbral_fisico_ms("trampa_palabras", node) == 72000
-
-    node_largo = {"interaction": {"type": "word_trap", "config": {"n_rounds": 8, "time_limit_s": 30}}}
-    assert _umbral_fisico_ms("trampa_palabras", node_largo) == 240000
-
-
-def test_suelo_nunca_baixa_do_minimo_plausible():
-    node_vacio = {"interaction": {"type": "word_trap", "config": {}}}
-    assert _umbral_fisico_ms("trampa_palabras", node_vacio) >= MIN_PLAUSIBLE_STAGE_MS
 
 
 def test_duracion_por_defecto_supera_o_minuto_pedido():
@@ -312,3 +295,10 @@ def test_backend_admin_rexistra_a_familia_word_trap():
     codigo = leer(ADMIN_PY)
     assert '"word_trap": 0' in codigo
     assert "desafio" in codigo
+
+
+def test_trampa_palabras_non_ten_suelo_feito_co_tempo_maximo():
+    """O suelo era rondas x segundos MÁXIMOS por pregunta: marcaba a quen
+    responde ben e rápido. Queda no suelo xenérico + evidence_too_fast."""
+    from backend.app.runtime.anti_cheat import MINIGAME_HARD_FLOOR_MS_BY_GAME
+    assert "trampa_palabras" not in MINIGAME_HARD_FLOOR_MS_BY_GAME

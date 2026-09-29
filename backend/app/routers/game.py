@@ -5,6 +5,46 @@ from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
 
+#: Eventos que acepta una sola llamada de sincronización.
+MAX_EVENTS_PER_SYNC = 200
+
+
+def ordenar_avances_de_la_tanda(events):
+    """Los `node_completed` de una tanda, por el nivel desde el que se hicieron.
+
+    El móvil ya sube la cola en el orden en que ocurrió, pero el orden LO ES
+    TODO: el servidor valida cada avance contra el nodo en el que está el
+    jugador en ese momento. Con el reloj del móvil corregido a mitad de un
+    tramo sin cobertura, o con una cola mezclada por un reintento, un avance
+    del nodo 3 podía llegar antes que el del 2, ser rechazado como código
+    inválido y darse por cerrado en el móvil: el jugador perdía un nodo que sí
+    había hecho.
+
+    Sólo se reordenan entre sí los avances (en los huecos que ya ocupaban); el
+    resto de eventos no se mueve. Un avance sin `level_before` legible conserva
+    su sitio relativo.
+    """
+    posiciones = []
+    for indice, evento in enumerate(events):
+        if isinstance(evento, dict) and evento.get("type") == "node_completed":
+            payload = evento.get("payload") if isinstance(evento.get("payload"), dict) else {}
+            nivel = payload.get("level_before")
+            try:
+                nivel = int(nivel) if nivel is not None and not isinstance(nivel, bool) else None
+            except (TypeError, ValueError):
+                nivel = None
+            posiciones.append((indice, nivel))
+
+    if len(posiciones) < 2 or any(nivel is None for _, nivel in posiciones):
+        return list(events)
+
+    huecos = [indice for indice, _ in posiciones]
+    ordenados = sorted(posiciones, key=lambda par: (par[1], par[0]))
+    resultado = list(events)
+    for hueco, (origen, _) in zip(huecos, ordenados):
+        resultado[hueco] = events[origen]
+    return resultado
+
 @router.get("/api/state/{user}")
 async def get_state(user: str, request: Request):
     import main
@@ -237,7 +277,11 @@ async def sync_player_events(request: Request):
     if not isinstance(events, list):
         raise HTTPException(status_code=400, detail="events must be a list")
 
-    if len(events) > 100:
+    # El móvil sube en tandas de 50, pero un tramo largo sin cobertura puede
+    # dejar cientos de eventos en cola (posiciones, mochila, minijuegos...) y
+    # un cliente viejo los mandaba todos juntos: con el tope de 100 esa cola se
+    # atascaba para siempre con un 400 en cada intento.
+    if len(events) > MAX_EVENTS_PER_SYNC:
         raise HTTPException(status_code=400, detail="too many events")
 
     inventory_snapshot = data.get("inventory_snapshot")
@@ -246,7 +290,7 @@ async def sync_player_events(request: Request):
 
     stored = []
     seen_client_events = {}
-    for raw_event in events:
+    for raw_event in ordenar_avances_de_la_tanda(events):
         normalized = main.normalize_player_event(raw_event, user, profile)
         client_event_id = _as_str(normalized.get("client_event_id")).strip()
 
@@ -483,6 +527,10 @@ async def advance(request: Request):
     # interno con el que los minijuegos dicen "superado" lo acepta cualquier
     # nodo, así que escrito a mano saltaba el que fuera sin jugar ni penalizar.
     codigo_a_mano = _as_bool(data.get("manual"))
+    # Lo que el móvil aporta de cómo se ganó el nodo (respuestas, rondas, GPS,
+    # QR leído). Se revisa contra la configuración real; ver runtime/evidencia.py.
+    from backend.app.runtime.evidencia import sanitize_evidence
+    evidencia = sanitize_evidence(data.get("evidence")) if isinstance(data.get("evidence"), dict) else None
     # Penalización que pide el cliente: código de respaldo, fallos en el reto...
     # Va aparte del tiempo del nodo porque se suma al total de la travesía.
     try:
@@ -574,6 +622,16 @@ async def advance(request: Request):
             # aquí es plausibilidad, no permiso.
             main.anti_cheat_check_completion_time(profile_id, current_node, time_spent_ms)
 
+            # Y la evidencia de la partida, contra la config real del nodo.
+            # Igual: sólo anota, el avance sigue.
+            hallazgos = main.anti_cheat_review_evidence(
+                profile_id,
+                current_node,
+                evidencia,
+                penalty_ms=penalty_ms,
+                manual=codigo_a_mano,
+            )
+
             # Igual que penalty_ms arriba: viene del móvil sin garantía de forma.
             # Un valor no numérico (típico de una cola vieja o un cliente roto)
             # tiraba abajo /api/advance entero con un 500 en vez de avanzar el
@@ -598,14 +656,17 @@ async def advance(request: Request):
             main.match_log_record(
                 "advance",
                 profile_id,
-                payload={
-                    "node_id": current_node.get("id"),
-                    "level_before": lvl,
-                    "level_after": lvl + 1,
-                    "time_spent_ms": time_spent_ms,
-                    "penalty_ms": penalty_ms,
-                    "manual": codigo_a_mano,
-                },
+                payload=main.payload_de_avance_para_el_registro(
+                    current_node,
+                    lvl,
+                    time_spent_ms=time_spent_ms,
+                    penalty_ms=penalty_ms,
+                    manual=codigo_a_mano,
+                    evidencia=evidencia,
+                    hallazgos=hallazgos,
+                    via="online",
+                    contexto={"offline": False},
+                ),
                 profile=profile,
             )
 

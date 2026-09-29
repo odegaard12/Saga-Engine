@@ -24,6 +24,11 @@ from backend.app.runtime.minigames import (
 )
 
 
+#: Súbelo cuando cambie la FORMA de lo que `project_stage_for_player` manda al
+#: móvil aunque los nodos no cambien. Ver `stages_revision`.
+PROYECCION_VERSION = 2
+
+
 def validate_stages(raw_stages):
     if not isinstance(raw_stages, list):
         return [{"index": None, "field": "stages", "detail": "stages payload must be a list"}]
@@ -103,7 +108,18 @@ def stages_revision(runtime_stages):
     su estado —nivel, tiempo, mochila—, que son 28 KB.
     """
     try:
-        serializado = json.dumps(runtime_stages, sort_keys=True, default=str, ensure_ascii=False)
+        # La versión de la PROYECCIÓN entra en la huella: cuando cambia lo que
+        # el servidor le manda al móvil de cada nodo (celdas de llegada de
+        # «mapa mudo», rondas extra y explicación cifrada de «trampa de
+        # palabras») sin que cambie ningún nodo, los móviles con el paquete
+        # guardado deben bajarse el nuevo. Con la huella sólo de los nodos se
+        # quedaban con el contenido viejo hasta que alguien tocase la misión.
+        serializado = json.dumps(
+            {"proyeccion": PROYECCION_VERSION, "nodos": runtime_stages},
+            sort_keys=True,
+            default=str,
+            ensure_ascii=False,
+        )
     except (TypeError, ValueError):
         # Antes que dar una huella falsa —que dejaría al jugador con nodos
         # viejos para siempre—, se declara "no sé": el móvil bajará todo.
@@ -259,6 +275,71 @@ def fuzzy_search_circle(node_id, real_lat, real_lon, search_radius_m):
     lon_centro = real_lon + (este_m / (111320.0 * max(0.2, math.cos(math.radians(real_lat)))))
 
     return {"lat": lat_centro, "lon": lon_centro, "radius_m": radio}
+
+
+#: "Mapa mudo": el móvil NO conoce el punto real, sólo el círculo difuso. Para
+#: saber SIN COBERTURA si ha llegado se le manda, en vez del punto, el conjunto
+#: de celdas de una cuadrícula que cubren el radio real del nodo, cada una
+#: como un hash salado. El móvil pasa su posición a celda, la hashea y mira si
+#: está en el conjunto.
+#:
+#: Trade-off (elegido a propósito frente a "el móvil acepta la cercanía al
+#: círculo difuso", que era lo que había y completaba el nodo a 250 m del
+#: sitio): con la cuadrícula fija y el centro difuso público, alguien que
+#: sepa programar puede probar las ~3 000 celdas del círculo y dar con las
+#: buenas. Es el mismo nivel de defensa que `answer_hash`: no se lee el punto
+#: a ojo ni en el paquete ni en el mapa, pero no aguanta a un atacante con
+#: DevTools -el modo prueba, que existe siempre, es un salto mucho más
+#: barato-. La barrera real es que el servidor revisa las muestras de GPS que
+#: el móvil manda como evidencia (ver runtime/evidencia.py) y lo anota.
+MAPA_MUDO_CELDA_M = 8.0
+#: Suelo del radio real: con radios de 5 m el GPS de monte no llegaría nunca.
+MAPA_MUDO_RADIO_MINIMO_M = 15.0
+_METROS_POR_GRADO = 111320.0
+
+
+def mapa_mudo_celda(centro_lat, centro_lon, lat, lon, celda_m=MAPA_MUDO_CELDA_M):
+    """(i, j) de la celda que contiene (lat, lon) en el plano local del centro.
+
+    El JS del móvil (player/utils/mapaMudo.ts) hace exactamente esta cuenta.
+    """
+    dy = (float(lat) - float(centro_lat)) * _METROS_POR_GRADO
+    dx = (float(lon) - float(centro_lon)) * _METROS_POR_GRADO * max(0.2, math.cos(math.radians(float(centro_lat))))
+    return int(math.floor(dx / celda_m)), int(math.floor(dy / celda_m))
+
+
+def mapa_mudo_sal(node_id):
+    return hashlib.sha256(f"{node_id}:mapa-mudo".encode("utf-8", errors="replace")).hexdigest()[:16]
+
+
+def mapa_mudo_hash_celda(sal, i, j):
+    return hashlib.sha256(f"{sal}:{int(i)}:{int(j)}".encode("utf-8")).hexdigest()[:16]
+
+
+def mapa_mudo_verificador(node, centro_lat, centro_lon):
+    """Lo que viaja al móvil para comprobar la llegada sin conocer el punto.
+
+    `centro_*` es el centro DIFUSO que ya recibe el jugador: sirve de origen
+    de la cuadrícula. Devuelve `{celda_m, sal, hashes}`.
+    """
+    ubicacion = node["location"]
+    radio = max(float(ubicacion.get("radius_m") or 0), MAPA_MUDO_RADIO_MINIMO_M)
+    celda = MAPA_MUDO_CELDA_M
+
+    ry = (float(ubicacion["lat"]) - float(centro_lat)) * _METROS_POR_GRADO
+    rx = (float(ubicacion["lon"]) - float(centro_lon)) * _METROS_POR_GRADO * max(0.2, math.cos(math.radians(float(centro_lat))))
+
+    sal = mapa_mudo_sal(node["id"])
+    hashes = set()
+    for i in range(int(math.floor((rx - radio) / celda)), int(math.floor((rx + radio) / celda)) + 1):
+        for j in range(int(math.floor((ry - radio) / celda)), int(math.floor((ry + radio) / celda)) + 1):
+            # Distancia del punto real al cuadrado de la celda.
+            cx = min(max(rx, i * celda), (i + 1) * celda)
+            cy = min(max(ry, j * celda), (j + 1) * celda)
+            if math.hypot(rx - cx, ry - cy) <= radio:
+                hashes.add(mapa_mudo_hash_celda(sal, i, j))
+
+    return {"celda_m": celda, "sal": sal, "hashes": sorted(hashes)}
 
 
 def hot_cold_band_es(distance_m, search_radius_m):
@@ -427,6 +508,18 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
                 nuevo_mg_config_wt = {**minigame_efectivo["config"], **proyectada_wt_mg}
                 nuevo_mg_config_wt.pop("questions", None)
                 minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config_wt}
+
+        # "Mapa mudo" aún sin completar: el móvil no tiene el punto real, así
+        # que se le da con qué comprobar la llegada (ver mapa_mudo_verificador).
+        if oculto:
+            verificador = mapa_mudo_verificador(node, lat, lon)
+            if isinstance(config_efectiva, dict):
+                config_efectiva = {**config_efectiva, "arrival": verificador}
+            if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+                minigame_efectivo = {
+                    **minigame_efectivo,
+                    "config": {**minigame_efectivo["config"], "arrival": verificador},
+                }
 
         out.update({
             "content": node["presentation"]["content"],

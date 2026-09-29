@@ -53,6 +53,16 @@ export function deriveStageRuntime(args: {
    * dejaba entrar".
    */
   esperandoGpsMs?: number | null
+  /**
+   * Llegada comprobada por otro medio que el círculo del nodo.
+   *
+   * «Mapa mudo» no enseña su punto: el círculo que tiene el móvil es difuso y
+   * de 150 m o más, así que «estar dentro del radio» completaba el nodo a
+   * 250 m del sitio. Ahí la llegada se comprueba contra las celdas que manda
+   * el servidor (ver utils/mapaMudo.ts) y se pasa aquí el resultado. `null` =
+   * nodo normal, manda la distancia.
+   */
+  llegada?: boolean | null
 }): StageRuntimeState {
   const {
     currentStage,
@@ -62,6 +72,7 @@ export function deriveStageRuntime(args: {
     debugEnabled,
     itemGate,
     esperandoGpsMs,
+    llegada = null,
   } = args
 
   if (finished) {
@@ -169,13 +180,24 @@ export function deriveStageRuntime(args: {
     }
   }
 
-  if (distanceMeters <= currentStage.radius) {
+  if (llegada === null ? distanceMeters <= currentStage.radius : llegada) {
     return {
       canEnter: true,
       reason: 'within_radius',
       primaryLabel: 'Abrir nodo',
       primaryTone: 'ready',
       helperText: currentStage.messages?.hint || currentStage.content || 'Estás dentro do radio.',
+    }
+  }
+
+  if (llegada === false) {
+    // Mapa mudo: no se dice cuánto falta ni hacia dónde, sólo que aún no es.
+    return {
+      canEnter: false,
+      reason: 'out_of_range',
+      primaryLabel: 'Segue buscando',
+      primaryTone: 'warn',
+      helperText: 'Aínda non é o sitio exacto. Segue a pista e busca dentro da zona.',
     }
   }
 

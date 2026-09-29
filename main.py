@@ -15,7 +15,7 @@ import secrets
 import sqlite3
 import time
 import ipaddress
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 try:
     import httpx as _httpx
@@ -1069,6 +1069,30 @@ def anti_cheat_check_client_reported_exit(user, reason, payload):
     )
 
 
+def anti_cheat_review_evidence(user, node, evidence, penalty_ms=None, manual=False):
+    """Revisa la evidencia que trae un nodo completado y anota lo que no cuadre.
+
+    El móvil valida en local -sin cobertura no hay otra- y aquí se vuelve a
+    comprobar contra la configuración REAL del nodo (ver
+    runtime/evidencia.py). FLAG, no bloqueo: si no cuadra queda una sospecha
+    con nombre propio en el panel, y el progreso no se toca.
+    """
+    from backend.app.runtime import evidencia as _evidencia
+
+    hallazgos = _evidencia.verificar_evidencia(
+        node, user, evidence, penalty_ms=penalty_ms, manual=manual
+    )
+    for hallazgo in hallazgos:
+        _anti_cheat.record_suspicion(
+            ANTI_CHEAT_DB,
+            user,
+            hallazgo["reason"],
+            {"node_id": node.get("id") if isinstance(node, dict) else None, **hallazgo["evidence"]},
+            severity=hallazgo["severity"],
+        )
+    return hallazgos
+
+
 def list_anti_cheat_suspicions(user=None):
     return _anti_cheat.list_suspicions(ANTI_CHEAT_DB, user)
 
@@ -1303,9 +1327,13 @@ def match_log_record_session_open(user, profile=None, active=None, now_s=None):
     )
 
 
-def match_log_list_timeline(user=None, date_from=None, date_to=None, event_type=None, limit=None):
+def match_log_list_timeline(
+    user=None, date_from=None, date_to=None, event_type=None, limit=None,
+    only_suspicions=False, only_offline=False, by_occurrence=False,
+):
     return _match_log.list_timeline(
-        MATCH_LOG_DB, user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit
+        MATCH_LOG_DB, user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit,
+        only_suspicions=only_suspicions, only_offline=only_offline, by_occurrence=by_occurrence,
     )
 
 
@@ -1349,6 +1377,32 @@ def match_log_offline_sync_delay_ms(raw_events):
         return None
 
     return max(0, int(time.time() * 1000) - min(momentos_ms))
+
+
+def _clamp_penalty_ms(valor):
+    try:
+        return max(0, min(3_600_000, int(valor or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def match_log_offline_context(payload, now_ms=None):
+    """Lo que el Registro de partida necesita saber de un evento que llegó por
+    la cola: hora original del móvil, retraso hasta llegar y si se creó sin
+    cobertura. `offline` es verdad si el móvil lo declaró al encolar o si
+    tardó más de minuto y medio en llegar (una cola que sube al momento no es
+    un tramo sin cobertura)."""
+    payload = payload if isinstance(payload, dict) else {}
+    ahora = now_ms if now_ms is not None else int(time.time() * 1000)
+    creado = _iso_a_ms(payload.get("local_created_at"))
+    retraso = max(0, ahora - creado) if creado else None
+    declarado = bool(payload.get("offline_at_creation"))
+    contexto = {"offline": bool(declarado or (retraso is not None and retraso > 90_000))}
+    if retraso is not None:
+        contexto["sync_delay_ms"] = retraso
+    if payload.get("seq") is not None:
+        contexto["seq"] = payload.get("seq")
+    return contexto
 
 
 def _match_log_anti_cheat_sink(user, reason, evidence, severity):
@@ -1459,13 +1513,32 @@ def apply_synced_player_event(normalized_event, user, profile):
         # -nodo abierto, QR, mochila, minijuego, equipo- se anota tal cual,
         # con su tipo de evento como tipo de fila. node_completed tiene su
         # propio camino más abajo porque además avanza progreso de verdad.
-        match_log_record(
-            event.get("type") or "player_event",
-            profile_id_evento,
-            payload={**payload, "node_id": event.get("node_id")},
-            client_created_at=_as_str(payload.get("local_created_at")) or None,
-            profile=profile,
-        )
+        #
+        # Con la hora ORIGINAL del móvil (`client_created_at`), cuánto tardó
+        # en llegar y si se creó sin cobertura: al revisar la partida en casa
+        # lo que importa es cuándo pasó, no cuándo se subió.
+        contexto = match_log_offline_context(payload)
+        if event.get("type") == "position_track":
+            _registrar_track_de_posiciones(profile_id_evento, payload, contexto, profile)
+            # Las posiciones sólo se guardan si hay partida que auditar (misión
+            # programada y en marcha). Fuera de esa ventana el evento consta,
+            # pero sin coordenadas: no se acumulan sitios donde estuvo la gente
+            # sin un motivo.
+            if not match_log_is_active():
+                event["payload"] = {**payload, "samples": []}
+        else:
+            match_log_record(
+                event.get("type") or "player_event",
+                profile_id_evento,
+                payload={
+                    **payload,
+                    "node_id": event.get("node_id"),
+                    "via": payload.get("via") or "offline_queue",
+                    **contexto,
+                },
+                client_created_at=_as_str(payload.get("local_created_at")) or None,
+                profile=profile,
+            )
         return append_event(EVENT_LOG_DB, event)
 
     profile_id = _as_str(profile.get("id") or user).strip() or "PLAYER 1"
@@ -1475,6 +1548,7 @@ def apply_synced_player_event(normalized_event, user, profile):
     if current_level >= len(stages):
         event["status"] = "ignored"
         event["error"] = "mission_already_complete"
+        _registrar_avance_rechazado(event, profile_id, profile, current_level)
         return append_event(EVENT_LOG_DB, event)
 
     if current_level < 0:
@@ -1525,6 +1599,7 @@ def apply_synced_player_event(normalized_event, user, profile):
             "server_level": current_level,
             "duplicate_of_level": level_before,
         }
+        _registrar_avance_rechazado(event, profile_id, profile, current_level)
         return append_event(EVENT_LOG_DB, event)
 
     # Un reinicio tiene que aguantar a la cola vieja del móvil.
@@ -1553,6 +1628,7 @@ def apply_synced_player_event(normalized_event, user, profile):
             "reset_at": reset_at,
             "event_created_ms": creado_ms,
         }
+        _registrar_avance_rechazado(event, profile_id, profile, current_level)
         return append_event(EVENT_LOG_DB, event)
 
     current_node = stages[current_level]
@@ -1568,6 +1644,7 @@ def apply_synced_player_event(normalized_event, user, profile):
     if not stage_accepts_code(current_node, submitted_code, manual=_as_bool(payload.get("manual"))):
         event["status"] = "failed"
         event["error"] = "invalid_completion_code"
+        _registrar_avance_rechazado(event, profile_id, profile, current_level)
         return append_event(EVENT_LOG_DB, event)
 
     requirement_status = evaluate_stage_item_requirement(current_node, profile_id)
@@ -1579,6 +1656,7 @@ def apply_synced_player_event(normalized_event, user, profile):
             "requirement": requirement_status,
             "level_before": current_level,
         }
+        _registrar_avance_rechazado(event, profile_id, profile, current_level)
         return append_event(EVENT_LOG_DB, event)
 
     if requirement_status.get("required") and requirement_status.get("consume"):
@@ -1605,7 +1683,32 @@ def apply_synced_player_event(normalized_event, user, profile):
         except (TypeError, ValueError):
             pass
 
+    # El cronómetro y las penalizaciones, igual que en /api/advance.
+    #
+    # Aquí sólo se guardaba el tiempo del nodo: lo completado sin cobertura no
+    # arrancaba el reloj de la travesía, perdía la penalización (código de
+    # respaldo, fallos en el reto) y, si era el último nodo, no paraba nunca
+    # el cronómetro del jugador. Justo lo que pasa cuando alguien acaba la ruta
+    # en un tramo sin cobertura.
+    penalizacion_ms = _clamp_penalty_ms(payload.get("penalty_ms"))
+    mark_player_started(profile_id)
+    add_player_penalty(profile_id, penalizacion_ms)
+
+    # La evidencia se revisa sólo para ANOTAR: pase lo que pase aquí, el
+    # jugador avanza (motor antitrampas: flag, no bloqueo).
+    evidencia = payload.get("evidence")
+    hallazgos = anti_cheat_review_evidence(
+        profile_id,
+        current_node,
+        evidencia,
+        penalty_ms=penalizacion_ms if "penalty_ms" in payload else None,
+        manual=_as_bool(payload.get("manual")),
+    )
+
     set_player_progress_level(profile_id, current_level + 1)
+
+    if current_level + 1 >= len(stages):
+        mark_player_finished(profile_id)
 
     event["status"] = "synced"
     event["payload"] = {
@@ -1619,18 +1722,102 @@ def apply_synced_player_event(normalized_event, user, profile):
     match_log_record(
         "advance",
         profile_id,
-        payload={
-            "node_id": current_node.get("id"),
-            "level_before": current_level,
-            "level_after": current_level + 1,
-            "time_spent_ms": time_spent_ms,
-            "via": "offline_queue",
-        },
+        payload=payload_de_avance_para_el_registro(
+            current_node,
+            current_level,
+            time_spent_ms=time_spent_ms,
+            penalty_ms=penalizacion_ms,
+            manual=_as_bool(payload.get("manual")),
+            evidencia=evidencia,
+            hallazgos=hallazgos,
+            via=raw_payload.get("via") or "offline_queue",
+            contexto=match_log_offline_context(raw_payload),
+        ),
         client_created_at=_as_str(payload.get("local_created_at")) or None,
         profile=profile,
     )
 
     return append_event(EVENT_LOG_DB, event)
+
+
+def payload_de_avance_para_el_registro(
+    node, level_before, *, time_spent_ms, penalty_ms, manual, evidencia, hallazgos, via, contexto
+):
+    """La fila «avance» del Registro de partida, igual venga del móvil con red
+    (/api/advance) o de la cola: nodo, tipo, juego, evidencia resumida y las
+    sospechas que salieron de revisarla."""
+    from backend.app.runtime import evidencia as _evidencia
+
+    config = _mision._config_del_nodo(node) if isinstance(node, dict) else {}
+    payload = {
+        "node_id": node.get("id") if isinstance(node, dict) else None,
+        "node_index": level_before,
+        "kind": _mision.kind_del_nodo(node) if isinstance(node, dict) else None,
+        "game_id": _as_str(config.get("game_id")) or None,
+        "level_before": level_before,
+        "level_after": level_before + 1,
+        "time_spent_ms": time_spent_ms,
+        "penalty_ms": penalty_ms,
+        "manual": manual,
+        "via": via,
+        **_evidencia.resumen_de_evidencia(node, evidencia),
+        **(contexto or {}),
+    }
+    if hallazgos:
+        payload["sospechas"] = [hallazgo["reason"] for hallazgo in hallazgos]
+    return payload
+
+
+def _registrar_avance_rechazado(event, profile_id, profile, current_level):
+    """Un node_completed que el servidor NO aplicó, en el Registro de partida.
+
+    Sin esto una cola que llegaba con nodos rechazados -un código que ya no
+    cuadraba, un eco de otro dispositivo- no dejaba rastro: al revisar la
+    partida el jugador aparecía con nodos «que no constan».
+    """
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    match_log_record(
+        "advance_rejected",
+        profile_id,
+        payload={
+            "node_id": event.get("node_id") or payload.get("node_id"),
+            "server_level": current_level,
+            "level_before": payload.get("level_before"),
+            "error": event.get("error"),
+            "status": event.get("status"),
+            "via": payload.get("via") or "offline_queue",
+            **match_log_offline_context(payload),
+        },
+        client_created_at=_as_str(payload.get("local_created_at")) or None,
+        profile=profile,
+    )
+
+
+def _registrar_track_de_posiciones(profile_id, payload, contexto, profile):
+    """Las posiciones que el móvil fue guardando SIN cobertura (el latido no
+    llegaba): cada una entra en el Registro de partida con su hora original."""
+    muestras = payload.get("samples") if isinstance(payload.get("samples"), list) else []
+    for muestra in muestras[:60]:
+        if not isinstance(muestra, dict):
+            continue
+        try:
+            iso = datetime.fromtimestamp(float(muestra.get("t")) / 1000.0, tz=timezone.utc).isoformat()
+        except (TypeError, ValueError, OverflowError, OSError):
+            iso = None
+        match_log_record(
+            "position_sample",
+            profile_id,
+            payload={
+                "lat": muestra.get("lat"),
+                "lon": muestra.get("lon"),
+                "accuracy": muestra.get("acc"),
+                "source": muestra.get("src") or "real",
+                "via": "offline_track",
+                **contexto,
+            },
+            client_created_at=iso,
+            profile=profile,
+        )
 
 
 def _admin_react_stage_summary(stage, index):

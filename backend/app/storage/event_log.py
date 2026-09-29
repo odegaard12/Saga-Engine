@@ -32,6 +32,7 @@ VALID_EVENT_TYPES = {
     "minigame_started",
     "minigame_finished",
     "minigame_restarted",
+    "position_track",
 }
 
 VALID_EVENT_STATUS = {

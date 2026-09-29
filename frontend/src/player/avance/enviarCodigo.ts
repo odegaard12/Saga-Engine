@@ -3,7 +3,13 @@ import type { PlayerGamePayload, PlayerStage } from '../../types/player'
 import { cerrarNodo } from '../nodeClock'
 import { collectInventoryItem } from '../offline/inventory'
 import { flushOfflineEvents, syncInventoryToServer } from '../offline/localFirst'
-import { advanceLocalProgress, syncPendingOfflineEvents } from '../offline/missionPack'
+import {
+  advanceLocalProgress,
+  contarAvancesPendentes,
+  syncPendingOfflineEvents,
+} from '../offline/missionPack'
+import { sinCoberturaAhora } from '../offline/redEstado'
+import { construirEvidencia, olvidarEvidencia } from './evidencia'
 import { queueManualCode } from '../offline/physicalEvents'
 import { readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { haptics, sounds } from '../utils/haptics'
@@ -135,6 +141,40 @@ export async function enviarCodigo(
       await syncInventoryToServer(payload.user, fetch, { forzar: true }).catch(() => undefined)
     }
 
+    /**
+     * Cómo se ganó el nodo: respuestas, rondas, GPS, QR leído. Viaja con el
+     * avance -por red o por la cola- para que el servidor lo vuelva a revisar.
+     */
+    const evidencia = construirEvidencia({
+      nodo: currentStage?.id ?? '',
+      code,
+      aMano,
+    })
+
+    /**
+     * ¿Se intenta el servidor, o se guarda directamente en el móvil?
+     *
+     * Sin cobertura, cada intento costaba un corte de red entero (8 s con una
+     * barra, y otros 8 tras el «voy por detrás») antes de que el nodo se
+     * guardara: cinco nodos seguidos eran casi un minuto de pantalla
+     * congelada. Si ya se sabe que no hay red, o hay nodos hechos que el
+     * servidor todavía no conoce y no se pueden subir, se va directo a lo
+     * local. Lo hecho sin subir se sube solo, en orden, en cuanto haya red.
+     */
+    let irDirectoAlMovil = sinCoberturaAhora()
+
+    if (!irDirectoAlMovil) {
+      const pendientes = await contarAvancesPendentes(payload.user).catch(() => 0)
+      if (pendientes > 0) {
+        await syncPendingOfflineEvents(payload.user).catch(() => undefined)
+        irDirectoAlMovil = (await contarAvancesPendentes(payload.user).catch(() => 0)) > 0
+      }
+    }
+
+    if (irDirectoAlMovil) {
+      throw new Error('sin cobertura: el nodo se guarda en el móvil')
+    }
+
     const result = await advancePlayer(
       payload.user,
       code,
@@ -147,7 +187,8 @@ export async function enviarCodigo(
       async () => {
         await syncPendingOfflineEvents(payload.user).catch(() => undefined)
         await flushOfflineEvents(payload.user).catch(() => undefined)
-      }
+      },
+      evidencia
     )
 
     /**
@@ -173,6 +214,7 @@ export async function enviarCodigo(
 
     // Nodo superado: su reloj ya no hace falta y no debe arrastrarse.
     cerrarNodo(payload.user, entorno.claveDelNodo)
+    olvidarEvidencia(currentStage?.id ?? '')
     entorno.cerrarHoja()
 
     /**
@@ -229,12 +271,15 @@ export async function enviarCodigo(
         currentStage,
         code,
         timeSpentMs,
+        penaltyMs,
+        evidence: construirEvidencia({ nodo: currentStage?.id ?? '', code, aMano }),
         aMano,
       })
 
       if (localResult.ok) {
         // Superado sin conexión: el reloj de este nodo también se cierra.
         cerrarNodo(payload.user, entorno.claveDelNodo)
+        olvidarEvidencia(currentStage?.id ?? '')
         entorno.cerrarHoja()
 
         const payloadLocal = conTotalSumado(

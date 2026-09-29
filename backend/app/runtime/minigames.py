@@ -4,6 +4,7 @@ This module intentionally contains pure helpers only. FastAPI routes stay in
 main.py for now; later PRs can move routers after contract tests exist.
 """
 
+import base64
 import hashlib
 import random
 
@@ -38,6 +39,12 @@ WORD_TRAP_OPTION_COUNT = 4
 #: Misma magnitud de penalización que cuenta_senales: no se bloquea nunca,
 #: fallar o agotar el tiempo solo suma 30 s y sigue a la siguiente ronda.
 WORD_TRAP_PENALTY_MS = 30000
+#: Cada fallo (o pregunta sin responder a tiempo) suma UNA ronda extra del
+#: banco, hasta este tope. Sin esto quien lee rápido la acababa en menos de un
+#: minuto pese a fallar: el fallo sólo costaba 30 s de penalización sobre el
+#: reloj, no tiempo de juego. El tope evita que un mal día encadene rondas sin
+#: fin (el juego nunca bloquea: ver `WORD_TRAP_PENALTY_MS`).
+WORD_TRAP_MAX_EXTRA_ROUNDS = 4
 
 
 def hash_word_trap_answer(option_index, salt):
@@ -54,6 +61,60 @@ def hash_word_trap_answer(option_index, salt):
 
 def _word_trap_salt(node_id, bank_index, round_index):
     return f"{_as_str(node_id)}:{int(bank_index)}:{int(round_index)}"
+
+
+_WORD_TRAP_EXPLANATION_MAGIC = b"SAGA1:"
+
+
+def _word_trap_keystream(key, length):
+    """Flujo de bytes sha256(key || contador) — el mismo que calcula el móvil
+    con Web Crypto (ver wordTrap/explicacion.ts)."""
+    salida = b""
+    contador = 0
+    while len(salida) < length:
+        salida += hashlib.sha256(key + contador.to_bytes(4, "big")).digest()
+        contador += 1
+    return salida[:length]
+
+
+def _word_trap_explanation_key(salt, correct_index):
+    return hashlib.sha256(f"{_as_str(salt)}:{int(correct_index)}:explicacion".encode("utf-8")).digest()
+
+
+def encrypt_word_trap_explanation(explanation, salt, correct_index):
+    """La explicación de una ronda, cifrada con la opción correcta como clave.
+
+    Antes viajaba en claro en el paquete, con la ronda entera, ANTES de
+    contestar: «la correcta es la B porque…» se leía en DevTools o en la
+    pestaña de red. Ahora sólo se abre con el índice correcto (el móvil lo
+    prueba con las 4 opciones cuando ya se ha contestado). Mismo nivel de
+    defensa que `answer_hash`: 4 candidatos se fuerzan al instante, pero no
+    se lee a ojo ni sale en una captura del paquete.
+    """
+    texto = _as_str(explanation).strip()
+    if not texto:
+        return ""
+    datos = _WORD_TRAP_EXPLANATION_MAGIC + texto.encode("utf-8")
+    flujo = _word_trap_keystream(_word_trap_explanation_key(salt, correct_index), len(datos))
+    return base64.b64encode(bytes(a ^ b for a, b in zip(datos, flujo))).decode("ascii")
+
+
+def decrypt_word_trap_explanation(cifrada, salt, option_index):
+    """Inversa de `encrypt_word_trap_explanation`. `None` si la clave no vale."""
+    if not cifrada:
+        return None
+    try:
+        datos = base64.b64decode(cifrada)
+    except (ValueError, TypeError):
+        return None
+    flujo = _word_trap_keystream(_word_trap_explanation_key(salt, option_index), len(datos))
+    claro = bytes(a ^ b for a, b in zip(datos, flujo))
+    if not claro.startswith(_WORD_TRAP_EXPLANATION_MAGIC):
+        return None
+    try:
+        return claro[len(_WORD_TRAP_EXPLANATION_MAGIC):].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _word_trap_shuffle_seed(node_id, player_id):
@@ -138,12 +199,10 @@ def project_word_trap_for_player(config, node_id, player_id):
     `n_rounds` rondas que le tocan (barajadas de forma estable a partir de
     hash(player_id + node_id), ver pick_word_trap_bank_indices), cada una
     con sus 4 opciones y la respuesta correcta sustituida por su hash
-    salado. Nunca viaja `correct_index` en claro.
+    salado. Nunca viaja `correct_index` en claro, ni la explicación (sólo
+    cifrada: `explanation_enc`, ver encrypt_word_trap_explanation). Además de
+    las rondas base van `extra_rounds`: una por cada fallo, con tope.
     """
-    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
-    if not questions:
-        questions = [_default_word_trap_question(1)]
-
     n_rounds = _clamp_int(
         config.get("n_rounds"), WORD_TRAP_DEFAULT_ROUNDS, WORD_TRAP_MIN_ROUNDS, WORD_TRAP_MAX_ROUNDS
     )
@@ -154,32 +213,74 @@ def project_word_trap_for_player(config, node_id, player_id):
         WORD_TRAP_MAX_TIME_LIMIT_S,
     )
 
-    bank_indices = pick_word_trap_bank_indices(node_id, player_id, len(questions), n_rounds)
-
-    rounds = []
-    for round_index, bank_index in enumerate(bank_indices):
-        question = questions[bank_index] if 0 <= bank_index < len(questions) else questions[0]
-        options = question.get("options") if isinstance(question.get("options"), list) else []
-        correct_index = _clamp_int(question.get("correct_index"), 0, 0, max(0, len(options) - 1))
-        salt = _word_trap_salt(node_id, bank_index, round_index)
-        rounds.append(
-            {
-                "question": _as_str(question.get("question")).strip(),
-                "options": [_as_str(opt).strip() for opt in options],
-                "salt": salt,
-                "answer_hash": hash_word_trap_answer(correct_index, salt),
-                "explanation": _as_str(question.get("explanation")).strip(),
-            }
-        )
+    todas = word_trap_server_rounds(config, node_id, player_id)
+    rounds = [_word_trap_public_round(ronda) for ronda in todas[:n_rounds]]
+    extra_rounds = [_word_trap_public_round(ronda) for ronda in todas[n_rounds:]]
 
     return {
         "objective": "word_trap",
         "game_id": "trampa_palabras",
         "completion_method": "quiz",
         "rounds": rounds,
+        # Rondas de repuesto: cada fallo del jugador consume la siguiente,
+        # hasta WORD_TRAP_MAX_EXTRA_ROUNDS. Van ya proyectadas (respuesta
+        # hasheada) para que el juego siga funcionando sin cobertura.
+        "extra_rounds": extra_rounds,
         "n_rounds": n_rounds,
         "time_limit_s": time_limit_s,
         "penalty_ms": WORD_TRAP_PENALTY_MS,
+    }
+
+
+def word_trap_server_rounds(config, node_id, player_id):
+    """Todas las rondas que puede jugar UN jugador -base + extras-, con la
+    respuesta correcta EN CLARO. Sólo para el servidor: sirve tanto para
+    proyectar lo que se manda al móvil como para revalidar la partida
+    (ver runtime/evidencia.py). El orden es el mismo siempre.
+    """
+    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
+    if not questions:
+        questions = [_default_word_trap_question(1)]
+
+    n_rounds = _clamp_int(
+        config.get("n_rounds"), WORD_TRAP_DEFAULT_ROUNDS, WORD_TRAP_MIN_ROUNDS, WORD_TRAP_MAX_ROUNDS
+    )
+
+    # Prefijo estable: pedir n_rounds+extras da las mismas n_rounds primeras.
+    bank_indices = pick_word_trap_bank_indices(
+        node_id, player_id, len(questions), n_rounds + WORD_TRAP_MAX_EXTRA_ROUNDS
+    )
+
+    rondas = []
+    for round_index, bank_index in enumerate(bank_indices):
+        question = questions[bank_index] if 0 <= bank_index < len(questions) else questions[0]
+        options = question.get("options") if isinstance(question.get("options"), list) else []
+        correct_index = _clamp_int(question.get("correct_index"), 0, 0, max(0, len(options) - 1))
+        rondas.append(
+            {
+                "round_index": round_index,
+                "bank_index": bank_index,
+                "question": _as_str(question.get("question")).strip(),
+                "options": [_as_str(opt).strip() for opt in options],
+                "correct_index": correct_index,
+                "salt": _word_trap_salt(node_id, bank_index, round_index),
+                "explanation": _as_str(question.get("explanation")).strip(),
+            }
+        )
+    return rondas
+
+
+def _word_trap_public_round(ronda):
+    """Lo de una ronda que sale hacia el móvil: nada en claro que delate la
+    respuesta (ni `correct_index` ni la explicación)."""
+    return {
+        "question": ronda["question"],
+        "options": list(ronda["options"]),
+        "salt": ronda["salt"],
+        "answer_hash": hash_word_trap_answer(ronda["correct_index"], ronda["salt"]),
+        "explanation_enc": encrypt_word_trap_explanation(
+            ronda["explanation"], ronda["salt"], ronda["correct_index"]
+        ),
     }
 
 
@@ -258,6 +359,23 @@ def project_cuenta_senales_for_player(config, node_id, player_id):
         "max_attempts": CUENTA_SENALES_MAX_ATTEMPTS,
         "penalty_ms": CUENTA_SENALES_PENALTY_MS,
     }
+
+def cuenta_senales_accepted_values(config, node_id, player_id):
+    """Los enteros que dan por buena la pregunta asignada a este jugador.
+
+    Sólo para el servidor (revalidar la partida, ver runtime/evidencia.py):
+    la misma pregunta y el mismo rango que salen hasheados hacia el móvil en
+    `project_cuenta_senales_for_player`, pero en claro.
+    """
+    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
+    if not questions:
+        questions = [_default_cuenta_senales_question(1)]
+    index = pick_cuenta_senales_question_index(node_id, player_id, len(questions))
+    question = questions[index] if 0 <= index < len(questions) else questions[0]
+    tolerance = _clamp_int(question.get("tolerance"), 0, 0, 20)
+    answer = _clamp_int(question.get("answer"), 0, 0, 999)
+    return list(range(max(0, answer - tolerance), answer + tolerance + 1))
+
 
 SUPPORTED_MINIGAME_TYPES = {
     "circuit_matrix",

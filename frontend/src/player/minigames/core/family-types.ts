@@ -208,6 +208,12 @@ export type WordTrapRound = {
   options: string[]
   salt: string
   answer_hash: string
+  /**
+   * Explicación CIFRADA con la opción correcta como clave: sólo se abre tras
+   * contestar (ver wordTrap/explicacion.ts). Nunca viaja en claro.
+   */
+  explanation_enc?: string
+  /** Sólo un servidor antiguo la manda en claro. */
   explanation?: string
 }
 
@@ -226,6 +232,11 @@ export type WordTrapConfig = {
   completion_method?: 'quiz'
   /** Rondas ya proyectadas para ESTE jugador (payload real del móvil). */
   rounds?: WordTrapRound[]
+  /**
+   * Rondas de repuesto: cada fallo o pregunta sin contestar suma la siguiente,
+   * hasta agotarlas. Así no se acaba en menos de un minuto fallando.
+   */
+  extra_rounds?: WordTrapRound[]
   /** Banco completo en claro: solo lo usa el editor de admin. */
   questions?: WordTrapBankQuestion[]
   n_rounds?: number
