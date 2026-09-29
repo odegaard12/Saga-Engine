@@ -1,5 +1,6 @@
 import type { PlayerGamePayload, PlayerStage, PublicConfig } from '../../types/player'
-import { markInventoryItemUsed } from './inventory'
+import { loadInventorySnapshot, markInventoryItemUsed } from './inventory'
+import { esFalloDeRed, notarFalloDeRed, notarRedOk, sinCoberturaAhora } from './redEstado'
 import { countOwnedItems, readStageItemRequirement } from '../rewards/stageItemRequirement'
 import { configDelNodo } from '../configDelNodo'
 
@@ -40,6 +41,16 @@ export type OfflineEvent = {
   user: string
   type: string
   created_at: string
+  /**
+   * Número de orden de la cola: crece siempre, nunca depende del reloj.
+   *
+   * La cola se ordenaba por `created_at`, y el reloj del móvil SE CORRIGE al
+   * volver la cobertura (la hora de red pisa la que se fue desviando). Con un
+   * salto hacia atrás en mitad de un tramo, el nodo 3 podía quedar «antes»
+   * que el 2, subir primero, y perderse. La hora original se sigue mandando
+   * -es lo que se lee al revisar la partida-, pero el orden lo da esto.
+   */
+  seq?: number
   status: OfflineEventStatus
   retry_count: number
   payload: Record<string, unknown>
@@ -197,7 +208,10 @@ export async function getQueuedOfflineEvents(user: string) {
   // delante. Ordenar por fecha lo deja como pasó de verdad.
   return events
     .filter((event) => event.user === user && event.status !== 'synced')
-    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .sort(
+      (a, b) =>
+        (a.seq ?? 0) - (b.seq ?? 0) || String(a.created_at).localeCompare(String(b.created_at))
+    )
 }
 
 /**
@@ -287,7 +301,12 @@ export async function syncPendingOfflineEvents(user: string) {
   if (Date.now() < siguienteIntento) return nada
 
   const events = await getQueuedOfflineEvents(user)
-  const syncable = events.filter((event) => event.status === 'pending' || event.status === 'failed')
+  // 'syncing' también: aquí se tiene el candado, así que un evento que sigue
+  // «subiendo» es de una sincronización que se cortó (app cerrada, móvil sin
+  // batería). Antes se quedaba así para siempre y ese nodo no subía nunca.
+  const syncable = events.filter(
+    (event) => event.status === 'pending' || event.status === 'failed' || event.status === 'syncing'
+  )
 
   if (syncable.length === 0) {
     // Sin nada que mandar no hay por qué seguir castigando la espera.
@@ -304,8 +323,50 @@ export async function syncPendingOfflineEvents(user: string) {
   }
 }
 
-async function enviarCola(user: string, syncable: OfflineEvent[]) {
+/**
+ * Cuántos eventos suben en cada llamada.
+ *
+ * Un tramo largo sin cobertura deja decenas de eventos en cola (nodos, QR,
+ * mochila, posiciones). Mandarlos todos juntos chocaba con el tope del
+ * servidor (400) y la cola se atascaba para siempre. En tandas, y en orden.
+ */
+const TANDA_DE_ENVIO = 50
 
+type ResultadoDeEnvio = {
+  status: 'ok' | 'error'
+  attempted: number
+  synced: number
+  failed: number
+  message?: string
+  /** No llegó a la red: no tiene sentido probar la tanda siguiente. */
+  sinRed?: boolean
+}
+
+async function enviarCola(user: string, syncable: OfflineEvent[]): Promise<ResultadoDeEnvio> {
+  const total: ResultadoDeEnvio = { status: 'ok', attempted: 0, synced: 0, failed: 0 }
+
+  for (let desde = 0; desde < syncable.length; desde += TANDA_DE_ENVIO) {
+    const tanda = syncable.slice(desde, desde + TANDA_DE_ENVIO)
+    const resultado = await enviarTanda(user, tanda, desde === 0)
+
+    total.attempted += resultado.attempted
+    total.synced += resultado.synced
+    total.failed += resultado.failed
+    if (resultado.message) total.message = resultado.message
+    if (resultado.status === 'error') total.status = 'error'
+
+    // Sin red no se sigue: el resto se queda pendiente, intacto y en orden.
+    if (resultado.sinRed) break
+  }
+
+  return total
+}
+
+async function enviarTanda(
+  user: string,
+  syncable: OfflineEvent[],
+  conMochila: boolean
+): Promise<ResultadoDeEnvio> {
   const syncing = await Promise.all(
     syncable.map((event) =>
       updateOfflineEvent({
@@ -317,6 +378,12 @@ async function enviarCola(user: string, syncable: OfflineEvent[]) {
   )
 
   try {
+    // La mochila viaja en la MISMA llamada, antes que los eventos: un nodo que
+    // exige un objeto forjado sin cobertura se valida contra ella. Subirla
+    // aparte y después hacía que el servidor rechazara el nodo por «falta
+    // objeto» y ese rechazo se daba por definitivo.
+    const mochila = conMochila ? loadInventorySnapshot(user) : null
+
     const response = await fetch('/api/events/sync', {
       method: 'POST',
       headers: {
@@ -326,8 +393,12 @@ async function enviarCola(user: string, syncable: OfflineEvent[]) {
       body: JSON.stringify({
         user,
         events: syncing.map(eventToSyncPayload),
+        ...(mochila && mochila.items?.length ? { inventory_snapshot: mochila } : {}),
       }),
     })
+
+    // Contestó: hay red, diga lo que diga.
+    notarRedOk()
 
     if (!response.ok) {
       throw new Error(`Sync failed: HTTP ${response.status}`)
@@ -408,6 +479,9 @@ async function enviarCola(user: string, syncable: OfflineEvent[]) {
     esperaTrasFallo = esperaTrasFallo ? Math.min(esperaTrasFallo * 2, ESPERA_MAXIMA_MS) : ESPERA_MINIMA_MS
     siguienteIntento = Date.now() + esperaTrasFallo
 
+    const sinRed = esFalloDeRed(error)
+    if (sinRed) notarFalloDeRed()
+
     const message = error instanceof Error ? error.message : 'Unknown sync error'
 
     await Promise.all(
@@ -427,6 +501,7 @@ async function enviarCola(user: string, syncable: OfflineEvent[]) {
       synced: 0,
       failed: syncing.length,
       message,
+      sinRed,
     }
   }
 }
@@ -488,7 +563,33 @@ export function getLocalProgressSnapshot(user: string) {
   return readRecord<LocalProgressSnapshot>(STORE_LOCAL_PROGRESS, progressId(user))
 }
 
-export function queueOfflineEvent(args: {
+/**
+ * La siguiente hora para un evento de la cola: nunca igual ni anterior a la de
+ * la anterior. Dos eventos en el mismo milisegundo no deben poder cambiar de
+ * orden, y un reloj que se corrige hacia atrás tampoco.
+ */
+let ultimaHoraMs = 0
+
+function horaMonotona(): string {
+  const ahora = Date.now()
+  ultimaHoraMs = ahora > ultimaHoraMs ? ahora : ultimaHoraMs + 1
+  return new Date(ultimaHoraMs).toISOString()
+}
+
+let ultimaSeq = 0
+
+async function siguienteSeq(): Promise<number> {
+  if (ultimaSeq === 0) {
+    const existentes = await getAllRecords<OfflineEvent>(STORE_EVENT_QUEUE).catch(() => [])
+    const mayor = existentes.reduce((max, evento) => Math.max(max, Number(evento.seq) || 0), 0)
+    // Se relee `ultimaSeq` DESPUÉS de esperar: otra llamada pudo avanzarla.
+    ultimaSeq = Math.max(ultimaSeq, mayor)
+  }
+  ultimaSeq += 1
+  return ultimaSeq
+}
+
+export async function queueOfflineEvent(args: {
   user: string
   type: string
   payload: Record<string, unknown>
@@ -496,14 +597,23 @@ export function queueOfflineEvent(args: {
   team_id?: string
   node_id?: string | number
 }) {
+  const seq = await siguienteSeq()
+
   const event: OfflineEvent = {
     id: `${args.user}:${args.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
     user: args.user,
     type: args.type,
-    created_at: nowIso(),
+    created_at: horaMonotona(),
+    seq,
     status: 'pending',
     retry_count: 0,
-    payload: args.payload,
+    payload: {
+      ...args.payload,
+      // Si al crearse no había cobertura. Para el Registro de partida: es lo
+      // que marca los tramos sin cobertura al revisar la ruta en casa.
+      offline_at_creation: sinCoberturaAhora(),
+      seq,
+    },
     source: args.source,
     team_id: args.team_id,
     node_id: args.node_id,
@@ -518,9 +628,9 @@ export function queueOfflineEvent(args: {
   //
   // Va después de escribir, no antes: si el registro falla, el evento ya está
   // guardado y lo recogerá el ciclo normal. Esto se SUMA, no sustituye.
+  const escrito = await writeRecord(STORE_EVENT_QUEUE, event)
   void rexistrarSyncDeFondo()
-
-  return writeRecord(STORE_EVENT_QUEUE, event)
+  return escrito
 }
 
 /**
@@ -662,6 +772,10 @@ export async function advanceLocalProgress(args: {
   currentStage: PlayerStage | null
   code: string
   timeSpentMs?: number
+  /** Penalización del reto o del respaldo: viaja aparte del tiempo del nodo. */
+  penaltyMs?: number
+  /** Cómo se ganó el nodo, para que el servidor lo revise al sincronizar. */
+  evidence?: Record<string, unknown>
   /** Escrito a mano en una casilla de respaldo. */
   aMano?: boolean
 }) {
@@ -704,6 +818,10 @@ export async function advanceLocalProgress(args: {
       level_before: currentLevel,
       level_after: currentLevel + 1,
       time_spent_ms: args.timeSpentMs,
+      // Sin esto una penalización ganada sin cobertura (código de respaldo,
+      // fallos en el reto) se perdía: el servidor nunca la llegaba a saber.
+      penalty_ms: Math.max(0, Math.round(args.penaltyMs || 0)),
+      evidence: args.evidence,
       requirement: requirement
         ? { ...requirement, owned, ok: true }
         : { required: false, ok: true },

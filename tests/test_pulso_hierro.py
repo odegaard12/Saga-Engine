@@ -133,56 +133,19 @@ def test_alias_resolve_via_normalize_stage_tipo_segue_sendo_motion_challenge():
 # ---------------------------------------------------------------------------
 
 
-def test_pulso_hierro_ten_suelo_propio_rexistrado():
-    assert "pulso_hierro" in MINIGAME_HARD_FLOOR_MS_BY_GAME
-
-
-def test_suelo_de_pulso_hierro_e_toques_totais_por_ventana_de_toque():
-    # 3 rondas: lonxitudes 3, 4, 5 -> 12 toques totais. Ventana 2000 ms.
-    node = {
-        "interaction": {
-            "type": "motion_challenge",
-            "config": {
-                "game_id": "pulso_hierro",
-                "pulso_start_length": 3,
-                "pulso_target_rounds": 3,
-                "pulso_growth_per_round": 1,
-                "pulso_tap_window_ms": 2000,
-            },
-        }
-    }
-    umbral = _umbral_fisico_ms("pulso_hierro", node)
-    assert umbral == 12 * 2000
-
-
-def test_suelo_de_pulso_hierro_nunca_baixa_do_xenerico():
-    node = {
-        "interaction": {
-            "type": "motion_challenge",
-            "config": {
-                "game_id": "pulso_hierro",
-                "pulso_start_length": 1,
-                "pulso_target_rounds": 1,
-                "pulso_growth_per_round": 0,
-                "pulso_tap_window_ms": 1,
-            },
-        }
-    }
-    umbral = _umbral_fisico_ms("pulso_hierro", node)
-    assert umbral >= MIN_PLAUSIBLE_STAGE_MS
-
-
-def test_configuracion_por_defecto_dura_moito_mais_de_60_segundos():
-    """Requisito explícito do dono: "que dure mais de 1 minuto". O suelo
-    físico -que xa é un MÍNIMO, nunca a duración esperada dunha partida
-    real- ten que quedar claramente por riba de 60000 ms coa configuración
-    por defecto (3, 4, 5, 6, 7, 8 toques = 33 toques x 2600 ms)."""
+def test_configuracion_por_defecto_e_longa_pero_sen_suelo_inventado():
+    """Requisito do dono: "que dure mais de 1 minuto". A duración sae do
+    tamaño da partida (6 rondas, 3..8 toques = 33 toques, cada ronda mostra
+    antes a secuencia e pide quietude), NON dun suelo antitrampas: o de antes
+    usaba a ventana MÁXIMA por toque e marcaba a xogadores honestos."""
     config = normalize_minigame_config("motion_challenge", {"game_id": "pulso_hierro"})
+    rondas = int(config["pulso_target_rounds"])
+    inicio = int(config["pulso_start_length"])
+    crece = int(config["pulso_growth_per_round"])
+    toques = sum(inicio + i * crece for i in range(rondas))
+    assert rondas >= 6 and toques >= 30
     node = {"interaction": {"type": "motion_challenge", "config": config}}
-    umbral = _umbral_fisico_ms("pulso_hierro", node)
-    assert umbral == 33 * 2600
-    assert umbral > 60000, "o suelo por defecto debería quedar claramente por riba de 60s"
-    assert umbral > 80000, "moito máis de 60s, non só 'xusto por riba'"
+    assert _umbral_fisico_ms("pulso_hierro", node) == 2000
 
 
 # ---------------------------------------------------------------------------
@@ -254,3 +217,10 @@ def test_familyconfigs_non_perde_os_campos_pulso_ao_normalizar():
     assert "pulso_target_rounds" in codigo
     assert "pulso_stability_variance_max" in codigo
     assert "pulso_tap_window_ms" in codigo
+
+
+def test_pulso_hierro_non_ten_suelo_feito_coa_ventana_maxima():
+    """O suelo era toques x ventana MÁXIMA por toque (~86 s): marcaba a
+    calquera xogador honesto e rápido. Queda no suelo xenérico."""
+    from backend.app.runtime.anti_cheat import MINIGAME_HARD_FLOOR_MS_BY_GAME
+    assert "pulso_hierro" not in MINIGAME_HARD_FLOOR_MS_BY_GAME

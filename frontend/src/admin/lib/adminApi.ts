@@ -669,6 +669,8 @@ export type MatchLogEntry = {
   display_name: string
   created_at: string
   client_created_at?: string
+  /** Cuándo PASÓ (hora del móvil si la trae). El servidor la calcula al listar. */
+  occurred_at?: string
   severity?: 'suspicion' | 'info'
   payload?: Record<string, unknown>
 }
@@ -686,6 +688,10 @@ export type MatchLogQuery = {
   hasta?: string
   type?: string
   limit?: number
+  /** Sólo las filas de sospecha de trampa. */
+  solo_sospechas?: boolean
+  /** Sólo lo hecho sin cobertura o subido en diferido. */
+  solo_sin_cobertura?: boolean
 }
 
 /** Línea de tiempo de un jugador (o de todos) entre dos fechas. Sólo lectura. */

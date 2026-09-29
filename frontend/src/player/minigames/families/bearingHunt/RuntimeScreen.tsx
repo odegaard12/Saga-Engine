@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useI18n } from '../../../../i18n/useI18n'
+import { registrarEvidencia } from '../../../avance/evidencia'
 
 type AnyRecord = Record<string, any>
 
@@ -764,6 +765,13 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
     const finalHeading = headingRef.current
 
+    // Para el servidor: cuántos objetivos se dieron. Sólo cuenta en «Rumbo
+    // doble»; el rumbo simple es un único objetivo.
+    registrarEvidencia(String(props.stage?.id ?? ''), {
+      game: sequenceMode ? 'rumbo_doble' : 'bearing_hunt',
+      objetivos_ok: sequenceMode ? targets?.length ?? 0 : 1,
+    })
+
     await completionCallback?.({
       type: 'bearing_hunt',
       status: 'locked',
@@ -783,6 +791,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     completionCallback,
     holdMs,
     isLastTarget,
+    props.stage?.id,
     sequenceMode,
     targetBearing,
     targets,

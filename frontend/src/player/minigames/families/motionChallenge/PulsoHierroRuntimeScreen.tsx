@@ -5,6 +5,7 @@ import { useI18n } from '../../../../i18n/useI18n'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
 import { haptics, sounds } from '../../../utils/haptics'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import { registrarEvidencia } from '../../../avance/evidencia'
 
 interface Props {
   resolved: ResolvedMotionChallengeMinigame
@@ -283,6 +284,8 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
       setMessage(t('player.minigames.pulsoHierro.completed'))
       haptics.success()
       sounds.success()
+      // Para el servidor: cuántas rondas se dieron de las que pide el nodo.
+      registrarEvidencia(stage.id ?? '', { game: 'pulso_hierro', rondas_ok: nextRound })
       await onWin()
       return
     }
@@ -292,7 +295,7 @@ export function PulsoHierroRuntimeScreen({ resolved, stage, submitting, onWin }:
     // showSequence del siguiente round se dispara desde el efecto de `round`
     // vía este timeout directo porque `sequence` todavía referencia la ronda
     // vieja en este cierre.
-  }, [round, targetRounds, clearTimers, onWin, showSequence, t])
+  }, [round, targetRounds, clearTimers, onWin, showSequence, stage.id, t])
 
   function handlePad(pad: number) {
     if (phase !== 'input' || submitting) return

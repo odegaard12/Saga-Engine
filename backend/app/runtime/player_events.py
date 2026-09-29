@@ -15,6 +15,7 @@ en player_timers.py.
 """
 from fastapi import HTTPException
 
+from backend.app.runtime.evidencia import sanitize_evidence
 from backend.app.runtime.minigames import _as_str
 
 PLAYER_EVENT_TYPES = {
@@ -34,7 +35,15 @@ PLAYER_EVENT_TYPES = {
     "minigame_started",
     "minigame_finished",
     "minigame_restarted",
+    # Posiciones que el móvil fue guardando mientras el latido no llegaba
+    # (sin cobertura): se suben en bloque con su hora original.
+    "position_track",
 }
+
+#: Claves del payload que llevan estructura (listas de objetos) y no pueden
+#: aplastarse a texto como el resto: la evidencia de una partida y las
+#: muestras de posición. Se saneen aparte, con topes.
+_CLAVES_ESTRUCTURADAS = {"evidence", "samples"}
 
 EVENT_PAYLOAD_MAX_KEYS = 32
 EVENT_PAYLOAD_MAX_TEXT_LENGTH = 500
@@ -60,7 +69,9 @@ def sanitize_event_payload(value):
         if not clean_key:
             continue
 
-        if isinstance(raw_value, bool) or raw_value is None:
+        if clean_key in _CLAVES_ESTRUCTURADAS:
+            clean[clean_key] = sanitize_evidence(raw_value)
+        elif isinstance(raw_value, bool) or raw_value is None:
             clean[clean_key] = raw_value
         elif isinstance(raw_value, (int, float)):
             clean[clean_key] = raw_value

@@ -6,6 +6,40 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.41.0
+
+- **Sin suelo inventado en Pulso de hierro y Trampa de palabras.** Su tiempo
+  mínimo antitrampas multiplicaba por la ventana MÁXIMA del juego (ms por
+  toque, segundos por pregunta): todo jugador honesto y rápido salía como
+  "más rápido de lo posible", el mismo error que v5.34.0. Quedan en el suelo
+  genérico + la mediana + las pruebas de evidencia.
+
+- **Jugar sin cobertura 5 nodos o más, con todo registrado.** La cola de
+  eventos ordena por un número de secuencia (no por la hora del móvil, que se
+  corrige al volver la red), sube en tandas de 50 (el servidor rechazaba con
+  400 colas de más de 100 y se atascaban), recupera los eventos que quedaron
+  en «subiendo» si la app se cerró a mitad, lleva la mochila en la misma
+  llamada y el servidor reordena los avances por nivel. Sin cobertura conocida
+  el nodo se guarda en el móvil sin esperar el corte de 8 s. Los avances de la
+  cola ahora aplican penalización, arrancan el reloj de la ruta y lo paran en
+  el último nodo (antes sólo lo hacía /api/advance). El service worker ya no
+  da por subidos eventos que el servidor no aceptó.
+- **El servidor revisa la evidencia** (`runtime/evidencia.py`): cuenta las
+  señales (respuestas), trampa de palabras (rondas, fallos, penalización,
+  tiempos), pulso de hierro y rumbo doble (rondas/objetivos), QR leído y GPS
+  de mapa mudo. Motivos nuevos `evidence_*` en el panel; sólo anotan.
+- **Mapa mudo** se completa ahora en el radio REAL, también sin cobertura: el
+  servidor manda celdas de 8 m con hash salado, no el punto. Límite: nivel de
+  defensa del hash de respuestas. La pista frío/caliente sigue necesitando red.
+- **Trampa de palabras**: la explicación viaja cifrada y cada fallo suma una
+  ronda extra (máx. 4).
+- **Registro de partida**: hora del móvil, retraso, marca sin cobertura,
+  nodo/tipo/juego, rechazos, rastro de posiciones sin cobertura; panel por
+  jugador y nodo con filtros. La huella de la misión incluye la versión de la
+  proyección, así que los móviles bajarán el paquete nuevo.
+
+---
+
 ## 5.40.0
 
 - **Familia "Desafío" con los dos retos largos.** Pulso de hierro pasa de

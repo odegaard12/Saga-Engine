@@ -945,8 +945,18 @@ async def admin_match_log(request: Request):
     except (TypeError, ValueError):
         limit = 5000
 
+    # Filtros de revisión: sólo sospechas / sólo lo hecho sin cobertura. Las
+    # filas salen ordenadas por CUÁNDO OCURRIERON (hora del móvil), no por
+    # cuándo se subieron, y con `occurred_at` para poder agruparlas.
     entries = main.match_log_list_timeline(
-        user=user, date_from=date_from, date_to=date_to, event_type=event_type, limit=limit
+        user=user,
+        date_from=date_from,
+        date_to=date_to,
+        event_type=event_type,
+        limit=limit,
+        only_suspicions=bool(data.get("solo_sospechas")),
+        only_offline=bool(data.get("solo_sin_cobertura")),
+        by_occurrence=True,
     )
 
     return {
@@ -970,7 +980,15 @@ async def admin_match_log_export(request: Request):
     date_to = main.sanitize_event_text(data.get("hasta"), 40) or None
     formato = (main.sanitize_event_text(data.get("formato"), 10) or "json").lower()
 
-    entries = main.match_log_list_timeline(user=user, date_from=date_from, date_to=date_to, limit=20000)
+    entries = main.match_log_list_timeline(
+        user=user,
+        date_from=date_from,
+        date_to=date_to,
+        limit=20000,
+        only_suspicions=bool(data.get("solo_sospechas")),
+        only_offline=bool(data.get("solo_sin_cobertura")),
+        by_occurrence=True,
+    )
 
     nombre_jugador = user or "todos"
     nombre_fichero = f"registro-de-partida-{nombre_jugador}"
