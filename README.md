@@ -7,7 +7,7 @@
 **Un motor de misiones de campo geolocalizado, en tiempo real y offline-first.**  
 Diseñado para experiencias de juego presencial con equipos, QR físicos, GPS y minijuegos.
 
-[![Version](https://img.shields.io/badge/version-5.39.1-34d399?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.40.0-34d399?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
@@ -282,8 +282,15 @@ El script gestiona automáticamente:
 # Instalar dependencias de test
 pip install -r requirements-dev.txt
 
-# Ejecutar todos los tests
-pytest tests/ -v
+# Rápido (por defecto, ~30 s): en paralelo (pytest-xdist) y sin las marcadas `slow`
+python -m pytest -q
+
+# Completo (antes de publicar, ~1,5 min): incluye `slow` (banco de simulación, fuerza bruta)
+python -m pytest -q -m ""
+
+# Solo las lentas / depurar sin paralelo
+python -m pytest -q -m slow
+python -m pytest -q -n0 tests/test_x.py
 
 # Tests específicos
 pytest tests/test_game_state_repository.py -v

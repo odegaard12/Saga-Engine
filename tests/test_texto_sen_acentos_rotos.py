@@ -23,6 +23,7 @@ La misión está escrita en gallego y sus textos van en el código, así que est
 guarda vale para todo el repositorio: un `?` en medio de una palabra es texto
 roto en pantalla.
 """
+import os
 import re
 from pathlib import Path
 
@@ -64,11 +65,17 @@ def acentos_rotos(texto: str) -> list[tuple[int, str]]:
 def test_non_hai_acentos_rotos_en_todo_o_repositorio():
     culpables = []
 
-    for p in RAIZ.rglob("*"):
-        if not p.is_file() or p.suffix not in EXTENSIONES:
-            continue
-        if any(s in p.parts for s in SALTAR):
-            continue
+    def _ficheros():
+        # os.walk con poda: rglob entraba en node_modules/.git para luego
+        # descartarlos. Mismo conjunto, sin recorrer lo que se salta.
+        for base, dirs, nombres in os.walk(RAIZ):
+            dirs[:] = [d for d in dirs if d not in SALTAR]
+            for nombre in nombres:
+                p = Path(base) / nombre
+                if p.suffix in EXTENSIONES:
+                    yield p
+
+    for p in _ficheros():
         # Este fichero enseña el texto roto a propósito: es de lo que habla.
         # Es la única exención, y va aquí escrita en vez de en una lista suelta.
         if p.resolve() == Path(__file__).resolve():

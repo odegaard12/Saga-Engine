@@ -18,7 +18,16 @@ GUIDED_UTILS = RAIZ / "frontend" / "src" / "admin" / "components" / "guided-edit
 RUNTIME_BRIDGE = RAIZ / "frontend" / "src" / "player" / "minigames" / "core" / "runtime-bridge.ts"
 ADMIN_PY = RAIZ / "backend" / "app" / "routers" / "admin.py"
 
-VALID_DISPLAY_FAMILIES = {"llegar_y_escanear", "puzles", "movimiento", "orientacion", "sonido"}
+VALID_DISPLAY_FAMILIES = {
+    "llegar_y_escanear",
+    "puzles",
+    "movimiento",
+    "orientacion",
+    "sonido",
+    # Sexta familia de presentación (owner-approved "Trampa de palabras"):
+    # primera familia TÉCNICA nueva desde v5.36 (word_trap/trampa_palabras).
+    "desafio",
+}
 
 
 def leer(ruta: Path) -> str:
@@ -43,10 +52,12 @@ def extraer_mapa_de_familias() -> dict[str, str]:
     return dict(pares)
 
 
-def test_o_catalogo_ten_os_dezanove_xogos_esperados():
-    # 19 desde "Cuenta las señales" (owner-approved): mismo catálogo, un id más.
+def test_o_catalogo_ten_os_vinte_e_un_xogos_esperados():
+    # 21 desde "Pulso de hierro" (owner-approved, motion_challenge) e
+    # "Trampa de palabras" (owner-approved, word_trap): dous ids máis sobre
+    # os 19 anteriores a esta ronda de cambios.
     ids = extraer_ids_do_catalogo()
-    assert len(ids) == 19, f"se esperaban 19 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
+    assert len(ids) == 21, f"se esperaban 21 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
     assert len(set(ids)) == len(ids), "hay ids duplicados en adminGameCatalog"
 
 
@@ -81,6 +92,7 @@ def test_as_familias_obxectivo_teñen_os_xogos_correctos():
         "bearing_hunt": "orientacion",
         "rumbo_doble": "orientacion",
         "audio_challenge": "sonido",
+        "trampa_palabras": "desafio",
     }
     for game_id, familia in esperado.items():
         assert mapa.get(game_id) == familia, (
@@ -149,6 +161,8 @@ def test_display_family_for_stage_usa_game_id_e_ten_fallback_por_tipo():
     assert display_family_for_stage("motion_challenge", "shake_charge") == "movimiento"
     assert display_family_for_stage("bearing_hunt", None) == "orientacion"
     assert display_family_for_stage("audio_challenge", "") == "sonido"
+    assert display_family_for_stage("word_trap", "trampa_palabras") == "desafio"
+    assert display_family_for_stage("word_trap", None) == "desafio"
     # Nodo viejo sin game_id: cae por su family técnica, nunca revienta.
     assert display_family_for_stage("signal_hunt", None) == "llegar_y_escanear"
     assert display_family_for_stage("circuit_matrix", None) == "puzles"

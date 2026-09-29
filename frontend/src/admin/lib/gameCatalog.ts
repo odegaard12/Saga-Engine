@@ -13,6 +13,11 @@ export type AdminGameId =
   // motion_challenge acababa mostrando un puzle de circuitos-. Renombrado,
   // ver motionChallenge/definition.ts.
   | 'shake_charge'
+  // Familia motion_challenge, segundo game_id (owner-approved "Pulso de
+  // hierro"): dos manos a la vez -quietud del móvil con una, secuencia
+  // Simón Dice creciente con la otra-. Ver
+  // frontend/src/player/minigames/families/motionChallenge/PulsoHierroRuntimeScreen.tsx.
+  | 'pulso_hierro'
   | 'bearing_hunt'
   // Marca legacy: misiones de antes de que existiera circuit_matrix. NO es
   // el game_id de ningún juego actual -runtime-bridge.ts (jugador) y
@@ -43,6 +48,14 @@ export type AdminGameId =
   // frontend/src/admin/components/cuentaSenales/CuentaSenalesEditor.tsx y
   // frontend/src/player/minigames/families/signalHunt/CuentaSenalesRuntimeScreen.tsx.
   | 'cuenta_senales'
+  // Sexta familia TÉCNICA nueva (owner-approved "Trampa de palabras",
+  // presentación "Desafío"): único game_id de la familia `word_trap`.
+  // Varias rondas de preguntas con 4 opciones casi idénticas y un
+  // temporizador corto por pregunta -pensado para durar más de 1 minuto,
+  // a diferencia del resto de minijuegos (20-90 s)-. Ver
+  // frontend/src/admin/components/trampaPalabras/TrampaPalabrasEditor.tsx y
+  // frontend/src/player/minigames/families/wordTrap/RuntimeScreen.tsx.
+  | 'trampa_palabras'
 
 export type AdminGameRuntimeStatus = 'runtime_ready' | 'runtime_partial' | 'preset_only' | 'planned'
 export type AdminGameOfflineStatus = 'offline_ready' | 'offline_partial' | 'offline_planned'
@@ -58,6 +71,8 @@ export type AdminGameCompletionMethod =
   | 'inventory_only'
   | 'team'
   | 'motion'
+  // "Trampa de palabras": varias rondas de pregunta con 4 opciones.
+  | 'quiz'
 
 export type MissionTemplateId = 'qr_route' | 'clue_hunt' | 'urban_escape' | 'family_gymkhana'
 
@@ -66,7 +81,7 @@ export type AdminGameCatalogItem = {
   title: string
   icon: string
   family: FamilyId
-  category: 'gps' | 'compass' | 'logic' | 'physical' | 'photo' | 'team' | 'motion'
+  category: 'gps' | 'compass' | 'logic' | 'physical' | 'photo' | 'team' | 'motion' | 'quiz'
   difficulty: 'Fácil' | 'Media' | 'Alta'
   duration: string
   runtimeStatus: AdminGameRuntimeStatus
@@ -679,6 +694,59 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
     },
   },
   {
+    // Segundo game_id de la familia motion_challenge (owner-approved "Pulso
+    // de hierro"): pedido explícito del organizador -"que sea mas
+    // dificil.. la gente se queja de que los juegos eran faciles" y "que
+    // dure mas de 1 minuto"-. Combina DOS entradas/sensores simultáneos e
+    // independientes -algo que ningún otro juego del catálogo hace-: una
+    // mano sujeta el móvil lo más quieto posible (ventana estrecha de
+    // varianza del acelerómetro, motionChallenge invertido) mientras la
+    // otra repite una secuencia Simón Dice que crece cada ronda
+    // (sequenceCode/SimonRuntimeScreen.tsx, adaptado). Perder la quietud en
+    // cualquier momento resetea solo la ronda de toques en curso -no la
+    // partida entera-, así que unos pocos resets por temblor natural de la
+    // mano son parte esperada del juego, no un fallo. Inmune por
+    // construcción al modo prueba/spoofing GPS: no usa posición en
+    // absoluto, solo acelerómetro + toques reales.
+    id: 'pulso_hierro',
+    title: 'Pulso de hierro',
+    icon: '🫳',
+    family: 'motion_challenge',
+    category: 'motion',
+    difficulty: 'Alta',
+    duration: '1.5-3 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'motion',
+    offlineNote: 'Acelerómetro y toques funcionan enteramente offline, sin GPS ni red.',
+    summary:
+      'Sujeta el móvil lo más quieto posible con una mano mientras repites con la otra una secuencia de colores que crece cada ronda. Moverte de más reinicia la ronda de toques, no la partida.',
+    playerGoal:
+      'Mano firme + memoria de secuencia a la vez: si el móvil se mueve demasiado, la ronda actual se reinicia y hay que volver a estabilizar antes de seguir tocando.',
+    editorHint:
+      'Todo son números planos, sin editor propio: longitud inicial de la secuencia, cuántas rondas hay que completar, cuánto crece cada ronda, la tolerancia de quietud (varianza del acelerómetro) y la ventana de tiempo por toque.',
+    config: {
+      objective: 'pulso_hierro',
+      game_id: 'pulso_hierro',
+      difficulty: 'hard',
+      allow_touch_fallback: true,
+      pulso_start_length: 3,
+      pulso_target_rounds: 6,
+      pulso_growth_per_round: 1,
+      pulso_stability_variance_max: 0.9,
+      pulso_tap_window_ms: 2600,
+      pulso_pad_count: 4,
+      use_vibration: true,
+    },
+    content:
+      'Sujeta el móvil lo más quieto posible con una mano. Con la otra, repite la secuencia de colores que se muestra: crece cada ronda. Si el móvil se mueve demasiado, la ronda actual se reinicia.',
+    messages: {
+      hint: 'Apoya el codo o el brazo para ganar quietud. Si pierdes la estabilidad, para de tocar, respira y vuelve a intentarlo.',
+      gps_unavailable: 'Este reto no necesita GPS: solo acelerómetro y pantalla táctil.',
+      locked: 'Completa todas las rondas para continuar.',
+    },
+  },
+  {
     // Familia bearing_hunt: mismo caso que motion_challenge, sin entrada en
     // el catálogo. Auditado antes de añadirla: target_bearing_deg y
     // tolerance_deg NUNCA llegaban al runtime -RuntimeScreen.tsx buscaba
@@ -749,6 +817,75 @@ export const adminGameCatalog: AdminGameCatalogItem[] = [
       hint: 'Mira la pista del objetivo actual y gira hacia el rumbo que se indica.',
       gps_unavailable: 'Este reto no necesita GPS, solo la brújula del móvil.',
       locked: 'Bloquea los dos (o tres) rumbos para continuar.',
+    },
+  },
+  {
+    // Sexta familia TÉCNICA nueva (owner-approved "Trampa de palabras",
+    // presentación "Desafío"): único game_id de la familia `word_trap`.
+    // Varias rondas de preguntas trampa con 4 opciones casi idénticas y un
+    // temporizador corto por pregunta, pensadas para durar más de 1 minuto
+    // -a diferencia del resto de minijuegos (20-90 s)-. El editor dedicado
+    // vive en admin/components/trampaPalabras/TrampaPalabrasEditor.tsx.
+    id: 'trampa_palabras',
+    title: 'Trampa de palabras',
+    icon: '🧠',
+    family: 'word_trap',
+    category: 'quiz',
+    difficulty: 'Alta',
+    duration: '1-3 min',
+    runtimeStatus: 'runtime_ready',
+    offlineStatus: 'offline_ready',
+    completionMethod: 'quiz',
+    offlineNote:
+      'Las rondas asignadas (con la respuesta ya hasheada) viajan dentro del paquete offline del jugador; comprobar la respuesta no necesita red.',
+    summary:
+      'Varias preguntas trampa seguidas, con 4 opciones casi idénticas cada una: hay que leer con calma y responder antes de que se acabe el tiempo.',
+    playerGoal: 'Lee cada pregunta con calma y elige la opción correcta antes de que se acabe el tiempo.',
+    editorHint:
+      'Escribe preguntas con truco: una opción casi igual a la correcta, una negación escondida, un número cambiado.',
+    config: {
+      game_id: 'trampa_palabras',
+      objective: 'word_trap',
+      completion_method: 'quiz',
+      n_rounds: 6,
+      time_limit_s: 12,
+      questions: [
+        {
+          question: '¿Cuál de estas NO es una forma de decir que algo es imposible?',
+          options: [
+            'No tiene ni pies ni cabeza',
+            'No hay manera de que pase',
+            'Es pan comido',
+            'Ni en sueños',
+          ],
+          correct_index: 2,
+          explanation: '"Pan comido" significa que algo es fácil, no imposible.',
+        },
+        {
+          question: 'El cartel dice "Prohibido no pisar el césped". ¿Qué hay que hacer?',
+          options: ['Pisarlo', 'No pisarlo', 'Regarlo', 'Cortarlo'],
+          correct_index: 0,
+          explanation: 'La doble negación ("prohibido no pisar") obliga a pisarlo.',
+        },
+        {
+          question: 'Un ciclista recorre 12 km en 40 minutos. ¿Cuál de estas NO es su velocidad media?',
+          options: ['18 km/h', '0,3 km/min', '300 m/min', '20 km/h'],
+          correct_index: 3,
+          explanation: '12 km en 40 min son 18 km/h, no 20 km/h.',
+        },
+        {
+          question: 'De estas cuatro, ¿cuál NO es sinónimo de "empezar"?',
+          options: ['Iniciar', 'Comenzar', 'Concluir', 'Arrancar'],
+          correct_index: 2,
+          explanation: '"Concluir" significa terminar, justo lo contrario.',
+        },
+      ],
+    },
+    content: 'Lee cada pregunta con calma: hay opciones casi idénticas y solo una es correcta.',
+    messages: {
+      hint: 'No hay pin ni GPS: solo leer despacio y elegir antes de que se acabe el tiempo.',
+      gps_unavailable: 'Este reto no necesita GPS.',
+      locked: 'Responde todas las rondas para continuar.',
     },
   },
 ]
@@ -951,6 +1088,7 @@ const ORDEN_DE_CATEGORIA: Record<AdminGameCatalogItem['category'], number> = {
   photo: 4,
   physical: 5,
   team: 6,
+  quiz: 7,
 }
 
 export function sortedByCategoryForDisplay(

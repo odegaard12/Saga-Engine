@@ -181,6 +181,78 @@ def _suelo_rumbo_doble(node: dict) -> int:
     return max(MIN_PLAUSIBLE_STAGE_MS, n_targets * hold_ms)
 
 
+def _suelo_pulso_hierro(node: dict) -> int:
+    """Mínimo físico de `pulso_hierro`: suma de toques reales de todas las
+    rondas (longitud inicial + crecimiento por ronda, tantas rondas como
+    pida el nodo) por la ventana de tiempo real que el runtime da para cada
+    toque (`pulso_tap_window_ms`) -exactamente el mismo patrón que
+    `_suelo_rumbo_doble` (nº de objetivos x hold_ms), aplicado aquí a nº de
+    toques x ventana de toque-. A propósito NO se suma nada por la fase de
+    "memorizar" la secuencia ni por las re-estabilizaciones tras perder la
+    quietud: eso alargaría el suelo con tiempo que un jugador rápido de
+    verdad podría no necesitar, y el suelo es un mínimo físico, no una
+    duración esperada.
+    """
+    config = _config_del_nodo(node)
+
+    try:
+        start_length = int(config.get("pulso_start_length"))
+    except (TypeError, ValueError):
+        start_length = 3
+    if start_length <= 0:
+        start_length = 3
+
+    try:
+        target_rounds = int(config.get("pulso_target_rounds"))
+    except (TypeError, ValueError):
+        target_rounds = 6
+    if target_rounds <= 0:
+        target_rounds = 6
+
+    try:
+        growth = int(config.get("pulso_growth_per_round"))
+    except (TypeError, ValueError):
+        growth = 1
+    if growth < 0:
+        growth = 0
+
+    try:
+        tap_window_ms = int(config.get("pulso_tap_window_ms"))
+    except (TypeError, ValueError):
+        tap_window_ms = 2600
+    if tap_window_ms <= 0:
+        tap_window_ms = 2600
+
+    total_taps = sum(start_length + i * growth for i in range(target_rounds))
+    return max(MIN_PLAUSIBLE_STAGE_MS, total_taps * tap_window_ms)
+
+
+def _suelo_trampa_palabras(node: dict) -> int:
+    """Mínimo físico de `trampa_palabras`: nº de rondas x el límite de
+    tiempo por pregunta que puso el organizador, tal cual sale de la config
+    REAL de este nodo (`config.n_rounds` / `config.time_limit_s`) -no una
+    tabla adivinada, mismo criterio que `_suelo_sequence_code` /
+    `_suelo_rumbo_doble` (ver v5.34.0 en MIN_PLAUSIBLE_STAGE_MS)-.
+    """
+    config = _config_del_nodo(node)
+
+    try:
+        n_rounds = int(config.get("n_rounds"))
+    except (TypeError, ValueError):
+        n_rounds = 6
+    if n_rounds <= 0:
+        n_rounds = 6
+
+    try:
+        time_limit_s = int(config.get("time_limit_s"))
+    except (TypeError, ValueError):
+        time_limit_s = 12
+    if time_limit_s <= 0:
+        time_limit_s = 12
+
+    return max(MIN_PLAUSIBLE_STAGE_MS, n_rounds * time_limit_s * 1000)
+
+
 #: Mínimo físico por FAMILIA de minijuego, sólo para los que tienen un límite
 #: físico real y calculable (no una "duración típica"). A propósito NO hay
 #: entrada para spark_radar ni team_relay: son prototipos sin cablear en la
@@ -194,6 +266,8 @@ def _suelo_rumbo_doble(node: dict) -> int:
 MINIGAME_HARD_FLOOR_MS_BY_GAME: Dict[str, Any] = {
     "sequence_code": _suelo_sequence_code,  # depende del nodo: nº de pasos real.
     "rumbo_doble": _suelo_rumbo_doble,  # depende del nodo: nº de objetivos x hold_ms real.
+    "pulso_hierro": _suelo_pulso_hierro,  # depende del nodo: nº de toques totales x ventana real.
+    "trampa_palabras": _suelo_trampa_palabras,  # depende del nodo: rondas x segundos/pregunta real.
 }
 
 

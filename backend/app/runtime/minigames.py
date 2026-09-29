@@ -5,6 +5,7 @@ main.py for now; later PRs can move routers after contract tests exist.
 """
 
 import hashlib
+import random
 
 MINIGAME_OK_CODE = "OK"
 
@@ -17,6 +18,169 @@ CUENTA_SENALES_MAX_QUESTIONS = 5
 #: un número nuevo-. El jugador nunca queda bloqueado: solo suma tiempo.
 CUENTA_SENALES_PENALTY_MS = 30000
 CUENTA_SENALES_MAX_ATTEMPTS = 3
+
+#: "Trampa de palabras" (owner-approved): familia NUEVA "word_trap"
+#: (presentación admin: "Desafío"), no un game_id dentro de una familia ya
+#: existente. Varias rondas seguidas de preguntas trampa con 4 opciones
+#: casi idénticas -para que dure más de 1 minuto, a diferencia del resto de
+#: minijuegos (20-90 s)-. El admin escribe un BANCO de preguntas (puede ser
+#: mayor que las rondas por partida) y cuántas rondas/segundos por pregunta
+#: quiere; nunca se inventa un número universal -ver v5.34.0-.
+WORD_TRAP_MIN_ROUNDS = 4
+WORD_TRAP_MAX_ROUNDS = 12
+WORD_TRAP_DEFAULT_ROUNDS = 8
+WORD_TRAP_MIN_TIME_LIMIT_S = 4
+WORD_TRAP_MAX_TIME_LIMIT_S = 30
+WORD_TRAP_DEFAULT_TIME_LIMIT_S = 12
+WORD_TRAP_MIN_BANK_QUESTIONS = 4
+WORD_TRAP_MAX_BANK_QUESTIONS = 40
+WORD_TRAP_OPTION_COUNT = 4
+#: Misma magnitud de penalización que cuenta_senales: no se bloquea nunca,
+#: fallar o agotar el tiempo solo suma 30 s y sigue a la siguiente ronda.
+WORD_TRAP_PENALTY_MS = 30000
+
+
+def hash_word_trap_answer(option_index, salt):
+    """sha256(salt + ':' + índice de opción elegido), la MISMA función que
+    corre en el cliente (Web Crypto SubtleCrypto, ver
+    WordTrapRuntimeScreen.tsx) para poder comprobar sin red qué opción
+    eligió el jugador. Igual que hash_cuenta_senales_answer: no es una
+    defensa fuerte -4 índices se fuerzan al instante-, solo evita que la
+    opción correcta se lea a ojo en DevTools o en el payload de red.
+    """
+    texto = f"{_as_str(salt)}:{int(option_index)}"
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def _word_trap_salt(node_id, bank_index, round_index):
+    return f"{_as_str(node_id)}:{int(bank_index)}:{int(round_index)}"
+
+
+def _word_trap_shuffle_seed(node_id, player_id):
+    texto = f"{_as_str(player_id)}:{_as_str(node_id)}:trampa_palabras"
+    return int(hashlib.sha256(texto.encode("utf-8")).hexdigest(), 16)
+
+
+def pick_word_trap_bank_indices(node_id, player_id, bank_size, n_rounds):
+    """`n_rounds` índices deterministas dentro de 0..bank_size-1, uno por
+    ronda. Estable entre recargas/offline (no usa random real: la semilla
+    sale de hash(player_id + node_id)) pero recorre el banco COMPLETO que
+    escribió el organizador -no siempre las primeras `n_rounds`-, para que
+    una partida no agote todo el banco si es mayor que las rondas por
+    partida. Con un banco más pequeño que `n_rounds` se repite el ciclo ya
+    barajado -nunca se inventa una pregunta que el organizador no escribió-.
+    """
+    if bank_size <= 0 or n_rounds <= 0:
+        return []
+    orden = list(range(bank_size))
+    random.Random(_word_trap_shuffle_seed(node_id, player_id)).shuffle(orden)
+    if n_rounds <= bank_size:
+        return orden[:n_rounds]
+    vueltas = []
+    while len(vueltas) < n_rounds:
+        vueltas.extend(orden)
+    return vueltas[:n_rounds]
+
+
+def _default_word_trap_question(index):
+    return {
+        "question": f"Pregunta trampa {index}: escribe el enunciado.",
+        "options": ["Opción A", "Opción B", "Opción C", "Opción D"],
+        "correct_index": 0,
+        "explanation": "",
+    }
+
+
+def _normalize_word_trap_questions(value):
+    """Banco de preguntas trampa: texto, 4 opciones (decoys casi idénticos),
+    índice de la correcta y explicación opcional. Igual que
+    _normalize_cuenta_senales_questions: un banco a medio escribir no debe
+    quedar sin preguntas jugables -se rellena hasta el mínimo-, y nunca se
+    admiten más de WORD_TRAP_MAX_BANK_QUESTIONS.
+    """
+    raw_list = value if isinstance(value, list) else []
+    questions = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        text = _as_str(item.get("question")).strip()[:300]
+        if not text:
+            continue
+        raw_options = item.get("options") if isinstance(item.get("options"), list) else []
+        options = [_as_str(opt).strip()[:120] for opt in raw_options][:WORD_TRAP_OPTION_COUNT]
+        options = [opt or f"Opción {idx + 1}" for idx, opt in enumerate(options)]
+        while len(options) < WORD_TRAP_OPTION_COUNT:
+            options.append(f"Opción {len(options) + 1}")
+        correct_index = _clamp_int(item.get("correct_index"), 0, 0, WORD_TRAP_OPTION_COUNT - 1)
+        explanation = _as_str(item.get("explanation")).strip()[:400]
+        questions.append(
+            {
+                "question": text,
+                "options": options,
+                "correct_index": correct_index,
+                "explanation": explanation,
+            }
+        )
+
+    questions = questions[:WORD_TRAP_MAX_BANK_QUESTIONS]
+
+    idx = 1
+    while len(questions) < WORD_TRAP_MIN_BANK_QUESTIONS:
+        questions.append(_default_word_trap_question(idx))
+        idx += 1
+
+    return questions
+
+
+def project_word_trap_for_player(config, node_id, player_id):
+    """De la config completa (banco entero + respuestas en claro, tal y
+    como la guarda el organizador) a lo que recibe UN jugador: solo las
+    `n_rounds` rondas que le tocan (barajadas de forma estable a partir de
+    hash(player_id + node_id), ver pick_word_trap_bank_indices), cada una
+    con sus 4 opciones y la respuesta correcta sustituida por su hash
+    salado. Nunca viaja `correct_index` en claro.
+    """
+    questions = config.get("questions") if isinstance(config.get("questions"), list) else []
+    if not questions:
+        questions = [_default_word_trap_question(1)]
+
+    n_rounds = _clamp_int(
+        config.get("n_rounds"), WORD_TRAP_DEFAULT_ROUNDS, WORD_TRAP_MIN_ROUNDS, WORD_TRAP_MAX_ROUNDS
+    )
+    time_limit_s = _clamp_int(
+        config.get("time_limit_s"),
+        WORD_TRAP_DEFAULT_TIME_LIMIT_S,
+        WORD_TRAP_MIN_TIME_LIMIT_S,
+        WORD_TRAP_MAX_TIME_LIMIT_S,
+    )
+
+    bank_indices = pick_word_trap_bank_indices(node_id, player_id, len(questions), n_rounds)
+
+    rounds = []
+    for round_index, bank_index in enumerate(bank_indices):
+        question = questions[bank_index] if 0 <= bank_index < len(questions) else questions[0]
+        options = question.get("options") if isinstance(question.get("options"), list) else []
+        correct_index = _clamp_int(question.get("correct_index"), 0, 0, max(0, len(options) - 1))
+        salt = _word_trap_salt(node_id, bank_index, round_index)
+        rounds.append(
+            {
+                "question": _as_str(question.get("question")).strip(),
+                "options": [_as_str(opt).strip() for opt in options],
+                "salt": salt,
+                "answer_hash": hash_word_trap_answer(correct_index, salt),
+                "explanation": _as_str(question.get("explanation")).strip(),
+            }
+        )
+
+    return {
+        "objective": "word_trap",
+        "game_id": "trampa_palabras",
+        "completion_method": "quiz",
+        "rounds": rounds,
+        "n_rounds": n_rounds,
+        "time_limit_s": time_limit_s,
+        "penalty_ms": WORD_TRAP_PENALTY_MS,
+    }
 
 
 def hash_cuenta_senales_answer(answer, salt):
@@ -101,6 +265,10 @@ SUPPORTED_MINIGAME_TYPES = {
     "bearing_hunt",
     "motion_challenge",
     "audio_challenge",
+    # "Trampa de palabras" (owner-approved): sexta familia técnica NUEVA
+    # -no un game_id dentro de una de las 5 de siempre-. Ver
+    # project_word_trap_for_player / _normalize_word_trap_questions arriba.
+    "word_trap",
     "sequence_code",
     "tilt_maze",
     "place_mosaic",
@@ -156,6 +324,7 @@ MINIGAME_SPECS = {
     "signal_hunt": {"label": "Signal Hunt"},
     "motion_challenge": {"label": "Motion Challenge"},
     "audio_challenge": {"label": "Audio Challenge"},
+    "word_trap": {"label": "Trampa de palabras"},
 }
 
 def _clamp_int(value, default, minimum=None, maximum=None):
@@ -443,6 +612,21 @@ def normalize_minigame_config(minigame_type, raw_cfg):
     # de que el payload salga hacia el móvil-.
     if juego_id == "cuenta_senales":
         out["questions"] = _normalize_cuenta_senales_questions(raw.get("questions"))
+    # word_trap: familia técnica propia (no un game_id compartido), pero
+    # las mismas 3 claves -banco completo en claro, rondas por partida y
+    # segundos por pregunta- se validan aquí igual que el resto de campos
+    # "solo de un juego concreto", nunca en _normalize_minigame_config_raw.
+    if juego_id == "trampa_palabras":
+        out["questions"] = _normalize_word_trap_questions(raw.get("questions"))
+        out["n_rounds"] = _clamp_int(
+            raw.get("n_rounds"), WORD_TRAP_DEFAULT_ROUNDS, WORD_TRAP_MIN_ROUNDS, WORD_TRAP_MAX_ROUNDS
+        )
+        out["time_limit_s"] = _clamp_int(
+            raw.get("time_limit_s"),
+            WORD_TRAP_DEFAULT_TIME_LIMIT_S,
+            WORD_TRAP_MIN_TIME_LIMIT_S,
+            WORD_TRAP_MAX_TIME_LIMIT_S,
+        )
     return out
 
 
@@ -456,6 +640,18 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
         return {
             "objective": _as_str(raw.get("objective") or "blow_charge").strip().lower() or "blow_charge",
             "game_id": _as_str(raw.get("game_id") or "audio_challenge").strip() or "audio_challenge",
+        }
+
+    if normalized_type == "word_trap":
+        # Un único game_id en toda la familia -a diferencia de circuit_matrix
+        # (logic_circuit/sequence_code/place_mosaic/tilt_maze/spark_radar)-,
+        # así que no hace falta bifurcar por game_id aquí. `questions` /
+        # `n_rounds` / `time_limit_s` los añade normalize_minigame_config
+        # (arriba), igual que `questions` de cuenta_senales.
+        return {
+            "objective": "word_trap",
+            "game_id": "trampa_palabras",
+            "completion_method": "quiz",
         }
 
     if normalized_type == "circuit_matrix":
@@ -989,6 +1185,38 @@ def _normalize_minigame_config_raw(minigame_type, raw_cfg):
 
 
     if normalized_type == "motion_challenge":
+        game_id_mc = _as_str(raw.get("game_id")).strip().lower()
+
+        if game_id_mc == "pulso_hierro":
+            # "Pulso de hierro" (owner-approved): dos manos a la vez, cada
+            # una con su propio sensor/entrada -no hay otro minijuego del
+            # catálogo que combine dos streams independientes-. Una mano
+            # sujeta el móvil lo más quieto posible (ventana estrecha de
+            # varianza del acelerómetro, motionChallenge invertido: quietud
+            # en vez de sacudida); la otra repite una secuencia Simón Dice
+            # que crece cada ronda. Perder la quietud en CUALQUIER momento
+            # resetea solo la ronda de toques en curso (no la partida
+            # entera): hay que re-estabilizar antes de seguir. Ver
+            # PulsoHierroRuntimeScreen.tsx (motor) y
+            # _suelo_pulso_hierro/MINIGAME_HARD_FLOOR_MS_BY_GAME en
+            # anti_cheat.py (suelo derivado de estos mismos números, no
+            # adivinado).
+            return {
+                "objective": "pulso_hierro",
+                "game_id": "pulso_hierro",
+                "difficulty": _as_str(raw.get("difficulty") or "hard").strip().lower() or "hard",
+                "allow_touch_fallback": _as_bool(raw.get("allow_touch_fallback"), True),
+                "pulso_start_length": _clamp_int(raw.get("pulso_start_length"), 3, 2, 6),
+                "pulso_target_rounds": _clamp_int(raw.get("pulso_target_rounds"), 6, 3, 10),
+                "pulso_growth_per_round": _clamp_int(raw.get("pulso_growth_per_round"), 1, 0, 3),
+                "pulso_stability_variance_max": max(
+                    0.2, min(3.0, _as_float(raw.get("pulso_stability_variance_max"), 0.9) or 0.9)
+                ),
+                "pulso_tap_window_ms": _clamp_int(raw.get("pulso_tap_window_ms"), 2600, 1200, 5000),
+                "pulso_pad_count": _clamp_int(raw.get("pulso_pad_count"), 4, 3, 6),
+                "use_vibration": _as_bool(raw.get("use_vibration"), True),
+            }
+
         difficulty = _as_str(raw.get("difficulty") or "normal").strip().lower() or "normal"
         if difficulty not in {"easy", "normal", "hard"}:
             difficulty = "normal"

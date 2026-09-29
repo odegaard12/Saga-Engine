@@ -1,4 +1,4 @@
-export type MotionChallengeObjective = 'shake_charge' | 'figure_eight' | 'rotary_safe'
+export type MotionChallengeObjective = 'shake_charge' | 'figure_eight' | 'rotary_safe' | 'pulso_hierro'
 
 export type MotionChallengeConfig = {
   objective: MotionChallengeObjective
@@ -18,6 +18,19 @@ export type MotionChallengeConfig = {
   charge_rate?: number
   stability_min?: number
   use_vibration?: boolean
+  // "Pulso de hierro" (game_id 'pulso_hierro'): dos manos a la vez, dos
+  // streams de entrada independientes -motionChallenge invertido (quietud,
+  // no sacudida) más una secuencia Simón Dice que crece por ronda-. Todo
+  // admin-configurable, cero editor propio (ver
+  // guidedEditorUtils.ts/guidedConfigKeysForGame): son números planos, no
+  // hace falta un componente dedicado como RumboDobleEditor.tsx. Ver
+  // PulsoHierroRuntimeScreen.tsx y _suelo_pulso_hierro en anti_cheat.py.
+  pulso_start_length?: number
+  pulso_target_rounds?: number
+  pulso_growth_per_round?: number
+  pulso_stability_variance_max?: number
+  pulso_tap_window_ms?: number
+  pulso_pad_count?: number
 }
 
 export type CircuitMatrixObjective =
@@ -181,9 +194,49 @@ export type AudioChallengeConfig = {
   game_id?: string
 }
 
+/**
+ * "Trampa de palabras" (owner-approved, game_id 'trampa_palabras', familia
+ * NUEVA 'word_trap'). El jugador SOLO recibe las `n_rounds` rondas que le
+ * tocan (barajadas de forma estable a partir de player_id+node_id), cada
+ * una con sus 4 opciones y la respuesta correcta ya sustituida por su hash
+ * salado -nunca `correct_index` en claro-. Ver project_word_trap_for_player
+ * en minigames.py (servidor) y WordTrapRuntimeScreen.tsx (cliente, calcula
+ * el mismo hash con Web Crypto para comprobar sin red).
+ */
+export type WordTrapRound = {
+  question: string
+  options: string[]
+  salt: string
+  answer_hash: string
+  explanation?: string
+}
+
+/** Una pregunta del BANCO tal y como la edita el organizador (admin, en
+ * claro): nunca viaja así hacia el jugador -ver WordTrapRound arriba-. */
+export type WordTrapBankQuestion = {
+  question: string
+  options: string[]
+  correct_index: number
+  explanation?: string
+}
+
+export type WordTrapConfig = {
+  objective: 'word_trap'
+  game_id?: string
+  completion_method?: 'quiz'
+  /** Rondas ya proyectadas para ESTE jugador (payload real del móvil). */
+  rounds?: WordTrapRound[]
+  /** Banco completo en claro: solo lo usa el editor de admin. */
+  questions?: WordTrapBankQuestion[]
+  n_rounds?: number
+  time_limit_s?: number
+  penalty_ms?: number
+}
+
 export type AnyMinigameConfig =
   | CircuitMatrixConfig
   | BearingHuntConfig
   | SignalHuntConfig
   | MotionChallengeConfig
   | AudioChallengeConfig
+  | WordTrapConfig
