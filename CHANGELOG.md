@@ -6,6 +6,96 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.40.0
+
+- **Familia "Desafío" con los dos retos largos.** Pulso de hierro pasa de
+  "Movimiento" a "Desafío", junto a Trampa de palabras. El servidor contaba
+  las familias con su propia lista y la tenía distinta a la del admin (Pulso
+  de hierro salía en "Movimiento"): ahora coinciden, y
+  `test_as_familias_do_servidor_coinciden_co_admin.py` compara las dos listas
+  juego a juego. Trampa de palabras sube a 8 rondas por defecto (máx. 12):
+  con 6, quien lee rápido la acababa en menos de un minuto.
+
+- **Suite de pruebas más rápida, sin perder cobertura.** Nueva marca `slow`
+  (`pytest.ini`) para las 5 pruebas de más de 3 s (banco de simulación y
+  fuerza bruta del unlock) y `pytest-xdist` en paralelo por defecto:
+  `python -m pytest -q` (~30 s) corre lo rápido y `python -m pytest -q -m ""`
+  corre todo (~1,5 min, antes ~3 min en serie). La guarda de privacidad
+  (9 s → 1,4 s, filtro previo por subcadena y lista local leída una vez) y
+  la prueba de acentos rotos (poda de `node_modules`/`.git`) detectan lo mismo.
+  Cómo ejecutar cada modo: README, sección Tests.
+
+- **Seguridad: Pillow 11.3.0 → 12.3.0.** Las 18 alertas de Dependabot (13
+  altas) eran todas de Pillow, la librería que procesa las fotos que suben
+  los jugadores: escrituras fuera de memoria y "bombas de descompresión"
+  con imágenes o fuentes manipuladas. `pip-audit` sobre `requirements.txt`
+  y `npm audit` del frontend quedan sin ninguna vulnerabilidad conocida.
+
+- **Nuevo minijuego "Trampa de palabras" (`trampa_palabras`), sexta familia
+  técnica nueva `word_trap` / grupo de presentación "Desafío".** Pedido
+  explícito del organizador: los minijuegos anteriores eran fáciles y
+  demasiado cortos, y esta vez el encargo era "que dure más de 1 minuto".
+  A diferencia del resto (20-90 s), reúne varias rondas seguidas (4-8,
+  admin-configurable) de preguntas trampa con 4 opciones deliberadamente
+  casi idénticas -una palabra cambiada, una negación escondida, un número
+  distinto- y un temporizador corto por pregunta (4-30 s,
+  admin-configurable) que castiga tanto leer demasiado rápido (te comes el
+  truco) como pensar demasiado (se acaba el tiempo). Fallar una ronda o
+  agotar el tiempo NUNCA bloquea: suma una penalización de 30 s -mismo
+  mecanismo que `cuenta_senales`- y sigue a la ronda siguiente. El
+  organizador escribe un BANCO de preguntas mayor que las rondas por
+  partida; el servidor elige, por jugador, un subconjunto barajado de forma
+  estable (hash de player_id+node_id+ronda) para que no sea memorizable con
+  una sola partida ni cambie entre recargas/offline. Igual que
+  `cuenta_senales`, el jugador solo recibe SUS rondas asignadas con la
+  opción correcta ya sustituida por un hash salado -nunca `correct_index`
+  en claro, ver `project_word_trap_for_player` en
+  `backend/app/runtime/minigames.py`-. Suelo de anti-trampas derivado del
+  propio nodo (`_suelo_trampa_palabras`,
+  `backend/app/runtime/anti_cheat.py`: nº de rondas × segundos por pregunta
+  reales), igual que `rumbo_doble`/`sequence_code` -nunca un número
+  adivinado, ver v5.34.0-; con la configuración por defecto (6 rondas × 12 s)
+  ya supera los 72 s. Familia técnica nueva cableada de punta a punta
+  -primera desde v5.36-: `frontend/src/player/minigames/core/types.ts`
+  (`MinigameFamily`), `family-types.ts`, `resolver.ts`,
+  `FamilyRuntimeHost.tsx`, `frontend/src/admin/lib/gameCatalog.ts`
+  (`AdminGameId`, catálogo, categoría `quiz`), `familyConfigs.ts`
+  (`FamilyId`, default config y normalización -con su propia rama para no
+  repetir el bug de `familyConfigs.ts` que clobbereaba `targets`/`questions`
+  de `rumbo_doble`/`cuenta_senales`-), `displayFamilies.ts` (familia
+  "Desafío"), `guidedEditorUtils.ts`, `backend/app/runtime/core_engine.py`,
+  `backend/app/runtime/minigames.py` y `backend/app/routers/admin.py`
+  (`family_counts`/`families`/`DISPLAY_FAMILIES`). Editor dedicado
+  `frontend/src/admin/components/trampaPalabras/TrampaPalabrasEditor.tsx`
+  para gestionar el banco (añadir/quitar/editar cada pregunta, rondas por
+  partida y segundos por pregunta), con la guía "Escribe preguntas con
+  truco: una opción casi igual a la correcta, una negación escondida, un
+  número cambiado." Tests: `tests/test_trampa_palabras.py`.
+
+- **Nuevo minijuego "Pulso de hierro" (`pulso_hierro`), familia
+  `motion_challenge` / grupo "Movimiento".** Pedido explícito del
+  organizador: los minijuegos anteriores eran fáciles y demasiado cortos.
+  Combina DOS entradas/sensores independientes a la vez -algo que ningún
+  otro juego del catálogo hace-: una mano sujeta el móvil lo más quieto
+  posible (ventana estrecha de varianza del acelerómetro, motionChallenge
+  invertido: quietud en vez de sacudida) mientras la otra repite una
+  secuencia Simón Dice que crece cada ronda (adaptado de
+  sequenceCode/SimonRuntimeScreen.tsx). Perder la quietud en cualquier
+  momento reinicia solo la ronda de toques en curso -nunca la partida
+  entera-, así que unos pocos reinicios por temblor natural de la mano son
+  parte esperada del diseño. Con la configuración por defecto (6 rondas,
+  secuencia inicial de 3 pasos +1 por ronda, ventana de 2,6 s por toque) el
+  suelo físico de anti-trampas ya supera los 85 s -bastante por encima del
+  minuto pedido-, y la partida real (memorización + algún reinicio) dura
+  más todavía. Todo admin-configurable con números planos, sin editor
+  dedicado (`guidedEditorUtils.ts`): dar de alta un nodo no exige tocar
+  ningún componente nuevo de admin. Inmune por construcción al modo
+  prueba/spoofing de GPS: no usa posición en absoluto. Suelo de
+  anti-trampas derivado del propio nodo (`_suelo_pulso_hierro`,
+  `backend/app/runtime/anti_cheat.py`: nº de toques totales × ventana de
+  toque real), igual que `rumbo_doble`/`sequence_code` -nunca un número
+  adivinado, ver v5.34.0-. Tests: `tests/test_pulso_hierro.py`.
+
 ## 5.39.1
 
 - **Fix: el escáner de campo podía registrar la misma pegatina QR dos veces.**

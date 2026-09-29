@@ -69,6 +69,12 @@ export const TECHNICAL_CONFIG_KEYS = new Set([
   // hint_image_data_url}. La edita CuentaSenalesEditor.tsx, igual que
   // `targets` de arriba.
   'questions',
+  // "Trampa de palabras": banco de preguntas {question, options,
+  // correct_index, explanation} y sus 2 ajustes. Los edita
+  // TrampaPalabrasEditor.tsx, igual que `targets`/`questions` de arriba.
+  'n_rounds',
+  'time_limit_s',
+  'rounds',
 ])
 
 export const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
@@ -122,6 +128,7 @@ export const CONFIG_FIELD_META: Record<
       { value: 'inventory_only', label: 'Objeto/mochila' },
       { value: 'team', label: 'Equipo' },
       { value: 'motion', label: 'Movimiento / sensor' },
+      { value: 'quiz', label: 'Cuestionario' },
     ],
   },
   source_radius_m: {
@@ -644,6 +651,7 @@ export const CUSTOM_GAME_EDITOR_IDS = new Set([
   'tilt_maze',
   'rumbo_doble',
   'cuenta_senales',
+  'trampa_palabras',
 ])
 
 export function hasCustomGameEditor(game: AdminGameCatalogItem) {
@@ -656,7 +664,8 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     game.id === 'place_mosaic' ||
     game.id === 'tilt_maze' ||
     game.id === 'rumbo_doble' ||
-    game.id === 'cuenta_senales'
+    game.id === 'cuenta_senales' ||
+    game.id === 'trampa_palabras'
   ) {
     return []
   }
@@ -688,6 +697,23 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
 
   if (game.category === 'motion' || game.completionMethod === 'motion') {
     for (const key of ['difficulty', 'time_limit_ms', 'stabilize_ms']) {
+      if (key in config) keys.add(key)
+    }
+  }
+
+  // "Pulso de hierro" (game_id 'pulso_hierro'): cero editor propio a
+  // propósito -a diferencia de rumbo_doble/cuenta_senales, que sí lo
+  // necesitan porque editan listas-, aquí todo son números planos que el
+  // editor genérico ya sabe renderizar. Ventaja operativa: dar de alta un
+  // nodo no exige tocar ningún componente de admin, solo estos 5 knobs.
+  if (game.id === 'pulso_hierro') {
+    for (const key of [
+      'pulso_start_length',
+      'pulso_target_rounds',
+      'pulso_growth_per_round',
+      'pulso_stability_variance_max',
+      'pulso_tap_window_ms',
+    ]) {
       if (key in config) keys.add(key)
     }
   }

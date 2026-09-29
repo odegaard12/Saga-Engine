@@ -69,7 +69,7 @@ jobs:
       - name: Run backend tests
         env:
           ADMIN_PASS: pytest_admin_password
-        run: PYTHONPATH=. pytest -q
+        run: PYTHONPATH=. pytest -q -m ""
 
       - name: Start app with real frontend dist
         env:

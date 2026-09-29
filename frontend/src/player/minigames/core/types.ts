@@ -1,5 +1,14 @@
 export type MinigameFamily =
-  'circuit_matrix' | 'bearing_hunt' | 'signal_hunt' | 'motion_challenge' | 'audio_challenge'
+  | 'circuit_matrix'
+  | 'bearing_hunt'
+  | 'signal_hunt'
+  | 'motion_challenge'
+  | 'audio_challenge'
+  // "Trampa de palabras" (owner-approved): sexta familia NUEVA -no un
+  // game_id dentro de una de las 5 de siempre-. Varias rondas de preguntas
+  // trampa con 4 opciones casi idénticas. Ver
+  // frontend/src/player/minigames/families/wordTrap/.
+  | 'word_trap'
 
 export type MinigameVersion = 'v1'
 

@@ -9,7 +9,9 @@ import { SparkRadarRuntimeScreen } from '../families/sparkRadar/RuntimeScreen'
 import { CheckpointRuntimeScreen } from '../families/signalHunt/CheckpointRuntimeScreen'
 import { CuentaSenalesRuntimeScreen } from '../families/signalHunt/CuentaSenalesRuntimeScreen'
 import { MotionChallengeRuntimeScreen } from '../families/motionChallenge/RuntimeScreen'
+import { PulsoHierroRuntimeScreen } from '../families/motionChallenge/PulsoHierroRuntimeScreen'
 import { AudioChallengeRuntime } from '../families/audioChallenge/AudioChallengeRuntime'
+import { WordTrapRuntimeScreen } from '../families/wordTrap/RuntimeScreen'
 import { TeamRelayRuntimeScreen } from '../families/teamRelay/RuntimeScreen'
 
 export interface FamilyRuntimeHostProps {
@@ -117,6 +119,18 @@ export function FamilyRuntimeHost({
     )
   }
 
+  if (resolved.family === 'motion_challenge' && resolved.config.game_id === 'pulso_hierro') {
+    return (
+      <PulsoHierroRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
+  }
+
   if (resolved.family === 'motion_challenge') {
     return (
       <MotionChallengeRuntimeScreen
@@ -131,6 +145,18 @@ export function FamilyRuntimeHost({
 
   if (resolved.family === 'audio_challenge') {
     return <AudioChallengeRuntime onWin={onWin} />
+  }
+
+  if (resolved.family === 'word_trap') {
+    return (
+      <WordTrapRuntimeScreen
+        resolved={resolved}
+        stage={stage}
+        helperText={helperText}
+        submitting={submitting}
+        onWin={onWin}
+      />
+    )
   }
 
   if ((resolved.config as any)?.game_id === 'team_relay') {

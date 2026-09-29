@@ -16,6 +16,12 @@ DISPLAY_FAMILIES = [
     {"id": "movimiento", "label": "Movimiento"},
     {"id": "orientacion", "label": "Orientación"},
     {"id": "sonido", "label": "Sonido"},
+    # Sexta familia de presentación (owner-approved "Trampa de palabras"):
+    # primera familia TÉCNICA nueva desde v5.36 -no encaja en ninguna de
+    # las 5 de arriba (no es GPS/checkpoint, ni puzle de tablero, ni
+    # movimiento, ni orientación, ni sonido)-. Ver
+    # frontend/src/admin/lib/displayFamilies.ts.
+    {"id": "desafio", "label": "Desafío"},
 ]
 
 GAME_ID_DISPLAY_FAMILY = {
@@ -31,11 +37,16 @@ GAME_ID_DISPLAY_FAMILY = {
     "sequence_code": "puzles",
     "place_mosaic": "puzles",
     "manual_password": "puzles",
+    "shake_antenna_charge": "puzles",
     "tilt_maze": "movimiento",
     "spark_radar": "movimiento",
     "shake_charge": "movimiento",
     "bearing_hunt": "orientacion",
     "audio_challenge": "sonido",
+    "trampa_palabras": "desafio",
+    "pulso_hierro": "desafio",
+    "rumbo_doble": "orientacion",
+    "cuenta_senales": "llegar_y_escanear",
 }
 
 # Cuando el nodo no lleva game_id (nodos viejos), se agrupa por su family
@@ -47,6 +58,7 @@ TYPE_DISPLAY_FAMILY_FALLBACK = {
     "motion_challenge": "movimiento",
     "bearing_hunt": "orientacion",
     "audio_challenge": "sonido",
+    "word_trap": "desafio",
 }
 
 
@@ -253,13 +265,14 @@ async def admin_react_overview(request: Request):
         for idx, stage in enumerate(stages)
     ]
 
-    # Las cinco familias del editor (familyConfigs.ts), no sólo tres.
+    # Las seis familias del editor (familyConfigs.ts), no sólo tres.
     family_counts = {
         "signal_hunt": 0,
         "bearing_hunt": 0,
         "circuit_matrix": 0,
         "motion_challenge": 0,
         "audio_challenge": 0,
+        "word_trap": 0,
     }
     # Las 5 familias de PRESENTACIÓN del admin (displayFamilies.ts), sobre
     # las mismas plantillas: agrupación distinta de las técnicas de arriba.
@@ -314,8 +327,9 @@ async def admin_react_overview(request: Request):
             {"id": "circuit_matrix", "label": "Matriz de circuitos"},
             {"id": "motion_challenge", "label": "Reto de movimiento"},
             {"id": "audio_challenge", "label": "Reto de sonido"},
+            {"id": "word_trap", "label": "Trampa de palabras"},
         ],
-        # Nuevo: las 5 familias que ve el admin en el selector de juegos.
+        # Nuevo: las 6 familias que ve el admin en el selector de juegos.
         # "families" (arriba) se mantiene por compatibilidad con quien ya lo
         # lea.
         "display_families": DISPLAY_FAMILIES,

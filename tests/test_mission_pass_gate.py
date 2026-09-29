@@ -5,6 +5,7 @@ Sin clave guardada el motor público va exactamente como antes. Con ella puesta
 (desde el panel), `/api/config` deja de repartir la lista de jugadores y
 `/api/game` no entrega sesión hasta acertar la clave en `/api/mission/unlock`.
 """
+import pytest
 from fastapi.testclient import TestClient
 
 import main
@@ -75,6 +76,7 @@ def test_quitar_a_clave_reabre(monkeypatch, tmp_path):
     assert client.get("/api/game/PLAYER 1").status_code == 200
 
 
+@pytest.mark.slow
 def test_o_freo_de_forza_bruta_do_unlock(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     main.set_mission_password("Pelochito13")

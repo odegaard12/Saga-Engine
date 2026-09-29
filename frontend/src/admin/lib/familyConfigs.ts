@@ -1,7 +1,16 @@
 import type { AdminReactOverviewStage } from './adminApi'
 
 export type FamilyId =
-  'signal_hunt' | 'bearing_hunt' | 'circuit_matrix' | 'motion_challenge' | 'audio_challenge'
+  | 'signal_hunt'
+  | 'bearing_hunt'
+  | 'circuit_matrix'
+  | 'motion_challenge'
+  | 'audio_challenge'
+  // Sexta familia TÉCNICA nueva (owner-approved "Trampa de palabras",
+  // presentación "Desafío"): la primera familia nueva desde v5.36. Ver
+  // frontend/src/admin/lib/displayFamilies.ts y
+  // frontend/src/player/minigames/families/wordTrap/.
+  | 'word_trap'
 
 export type EditableAdminStage = AdminReactOverviewStage & {
   config?: Record<string, unknown>
@@ -43,6 +52,12 @@ export const familyCards: Array<{
     title: 'Reto de sonido',
     detail: 'Micrófono del dispositivo, soplado o volumen de sonido.',
   },
+  {
+    id: 'word_trap',
+    icon: '🧠',
+    title: 'Trampa de palabras',
+    detail: 'Varias rondas de preguntas con 4 opciones casi idénticas, contrarreloj.',
+  },
 ]
 
 export function getAdminFamilyLabel(type: string) {
@@ -54,6 +69,7 @@ export function getAdminFamilyLabel(type: string) {
   if (type === 'tilt_maze') return 'Laberinto de equilibrio'
   if (type === 'spark_radar') return 'Caza-Señales'
   if (type === 'audio_challenge') return 'Desafío de audio'
+  if (type === 'word_trap') return 'Trampa de palabras'
   return 'Checkpoint GPS'
 }
 
@@ -66,6 +82,7 @@ export function getAdminFamilyIcon(type: string) {
   if (type === 'tilt_maze') return '🎱'
   if (type === 'spark_radar') return '📡'
   if (type === 'audio_challenge') return '🎤'
+  if (type === 'word_trap') return '🧠'
   return '📍'
 }
 
@@ -171,6 +188,17 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
     }
   }
 
+  if (type === 'word_trap') {
+    return {
+      objective: 'word_trap',
+      game_id: 'trampa_palabras',
+      completion_method: 'quiz',
+      n_rounds: 8,
+      time_limit_s: 12,
+      questions: [],
+    }
+  }
+
   return {
     objective: 'proximity_lock',
     source_radius_m: 75,
@@ -203,6 +231,86 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
     return {
       objective: String(raw.objective || 'blow_charge'),
       game_id: String(raw.game_id || 'audio_challenge'),
+    }
+  }
+
+  // "Trampa de palabras" (game_id trampa_palabras, familia word_trap NUEVA):
+  // MISMO bug que rumbo_doble/cuenta_senales de abajo -un `return` genérico
+  // devuelve SIEMPRE sus propias claves fijas y tira cualquier otra cosa que
+  // traiga `raw`-. Como word_trap es una familia TÉCNICA propia (no un
+  // game_id compartido dentro de bearing_hunt/signal_hunt), esta rama va
+  // arriba del todo, igual que audio_challenge: sin ella, `questions`
+  // (el banco completo que escribió el organizador) se perdería aquí, ANTES
+  // de llegar al backend, exactamente como le pasó a `targets`/`questions`
+  // en v5.38/5.39. El editor dedicado vive en
+  // admin/components/trampaPalabras/TrampaPalabrasEditor.tsx.
+  if (type === 'word_trap') {
+    const rawQuestions = Array.isArray(raw.questions) ? raw.questions : []
+    const questions = rawQuestions
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .slice(0, 40)
+      .map((item) => {
+        const rawOptions = Array.isArray(item.options) ? item.options : []
+        const options = rawOptions.map((opt) => String(opt).trim().slice(0, 120)).slice(0, 4)
+        while (options.length < 4) options.push(`Opción ${options.length + 1}`)
+        return {
+          question: String(item.question ?? '').trim().slice(0, 300),
+          options,
+          correct_index: Math.max(0, Math.min(3, Math.round(toAdminConfigNumber(item.correct_index, 0)))),
+          explanation: String(item.explanation ?? '').trim().slice(0, 400),
+        }
+      })
+      .filter((item) => item.question.length > 0)
+
+    while (questions.length < 4) {
+      questions.push({
+        question: `Pregunta trampa ${questions.length + 1}: escribe el enunciado.`,
+        options: ['Opción A', 'Opción B', 'Opción C', 'Opción D'],
+        correct_index: 0,
+        explanation: '',
+      })
+    }
+
+    return {
+      objective: 'word_trap',
+      game_id: 'trampa_palabras',
+      completion_method: 'quiz',
+      questions,
+      n_rounds: Math.max(4, Math.min(12, Math.round(toAdminConfigNumber(raw.n_rounds, 8)))),
+      time_limit_s: Math.max(4, Math.min(30, Math.round(toAdminConfigNumber(raw.time_limit_s, 12)))),
+    }
+  }
+
+  // "Pulso de hierro" (owner-approved, game_id 'pulso_hierro'): MISMO bug
+  // que rumbo_doble/cuenta_senales arriba -la rama genérica de
+  // motion_challonge, justo debajo, devuelve SIEMPRE sus claves fijas de
+  // shake_charge y tiraría los campos pulso_* antes de llegar al backend.
+  // Esta rama tiene que ir ANTES de esa.
+  if (type === 'motion_challenge' && raw.game_id === 'pulso_hierro') {
+    return {
+      objective: 'pulso_hierro',
+      game_id: 'pulso_hierro',
+      difficulty: String(raw.difficulty || 'hard'),
+      allow_touch_fallback: raw.allow_touch_fallback !== false,
+      pulso_start_length: Math.max(2, Math.min(6, Math.round(toAdminConfigNumber(raw.pulso_start_length, 3)))),
+      pulso_target_rounds: Math.max(
+        3,
+        Math.min(10, Math.round(toAdminConfigNumber(raw.pulso_target_rounds, 6)))
+      ),
+      pulso_growth_per_round: Math.max(
+        0,
+        Math.min(3, Math.round(toAdminConfigNumber(raw.pulso_growth_per_round, 1)))
+      ),
+      pulso_stability_variance_max: Math.max(
+        0.2,
+        Math.min(3, toAdminConfigNumber(raw.pulso_stability_variance_max, 0.9))
+      ),
+      pulso_tap_window_ms: Math.max(
+        1200,
+        Math.min(5000, Math.round(toAdminConfigNumber(raw.pulso_tap_window_ms, 2600)))
+      ),
+      pulso_pad_count: Math.max(3, Math.min(6, Math.round(toAdminConfigNumber(raw.pulso_pad_count, 4)))),
+      use_vibration: raw.use_vibration !== false,
     }
   }
 
