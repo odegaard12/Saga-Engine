@@ -3,6 +3,7 @@ import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedSignalHuntMinigame } from '../../core/resolver'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
+import { registrarEvidencia } from '../../../avance/evidencia'
 
 interface Props {
   resolved: ResolvedSignalHuntMinigame
@@ -257,6 +258,8 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
   const [checking, setChecking] = useState(false)
   const [statusKind, setStatusKind] = useState<'idle' | 'wrong' | 'penalty'>('idle')
   const wonRef = useRef(false)
+  /** Cada respuesta tecleada, en orden: es la evidencia que revisa el servidor. */
+  const respuestasRef = useRef<number[]>([])
 
   function pressDigit(digit: string) {
     if (submitting || checking) return
@@ -277,8 +280,15 @@ export function CuentaSenalesRuntimeScreen({ resolved, stage, submitting, onWin,
       const candidate = await sha256Hex(`${salt}:${digits}`)
       const correct = answerHashes.includes(candidate)
 
+      respuestasRef.current.push(Number(digits))
+
       if (correct) {
         wonRef.current = true
+        registrarEvidencia(stage.id ?? '', {
+          game: 'cuenta_senales',
+          answers: respuestasRef.current,
+          fallos: respuestasRef.current.length - 1,
+        })
         haptics.signalLock()
         sounds.signalLock()
         await onWin(penaltyAccumMs)

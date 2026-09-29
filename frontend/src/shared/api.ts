@@ -1,3 +1,4 @@
+import { esFalloDeRed, notarFalloDeRed, notarRedOk } from '../player/offline/redEstado'
 import type {
   FieldProofsPayload,
   FieldProofUploadResponse,
@@ -61,6 +62,8 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
       body: JSON.stringify(body),
     })
 
+    notarRedOk()
+
     if (!res.ok) {
       const fallo = new Error(`Request failed: HTTP ${res.status}`) as Error & { status?: number }
       // El numero hace falta arriba: un 403 es la sesion caducada y tiene
@@ -70,6 +73,9 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 8000): Promis
     }
 
     return (await res.json()) as T
+  } catch (error) {
+    if (esFalloDeRed(error)) notarFalloDeRed()
+    throw error
   } finally {
     timeout.cleanup()
   }
@@ -130,11 +136,16 @@ export async function fetchPlayerGame(
       },
     })
 
+    notarRedOk()
+
     if (!res.ok) {
       throw new Error(`Failed to load player payload: HTTP ${res.status}`)
     }
 
     return res.json() as Promise<PlayerGamePayload>
+  } catch (error) {
+    if (esFalloDeRed(error)) notarFalloDeRed()
+    throw error
   } finally {
     timeout.cleanup()
   }
@@ -229,7 +240,12 @@ export async function advancePlayer(
    *
    * Se inyecta desde arriba para no atar este módulo al almacén del jugador.
    */
-  vaciarCola?: () => Promise<unknown>
+  vaciarCola?: () => Promise<unknown>,
+  /**
+   * Cómo se ganó el nodo (respuestas, rondas, GPS, QR). El servidor lo revisa
+   * contra la configuración real y anota lo que no cuadre; nunca bloquea.
+   */
+  evidence?: Record<string, unknown>
 ) {
   const cuerpo = {
     user,
@@ -238,6 +254,7 @@ export async function advancePlayer(
     penalty_ms,
     manual: Boolean(manual),
     level_before,
+    evidence,
   }
 
   try {

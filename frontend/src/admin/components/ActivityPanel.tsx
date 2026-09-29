@@ -15,6 +15,19 @@ const ETIQUETA_MOTIVO: Record<string, string> = {
   left_app_during_minigame: 'Salió de la app durante el minijuego',
   opened_app_switcher_during_minigame: 'Abrió el selector de apps durante el minijuego',
   manual_position_used: 'Usó posición manual (modo prueba)',
+  // Revisión de la evidencia de la partida (backend/app/runtime/evidencia.py):
+  // el servidor vuelve a comprobar lo que el móvil dio por bueno. Son avisos,
+  // no bloqueos: el jugador avanzó igual.
+  evidence_answer_mismatch: 'La respuesta enviada no cuadra con la del servidor',
+  evidence_rounds_mismatch: 'Las rondas de la partida no cuadran con lo que tocaba',
+  evidence_penalty_short: 'Penalización recortada respecto a los fallos',
+  evidence_too_fast: 'Rondas contestadas más rápido de lo humano',
+  evidence_qr_mismatch: 'El QR leído no es el del nodo',
+  evidence_gps_far_mapa_mudo: 'Mapa mudo: ningún GPS cerca del punto real',
+  evidence_gps_missing: 'Mapa mudo completado sin muestras de GPS',
+  evidence_missing: 'Partida sin la evidencia que exige el juego (móvil modificado)',
+  evidence_legacy_client: 'Nodo completado sin evidencia (app antigua)',
+  evidence_unreadable: 'Evidencia ilegible',
 }
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'

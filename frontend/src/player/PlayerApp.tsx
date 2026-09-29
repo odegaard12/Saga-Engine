@@ -70,6 +70,7 @@ import {
   contarAvancesPendentes,
   getOfflineMissionSummary,
   getStoredMissionPack,
+  queueOfflineEvent,
   saveMissionPack,
   syncPendingOfflineEvents,
   type OfflineMissionSummary,
@@ -99,6 +100,12 @@ import {
 } from './utils/gpsStorage'
 import { haptics } from './utils/haptics'
 import { getCurrentStage, getStagePosition, getStageRadius } from './utils/stagePosition'
+import { haLlegadoAlMapaMudo, leerLlegada } from './utils/mapaMudo'
+import {
+  anotarMuestraGps,
+  registrarProveedorDePosicion,
+} from './avance/evidencia'
+import { apuntarPosicionSinRed, volcarRastro } from './offline/rastroSinRed'
 import {
   CelebrationOverlay,
   ScreenFrame,
@@ -1235,6 +1242,22 @@ export default function PlayerApp() {
   gpsAccRef.current =
     !localDebugPosition && browserGpsFresh ? browserGpsAccuracy ?? undefined : undefined
 
+  // La evidencia de cada nodo lleva las últimas posiciones (ver
+  // avance/evidencia.ts): se le dice cómo leer la de ahora mismo.
+  useEffect(() => {
+    registrarProveedorDePosicion(() => {
+      const posicion = heartbeatPositionRef.current
+      if (!posicion) return null
+      return {
+        lat: posicion.lat,
+        lon: posicion.lon,
+        acc: gpsAccRef.current,
+        src: heartbeatSourceRef.current === 'manual' ? 'manual' : 'real',
+      }
+    })
+    return () => registrarProveedorDePosicion(null)
+  }, [])
+
   useEffect(() => {
     if (state.status !== 'ready') return
 
@@ -1272,6 +1295,10 @@ export default function PlayerApp() {
         const misionRematada = Boolean(payloadRef.current?.finished)
         const effectivePosition = misionRematada ? null : heartbeatPositionRef.current
 
+        // Una muestra por latido, llegue o no: es el rastro que va en la
+        // evidencia de los nodos y el que se sube si no hay cobertura.
+        if (!misionRematada) anotarMuestraGps(true)
+
         const respuesta = await sendHeartbeat({
           user,
           ...(effectivePosition
@@ -1294,6 +1321,9 @@ export default function PlayerApp() {
           aplicarEquipoRef.current(profiles)
         }
 
+        // Volvió la red: lo apuntado sin cobertura pasa a la cola de eventos.
+        void volcarRastro(user)
+
         // El latido ya trae el nivel real del servidor (ver /api/heartbeat,
         // live_status.level): si no coincide con lo que se está pintando, o
         // si la misión acaba de terminar, el refresco pesado de 214 KB pasa
@@ -1310,6 +1340,10 @@ export default function PlayerApp() {
           heavyRefreshDueRef.current = true
         }
       } catch {
+        // Sin cobertura el latido no llega, pero la posición no se pierde: se
+        // guarda y se sube en bloque, con su hora, al volver la red.
+        if (!payloadRef.current?.finished) apuntarPosicionSinRed(user, anotarMuestraGps(false))
+
         // Sin cobertura se pinta el último equipo conocido en vez de vaciar la
         // pantalla: los compañeros siguen donde estaban, que es más útil que
         // un mapa en blanco.
@@ -1875,8 +1909,19 @@ export default function PlayerApp() {
   // el jugador físicamente encima del nodo. Ver gps/decisiones.ts.
   const accuracyMargin = margenQueSePerdona(browserGpsAccuracy)
 
-  const inRange =
-    stageRadius !== null && distanceMeters !== null
+  // «Mapa mudo»: el círculo que tiene el móvil es difuso, así que la llegada
+  // se comprueba contra las celdas que manda el servidor -ver utils/mapaMudo.ts-,
+  // también sin cobertura. Sin ellas (servidor o paquete antiguo) manda el
+  // círculo, como antes. Con `unlockPosition` nula no hay nada que comprobar.
+  const llegadaDelNodo = String(currentStage?.kind || '') === 'mapa_mudo' ? leerLlegada(currentStage) : null
+  const llegadaMapaMudo: boolean | null =
+    llegadaDelNodo && stagePosition && unlockPosition
+      ? haLlegadoAlMapaMudo(unlockPosition, accuracyMargin, stagePosition, llegadaDelNodo)
+      : null
+
+  const inRange = llegadaDelNodo
+    ? Boolean(llegadaMapaMudo)
+    : stageRadius !== null && distanceMeters !== null
       ? distanceMeters - accuracyMargin <= stageRadius
       : false
 
@@ -1923,6 +1968,7 @@ export default function PlayerApp() {
         }
       : null,
     esperandoGpsMs: esperandoGpsDesde ? Date.now() - esperandoGpsDesde : null,
+    llegada: llegadaDelNodo ? Boolean(llegadaMapaMudo) : null,
   })
 
   // Sólo se pide activar el GPS cuando NO hay ninguna posición. Antes bastaba
@@ -2404,6 +2450,21 @@ export default function PlayerApp() {
   }
 
   function openInteraction() {
+    // Para el Registro de partida: cuándo abrió el jugador este nodo. Va por la
+    // misma cola que todo lo demás, así que también queda sin cobertura.
+    if (currentStage) {
+      void queueOfflineEvent({
+        user,
+        type: 'node_opened',
+        source: 'offline_queue',
+        node_id: String(currentStage.id ?? ''),
+        payload: {
+          stage_title: currentStage.title || '',
+          kind: currentStage.kind || '',
+          level: payload.level,
+        },
+      }).catch(() => undefined)
+    }
     setSubmitError(null)
     setActivePanel(null)
     setToolsOpen(false)

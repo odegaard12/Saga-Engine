@@ -4,6 +4,8 @@ import type { ResolvedWordTrapMinigame } from '../../core/resolver'
 import type { WordTrapRound } from '../../core/family-types'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
+import { registrarEvidencia } from '../../../avance/evidencia'
+import { leerExplicacion } from './explicacion'
 
 interface Props {
   resolved: ResolvedWordTrapMinigame
@@ -193,15 +195,18 @@ function useCountdown(activeKey: string, durationMs: number, onExpire: () => voi
   return remainingMs
 }
 
-export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
+export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
   const { t } = useI18n()
   const cfg = resolved.config as unknown as Record<string, unknown>
 
-  const rounds = useMemo(
+  const baseRounds = useMemo(
     () => (Array.isArray(cfg.rounds) ? (cfg.rounds as WordTrapRound[]) : []),
     [cfg.rounds]
   )
-  const nRounds = rounds.length > 0 ? rounds.length : Number(cfg.n_rounds) || DEFAULT_N_ROUNDS
+  const extraPool = useMemo(
+    () => (Array.isArray(cfg.extra_rounds) ? (cfg.extra_rounds as WordTrapRound[]) : []),
+    [cfg.extra_rounds]
+  )
   const timeLimitS = Number(cfg.time_limit_s) > 0 ? Number(cfg.time_limit_s) : DEFAULT_TIME_LIMIT_S
   const timeLimitMs = timeLimitS * 1000
   const penaltyMs = Number(cfg.penalty_ms) >= 0 ? Number(cfg.penalty_ms) : DEFAULT_PENALTY_MS
@@ -212,16 +217,54 @@ export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
   const [result, setResult] = useState<RoundResult>('idle')
   const [checking, setChecking] = useState(false)
   const [penaltyAccumMs, setPenaltyAccumMs] = useState(0)
+  const [explicacion, setExplicacion] = useState('')
+  /**
+   * Cada fallo (o pregunta sin contestar a tiempo) suma UNA ronda de repuesto,
+   * hasta agotar las que mandó el servidor. Sin esto, quien lee rápido la
+   * acababa en menos de un minuto aunque fallase: el fallo sólo costaba 30 s
+   * en el marcador, no tiempo de juego. La cuenta va en un ref además de en el
+   * estado porque `advanceOrFinish` decide si es la última ronda en el mismo
+   * instante en que se suma.
+   */
+  const extrasRef = useRef(0)
+  const [extrasUsadas, setExtrasUsadas] = useState(0)
+  const rounds = useMemo(
+    () => [...baseRounds, ...extraPool.slice(0, extrasUsadas)],
+    [baseRounds, extraPool, extrasUsadas]
+  )
+  const nRounds = rounds.length > 0 ? rounds.length : Number(cfg.n_rounds) || DEFAULT_N_ROUNDS
   const finishingRef = useRef(false)
+
+  /** Lo que se le cuenta al servidor: cada ronda con su opción y su tiempo. */
+  const registroRef = useRef<Array<{ r: number; c: number | null; ms: number }>>([])
+  const inicioRondaRef = useRef(Date.now())
+  const fallosRef = useRef(0)
+
+  useEffect(() => {
+    inicioRondaRef.current = Date.now()
+  }, [roundIndex])
+
+  const sumarRondaExtra = () => {
+    if (extrasRef.current >= extraPool.length) return
+    extrasRef.current += 1
+    setExtrasUsadas(extrasRef.current)
+  }
 
   const round = rounds[roundIndex]
   const revealed = result !== 'idle'
 
   const advanceOrFinish = (nextPenaltyAccumMs: number) => {
     window.setTimeout(() => {
-      if (roundIndex + 1 >= rounds.length) {
+      if (roundIndex + 1 >= baseRounds.length + extrasRef.current) {
         if (finishingRef.current) return
         finishingRef.current = true
+        const registro = registroRef.current
+        registrarEvidencia(stage.id ?? '', {
+          game: 'trampa_palabras',
+          rondas: registro,
+          fallos: fallosRef.current,
+          penalty_ms: nextPenaltyAccumMs,
+        })
         void onWin(nextPenaltyAccumMs)
         return
       }
@@ -229,12 +272,28 @@ export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
       setPickedIndex(null)
       setCorrectIndex(null)
       setResult('idle')
+      setExplicacion('')
     }, REVEAL_PAUSE_MS)
+  }
+
+  /** La explicación, ya contestada: se abre ahora, no estaba en el paquete en claro. */
+  const mostrarExplicacion = async (ronda: WordTrapRound | undefined) => {
+    if (!ronda) return
+    if (ronda.explanation) {
+      setExplicacion(ronda.explanation)
+      return
+    }
+    const texto = await leerExplicacion(ronda.explanation_enc, ronda.salt, ronda.options.length)
+    setExplicacion(texto)
   }
 
   const handleTimeout = () => {
     if (revealed || !round) return
     haptics.error()
+    registroRef.current.push({ r: roundIndex, c: null, ms: Math.round(timeLimitMs) })
+    fallosRef.current += 1
+    sumarRondaExtra()
+    void mostrarExplicacion(round)
     setResult('timeout')
     setPickedIndex(null)
     setCorrectIndex(null)
@@ -254,8 +313,15 @@ export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
       const candidate = await sha256Hex(`${round.salt}:${index}`)
       const correct = candidate === round.answer_hash
 
+      registroRef.current.push({
+        r: roundIndex,
+        c: index,
+        ms: Math.max(0, Math.round(Date.now() - inicioRondaRef.current)),
+      })
+
       setPickedIndex(index)
       setCorrectIndex(correct ? index : null)
+      void mostrarExplicacion(round)
 
       if (correct) {
         haptics.signalLock()
@@ -264,6 +330,8 @@ export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
         advanceOrFinish(penaltyAccumMs)
       } else {
         haptics.error()
+        fallosRef.current += 1
+        sumarRondaExtra()
         setResult('wrong')
         setPenaltyAccumMs((prev) => {
           const next = prev + penaltyMs
@@ -360,7 +428,7 @@ export function WordTrapRuntimeScreen({ resolved, submitting, onWin }: Props) {
           {statusText}
         </div>
 
-        {revealed && round.explanation ? <div className="wtp-explain">{round.explanation}</div> : null}
+        {revealed && explicacion ? <div className="wtp-explain">{explicacion}</div> : null}
 
         {penaltyAccumMs > 0 ? (
           <div className="wtp-penalty">

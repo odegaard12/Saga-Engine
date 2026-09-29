@@ -337,8 +337,12 @@ function leerPendientes(db) {
         filas
           .filter((fila) => fila && fila.status !== 'synced')
           // El orden ES el progreso del jugador: el servidor aplica los avances
-          // segun le llegan.
-          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+          // segun le llegan. Manda `seq` (crece siempre); la hora del movil se
+          // corrige al volver la cobertura y no sirve para ordenar.
+          .sort(
+            (a, b) =>
+              (a.seq || 0) - (b.seq || 0) || String(a.created_at).localeCompare(String(b.created_at)),
+          )
       )
     }
     peticion.onerror = () => resolve([])
@@ -386,6 +390,26 @@ function aFormatoDeEnvio(evento) {
   }
 }
 
+// Igual que en la aplicacion (missionPack.ts): un rechazo definitivo no se
+// reintenta jamas, y una tanda no pasa de 50 para no chocar con el tope del
+// servidor (400 y la cola atascada para siempre).
+const RECHAZOS_DEFINITIVOS = [
+  'invalid_completion_code',
+  'missing_required_item',
+  'mission_already_complete',
+  'already_advanced',
+]
+const TANDA_DE_ENVIO = 50
+
+function aceptado(respuestaDelEvento) {
+  if (!respuestaDelEvento) return false
+  if (respuestaDelEvento.duplicate === true) return true
+  const estado = String(respuestaDelEvento.status || '').toLowerCase()
+  if (['pending', 'synced', 'ok', 'applied', 'ignored'].includes(estado)) return true
+  const motivo = String(respuestaDelEvento.error || '').toLowerCase()
+  return RECHAZOS_DEFINITIVOS.some((rechazo) => motivo.includes(rechazo))
+}
+
 async function vaciarColaEnSegundoPlano() {
   const db = await abrirBaseOffline()
   try {
@@ -402,23 +426,48 @@ async function vaciarColaEnSegundoPlano() {
       porJugador.get(quen).push(evento)
     })
 
+    let hayRechazados = false
+
     for (const [quen, eventos] of porJugador) {
-      const response = await fetch('/api/events/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // El endpoint exige pase de jugador; sin cookie son 403.
-        credentials: 'include',
-        body: JSON.stringify({ user: quen, events: eventos.map(aFormatoDeEnvio) }),
-      })
+      for (let desde = 0; desde < eventos.length; desde += TANDA_DE_ENVIO) {
+        const tanda = eventos.slice(desde, desde + TANDA_DE_ENVIO)
 
-      // Si no lo acepta NO se marca nada: marcarlo antes de tiempo perderia el
-      // avance para siempre. Al lanzar, el navegador reintenta el sync solo.
-      if (!response.ok) {
-        throw new Error('el servidor no acepto la cola: ' + response.status)
+        const response = await fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // El endpoint exige pase de jugador; sin cookie son 403.
+          credentials: 'include',
+          body: JSON.stringify({ user: quen, events: tanda.map(aFormatoDeEnvio) }),
+        })
+
+        // Si no lo acepta NO se marca nada: marcarlo antes de tiempo perderia el
+        // avance para siempre. Al lanzar, el navegador reintenta el sync solo.
+        if (!response.ok) {
+          throw new Error('el servidor no acepto la cola: ' + response.status)
+        }
+
+        // Un 200 NO quiere decir que todos los eventos entraron: el servidor
+        // contesta por cada uno, y uno rechazado por algo pasajero (la mision
+        // aun no ha empezado, por ejemplo) hay que dejarlo para otro intento.
+        // Antes se marcaba TODO como subido con solo ver el 200.
+        const cuerpo = await response.json().catch(() => ({}))
+        const respuestas = Array.isArray(cuerpo.events) ? cuerpo.events : []
+        const porIdCliente = new Map(
+          respuestas.filter((r) => r && r.client_event_id).map((r) => [String(r.client_event_id), r]),
+        )
+
+        const subidos = []
+        tanda.forEach((evento, indice) => {
+          const suya = porIdCliente.get(evento.id) || respuestas[indice]
+          if (aceptado(suya)) subidos.push(evento.id)
+          else hayRechazados = true
+        })
+
+        await marcarSubidos(db, subidos)
       }
-
-      await marcarSubidos(db, eventos.map((evento) => evento.id))
     }
+
+    if (hayRechazados) throw new Error('quedan eventos sin aceptar: se reintenta')
   } finally {
     db.close()
   }

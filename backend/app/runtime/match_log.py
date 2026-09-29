@@ -27,6 +27,7 @@ from __future__ import annotations
 import csv
 import io
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from backend.app.runtime import mission_schedule as _mission_schedule
@@ -172,6 +173,40 @@ def reset_rate_state() -> None:
     _LAST_SESSION_OPEN_AT.clear()
 
 
+def _parse_iso(value: Any):
+    """Fecha ISO (con `Z` o con `+00:00`) como datetime UTC, o None."""
+    texto = str(value or "").strip()
+    if not texto:
+        return None
+    try:
+        fecha = datetime.fromisoformat(texto.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if fecha.tzinfo is None:
+        fecha = fecha.replace(tzinfo=timezone.utc)
+    return fecha.astimezone(timezone.utc)
+
+
+def occurred_at(entry: dict[str, Any]) -> str:
+    """Cuándo PASÓ de verdad: la hora del móvil si la trae, si no la del servidor.
+
+    Un evento creado sin cobertura llega minutos u horas después de ocurrir.
+    Para revisar la partida en casa importa el orden en que pasaron las cosas,
+    no el orden en que se subieron.
+    """
+    fecha = _parse_iso(entry.get("client_created_at")) or _parse_iso(entry.get("created_at"))
+    return fecha.isoformat() if fecha else str(entry.get("created_at") or "")
+
+
+def es_sospecha(entry: dict[str, Any]) -> bool:
+    return entry.get("severity") == "suspicion" or entry.get("type") == "suspicion"
+
+
+def es_sin_cobertura(entry: dict[str, Any]) -> bool:
+    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+    return bool(payload.get("offline")) or entry.get("type") == "offline_sync_batch"
+
+
 def list_timeline(
     db_path: str,
     *,
@@ -180,8 +215,16 @@ def list_timeline(
     date_to: str | None = None,
     event_type: str | None = None,
     limit: int | None = None,
+    only_suspicions: bool = False,
+    only_offline: bool = False,
+    by_occurrence: bool = False,
 ) -> list[dict[str, Any]]:
-    return _store.list_entries(
+    """La línea de tiempo, con filtros de revisión.
+
+    `by_occurrence` ordena por cuándo ocurrió (hora del móvil) y añade
+    `occurred_at` a cada fila; sin él el orden es el de registro, como siempre.
+    """
+    entradas = _store.list_entries(
         db_path,
         user=user,
         date_from=date_from,
@@ -189,6 +232,18 @@ def list_timeline(
         event_type=event_type,
         limit=limit,
     )
+
+    if only_suspicions:
+        entradas = [e for e in entradas if es_sospecha(e)]
+    if only_offline:
+        entradas = [e for e in entradas if es_sin_cobertura(e)]
+
+    if by_occurrence:
+        for entrada in entradas:
+            entrada["occurred_at"] = occurred_at(entrada)
+        entradas.sort(key=lambda e: (e["occurred_at"], e.get("created_at") or "", e.get("id") or ""))
+
+    return entradas
 
 
 def count_entries(db_path: str, *, user: str | None = None) -> int:
@@ -202,6 +257,10 @@ def purge(db_path: str, *, user: str | None = None) -> int:
 _CSV_COLUMNS = [
     "created_at",
     "client_created_at",
+    "occurred_at",
+    "offline",
+    "sync_delay_ms",
+    "node_id",
     "user",
     "display_name",
     "type",
@@ -243,6 +302,10 @@ def to_csv(entries: list[dict[str, Any]]) -> str:
             {
                 "created_at": _celda_csv_segura(entry.get("created_at", "")),
                 "client_created_at": _celda_csv_segura(entry.get("client_created_at", "")),
+                "occurred_at": _celda_csv_segura(entry.get("occurred_at") or occurred_at(entry)),
+                "offline": _celda_csv_segura(_campo_de_payload(entry, "offline")),
+                "sync_delay_ms": _celda_csv_segura(_campo_de_payload(entry, "sync_delay_ms")),
+                "node_id": _celda_csv_segura(_campo_de_payload(entry, "node_id")),
                 "user": _celda_csv_segura(entry.get("user", "")),
                 "display_name": _celda_csv_segura(entry.get("display_name", "")),
                 "type": _celda_csv_segura(entry.get("type", "")),
@@ -251,6 +314,12 @@ def to_csv(entries: list[dict[str, Any]]) -> str:
             }
         )
     return buffer.getvalue()
+
+
+def _campo_de_payload(entry: dict[str, Any], clave: str) -> Any:
+    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+    valor = payload.get(clave)
+    return "" if valor is None else valor
 
 
 def _stringify_payload(payload: Any) -> str:
