@@ -9,6 +9,7 @@ import TiltMazeEditor from './tiltMaze/TiltMazeEditor'
 import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
 import RumboDobleEditor from './rumboDoble/RumboDobleEditor'
 import CuentaSenalesEditor from './cuentaSenales/CuentaSenalesEditor'
+import TrampaPalabrasEditor from './trampaPalabras/TrampaPalabrasEditor'
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
 import {
@@ -973,6 +974,9 @@ export default function AdminGameEditor({
                   )}
                   {selectedGame.id === 'cuenta_senales' && (
                     <div className="wide saga-guided-v4-custom-editor"><CuentaSenalesEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
+                  )}
+                  {selectedGame.id === 'trampa_palabras' && (
+                    <div className="wide saga-guided-v4-custom-editor"><TrampaPalabrasEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
                   )}
                   {selectedGame.id === 'mapa_mudo' && (
                     <label className="wide">

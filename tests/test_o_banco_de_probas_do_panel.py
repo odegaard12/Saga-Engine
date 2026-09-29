@@ -273,6 +273,7 @@ def test_o_banco_sen_cobertura_manda_a_cola_de_golpe(monkeypatch):
     assert jugador["peticiones"][0]["tipo"] == "events_sync_lote"
 
 
+@pytest.mark.slow
 def test_o_banco_simula_un_corte_a_mitade_de_ruta(monkeypatch):
     """El caso que máis importaba probar: non "todo ou nada", un tramo morto
     no medio -unha vagoada- e que ao saír del se manda todo o pendente de
@@ -300,6 +301,7 @@ def test_o_banco_simula_un_corte_a_mitade_de_ruta(monkeypatch):
     assert main.get_player_progress_level("SIM_01", 0) == 8
 
 
+@pytest.mark.slow
 def test_o_banco_a_saltos_cruza_e_volve_varias_veces(monkeypatch):
     """El caso que "corte" no prueba: no UN tramo muerto, sino entrar y
     salir de cobertura VARIAS veces en la misma ruta -cada cruce tiene que
@@ -329,6 +331,7 @@ def test_o_banco_a_saltos_cruza_e_volve_varias_veces(monkeypatch):
     assert main.get_player_progress_level("SIM_01", 0) == 9
 
 
+@pytest.mark.slow
 def test_o_banco_ruta_larga_caotica_non_perde_nin_duplica_nada(monkeypatch):
     """"Todas las casuísticas a la vez": empieza sin cobertura, seis cortes
     sueltos más repartidos sin patrón, GPS degradado todo el rato. Una ruta
@@ -358,6 +361,7 @@ def test_o_banco_ruta_larga_caotica_non_perde_nin_duplica_nada(monkeypatch):
         assert main.get_player_progress_level(jugador["nombre"], 0) == 30
 
 
+@pytest.mark.slow
 def test_o_banco_cliente_antigo_avanza_sen_level_before(monkeypatch):
     """El comentario de game.py::advance promete que un movil sin
     level_before "sigue funcionando igual que antes". Esto lo comprueba de

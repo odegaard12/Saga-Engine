@@ -11,7 +11,8 @@ import { circuitMatrixDefinition } from '../families/circuitMatrix/definition'
 import { signalHuntDefinition } from '../families/signalHunt/definition'
 import { motionChallengeDefinition } from '../families/motionChallenge/definition'
 import { audioChallengeDefinition } from '../families/audioChallenge/definition'
-import type { AudioChallengeConfig } from './family-types'
+import { wordTrapDefinition } from '../families/wordTrap/definition'
+import type { AudioChallengeConfig, WordTrapConfig } from './family-types'
 
 // React player policy: family-native runtimes are the normal path.
 // Compatibility helpers may normalize older stage shapes, but the React player resolver only executes family-native runtimes.
@@ -75,12 +76,23 @@ export type ResolvedAudioChallengeMinigame = {
   config: AudioChallengeConfig
 }
 
+export type ResolvedWordTrapMinigame = {
+  family: 'word_trap'
+  type: 'word_trap'
+  version: 'v1'
+  compatibility: MinigameCompatibility
+  label: string
+  definition: typeof wordTrapDefinition
+  config: WordTrapConfig
+}
+
 export type ResolvedMinigame =
   | ResolvedCircuitMatrixMinigame
   | ResolvedBearingHuntMinigame
   | ResolvedSignalHuntMinigame
   | ResolvedMotionChallengeMinigame
   | ResolvedAudioChallengeMinigame
+  | ResolvedWordTrapMinigame
 
 function asObject<T>(value: unknown): Partial<T> {
   return value && typeof value === 'object' ? (value as Partial<T>) : {}
@@ -96,7 +108,8 @@ export function isNativeMinigameFamily(value: string): value is MinigameFamily {
     value === 'bearing_hunt' ||
     value === 'signal_hunt' ||
     value === 'motion_challenge' ||
-    value === 'audio_challenge'
+    value === 'audio_challenge' ||
+    value === 'word_trap'
   )
 }
 
@@ -186,6 +199,21 @@ function resolveAudioChallengeNative(input: ResolveMinigameInput): ResolvedAudio
   }
 }
 
+function resolveWordTrapNative(input: ResolveMinigameInput): ResolvedWordTrapMinigame {
+  return {
+    family: 'word_trap',
+    type: 'word_trap',
+    version: normalizeVersion(input.version),
+    compatibility: 'native',
+    label: wordTrapDefinition.label,
+    definition: wordTrapDefinition,
+    config: {
+      ...wordTrapDefinition.default_config,
+      ...asObject<WordTrapConfig>(input.config),
+    },
+  }
+}
+
 function resolveNativeMinigame(
   input: ResolveMinigameInput & { type: MinigameFamily }
 ): ResolvedMinigame {
@@ -203,6 +231,10 @@ function resolveNativeMinigame(
 
   if (input.type === 'audio_challenge') {
     return resolveAudioChallengeNative(input)
+  }
+
+  if (input.type === 'word_trap') {
+    return resolveWordTrapNative(input)
   }
 
   return resolveSignalHuntNative(input)
@@ -237,5 +269,12 @@ export function getResolvedMinigameLabel(input: ResolveMinigameInput): string | 
 }
 
 export function listSupportedRuntimeTypes(): string[] {
-  return ['signal_hunt', 'bearing_hunt', 'circuit_matrix', 'motion_challenge', 'audio_challenge']
+  return [
+    'signal_hunt',
+    'bearing_hunt',
+    'circuit_matrix',
+    'motion_challenge',
+    'audio_challenge',
+    'word_trap',
+  ]
 }

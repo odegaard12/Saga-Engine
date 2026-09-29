@@ -17,7 +17,11 @@ from backend.app.runtime.core_engine import (
     validate_stage,
     _clean_code,
 )
-from backend.app.runtime.minigames import build_stage_minigame_runtime, project_cuenta_senales_for_player
+from backend.app.runtime.minigames import (
+    build_stage_minigame_runtime,
+    project_cuenta_senales_for_player,
+    project_word_trap_for_player,
+)
 
 
 def validate_stages(raw_stages):
@@ -404,6 +408,25 @@ def project_stage_for_player(raw_stage, include_runtime=False, fotos_por_url=Fal
                 nuevo_mg_config = {**minigame_efectivo["config"], **proyectada_mg}
                 nuevo_mg_config.pop("questions", None)
                 minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config}
+
+        # "Trampa de palabras": el banco ENTERO de preguntas trampa (con su
+        # índice correcto en claro) vive en la config del editor/minijuego,
+        # igual que `questions` de cuenta_senales arriba. Se sustituye aquí,
+        # justo antes de salir hacia el jugador, por SOLO las `n_rounds`
+        # rondas que le tocan a `player_id`, cada una con su respuesta ya
+        # hasheada (ver project_word_trap_for_player en minigames.py).
+        if str(_config_del_nodo(node).get("game_id") or "").lower() == "trampa_palabras":
+            if isinstance(config_efectiva, dict):
+                proyectada_wt = project_word_trap_for_player(config_efectiva, node["id"], player_id)
+                config_efectiva = {**config_efectiva, **proyectada_wt}
+                config_efectiva.pop("questions", None)
+            if isinstance(minigame_efectivo, dict) and isinstance(minigame_efectivo.get("config"), dict):
+                proyectada_wt_mg = project_word_trap_for_player(
+                    minigame_efectivo["config"], node["id"], player_id
+                )
+                nuevo_mg_config_wt = {**minigame_efectivo["config"], **proyectada_wt_mg}
+                nuevo_mg_config_wt.pop("questions", None)
+                minigame_efectivo = {**minigame_efectivo, "config": nuevo_mg_config_wt}
 
         out.update({
             "content": node["presentation"]["content"],

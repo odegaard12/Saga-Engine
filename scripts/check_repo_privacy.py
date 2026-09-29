@@ -85,6 +85,22 @@ def load_local_wordlist() -> list[re.Pattern[str]]:
     return patrones
 
 
+def _literal(patron: re.Pattern[str]) -> str:
+    """Palabra en claro de un patron de `load_local_wordlist` (para el filtro previo)."""
+    cuerpo = patron.pattern[len(r"(?<!\w)") : -len(r"(?!\w)")]
+    return cuerpo.replace(chr(92), "").casefold()
+
+
+_WORDLIST_CACHE: list[re.Pattern[str]] | None = None
+
+
+def _wordlist_cached() -> list[re.Pattern[str]]:
+    global _WORDLIST_CACHE
+    if _WORDLIST_CACHE is None:
+        _WORDLIST_CACHE = load_local_wordlist()
+    return _WORDLIST_CACHE
+
+
 SECRET_CONTENT_PATTERNS = [
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"), "private key material"),
     (re.compile(r"ghp_[A-Za-z0-9_]{20,}"), "GitHub personal access token"),
@@ -192,7 +208,18 @@ def scan_content(path: Path) -> list[str]:
     text = raw.decode("utf-8", errors="replace")
     findings = []
 
-    palabras = load_local_wordlist()
+    palabras = _wordlist_cached()
+
+    # Filtro previo: si ningun patron casa en el texto entero, tampoco casara
+    # linea a linea (cada coincidencia por linea es subcadena del texto). Solo
+    # se recorre linea a linea lo que ya ha dado positivo, para localizarlo.
+    # Las palabras de la lista se filtran antes con una busqueda de subcadena
+    # (casefold: superconjunto de IGNORECASE), mucho mas barata que el regex.
+    plegado = text.casefold()
+    palabras = [p for p in palabras if _literal(p) in plegado]
+    todos = [p for p, _ in SECRET_CONTENT_PATTERNS] + [p for p, _ in MISSION_CONTENT_PATTERNS] + palabras
+    if not any(p.search(text) for p in todos):
+        return findings
 
     for line_no, line in enumerate(text.splitlines(), start=1):
         for pattern, label in SECRET_CONTENT_PATTERNS:

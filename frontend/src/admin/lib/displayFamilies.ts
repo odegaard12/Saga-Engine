@@ -1,12 +1,12 @@
-// Agrupación de PRESENTACIÓN para el admin: 5 familias claras en español que
+// Agrupación de PRESENTACIÓN para el admin: 6 familias claras en español que
 // organizan el selector de juegos y las tarjetas de familia.
 //
 // Esto NO cambia ningún id que viaje en datos de misión: interaction_type,
 // game_id, o la familia nativa que usan el resolver/runtime del jugador
 // (frontend/src/player/minigames/core/resolver.ts) y el anti-cheat siguen
 // siendo los técnicos de siempre (signal_hunt, circuit_matrix,
-// motion_challenge, bearing_hunt, audio_challenge). Una misión existente
-// carga y juega exactamente igual que antes.
+// motion_challenge, bearing_hunt, audio_challenge, word_trap). Una misión
+// existente carga y juega exactamente igual que antes.
 //
 // Grupo de destino (owner-approved):
 //   1. Llegar y escanear — checkpoint/señal + QR/físico
@@ -14,9 +14,18 @@
 //   3. Movimiento        — agitar/inclinar el móvil
 //   4. Orientación       — brújula
 //   5. Sonido            — micrófono
+//   6. Desafío           — preguntas trampa contrarreloj (familia TÉCNICA
+//                          nueva, word_trap/trampa_palabras: ninguna de las
+//                          5 de arriba encajaba)
 import type { AdminGameId } from './gameCatalog'
 
-export type DisplayFamilyId = 'llegar_y_escanear' | 'puzles' | 'movimiento' | 'orientacion' | 'sonido'
+export type DisplayFamilyId =
+  | 'llegar_y_escanear'
+  | 'puzles'
+  | 'movimiento'
+  | 'orientacion'
+  | 'sonido'
+  | 'desafio'
 
 export type DisplayFamilyCard = {
   id: DisplayFamilyId
@@ -56,11 +65,18 @@ export const displayFamilyCards: DisplayFamilyCard[] = [
     title: 'Sonido',
     description: 'Reto de micrófono: soplar o hacer ruido para cargar una barra.',
   },
+  {
+    id: 'desafio',
+    icon: '🧠',
+    title: 'Desafío',
+    description:
+      'Los retos difíciles de verdad, de más de un minuto: preguntas trampa contrarreloj y coordinación a dos manos.',
+  },
 ]
 
-// Mapa 1:1 con los 17 AdminGameId del catálogo (adminGameCatalog en
+// Mapa 1:1 con los AdminGameId del catálogo (adminGameCatalog en
 // gameCatalog.ts). El test de cobertura recorre ese catálogo y comprueba que
-// cada juego cae en exactamente una de las 5 familias.
+// cada juego cae en exactamente una de las 6 familias.
 export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   simple_checkpoint: 'llegar_y_escanear',
   qr_collectible: 'llegar_y_escanear',
@@ -92,6 +108,13 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   // técnica (heredada) sea circuit_matrix.
   spark_radar: 'movimiento',
   shake_charge: 'movimiento',
+  // "Pulso de hierro" (owner-approved): dos manos a la vez -quietud del
+  // móvil con una, secuencia creciente con la otra-. Es fundamentalmente
+  // sensor+movimiento, así que cae en Movimiento igual que shake_charge;
+  // si en el futuro existe una familia de presentación "Desafío" (para
+  // retos de destreza combinada, no solo movimiento puro), tendría más
+  // sentido moverlo ahí.
+  pulso_hierro: 'desafio',
   bearing_hunt: 'orientacion',
   // Segundo game_id de la familia bearing_hunt (owner-approved "Rumbo
   // doble"): mismo grupo de presentación que Caza de rumbo.
@@ -102,6 +125,10 @@ export const DISPLAY_FAMILY_BY_GAME_ID: Record<AdminGameId, DisplayFamilyId> = {
   // algún día se recorre el tipo AdminGameId completo; runtime-bridge.ts la
   // redirige siempre a logic_circuit, así que comparte grupo con ese juego.
   shake_antenna_charge: 'puzles',
+  // "Trampa de palabras" (owner-approved): familia TÉCNICA nueva word_trap,
+  // no un game_id reutilizando una de las 5 de siempre -por eso tiene su
+  // propia familia de presentación "Desafío", la primera nueva desde v5.36.
+  trampa_palabras: 'desafio',
 }
 
 export function getDisplayFamily(gameId: AdminGameId): DisplayFamilyId {
