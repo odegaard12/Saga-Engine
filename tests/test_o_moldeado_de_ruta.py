@@ -5,7 +5,7 @@
 vive en el nodo DESTINO. El servidor lo pasaba tal cual al jugador, sin mirarlo.
 
 El cliente es defensivo y descarta lo que no sea un par de números finitos
-(`MapSurface.tsx`), así que basura evidente no rompe nada: simplemente el
+(`MapSurfaceGL.tsx`), así que basura evidente no rompe nada: simplemente el
 moldeado no se aplica, en silencio. Pero una coordenada **fuera de rango** sí
 pasa ese filtro —999 es un número finito— y se dibuja: la línea verde que el
 jugador tiene que seguir sale disparada fuera del mapa.

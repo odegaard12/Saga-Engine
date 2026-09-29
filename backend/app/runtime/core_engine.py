@@ -1,4 +1,5 @@
 import time
+from backend.app.runtime.game_registry import TYPE_ALIASES
 from backend.app.runtime.minigames import (
     SUPPORTED_MINIGAME_TYPES,
     _as_str,
@@ -154,23 +155,17 @@ def normalize_stage(raw):
         raw_minigame.get("type") or raw.get("type")
     ).strip().lower()
 
-    if raw_interaction_type in {"sequence_code", "place_mosaic", "tilt_maze", "qr_collectible"}:
+    # Alias de tipos viejos -> familia técnica: declarativos, en el registro
+    # (`type_aliases` de shared/game_registry.json). Si el nodo no trae game_id
+    # se le fija el del alias. Es lo que antes eran tres ramas escritas a mano
+    # (sequence_code/place_mosaic/tilt_maze/qr_collectible, checkpoint y
+    # mapa_mudo, este último sólo para nodos viejos que guardasen "mapa_mudo"
+    # como `type` a pelo: el editor moderno guarda signal_hunt + game_id).
+    alias = TYPE_ALIASES.get(raw_interaction_type)
+    if alias:
         if isinstance(cfg, dict) and not cfg.get("game_id"):
-            cfg["game_id"] = raw_interaction_type
-        raw_interaction_type = "circuit_matrix"
-    elif raw_interaction_type == "checkpoint":
-        if isinstance(cfg, dict) and not cfg.get("game_id"):
-            cfg["game_id"] = "simple_checkpoint"
-        raw_interaction_type = "signal_hunt"
-    elif raw_interaction_type == "mapa_mudo":
-        # Defensiva/legacy, igual que la rama "checkpoint" de arriba: el
-        # editor moderno guarda directamente type="signal_hunt" +
-        # config.game_id="mapa_mudo" (como team_relay o qr_collectible) y
-        # nunca pasa por aquí. Esta rama sólo cubre un nodo viejo que
-        # guardase "mapa_mudo" como `type` a pelo.
-        if isinstance(cfg, dict) and not cfg.get("game_id"):
-            cfg["game_id"] = "mapa_mudo"
-        raw_interaction_type = "signal_hunt"
+            cfg["game_id"] = alias["game_id"]
+        raw_interaction_type = alias["type"]
 
     interaction_type_fallback_reason = ""
     if not raw_interaction_type:

@@ -1,88 +1,39 @@
 import type { AdminReactOverviewStage } from './adminApi'
+import { gameRegistry, getRegistryGame, registryGames, type RegistryFamily } from '../../shared/gameRegistry'
 
-export type FamilyId =
-  | 'signal_hunt'
-  | 'bearing_hunt'
-  | 'circuit_matrix'
-  | 'motion_challenge'
-  | 'audio_challenge'
-  // Sexta familia TÉCNICA nueva (owner-approved "Trampa de palabras",
-  // presentación "Desafío"): la primera familia nueva desde v5.36. Ver
-  // frontend/src/admin/lib/displayFamilies.ts y
-  // frontend/src/player/minigames/families/wordTrap/.
-  | 'word_trap'
+// Familias TÉCNICAS: salen de shared/game_registry.json (`families`). Ya no es
+// una unión de literales a mano; el test parametrizado
+// tests/test_registro_de_minijuegos.py valida los ids.
+export type FamilyId = string
 
 export type EditableAdminStage = AdminReactOverviewStage & {
   config?: Record<string, unknown>
 }
 
+// Orden de las tarjetas del editor: `family_card_order` del registro.
 export const familyCards: Array<{
   id: FamilyId
   icon: string
   title: string
   detail: string
-}> = [
-  {
-    id: 'motion_challenge',
-    icon: '⚡',
-    title: 'Reto de movimiento',
-    detail: 'Movimiento del móvil, agitar, calibrar y retos físicos.',
-  },
-  {
-    id: 'signal_hunt',
-    icon: '📍',
-    title: 'Checkpoints GPS',
-    detail: 'Puntos de control, mensajes rápidos y captura de zona GPS.',
-  },
-  {
-    id: 'bearing_hunt',
-    icon: '🧭',
-    title: 'Caza de rumbo',
-    detail: 'Rumbo con la brújula: apuntar a un sector y mantenerlo.',
-  },
-  {
-    id: 'circuit_matrix',
-    icon: '🧩',
-    title: 'Matriz de circuitos',
-    detail: 'Rejillas lógicas, reparar rutas y puzles de tablero.',
-  },
-  {
-    id: 'audio_challenge',
-    icon: '🎤',
-    title: 'Reto de sonido',
-    detail: 'Micrófono del dispositivo, soplado o volumen de sonido.',
-  },
-  {
-    id: 'word_trap',
-    icon: '🧠',
-    title: 'Trampa de palabras',
-    detail: 'Varias rondas de preguntas con 4 opciones casi idénticas, contrarreloj.',
-  },
-]
+}> = gameRegistry.family_card_order.map((id) => {
+  const family = gameRegistry.families.find((item) => item.id === id) as RegistryFamily
+  return { id: family.id, icon: family.icon, title: family.label, detail: family.detail }
+})
 
 export function getAdminFamilyLabel(type: string) {
-  if (type === 'motion_challenge') return 'Motion Challenge'
-  if (type === 'bearing_hunt') return 'Bearing Hunt'
-  if (type === 'circuit_matrix') return 'Matriz de circuitos'
-  if (type === 'sequence_code') return 'Simón Dice'
-  if (type === 'place_mosaic') return 'Mosaico del lugar'
-  if (type === 'tilt_maze') return 'Laberinto de equilibrio'
-  if (type === 'spark_radar') return 'Caza-Señales'
-  if (type === 'audio_challenge') return 'Desafío de audio'
-  if (type === 'word_trap') return 'Trampa de palabras'
+  const family = gameRegistry.families.find((item) => item.id === type)
+  if (family) return family.admin_label
+  const extra = gameRegistry.extra_type_labels[type]
+  if (extra) return extra.label
   return 'Checkpoint GPS'
 }
 
 export function getAdminFamilyIcon(type: string) {
-  if (type === 'motion_challenge') return '⚡'
-  if (type === 'bearing_hunt') return '🧭'
-  if (type === 'circuit_matrix') return '🧩'
-  if (type === 'sequence_code') return '🔢'
-  if (type === 'place_mosaic') return '🖼️'
-  if (type === 'tilt_maze') return '🎱'
-  if (type === 'spark_radar') return '📡'
-  if (type === 'audio_challenge') return '🎤'
-  if (type === 'word_trap') return '🧠'
+  const family = gameRegistry.families.find((item) => item.id === type)
+  if (family) return family.admin_icon
+  const extra = gameRegistry.extra_type_labels[type]
+  if (extra) return extra.icon
   return '📍'
 }
 
@@ -207,6 +158,46 @@ export function getDefaultAdminConfigForFamily(type: string): Record<string, unk
   }
 }
 
+// Claves declaradas (config_keys) por juego, para reconocer restos de OTRO
+// juego de la misma familia técnica (ver conservarClavesDesconocidas).
+const CLAVES_POR_JUEGO = new Map<string, Set<string>>(
+  registryGames.map((game) => [game.id, new Set(game.config_keys || [])])
+)
+
+/**
+ * Qué se hace con las claves de `raw` que el normalizador de la familia no
+ * emite. ANTES se tiraban SIEMPRE, en silencio: así se perdieron `targets`
+ * (rumbo_doble), `questions` (cuenta_senales), los campos pulso_* y, sin que
+ * nadie lo notara, `required_members` (team_relay), clue_text/... (mapa_mudo)
+ * y target_hits/... (spark_radar). Ahora se CONSERVAN por defecto
+ * (config_policy "keep_unknown" del registro), con una sola excepción: una
+ * clave que el registro declara para OTRO juego de la misma familia técnica y
+ * no para este es un resto de un cambio de juego y se descarta, como antes.
+ * Un juego con "config_policy": "strict" en el registro conserva el
+ * comportamiento antiguo (sólo lo que emita el normalizador).
+ */
+function conservarClavesDesconocidas(
+  raw: Record<string, unknown>,
+  out: Record<string, any>,
+  gameId: string
+) {
+  const game = getRegistryGame(gameId)
+  const policy = game?.config_policy || gameRegistry.config_policy.default
+  if (policy === 'strict') return
+
+  const familiares = registryGames.filter(
+    (other) => game && other.id !== game.id && other.family === game.family
+  )
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (key in out || value === undefined) continue
+    if (game && !(CLAVES_POR_JUEGO.get(game.id) as Set<string>).has(key)) {
+      if (familiares.some((other) => (CLAVES_POR_JUEGO.get(other.id) as Set<string>).has(key))) continue
+    }
+    out[key] = value
+  }
+}
+
 export function normalizeAdminConfigForFamily(type: string, input: Record<string, unknown>): Record<string, any> {
   const raw = input || {}
   const out = _normalizeAdminConfigForFamilyRaw(type, raw) as Record<string, any>
@@ -220,6 +211,8 @@ export function normalizeAdminConfigForFamily(type: string, input: Record<string
       }
     }
   }
+
+  conservarClavesDesconocidas(raw, out, String(out.game_id || raw.game_id || ''))
 
   return out
 }

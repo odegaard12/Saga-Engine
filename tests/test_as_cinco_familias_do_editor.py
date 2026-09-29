@@ -52,85 +52,6 @@ def extraer_mapa_de_familias() -> dict[str, str]:
     return dict(pares)
 
 
-def test_o_catalogo_ten_os_vinte_e_un_xogos_esperados():
-    # 21 desde "Pulso de hierro" (owner-approved, motion_challenge) e
-    # "Trampa de palabras" (owner-approved, word_trap): dous ids máis sobre
-    # os 19 anteriores a esta ronda de cambios.
-    ids = extraer_ids_do_catalogo()
-    assert len(ids) == 21, f"se esperaban 21 AdminGameId en el catálogo, hay {len(ids)}: {ids}"
-    assert len(set(ids)) == len(ids), "hay ids duplicados en adminGameCatalog"
-
-
-def test_cada_xogo_do_catalogo_cae_en_exactamente_unha_familia():
-    ids = extraer_ids_do_catalogo()
-    mapa = extraer_mapa_de_familias()
-
-    sen_familia = [game_id for game_id in ids if game_id not in mapa]
-    assert not sen_familia, f"sin familia de presentación asignada: {sen_familia}"
-
-    for game_id in ids:
-        familia = mapa[game_id]
-        assert familia in VALID_DISPLAY_FAMILIES, (
-            f"{game_id} apunta a una familia desconocida: {familia!r}"
-        )
-
-
-def test_as_familias_obxectivo_teñen_os_xogos_correctos():
-    mapa = extraer_mapa_de_familias()
-
-    esperado = {
-        "simple_checkpoint": "llegar_y_escanear",
-        "qr_collectible": "llegar_y_escanear",
-        "qr_key_gate": "llegar_y_escanear",
-        "clue_card": "llegar_y_escanear",
-        "bonus_cache": "llegar_y_escanear",
-        "photo_scout": "llegar_y_escanear",
-        "logic_circuit": "puzles",
-        "sequence_code": "puzles",
-        "place_mosaic": "puzles",
-        "tilt_maze": "movimiento",
-        "bearing_hunt": "orientacion",
-        "rumbo_doble": "orientacion",
-        "audio_challenge": "sonido",
-        "trampa_palabras": "desafio",
-    }
-    for game_id, familia in esperado.items():
-        assert mapa.get(game_id) == familia, (
-            f"{game_id} debería estar en {familia!r}, pero está en {mapa.get(game_id)!r}"
-        )
-
-
-def test_spark_radar_e_team_relay_non_se_poden_elixir_para_un_no_novo():
-    """No están cableados de punta a punta (ver sus README): no deben
-    aparecer en el selector normal de juego nuevo, aunque sigan existiendo
-    en el catálogo para no romper nodos viejos que ya los usen."""
-    codigo_catalogo = leer(GAME_CATALOG)
-
-    for game_id in ("spark_radar", "team_relay"):
-        inicio = codigo_catalogo.index(f"id: '{game_id}',")
-        fin = codigo_catalogo.index("\n  },", inicio)
-        bloque = codigo_catalogo[inicio:fin]
-        assert "runtimeStatus: 'runtime_ready'" not in bloque, (
-            f"{game_id} sigue marcado 'runtime_ready': el selector de nodo nuevo lo "
-            "ofrecería como si estuviera listo"
-        )
-
-    codigo_utils = leer(GUIDED_UTILS)
-    assert "READY_STATUSES = new Set(['runtime_ready'])" in codigo_utils, (
-        "isPlayableNow ya no depende solo de READY_STATUSES: revisar si "
-        "gameOptions() todavía excluye 'runtime_partial'/'planned' del selector normal"
-    )
-
-
-def test_manual_password_e_photo_scout_seguen_marcados_como_non_listos():
-    codigo_catalogo = leer(GAME_CATALOG)
-    for game_id in ("manual_password", "photo_scout"):
-        inicio = codigo_catalogo.index(f"id: '{game_id}',")
-        fin = codigo_catalogo.index("\n  },", inicio)
-        bloque = codigo_catalogo[inicio:fin]
-        assert "runtimeStatus: 'planned'" in bloque, f"{game_id} debería seguir 'planned'"
-
-
 def test_shake_antenna_charge_legacy_segue_resolvendo_a_logic_circuit():
     """El id legacy no tiene entrada propia en el catálogo a propósito -ver
     el comentario de AdminGameId en gameCatalog.ts-, pero runtime-bridge.ts
@@ -168,3 +89,8 @@ def test_display_family_for_stage_usa_game_id_e_ten_fallback_por_tipo():
     assert display_family_for_stage("circuit_matrix", None) == "puzles"
     # Tipo desconocido: no debe reventar, cae al grupo por defecto.
     assert display_family_for_stage("algo_raro", "algo_raro") == "llegar_y_escanear"
+
+
+# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
+# familia de presentación, editor propio) se sustituyeron por la prueba
+# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).

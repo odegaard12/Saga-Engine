@@ -19,6 +19,9 @@ ENV NODE_OPTIONS=--max-old-space-size=640
 RUN npm ci --no-audit --no-fund
 # VERSION entra en esta etapa porque vite.config.ts la inyecta en el bundle.
 COPY VERSION /app/VERSION
+# Registro unico de minijuegos: el frontend lo importa como JSON en tiempo de
+# compilacion (frontend/src/shared/gameRegistry.ts -> ../../../shared).
+COPY shared /app/shared
 COPY frontend/ ./
 # Aqui habia una puerta que abortaba la construccion si faltaba
 # frontend/public/opencv.js: 11 MB que no estaban en git y habia que copiar a
@@ -49,6 +52,8 @@ COPY backend /app/backend
 COPY frontend /app/frontend
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 COPY scripts /app/scripts
+# El backend lee el mismo registro (backend/app/runtime/game_registry.py).
+COPY shared /app/shared
 COPY main.py /app/main.py
 COPY VERSION /app/VERSION
 COPY config.json /app/config.json

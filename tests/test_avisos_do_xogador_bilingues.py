@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAYER_APP = ROOT / "frontend" / "src" / "player" / "PlayerApp.tsx"
-MAP_SURFACE = ROOT / "frontend" / "src" / "player" / "components" / "MapSurface.tsx"
+MAP_SURFACE = ROOT / "frontend" / "src" / "player" / "components" / "MapSurfaceGL.tsx"
 BRIDGE = ROOT / "frontend" / "src" / "i18n" / "legacySpanishBridge.ts"
 
 
@@ -53,12 +53,10 @@ def test_avisos_ingleses_ya_no_estan_sueltos_en_ingles() -> None:
 
 def test_aviso_de_fuera_de_camino_esta_en_castellano_en_la_fuente() -> None:
     fonte = MAP_SURFACE.read_text(encoding="utf-8")
-    # Antes decía "Saíches do camiño" / "Volve á liña verde" tal cual, en
-    # gallego, sin importar el idioma de la misión.
+    # El aviso del mapa 3D se escribe en castellano en la fuente, no en
+    # gallego a pelo, sin importar el idioma de la misión.
     assert "Saíches do camiño" not in fonte
-    assert "Volve á liña verde" not in fonte
-    assert "Te has salido del camino" in fonte
-    assert "Vuelve a la línea verde" in fonte
+    assert "Fuera del trazado" in fonte
 
 
 def test_el_puente_traduce_el_aviso_de_fuera_de_camino_al_galego() -> None:

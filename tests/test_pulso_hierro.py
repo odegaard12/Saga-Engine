@@ -153,53 +153,6 @@ def test_configuracion_por_defecto_e_longa_pero_sen_suelo_inventado():
 # ---------------------------------------------------------------------------
 
 
-def test_pulso_hierro_aparece_unha_vez_no_catalogo():
-    codigo = leer(GAME_CATALOG)
-    ocorrencias = len(re.findall(r"^\s*id:\s*'pulso_hierro'", codigo, flags=re.MULTILINE))
-    assert ocorrencias == 1, f"pulso_hierro debería aparecer 1 vez en adminGameCatalog, aparece {ocorrencias}"
-    assert "'pulso_hierro'" in codigo  # tamén no tipo AdminGameId
-
-
-def test_pulso_hierro_familia_motion_challenge_e_runtime_ready():
-    codigo = leer(GAME_CATALOG)
-    inicio = codigo.index("id: 'pulso_hierro',")
-    fin = codigo.index("\n  },", inicio)
-    bloque = codigo[inicio:fin]
-    assert "family: 'motion_challenge'" in bloque
-    assert "runtimeStatus: 'runtime_ready'" in bloque
-    assert "game_id: 'pulso_hierro'" in bloque
-
-
-def test_pulso_hierro_mapea_a_desafio():
-    codigo = leer(DISPLAY_FAMILIES)
-    inicio = codigo.index("DISPLAY_FAMILY_BY_GAME_ID")
-    fin = codigo.index("\n}", inicio)
-    bloque = codigo[inicio:fin]
-    pares = dict(re.findall(r"^\s*([a-z_]+):\s*'([a-z_]+)',?\s*$", bloque, flags=re.MULTILINE))
-    assert pares.get("pulso_hierro") == "desafio"
-
-
-def test_pulso_hierro_non_ten_editor_propio_son_knobs_xenericos():
-    """A diferencia de rumbo_doble/cuenta_senales (listas -> editor propio),
-    pulso_hierro son números planos: cero compoñente de admin dedicado."""
-    codigo = leer(GUIDED_UTILS)
-    assert "'pulso_hierro'" in codigo
-    idx = codigo.index("export function guidedConfigKeysForGame")
-    fin = codigo.index("\nexport function slugOf", idx)
-    bloque = codigo[idx:fin]
-    assert "pulso_hierro" in bloque
-    assert "pulso_start_length" in bloque
-    assert "pulso_target_rounds" in bloque
-
-    idx_custom = codigo.index("CUSTOM_GAME_EDITOR_IDS")
-    fin_custom = codigo.index("])", idx_custom)
-    bloque_custom = codigo[idx_custom:fin_custom]
-    assert "pulso_hierro" not in bloque_custom, (
-        "pulso_hierro NON debería estar en CUSTOM_GAME_EDITOR_IDS: son knobs "
-        "xenéricos, non precisa editor propio -é a ventaxe operativa deste deseño-"
-    )
-
-
 def test_familyconfigs_non_perde_os_campos_pulso_ao_normalizar():
     """Mesmo bug que rumbo_doble/cuenta_senales (ver comentario en
     familyConfigs.ts): a rama xenérica de motion_challenge devolve SEMPRE
@@ -224,3 +177,8 @@ def test_pulso_hierro_non_ten_suelo_feito_coa_ventana_maxima():
     calquera xogador honesto e rápido. Queda no suelo xenérico."""
     from backend.app.runtime.anti_cheat import MINIGAME_HARD_FLOOR_MS_BY_GAME
     assert "pulso_hierro" not in MINIGAME_HARD_FLOOR_MS_BY_GAME
+
+
+# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
+# familia de presentación, editor propio) se sustituyeron por la prueba
+# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).

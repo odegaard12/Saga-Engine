@@ -26,45 +26,15 @@ import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-MAPA = RAIZ / "frontend" / "src" / "player" / "components" / "MapSurface.tsx"
 TEMAS = RAIZ / "frontend" / "src" / "mobile-themes.css"
 
 ESTADOS = ("completed", "current", "locked")
 
 
-def codigo() -> str:
-    return MAPA.read_text(encoding="utf-8")
 
 
-def test_o_alfiler_non_leva_estilo_en_linea():
-    """Un estilo en línea gana, y deja la regla del tema sin efecto."""
-    texto = codigo()
-
-    for m in re.finditer(r'class="saga-mission-node-pin[^"]*"([^>]*)>', texto):
-        assert "style=" not in m.group(1), (
-            "el alfiler vuelve a llevar estilo en línea: eso gana sobre el CSS "
-            "y deja la regla del tema muerta sin avisar"
-        )
 
 
-def test_os_tres_estados_teñen_regra():
-    texto = codigo()
-
-    for estado in ESTADOS:
-        assert ".saga-mission-node-pin--%s {" % estado in texto, (
-            "el estado %s no tiene regla: saldría del color base" % estado
-        )
-
-
-def test_os_tres_estados_saen_do_tema():
-    texto = codigo()
-
-    for estado in ESTADOS:
-        inicio = texto.index(".saga-mission-node-pin--%s {" % estado)
-        regla = texto[inicio : texto.index("}", inicio)]
-        assert "var(--theme" in regla, (
-            "el alfiler %s no lee ninguna variable del tema: %s" % (estado, regla[:90])
-        )
 
 
 def test_os_tres_estados_distinguense():

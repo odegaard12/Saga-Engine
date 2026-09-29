@@ -35,13 +35,10 @@ import { PlayerShell } from './components/PlayerShell'
 import { PlayerHud } from './components/PlayerHud'
 import { StoryModal } from './components/StoryModal'
 import { QuickProofPanel } from './components/QuickProofPanel'
-import { MapSurface } from './components/MapSurface'
 /**
- * El motor WebGL se carga SOLO si la misión lo pide (`map_engine`).
- *
- * `lazy` y no un import normal a propósito: maplibre-gl son ~800 kB, y
- * con un import normal se los descargaría también quien juega con
- * Leaflet -que es todo el mundo mientras dure la migración-.
+ * El mapa (MapLibre, WebGL) es el único del jugador; `map_engine` de la
+ * configuración se ignora. `lazy` para que maplibre-gl (~800 kB) no bloquee
+ * el arranque de la pantalla de carga.
  */
 const MapSurfaceGL = lazy(() =>
   import('./components/MapSurfaceGL').then((modulo) => ({ default: modulo.MapSurfaceGL }))
@@ -547,7 +544,7 @@ export default function PlayerApp() {
   const [fieldPhotoUploading, setFieldPhotoUploading] = useState(false)
   const [hideInsecureNotice, setHideInsecureNotice] = useState(false)
   const isSecure = typeof window !== 'undefined' ? window.isSecureContext : true
-  const [mapRefreshToken, setMapRefreshToken] = useState(0)
+  const [, setMapRefreshToken] = useState(0)
   // Removed gpsLoaded state and 20s timeout
 
   const noticeTimerRef = useRef<number | null>(null)
@@ -1671,7 +1668,7 @@ export default function PlayerApp() {
    * El velo se apagaba con una `animation` de CSS (620ms) mientras un
    * `setTimeout` de JS (640ms) lo desmontaba por su cuenta, en un momento en
    * el que el hilo principal esta OCUPADO montando el mapa de verdad
-   * -Leaflet, teselas, marcadores- por primera vez. Si el navegador se
+   * -teselas, relieve, marcadores- por primera vez. Si el navegador se
    * retrasa aunque sea un poco pintando los fotogramas intermedios de la
    * animacion, el `setTimeout` no espera: llega a los 640ms de reloj y
    * desmonta el velo aunque el fundido no se haya visto, y el corte se lee
@@ -1691,7 +1688,7 @@ export default function PlayerApp() {
    * relieve se hace DEBAJO del velo, y al entrar el mapa ya está. Antes el
    * velo se iba en cuanto había permisos y todo ese trabajo caía encima del
    * jugador mientras se movía: "tuvo que renderizar todo mientras me
-   * movía". Con el motor de Leaflet no hay aviso, así que no se espera.
+   * movía".  Si WebGL no está disponible el propio mapa avisa igualmente (`onListo`).
    */
   const [mapaListo, setMapaListo] = useState(false)
   const ultimoDetalleRef = useRef('Preparando la misión…')
@@ -1724,7 +1721,7 @@ export default function PlayerApp() {
    *
    * O sea: la pantalla de carga desaparecia de golpe, asomaba el juego, y
    * encima caia un velo que luego se iba. Tres cortes donde tenia que haber
-   * un fundido. Y con Leaflet montandose en medio, el paso 2 no dura un
+   * un fundido. Y con el mapa montandose en medio, el paso 2 no dura un
    * fotograma: dura lo que tarde el mapa.
    *
    * Decidirlo durante el render -patron admitido de "ajustar estado cuando
@@ -1747,7 +1744,7 @@ export default function PlayerApp() {
     // DENTRO de ella. Una partida ya terminada no pide nada.
     if (permisosPendientes && !payloadRef.current?.finished) return undefined
     // Y mientras el mapa 3D no haya pintado su primera vista (con tope).
-    if (state.status === 'ready' && state.config?.map_engine === 'maplibre' && !mapaListo) {
+    if (state.status === 'ready' && !mapaListo) {
       ultimoDetalleRef.current = 'Preparando el mapa y los nodos…'
       return undefined
     }
@@ -1766,7 +1763,7 @@ export default function PlayerApp() {
       window.cancelAnimationFrame(idInicio)
       window.clearTimeout(idRespaldo)
     }
-  }, [velo, permisosPendientes, mapaListo, state.status, state.status === 'ready' ? state.config?.map_engine : undefined])
+  }, [velo, permisosPendientes, mapaListo, state.status])
 
   /**
    * Tope para la espera del mapa: siete segundos. Si `idle` no llega -sin
@@ -3198,82 +3195,40 @@ export default function PlayerApp() {
           ) : null}
         </div>
       ) : null}
-      {/**
-       * Dos motores de mapa conviviendo, elegidos por misión.
-       *
-       * `maplibre` está en migración por capas y le faltan cosas -la lista
-       * exacta está en mapSurfaceContract.ts-, así que NO es el defecto y
-       * no debe serlo hasta que gane en todo. Existe ya para poder
-       * compararlos en un móvil de verdad sin tocar lo que juega la gente.
-       *
-       * Va con `lazy`, no con un import normal: maplibre-gl son ~800 kB y
-       * no puede caerle encima a quien está jugando con Leaflet.
-       */}
-      {state.config?.map_engine === 'maplibre' ? (
-        <Suspense fallback={null}>
-          <MapSurfaceGL
-            currentStage={currentStage}
-            missionStages={payload.stages || []}
-            currentLevel={payload.level || 0}
-            playerPosition={posicionEnMapa}
-            tresD={mapaTresD}
-            focusRequest={focusRequest}
-            followPlayer={followPlayer}
-            onUserMapMove={() => {
-              setFollowPlayer(false)
-              setRouteOverviewActive(false)
-            }}
-            onRumbo={setRumboMapa}
-            fieldProofs={todasAsFotos}
-            onOpenFieldProofs={setSelectedFieldProofs}
-            initialCenter={
-              browserGpsPosition ??
-              (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
-            }
-            selfProfile={{
-              ...(payload.profile || {}),
-              user: payload.user,
-              display_name: payload.display_name || payload.user,
-              gps_status: gpsState,
-            }}
-            onListo={() => setMapaListo(true)}
-          />
-        </Suspense>
-      ) : (
-      <MapSurface
-        currentStage={currentStage}
-        missionStages={payload.stages || []}
-        currentLevel={payload.level || 0}
-        playerPosition={posicionEnMapa}
-        gpsState={gpsState}
-        debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
-        followPlayer={followPlayer}
-        focusRequest={focusRequest}
-        refreshToken={mapRefreshToken}
-        mapboxToken={state.config?.mapbox_token}
-        mapboxStyle={state.config?.mapbox_style}
-        initialCenter={browserGpsPosition ?? (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)}
-        onUserMapMove={() => {
-          setFollowPlayer(false)
-          setRouteOverviewActive(false)
-        }}
-        nodeState={interactionOpen ? 'engaging' : runtime.canEnter ? 'ready' : 'locked'}
-        otherPlayers={teamMapMarkers}
-        fieldProofs={todasAsFotos}
-        viewerUser={payload.user}
-        onDeleteFieldProof={handleDeleteFieldProof}
-        onOpenFieldProofs={setSelectedFieldProofs}
-        selfLabel={payload.display_name || payload.user || 'YO'}
-        selfProfile={{
-          ...(payload.profile || {}),
-          user: payload.user,
-          display_name: payload.display_name || payload.user,
-          gps_status: gpsState,
-        }}
-        onDebugSetPosition={handleDebugSetPosition}
-        onNodeTap={handleMapNodeTap}
-      />
-      )}
+      <Suspense fallback={null}>
+        <MapSurfaceGL
+          currentStage={currentStage}
+          missionStages={payload.stages || []}
+          currentLevel={payload.level || 0}
+          playerPosition={posicionEnMapa}
+          tresD={mapaTresD}
+          focusRequest={focusRequest}
+          followPlayer={followPlayer}
+          onUserMapMove={() => {
+            setFollowPlayer(false)
+            setRouteOverviewActive(false)
+          }}
+          onRumbo={setRumboMapa}
+          fieldProofs={todasAsFotos}
+          onOpenFieldProofs={setSelectedFieldProofs}
+          initialCenter={
+            browserGpsPosition ??
+            (stagePosition ? { lat: stagePosition.lat, lon: stagePosition.lon } : undefined)
+          }
+          selfProfile={{
+            ...(payload.profile || {}),
+            user: payload.user,
+            display_name: payload.display_name || payload.user,
+            gps_status: gpsState,
+          }}
+          onListo={() => setMapaListo(true)}
+          gpsState={gpsState}
+          debugSimulation={localDebugEnabled || Boolean(localDebugPosition)}
+          onDebugSetPosition={handleDebugSetPosition}
+          onNodeTap={handleMapNodeTap}
+          otherPlayers={teamMapMarkers}
+        />
+      </Suspense>
 
       {!isSecure && !hideInsecureNotice ? (
         <div style={insecureNoticeCardStyle}>
@@ -3544,8 +3499,6 @@ export default function PlayerApp() {
               </span>
             </button>
 
-            {/* Solo con el motor WebGL: Leaflet no sabe inclinar la cámara. */}
-            {state.config?.map_engine === 'maplibre' ? (
               <button
                 type="button"
                 // El color va con la ETIQUETA: "3D" claro, "2D" oscuro. Es lo
@@ -3567,7 +3520,6 @@ export default function PlayerApp() {
                   {mapaTresD ? '2D' : '3D'}
                 </span>
               </button>
-            ) : null}
 
             <button
               type="button"
