@@ -244,45 +244,6 @@ def test_suelo_de_rumbo_doble_nunca_baixa_do_xenerico():
 # ---------------------------------------------------------------------------
 
 
-def test_rumbo_doble_aparece_unha_vez_no_catalogo():
-    codigo = leer(GAME_CATALOG)
-    ocorrencias = len(re.findall(r"^\s*id:\s*'rumbo_doble'", codigo, flags=re.MULTILINE))
-    assert ocorrencias == 1, f"rumbo_doble debería aparecer 1 vez en adminGameCatalog, aparece {ocorrencias}"
-    assert "'rumbo_doble'" in codigo  # tamén no tipo AdminGameId
-
-
-def test_rumbo_doble_familia_bearing_hunt_e_runtime_ready():
-    codigo = leer(GAME_CATALOG)
-    inicio = codigo.index("id: 'rumbo_doble',")
-    fin = codigo.index("\n  },", inicio)
-    bloque = codigo[inicio:fin]
-    assert "family: 'bearing_hunt'" in bloque
-    assert "runtimeStatus: 'runtime_ready'" in bloque
-    assert "game_id: 'rumbo_doble'" in bloque
-
-
-def test_rumbo_doble_mapea_a_orientacion():
-    codigo = leer(DISPLAY_FAMILIES)
-    inicio = codigo.index("DISPLAY_FAMILY_BY_GAME_ID")
-    fin = codigo.index("\n}", inicio)
-    bloque = codigo[inicio:fin]
-    pares = dict(re.findall(r"^\s*([a-z_]+):\s*'([a-z_]+)',?\s*$", bloque, flags=re.MULTILINE))
-    assert pares.get("rumbo_doble") == "orientacion"
-
-
-def test_rumbo_doble_ten_editor_dedicado_e_non_bucle_xenerico():
-    codigo = leer(GUIDED_UTILS)
-    assert "'rumbo_doble'" in codigo
-    idx = codigo.index("export function guidedConfigKeysForGame")
-    fin = codigo.index("\n}", idx)
-    bloque = codigo[idx:fin]
-    assert "rumbo_doble" in bloque, (
-        "rumbo_doble debería devolver [] en guidedConfigKeysForGame -editor propio, "
-        "como sequence_code/place_mosaic/tilt_maze-"
-    )
-    assert "'targets'" in codigo  # en TECHNICAL_CONFIG_KEYS: non se renderiza como campo xenérico
-
-
 def test_bearing_hunt_config_type_declara_targets_opcional():
     codigo = leer(
         RAIZ / "frontend" / "src" / "player" / "minigames" / "core" / "family-types.ts"
@@ -303,3 +264,8 @@ def test_runtime_screen_soporta_modo_secuencia():
 def test_definition_valida_targets():
     codigo = leer(BEARING_HUNT_DEFINITION)
     assert "targets" in codigo
+
+
+# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
+# familia de presentación, editor propio) se sustituyeron por la prueba
+# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).

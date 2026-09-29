@@ -52,6 +52,8 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       strictPort: true,
+      // shared/game_registry.json vive en la raíz del repo, fuera de frontend/.
+      fs: { allow: ['..'] },
       allowedHosts,
       proxy: {
         '/api': {

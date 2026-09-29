@@ -16,21 +16,6 @@
   height: 100%;
 }
 
-.map-surface .leaflet-container {
-  width: 100%;
-  height: 100%;
-  background: transparent;
-  font: inherit;
-}
-
-.map-surface .leaflet-control-attribution {
-  display: none !important;
-}
-
-.map-surface .leaflet-tooltip {
-  display: none !important;
-}
-
 @media (max-width: 560px) {
   .map-surface {
     min-height: 100%;
@@ -158,6 +143,39 @@
 }
 
 .leaflet-container a.leaflet-popup-close-button:hover {
+  color: #f8fafc;
+  background: transparent;
+}
+
+/* Los globos del mapa 3D (MapLibre), del mismo color que los de arriba. */
+.maplibregl-popup-content {
+  background: linear-gradient(180deg, rgba(22, 30, 46, .97), rgba(8, 12, 24, .97));
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(var(--theme-ink-deep), .5);
+  padding: 12px 14px;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: rgba(22, 30, 46, .97);
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: rgba(8, 12, 24, .97);
+}
+
+.maplibregl-popup-close-button {
+  color: rgba(var(--theme-line), .8);
+  font-size: 18px;
+  padding: 4px 8px 0 0;
+}
+
+.maplibregl-popup-close-button:hover {
   color: #f8fafc;
   background: transparent;
 }

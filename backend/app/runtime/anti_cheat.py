@@ -55,6 +55,7 @@ import time
 from typing import Any, Dict, Optional
 
 from backend.app.storage.json_store import load_json, update_json
+from backend.app.runtime.game_registry import hard_floor_by_game
 from backend.app.runtime.mision import kind_del_nodo
 
 #: Severidad de una entrada: "suspicion" (algo a revisar) o "info" (neutro,
@@ -209,9 +210,18 @@ def _suelo_rumbo_doble(node: dict) -> int:
 #: existen o quedaron fuera de esta tabla a propósito- cae en el suelo
 #: genérico `MIN_PLAUSIBLE_STAGE_MS`, nunca sin comprobación, nunca más
 #: estricto que ese suelo.
+#: Qué suelo lleva cada juego lo declara el registro (`hard_floor` de
+#: shared/game_registry.json): un NOMBRE de estrategia de esta tabla o un
+#: número de ms. Añadir un juego con suelo propio = una estrategia aquí + su
+#: entrada en el registro. Un nombre desconocido falla al importar, no en
+#: mitad de una misión.
+_ESTRATEGIAS_DE_SUELO: Dict[str, Any] = {
+    "sequence_steps": _suelo_sequence_code,  # depende del nodo: nº de pasos real.
+    "bearing_targets": _suelo_rumbo_doble,  # depende del nodo: nº de objetivos x hold_ms real.
+}
 MINIGAME_HARD_FLOOR_MS_BY_GAME: Dict[str, Any] = {
-    "sequence_code": _suelo_sequence_code,  # depende del nodo: nº de pasos real.
-    "rumbo_doble": _suelo_rumbo_doble,  # depende del nodo: nº de objetivos x hold_ms real.
+    game_id: (_ESTRATEGIAS_DE_SUELO[estrategia] if isinstance(estrategia, str) else estrategia)
+    for game_id, estrategia in hard_floor_by_game().items()
 }
 
 

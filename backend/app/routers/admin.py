@@ -2,6 +2,12 @@ import time
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 from backend.app.runtime.core_engine import _as_str, _as_bool
+from backend.app.runtime.game_registry import (
+    DISPLAY_FAMILIES as REGISTRY_DISPLAY_FAMILIES,
+    FAMILIES as REGISTRY_FAMILIES,
+    GAME_ID_DISPLAY_FAMILY as REGISTRY_GAME_ID_DISPLAY_FAMILY,
+    TYPE_DISPLAY_FAMILY_FALLBACK as REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK,
+)
 
 router = APIRouter()
 
@@ -10,56 +16,15 @@ router = APIRouter()
 # frontend/src/admin/lib/displayFamilies.ts. Solo reordena cómo se cuentan y
 # muestran los nodos en el panel; no cambia ningún "type"/game_id que viaje
 # en datos de misión ni la family técnica que usa el runtime del jugador.
-DISPLAY_FAMILIES = [
-    {"id": "llegar_y_escanear", "label": "Llegar y escanear"},
-    {"id": "puzles", "label": "Puzles"},
-    {"id": "movimiento", "label": "Movimiento"},
-    {"id": "orientacion", "label": "Orientación"},
-    {"id": "sonido", "label": "Sonido"},
-    # Sexta familia de presentación (owner-approved "Trampa de palabras"):
-    # primera familia TÉCNICA nueva desde v5.36 -no encaja en ninguna de
-    # las 5 de arriba (no es GPS/checkpoint, ni puzle de tablero, ni
-    # movimiento, ni orientación, ni sonido)-. Ver
-    # frontend/src/admin/lib/displayFamilies.ts.
-    {"id": "desafio", "label": "Desafío"},
-]
-
-GAME_ID_DISPLAY_FAMILY = {
-    "simple_checkpoint": "llegar_y_escanear",
-    "qr_collectible": "llegar_y_escanear",
-    "qr_key_gate": "llegar_y_escanear",
-    "clue_card": "llegar_y_escanear",
-    "bonus_cache": "llegar_y_escanear",
-    "photo_scout": "llegar_y_escanear",
-    "team_relay": "llegar_y_escanear",
-    "mapa_mudo": "llegar_y_escanear",
-    "logic_circuit": "puzles",
-    "sequence_code": "puzles",
-    "place_mosaic": "puzles",
-    "manual_password": "puzles",
-    "shake_antenna_charge": "puzles",
-    "tilt_maze": "movimiento",
-    "spark_radar": "movimiento",
-    "shake_charge": "movimiento",
-    "bearing_hunt": "orientacion",
-    "audio_challenge": "sonido",
-    "trampa_palabras": "desafio",
-    "pulso_hierro": "desafio",
-    "rumbo_doble": "orientacion",
-    "cuenta_senales": "llegar_y_escanear",
-}
-
+# Familias y mapas de presentación: salen de shared/game_registry.json (la misma
+# fuente que el frontend, frontend/src/admin/lib/displayFamilies.ts), no de
+# listas escritas aquí. Antes había dos copias a mano y un juego llegó a estar
+# en «Movimiento» en el servidor y en «Desafío» en el admin.
+DISPLAY_FAMILIES = REGISTRY_DISPLAY_FAMILIES
+GAME_ID_DISPLAY_FAMILY = REGISTRY_GAME_ID_DISPLAY_FAMILY
 # Cuando el nodo no lleva game_id (nodos viejos), se agrupa por su family
 # técnica.
-TYPE_DISPLAY_FAMILY_FALLBACK = {
-    "signal_hunt": "llegar_y_escanear",
-    "checkpoint": "llegar_y_escanear",
-    "circuit_matrix": "puzles",
-    "motion_challenge": "movimiento",
-    "bearing_hunt": "orientacion",
-    "audio_challenge": "sonido",
-    "word_trap": "desafio",
-}
+TYPE_DISPLAY_FAMILY_FALLBACK = REGISTRY_TYPE_DISPLAY_FAMILY_FALLBACK
 
 
 def display_family_for_stage(stage_type, game_id):
@@ -266,14 +231,7 @@ async def admin_react_overview(request: Request):
     ]
 
     # Las seis familias del editor (familyConfigs.ts), no sólo tres.
-    family_counts = {
-        "signal_hunt": 0,
-        "bearing_hunt": 0,
-        "circuit_matrix": 0,
-        "motion_challenge": 0,
-        "audio_challenge": 0,
-        "word_trap": 0,
-    }
+    family_counts = {family["id"]: 0 for family in REGISTRY_FAMILIES}
     # Las 5 familias de PRESENTACIÓN del admin (displayFamilies.ts), sobre
     # las mismas plantillas: agrupación distinta de las técnicas de arriba.
     display_family_counts = {family["id"]: 0 for family in DISPLAY_FAMILIES}
@@ -321,14 +279,7 @@ async def admin_react_overview(request: Request):
             # Nuevo: mismos nodos, contados por las 5 familias de admin.
             "display_family_counts": display_family_counts,
         },
-        "families": [
-            {"id": "signal_hunt", "label": "Checkpoints GPS"},
-            {"id": "bearing_hunt", "label": "Caza de rumbo"},
-            {"id": "circuit_matrix", "label": "Matriz de circuitos"},
-            {"id": "motion_challenge", "label": "Reto de movimiento"},
-            {"id": "audio_challenge", "label": "Reto de sonido"},
-            {"id": "word_trap", "label": "Trampa de palabras"},
-        ],
+        "families": [{"id": family["id"], "label": family["label"]} for family in REGISTRY_FAMILIES],
         # Nuevo: las 6 familias que ve el admin en el selector de juegos.
         # "families" (arriba) se mantiene por compatibilidad con quien ya lo
         # lea.

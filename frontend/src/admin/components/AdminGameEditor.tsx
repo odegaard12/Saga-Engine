@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import QrCardStudio, { getQrDesignSignature } from './QrCardStudio'
 import { getDefaultAdminStagePatchForGame, type AdminGameCatalogItem } from '../lib/gameCatalog'
 import type { SavedPhysicalQrCard } from './PhysicalQrCardsPanel'
@@ -10,6 +10,25 @@ import SparkRadarEditor from './sparkRadar/SparkRadarEditor'
 import RumboDobleEditor from './rumboDoble/RumboDobleEditor'
 import CuentaSenalesEditor from './cuentaSenales/CuentaSenalesEditor'
 import TrampaPalabrasEditor from './trampaPalabras/TrampaPalabrasEditor'
+
+// Editor propio de cada juego (paso opcional de "Cómo añadir un minijuego").
+// La clave es el game_id; el registro (shared/game_registry.json) marca con
+// `custom_editor` los juegos cuya config guiada se oculta porque la edita este
+// componente. spark_radar tiene editor pero conserva sus campos genéricos.
+type CustomEditorProps = {
+  config: Record<string, any>
+  onChange: (values: Record<string, any>) => void
+}
+const CUSTOM_EDITOR_COMPONENTS: Record<string, ComponentType<CustomEditorProps>> = {
+  logic_circuit: CircuitPatternEditor as ComponentType<CustomEditorProps>,
+  spark_radar: SparkRadarEditor as ComponentType<CustomEditorProps>,
+  tilt_maze: TiltMazeEditor as ComponentType<CustomEditorProps>,
+  place_mosaic: PlaceMosaicEditor as ComponentType<CustomEditorProps>,
+  sequence_code: SimonSaysEditor as ComponentType<CustomEditorProps>,
+  rumbo_doble: RumboDobleEditor as ComponentType<CustomEditorProps>,
+  cuenta_senales: CuentaSenalesEditor as ComponentType<CustomEditorProps>,
+  trampa_palabras: TrampaPalabrasEditor as ComponentType<CustomEditorProps>,
+}
 import { displayFamilyCards, getDisplayFamily } from '../lib/displayFamilies'
 
 import {
@@ -954,30 +973,19 @@ export default function AdminGameEditor({
                       </label>
                     )
                   })}
-                  {selectedGame.id === 'logic_circuit' && (
-                    <div className="wide saga-guided-v4-custom-editor"><CircuitPatternEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'spark_radar' && (
-                    <div className="wide saga-guided-v4-custom-editor"><SparkRadarEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'tilt_maze' && (
-                    <div className="wide saga-guided-v4-custom-editor"><TiltMazeEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'place_mosaic' && (
-                    <div className="wide saga-guided-v4-custom-editor"><PlaceMosaicEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'sequence_code' && (
-                    <div className="wide saga-guided-v4-custom-editor"><SimonSaysEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'rumbo_doble' && (
-                    <div className="wide saga-guided-v4-custom-editor"><RumboDobleEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'cuenta_senales' && (
-                    <div className="wide saga-guided-v4-custom-editor"><CuentaSenalesEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
-                  {selectedGame.id === 'trampa_palabras' && (
-                    <div className="wide saga-guided-v4-custom-editor"><TrampaPalabrasEditor key={selectedGame.id} config={config} onChange={(values) => onPatch({ config: { ...config, ...values } })} /></div>
-                  )}
+                  {(() => {
+                    const CustomEditor = CUSTOM_EDITOR_COMPONENTS[selectedGame.id]
+                    if (!CustomEditor) return null
+                    return (
+                      <div className="wide saga-guided-v4-custom-editor">
+                        <CustomEditor
+                          key={selectedGame.id}
+                          config={config}
+                          onChange={(values) => onPatch({ config: { ...config, ...values } })}
+                        />
+                      </div>
+                    )
+                  })()}
                   {selectedGame.id === 'mapa_mudo' && (
                     <label className="wide">
                       <span>Foto de la pista (opcional)</span>

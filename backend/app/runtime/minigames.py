@@ -4,6 +4,10 @@ This module intentionally contains pure helpers only. FastAPI routes stay in
 main.py for now; later PRs can move routers after contract tests exist.
 """
 
+from backend.app.runtime.game_registry import (
+    MINIGAME_SPECS as _REGISTRY_MINIGAME_SPECS,
+    SUPPORTED_MINIGAME_TYPES as _REGISTRY_SUPPORTED_TYPES,
+)
 import base64
 import hashlib
 import random
@@ -377,22 +381,9 @@ def cuenta_senales_accepted_values(config, node_id, player_id):
     return list(range(max(0, answer - tolerance), answer + tolerance + 1))
 
 
-SUPPORTED_MINIGAME_TYPES = {
-    "circuit_matrix",
-    "signal_hunt",
-    "bearing_hunt",
-    "motion_challenge",
-    "audio_challenge",
-    # "Trampa de palabras" (owner-approved): sexta familia técnica NUEVA
-    # -no un game_id dentro de una de las 5 de siempre-. Ver
-    # project_word_trap_for_player / _normalize_word_trap_questions arriba.
-    "word_trap",
-    "sequence_code",
-    "tilt_maze",
-    "place_mosaic",
-    "spark_radar",
-    "checkpoint",
-}
+# Tipos soportados: `supported_types` de shared/game_registry.json (ver
+# game_registry.py). Añadir una familia técnica nueva = una entrada allí.
+SUPPORTED_MINIGAME_TYPES = set(_REGISTRY_SUPPORTED_TYPES)
 
 import unicodedata
 
@@ -436,14 +427,7 @@ def _as_bool(value, default=False):
     return default
 
 
-MINIGAME_SPECS = {
-    "circuit_matrix": {"label": "Circuit Matrix"},
-    "bearing_hunt": {"label": "Bearing Hunt"},
-    "signal_hunt": {"label": "Signal Hunt"},
-    "motion_challenge": {"label": "Motion Challenge"},
-    "audio_challenge": {"label": "Audio Challenge"},
-    "word_trap": {"label": "Trampa de palabras"},
-}
+MINIGAME_SPECS = dict(_REGISTRY_MINIGAME_SPECS)
 
 def _clamp_int(value, default, minimum=None, maximum=None):
     num = _as_float(value, default)

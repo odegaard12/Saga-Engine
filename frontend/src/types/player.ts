@@ -136,9 +136,8 @@ export interface PublicConfig {
   ui_lang?: string
   player_theme?: string
   /**
-   * Qué motor dibuja el mapa: `leaflet` (el completo, por defecto) o
-   * `maplibre` (WebGL, en migración por capas). Ver VALID_MAP_ENGINES en
-   * main.py y la lista de capas pendientes en mapSurfaceContract.ts.
+   * Obsoleto: el mapa del jugador es siempre el 3D (MapLibre). Se sigue
+   * recibiendo por las configuraciones antiguas, pero ya no elige nada.
    */
   map_engine?: string
   story_title?: string

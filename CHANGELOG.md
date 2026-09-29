@@ -6,6 +6,36 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.42.0
+
+- **Un solo registro de minijuegos (`shared/game_registry.json`).** Añadir un
+  juego tocaba 12-16 ficheros, cada uno con su lista a mano, y el admin
+  llegó a tirar en silencio la configuración de juegos nuevos al guardar
+  (`rumbo_doble`, `cuenta_senales`, `pulso_hierro`...). Ahora el catálogo, las
+  familias de presentación, los tipos soportados, los alias de tipo, el suelo
+  del antitrampas, el editor propio y las claves guiadas salen de un JSON que
+  leen el servidor y el admin (y la imagen Docker lo lleva en `/app/shared`).
+  Añadir un juego pasa a ser: una entrada en el registro + su pantalla + (si
+  quiere) su editor + su normalizador. Ver `docs/como-anadir-un-minijuego.md`.
+  Mismos ids, misma normalización del servidor y mismo catálogo que antes
+  (comprobado con una foto antes/después de cada juego). Único cambio
+  intencionado: al guardar, el admin **conserva** las claves de config que no
+  conoce (antes las tiraba). Con ello dejan de perderse `required_members`
+  (relevo de equipo), `clue_text`/`search_radius_m`/`hot_cold_hint` (mapa
+  mudo), los campos de Caza-Señales (`target_hits`...), `expected_code`
+  (contraseña manual) y los ajustes propios de Simón Dice. Un resto de otro
+  juego de la misma familia (p. ej. `targets` en un nodo que pasó de
+  `rumbo_doble` a `bearing_hunt`) se sigue descartando.
+
+
+- El mapa 3D (MapLibre) es ahora el único mapa del jugador, sea cual sea el `map_engine` de la misión (la clave se sigue leyendo, sin efecto). Se retira `MapSurface.tsx` (Leaflet, ~2 800 líneas); Leaflet queda sólo en el mapa de administración.
+- Portado al mapa 3D lo que sólo tenía Leaflet: los compañeros del grupo (con agrupación por cercanía y globo al tocarlos), el aura del GPS / modo prueba, el toque en el mapa para colocarte en modo prueba y el toque sobre el nodo actual.
+- Sin WebGL el mapa no se queda en blanco: aparece un aviso en castellano y gallego, la pantalla de carga no se queda esperando y el juego sigue (brújula, lista de nodos, QR y modo prueba, con un botón para colocarte en el nodo).
+- Arreglo: el círculo difuso del mapa mudo podía quedarse oculto si los datos llegaban antes de que el estilo montase las capas.
+- Pruebas: se retiran las que leían el CSS/JS de Leaflet y se añaden guardas del mapa 3D único, el modo prueba y el aviso sin WebGL.
+
+---
+
 ## 5.41.0
 
 - **Sin suelo inventado en Pulso de hierro y Trampa de palabras.** Su tiempo

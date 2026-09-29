@@ -1,3 +1,4 @@
+import { getRegistryGame, registryGames } from '../../../shared/gameRegistry'
 import {
   adminGameCatalog,
   getAdminGame,
@@ -83,19 +84,21 @@ export const LEGACY_MESSAGE_FALLBACKS: Record<string, string> = {
   'Complete this node to continue.': 'Completa este nodo para continuar.',
 }
 
-export const QR_KIND_BY_GAME_ID: Partial<Record<AdminGameId, PhysicalQrKind>> = {
-  qr_collectible: 'collectible',
-  qr_key_gate: 'requirement',
-  clue_card: 'clue',
-  bonus_cache: 'bonus',
-}
+// Derivados del registro (`qr_kind` de cada juego). `qr` (tarjeta QR genérica)
+// resuelve al juego de tipo coleccionable.
+export const QR_KIND_BY_GAME_ID: Partial<Record<AdminGameId, PhysicalQrKind>> = Object.fromEntries(
+  registryGames.filter((game) => game.qr_kind).map((game) => [game.id, game.qr_kind])
+) as Partial<Record<AdminGameId, PhysicalQrKind>>
+
+const juegoDeQr = (kind: string) =>
+  registryGames.find((game) => game.qr_kind === kind)?.id as AdminGameId
 
 export const QR_GAME_BY_KIND: Record<PhysicalQrKind, AdminGameId> = {
-  collectible: 'qr_collectible',
-  requirement: 'qr_key_gate',
-  clue: 'clue_card',
-  bonus: 'bonus_cache',
-  qr: 'qr_collectible',
+  collectible: juegoDeQr('collectible'),
+  requirement: juegoDeQr('requirement'),
+  clue: juegoDeQr('clue'),
+  bonus: juegoDeQr('bonus'),
+  qr: juegoDeQr('collectible'),
 }
 
 export const CONFIG_FIELD_META: Record<
@@ -644,29 +647,21 @@ export function normalizeMessage(value: unknown, fallback: string) {
   return LEGACY_MESSAGE_FALLBACKS[raw] || raw
 }
 
-export const CUSTOM_GAME_EDITOR_IDS = new Set([
-  'logic_circuit',
-  'sequence_code',
-  'place_mosaic',
-  'tilt_maze',
-  'rumbo_doble',
-  'cuenta_senales',
-  'trampa_palabras',
-])
+// Juegos con editor propio: `custom_editor` en el registro. El componente
+// concreto se cablea en AdminGameEditor.tsx (CUSTOM_EDITOR_COMPONENTS).
+export const CUSTOM_GAME_EDITOR_IDS = new Set(
+  registryGames.filter((game) => game.custom_editor).map((game) => game.id)
+)
 
 export function hasCustomGameEditor(game: AdminGameCatalogItem) {
   return CUSTOM_GAME_EDITOR_IDS.has(game.id)
 }
 
 export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Record<string, unknown>) {
-  if (
-    game.id === 'sequence_code' ||
-    game.id === 'place_mosaic' ||
-    game.id === 'tilt_maze' ||
-    game.id === 'rumbo_doble' ||
-    game.id === 'cuenta_senales' ||
-    game.id === 'trampa_palabras'
-  ) {
+  const registryGame = getRegistryGame(game.id)
+
+  // hide_guided_keys: el juego edita todo en su editor propio.
+  if (registryGame?.hide_guided_keys) {
     return []
   }
 
@@ -701,21 +696,11 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
     }
   }
 
-  // "Pulso de hierro" (game_id 'pulso_hierro'): cero editor propio a
-  // propósito -a diferencia de rumbo_doble/cuenta_senales, que sí lo
-  // necesitan porque editan listas-, aquí todo son números planos que el
-  // editor genérico ya sabe renderizar. Ventaja operativa: dar de alta un
-  // nodo no exige tocar ningún componente de admin, solo estos 5 knobs.
-  if (game.id === 'pulso_hierro') {
-    for (const key of [
-      'pulso_start_length',
-      'pulso_target_rounds',
-      'pulso_growth_per_round',
-      'pulso_stability_variance_max',
-      'pulso_tap_window_ms',
-    ]) {
-      if (key in config) keys.add(key)
-    }
+  // extra_guided_keys (registro): campos planos de un juego concreto que el
+  // editor genérico ya sabe renderizar, sin necesidad de un editor propio
+  // (p. ej. los knobs pulso_* de "Pulso de hierro").
+  for (const key of registryGame?.extra_guided_keys || []) {
+    if (key in config) keys.add(key)
   }
 
   if (game.completionMethod === 'manual_code') {
@@ -726,12 +711,6 @@ export function guidedConfigKeysForGame(game: AdminGameCatalogItem, config: Reco
 
   if (game.completionMethod === 'sequence') {
     for (const key of ['sequence', 'difficulty']) {
-      if (key in config) keys.add(key)
-    }
-  }
-
-  if (game.id === 'mapa_mudo') {
-    for (const key of ['clue_text', 'search_radius_m', 'hot_cold_hint']) {
       if (key in config) keys.add(key)
     }
   }

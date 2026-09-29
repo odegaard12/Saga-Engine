@@ -254,13 +254,6 @@ def test_family_runtime_host_monta_o_runtime_de_word_trap():
     assert "resolved.family === 'word_trap'" in codigo
 
 
-def test_game_catalog_rexistra_trampa_palabras_unha_soa_vez():
-    codigo = leer(GAME_CATALOG)
-    aparicions = len(re.findall(r"^\s*id:\s*'trampa_palabras'", codigo, flags=re.MULTILINE))
-    assert aparicions == 1
-    assert "family: 'word_trap'" in codigo
-
-
 def test_family_configs_ten_a_familia_word_trap_sen_clobber():
     codigo = leer(FAMILY_CONFIGS)
     assert "'word_trap'" in codigo
@@ -274,31 +267,13 @@ def test_family_configs_ten_a_familia_word_trap_sen_clobber():
     assert "time_limit_s" in bloque
 
 
-def test_display_families_ten_o_grupo_desafio():
-    codigo = leer(DISPLAY_FAMILIES)
-    assert "id: 'desafio'" in codigo
-    assert "trampa_palabras: 'desafio'" in codigo
-
-
-def test_guided_utils_ten_editor_dedicado_para_trampa_palabras():
-    codigo = leer(GUIDED_UTILS)
-    assert "'trampa_palabras'" in codigo
-
-
-def test_admin_game_editor_monta_o_editor_dedicado():
-    codigo = leer(ADMIN_GAME_EDITOR)
-    assert "TrampaPalabrasEditor" in codigo
-    assert "selectedGame.id === 'trampa_palabras'" in codigo
-
-
-def test_backend_admin_rexistra_a_familia_word_trap():
-    codigo = leer(ADMIN_PY)
-    assert '"word_trap": 0' in codigo
-    assert "desafio" in codigo
-
-
 def test_trampa_palabras_non_ten_suelo_feito_co_tempo_maximo():
     """O suelo era rondas x segundos MÁXIMOS por pregunta: marcaba a quen
     responde ben e rápido. Queda no suelo xenérico + evidence_too_fast."""
     from backend.app.runtime.anti_cheat import MINIGAME_HARD_FLOOR_MS_BY_GAME
     assert "trampa_palabras" not in MINIGAME_HARD_FLOOR_MS_BY_GAME
+
+
+# Las pruebas por subcadena de «el juego aparece en la lista X» (catálogo,
+# familia de presentación, editor propio) se sustituyeron por la prueba
+# parametrizada tests/test_registro_de_minijuegos.py (shared/game_registry.json).
