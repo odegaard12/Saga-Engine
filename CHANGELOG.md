@@ -6,6 +6,35 @@ La versión que corre en producción está en `VERSION` y la sirve `/api/version
 
 ---
 
+## 5.43.2
+
+- **La app del jugador ya no se puede ampliar.** Al enfocar «introduce código»
+  de Herramientas, iOS Safari ampliaba la página entera: los campos de texto
+  tenían 13-15 px y Safari amplía todo lo que baje de 16. Ahora todos los campos
+  van a 16 px (en origen y con una regla de respaldo en `mobile-shell.css`), el
+  `<meta viewport>` lleva `maximum-scale=1, user-scalable=no` (el panel de admin
+  conserva su zoom), el pellizco de página queda apagado (`touch-action` y los
+  gestos `gesture*` de Safari) y el mapa mantiene su propio pellizco.
+- **Los compañeros, dibujados en el propio mapa como los nodos.** Eran
+  marcadores del DOM con un desplazamiento en píxeles que se recalculaba al
+  mover el mapa, y al hacer zoom acababan «en otras zonas de Galicia». Ahora son
+  una capa de símbolos WebGL (`saga-otros-capa`) con la misma altura, ancla y
+  tamaño compuesto que tu avatar: siempre en su posición real, a cualquier zoom.
+  Si caen encima de ti o unos de otros se separan en pantalla con `icon-offset`
+  (8 huecos), sin tocar sus coordenadas. Tu capa va después: quedas encima.
+  Siguen la agrupación con número a zoom bajo y la tarjeta oscura al tocar (ahora
+  anclada a la posición real). Fuera el camino de marcadores del DOM.
+- **Fotos de campo con más calidad.** Se pide la cámara trasera hasta 4K, se usa
+  `ImageCapture.takePhoto()` (foto a resolución completa) cuando el navegador lo
+  ofrece, con el fotograma del vídeo como reserva, y se guarda a 2048 px de lado
+  mayor, JPEG 0,85 (antes 1600 px, 0,9 sobre un fotograma de ~1080p). Si pasa de
+  2,4 MB baja la calidad y luego el tamaño. Sigue reencodificándose en un canvas:
+  el EXIF (ubicación, modelo) no viaja. La miniatura sube de 360 px/82 a 720
+  px/86 y las antiguas se rehacen solas al pedirlas. El tope del servidor (3 MB)
+  y el de 40 Mpx no cambian.
+
+---
+
 ## 5.43.1
 
 - **Arreglos tras probar la 5.43.0 en un móvil real.** (1) La pantalla de carga

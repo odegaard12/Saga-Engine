@@ -1416,7 +1416,7 @@ const fallbackToolInput: CSSProperties = {
   background: 'rgba(var(--theme-ink), .52)',
   color: '#ffffff',
   padding: '0 12px',
-  fontSize: 13,
+  fontSize: 16,
   fontWeight: 900,
   outline: 'none',
 }

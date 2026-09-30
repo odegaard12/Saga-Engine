@@ -986,44 +986,40 @@ function analizarTextos(todos) {
   const e = nuevoEntorno()
   const m = e.modulo('player/components/jugadoresEnMapa.ts')
   const motor = e.modulo('player/offline/motorDeCarga.ts')
-  // Un mapa de mentira: 1 grado de longitud/latitud = 1e6 px, con «yo» en el origen.
-  const mapa = { project: ([lon, lat]) => ({ x: lon * 1e6, y: -lat * 1e6 }) }
-  const entrada = (lon, lat) => {
-    const ofs = []
-    return { ofs, marcador: { setOffset: (o) => ofs.push(o) }, punto: { lon, lat } }
-  }
-  const yo = { lon: 0, lat: 0 }
-  const encima = entrada(0, 0) // exactamente en mi sitio
-  const casi = entrada(10e-6, 0) // a 10 px
-  const lejos = entrada(200e-6, 0) // a 200 px
-  const otroEncima = entrada(0, 0)
-  m.apartarDeMi(mapa, new Map([['a', encima], ['b', casi], ['c', lejos], ['d', otroEncima]]), yo)
-  const posFinal = (en, base) => ({ x: base.x + en.ofs[0][0], y: base.y + en.ofs[0][1] })
-  const dist = (p) => Math.hypot(p.x, p.y)
-  const pEncima = posFinal(encima, { x: 0, y: 0 })
-  const pCasi = posFinal(casi, { x: 10, y: 0 })
-  const pOtro = posFinal(otroEncima, { x: 0, y: 0 })
-  // Sin mi posición: nadie se mueve.
-  const sinYo = entrada(0, 0)
-  m.apartarDeMi(mapa, new Map([['a', sinYo]]), null)
+  // Compañeros como símbolos del mapa: posición REAL siempre; los solapados, hueco en pantalla.
+  const yo = { lat: 42.4333, lon: -8.65 }
+  const j = (user, lat, lon, extra = {}) => ({ user, display_name: user, lat, lon, presence: 'live', ...extra })
+  const encima = j('a', yo.lat, yo.lon)
+  const otroEncima = j('b', yo.lat, yo.lon)
+  const casi = j('c', yo.lat + 0.000027, yo.lon) // ~3 m
+  const lejos = j('d', yo.lat + 0.005, yo.lon) // ~550 m
+  const propio = j('yo', yo.lat, yo.lon, { is_self: true })
+  const plan19 = m.planDeJugadores([encima, otroEncima, casi, lejos, propio], 19, yo)
+  const por = (plan, user) => plan.find((x) => x.jugadores[0].user === user)
+  const plan14 = m.planDeJugadores([j('e', yo.lat + 0.01, yo.lon), j('f', yo.lat + 0.0101, yo.lon)], 14, null)
+  const plan18sinYo = m.planDeJugadores([j('g', 42.5, -8.6), j('h', 42.5, -8.6)], 18, null)
+  const huecosDistintos = new Set([1, 2, 3, 4, 5, 6, 7, 8].map((h) => m.desplazamientoDeHueco(h).join(',')))
   salida.mapaSolape = {
-    distEncima: dist(pEncima),
-    distCasi: dist(pCasi),
-    distOtroEncima: dist(pOtro),
-    losDosEncimaNoSeTapanEntreSi: Math.hypot(pEncima.x - pOtro.x, pEncima.y - pOtro.y),
-    lejosSinMover: lejos.ofs[0],
-    sinYo: sinYo.ofs[0],
+    n19: plan19.length,
+    sinPropio: plan19.every((x) => x.jugadores[0].user !== 'yo'),
+    huecoEncima: por(plan19, 'a').hueco,
+    huecoOtroEncima: por(plan19, 'b').hueco,
+    huecoCasi: por(plan19, 'c').hueco,
+    huecoLejos: por(plan19, 'd').hueco,
+    // Nadie se mueve: la coordenada es la del jugador, exacta.
+    coordenadasIntactas: plan19.every((x) => {
+      const o = x.jugadores[0]
+      return x.lat === o.lat && x.lon === o.lon
+    }),
+    grupoZoom14: plan14.map((x) => [x.tipo, x.jugadores.length]),
+    grupoCentroZoom14: [plan14[0].lat, plan14[0].lon],
+    porSeparadoZoom18: plan18sinYo.map((x) => [x.tipo, x.hueco, x.lat, x.lon]),
+    huecosDistintos: huecosDistintos.size,
+    radioDeHuecos: Math.hypot(...m.desplazamientoDeHueco(3)),
+    huecoCero: m.desplazamientoDeHueco(0),
+    metrosPorPixelZ19: m.metrosPorPixel(19, 0),
+    ordenPresencia: [m.ordenDePresencia('offline'), m.ordenDePresencia('recent'), m.ordenDePresencia('live')],
     metros: [m.distanciaLegible(3), m.distanciaLegible(47), m.distanciaLegible(1234)],
-  }
-  // Con el mapa inclinado tu avatar (elevado 3 m) sube en pantalla: se aparta de ÉL, no del suelo.
-  const inclinado = { ...mapa, getZoom: () => 19.5, getPitch: () => 55 }
-  const sobreElSuelo = entrada(0, 0)
-  m.apartarDeMi(inclinado, new Map([['a', sobreElSuelo]]), yo)
-  const subida = (3 * Math.sin((55 * Math.PI) / 180)) / (78271.517 / 2 ** 19.5)
-  const pInclinado = { x: sobreElSuelo.ofs[0][0], y: sobreElSuelo.ofs[0][1] }
-  salida.mapaSolape.inclinado = {
-    subida,
-    distAlAvatarElevado: Math.hypot(pInclinado.x, pInclinado.y + subida),
   }
   salida.microfonoDeLaRuta = {
     sinAudio: motor.rutaUsaMicrofono([{ type: 'checkpoint' }, { type: 'qr_collectible' }]),
@@ -1031,6 +1027,37 @@ function analizarTextos(todos) {
     porGameId: motor.rutaUsaMicrofono([{ type: 'minigame', game_id: 'audio_challenge' }]),
     sinDatos: motor.rutaUsaMicrofono(undefined),
     vacia: motor.rutaUsaMicrofono([]),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calidad de las fotos de campo: tamaño, calidad y tope de peso.
+// ---------------------------------------------------------------------------
+{
+  const e = nuevoEntorno()
+  const f = e.modulo('player/utils/calidadDeFoto.ts')
+  const llamadas = []
+  // Codificador de mentira: pesa según la calidad y los píxeles.
+  const pesado = (w, h, q) => {
+    llamadas.push([w, h, q])
+    const bytes = Math.round(w * h * q * 0.6)
+    return 'data:image/jpeg;base64,' + 'A'.repeat(Math.ceil((bytes * 4) / 3))
+  }
+  const normal = f.codificarConTope(4032, 3024, (w, h, q) => 'data:image/jpeg;base64,' + 'A'.repeat(1000))
+  llamadas.length = 0
+  const enorme = f.codificarConTope(4032, 3024, pesado, 900_000)
+  salida.calidadDeFoto = {
+    lado: f.LADO_FOTO_PX,
+    calidad: f.CALIDAD_FOTO,
+    dim4032: f.dimensionesDeFoto(4032, 3024),
+    dimVertical: f.dimensionesDeFoto(3024, 4032),
+    dimPequena: f.dimensionesDeFoto(800, 600),
+    bytes: f.bytesDeDataUrl('data:image/jpeg;base64,QUJD'),
+    normal: { ancho: normal.ancho, alto: normal.alto, calidad: normal.calidad },
+    enorme: { ancho: enorme.ancho, alto: enorme.alto, calidad: enorme.calidad, bytes: f.bytesDeDataUrl(enorme.dataUrl) },
+    intentos: llamadas.length,
+    camara: f.restriccionesDeCamara('environment'),
+    viewport: [e.modulo('player/utils/sinZoomDePagina.ts').VIEWPORT_SIN_ZOOM, e.modulo('player/utils/sinZoomDePagina.ts').VIEWPORT_CON_ZOOM],
   }
 }
 

@@ -1075,7 +1075,7 @@ const manualInput: CSSProperties = {
   background: 'rgba(var(--theme-ink-deep), .6)',
   color: '#fff',
   padding: '0 12px',
-  fontSize: 15,
+  fontSize: 16,
   fontWeight: 800,
 }
 

@@ -789,7 +789,7 @@ export function InteractionSheet({
                       color: '#ffffff',
                       borderRadius: 'var(--theme-radius-card)',
                       padding: '6px 12px',
-                      fontSize: 13,
+                      fontSize: 16,
                       textTransform: 'uppercase',
                       outline: 'none',
                       width: '180px',
