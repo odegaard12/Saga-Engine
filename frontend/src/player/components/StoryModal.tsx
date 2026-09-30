@@ -1,4 +1,5 @@
 import { renderMarkdown } from '../utils/formatMarkdown'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
 
 interface StoryModalProps {
   title: string
@@ -21,6 +22,9 @@ interface StoryModalProps {
  * titulo grande y boton solido con texto oscuro.
  */
 export function StoryModal({ title, subtitle, body, buttonText, onClose }: StoryModalProps) {
+  // Mientras está en pantalla (se monta sólo cuando toca) tapa el mapa entero.
+  useCubreElMapa(true)
+
   return (
     <div
       style={{

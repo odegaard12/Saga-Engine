@@ -1,3 +1,12 @@
+import {
+  AdminHttpError,
+  describeAdminError,
+  describeValidationErrors,
+  extractErrorDetail,
+  isAdminHttpError,
+  notifyAdminSessionExpired,
+} from './adminErrors'
+
 export type AdminPhysicalNodeKind = 'collectible' | 'requirement' | 'clue' | 'bonus'
 
 export type AdminReactOverviewStage = {
@@ -42,6 +51,18 @@ export type AdminReactOverviewStage = {
   route_via?: Array<[number, number]>
   /** Trazado real del tramo que llega a este nodo (GPX de campo) */
   route_track?: Array<[number, number]>
+  /**
+   * Requisito de mochila y código de emergencia. El resumen del servidor no los
+   * devuelve: el panel los completa leyendo el nodo guardado (ver
+   * `hydrateStagesFromRaw` en stageFields.ts) y los vuelve a escribir al guardar.
+   */
+  required_item_id?: string
+  required_item_label?: string
+  required_item_quantity?: number
+  consume_required_item?: boolean
+  requires_item?: boolean
+  fallback_code?: string
+  physical_fallback_code?: string
 }
 
 export type AdminRawStage = Record<string, unknown>
@@ -63,23 +84,56 @@ export type AdminProfileActionResponse = {
 export type AdminConfigSaveResponse = {
   status: 'ok' | 'fail'
   message?: string
+  httpStatus?: number
 }
 
 export type AdminLoginResponse = {
   status: 'ok' | 'fail' | 'password_change_required'
   message?: string
   must_change?: boolean
+  /** Hasta cuándo vale la sesión (segundos desde 1970), si el servidor lo dice. */
+  session_expires_at?: number
 }
 
 export type AdminStagesResponse = {
   status: 'ok' | 'fail'
   message?: string
   stages?: AdminRawStage[]
+  /** Huella de la lista de nodos tal y como está guardada AHORA (contrato 1). */
+  stages_revision?: string
+  httpStatus?: number
+}
+
+/** A quién le cambia el nodo con un guardado (contrato 2: `dry_run`). */
+export type AdminAffectedPlayer = {
+  user: string
+  display_name?: string
+  level_antes?: number | null
+  level_despues?: number | null
+  nodo_antes?: string | number | null
+  nodo_despues?: string | number | null
 }
 
 export type AdminSaveResponse = {
-  status: 'ok' | 'fail'
+  status: 'ok' | 'fail' | 'conflict'
   message?: string
+  httpStatus?: number
+  /** Solo en un ensayo (`dry_run: true`): el servidor NO guardó nada. */
+  dry_run?: boolean
+  afectados?: AdminAffectedPlayer[]
+  /** Solo en un conflicto (409 `stages_changed`): la huella que hay ahora. */
+  reason?: string
+  current_revision?: string
+  /** Errores de validación por nodo (400). */
+  errors?: Array<{ index?: number | null; field?: string; detail?: string }>
+  stages_revision?: string
+}
+
+export type AdminSaveOptions = {
+  /** La huella con la que se cargaron los nodos que se están editando. */
+  stagesRevision?: string
+  /** Pide solo el ensayo: a quién afectaría, sin guardar nada. */
+  dryRun?: boolean
 }
 
 export type AdminReactOverviewProfile = {
@@ -133,6 +187,12 @@ export type AdminReactOverviewResponse = {
   /** Las 5 familias de presentación del admin (displayFamilies.ts). */
   display_families?: Array<{ id: string; label: string }>
   stages?: AdminReactOverviewStage[]
+  /**
+   * Huella de la lista de nodos cuando se cargó esta vista (contrato 1). Se
+   * devuelve tal cual al guardar: si otra pestaña o persona guardó antes, el
+   * servidor contesta 409 en vez de pisarla.
+   */
+  stages_revision?: string
   profiles?: AdminReactOverviewProfile[]
   /**
    * Los perfiles completos, con la foto incrustada.
@@ -143,6 +203,27 @@ export type AdminReactOverviewResponse = {
    * enteras para editarlas.
    */
   player_profiles?: Array<Record<string, unknown>>
+}
+
+async function readJsonBody(res: Response): Promise<unknown> {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Convierte una respuesta que no es 2xx en un `AdminHttpError` con el detalle
+ * que mandó el servidor. Si es un 403 de sesión, además avisa a la aplicación
+ * (evento en `window`) para que vuelva al login SIN tirar el trabajo pendiente:
+ * antes cada panel se quedaba con un «HTTP 403» a secas, en inglés.
+ */
+async function httpErrorFrom(res: Response): Promise<AdminHttpError> {
+  const body = await readJsonBody(res)
+  const detail = extractErrorDetail(body)
+  notifyAdminSessionExpired(res.status, detail)
+  return new AdminHttpError(res.status, detail, body)
 }
 
 async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
@@ -157,7 +238,7 @@ async function adminPostJson<T>(url: string, body: unknown): Promise<T> {
   })
 
   if (!res.ok) {
-    throw new Error(`Request failed: HTTP ${res.status}`)
+    throw await httpErrorFrom(res)
   }
 
   return res.json() as Promise<T>
@@ -218,50 +299,14 @@ export function fetchMissionBackup(password?: string) {
   return adminPostJson<SagaBackup>('/api/admin/export', password ? { password } : {})
 }
 
-async function adminPostJsonResilient(url: string, body: unknown): Promise<unknown> {
-  const res = await fetch(url, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  let payload: unknown = null
-
-  try {
-    payload = await res.json()
-  } catch {
-    payload = null
-  }
-
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'message' in payload
-        ? String((payload as { message?: unknown }).message)
-        : `HTTP ${res.status}`
-
-    throw new Error(message)
-  }
-
-  return payload
-}
-
-
-function adminPayloadVariantsResilient(password?: string, extra: Record<string, unknown> = {}) {
-  if (!password) {
-    return [{ ...extra }]
-  }
-
-  return [
-    { password, ...extra },
-    { admin_password: password, ...extra },
-    { admin_pass: password, ...extra },
-    { admin_key: password, ...extra },
-    { key: password, ...extra },
-  ]
+/**
+ * La contraseña, si se pasa, viaja UNA vez y con su nombre de siempre. Antes se
+ * probaban cinco nombres distintos (`admin_pass`, `admin_key`, `key`...) y, si
+ * la primera fallaba, las cuatro restantes: hasta quince peticiones para un solo
+ * guardado. El panel trabaja con la cookie de sesión y nunca la pasa.
+ */
+function conClave(password: string | undefined, cuerpo: Record<string, unknown>) {
+  return password ? { password, ...cuerpo } : cuerpo
 }
 
 function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResponse {
@@ -295,94 +340,144 @@ function normalizeAdminStagesPayloadResilient(payload: unknown): AdminStagesResp
     return { status: 'fail', message: message || 'Admin stages response did not include stages.' }
   }
 
-  return { status: 'ok', stages: stages as AdminRawStage[] }
+  const revision =
+    typeof obj.stages_revision === 'string' && obj.stages_revision ? obj.stages_revision : undefined
+
+  return {
+    status: 'ok',
+    stages: stages as AdminRawStage[],
+    ...(revision ? { stages_revision: revision } : {}),
+  }
 }
 
-function normalizeAdminSavePayloadResilient(payload: unknown): AdminSaveResponse {
-  if (!payload || typeof payload !== 'object') {
+/**
+ * La lista de nodos tal y como está guardada en el servidor, entera (con los
+ * códigos de respaldo y todo lo que el resumen del panel no trae).
+ *
+ * Nunca lanza: si algo falla devuelve `{ status: 'fail', message }` con el
+ * motivo en castellano. QUIEN GUARDA no puede continuar si esto falla: guardar
+ * sin haber leído los nodos reales borraba los códigos de respaldo de todos.
+ */
+export async function fetchAdminStages(password?: string): Promise<AdminStagesResponse> {
+  try {
+    const res = await fetch('/api/admin/stages', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(conClave(password, {})),
+    })
+
+    if (!res.ok) {
+      const fallo = await httpErrorFrom(res)
+      return { status: 'fail', message: describeAdminError(fallo, 'cargar'), httpStatus: res.status }
+    }
+
+    const normalized = normalizeAdminStagesPayloadResilient(await readJsonBody(res))
+    return normalized.status === 'ok'
+      ? normalized
+      : {
+          ...normalized,
+          message: normalized.message || 'El servidor no devolvió la lista de nodos.',
+        }
+  } catch (err) {
     return {
       status: 'fail',
-      message: 'Admin save returned an empty response.',
+      message: describeAdminError(err, 'cargar'),
+      httpStatus: isAdminHttpError(err) ? err.status : undefined,
+    }
+  }
+}
+
+function normalizeAdminSaveBody(status: number, payload: unknown): AdminSaveResponse {
+  const obj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+  const rawStatus = typeof obj.status === 'string' ? obj.status.toLowerCase() : ''
+  const revision = (valor: unknown) => (typeof valor === 'string' && valor ? valor : undefined)
+
+  // Conflicto de revisión (contrato 1): otro guardado se adelantó.
+  if (status === 409 || rawStatus === 'conflict') {
+    return {
+      status: 'conflict',
+      httpStatus: status,
+      reason: typeof obj.reason === 'string' ? obj.reason : 'stages_changed',
+      current_revision: revision(obj.current_revision),
+      message:
+        'La misión ha cambiado en el servidor desde que la cargaste (otra pestaña u otra persona ha guardado).',
     }
   }
 
-  const obj = payload as Record<string, unknown>
-  const rawStatus = typeof obj.status === 'string' ? obj.status.toLowerCase() : ''
-
-  const message =
-    typeof obj.message === 'string'
-      ? obj.message
-      : typeof obj.detail === 'string'
-        ? obj.detail
-        : undefined
-
-  if (rawStatus !== 'ok' && rawStatus !== 'success') {
+  if (status >= 400) {
+    const detalle = extractErrorDetail(payload)
+    const errores = Array.isArray(obj.errors)
+      ? (obj.errors as AdminSaveResponse['errors'])
+      : undefined
+    const validaciones = describeValidationErrors(errores)
     return {
       status: 'fail',
-      message: message || `Admin save returned status ${rawStatus || 'missing'}.`,
+      httpStatus: status,
+      errors: errores,
+      message: validaciones
+        ? `El servidor ha rechazado la misión: ${validaciones}.`
+        : describeAdminError(new AdminHttpError(status, detalle, payload), 'guardar'),
+    }
+  }
+
+  if (rawStatus !== 'ok' && rawStatus !== 'success') {
+    const mensaje =
+      typeof obj.message === 'string' ? obj.message : typeof obj.detail === 'string' ? obj.detail : ''
+    return {
+      status: 'fail',
+      httpStatus: status,
+      message: mensaje || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
     }
   }
 
   return {
     status: 'ok',
-    message,
+    httpStatus: status,
+    dry_run: obj.dry_run === true,
+    afectados: Array.isArray(obj.afectados) ? (obj.afectados as AdminAffectedPlayer[]) : undefined,
+    stages_revision: revision(obj.stages_revision),
   }
 }
 
-export async function fetchAdminStages(password?: string): Promise<AdminStagesResponse> {
-  const errors: string[] = []
-
-  for (const body of adminPayloadVariantsResilient(password)) {
-    try {
-      const payload = await adminPostJsonResilient('/api/admin/stages', body)
-      const normalized = normalizeAdminStagesPayloadResilient(payload)
-
-      if (normalized.status === 'ok') {
-        return normalized
-      }
-
-      errors.push(normalized.message || 'Unknown stages POST response error.')
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : 'Unknown stages POST request error.')
-    }
-  }
-
-  return {
-    status: 'fail',
-    message: errors.filter(Boolean).join(' | ') || 'Could not load raw admin stages.',
-  }
-}
-
+/**
+ * Guarda los nodos. UNA sola petición `{ stages, stages_revision? }`.
+ *
+ * - `stagesRevision` es la huella con la que se cargó lo que se está editando
+ *   (contrato 1). Si otra persona guardó antes, el servidor contesta 409 y aquí
+ *   sale `{ status: 'conflict' }` en vez de pisarla.
+ * - `dryRun` pide solo el ensayo (contrato 2): a quién le cambiaría el nodo.
+ *   Un servidor que no lo conozca GUARDARÍA de verdad y contestaría sin
+ *   `dry_run: true`: quien llama tiene que comprobarlo (ver adminSaveFlow.ts).
+ */
 export async function saveAdminStages(
   password: string | undefined,
-  stages: AdminRawStage[]
+  stages: AdminRawStage[],
+  options: AdminSaveOptions = {}
 ): Promise<AdminSaveResponse> {
-  const errors: string[] = []
+  try {
+    const res = await fetch('/api/admin/save', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        conClave(password, {
+          stages,
+          ...(options.stagesRevision ? { stages_revision: options.stagesRevision } : {}),
+          ...(options.dryRun ? { dry_run: true } : {}),
+        })
+      ),
+    })
 
-  const payloads = [
-    ...adminPayloadVariantsResilient(password, { stages }),
-    ...adminPayloadVariantsResilient(password, { data: stages }),
-    ...adminPayloadVariantsResilient(password, { nodes: stages }),
-  ]
-
-  for (const body of payloads) {
-    try {
-      const payload = await adminPostJsonResilient('/api/admin/save', body)
-      const normalized = normalizeAdminSavePayloadResilient(payload)
-
-      if (normalized.status === 'ok') {
-        return normalized
-      }
-
-      errors.push(normalized.message || 'Unknown save response error.')
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : 'Unknown save request error.')
+    const payload = await readJsonBody(res)
+    if (!res.ok) notifyAdminSessionExpired(res.status, extractErrorDetail(payload))
+    return normalizeAdminSaveBody(res.status, payload)
+  } catch (err) {
+    return {
+      status: 'fail',
+      message: describeAdminError(err, 'guardar'),
+      httpStatus: isAdminHttpError(err) ? err.status : undefined,
     }
-  }
-
-  return {
-    status: 'fail',
-    message: errors.filter(Boolean).join(' | ') || 'Could not save admin stages.',
   }
 }
 
@@ -390,7 +485,7 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   if (!payload || typeof payload !== 'object') {
     return {
       status: 'fail',
-      message: 'Admin config save returned an empty response.',
+      message: 'El servidor no ha contestado al guardar los ajustes.',
     }
   }
 
@@ -407,7 +502,7 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   if (rawStatus !== 'ok' && rawStatus !== 'success') {
     return {
       status: 'fail',
-      message: message || `Admin config save returned status ${rawStatus || 'missing'}.`,
+      message: message || `El servidor no confirmó el guardado (estado «${rawStatus || 'sin estado'}»).`,
     }
   }
 
@@ -417,73 +512,50 @@ function normalizeAdminConfigSavePayload(payload: unknown): AdminConfigSaveRespo
   }
 }
 
-function adminConfigPayloadVariants(password: string | undefined, config: Record<string, unknown>) {
-  if (!password) {
-    return [{ config }, { data: config }, { ...config }]
-  }
-
-  return [
-    { password, config },
-    { admin_password: password, config },
-    { admin_pass: password, config },
-    { admin_key: password, config },
-    { key: password, config },
-    { password, data: config },
-    { password, ...config },
-  ]
-}
-
+/**
+ * Guarda los ajustes. UNA sola petición con la forma que el servidor exige:
+ * `{ config: {...} }` (contrato 3: sin `config` contesta 400 `missing_config`).
+ *
+ * Antes se probaban `{config}`, `{data: config}` y `{...config}`: el servidor
+ * hace `data.get("config") or {}` y contesta «ok» sin cambiar nada con las otras
+ * dos, así que si la primera petición se perdía por la red, la segunda «triunfaba»
+ * sin guardar un solo campo. Quien llama debe releer y comparar después
+ * (adminConfigVerify.ts): un «ok» del servidor no prueba que se guardara.
+ */
 export async function saveAdminConfig(
   password: string | undefined,
   config: Record<string, unknown>
 ): Promise<AdminConfigSaveResponse> {
-  const errors: string[] = []
+  try {
+    const res = await fetch('/api/admin/save-config', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(conClave(password, { config })),
+    })
 
-  for (const body of adminConfigPayloadVariants(password, config)) {
-    try {
-      const res = await fetch('/api/admin/save-config', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
+    const payload = await readJsonBody(res)
 
-      let payload: unknown = null
-
-      try {
-        payload = await res.json()
-      } catch {
-        payload = null
+    if (!res.ok) {
+      const detalle = extractErrorDetail(payload)
+      notifyAdminSessionExpired(res.status, detalle)
+      return {
+        status: 'fail',
+        httpStatus: res.status,
+        message: describeAdminError(new AdminHttpError(res.status, detalle, payload), 'guardar'),
       }
-
-      if (!res.ok) {
-        const message =
-          payload && typeof payload === 'object' && 'message' in payload
-            ? String((payload as { message?: unknown }).message)
-            : `HTTP ${res.status}`
-
-        errors.push(message)
-        continue
-      }
-
-      const normalized = normalizeAdminConfigSavePayload(payload)
-
-      if (normalized.status === 'ok') {
-        return normalized
-      }
-
-      errors.push(normalized.message || 'Unknown config save response error.')
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : 'Unknown config save request error.')
     }
-  }
 
-  return {
-    status: 'fail',
-    message: errors.filter(Boolean).join(' | ') || 'Could not save admin config.',
+    return { ...normalizeAdminConfigSavePayload(payload), httpStatus: res.status }
+  } catch (err) {
+    return {
+      status: 'fail',
+      message: describeAdminError(err, 'guardar'),
+      httpStatus: isAdminHttpError(err) ? err.status : undefined,
+    }
   }
 }
 
@@ -517,6 +589,8 @@ async function adminPostJsonConEstado(url: string, body: unknown): Promise<{ htt
   } catch {
     data = null
   }
+
+  if (!res.ok) notifyAdminSessionExpired(res.status, extractErrorDetail(data))
 
   return { httpStatus: res.status, data }
 }
@@ -559,6 +633,13 @@ export type AdminEventsResponse = {
   status: 'ok' | 'error'
   detail?: string
   events?: AdminEvent[]
+  /**
+   * Cuántos eventos pendientes hay en TOTAL, no solo entre los que llegan en
+   * esta página (que se corta en `limit`). Si el servidor no lo manda, el panel
+   * no puede afirmar un número exacto cuando la lista llega al tope: dice «200+».
+   */
+  pending_count?: number
+  total_count?: number
 }
 
 /** Lista de eventos del registro de actividad (heartbeats, QR, acciones de admin...). */
@@ -714,7 +795,7 @@ export async function downloadMatchLogExport(
     body: JSON.stringify(query),
   })
   if (!res.ok) {
-    throw new Error(`Request failed: HTTP ${res.status}`)
+    throw await httpErrorFrom(res)
   }
   return res.blob()
 }

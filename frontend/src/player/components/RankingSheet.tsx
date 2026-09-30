@@ -6,7 +6,8 @@ import {
   getPlayerColor,
 } from '../../shared/playerIdentity'
 import { SwipeableSheet } from './SwipeableSheet'
-import { leerMarcaDeTiempo } from '../../shared/fechas'
+import { ordenarClasificacion } from './clasificacion'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 interface RankingSheetProps {
   open: boolean
@@ -28,25 +29,6 @@ function formatearTiempo(ms: number) {
   const segundos = total % 60
   if (horas > 0) return `${horas}h ${minutos.toString().padStart(2, '0')}m`
   return `${minutos}m ${segundos.toString().padStart(2, '0')}s`
-}
-
-function readNumericStat(player: TeamProfileLiveStatus, keys: string[]) {
-  const raw = player as unknown as Record<string, unknown>
-  for (const key of keys) {
-    const value = raw[key]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-  }
-  return 0
-}
-
-function readTimestamp(player: TeamProfileLiveStatus, keys: string[]) {
-  const raw = player as unknown as Record<string, unknown>
-  for (const key of keys) {
-    const value = raw[key]
-    const marca = leerMarcaDeTiempo(value)
-    if (marca !== null) return marca
-  }
-  return Number.MAX_SAFE_INTEGER
 }
 
 function Retrato({
@@ -97,6 +79,7 @@ function Retrato({
 }
 
 export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetProps) {
+  const tx = useTextosDePantallas().clasificacion
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -117,25 +100,10 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
    *
    * Quien decide cuando montar y cuando desmontar es la hoja, y solo ella.
    */
-  const sorted = [...players].sort((a, b) => {
-    const pointsA = readNumericStat(a, ['score', 'points', 'total_points'])
-    const pointsB = readNumericStat(b, ['score', 'points', 'total_points'])
-    if (pointsA !== pointsB) return pointsB - pointsA
-
-    const lvlA = a.finished ? 999 : a.level || 0
-    const lvlB = b.finished ? 999 : b.level || 0
-    if (lvlA !== lvlB) return lvlB - lvlA
-
-    const timeA = a.total_time_ms || 0
-    const timeB = b.total_time_ms || 0
-    if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB
-
-    const dateA = readTimestamp(a, ['finished_at', 'completed_at', 'updated_at', 'last_seen'])
-    const dateB = readTimestamp(b, ['finished_at', 'completed_at', 'updated_at', 'last_seen'])
-    if (dateA !== dateB) return dateA - dateB
-
-    return a.display_name.localeCompare(b.display_name)
-  })
+  // El orden vive en `clasificacion.ts`. Desempata por lo que NO se mueve (hora
+  // de fin, nombre, id): antes era `last_seen`, que cambia en cada latido y hacía
+  // que dos jugadores empatados se intercambiaran de sitio cada pocos segundos.
+  const sorted = ordenarClasificacion(players)
 
   const liveCount = sorted.filter((p) => p.presence === 'live').length
   const hayPodio = sorted.length >= 3
@@ -165,15 +133,15 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
           con versalitas. El trofeo ya esta en el icono que abre esta hoja. */}
       <div style={headerRow}>
         <div style={{ minWidth: 0 }}>
-          <div style={title}>Clasificación</div>
+          <div style={title}>{tx.titulo}</div>
           <div style={subtitulo}>
-            {sorted.length} {sorted.length === 1 ? 'xogador' : 'xogadores'}
+            {tx.jugadores(sorted.length)}
             {liveCount > 0 ? (
-              <span style={{ color: VERDE_EN_LINEA, fontWeight: 800 }}> · {liveCount} en liña</span>
+              <span style={{ color: VERDE_EN_LINEA, fontWeight: 800 }}>{tx.enLinea(liveCount)}</span>
             ) : null}
           </div>
         </div>
-        <button type="button" aria-label="Cerrar" style={closeBtn} onClick={onClose}>
+        <button type="button" aria-label={tx.cerrar} style={closeBtn} onClick={onClose}>
           ×
         </button>
       </div>
@@ -181,9 +149,9 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
       {sorted.length === 0 ? (
         <div style={emptyState}>
           <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.5 }}>🏆</div>
-          <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: 15 }}>Aínda non hai tempos</div>
+          <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: 15 }}>{tx.vacioTitulo}</div>
           <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 5, fontSize: 12.5 }}>
-            Aparecerán en canto alguén complete un nodo.
+            {tx.vacioDetalle}
           </div>
         </div>
       ) : (
@@ -216,7 +184,7 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                   </div>
                   <div style={ganador ? podioNombreGanador : podioNombre}>
                     {selfUser && jugador.user === selfUser
-                      ? 'Ti'
+                      ? tx.tu
                       : jugador.display_name || jugador.user}
                   </div>
                   <div style={ganador ? podioTiempoGanador : podioTiempo}>
@@ -263,14 +231,14 @@ export function RankingSheet({ open, players, onClose, selfUser }: RankingSheetP
                     />
 
                     <span style={{ ...nombre, color: soyYo ? 'var(--theme-primary)' : '#fff' }}>
-                      {soyYo ? 'Ti' : player.display_name || player.user}
+                      {soyYo ? tx.tu : player.display_name || player.user}
                     </span>
 
                     {/* El nodo SOLO si aun no ha acabado. Antes ponia
                         "¡FINALIZADO!" en cada fila: con todos terminados eran
                         nueve lineas identicas que no informaban de nada. */}
                     {!player.finished ? (
-                      <span style={etiquetaNodo}>Nodo {player.level || 0}</span>
+                      <span style={etiquetaNodo}>{tx.nodo(player.level || 0)}</span>
                     ) : null}
                     {isLive ? <span style={puntoEnLinea} /> : null}
 

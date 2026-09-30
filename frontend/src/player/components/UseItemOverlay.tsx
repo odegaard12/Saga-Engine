@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import ItemIconSvg from './ItemIconSvg'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { useTextosDePantallas } from './useTextosDePantallas'
 
 /**
  * Paso de "usar el objeto" antes de abrir un nodo que lo exige.
@@ -21,6 +23,9 @@ interface UseItemOverlayProps {
 type Fase = 'listo' | 'usando' | 'hecho'
 
 export function UseItemOverlay({ open, label, itemId, onUsed, onCancel }: UseItemOverlayProps) {
+  useCubreElMapa(open)
+  const tx = useTextosDePantallas().usarObjeto
+
   const [fase, setFase] = useState<Fase>('listo')
 
   useEffect(() => {
@@ -66,26 +71,24 @@ export function UseItemOverlay({ open, label, itemId, onUsed, onCancel }: UseIte
 
         {fase === 'hecho' ? (
           <>
-            <h2 className="saga-use-title">A porta cede</h2>
-            <p className="saga-use-text">{label} encaixou no seu sitio.</p>
+            <h2 className="saga-use-title">{tx.hechoTitulo}</h2>
+            <p className="saga-use-text">{tx.hechoTexto(label)}</p>
           </>
         ) : fase === 'usando' ? (
           <>
-            <h2 className="saga-use-title">Encaixando…</h2>
-            <p className="saga-use-text">Non o soltes.</p>
+            <h2 className="saga-use-title">{tx.usandoTitulo}</h2>
+            <p className="saga-use-text">{tx.usandoTexto}</p>
           </>
         ) : (
           <>
             <h2 className="saga-use-title">{label}</h2>
-            <p className="saga-use-text">
-              Lévalo encima. Este nodo non abre sen el: úsao para entrar.
-            </p>
+            <p className="saga-use-text">{tx.listoTexto}</p>
 
             <button type="button" className="saga-use-btn" onClick={() => setFase('usando')}>
-              Usar {label}
+              {tx.usar(label)}
             </button>
             <button type="button" className="saga-use-cancel" onClick={onCancel}>
-              Agora non
+              {tx.ahoraNo}
             </button>
           </>
         )}

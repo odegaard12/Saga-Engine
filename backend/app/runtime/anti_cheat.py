@@ -330,6 +330,58 @@ def record_suspicion(
     return entrada
 
 
+#: Claves de la evidencia de una sospecha que llevan COORDENADAS de una persona
+#: (p. ej. el par `from`/`to` de «velocidad imposible»).
+CLAVES_CON_COORDENADAS = ("from", "to", "lat", "lon", "samples", "position", "origin")
+
+
+def count_entries_with_coordinates(db_path: str) -> int:
+    """Cuántas sospechas guardadas llevan coordenadas en su evidencia."""
+    datos = load_json(db_path, {})
+    if not isinstance(datos, dict):
+        return 0
+    total = 0
+    for lista in datos.values():
+        if not isinstance(lista, list):
+            continue
+        for entrada in lista:
+            evidencia = entrada.get("evidence") if isinstance(entrada, dict) else None
+            if isinstance(evidencia, dict) and any(clave in evidencia for clave in CLAVES_CON_COORDENADAS):
+                total += 1
+    return total
+
+
+def scrub_coordinates(db_path: str) -> int:
+    """Quita las coordenadas de la evidencia de todas las sospechas.
+
+    Es parte de la purga de datos personales: `anti_cheat.json` guardaba de
+    dónde a dónde iba un jugador (lat/lon exactos) sin que nada lo borrase
+    (caza de fallos S3). Las sospechas se conservan -motivo, hora, distancia,
+    velocidad- pero sin sitio. Devuelve cuántas entradas se limpiaron.
+    """
+    limpiadas = {"n": 0}
+
+    def _limpiar(actual):
+        if not isinstance(actual, dict):
+            return {}
+        for lista in actual.values():
+            if not isinstance(lista, list):
+                continue
+            for entrada in lista:
+                evidencia = entrada.get("evidence") if isinstance(entrada, dict) else None
+                if not isinstance(evidencia, dict):
+                    continue
+                quitadas = [clave for clave in CLAVES_CON_COORDENADAS if clave in evidencia]
+                if quitadas:
+                    for clave in quitadas:
+                        evidencia.pop(clave, None)
+                    limpiadas["n"] += 1
+        return actual
+
+    update_json(db_path, {}, _limpiar)
+    return limpiadas["n"]
+
+
 def list_suspicions(db_path: str, user: Optional[str] = None) -> dict:
     """Todas las sospechas, o sólo las de `user` si se pide."""
     data = load_json(db_path, {})
@@ -381,6 +433,12 @@ def _reset_speed_streak(streak_db_path: str, user: str) -> None:
     """El tramo actual no es sospechoso: se olvida cualquier racha anterior."""
     user_key = str(user or "").strip()
     if not user_key:
+        return
+
+    # Lo normal es que no haya racha que olvidar: se mira SIN cerrojo ni
+    # escritura. Esto corre en cada latido de cada móvil (caza de fallos S1).
+    visto = load_json(streak_db_path, {})
+    if not isinstance(visto, dict) or user_key not in visto:
         return
 
     def _actualizar(actual):
@@ -692,6 +750,57 @@ def check_future_timestamp(
     )
 
 
+#: Holgura al comparar el tiempo que declara el móvil con el que el servidor vio
+#: pasar entre dos avances: el reloj del móvil y el tiempo de red no son
+#: exactos, y un avance subido desde la cola llega con su hora corregida a ojo.
+DECLARED_TIME_TOLERANCE_MS = 60_000
+DECLARED_TIME_TOLERANCE_FRACTION = 0.25
+
+
+def check_declared_time_vs_observed(
+    db_path: str,
+    user: str,
+    node: dict,
+    declared_ms: Optional[int],
+    observed_ms: Optional[int],
+) -> Optional[dict]:
+    """El tiempo declarado en un nodo no cabe entre los dos avances que vio el servidor.
+
+    El tiempo por nodo (`time_spent_ms`) y el total de la clasificación los
+    declara el móvil; el servidor sólo ve CUÁNDO llega cada avance. Un nodo no
+    puede haber durado más que el intervalo entre el avance anterior y éste
+    (`observed_ms`): si el móvil declara más, el dato está manipulado o el reloj
+    del móvil miente. Sólo FLAG: no cambia el avance ni la clasificación.
+
+    Sin `observed_ms` (primer avance, o un evento de la cola sin hora fiable) no
+    se compara nada: mejor no marcar que marcar a ciegas.
+    """
+    try:
+        declarado = int(declared_ms)
+        observado = int(observed_ms)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+    if declarado <= 0 or observado <= 0:
+        return None
+
+    holgura = max(DECLARED_TIME_TOLERANCE_MS, int(observado * DECLARED_TIME_TOLERANCE_FRACTION))
+    if declarado <= observado + holgura:
+        return None
+
+    return record_suspicion(
+        db_path,
+        user,
+        "declared_time_exceeds_observed",
+        {
+            "node_id": node.get("id") if isinstance(node, dict) else None,
+            "declared_ms": declarado,
+            "observed_ms": observado,
+            "tolerance_ms": holgura,
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # Posición manual/debug: nota NEUTRA, no sospecha (ver MANUAL_POSITION_SOURCE).
 # ---------------------------------------------------------------------------
@@ -702,6 +811,13 @@ def _manual_notice_marked(notice_db_path: str, user_key: str) -> bool:
 
 
 def _set_manual_notice(notice_db_path: str, user_key: str, marcado: bool) -> None:
+    # Igual que la racha: casi siempre no hay nada que cambiar, y esto se
+    # ejecuta en cada latido. Sin cerrojo ni escritura si ya está como se pide.
+    visto = load_json(notice_db_path, {})
+    visto = visto if isinstance(visto, dict) else {}
+    if bool(visto.get(user_key)) == bool(marcado):
+        return
+
     def _actualizar(actual):
         actual = dict(actual) if isinstance(actual, dict) else {}
         if marcado:

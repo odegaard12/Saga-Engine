@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { Suspense, lazy, useEffect, useState } from 'react'
-import LoginApp from './login/LoginApp'
 import PlayerApp from './player/PlayerApp'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
+import { bloquearGestosDeZoom, fijarViewport } from './player/utils/sinZoomDePagina'
 
 /**
  * El panel de administración se carga aparte, sólo al entrar en él.
@@ -14,6 +14,9 @@ import { BuildInfoBadge } from './shared/BuildInfoBadge'
  * Eso es peso de descarga en el punto de salida, con la cobertura que haya, y
  * espacio ocupado en el móvil para siempre.
  */
+/** La pantalla de elegir jugador: el jugador que ya tiene su enlace no la necesita. */
+const LoginApp = lazy(() => import('./login/LoginApp'))
+
 const AdminApp = lazy(() => import('./admin/AdminApp'))
 
 /**
@@ -74,6 +77,11 @@ export default function App() {
   }, [])
 
   const isAdmin = currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
+  // La app del jugador nunca se amplía (campos a 16 px, meta y gestos); el panel sí puede.
+  useEffect(() => {
+    fijarViewport(!isAdmin)
+  }, [isAdmin])
+  useEffect(() => bloquearGestosDeZoom(), [])
   const esBancoDeMapa = currentPath === '/banco-mapa'
   let content: ReactNode
   let showFloatingBuildInfo = true
@@ -102,7 +110,11 @@ export default function App() {
   } else {
     const user = getPlayerNameFromLocation()
     if (!user) {
-      content = <LoginApp />
+      content = (
+        <Suspense fallback={null}>
+          <LoginApp />
+        </Suspense>
+      )
     } else {
       ensurePlayerQueryParam(user)
       content = <PlayerApp />

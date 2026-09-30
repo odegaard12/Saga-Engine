@@ -1,11 +1,25 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { useI18n } from '../../i18n/useI18n'
+import {
+  horaDelServidorAhora,
+  leerMuestraDeReloj,
+  registrarHoraDelServidor,
+} from '../offline/relojDelServidor'
 
 interface MissionLockScreenProps {
   /** `mission_launch_at` tal y como viene de /api/config -vacío = sin bloqueo. */
   launchAtRaw: string
   /** `server_time_ms` de /api/config: el reloj que de verdad manda. */
   serverTimeMs: number | undefined
+  /**
+   * Hora del MÓVIL (ms) a la que llegó `serverTimeMs`.
+   *
+   * Sin ella no se sabe si el dato es de ahora o de la configuración guardada
+   * hace tres días, y la cuenta atrás iba atrasada tanto como el dato. Con ella
+   * la diferencia entre relojes se calcula con el momento en que se recibió.
+   */
+  serverTimeRecibidoEnMs?: number | null
   mobile: boolean
   displayName?: string
   /** Se llama UNA vez, en el momento exacto en que deja de estar bloqueado. */
@@ -13,6 +27,33 @@ interface MissionLockScreenProps {
   /** Abre el panel de "antes de salir" -descarga offline y permisos-, que
    * sigue funcionando igual esté bloqueada la misión o no. */
   onOpenDownload: () => void
+}
+
+/**
+ * Los textos, en los dos idiomas de las misiones. Estaba sólo en gallego: en una
+ * misión en castellano la cortina del día de la salida hablaba otro idioma.
+ */
+const TEXTOS = {
+  es: {
+    antetitulo: 'AÚN NO TOCA',
+    titulo: 'La misión empieza el',
+    saludo: (nombre: string) => `Hola, ${nombre} 👋`,
+    explicacion:
+      'Ya puedes prepararte: descarga la misión para jugar sin cobertura y concede los permisos. El mapa y los retos se abren solos en cuanto llegue la hora.',
+    prepararse: '📥 Prepararse antes de salir',
+    horaDelMovil: 'Contando con la hora de este móvil (no hay una hora reciente del servidor).',
+    lugar: 'es-ES',
+  },
+  gl: {
+    antetitulo: 'AÍNDA NON TOCA',
+    titulo: 'A misión empeza o',
+    saludo: (nombre: string) => `Ola, ${nombre} 👋`,
+    explicacion:
+      'Xa podes prepararte: descarga a misión para xogar sen cobertura e concede os permisos. O mapa e os retos ábrense sós en canto chegue a hora.',
+    prepararse: '📥 Prepararse antes de saír',
+    horaDelMovil: 'Contando coa hora deste móbil (non hai unha hora recente do servidor).',
+    lugar: 'gl-ES',
+  },
 }
 
 function parseLaunchAt(raw: string): number | null {
@@ -47,26 +88,34 @@ function formatearFalta(msRestantes: number): string {
  * servidor -/api/advance y node_completed lo rechazan igual aunque esta
  * pantalla se saltara a mano-; esto es sólo la cortina.
  *
- * La cuenta atrás se mide contra el reloj del SERVIDOR (`serverTimeMs`), no
- * contra el del móvil: cambiar la hora del teléfono no adelanta nada, porque
- * el desfase se calcula una vez, al llegar el primer dato, y desde ahí se
- * seguim contando con el reloj de verdad del aparato -que si avanza al ritmo
- * normal, sólo que corregido-.
+ * La cuenta atrás se mide contra el reloj del SERVIDOR, no contra el del móvil:
+ * cambiar la hora del teléfono no adelanta nada. La diferencia entre los dos
+ * relojes se mide en el instante en que llega `server_time_ms` (ver
+ * `offline/relojDelServidor.ts`), se sustituye en cuanto llega una hora más
+ * nueva, y si la última es vieja se usa el reloj del móvil, que el sistema
+ * corrige solo.
  */
 export function MissionLockScreen({
   launchAtRaw,
   serverTimeMs,
+  serverTimeRecibidoEnMs,
   mobile,
   displayName,
   onUnlocked,
   onOpenDownload,
 }: MissionLockScreenProps) {
+  const { locale } = useI18n()
+  const tx = locale === 'gl' ? TEXTOS.gl : TEXTOS.es
   const launchAtMs = parseLaunchAt(launchAtRaw)
 
-  const offsetRef = useRef<number | null>(null)
-  if (offsetRef.current === null && typeof serverTimeMs === 'number' && serverTimeMs > 0) {
-    offsetRef.current = serverTimeMs - Date.now()
-  }
+  // Una hora más nueva que la guardada la sustituye (registrar sólo acepta las
+  // posteriores). Sólo con su instante de recepción: sin él no se sabe si es de
+  // ahora, y tomarla por de ahora es justo el fallo que esto arregla.
+  useEffect(() => {
+    if (typeof serverTimeRecibidoEnMs === 'number') {
+      registrarHoraDelServidor(serverTimeMs, serverTimeRecibidoEnMs)
+    }
+  }, [serverTimeMs, serverTimeRecibidoEnMs])
 
   const [ahora, setAhora] = useState(() => Date.now())
 
@@ -75,9 +124,10 @@ export function MissionLockScreen({
     return () => window.clearInterval(id)
   }, [])
 
-  const desfase = offsetRef.current ?? 0
-  const servidorAhora = ahora + desfase
-  const faltan = launchAtMs !== null ? launchAtMs - servidorAhora : -1
+  // Se lee en cada tick: una hora del servidor que llegue con la cortina puesta
+  // (refresco de fondo, vuelta de la cobertura) se recoge sola.
+  const hora = horaDelServidorAhora(leerMuestraDeReloj(), ahora)
+  const faltan = launchAtMs !== null ? launchAtMs - hora.ms : -1
 
   const desbloqueada = launchAtMs === null || faltan <= 0
 
@@ -91,7 +141,7 @@ export function MissionLockScreen({
   if (desbloqueada) return null
 
   const fecha = new Date(launchAtMs as number)
-  const fechaTexto = fecha.toLocaleString('gl-ES', {
+  const fechaTexto = fecha.toLocaleString(tx.lugar, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -102,17 +152,15 @@ export function MissionLockScreen({
   const panel = (
     <div style={capa}>
       <section className="saga-glass-panel" style={tarjeta(mobile)}>
-        <div style={antetitulo}>AÍNDA NON TOCA</div>
-        <strong style={titulo}>A misión empeza o</strong>
+        <div style={antetitulo}>{tx.antetitulo}</div>
+        <strong style={titulo}>{tx.titulo}</strong>
         <div style={fechaEstilo}>{fechaTexto}</div>
         <div style={contador}>{formatearFalta(faltan)}</div>
-        {displayName ? <div style={saudo}>Ola, {displayName} 👋</div> : null}
-        <p style={explicacion}>
-          Xa podes prepararte: descarga a misión para xogar sen cobertura e concede os
-          permisos. O mapa e os retos ábrense sós en canto chegue a hora.
-        </p>
+        {displayName ? <div style={saudo}>{tx.saludo(displayName)}</div> : null}
+        {hora.fuente === 'movil' ? <div style={notaDeReloj}>{tx.horaDelMovil}</div> : null}
+        <p style={explicacion}>{tx.explicacion}</p>
         <button type="button" style={boton} onClick={onOpenDownload}>
-          📥 Prepararse antes de saír
+          {tx.prepararse}
         </button>
       </section>
     </div>
@@ -180,6 +228,12 @@ const contador: CSSProperties = {
   fontWeight: 900,
   fontVariantNumeric: 'tabular-nums',
   letterSpacing: '-.02em',
+}
+
+const notaDeReloj: CSSProperties = {
+  fontSize: 11,
+  opacity: 0.6,
+  maxWidth: 280,
 }
 
 const saudo: CSSProperties = {

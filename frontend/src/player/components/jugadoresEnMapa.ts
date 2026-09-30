@@ -4,11 +4,21 @@ import {
   getPlayerAvatarUrl,
   getPlayerColor,
 } from '../../shared/playerIdentity'
+import { getLocale } from '../../i18n'
+import { textosDePantallasDe } from './textosDePantallas'
+
+/** Los textos del popup, en el idioma de ESTE momento (se construye al tocar). */
+function textosDelPopup() {
+  return textosDePantallasDe(getLocale()).popup
+}
 
 /**
- * Los compañeros en el mapa 3D: agrupación por cercanía y marcadores del DOM.
+ * Los compañeros en el mapa 3D: agrupación por cercanía y plan de dibujo.
  *
- * Es lo que hacía el mapa de Leaflet (ya retirado) con `otherPlayers`. Todo
+ * Se pintan como SÍMBOLOS del mapa (capa WebGL, igual que los nodos), nunca
+ * como marcadores del DOM: la posición de cada uno es SIEMPRE la real. Cuando
+ * dos caen en el mismo sitio en pantalla se separan con un `icon-offset` (ver
+ * `huecoDeSolape`), sin tocar sus coordenadas. Todo
  * el texto se construye con `textContent`, nunca con `innerHTML`: los nombres
  * los escribe el jugador.
  */
@@ -61,30 +71,6 @@ export function agruparJugadores(jugadores: Jugador[], radioMetros: number): Gru
   return grupos
 }
 
-/** Desplaza un punto `metros` en el ángulo dado (grados, 0 = este). */
-export function desplazar(punto: Punto, metros: number, anguloGrados: number): Punto {
-  const angulo = (anguloGrados * Math.PI) / 180
-  return {
-    lat: punto.lat + (Math.sin(angulo) * metros) / 111_111,
-    lon:
-      punto.lon +
-      (Math.cos(angulo) * metros) /
-        (111_111 * Math.max(0.18, Math.cos((punto.lat * Math.PI) / 180))),
-  }
-}
-
-/** Reparte `total` jugadores en corro alrededor de un centro. */
-export function repartirEnCorro(
-  centro: Punto,
-  indice: number,
-  total: number,
-  radioMetros: number,
-  anguloInicial = -45
-): Punto {
-  if (total <= 1) return centro
-  return desplazar(centro, radioMetros, anguloInicial + (360 / total) * indice)
-}
-
 export function distanciaEnMetros(a: Punto, b: Punto): number {
   return metrosEntre(a, b)
 }
@@ -98,149 +84,233 @@ export function claveDeGrupo(jugadores: Jugador[]): string {
   return `grupo:${jugadores.map((j) => j.user || j.display_name).join('|')}`
 }
 
-/** El círculo con foto (o iniciales) y el color del jugador. */
-export function crearElementoJugador(jugador: Jugador, tipo: TipoDePresencia): HTMLElement {
-  const color = getPlayerColor(jugador)
-  const foto = getPlayerAvatarUrl(jugador)
-  const iniciales = getPlayerAvatarInitials(jugador)
+function haceCuanto(ultimaVez?: number): string {
+  const t = textosDelPopup()
+  if (typeof ultimaVez !== 'number' || !Number.isFinite(ultimaVez)) return t.sinActualizar
+  const segundos = Math.max(0, Math.round(Date.now() / 1000 - ultimaVez))
+  if (segundos < 60) return t.haceSegundos(segundos)
+  const minutos = Math.round(segundos / 60)
+  if (minutos < 60) return t.haceMinutos(minutos)
+  return t.haceHoras(Math.round(minutos / 60))
+}
+
+/** «45 m», «1,2 km»: la distancia en palabras cortas. */
+export function distanciaLegible(metros: number): string {
+  if (!Number.isFinite(metros)) return ''
+  if (metros < 10) return `${Math.max(1, Math.round(metros))} m`
+  if (metros < 1000) return `${Math.round(metros / 10) * 10} m`
+  return `${(metros / 1000).toFixed(1).replace('.', ',')} km`
+}
+
+function elemento(clase: string, texto?: string): HTMLElement {
   const el = document.createElement('div')
-  el.setAttribute('role', 'button')
-  el.setAttribute('aria-label', jugador.display_name || jugador.user || 'Jugador')
-  Object.assign(el.style, {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    boxSizing: 'border-box',
-    border: `3px solid ${color}`,
-    background: color,
-    color: '#fff',
-    font: '900 14px system-ui, sans-serif',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(0,0,0,.45)',
-    opacity: tipo === 'offline' ? '0.55' : tipo === 'recent' ? '0.8' : '1',
-    filter: tipo === 'offline' ? 'grayscale(0.7)' : 'none',
-  } as Partial<CSSStyleDeclaration>)
+  el.className = clase
+  if (texto !== undefined) el.textContent = texto
+  return el
+}
+
+function botonCerrar(alCerrar?: () => void): HTMLElement {
+  const cerrar = document.createElement('button')
+  cerrar.type = 'button'
+  cerrar.className = 'saga-popup-cerrar'
+  cerrar.setAttribute('aria-label', textosDelPopup().cerrar)
+  cerrar.textContent = '×'
+  cerrar.addEventListener('click', (ev) => {
+    ev.stopPropagation()
+    alCerrar?.()
+  })
+  return cerrar
+}
+
+/**
+ * Lo que se ve al tocar a un compañero. Los colores salen de la clase
+ * `.saga-popup-jugador` (map-surface.css), que usa las variables del tema como
+ * el resto de tarjetas del jugador: nada de blanco sobre blanco.
+ */
+export function contenidoPopupJugador(
+  jugador: Jugador,
+  tipo: TipoDePresencia,
+  totalNodos: number,
+  miPosicion?: Punto | null,
+  alCerrar?: () => void
+): HTMLElement {
+  const t = textosDelPopup()
+  const raiz = elemento('saga-popup-jugador')
+
+  const cabecera = elemento('saga-popup-cabecera')
+  const cara = elemento('saga-popup-cara')
+  cara.style.background = getPlayerColor(jugador)
+  const foto = getPlayerAvatarUrl(jugador)
   if (foto) {
     const img = document.createElement('img')
     img.src = foto
     img.alt = ''
-    Object.assign(img.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block' })
-    el.appendChild(img)
+    cara.appendChild(img)
   } else {
-    el.textContent = iniciales
+    cara.textContent = getPlayerAvatarInitials(jugador)
   }
-  return el
-}
+  cabecera.appendChild(cara)
 
-export function crearElementoGrupo(cuantos: number): HTMLElement {
-  const el = document.createElement('div')
-  el.setAttribute('role', 'button')
-  el.setAttribute('aria-label', `${cuantos} jugadores cerca`)
-  Object.assign(el.style, {
-    width: '46px',
-    height: '46px',
-    borderRadius: '50%',
-    background: 'rgba(var(--theme-ink), .92)',
-    border: '2px solid rgba(255,255,255,.7)',
-    color: '#fff',
-    font: '900 15px system-ui, sans-serif',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '2px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(0,0,0,.45)',
-  } as Partial<CSSStyleDeclaration>)
-  el.textContent = `👥${cuantos}`
-  return el
-}
-
-function haceCuanto(ultimaVez?: number): string {
-  if (typeof ultimaVez !== 'number' || !Number.isFinite(ultimaVez)) return 'sin actualizar'
-  const segundos = Math.max(0, Math.round(Date.now() / 1000 - ultimaVez))
-  if (segundos < 60) return `hace ${segundos}s`
-  const minutos = Math.round(segundos / 60)
-  if (minutos < 60) return `hace ${minutos}min`
-  return `hace ${Math.round(minutos / 60)}h`
-}
-
-function linea(texto: string, estilo: Partial<CSSStyleDeclaration>): HTMLElement {
-  const el = document.createElement('div')
-  el.textContent = texto
-  Object.assign(el.style, estilo)
-  return el
-}
-
-/** Lo que se ve al tocar a un compañero: quién es, por qué nodo va y cuánto lleva. */
-export function contenidoPopupJugador(
-  jugador: Jugador,
-  tipo: TipoDePresencia,
-  totalNodos: number
-): HTMLElement {
-  const raiz = document.createElement('div')
-  Object.assign(raiz.style, {
-    minWidth: '190px',
-    font: '600 13px system-ui, sans-serif',
-    color: '#f8fafc',
-  } as Partial<CSSStyleDeclaration>)
-  const color = getPlayerColor(jugador)
-  raiz.appendChild(
-    linea(jugador.display_name || jugador.user || 'Jugador', {
-      fontSize: '15px',
-      fontWeight: '900',
-    } as Partial<CSSStyleDeclaration>)
+  const quien = elemento('saga-popup-quien')
+  quien.appendChild(elemento('saga-popup-nombre', jugador.display_name || jugador.user || t.jugador))
+  quien.appendChild(
+    elemento(
+      `saga-popup-estado saga-popup-estado-${tipo}`,
+      tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
+    )
   )
-  raiz.appendChild(
-    linea(tipo === 'live' ? 'EN LÍNEA' : tipo === 'recent' ? 'RECIENTE' : 'SIN CONEXIÓN', {
-      fontSize: '9px',
-      fontWeight: '900',
-      letterSpacing: '.1em',
-      color,
-      marginTop: '3px',
-    } as Partial<CSSStyleDeclaration>)
-  )
+  cabecera.appendChild(quien)
+  cabecera.appendChild(botonCerrar(alCerrar))
+  raiz.appendChild(cabecera)
+
+  const miembros = (jugador.members || []).filter(Boolean)
+  if (miembros.length > 1) raiz.appendChild(elemento('saga-popup-linea', t.equipo(miembros.join(', '))))
+
   const ms = Number(jugador.total_time_ms || 0)
   const tiempo = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`
   const nivel = Number(jugador.level || 0)
   const nodo = jugador.finished
-    ? 'Rematou'
+    ? t.terminado
     : totalNodos > 0
       ? `${Math.min(nivel + 1, totalNodos)} / ${totalNodos}`
       : String(nivel + 1)
+  raiz.appendChild(elemento('saga-popup-linea', t.nodoTiempo(nodo, tiempo)))
+
+  const lejos =
+    miPosicion && typeof jugador.lat === 'number' && typeof jugador.lon === 'number'
+      ? distanciaEnMetros(miPosicion, { lat: jugador.lat, lon: jugador.lon })
+      : null
   raiz.appendChild(
-    linea(`Nodo ${nodo} · Tempo ${tiempo}`, { marginTop: '8px' } as Partial<CSSStyleDeclaration>)
+    elemento('saga-popup-linea', lejos === null ? t.distanciaDesconocida : t.distancia(distanciaLegible(lejos)))
   )
-  raiz.appendChild(
-    linea(`Visto ${haceCuanto(jugador.last_seen)}`, {
-      marginTop: '6px',
-      fontSize: '10px',
-      opacity: '0.72',
-    } as Partial<CSSStyleDeclaration>)
-  )
+  raiz.appendChild(elemento('saga-popup-linea saga-popup-visto', t.visto(haceCuanto(jugador.last_seen))))
   return raiz
 }
 
-export function contenidoPopupGrupo(jugadores: Jugador[]): HTMLElement {
-  const raiz = document.createElement('div')
-  Object.assign(raiz.style, {
-    minWidth: '170px',
-    font: '600 13px system-ui, sans-serif',
-    color: '#f8fafc',
-  } as Partial<CSSStyleDeclaration>)
-  raiz.appendChild(
-    linea('Jugadores cerca', { fontWeight: '900', marginBottom: '6px' } as Partial<CSSStyleDeclaration>)
-  )
+export function contenidoPopupGrupo(jugadores: Jugador[], alCerrar?: () => void): HTMLElement {
+  const t = textosDelPopup()
+  const raiz = elemento('saga-popup-jugador')
+  const cabecera = elemento('saga-popup-cabecera')
+  const quien = elemento('saga-popup-quien')
+  quien.appendChild(elemento('saga-popup-nombre', t.jugadoresCerca))
+  cabecera.appendChild(quien)
+  cabecera.appendChild(botonCerrar(alCerrar))
+  raiz.appendChild(cabecera)
   for (const jugador of jugadores) {
-    raiz.appendChild(
-      linea(
-        `${jugador.display_name || jugador.user || 'Jugador'} · ${String(jugador.presence || 'online').toUpperCase()}`,
-        { padding: '2px 0' } as Partial<CSSStyleDeclaration>
-      )
-    )
+    const tipo = tipoDePresencia(jugador)
+    const estado = tipo === 'live' ? t.enLinea : tipo === 'recent' ? t.reciente : t.sinConexion
+    raiz.appendChild(elemento('saga-popup-linea', `${jugador.display_name || jugador.user || t.jugador} · ${estado}`))
   }
   return raiz
+}
+
+
+/** Metros por píxel de pantalla a un zoom de MapLibre (mundo de 512 px) y latitud. */
+export function metrosPorPixel(zoom: number, lat: number): number {
+  return (78271.517 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom
+}
+
+/** A cuántos píxeles de otro icono deja de estar tapado (avatar de ~44 px). */
+export const SOLAPE_MINIMO_PX = 40
+/** Cuántos huecos alrededor de un icono hay para abrir a los que caen encima. */
+export const HUECOS_EN_CORRO = 8
+
+export type ElementoDeMapa = {
+  tipo: 'jugador' | 'grupo'
+  clave: string
+  /** Posición REAL (la del jugador, o el centro del grupo). Nunca se desplaza. */
+  lat: number
+  lon: number
+  /** 0 = sin desplazar; 1..8 = hueco en pantalla alrededor del icono que tapaba. */
+  hueco: number
+  jugadores: Jugador[]
+  presencia: TipoDePresencia
+}
+
+const ORDEN_PRESENCIA: Record<TipoDePresencia, number> = { offline: 0, recent: 1, live: 2 }
+export function ordenDePresencia(presencia: TipoDePresencia): number {
+  return ORDEN_PRESENCIA[presencia]
+}
+
+/** La presencia más «viva» de un grupo de jugadores. */
+function mejorPresencia(jugadores: Jugador[]): TipoDePresencia {
+  let mejor: TipoDePresencia = 'offline'
+  for (const j of jugadores) {
+    const p = tipoDePresencia(j)
+    if (ORDEN_PRESENCIA[p] > ORDEN_PRESENCIA[mejor]) mejor = p
+  }
+  return mejor
+}
+
+/**
+ * Qué se dibuja y dónde. Función pura: sin mapa ni DOM.
+ *
+ * - Cerca unos de otros y con zoom bajo (< 17): un solo icono de grupo.
+ * - Con zoom alto: cada jugador en su posición real.
+ * - Los que quedan a menos de `SOLAPE_MINIMO_PX` de TI o de otro icono ya
+ *   colocado reciben un `hueco` (1..8): un desplazamiento en pantalla que
+ *   aplica la capa con `icon-offset`. Se mide en píxeles a este zoom, no en
+ *   metros, así que es el mismo criterio a zoom 15 que a zoom 20.
+ */
+export function planDeJugadores(
+  jugadores: Jugador[],
+  zoom: number,
+  yo: Punto | null
+): ElementoDeMapa[] {
+  const visibles = jugadores.filter(
+    (j) => !j.is_self && typeof j.lat === 'number' && typeof j.lon === 'number'
+  )
+  const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoom))
+  const elementos: ElementoDeMapa[] = []
+  for (const grupo of grupos) {
+    if (grupo.players.length > 1 && zoom < 17) {
+      elementos.push({
+        tipo: 'grupo',
+        clave: claveDeGrupo(grupo.players),
+        lat: grupo.lat,
+        lon: grupo.lon,
+        hueco: 0,
+        jugadores: grupo.players,
+        presencia: mejorPresencia(grupo.players),
+      })
+      continue
+    }
+    for (const jugador of grupo.players) {
+      elementos.push({
+        tipo: 'jugador',
+        clave: claveDeJugador(jugador),
+        lat: Number(jugador.lat),
+        lon: Number(jugador.lon),
+        hueco: 0,
+        jugadores: [jugador],
+        presencia: tipoDePresencia(jugador),
+      })
+    }
+  }
+
+  // Anclas ya ocupadas: tú primero (tu icono va encima y no debe taparse).
+  const anclas: { lat: number; lon: number; usados: number }[] = []
+  if (yo) anclas.push({ lat: yo.lat, lon: yo.lon, usados: 0 })
+  for (const el of elementos) {
+    const umbral = SOLAPE_MINIMO_PX * metrosPorPixel(zoom, el.lat)
+    const ancla = anclas.find((a) => metrosEntre(a, el) < umbral)
+    if (ancla) {
+      el.hueco = 1 + (ancla.usados % HUECOS_EN_CORRO)
+      ancla.usados += 1
+    } else {
+      anclas.push({ lat: el.lat, lon: el.lon, usados: 0 })
+    }
+  }
+  return elementos
+}
+
+/**
+ * Desplazamiento en píxeles (a tamaño 1 del icono) de cada hueco: en corro,
+ * empezando arriba a la derecha. `icon-offset` lo multiplica por el tamaño del
+ * icono, así que se abren igual a cualquier zoom.
+ */
+export function desplazamientoDeHueco(hueco: number, radioPx = 50): [number, number] {
+  if (hueco <= 0) return [0, 0]
+  const angulo = -Math.PI / 4 + ((hueco - 1) * 2 * Math.PI) / HUECOS_EN_CORRO
+  return [Math.round(Math.cos(angulo) * radioPx), Math.round(Math.sin(angulo) * radioPx)]
 }

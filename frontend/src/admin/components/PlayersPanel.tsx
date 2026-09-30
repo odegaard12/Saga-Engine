@@ -8,7 +8,13 @@ import {
   type AdminReactOverviewProfile,
   type AdminReactOverviewStage,
 } from '../lib/adminApi'
-import type { PlayerDraft } from '../lib/playerDrafts'
+import { describeAdminError } from '../lib/adminErrors'
+import {
+  findDuplicatePlayerIds,
+  isPlayerIdChanged,
+  savedPlayerId,
+  type PlayerDraft,
+} from '../lib/playerDrafts'
 import { getPlayerInitials, getStablePlayerColor } from '../../shared/playerIdentity'
 
 const AVATAR_CANVAS_SIZE = 160
@@ -83,14 +89,30 @@ type PlayersPanelProps = {
   onProfileAction: (profileId: string, action: AdminProfileAction) => void
 }
 
-/** Valores de profileActionState que significan "todavía trabajando". */
-const IN_FLIGHT_ACTIONS = new Set([
-  'level_next',
-  'level_prev',
-  'restore_node',
-  'reset_profile',
-  'mark_finished',
-])
+/**
+ * Lo que dice el panel al terminar una acción sobre un jugador. Ninguna llega
+ * al móvil en el acto: el servidor cambia SU copia y el móvil la adopta en su
+ * próxima conexión (baja o sube el nivel, vacía la mochila...). Decir que ya estaba
+ * «aplicado» hacía creer al organizador que el jugador ya lo tenía (informe A11).
+ */
+const ETIQUETA_ACCION_HECHA: Record<string, string> = {
+  level_prev: 'un nodo atrás',
+  restore_node: 'nodo restaurado',
+  level_next: 'un nodo adelante',
+  reset_profile: 'partida reiniciada',
+  mark_finished: 'partida finalizada',
+  clear_inventory: 'mochila vaciada',
+  give_item: 'objeto entregado',
+  remove_item: 'objeto retirado',
+}
+
+/**
+ * El estado de una acción es su nombre mientras está en curso, `saved:<acción>`
+ * al terminar bien y `error` si falla: solo lo primero cuenta como «ocupado».
+ */
+function isActionInFlight(raw: string) {
+  return Boolean(raw) && raw !== 'error' && !raw.startsWith('saved')
+}
 
 export default function PlayersPanel({
   playerDrafts,
@@ -109,6 +131,10 @@ export default function PlayersPanel({
 }: PlayersPanelProps) {
   /** Ficha desplegada, o null si están todas plegadas. */
   const [expandedPlayer, setExpandedPlayer] = useState<number | null>(null)
+
+  // IDs que salen más de una vez en los borradores (el servidor descartaría en
+  // silencio todas las fichas repetidas menos la primera).
+  const duplicatedIds = findDuplicatePlayerIds(playerDrafts)
 
   // Datos personales: fotos de campo y posiciones GPS de gente real. Es
   // global -no de un jugador concreto-, por eso vive aparte de las fichas.
@@ -129,7 +155,7 @@ export default function PlayersPanel({
         setAvisoPersonales(respuesta.detail || 'No se pudo consultar.')
       }
     } catch (error) {
-      setAvisoPersonales(error instanceof Error ? error.message : 'No se pudo consultar.')
+      setAvisoPersonales(describeAdminError(error, 'cargar'))
     } finally {
       setCargandoPersonales(false)
     }
@@ -159,7 +185,7 @@ Para confirmar, escribe BORRAR:`)
         setAvisoPersonales(respuesta.detail || 'No se pudo borrar.')
       }
     } catch (error) {
-      setAvisoPersonales(error instanceof Error ? error.message : 'No se pudo borrar.')
+      setAvisoPersonales(describeAdminError(error))
     } finally {
       setCargandoPersonales(false)
     }
@@ -281,8 +307,9 @@ Para confirmar, escribe BORRAR:`)
                  * hasta recargar la página. Sólo cuentan los nombres de acción.
                  */
                 const raw = profileActionState[draft.id] || ''
-                const busy = IN_FLIGHT_ACTIONS.has(raw) ? raw : ''
-                const justSaved = raw === 'saved'
+                const busy = isActionInFlight(raw) ? raw : ''
+                const justSaved = raw.startsWith('saved')
+                const savedAction = raw.startsWith('saved:') ? raw.slice('saved:'.length).split(':')[0] : ''
                 return (
               <div className="admin-player-progress-controls">
                 <div className="admin-player-progress-copy">
@@ -304,7 +331,11 @@ Para confirmar, escribe BORRAR:`)
                   {profileActionError[draft.id] ? (
                     <small>{profileActionError[draft.id]}</small>
                   ) : justSaved ? (
-                    <small className="admin-player-progress-ok">✓ Aplicado</small>
+                    <small className="admin-player-progress-ok">
+                      ✓ Guardado en el servidor
+                      {ETIQUETA_ACCION_HECHA[savedAction] ? ` (${ETIQUETA_ACCION_HECHA[savedAction]})` : ''}. El
+                      móvil lo aplicará en su próxima conexión.
+                    </small>
                   ) : null}
                 </div>
 
@@ -370,8 +401,25 @@ Para confirmar, escribe BORRAR:`)
                   Player ID
                   <input
                     value={draft.id}
+                    aria-invalid={duplicatedIds.includes(savedPlayerId(draft, index))}
                     onChange={(event) => onUpdatePlayer(index, 'id', event.target.value)}
                   />
+                  {duplicatedIds.includes(savedPlayerId(draft, index)) ? (
+                    <small style={{ color: '#f87171', fontWeight: 700 }}>
+                      ⚠ ID repetido. Cada jugador necesita uno distinto: al guardar, el servidor
+                      descartaría una de las dos fichas (con su foto y su nombre).
+                    </small>
+                  ) : null}
+                  {isPlayerIdChanged(draft, index) ? (
+                    <small style={{ color: '#fbbf24', fontWeight: 700 }}>
+                      ⚠ Cambiar el ID deja el progreso de «{draft.original_id}»
+                      {profileProgress[draft.original_id || '']
+                        ? ` (nodo ${(profileProgress[draft.original_id || '']?.level ?? 0) + 1})`
+                        : ''}{' '}
+                      sin dueño: el ID nuevo empieza de cero. Si solo quieres cambiar el nombre que se
+                      ve, usa «Display name».
+                    </small>
+                  ) : null}
                 </label>
 
                 <label>
@@ -645,8 +693,8 @@ Para confirmar, escribe BORRAR:`)
       </section>
 
       {playerSaveState === 'error' && playerSaveError ? (
-        <div className="admin-save-error">
-          <strong>Player save failed</strong>
+        <div className="admin-save-error" role="alert">
+          <strong>No se han guardado los jugadores</strong>
           <span>{playerSaveError}</span>
         </div>
       ) : null}

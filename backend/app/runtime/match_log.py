@@ -93,6 +93,39 @@ def record(
     )
 
 
+def record_many(
+    db_path: str,
+    *,
+    active: bool,
+    entries: list[dict[str, Any]],
+) -> int:
+    """Anota varias entradas en UNA transacción. Devuelve cuántas.
+
+    Cada entrada lleva `event_type`, `user`, `display_name`, `payload`,
+    `severity` y `client_created_at`, como `record`. Es lo que usa el volcado
+    del rastro de posiciones que sube el móvil tras un tramo sin cobertura:
+    antes cada muestra abría su propia conexión y hacía su commit (60 muestras
+    = 1,35 s; un lote de 50 eventos ≈ 80 s con el servidor bloqueado).
+    """
+    if not active or not entries:
+        return 0
+
+    limpias = []
+    for entrada in entries:
+        user_key = str(entrada.get("user") or "").strip()
+        if not user_key:
+            continue
+        limpias.append(
+            {
+                **entrada,
+                "user": user_key,
+                "display_name": entrada.get("display_name") or user_key,
+            }
+        )
+
+    return _store.append_entries(db_path, limpias)
+
+
 def record_position_sample(
     db_path: str,
     *,
@@ -192,10 +225,10 @@ def occurred_at(entry: dict[str, Any]) -> str:
 
     Un evento creado sin cobertura llega minutos u horas después de ocurrir.
     Para revisar la partida en casa importa el orden en que pasaron las cosas,
-    no el orden en que se subieron.
+    no el orden en que se subieron. Mismo formato fijo que la columna
+    `occurred_at` del almacén (ver `match_log_store.normalizar_instante`).
     """
-    fecha = _parse_iso(entry.get("client_created_at")) or _parse_iso(entry.get("created_at"))
-    return fecha.isoformat() if fecha else str(entry.get("created_at") or "")
+    return _store.calcular_occurred_at(entry.get("client_created_at"), entry.get("created_at"))
 
 
 def es_sospecha(entry: dict[str, Any]) -> bool:
@@ -224,6 +257,8 @@ def list_timeline(
     `by_occurrence` ordena por cuándo ocurrió (hora del móvil) y añade
     `occurred_at` a cada fila; sin él el orden es el de registro, como siempre.
     """
+    # «Sólo sospechas» se filtra EN LA CONSULTA: aplicado después del límite,
+    # una sospecha anterior a las últimas N filas se perdía.
     entradas = _store.list_entries(
         db_path,
         user=user,
@@ -231,6 +266,7 @@ def list_timeline(
         date_to=date_to,
         event_type=event_type,
         limit=limit,
+        only_suspicions=only_suspicions,
     )
 
     if only_suspicions:
@@ -240,7 +276,7 @@ def list_timeline(
 
     if by_occurrence:
         for entrada in entradas:
-            entrada["occurred_at"] = occurred_at(entrada)
+            entrada["occurred_at"] = entrada.get("occurred_at") or occurred_at(entrada)
         entradas.sort(key=lambda e: (e["occurred_at"], e.get("created_at") or "", e.get("id") or ""))
 
     return entradas
@@ -293,9 +329,18 @@ def _celda_csv_segura(valor: Any) -> str:
     return texto
 
 
-def to_csv(entries: list[dict[str, Any]]) -> str:
+#: Excel en castellano (y gallego) separa las columnas de un CSV con `;`, no con
+#: `,`: un CSV con comas se abre como UNA sola columna. Y sin la marca BOM
+#: interpreta el fichero como ANSI y rompe las tildes (caza de fallos A17).
+CSV_DELIMITER = ";"
+CSV_BOM = "﻿"
+
+
+def to_csv(entries: list[dict[str, Any]], *, delimiter: str = CSV_DELIMITER, bom: bool = True) -> str:
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=_CSV_COLUMNS)
+    if bom:
+        buffer.write(CSV_BOM)
+    writer = csv.DictWriter(buffer, fieldnames=_CSV_COLUMNS, delimiter=delimiter)
     writer.writeheader()
     for entry in entries:
         writer.writerow(

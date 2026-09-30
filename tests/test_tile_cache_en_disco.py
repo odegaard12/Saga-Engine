@@ -11,6 +11,13 @@ from fastapi.testclient import TestClient
 
 import main
 from backend.app.routers import public
+from backend.app.runtime import teselas
+
+# La zona de la misión de estas pruebas: una caja pequeña alrededor de un punto.
+# El proxy de teselas sólo sirve lo que cae dentro (caza de fallos S4).
+LAT, LON = 40.0, -3.0
+CAJA = (39.9, 40.1, -3.1, -2.9)
+X, Y = teselas.tesela_de(LAT, LON, 16)
 
 
 class _RespuestaFalsa:
@@ -38,6 +45,7 @@ class _ClienteFalso:
 
 def _client(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(teselas, "caja_de_la_mision", lambda: CAJA)
     monkeypatch.setattr(main._httpx, "AsyncClient", _ClienteFalso)
     _ClienteFalso.llamadas = 0
     return TestClient(main.app)
@@ -46,13 +54,13 @@ def _client(monkeypatch, tmp_path):
 def test_la_primera_vez_pide_a_esri_y_guarda_en_disco(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
 
-    resp = client.get("/map-tiles/16/1000/2000.png")
+    resp = client.get(f"/map-tiles/16/{X}/{Y}.png")
 
     assert resp.status_code == 200
     assert resp.content == b"contenido-de-prueba"
     assert _ClienteFalso.llamadas == 1
 
-    ruta_binario, ruta_tipo = public._tile_cache_paths(16, 1000, 2000)
+    ruta_binario, ruta_tipo = public._tile_cache_paths(16, X, Y)
     assert ruta_binario.exists()
     assert ruta_tipo.read_text(encoding="utf-8").strip() == "image/jpeg"
 
@@ -60,10 +68,10 @@ def test_la_primera_vez_pide_a_esri_y_guarda_en_disco(monkeypatch, tmp_path):
 def test_la_segunda_vez_no_toca_la_red(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
 
-    client.get("/map-tiles/16/1000/2000.png")
+    client.get(f"/map-tiles/16/{X}/{Y}.png")
     assert _ClienteFalso.llamadas == 1
 
-    resp = client.get("/map-tiles/16/1000/2000.png")
+    resp = client.get(f"/map-tiles/16/{X}/{Y}.png")
 
     assert resp.status_code == 200
     assert resp.content == b"contenido-de-prueba"
@@ -75,12 +83,12 @@ def test_otro_jugador_tambien_aprovecha_la_cache(monkeypatch, tmp_path):
     """La caché es del servidor, no del navegador: sirve a cualquiera."""
     client = _client(monkeypatch, tmp_path)
 
-    ruta_binario, ruta_tipo = public._tile_cache_paths(16, 1000, 2000)
+    ruta_binario, ruta_tipo = public._tile_cache_paths(16, X, Y)
     ruta_binario.parent.mkdir(parents=True, exist_ok=True)
     ruta_binario.write_bytes(b"ya-la-pidio-otro")
     ruta_tipo.write_text("image/png", encoding="utf-8")
 
-    resp = client.get("/map-tiles/16/1000/2000.png")
+    resp = client.get(f"/map-tiles/16/{X}/{Y}.png")
 
     assert resp.status_code == 200
     assert resp.content == b"ya-la-pidio-otro"

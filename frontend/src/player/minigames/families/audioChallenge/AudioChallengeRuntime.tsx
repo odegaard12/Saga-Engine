@@ -1,10 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
+import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { useTextos } from '../../core/useTextos'
 
 interface AudioChallengeRuntimeProps {
   onWin: () => void
 }
 
 export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
+  const t = useTextos().audio
   const [level, setLevel] = useState(0)
   const [active, setActive] = useState(false)
   const [error, setError] = useState('')
@@ -27,6 +31,9 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
    */
   const activeRef = useRef(false)
 
+  // Hasta activar el micrófono sólo hay una pantalla con un botón: sin reto.
+  useSinRetoEnPantalla(!active)
+
   useEffect(() => {
     return () => {
       activeRef.current = false
@@ -42,6 +49,10 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
   async function startListening() {
     try {
       setError('')
+      // El aviso de permiso del micrófono quita el foco a la página: sin avisar
+      // antes, el anti-trampas lo leía como «se fue a otra app» (+30 s y el reto
+      // reiniciado en cuanto se pulsaba «Activar micrófono»).
+      avisarPeticionDePermisoPropia()
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
@@ -60,8 +71,8 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
       progressRef.current = 0
 
       checkVolume()
-    } catch (err) {
-      setError('No se pudo acceder al micrófono. Asegúrate de dar permisos.')
+    } catch {
+      setError(t.sinMicrofono)
     }
   }
 
@@ -97,9 +108,9 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
 
   return (
     <div className="saga-glass-panel" style={{ padding: 24, textAlign: 'center' }}>
-      <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Desafío de Audio</h3>
+      <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>{t.titulo}</h3>
       <p style={{ color: 'rgb(var(--theme-line-soft))', fontSize: 14, marginBottom: 24 }}>
-        Sopla o haz ruido cerca del micrófono para cargar la barra.
+        {t.instrucciones}
       </p>
 
       {!active && progressRef.current === 0 ? (
@@ -115,7 +126,7 @@ export function AudioChallengeRuntime({ onWin }: AudioChallengeRuntimeProps) {
             cursor: 'pointer',
           }}
         >
-          Activar Micrófono
+          {t.activar}
         </button>
       ) : (
         <div

@@ -62,7 +62,7 @@ def test_sen_cobertura_dise_que_fai_falta_conexion():
     )
 
     # El texto real (es/gl) vive en NOTICES y sigue mencionando la conexión.
-    raiz = JUGADOR.read_text(encoding="utf-8")
+    raiz = (JUGADOR.parent / "playerAppBase.ts").read_text(encoding="utf-8")
     inicio = raiz.index("noSePudoPrepararZip:")
     bloque = raiz[inicio : inicio + 200]
     assert "conexión" in bloque or "conexion" in bloque

@@ -54,7 +54,7 @@ def test_o_refresco_pesado_si_se_salta_coa_pantalla_apagada():
 
     pos_corte = cuerpo.index("if (oculto) return")
     # La LLAMADA, no la mencion: el comentario de arriba tambien la nombra.
-    pos_partida = cuerpo.index("await pedirPartida(user)")
+    pos_partida = cuerpo.index("await pedirPartidaCompleta(user)")
 
     assert pos_corte < pos_partida, (
         "con la pantalla apagada se está pidiendo la partida entera (214 KB) "

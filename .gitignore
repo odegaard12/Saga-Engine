@@ -11,6 +11,7 @@ _backups/
 *.broken_now
 data/admin_auth.json
 data/mission_auth.json
+data/session_key.json
 data/admin_sessions.json
 data/config.json
 data/game_timers.json

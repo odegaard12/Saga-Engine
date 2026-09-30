@@ -1,20 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { fetchFieldProofs, fetchPlayerGame, fetchPublicConfig, fetchTeamStatus } from '../shared/api'
+import { fetchPublicConfig } from '../shared/api'
 import type { PlayerProfile, PublicConfig } from '../types/player'
 import { getPlayerAvatarInitials, getPlayerAvatarUrl, getPlayerColor } from '../shared/playerIdentity'
 import { cachePublicConfig, getCachedPublicConfig } from '../shared/offlinePublicConfig'
 import { aplicarTema } from '../shared/tema'
-import { saveMissionPack } from '../player/offline/missionPack'
-import { cachePlayerShell, registerPlayerServiceWorker } from '../player/offline/pwaShell'
-import { cacheTeamProfiles } from '../player/offline/teamPresence'
-import { cacheFieldProofAssets, cacheFieldProofs } from '../player/offline/fieldProofCache'
-import {
-  getOfflineVaultSummary,
-  makeOfflineVaultPlayer,
-  saveOfflineVaultSummary,
-  type OfflineVaultPlayer,
-  type OfflineVaultSummary,
-} from '../shared/offlineVault'
+import { registerPlayerServiceWorker } from '../player/offline/pwaShell'
+import { getOfflineVaultSummary, type OfflineVaultSummary } from '../shared/offlineVault'
 
 type LoadState =
   | { status: 'idle' | 'loading' }
@@ -22,13 +13,6 @@ type LoadState =
   | { status: 'ready'; config: PublicConfig }
 
 type LoginLocale = 'gl' | 'es' | 'en'
-
-type OfflinePrepProgress = {
-  label: string
-  done: number
-  total: number
-  detail?: string
-}
 
 function getLoginLocale(config?: PublicConfig): LoginLocale {
   let stored = ''
@@ -164,110 +148,21 @@ function buildConfigFromOfflineVault(summary: OfflineVaultSummary): PublicConfig
   }
 }
 
-async function warmOfflineProfiles(
-  config: PublicConfig,
-  onProgress?: (progress: OfflinePrepProgress) => void
-): Promise<OfflineVaultSummary> {
-  const profiles = normalizeProfiles(config).filter((profile) => profile.status !== 'disabled')
-
-  await registerPlayerServiceWorker()
-  await cachePlayerShell('/').catch(() => undefined)
-
-  const players: OfflineVaultPlayer[] = []
-  let mapPrepared = false
-
-  onProgress?.({
-    label: 'Preparando',
-    done: 3,
-    total: 100,
-    detail: 'Guardando shell de la app',
-  })
-
-  for (let index = 0; index < profiles.length; index += 1) {
-    const profile = profiles[index]
-
-    try {
-      const baseProgress = Math.round(8 + (index / Math.max(1, profiles.length)) * 20)
-
-      onProgress?.({
-        label: 'Jugadores',
-        done: baseProgress,
-        total: 100,
-        detail: `${index + 1}/${profiles.length} · ${profile.display_name || profile.id}`,
-      })
-
-      const payload = await fetchPlayerGame(profile.id, { offlinePack: true })
-
-      await saveMissionPack({
-        user: profile.id,
-        config,
-        payload,
-      })
-
-      // Map prefetch has been moved to PlayerApp to run automatically on load!
-
-      await fetchTeamStatus(profile.id)
-        .then((team) => {
-          cacheTeamProfiles(profile.id, Array.isArray(team.profiles) ? team.profiles : [])
-        })
-        .catch(() => undefined)
-
-      await fetchFieldProofs(profile.id)
-        .then(async (proofPayload) => {
-          const proofs = Array.isArray(proofPayload.proofs) ? proofPayload.proofs : []
-          cacheFieldProofs(profile.id, proofs)
-          await cacheFieldProofAssets(proofs)
-        })
-        .catch(() => undefined)
-
-      await cachePlayerShell(`/player/${encodeURIComponent(profile.id)}`).catch(() => undefined)
-
-      players.push(
-        makeOfflineVaultPlayer(profile, {
-          ok: true,
-          stage_count: Array.isArray(payload.stages) ? payload.stages.length : 0,
-          level: payload.level || 0,
-          finished: Boolean(payload.finished),
-        })
-      )
-    } catch (error) {
-      players.push(
-        makeOfflineVaultPlayer(profile, {
-          ok: false,
-          error: error instanceof Error ? error.message : 'Unknown offline preparation error',
-        })
-      )
-    }
-  }
-
-  onProgress?.({
-    label: 'Finalizando',
-    done: 94,
-    total: 100,
-    detail: 'Guardando resumen offline',
-  })
-
-  const summary = saveOfflineVaultSummary(players)
-
-  onProgress?.({
-    label: 'Listo',
-    done: 100,
-    total: 100,
-    detail: `${summary.ready_count}/${summary.profile_count} jugadores preparados`,
-  })
-  return summary
-}
+/*
+ * Aquí había `warmOfflineProfiles`: en CADA carga del login bajaba las catorce
+ * misiones (unos 214 KB cada una, con las fotos dentro del JSON), el equipo y las
+ * fotos de campo de todos los perfiles, y la aplicación entera, aunque el móvil
+ * fuese a usar uno solo. Eran ~90 peticiones y unos 3 MB en segundo plano
+ * cada vez que se abría el login.
+ *
+ * Ya no se baja nada desde aquí. La misión de cada jugador (y su app y su mapa)
+ * se baja en la pantalla de carga al entrar como él, y «Prepararse» la revisa;
+ * los otros jugadores que hayan usado este móvil se refrescan allí mismo, sólo
+ * los que ya tienen paquete en él.
+ */
 
 export default function LoginApp() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [offlinePrepState, setOfflinePrepState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle'
-  )
-  const [offlinePrepMessage, setOfflinePrepMessage] = useState('')
-  const [offlinePrepProgress, setOfflinePrepProgress] = useState<OfflinePrepProgress | null>(null)
-  const [offlineVault, setOfflineVault] = useState<OfflineVaultSummary>(() =>
-    getOfflineVaultSummary()
-  )
   const [playerInput, setPlayerInput] = useState('')
   const [loggingInId, setLoggingInId] = useState<string | null>(null)
   const [mapboxDrawerOpen, setMapboxDrawerOpen] = useState(false)
@@ -278,11 +173,10 @@ export default function LoginApp() {
 
     async function run() {
       setState({ status: 'loading' })
+      // Registrar el worker no baja nada: la instalación es mínima.
       void registerPlayerServiceWorker()
-      void cachePlayerShell('/')
 
       const vaultSummary = getOfflineVaultSummary()
-      setOfflineVault(vaultSummary)
 
       const cachedConfig = getCachedPublicConfig()
       const cachedProfiles = cachedConfig
@@ -303,9 +197,6 @@ export default function LoginApp() {
           setState({ status: 'ready', config })
         }
 
-        void warmOfflineProfiles(config).then((summary) => {
-          if (!cancelled) setOfflineVault(summary)
-        })
       } catch (error) {
         if (firstConfig) return
 
@@ -335,55 +226,6 @@ export default function LoginApp() {
   useEffect(() => {
     aplicarTema(state.status === 'ready' ? state.config.player_theme : null)
   }, [state])
-
-  async function handlePrepareOffline() {
-    if (state.status !== 'ready') return
-
-    try {
-      setOfflinePrepState('saving')
-      setOfflinePrepMessage('Descargando datos offline…')
-      setOfflinePrepProgress({
-        label: 'Conectando',
-        done: 2,
-        total: 100,
-        detail: 'Preparando descarga',
-      })
-
-      const onlineConfig = await fetchPublicConfig()
-        .then((nextConfig) => {
-          cachePublicConfig(nextConfig)
-          return nextConfig
-        })
-        .catch(() => state.config)
-
-      const summary = await warmOfflineProfiles(onlineConfig, setOfflinePrepProgress)
-
-      setOfflineVault(summary)
-      setOfflinePrepState(summary.failed_count > 0 ? 'error' : 'saved')
-      setOfflinePrepProgress({
-        label: summary.failed_count > 0 ? 'Parcial' : 'Listo',
-        done: 100,
-        total: 100,
-        detail: `${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados`,
-      })
-      setOfflinePrepMessage(
-        summary.failed_count > 0
-          ? `Preparado parcialmente: ${summary.ready_count}/${summary.profile_count} jugadores.`
-          : `Modo offline listo: ${summary.ready_count}/${summary.profile_count} jugadores · mapa/fotos actualizados.`
-      )
-    } catch (error) {
-      setOfflinePrepState('error')
-      setOfflinePrepProgress({
-        label: 'Error',
-        done: 100,
-        total: 100,
-        detail: error instanceof Error ? error.message : 'No se pudo preparar el modo offline.',
-      })
-      setOfflinePrepMessage(
-        error instanceof Error ? error.message : 'No se pudo preparar el modo offline.'
-      )
-    }
-  }
 
   const mobile = typeof window !== 'undefined' ? window.innerWidth <= 560 : false
 

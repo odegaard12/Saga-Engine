@@ -30,6 +30,29 @@ TRUSTED_PROXY_IPS = set(split_env_csv(os.getenv("TRUSTED_PROXY_IPS") or ""))
 TRUSTED_PROXY_CIDRS = parse_trusted_proxy_cidrs(os.getenv("TRUSTED_PROXY_CIDRS") or "")
 
 
+def lockout_key(ip: Any) -> str:
+    """La clave con la que se cuentan los intentos fallidos de un cliente.
+
+    Una IPv4 es tal cual. Una IPv6 se agrupa por su prefijo /64: cada casa y cada
+    móvil recibe un /64 entero, y quien ataca desde uno cambia de dirección
+    dentro de él cuando quiere, con lo que el bloqueo por dirección exacta no
+    servía de nada (caza de fallos S8). Las direcciones IPv4 «mapeadas»
+    (`::ffff:1.2.3.4`) cuentan como la IPv4 que son.
+    """
+    texto = str(ip or "").strip()
+    try:
+        direccion = ipaddress.ip_address(texto)
+    except ValueError:
+        return texto
+
+    if direccion.version == 6:
+        if direccion.ipv4_mapped is not None:
+            return str(direccion.ipv4_mapped)
+        base = ipaddress.IPv6Address((int(direccion) >> 64) << 64)
+        return f"{base}/64"
+    return str(direccion)
+
+
 def request_client_host(request) -> str:
     client = getattr(request, "client", None)
     if client and getattr(client, "host", None):

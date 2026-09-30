@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import { useI18n } from '../../../../i18n/useI18n'
+import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
 
 type AnyRecord = Record<string, any>
@@ -675,6 +676,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
     [props]
   )
   const { t } = useI18n()
+  const tx = useTextos().bearing
 
   const sequenceMode = Array.isArray(targets) && targets.length >= 2
 
@@ -957,16 +959,16 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
     if (heading === null) {
       if (sensorState === 'needs_permission')
-        return { main: 'READY', sub: 'Activa orientación', small: false }
+        return { main: 'READY', sub: tx.activaOrientacion, small: false }
       if (sensorState === 'blocked_https')
-        return { main: 'HTTPS', sub: 'Sensor bloqueado', small: false }
-      return { main: 'SCAN', sub: 'Buscando heading', small: false }
+        return { main: 'HTTPS', sub: tx.sensorBloqueado, small: false }
+      return { main: 'SCAN', sub: tx.buscandoHeading, small: false }
     }
 
     if (inWindow) {
       return {
         main: 'HOLD',
-        sub: sequenceMode ? t('player.minigames.rumboDoble.holdSteady') : 'Mantén estable',
+        sub: sequenceMode ? t('player.minigames.rumboDoble.holdSteady') : tx.mantenEstable,
         small: false,
       }
     }
@@ -976,33 +978,33 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
 
     return {
       main: `${direction} ${amount}°`,
-      sub: nearWindow ? 'Cerca del vector' : 'Gira hacia el vector',
+      sub: nearWindow ? tx.cercaDelVector : tx.giraHaciaElVector,
       small: amount >= 100,
     }
-  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState, sequenceMode, t])
+  }, [absDelta, delta, heading, inWindow, locked, nearWindow, sensorState, sequenceMode, t, tx])
 
   const sensorCopy = useMemo(() => {
     switch (sensorState) {
       case 'needs_permission':
-        return 'Safari iPhone necesita un toque para activar orientación real.'
+        return tx.necesitaToque
       case 'requesting':
-        return 'Solicitando acceso al sensor.'
+        return tx.solicitando
       case 'searching':
-        return 'Sensor activo. Esperando primera lectura estable.'
+        return tx.buscando
       case 'tracking':
-        return 'Orientación real activa.'
+        return tx.activa
       case 'silent':
-        return 'No llega heading. Puedes usar prueba manual discreta.'
+        return tx.silencioso
       case 'denied':
-        return 'Permiso denegado. Revisa movimiento/orientación en Safari.'
+        return tx.denegado
       case 'unsupported':
-        return 'Este navegador no expone DeviceOrientation.'
+        return tx.noSoportado
       case 'blocked_https':
-        return 'Abre el runtime desde HTTPS para usar sensores reales.'
+        return tx.sinHttps
       default:
-        return 'Preparando instrumento.'
+        return tx.preparando
     }
-  }, [sensorState])
+  }, [sensorState, tx])
 
   const statusLabel = props.submitting
     ? 'SYNC'
@@ -1124,7 +1126,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
                 sensorState === 'blocked_https' ||
                 sensorState === 'unsupported') && (
                 <button className="bh-button" type="button" onClick={() => void startSensors()}>
-                  Activar sensor
+                  {tx.activarSensor}
                 </button>
               )}
 
@@ -1139,7 +1141,7 @@ export function RuntimeScreen(props: BearingHuntRuntimeScreenProps) {
                     if (headingRef.current === null) updateHeading(targetBearing + 72)
                   }}
                 >
-                  Prueba manual
+                  {tx.pruebaManual}
                 </button>
               )}
             </div>

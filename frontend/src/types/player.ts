@@ -123,6 +123,13 @@ export interface PlayerGamePayload {
    * hace falta volver a bajarlos. Ver `pedirPartida` en offline/missionSync.ts.
    */
   stages_rev?: string
+  /**
+   * Revisión de la misión (contrato 5): cambia con los nodos, con lo que el
+   * servidor proyecta a ESTE jugador y con la configuración. La pantalla de carga
+   * la compara con la del paquete guardado para saber si hay que volver a bajar
+   * la misión. Ver `offline/revisiones.ts`.
+   */
+  mission_revision?: string
   /** La respuesta trae los nodos enteros, no sólo el título y las coordenadas. */
   offline_pack?: boolean
   current_stage: PlayerStage | null
@@ -158,6 +165,10 @@ export interface PublicConfig {
   mission_launch_at?: string
   /** Reloj del SERVIDOR, en ms — para la cuenta atrás no vale fiarse del móvil. */
   server_time_ms?: number
+  /** Revisión de la misión (contrato 5). Mismo valor que en `/api/game/{user}`. */
+  /** Huella de la red de caminos del servidor ("" si no hay). */
+  road_graph_version?: string
+  mission_revision?: string
 }
 
 export interface FieldProof {

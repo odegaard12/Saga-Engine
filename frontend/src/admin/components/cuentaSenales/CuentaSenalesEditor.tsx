@@ -14,6 +14,8 @@
  * quien recorta a UNA pregunta por jugador y sustituye la respuesta por su
  * hash justo antes de que el payload salga hacia el móvil.
  */
+import { useState } from 'react'
+import { compressImage, dataUrlKilobytes, describeImageError } from '../../lib/imageCompression'
 
 type Question = {
   question: string
@@ -86,6 +88,8 @@ function readQuestions(config: Record<string, unknown>): Question[] {
 
 export function CuentaSenalesEditor({ config, onChange }: Props) {
   const questions = readQuestions(config)
+  // Aviso de la última foto que se ha intentado subir (o de si era demasiado grande).
+  const [photoNotice, setPhotoNotice] = useState<{ index: number; text: string; failed: boolean } | null>(null)
 
   const updateQuestions = (next: Question[]) => onChange({ questions: next })
 
@@ -104,11 +108,26 @@ export function CuentaSenalesEditor({ config, onChange }: Props) {
     updateQuestions(questions.filter((_, i) => i !== index))
   }
 
-  const handlePhoto = (index: number, file: File | undefined) => {
+  // La foto se recorta en cuadrado y se comprime hasta que quepa (≤ 520 000
+  // caracteres, como el mosaico). Antes se leía el fichero tal cual: una foto de
+  // móvil de varios MB viajaba a todos los jugadores y, pasando de 600 000
+  // caracteres, el servidor la borraba sin decir nada.
+  const handlePhoto = async (index: number, file: File | undefined, input?: HTMLInputElement) => {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => updateQuestion(index, { hint_image_data_url: String(reader.result || '') })
-    reader.readAsDataURL(file)
+    setPhotoNotice({ index, text: 'Preparando la foto…', failed: false })
+    try {
+      const compressed = await compressImage(file)
+      updateQuestion(index, { hint_image_data_url: compressed })
+      setPhotoNotice({
+        index,
+        text: `Foto preparada (${dataUrlKilobytes(compressed)} KB). Guarda el nodo.`,
+        failed: false,
+      })
+    } catch (error) {
+      setPhotoNotice({ index, text: describeImageError(error), failed: true })
+    } finally {
+      if (input) input.value = ''
+    }
   }
 
   return (
@@ -185,10 +204,26 @@ export function CuentaSenalesEditor({ config, onChange }: Props) {
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => handlePhoto(index, event.target.files?.[0])}
+                  onChange={(event) =>
+                    void handlePhoto(index, event.target.files?.[0], event.currentTarget)
+                  }
                 />
               </label>
             </div>
+
+            {photoNotice && photoNotice.index === index ? (
+              <div
+                role={photoNotice.failed ? 'alert' : 'status'}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: photoNotice.failed ? '#b91c1c' : '#0369a1',
+                }}
+              >
+                {photoNotice.failed ? '⚠️ ' : ''}
+                {photoNotice.text}
+              </div>
+            ) : null}
 
             {question.hint_image_data_url ? (
               <img className="csn-preview" src={question.hint_image_data_url} alt={`Pista de la pregunta ${index + 1}`} />

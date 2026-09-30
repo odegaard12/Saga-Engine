@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { FieldProof } from '../../types/player'
+import { useCubreElMapa } from '../hooks/useCubreElMapa'
 
 type FieldPhotoViewerProps = {
   proofs: FieldProof[]
@@ -16,6 +17,9 @@ export function FieldPhotoViewer({
   onClose,
   onDelete,
 }: FieldPhotoViewerProps) {
+  // Visor a pantalla completa: el mapa de detrás no necesita latir.
+  useCubreElMapa(open && proofs.length > 0)
+
   const [index, setIndex] = useState(0)
 
   useEffect(() => {

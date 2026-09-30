@@ -164,7 +164,8 @@ def test_a_exportacion_csv_leva_as_columnas_de_revision_e_segue_escapando_formul
     monkeypatch.setattr(main, "admin_request_authorized", lambda request, data: True)
 
     resposta = cliente.post("/api/admin/match-log/export", json={"user": USUARIO, "formato": "csv"})
-    filas = list(csv.DictReader(io.StringIO(resposta.text)))
+    assert resposta.text.startswith("\ufeff"), "o BOM fai que Excel lea as tildes"
+    filas = list(csv.DictReader(io.StringIO(resposta.text.lstrip("\ufeff")), delimiter=";"))
 
     assert {"occurred_at", "offline", "sync_delay_ms", "node_id"} <= set(filas[0].keys())
     diferidas = [f for f in filas if f["offline"] == "True"]

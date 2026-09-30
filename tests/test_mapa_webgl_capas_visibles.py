@@ -473,13 +473,15 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "COLOR_TIPO" in bola and "new RoundedBoxGeometry(" in bola and "new RoomEnvironment()" in bola
     assert "id: CAPA_NODOS_MONEDA" in fonte and "setPaintProperty(CAPA_NODOS_MONEDA, 'icon-translate'" in fonte
     assert "'moneda')" in fonte and "'base') ?? dibujarBola(" in fonte
-    # La red de caminos NO se baja en la pasada de fondo (la pide el worker),
-    # y sólo se baja si no está ya guardada.
+    # La red de caminos se baja SÓLO en la pantalla de carga (o al «volver a bajar
+    # el mapa», a mano), nunca en una pasada de fondo mientras se juega; y sólo si
+    # no está ya guardada.
     pack = (COMPONENTE.parents[1] / "offline" / "mapTileCache.ts").read_text(encoding="utf-8")
-    assert "if (opciones.redDeCaminos !== false) await descargarRedDeCaminos(onProgress)" in pack
+    assert "await descargarRedDeCaminos(onProgress)" in pack
     assert "caches.open(ROAD_GRAPH_CACHE)" in pack
     app = (COMPONENTE.parents[1] / "PlayerApp.tsx").read_text(encoding="utf-8")
-    assert "void guardarMapa(false)" in app and "await guardarMapa(true)" in app
+    assert "guardarMapa" not in app, "el repaso del mapa por detrás mientras se juega ya no existe"
+    assert "cargarTodo(" in app
     # Sin círculo del radio de entrada ("cutre") para el caso normal: la capa
     # de relleno arranca oculta (visibility 'none') y solo el efecto de
     # "mapa mudo" la enciende -ver test_o_mapa_mudo_oculta_o_pin_e_pinta_o_circulo_difuso.
@@ -489,9 +491,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
+    # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 3
     assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 6
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
@@ -660,5 +662,5 @@ def test_sen_webgl_hai_aviso_e_a_carga_non_se_queda_esperando(fonte: str) -> Non
 
 
 def test_os_compañeiros_e_o_aura_do_gps_seguen_no_mapa_3d(fonte: str) -> None:
-    assert "otherPlayers" in fonte and "agruparJugadores(" in fonte
+    assert "otherPlayers" in fonte and "planDeJugadores(" in fonte
     assert "CAPA_AURA" in fonte and "'debug'" in fonte

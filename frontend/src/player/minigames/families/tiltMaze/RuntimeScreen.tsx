@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerStage } from '../../../../types/player'
 import type { ResolvedCircuitMatrixMinigame } from '../../core/resolver'
 import { useRegenerarAoOcultar } from '../../core/useRegenerarAoOcultar'
+import { useTextos } from '../../core/useTextos'
+import { useSinRetoEnPantalla } from '../../../hooks/useSinRetoEnPantalla'
+import { avisarPeticionDePermisoPropia } from '../../../utils/permissionPromptGuard'
 import {
   generateTiltMaze,
   nextTiltMazeCell,
@@ -17,7 +20,8 @@ type Props = {
   stage: PlayerStage
   helperText: string
   submitting: boolean
-  onWin: (penaltyMs?: number, tempoDaPartidaMs?: number) => Promise<void>
+  /** `false` = el nodo no se aceptó: hay que soltar «Avanzando…» y volver a ofrecer Continuar. */
+  onWin: (penaltyMs?: number, tempoDaPartidaMs?: number) => Promise<void | boolean>
   /** El reloj del nodo no corre hasta aquí: lo arranca Comenzar. */
   onComezar?: () => void
 }
@@ -106,6 +110,9 @@ export function TiltMazeRuntimeScreen({
   onWin,
   onComezar,
 }: Props) {
+  const textos = useTextos()
+  const t = textos.tilt
+  const juego = textos.juego
   const config = resolved.config
 
   const rows = clamp(config.grid_rows, 9, 5, 13)
@@ -151,13 +158,15 @@ export function TiltMazeRuntimeScreen({
   )
 
   /**
-   * Instante en que empieza la partida de verdad.
+   * El tiempo de la partida NO se lleva aquí.
    *
-   * El tiempo del nodo arrancaba al abrir la ficha, así que leer la explicación
-   * del mirador contaba como si ya estuvieses moviendo la bola. El reto empieza
-   * al pulsar Comezar.
+   * Lo cuenta el reloj del nodo (`nodeClock`), que arranca en el primer
+   * «Iniciar» (`onComezar`) y no se reinicia: leer la explicación no cuenta, y
+   * fallar y reintentar sí. Aquí se llevaba un `comezouRef` que se ponía a cero
+   * en CADA intento y se mandaba como tiempo de la partida: quien fallaba cuatro
+   * veces se clasificaba con el tiempo del último intento, un tercio de lo que
+   * había tardado de verdad. Ahora se manda el del nodo entero.
    */
-  const comezouRef = useRef(0)
 
   const [phase, setPhase] = useState<Phase>('ready')
 
@@ -175,7 +184,7 @@ export function TiltMazeRuntimeScreen({
 
   const [sensorActive, setSensorActive] = useState(false)
 
-  const [sensorText, setSensorText] = useState('Botones táctiles disponibles')
+  const [sensorText, setSensorText] = useState(t.sensorInicial)
 
   /**
    * Antitrampas: salir a media partida para planear la ruta con calma (en
@@ -187,11 +196,19 @@ export function TiltMazeRuntimeScreen({
    * igual que caer en el último agujero. Perder el intento entero es el
    * coste de salir, sea cual sea el motivo -capturar el mapa o cualquier
    * otro-.
+   *
+   * Sólo si el jugador se fue de verdad: el laberinto se juega INCLINANDO el
+   * móvil, sin tocarlo, y con el autobloqueo puesto la pantalla se apagaba a
+   * los 30 s y el intento se daba por perdido sin que nadie se hubiera ido a
+   * ninguna parte (ver `useRegenerarAoOcultar` y `hooks/salidasDeLaApp.ts`).
    */
   useRegenerarAoOcultar(phase === 'playing', () => {
-    setFailure('Saíches a media partida: perdiches o intento.')
+    setFailure(t.salioAMediaPartida)
     setPhase('failed')
   })
+
+  // En reglas, resultado o fallo no hay laberinto que memorizar: salir no cuenta.
+  useSinRetoEnPantalla(phase !== 'playing')
 
   const [continuing, setContinuing] = useState(false)
 
@@ -237,7 +254,7 @@ export function TiltMazeRuntimeScreen({
 
       if (next === null) {
         haptic(10)
-        setMessage('Pared. Busca otra dirección.')
+        setMessage(t.pared)
         return
       }
 
@@ -247,7 +264,7 @@ export function TiltMazeRuntimeScreen({
         nextCollected.add(next)
         setCollected(nextCollected)
         haptic([12, 20, 22])
-        setMessage('Objeto recogido.')
+        setMessage(t.objetoRecogido)
       } else {
         setMessage('')
       }
@@ -259,13 +276,13 @@ export function TiltMazeRuntimeScreen({
         setLives(nextLives)
 
         if (nextLives <= 0) {
-          setFailure('Has perdido todas las vidas.')
+          setFailure(t.sinVidas)
           setPhase('failed')
           return
         }
 
         setPosition(maze.start)
-        setMessage('Caíste en un agujero. Vuelves al inicio.')
+        setMessage(t.cayoEnAgujero)
         return
       }
 
@@ -278,10 +295,10 @@ export function TiltMazeRuntimeScreen({
           return
         }
 
-        setMessage('La salida está cerrada. Recoge todos los objetos.')
+        setMessage(t.salidaCerrada)
       }
     },
-    [phase, maze, position, collected, itemSet, holeSet, lives]
+    [phase, maze, position, collected, itemSet, holeSet, lives, t]
   )
 
   useEffect(() => {
@@ -297,7 +314,7 @@ export function TiltMazeRuntimeScreen({
       setRemaining((value) => {
         if (value <= 1) {
           window.clearInterval(timer)
-          setFailure('Se terminó el tiempo.')
+          setFailure(t.seTerminoElTiempo)
           setPhase('failed')
           return 0
         }
@@ -307,7 +324,7 @@ export function TiltMazeRuntimeScreen({
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [phase])
+  }, [phase, t])
 
   useEffect(() => {
     if (phase !== 'playing' || !sensorActive) {
@@ -325,7 +342,7 @@ export function TiltMazeRuntimeScreen({
           gamma: event.gamma,
         }
 
-        setSensorText('Sensor calibrado')
+        setSensorText(t.sensorCalibrado)
         return
       }
 
@@ -355,12 +372,12 @@ export function TiltMazeRuntimeScreen({
     window.addEventListener('deviceorientation', handler)
 
     return () => window.removeEventListener('deviceorientation', handler)
-  }, [phase, sensorActive, cooldown, threshold])
+  }, [phase, sensorActive, cooldown, threshold, t])
 
   async function enableSensor() {
     if (config.sensor_enabled === false || !('DeviceOrientationEvent' in window)) {
       setSensorActive(false)
-      setSensorText('Modo táctil activo')
+      setSensorText(t.modoTactil)
       return
     }
 
@@ -370,6 +387,10 @@ export function TiltMazeRuntimeScreen({
       }
 
       if (typeof Orientation.requestPermission === 'function') {
+        // El aviso de permiso del sistema (iOS) quita el foco a la página. Sin
+        // avisar antes, el anti-trampas lo leía como «se fue a otra app»: +30 s y
+        // el laberinto reiniciado justo al empezar.
+        avisarPeticionDePermisoPropia()
         const permission = await Orientation.requestPermission()
 
         if (permission !== 'granted') {
@@ -379,10 +400,10 @@ export function TiltMazeRuntimeScreen({
 
       baselineRef.current = null
       setSensorActive(true)
-      setSensorText('Mantén el móvil cómodo para calibrar')
+      setSensorText(t.calibrar)
     } catch {
       setSensorActive(false)
-      setSensorText('Sensor no disponible · usa botones')
+      setSensorText(t.sensorNoDisponible)
     }
   }
 
@@ -395,7 +416,6 @@ export function TiltMazeRuntimeScreen({
     setFailure('')
     continueLockRef.current = false
     setContinuing(false)
-    comezouRef.current = Date.now()
     onComezar?.()
     setPhase('playing')
 
@@ -415,8 +435,18 @@ export function TiltMazeRuntimeScreen({
     setContinuing(true)
 
     try {
-      const daPartida = comezouRef.current ? Date.now() - comezouRef.current : undefined
-      await onWin(undefined, daPartida)
+      // Sin tiempo propio: la hoja usa el reloj del nodo, que cuenta desde el
+      // primer «Iniciar» y por todos los intentos (ver arriba).
+      const superado = await onWin()
+
+      // El nodo no se aceptó (sin cobertura y sin poder guardar en el móvil, o
+      // un rechazo del servidor): se suelta «Avanzando…» y el botón vuelve a
+      // estar disponible. Antes se quedaba pegado para siempre. `undefined`
+      // = había otro envío en marcha; ese ya acabará solo.
+      if (superado === false) {
+        continueLockRef.current = false
+        setContinuing(false)
+      }
     } catch (error) {
       continueLockRef.current = false
       setContinuing(false)
@@ -424,11 +454,9 @@ export function TiltMazeRuntimeScreen({
     }
   }, [phase, submitting, continuing, onWin])
 
-  const title = stage.title || 'Laberinto de equilibrio'
+  const title = stage.title || t.titulo
 
-  const instructions =
-    String(stage.content || helperText || '').trim() ||
-    'Inclina el móvil o usa los botones para alcanzar la salida.'
+  const instructions = String(stage.content || helperText || '').trim() || t.instrucciones
 
   if (phase === 'ready') {
     return (
@@ -442,10 +470,10 @@ export function TiltMazeRuntimeScreen({
 
           <p>{instructions}</p>
 
-          <p>Recoge los objetos ◆, evita los agujeros × y llega a la bandera ⚑.</p>
+          <p>{t.leyenda}</p>
 
           <button type="button" className="tilt-primary" onClick={() => void start()}>
-            Iniciar laberinto
+            {t.iniciar}
           </button>
         </div>
       </section>
@@ -460,9 +488,9 @@ export function TiltMazeRuntimeScreen({
         <div className="tilt-result">
           <div className="tilt-result-icon">✓</div>
 
-          <h2>Laberinto superado</h2>
+          <h2>{t.superado}</h2>
 
-          <p>Has recogido todos los objetos y alcanzado la salida.</p>
+          <p>{t.superadoDetalle}</p>
 
           <button
             type="button"
@@ -470,7 +498,7 @@ export function TiltMazeRuntimeScreen({
             disabled={submitting || continuing}
             onClick={() => void continueRoute()}
           >
-            {submitting || continuing ? 'Avanzando…' : 'Continuar al siguiente nodo'}
+            {submitting || continuing ? juego.avanzando : juego.continuarSiguienteNodo}
           </button>
         </div>
       </section>
@@ -485,7 +513,7 @@ export function TiltMazeRuntimeScreen({
         <div className="tilt-result fail">
           <div className="tilt-result-icon">!</div>
 
-          <h2>Intento terminado</h2>
+          <h2>{t.intentoTerminado}</h2>
 
           <p>{failure}</p>
 
@@ -497,7 +525,7 @@ export function TiltMazeRuntimeScreen({
               setMessage('')
             }}
           >
-            Volver a intentarlo
+            {t.volverAIntentarlo}
           </button>
         </div>
       </section>
@@ -519,19 +547,19 @@ export function TiltMazeRuntimeScreen({
         <div className="tilt-stats">
           <div className="tilt-stat">
             <strong>{remaining}</strong>
-            <span>segundos</span>
+            <span>{t.segundos}</span>
           </div>
 
           <div className="tilt-stat">
             <strong>{lives}</strong>
-            <span>vidas</span>
+            <span>{t.vidas}</span>
           </div>
 
           <div className="tilt-stat">
             <strong>
               {collected.size}/{maze.collectibles.length}
             </strong>
-            <span>objetos</span>
+            <span>{t.objetos}</span>
           </div>
         </div>
 
@@ -602,37 +630,34 @@ export function TiltMazeRuntimeScreen({
         </div>
 
         <div className="tilt-help">
-          {message ||
-            (allCollected
-              ? 'Todos los objetos recogidos. Busca la salida.'
-              : 'Inclina suavemente el móvil o usa los botones.')}
+          {message || (allCollected ? t.todosLosObjetos : t.inclinaSuavemente)}
         </div>
 
         <div className="tilt-sensor">{sensorText}</div>
 
         {botonesVisibles ? (
           <div className="tilt-pad">
-            <button type="button" className="up" aria-label="Arriba" onClick={() => move('up')}>
+            <button type="button" className="up" aria-label={t.arriba} onClick={() => move('up')}>
               ↑
             </button>
 
             <button
               type="button"
               className="left"
-              aria-label="Izquierda"
+              aria-label={t.izquierda}
               onClick={() => move('left')}
             >
               ←
             </button>
 
-            <button type="button" className="down" aria-label="Abajo" onClick={() => move('down')}>
+            <button type="button" className="down" aria-label={t.abajo} onClick={() => move('down')}>
               ↓
             </button>
 
             <button
               type="button"
               className="right"
-              aria-label="Derecha"
+              aria-label={t.derecha}
               onClick={() => move('right')}
             >
               →
@@ -648,10 +673,10 @@ export function TiltMazeRuntimeScreen({
               setBotonesVisibles(true)
               setSensorActive(false)
               baselineRef.current = null
-              setSensorText('Botones activos · sensor apagado')
+              setSensorText(t.botonesActivos)
             }}
           >
-            ¿No responde al inclinar? Usar botones
+            {t.usarBotones}
           </button>
         )}
 
@@ -660,20 +685,20 @@ export function TiltMazeRuntimeScreen({
             type="button"
             onClick={() => {
               baselineRef.current = null
-              setSensorText('Mantén el móvil cómodo para recalibrar')
+              setSensorText(t.recalibrar)
             }}
           >
-            Recalibrar
+            {t.recalibrarBoton}
           </button>
 
           <button
             type="button"
             onClick={() => {
               setPosition(maze.start)
-              setMessage('Bola devuelta al inicio.')
+              setMessage(t.bolaAlInicio)
             }}
           >
-            Volver al inicio
+            {t.volverAlInicio}
           </button>
         </div>
       </div>

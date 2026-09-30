@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { AdminReactOverviewStage } from '../lib/adminApi'
 import { getDefaultAdminStagePatchForGame } from '../lib/gameCatalog'
+import { savedFallbackCode } from '../lib/stageFields'
 import GuidedNodeEditorFlow from './GuidedNodeEditorFlow'
 import PhysicalQrCardsPanel, {
   type PhysicalQrKind,
@@ -120,10 +121,9 @@ function getStageConfig(stage: AdminReactOverviewStage): Record<string, unknown>
 }
 
 function buildFallbackCodeForPhysicalStage(stage: AdminReactOverviewStage) {
-  const config = getStageConfig(stage)
-  const existing = String(config.success_code || config.fallback_code || '')
-    .trim()
-    .toUpperCase()
+  // Primero el código que el nodo ya tiene guardado (aunque viva en `answer` o en
+  // el propio nodo y no en `config`); solo si no hay ninguno, el sugerido.
+  const existing = savedFallbackCode(stage)
   if (existing) return existing
 
   const index = typeof stage.index === 'number' ? stage.index + 1 : 1
@@ -352,10 +352,16 @@ export default function NodePhysicalTypePanel({
 
   function updatePhysicalFallbackCode(value: string) {
     const config = getStageConfig(stage)
+    const codigo = value.trim().toUpperCase()
+    // Los tres sitios a la vez: `fallback_code` manda sobre `config.success_code`
+    // al guardar (ver lib/stageFields.ts), así que si solo cambia el segundo, el
+    // cambio se ignora.
     patchStage({
+      fallback_code: codigo,
+      physical_fallback_code: codigo,
       config: {
         ...config,
-        success_code: value.trim().toUpperCase(),
+        success_code: codigo,
       },
     })
   }

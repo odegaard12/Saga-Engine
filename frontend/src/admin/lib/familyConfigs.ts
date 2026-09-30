@@ -255,15 +255,10 @@ function _normalizeAdminConfigForFamilyRaw(type: string, input: Record<string, u
       })
       .filter((item) => item.question.length > 0)
 
-    while (questions.length < 4) {
-      questions.push({
-        question: `Pregunta trampa ${questions.length + 1}: escribe el enunciado.`,
-        options: ['Opción A', 'Opción B', 'Opción C', 'Opción D'],
-        correct_index: 0,
-        explanation: '',
-      })
-    }
-
+    // Ya NO se rellena hasta 4 con «Pregunta trampa N: escribe el enunciado»: ese
+    // relleno se guardaba y llegaba a los jugadores como preguntas de verdad. Si
+    // faltan preguntas, el guardado del panel lo avisa (ver
+    // `incompleteWordTrapNodes` en adminSaveChecks.ts) en vez de inventarlas.
     return {
       objective: 'word_trap',
       game_id: 'trampa_palabras',

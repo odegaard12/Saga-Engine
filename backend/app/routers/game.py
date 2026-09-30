@@ -1,6 +1,10 @@
 import time
 from fastapi import APIRouter, Request, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
+from backend.app.runtime import entradas as _entradas
+from backend.app.runtime import motivos_de_rechazo as _motivos
+from backend.app.runtime import reloj_del_movil as _reloj
 from backend.app.runtime.core_engine import _as_str, _as_bool
 
 router = APIRouter()
@@ -28,11 +32,7 @@ def ordenar_avances_de_la_tanda(events):
     for indice, evento in enumerate(events):
         if isinstance(evento, dict) and evento.get("type") == "node_completed":
             payload = evento.get("payload") if isinstance(evento.get("payload"), dict) else {}
-            nivel = payload.get("level_before")
-            try:
-                nivel = int(nivel) if nivel is not None and not isinstance(nivel, bool) else None
-            except (TypeError, ValueError):
-                nivel = None
+            nivel = _entradas.entero_seguro(payload.get("level_before"), None)
             posiciones.append((indice, nivel))
 
     if len(posiciones) < 2 or any(nivel is None for _, nivel in posiciones):
@@ -46,18 +46,20 @@ def ordenar_avances_de_la_tanda(events):
     return resultado
 
 @router.get("/api/state/{user}")
-async def get_state(user: str, request: Request):
+def get_state(user: str, request: Request):
+    # `def`, no `async def`: FastAPI lo ejecuta en un hilo y la E/S de SQLite no
+    # bloquea el bucle de eventos (caza de fallos S1).
     import main
     main.require_player_session(request, user)
-    stages = main.load_stages(main.STAGES_DB)
+    total_nodos = main.count_runtime_stages()
     profile = main.get_player_profile(user)
     profile_id = profile.get("id") or _as_str(user).strip() or "PLAYER 1"
     lvl = main.get_player_progress_level(profile_id, main.get_player_progress_level(user, 0))
-    return {"user": profile_id, "level": lvl, "finished": lvl >= len(stages)}
+    return {"user": profile_id, "level": lvl, "finished": lvl >= total_nodos}
 
 
 @router.get("/api/game/{user}")
-async def get_game_payload(user: str, request: Request, offline_pack: bool = False, fotos_por_url: bool = False):
+def get_game_payload(user: str, request: Request, offline_pack: bool = False, fotos_por_url: bool = False):
     import main
     # Punto de entrada del jugador: aquí es donde se emite la cookie de sesión.
     # Con la contraseña de misión puesta, sin desbloquear antes no se pasa.
@@ -130,6 +132,11 @@ async def get_game_payload(user: str, request: Request, offline_pack: bool = Fal
         "finished": finished,
         "stages": stages,
         "stages_rev": stages_rev,
+        # Huella de TODO lo que el móvil se baja de la misión (nodos con sus
+        # coordenadas, versión de la proyección por jugador, fotos, mapa y red
+        # de caminos). La pantalla de carga la compara con la que guardó para
+        # decidir «misión cambiada» (ver runtime/revisiones.py).
+        "mission_revision": main.mission_revision(stages_rev=stages_rev),
         "offline_pack": bool(offline_pack),
         "current_stage": current_stage,
         "inventory_snapshot": inventory_snapshot,
@@ -156,7 +163,7 @@ def construir_tabla_de_equipo(user):
     live_positions = main.load_live_positions()
     now = int(time.time())
 
-    total_nodes = len(main.get_runtime_stages())
+    total_nodes = main.count_runtime_stages()
     # Una sola lectura de cada fichero para toda la tabla, no una por jugador.
     timers = main.load_player_timers()
     progress = main.load_player_progress()
@@ -189,7 +196,7 @@ def construir_tabla_de_equipo(user):
 
 
 @router.get("/api/team/{user}")
-async def get_team_payload(user: str, request: Request):
+def get_team_payload(user: str, request: Request):
     import main
     # La tabla lleva la posición viva de todos: sólo para quien está jugando.
     main.exigir_ser_del_grupo(request)
@@ -197,7 +204,7 @@ async def get_team_payload(user: str, request: Request):
 
 
 @router.get("/media/nodo/{stage_id}/{huella}.{extension}")
-async def stage_image(stage_id: str, huella: str, extension: str):
+def stage_image(stage_id: str, huella: str, extension: str):
     """La foto de un nodo, por su propia URL y cacheable para siempre.
 
     Medido el 2026-08-20: el paquete del jugador eran 203 KB y 160 de ellos una
@@ -264,8 +271,10 @@ async def stage_image(stage_id: str, huella: str, extension: str):
 @router.post("/api/events/sync")
 async def sync_player_events(request: Request):
     import main
-    data = await request.json()
-    user = _as_str(data.get("user")).strip()
+    # Un cuerpo que no es un objeto, o con `Infinity`/`NaN`, no puede dar un 500
+    # que deje la cola del jugador atascada para siempre (caza de fallos S6/S16).
+    data = await _entradas.leer_cuerpo_json(request)
+    user = _entradas.texto_seguro(data.get("user"), 200)
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("events_sync", request, user, main.EVENT_SYNC_RATE_LIMIT_MAX)
 
@@ -284,9 +293,23 @@ async def sync_player_events(request: Request):
     if len(events) > MAX_EVENTS_PER_SYNC:
         raise HTTPException(status_code=400, detail="too many events")
 
+    # El reloj del móvil no es de fiar (ver runtime/reloj_del_movil.py). Si manda
+    # `client_sent_at_ms`, las horas de la tanda se corrigen con el desfase
+    # respecto al reloj del servidor ANTES de compararlas con el último
+    # reinicio, ordenarlas en el Registro o mirar si están en el futuro. Sin el
+    # campo no se toca nada.
+    ahora_ms = int(time.time() * 1000)
+    desfase_ms = _reloj.calcular_desfase_ms(data.get("client_sent_at_ms"), ahora_ms)
+    if desfase_ms:
+        events = [_reloj.corregir_evento(evento, desfase_ms, ahora_ms) for evento in events]
+
     inventory_snapshot = data.get("inventory_snapshot")
     if isinstance(inventory_snapshot, dict):
         main.save_player_inventory(user, inventory_snapshot)
+
+    # ¿Está escribiendo el Registro de partida? Se mira UNA vez para toda la
+    # tanda, no una por cada muestra de posición (caza de fallos S2).
+    registro_activo = main.match_log_is_active()
 
     stored = []
     seen_client_events = {}
@@ -312,7 +335,7 @@ async def sync_player_events(request: Request):
                 seen_client_events[client_event_id] = duplicate
                 continue
 
-        stored_event = main.apply_synced_player_event(normalized, user, profile)
+        stored_event = main.apply_synced_player_event(normalized, user, profile, active=registro_activo)
         stored.append(stored_event)
 
         if client_event_id:
@@ -337,16 +360,24 @@ async def sync_player_events(request: Request):
     # en que por fin llegó al servidor -la señal de "cuánto tiempo estuvo
     # este jugador sin cobertura"-.
     delay_ms = main.match_log_offline_sync_delay_ms(events)
+    lote = {"event_count": len(stored), "delay_ms": delay_ms}
+    if desfase_ms:
+        lote["clock_offset_ms"] = desfase_ms
     main.match_log_record(
         "offline_sync_batch",
         profile.get("id") or user,
-        payload={"event_count": len(stored), "delay_ms": delay_ms},
+        payload=lote,
         profile=profile,
+        active=registro_activo,
     )
 
     return {
         "status": "ok",
         "accepted": len(stored),
+        # La hora del servidor y el desfase que se aplicó a la tanda (0 si el
+        # móvil no mandó `client_sent_at_ms` o su reloj estaba en hora).
+        "server_time_ms": ahora_ms,
+        "clock_offset_ms": desfase_ms,
         "events": [
             {
                 "id": event.get("id"),
@@ -358,7 +389,12 @@ async def sync_player_events(request: Request):
                     else None
                 ),
                 "node_id": event.get("node_id"),
+                # El mismo nodo, con el nombre que usa el resto de la app.
+                "stage_id": event.get("node_id"),
                 "error": event.get("error"),
+                # Una frase corta en castellano si el evento NO se aplicó (null si
+                # se aceptó): lo que el móvil puede enseñar al jugador.
+                "motivo": _motivos.motivo_de(event),
                 "duplicate": bool(event.get("duplicate")),
             }
             for event in stored
@@ -369,7 +405,14 @@ async def sync_player_events(request: Request):
 @router.post("/api/heartbeat")
 async def heartbeat(request: Request):
     import main
-    data = await request.json()
+    data = await _entradas.leer_cuerpo_json(request)
+    # Todo lo demás es E/S síncrona de SQLite y de JSON: en un hilo, para no
+    # parar el bucle de eventos con cada latido de cada móvil (caza de fallos S1).
+    return await run_in_threadpool(_procesar_latido, request, data)
+
+
+def _procesar_latido(request: Request, data: dict):
+    import main
 
     user = _as_str(data.get("user")).strip()
     if not user:
@@ -519,9 +562,12 @@ async def heartbeat(request: Request):
 @router.post("/api/advance")
 async def advance(request: Request):
     import main
-    data = await request.json()
+    # Un cuerpo que no es un objeto, `penalty_ms: Infinity` o `code: 5` daban un
+    # 500 ANTES de comprobar la sesión (caza de fallos S6): ahora un 400 limpio,
+    # y los campos sueltos se leen sin que una entrada absurda pueda romper nada.
+    data = await _entradas.leer_cuerpo_json(request)
     user = data.get("user")
-    code = (data.get("code") or "").strip().upper()
+    code = _entradas.texto_seguro(data.get("code"), 200).upper()
     time_spent_ms = data.get("time_spent_ms")
     # Lo marca el cliente cuando el código lo ha TECLEADO el jugador. El aviso
     # interno con el que los minijuegos dicen "superado" lo acepta cualquier
@@ -533,10 +579,7 @@ async def advance(request: Request):
     evidencia = sanitize_evidence(data.get("evidence")) if isinstance(data.get("evidence"), dict) else None
     # Penalización que pide el cliente: código de respaldo, fallos en el reto...
     # Va aparte del tiempo del nodo porque se suma al total de la travesía.
-    try:
-        penalty_ms = max(0, min(3_600_000, int(data.get("penalty_ms") or 0)))
-    except (TypeError, ValueError):
-        penalty_ms = 0
+    penalty_ms = _entradas.entero_seguro(data.get("penalty_ms"), 0, minimo=0, maximo=3_600_000)
 
     main.require_player_session(request, user)
     main.enforce_player_rate_limit("advance", request, user, main.ADVANCE_RATE_LIMIT_MAX)
@@ -564,11 +607,7 @@ async def advance(request: Request):
     #
     # Los móviles viejos que no manden el número siguen funcionando igual que
     # antes: sin él no se puede distinguir nada y se procesa la petición.
-    try:
-        nivel_de_partida = data.get("level_before")
-        nivel_de_partida = int(nivel_de_partida) if nivel_de_partida is not None else None
-    except (TypeError, ValueError):
-        nivel_de_partida = None
+    nivel_de_partida = _entradas.entero_seguro(data.get("level_before"), None)
 
     # Va por DETRÁS del servidor: es el eco de algo que ya llegó. Se contesta
     # que sí, con el nivel real, y no se toca nada.
@@ -639,8 +678,12 @@ async def advance(request: Request):
             if time_spent_ms is not None:
                 try:
                     main.record_player_stage_time(profile_id, lvl, max(0, int(time_spent_ms)))
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     pass
+
+            # Sólo FLAG: ¿cabe el tiempo que declara el móvil entre el avance
+            # anterior y éste? El servidor sólo observa cuándo llega cada avance.
+            main._comprobar_tiempo_declarado(profile_id, current_node, time_spent_ms, main._now_ms())
 
             # El cronómetro de la travesía arranca al superar el primer nodo y
             # para al superar el último: lo que cuenta es el reloj, no los

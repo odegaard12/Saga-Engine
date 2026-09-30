@@ -4,6 +4,7 @@ import type { ResolvedWordTrapMinigame } from '../../core/resolver'
 import type { WordTrapRound } from '../../core/family-types'
 import { haptics, sounds } from '../../../utils/haptics'
 import { useI18n } from '../../../../i18n/useI18n'
+import { useTextos } from '../../core/useTextos'
 import { registrarEvidencia } from '../../../avance/evidencia'
 import { leerExplicacion } from './explicacion'
 
@@ -197,6 +198,7 @@ function useCountdown(activeKey: string, durationMs: number, onExpire: () => voi
 
 export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Props) {
   const { t } = useI18n()
+  const tx = useTextos().wordTrap
   const cfg = resolved.config as unknown as Record<string, unknown>
 
   const baseRounds = useMemo(
@@ -366,13 +368,13 @@ export function WordTrapRuntimeScreen({ resolved, stage, submitting, onWin }: Pr
         ? `❌ ${t('player.minigames.wordTrap.wrong')}`
         : result === 'timeout'
           ? `⏱️ ${t('player.minigames.wordTrap.timeout')}`
-          : 'Lee con calma: hay opciones casi idénticas.'
+          : tx.leeConCalma
 
   return (
     <div className="wtp-root">
       <style>{STYLES}</style>
       <div className="wtp-card">
-        <span className="wtp-overline">🧠 Trampa de palabras</span>
+        <span className="wtp-overline">{tx.titulo}</span>
 
         <div className="wtp-topbar">
           <span className="wtp-round">

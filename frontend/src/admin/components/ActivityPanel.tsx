@@ -7,6 +7,8 @@ import {
   type AdminEventStatus,
   type AntiCheatPlayerFlags,
 } from '../lib/adminApi'
+import { describeAdminError } from '../lib/adminErrors'
+import { EVENTS_PAGE_LIMIT, describePendingCount, sortEventsNewestFirst } from '../lib/adminEventsView'
 
 const ETIQUETA_MOTIVO: Record<string, string> = {
   impossible_travel_speed: 'Velocidad imposible entre nodos',
@@ -61,6 +63,8 @@ function formatFechaMs(ms?: number): string {
  */
 export default function ActivityPanel() {
   const [eventos, setEventos] = useState<AdminEvent[]>([])
+  // Total de pendientes según el servidor, si lo manda (la lista se corta en 200).
+  const [pendientesServidor, setPendientesServidor] = useState<number | null>(null)
   const [estado, setEstado] = useState<Estado>('idle')
   const [aviso, setAviso] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<'' | AdminEventStatus>('')
@@ -91,7 +95,7 @@ export default function ActivityPanel() {
     setAviso('')
     try {
       const respuesta = await fetchAdminEvents({
-        limit: 200,
+        limit: EVENTS_PAGE_LIMIT,
         status: filtroEstado || undefined,
       })
       if (respuesta.status !== 'ok') {
@@ -99,12 +103,16 @@ export default function ActivityPanel() {
         setAviso(respuesta.detail || 'No se pudo cargar la actividad.')
         return
       }
-      // Más recientes primero: el backend los devuelve en orden de llegada.
-      setEventos([...(respuesta.events || [])].reverse())
+      // Más recientes primero, por la fecha de cada evento: el orden en que los
+      // devuelve el servidor no se da por supuesto.
+      setEventos(sortEventsNewestFirst(respuesta.events || []))
+      // El servidor cuenta los pendientes aparte (COUNT), sin depender de lo que quepa
+      // en la página: es el número bueno aunque haya filtro.
+      setPendientesServidor(typeof respuesta.pending_count === 'number' ? respuesta.pending_count : null)
       setEstado('done')
     } catch (error) {
       setEstado('error')
-      setAviso(error instanceof Error ? error.message : 'Error al cargar la actividad.')
+      setAviso(describeAdminError(error, 'cargar'))
     }
   }
 
@@ -129,13 +137,15 @@ export default function ActivityPanel() {
         window.alert(respuesta.detail || 'No se pudo marcar como leído.')
       }
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'No se pudo marcar como leído.')
+      window.alert(`No se pudo marcar como leído: ${describeAdminError(error)}`)
     } finally {
       setMarcando('')
     }
   }
 
-  const pendientes = eventos.filter((evento) => evento.status === 'pending').length
+  // No se afirma «200 pendientes» cuando solo se han cargado 200 filas.
+  const pendientes = describePendingCount(eventos, EVENTS_PAGE_LIMIT, pendientesServidor)
+  const contarPendientes = pendientesServidor !== null || !filtroEstado || filtroEstado === 'pending'
 
   return (
     <div className="admin-cms-local-panel admin-settings-panel admin-panel-modern">
@@ -149,8 +159,17 @@ export default function ActivityPanel() {
           </p>
         </div>
 
-        <div className="admin-panel-count">
-          <strong>{pendientes}</strong>
+        <div
+          className="admin-panel-count"
+          title={
+            !contarPendientes
+              ? 'Con este filtro no se pueden contar los pendientes: elige «Todos los estados».'
+              : pendientes.exact
+                ? undefined
+                : `Solo se cargan los ${EVENTS_PAGE_LIMIT} eventos más recientes: puede haber más pendientes.`
+          }
+        >
+          <strong>{contarPendientes ? pendientes.text : '—'}</strong>
           <span>pendientes</span>
         </div>
       </div>

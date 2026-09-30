@@ -6,6 +6,7 @@ import {
   type AdminReactOverviewProfile,
   type MatchLogEntry,
 } from '../lib/adminApi'
+import { describeAdminError } from '../lib/adminErrors'
 
 type Estado = 'idle' | 'loading' | 'done' | 'error'
 type Vista = 'nodos' | 'cronologica'
@@ -298,7 +299,10 @@ function detalleDe(entrada: MatchLogEntry): string {
  * a la que PASÓ cada cosa (la del móvil) y la hora a la que llegó, los tramos
  * sin cobertura marcados y las sospechas resaltadas.
  */
-export default function MatchLogPanel() {
+export default function MatchLogPanel({ missionLaunchAt = '' }: { missionLaunchAt?: string }) {
+  // Sin fecha de inicio de la misión NO se anota nada (ni este registro ni los
+  // rastros GPS): el panel se veía vacío sin decir por qué (informe A13).
+  const sinFechaDeInicio = !String(missionLaunchAt || '').trim()
   const [jugadores, setJugadores] = useState<AdminReactOverviewProfile[]>([])
   const [jugadorId, setJugadorId] = useState('')
   const [desde, setDesde] = useState('')
@@ -350,7 +354,7 @@ export default function MatchLogPanel() {
       setEstado('done')
     } catch (error) {
       setEstado('error')
-      setAviso(error instanceof Error ? error.message : 'Error al cargar el registro de partida.')
+      setAviso(describeAdminError(error, 'cargar'))
     }
   }
 
@@ -365,7 +369,7 @@ export default function MatchLogPanel() {
       const blob = await downloadMatchLogExport({ ...consulta(), formato })
       descargarBlob(blob, `registro-de-partida-${jugadorId || 'todos'}.${formato}`)
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'No se pudo exportar el registro.')
+      window.alert(`No se pudo exportar el registro: ${describeAdminError(error, 'cargar')}`)
     } finally {
       setExportando('')
     }
@@ -394,6 +398,27 @@ export default function MatchLogPanel() {
           <span>sospechas en el filtro</span>
         </div>
       </div>
+
+      {sinFechaDeInicio ? (
+        <div
+          role="status"
+          style={{
+            margin: '12px 0',
+            padding: '12px 14px',
+            borderRadius: 10,
+            border: '1px solid rgba(250, 204, 21, 0.45)',
+            background: 'rgba(250, 204, 21, 0.1)',
+            color: '#fde68a',
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          <strong>⚠️ El Registro de partida está apagado.</strong> La misión no tiene fecha de inicio y,
+          sin ella, no se anota nada: ni este registro ni los rastros GPS («Ver Rastros» en el mapa).
+          Pon la fecha en Ajustes → «Fecha y Hora de Inicio» (vale una hora que ya haya pasado) para
+          que empiece a anotar. Lo que se juegue mientras tanto no se podrá revisar después.
+        </div>
+      ) : null}
 
       <section className="admin-settings-section-modern">
         <div className="admin-settings-section-head">
