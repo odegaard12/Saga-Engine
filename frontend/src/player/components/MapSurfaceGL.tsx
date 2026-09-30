@@ -51,17 +51,13 @@ import {
   renderizarBola,
 } from './bolaRenderizada'
 import {
-  agruparJugadores,
-  claveDeGrupo,
-  claveDeJugador,
-  apartarDeMi,
   contenidoPopupGrupo,
   contenidoPopupJugador,
-  crearElementoGrupo,
-  crearElementoJugador,
-  radioDeAgrupacion,
-  repartirEnCorro,
-  tipoDePresencia,
+  desplazamientoDeHueco,
+  HUECOS_EN_CORRO,
+  ordenDePresencia,
+  planDeJugadores,
+  type ElementoDeMapa,
 } from './jugadoresEnMapa'
 import { crearCapaNodosTresD, type CapaNodosTresD, type TipoDeNodo } from './nodosTresD'
 import { alCambiarCoberturaDelMapa, mapaCubierto } from '../hooks/useCubreElMapa'
@@ -102,6 +98,9 @@ const FUENTE_JUGADOR = 'saga-jugador'
 const CAPA_JUGADOR = 'saga-jugador-capa'
 const CAPA_AURA = 'saga-jugador-aura'
 const ICONO_AVATAR = 'avatar-propio'
+/** Los compañeros: símbolos del mapa, como los nodos y tú (ver CAPA_OTROS). */
+const FUENTE_OTROS = 'saga-otros'
+const CAPA_OTROS = 'saga-otros-capa'
 const FUENTE_GUIA = 'saga-guia'
 const CAPA_NODOS_TRES_D = 'saga-nodos-3d'
 const CAPA_GUIA = 'saga-guia-capa'
@@ -183,6 +182,16 @@ const TAMANO_JUGADOR: maplibregl.ExpressionSpecification = [
   12, ['*', 0.6, SIN_ESCALON],
   19.5, ['*', 1.15, SIN_ESCALON],
 ]
+
+/** `icon-offset` por hueco (dato del punto): ver `desplazamientoDeHueco`. */
+const OFFSET_DE_HUECO = [
+  'match', ['number', ['get', 'hueco'], 0],
+  ...Array.from({ length: HUECOS_EN_CORRO }, (_, i) => [
+    i + 1,
+    ['literal', desplazamientoDeHueco(i + 1)],
+  ]).flat(),
+  ['literal', [0, 0]],
+] as unknown as maplibregl.ExpressionSpecification
 
 /** Las fotos de cada nodo, en un montón al lado de su base (ver `dibujarPila`). */
 const CAPA_FOTOS_PILA = 'saga-fotos-pila-capa'
@@ -292,6 +301,13 @@ const FUERA_DE_TRAZADO_M = 500
 const DE_VUELTA_AL_TRAZADO_M = 400
 
 /** checkpoint / qr / minijuego, del campo `kind` del servidor (o del tipo, si viene). */
+/** Hash corto y estable de un texto (para nombrar imágenes). */
+function firmaCorta(texto: string): string {
+  let h = 5381
+  for (let i = 0; i < texto.length; i += 1) h = ((h * 33) ^ texto.charCodeAt(i)) >>> 0
+  return h.toString(36)
+}
+
 function tipoDelNodo(nodo: {
   kind?: string
   type?: string
@@ -877,6 +893,61 @@ function dibujarAvatar(
   return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
 }
 
+/** El icono de un grupo de compañeros: disco oscuro con el número dentro. */
+function dibujarGrupo(cuantos: number): ImageData | null {
+  const lado = 64
+  const lienzo = document.createElement('canvas')
+  lienzo.width = lado * 2
+  lienzo.height = lado * 2
+  const ctx = lienzo.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(2, 2)
+  const c = lado / 2
+  ctx.beginPath()
+  ctx.arc(c, c, 22, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.shadowColor = 'rgba(0,0,0,.45)'
+  ctx.shadowBlur = 5
+  ctx.shadowOffsetY = 2
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+  ctx.beginPath()
+  ctx.arc(c, c, 19, 0, Math.PI * 2)
+  ctx.fillStyle = '#1f302b'
+  ctx.fill()
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '900 20px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(Math.min(cuantos, 99)), c, c + 1)
+  return ctx.getImageData(0, 0, lienzo.width, lienzo.height)
+}
+
+/** Registra un avatar de compañero (iniciales ya; la foto sustituye al llegar). */
+function pintarAvatarAjeno(mapa: maplibregl.Map, id: string, ficha: { color: string; foto: string; iniciales: string }) {
+  const poner = (datos: ImageData | null) => {
+    if (!datos) return
+    try {
+      if (mapa.hasImage(id)) mapa.updateImage(id, datos)
+      else mapa.addImage(id, datos, { pixelRatio: 2 })
+    } catch {
+      // El mapa pudo cerrarse mientras cargaba la foto.
+    }
+  }
+  poner(dibujarAvatar(ficha, null))
+  if (!ficha.foto) return
+  const imagen = new Image()
+  imagen.crossOrigin = 'anonymous'
+  imagen.onload = () => {
+    try {
+      if (mapa.hasImage(id)) poner(dibujarAvatar(ficha, imagen))
+    } catch {
+      // Sin mapa: nada que sustituir.
+    }
+  }
+  imagen.src = ficha.foto
+}
+
 /**
  * Registra (o sustituye) el avatar en el mapa. Primero con iniciales, que
  * es inmediato; si hay foto, se carga y se sustituye al llegar.
@@ -952,6 +1023,7 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
         [FUENTE_NODOS_ICONOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_FOTOS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_JUGADOR]: { type: 'geojson', data: COLECCION_VACIA },
+        [FUENTE_OTROS]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_GUIA]: { type: 'geojson', data: COLECCION_VACIA },
         [FUENTE_RELIEVE]: {
           type: 'raster-dem',
@@ -1368,6 +1440,40 @@ function estiloDelMapa(): maplibregl.StyleSpecification {
       },
       {
         /**
+         * Los COMPAÑEROS, como símbolos del mapa y no como marcadores del DOM.
+         *
+         * Los marcadores del DOM (5.42-5.43) se colocan desde JavaScript un
+         * fotograma después del terreno y, con relieve y zoom, "se iban a otras
+         * zonas de Galicia". Un símbolo lo coloca el motor, en la posición REAL,
+         * a cualquier zoom y a la altura del suelo, igual que los nodos. Mismo
+         * ancla, misma altura y mismo tamaño compuesto que tu avatar.
+         *
+         * Si caen encima de ti o unos de otros se separan en PANTALLA con
+         * `icon-offset` (dato `hueco`), nunca moviendo sus coordenadas. Va ANTES
+         * de tu capa: tú siempre quedas encima. Los datos van por `pintarFuente`
+         * (sin `setData` repetido) y la opacidad por presencia es un dato del
+         * punto, no un `setPaintProperty` (que repinta el terreno entero).
+         */
+        id: CAPA_OTROS,
+        type: 'symbol',
+        source: FUENTE_OTROS,
+        layout: {
+          'symbol-height-offset': ALTURA_SIMBOLOS_M,
+          'symbol-height-anchor': 'ground' as const,
+          'icon-image': ['get', 'icono'],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
+          'icon-size': TAMANO_JUGADOR,
+          'icon-offset': OFFSET_DE_HUECO,
+          'symbol-sort-key': ['get', 'orden'],
+        },
+        paint: { 'icon-opacity': ['number', ['get', 'opacidad'], 1] },
+      },
+      {
+        /**
          * Aura alrededor de ti: cian con GPS (`gps`), naranja en modo prueba
          * (`debug`). Radio fijo en píxeles, como en el mapa antiguo; no es la
          * precisión real en metros.
@@ -1469,9 +1575,14 @@ export function MapSurfaceGL({
   etapaActualRef.current = currentStage
   /** Una foto tocada no cuenta como toque al mapa (ni mueve al jugador en modo prueba). */
   const fotoTocadaRef = useRef(false)
-  const marcadoresJugadoresRef = useRef<Map<string, { marcador: maplibregl.Marker; firma: string; punto: Punto }>>(new Map())
+  /** Fichas de los compañeros por id de imagen, para dibujarlas al pedirlas el mapa. */
+  const fichasOtrosRef = useRef(new Map<string, { color: string; foto: string; iniciales: string }>())
+  /** Lo que hay en cada punto de la capa de compañeros (índice = propiedad `idx`). */
+  const elementosOtrosRef = useRef<ElementoDeMapa[]>([])
+  const popupOtrosRef = useRef<maplibregl.Popup | null>(null)
   // Tu posición, para el popup (distancia) y para apartar a los demás de ti.
   const miPosicionRef = useRef<Punto | null>(null)
+  const totalNodosRef = useRef(0)
   const [zoomActual, setZoomActual] = useState(16)
   const contenedorRef = useRef<HTMLDivElement | null>(null)
   const mapaRef = useRef<maplibregl.Map | null>(null)
@@ -1651,6 +1762,19 @@ export function MapSurfaceGL({
      * Formato del nombre: `nodo-<número>-<estado>`.
      */
     const alFaltarImagen = (evento: { id: string }) => {
+      if (evento.id.startsWith('otro-')) {
+        if (mapa.hasImage(evento.id)) return
+        const ficha = fichasOtrosRef.current.get(evento.id)
+        if (ficha) pintarAvatarAjeno(mapa, evento.id, ficha)
+        return
+      }
+      const grupoOtros = /^otros-grupo-(\d+)$/.exec(evento.id)
+      if (grupoOtros) {
+        if (mapa.hasImage(evento.id)) return
+        const imagen = dibujarGrupo(Number(grupoOtros[1]))
+        if (imagen) mapa.addImage(evento.id, imagen, { pixelRatio: 2 })
+        return
+      }
       if (evento.id === ICONO_AVATAR) {
         if (mapa.hasImage(ICONO_AVATAR)) return
         pintarAvatar(mapa, fichaRef.current)
@@ -2206,6 +2330,40 @@ export function MapSurfaceGL({
       const ordenadas = tocada > 0 ? [...grupo.slice(tocada), ...grupo.slice(0, tocada)] : grupo
       if (ordenadas.length) abrirFotosRef.current?.(ordenadas)
     })
+    /**
+     * Tocar a un compañero (o a un grupo): la tarjeta oscura, anclada a su
+     * posición REAL. El contenido se rehace al abrir (la distancia y el «hace
+     * 2 min» cambian).
+     */
+    mapa.on('click', CAPA_OTROS, (evento) => {
+      const props = evento.features?.[0]?.properties as { idx?: number } | undefined
+      const el = props && typeof props.idx === 'number' ? elementosOtrosRef.current[props.idx] : undefined
+      if (!el) return
+      fotoTocadaRef.current = true
+      popupOtrosRef.current?.remove()
+      const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
+      ventana.on('open', () =>
+        ventana.setDOMContent(
+          el.tipo === 'grupo'
+            ? contenidoPopupGrupo(el.jugadores, () => ventana.remove())
+            : contenidoPopupJugador(
+                el.jugadores[0],
+                el.presencia,
+                totalNodosRef.current,
+                miPosicionRef.current,
+                () => ventana.remove()
+              )
+        )
+      )
+      ventana.setLngLat([el.lon, el.lat]).addTo(mapa)
+      popupOtrosRef.current = ventana
+    })
+    mapa.on('mouseenter', CAPA_OTROS, () => {
+      mapa.getCanvas().style.cursor = 'pointer'
+    })
+    mapa.on('mouseleave', CAPA_OTROS, () => {
+      mapa.getCanvas().style.cursor = debugRef.current.activo ? 'crosshair' : ''
+    })
     mapa.on('mouseenter', CAPA_FOTOS, () => {
       mapa.getCanvas().style.cursor = 'pointer'
     })
@@ -2294,8 +2452,8 @@ export function MapSurfaceGL({
       window.clearInterval(relojVigilante)
       marcadoresNodosRef.current.forEach((marcador) => marcador.remove())
       marcadoresNodosRef.current = []
-      marcadoresJugadoresRef.current.forEach((entrada) => entrada.marcador.remove())
-      marcadoresJugadoresRef.current.clear()
+      popupOtrosRef.current?.remove()
+      popupOtrosRef.current = null
       mapa.remove()
       mapaRef.current = null
     }
@@ -2453,96 +2611,59 @@ export function MapSurfaceGL({
   }, [debugSimulation])
 
   /**
-   * El resto del grupo: un marcador del DOM por jugador, o uno por grupo
-   * cuando están juntos y el zoom es bajo. Se reutilizan entre pasadas; la
-   * `firma` decide si hay que rehacer el elemento.
+   * El resto del grupo: símbolos de una capa del mapa (ver CAPA_OTROS). Cada
+   * jugador va en su posición real; los solapados, con un hueco en pantalla.
+   * Las imágenes se registran por firma (`otro-<hash>`): si cambian la foto,
+   * el color o las iniciales, la firma cambia y se dibuja una nueva.
    */
   useEffect(() => {
-    const mapa = mapaRef.current
-    if (!mapa) return
-    const marcadores = marcadoresJugadoresRef.current
     miPosicionRef.current = playerPosition ? { lat: playerPosition.lat, lon: playerPosition.lon } : null
-    const vistos = new Set<string>()
-    const visibles = (otherPlayers || []).filter(
-      (jugador) =>
-        !jugador.is_self && typeof jugador.lat === 'number' && typeof jugador.lon === 'number'
-    )
-    const grupos = agruparJugadores(visibles, radioDeAgrupacion(zoomActual))
-    const totalNodos = missionStages?.length || 0
-
-    const poner = (
-      clave: string,
-      firma: string,
-      punto: Punto,
-      crear: () => {
-        elemento: HTMLElement
-        popup: (alCerrar: () => void, miPosicion: Punto | null) => HTMLElement
+    totalNodosRef.current = missionStages?.length || 0
+    const elementos = planDeJugadores(otherPlayers || [], zoomActual, miPosicionRef.current)
+    elementosOtrosRef.current = elementos
+    const fichas = fichasOtrosRef.current
+    const nuevas = new Set<string>()
+    const features = elementos.map((el, idx) => {
+      let icono: string
+      if (el.tipo === 'grupo') {
+        icono = `otros-grupo-${el.jugadores.length}`
+      } else {
+        const j = el.jugadores[0]
+        const ficha = {
+          color: getPlayerColor(j),
+          foto: getPlayerAvatarUrl(j) || '',
+          iniciales: getPlayerAvatarInitials(j) || '',
+        }
+        icono = `otro-${firmaCorta(`${ficha.color}|${ficha.foto}|${ficha.iniciales}`)}`
+        if (!fichas.has(icono)) fichas.set(icono, ficha)
       }
-    ) => {
-      vistos.add(clave)
-      const previo = marcadores.get(clave)
-      if (previo && previo.firma === firma) {
-        previo.marcador.setLngLat([punto.lon, punto.lat])
-        previo.punto = punto
-        return
+      nuevas.add(icono)
+      return {
+        type: 'Feature' as const,
+        properties: {
+          idx,
+          icono,
+          hueco: el.hueco,
+          // Tú siempre encima (otra capa); entre ellos, los conectados encima.
+          orden: (el.tipo === 'grupo' ? 3 : 0) + ordenDePresencia(el.presencia),
+          opacidad: el.presencia === 'offline' ? 0.55 : el.presencia === 'recent' ? 0.8 : 1,
+        },
+        geometry: { type: 'Point' as const, coordinates: [el.lon, el.lat] },
       }
-      previo?.marcador.remove()
-      const { elemento, popup } = crear()
-      // El botón de cerrar es el de la tarjeta (más grande), no el de MapLibre.
-      const ventana = new maplibregl.Popup({ offset: 26, closeButton: false, maxWidth: '300px' })
-      // El contenido se rehace cada vez que se abre: la distancia y el «hace
-      // 2 min» cambian, y el marcador se reutiliza entre avisos.
-      ventana.on('open', () => ventana.setDOMContent(popup(() => ventana.remove(), miPosicionRef.current)))
-      const marcador = new maplibregl.Marker({ element: elemento, anchor: 'center' })
-        .setLngLat([punto.lon, punto.lat])
-        .setPopup(ventana)
-        .addTo(mapa)
-      marcadores.set(clave, { marcador, firma, punto })
-    }
-
-    for (const grupo of grupos) {
-      const centro = { lat: grupo.lat, lon: grupo.lon }
-      if (grupo.players.length > 1 && zoomActual < 17) {
-        poner(claveDeGrupo(grupo.players), `g${grupo.players.length}`, centro, () => ({
-          elemento: crearElementoGrupo(grupo.players.length),
-          popup: (alCerrar) => contenidoPopupGrupo(grupo.players, alCerrar),
-        }))
-        continue
+    })
+    pintarFuente(FUENTE_OTROS, { type: 'FeatureCollection', features })
+    // Fichas que ya nadie usa: fuera (el mapa las pedirá otra vez si vuelven).
+    const mapa = mapaRef.current
+    for (const id of [...fichas.keys()]) {
+      if (nuevas.has(id)) continue
+      fichas.delete(id)
+      try {
+        if (mapa?.hasImage(id)) mapa.removeImage(id)
+      } catch {
+        // Estilo a medio montar.
       }
-      grupo.players.forEach((jugador: TeamProfileLiveStatus, indice: number) => {
-        const tipo = tipoDePresencia(jugador)
-        const base =
-          grupo.players.length > 1
-            ? repartirEnCorro(centro, indice, grupo.players.length, zoomActual >= 18 ? 11 : 18, 20)
-            : { lat: Number(jugador.lat), lon: Number(jugador.lon) }
-        const punto = base
-        poner(
-          claveDeJugador(jugador),
-          [tipo, jugador.avatar_url, jugador.color, jugador.display_name, jugador.level, jugador.finished, jugador.last_seen].join('|'),
-          punto,
-          () => ({
-            elemento: crearElementoJugador(jugador, tipo),
-            popup: (alCerrar, miPosicion) => contenidoPopupJugador(jugador, tipo, totalNodos, miPosicion, alCerrar),
-          })
-        )
-      })
     }
-
-    for (const [clave, entrada] of marcadores.entries()) {
-      if (vistos.has(clave)) continue
-      entrada.marcador.remove()
-      marcadores.delete(clave)
-    }
-
-    // Nadie tapa tu marcador: a cualquier zoom, los que caen a menos de unos
-    // píxeles de ti se apartan en pantalla (ver `apartarDeMi`).
-    apartarDeMi(mapa, marcadores, miPosicionRef.current)
-    const alMover = () => apartarDeMi(mapa, marcadores, miPosicionRef.current)
-    mapa.on('move', alMover)
-    return () => {
-      mapa.off('move', alMover)
-    }
-  }, [otherPlayers, zoomActual, playerPosition?.lat, playerPosition?.lon, missionStages?.length, playerPosition])
+  }, [otherPlayers, zoomActual, playerPosition, missionStages?.length, pintarFuente])
 
   // 2D / 3D: modelos en 3D, chinchetas planas en 2D.
   useEffect(() => {

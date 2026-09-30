@@ -44,29 +44,6 @@ def js():
     return json.loads(res.stdout)
 
 
-def test_los_companeros_cerca_de_ti_se_apartan_en_pantalla(js):
-    m = js["mapaSolape"]
-    # A cualquier zoom (medido en píxeles), quien cae encima o casi se coloca a 60 px.
-    assert m["distEncima"] == pytest.approx(60, abs=0.01)
-    assert m["distCasi"] == pytest.approx(60, abs=0.01)
-    # Dos compañeros exactamente en tu sitio no se tapan entre sí: se abren en abanico.
-    assert m["distOtroEncima"] == pytest.approx(60, abs=0.01)
-    assert m["losDosEncimaNoSeTapanEntreSi"] > 40
-    # Quien ya estaba lejos no se toca, y sin tu posición nadie se mueve.
-    assert m["lejosSinMover"] == [0, 0]
-    assert m["sinYo"] == [0, 0]
-
-
-def test_con_el_mapa_inclinado_se_aparta_del_avatar_elevado_no_del_suelo(js):
-    i = js["mapaSolape"]["inclinado"]
-    assert i["subida"] > 15  # a zoom 19,5 y 55 grados el avatar sube más de 15 px
-    assert i["distAlAvatarElevado"] == pytest.approx(60, abs=0.01)
-
-
-def test_la_distancia_se_lee_en_palabras_cortas(js):
-    assert js["mapaSolape"]["metros"] == ["3 m", "50 m", "1,2 km"]
-
-
 def test_el_micro_solo_cuenta_si_la_ruta_tiene_un_reto_de_audio(js):
     r = js["microfonoDeLaRuta"]
     assert r["sinAudio"] is False and r["vacia"] is False
@@ -107,9 +84,10 @@ def test_el_aro_del_gps_se_apaga_fuera_del_trazado():
 
 def test_tu_marcador_no_lo_tapan_los_demas():
     gl = leer(COMP / "MapSurfaceGL.tsx")
-    assert gl.count("apartarDeMi(") >= 2 and "mapa.on('move', alMover)" in gl and "mapa.off('move', alMover)" in gl
-    # Ya no se apartan por metros (a zoom alto no bastaba).
-    assert "cercaDeMi" not in gl
+    # Desde la 5.43.2 son símbolos de una capa (debajo de la tuya), con `icon-offset` en pantalla
+    # para los solapados (ver tests/test_jugadores_zoom_camara_30_09.py).
+    assert gl.index("id: CAPA_OTROS,") < gl.index("id: CAPA_JUGADOR,")
+    assert "'icon-offset': OFFSET_DE_HUECO" in gl and "apartarDeMi" not in gl
 
 
 def test_el_mapa_no_salta_al_terminar_de_cargar():

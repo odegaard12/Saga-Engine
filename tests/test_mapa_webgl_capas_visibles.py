@@ -491,9 +491,9 @@ def test_os_nodos_son_modelos_3d_dentro_do_mapa(fonte: str) -> None:
     assert "layout: { visibility: 'none' }" in bloque_radio_relleno
     # Los símbolos van tres metros sobre el suelo: con relieve, el anclaje
     # bajo la malla basta del terreno los escondía "a veces".
-    # Fotos y jugador a tres; los nodos a dos y con su suelo tumbado en el
+    # Fotos, compañeros y jugador a tres; los nodos a dos y con su suelo tumbado en el
     # mapa (con el relieve de una sola resolución, la cota ya coincide).
-    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 2
+    assert fonte.count("'symbol-height-offset': ALTURA_SIMBOLOS_M") == 3
     assert fonte.count("'symbol-height-offset': ALTURA_NODOS_M") == 6
     assert "id: CAPA_NODOS_SUELO" in fonte and "'icon-pitch-alignment': 'map'" in fonte
     assert "dibujarSuelo(suelo[1]" in fonte
@@ -662,5 +662,5 @@ def test_sen_webgl_hai_aviso_e_a_carga_non_se_queda_esperando(fonte: str) -> Non
 
 
 def test_os_compañeiros_e_o_aura_do_gps_seguen_no_mapa_3d(fonte: str) -> None:
-    assert "otherPlayers" in fonte and "agruparJugadores(" in fonte
+    assert "otherPlayers" in fonte and "planDeJugadores(" in fonte
     assert "CAPA_AURA" in fonte and "'debug'" in fonte

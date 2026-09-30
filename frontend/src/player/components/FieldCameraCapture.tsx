@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconoCamara } from './PlayerIcons'
 import { useCubreElMapa } from '../hooks/useCubreElMapa'
+import { codificarConTope, restriccionesDeCamara } from '../utils/calidadDeFoto'
 
 type FieldCameraCaptureProps = {
   open: boolean
@@ -138,14 +139,8 @@ export function FieldCameraCapture({
       try {
         streamRef.current?.getTracks().forEach((track) => track.stop())
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-        })
+        // Trasera y lo más grande que dé el móvil (hasta 4K): ver utils/calidadDeFoto.
+        const stream = await navigator.mediaDevices.getUserMedia(restriccionesDeCamara(facingMode))
 
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
@@ -198,30 +193,62 @@ export function FieldCameraCapture({
    */
   if (!montada) return null
 
-  function captureFrame() {
+  /**
+   * Dibuja el original en un canvas de hasta 2048 px de lado y lo codifica a
+   * JPEG 0,85 (bajando calidad sólo si se pasa del tope del servidor). El
+   * reencode quita el EXIF: ubicación y modelo del móvil no viajan.
+   */
+  function codificarFoto(fuente: CanvasImageSource, ancho: number, alto: number): string | null {
+    return codificarConTope(ancho, alto, (w, h, calidad) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return ''
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(fuente, 0, 0, w, h)
+      return canvas.toDataURL('image/jpeg', calidad)
+    }).dataUrl || null
+  }
+
+  /** Foto de verdad a resolución completa del sensor, si el navegador la ofrece. */
+  async function tomarFotoCompleta(): Promise<string | null> {
+    const track = streamRef.current?.getVideoTracks()[0]
+    const Captura = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } })
+      .ImageCapture
+    if (!track || !Captura || track.readyState !== 'live') return null
+    try {
+      const blob = await new Captura(track).takePhoto()
+      const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
+      try {
+        return codificarFoto(bitmap, bitmap.width, bitmap.height)
+      } finally {
+        bitmap.close()
+      }
+    } catch {
+      return null
+    }
+  }
+
+  async function captureFrame() {
     const video = videoRef.current
     if (!video || video.videoWidth <= 0 || video.videoHeight <= 0) {
       setError('La cámara aún no está lista.')
       return
     }
 
-    const maxSide = 1600
-    const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight))
-    const width = Math.max(1, Math.round(video.videoWidth * scale))
-    const height = Math.max(1, Math.round(video.videoHeight * scale))
-
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
+    // Primero la foto completa (ImageCapture); si no hay, el fotograma del vídeo.
+    const completa = await tomarFotoCompleta()
+    if (completa) {
+      setPreview(completa)
+      return
+    }
+    const fotograma = codificarFoto(video, video.videoWidth, video.videoHeight)
+    if (!fotograma) {
       setError('No se pudo preparar la foto.')
       return
     }
-
-    ctx.drawImage(video, 0, 0, width, height)
-    setPreview(canvas.toDataURL('image/jpeg', 0.9))
+    setPreview(fotograma)
   }
 
   async function submitPhoto() {
@@ -360,7 +387,7 @@ export function FieldCameraCapture({
               <button
                 type="button"
                 className="saga-shutter-btn"
-                onClick={captureFrame}
+                onClick={() => void captureFrame()}
                 disabled={busy || Boolean(error)}
                 aria-label="Disparar foto"
                 title="Disparar foto"
@@ -511,7 +538,7 @@ const noteInput: CSSProperties = {
   background: 'rgba(var(--theme-ink), 0.45)',
   color: '#fff',
   padding: '0 14px',
-  fontSize: 14,
+  fontSize: 16,
   outline: 'none',
   boxSizing: 'border-box',
 }

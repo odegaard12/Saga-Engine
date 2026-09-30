@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import PlayerApp from './player/PlayerApp'
 import { getPlayerNameFromLocation } from './shared/playerRoute'
 import { BuildInfoBadge } from './shared/BuildInfoBadge'
+import { bloquearGestosDeZoom, fijarViewport } from './player/utils/sinZoomDePagina'
 
 /**
  * El panel de administración se carga aparte, sólo al entrar en él.
@@ -76,6 +77,11 @@ export default function App() {
   }, [])
 
   const isAdmin = currentPath === '/admin-react' || currentPath.startsWith('/admin-react/')
+  // La app del jugador nunca se amplía (campos a 16 px, meta y gestos); el panel sí puede.
+  useEffect(() => {
+    fijarViewport(!isAdmin)
+  }, [isAdmin])
+  useEffect(() => bloquearGestosDeZoom(), [])
   const esBancoDeMapa = currentPath === '/banco-mapa'
   let content: ReactNode
   let showFloatingBuildInfo = true

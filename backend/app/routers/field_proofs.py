@@ -47,7 +47,10 @@ FIELD_PROOF_MAX_BODY_BYTES = int(FIELD_PROOF_MAX_IMAGE_BYTES * 1.4) + 64_000
 #: total; pasar de esto es un cliente roto o un abuso, no una partida.
 FIELD_PROOF_MAX_PER_PLAYER = int(os.getenv("SAGA_MAX_PHOTOS_PER_PLAYER", "100") or "100")
 
-LADO_MINIATURA_PX = 360
+#: Miniatura del mapa y de las listas. Era 360 px / calidad 82: en un móvil de 3x
+#: la chincheta de foto se veía borrosa. 720 px pesa ~60-90 KB y va nítida.
+LADO_MINIATURA_PX = 720
+CALIDAD_MINIATURA = 86
 CARPETA_DE_MINIATURAS = "thumbs"
 
 
@@ -69,7 +72,7 @@ def borrar_miniatura(base_dir, image_filename):
 
 
 def generar_miniatura(origen, destino):
-    """Escribe la miniatura JPEG (360 px) de `origen` en `destino`. True si pudo."""
+    """Escribe la miniatura JPEG (`LADO_MINIATURA_PX`) de `origen` en `destino`. True si pudo."""
     if Image is None:
         return False
     try:
@@ -81,10 +84,25 @@ def generar_miniatura(origen, destino):
         with Image.open(origen) as imagen:
             imagen = ImageOps.exif_transpose(imagen)
             imagen = imagen.convert("RGB")
-            imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX))
-            imagen.save(temporal, "JPEG", quality=82, optimize=True)
+            imagen.thumbnail((LADO_MINIATURA_PX, LADO_MINIATURA_PX), Image.LANCZOS)
+            imagen.save(temporal, "JPEG", quality=CALIDAD_MINIATURA, optimize=True)
         os.replace(temporal, destino)
         return True
+    except Exception:
+        return False
+
+
+def miniatura_es_antigua(miniatura, original):
+    """True si la miniatura es de las de 360 px y la foto da para una mayor.
+
+    Sólo se leen las cabeceras. Así las fotos hechas antes de subir a 720 px se
+    rehacen solas la primera vez que se piden, sin script de migración.
+    """
+    if Image is None:
+        return False
+    try:
+        with Image.open(miniatura) as m, Image.open(original) as o:
+            return max(m.size) < LADO_MINIATURA_PX and max(o.size) > max(m.size)
     except Exception:
         return False
 
@@ -486,12 +504,12 @@ def download_field_proofs(request: Request, user: str = ""):
 @router.get("/api/field-proofs/{proof_id}/thumb")
 def get_field_proof_thumb(request: Request, proof_id: str):
     """
-    Miniatura para el mapa: 360 px de lado mayor, JPEG.
+    Miniatura para el mapa: 720 px de lado mayor, JPEG.
 
     El mapa pedía la foto ENTERA para pintar una chincheta de 40 px. Con
     diecisiete fotos de móvil son decenas de megas que compiten con las
     teselas: en el monte "las fotos no aparecen". Se hace una vez, se guarda
-    junto a la original y pesa unos 20 KB. Misma puerta que la foto entera.
+    junto a la original y pesa unos 60-90 KB. Misma puerta que la foto entera.
     Sin Pillow (o con una foto que no se pueda leer), se sirve la original.
     """
     from main import exigir_ser_del_grupo
@@ -532,6 +550,8 @@ def get_field_proof_thumb(request: Request, proof_id: str):
     miniatura = miniatura_de(base_dir, target.name)
     # Normalmente ya la hizo la subida. Si no (fotos antiguas), se hace aquí, y
     # esta ruta es `def`: FastAPI la ejecuta en un hilo, no en el bucle.
+    if miniatura.exists() and miniatura_es_antigua(miniatura, target):
+        generar_miniatura(target, miniatura)
     if not miniatura.exists() and not generar_miniatura(target, miniatura):
         return FileResponse(target, media_type=media_type, headers=cabeceras)
     return FileResponse(miniatura, media_type="image/jpeg", headers=cabeceras)
